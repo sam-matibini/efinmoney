@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import Header from "@/components/layout/Header";
 import MobileNav from "@/components/layout/MobileNav";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CrmCustomersPanel } from "@/components/crm/CrmCustomersPanel";
 import { TransactionMonitoringPanel } from "@/components/operations/TransactionMonitoringPanel";
 import { DisputesPanel } from "@/components/operations/DisputesPanel";
 import { WalletOperationsPanel } from "@/components/operations/WalletOperationsPanel";
@@ -23,12 +24,13 @@ const OperationsDashboard = () => {
         >
           <div>
             <h1 className="text-2xl font-display font-bold text-foreground">Operations Dashboard</h1>
-            <p className="text-muted-foreground">Transaction monitoring, disputes, compliance & operational controls</p>
+            <p className="text-muted-foreground">CRM, transaction monitoring, disputes, compliance & operational controls</p>
           </div>
 
-          <Tabs defaultValue="txn-monitor" className="space-y-4">
+          <Tabs defaultValue="crm" className="space-y-4">
             <div className="overflow-x-auto pb-2">
               <TabsList className="inline-flex w-auto min-w-full lg:min-w-0">
+                <TabsTrigger value="crm">CRM</TabsTrigger>
                 <TabsTrigger value="txn-monitor">Transactions</TabsTrigger>
                 <TabsTrigger value="disputes">Disputes</TabsTrigger>
                 <TabsTrigger value="wallet-ops">Wallet Ops</TabsTrigger>
@@ -38,6 +40,10 @@ const OperationsDashboard = () => {
                 <TabsTrigger value="kpis">KPIs</TabsTrigger>
               </TabsList>
             </div>
+
+            <TabsContent value="crm" className="space-y-4">
+              <CrmCustomersPanel />
+            </TabsContent>
 
             <TabsContent value="txn-monitor" className="space-y-4">
               <TransactionMonitoringPanel />
