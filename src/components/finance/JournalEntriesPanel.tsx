@@ -10,7 +10,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Plus, Trash2, CheckCircle, XCircle, Users, Building2 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -19,6 +18,8 @@ interface JournalLine {
   account_id: string;
   debit_amount: string;
   credit_amount: string;
+  party_type: 'none' | 'customer' | 'vendor';
+  party_id: string;
 }
 
 export const JournalEntriesPanel = () => {
@@ -26,11 +27,9 @@ export const JournalEntriesPanel = () => {
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [description, setDescription] = useState('');
-  const [partyType, setPartyType] = useState<'none' | 'customer' | 'vendor'>('none');
-  const [selectedPartyId, setSelectedPartyId] = useState('');
   const [lines, setLines] = useState<JournalLine[]>([
-    { account_id: '', debit_amount: '', credit_amount: '' },
-    { account_id: '', debit_amount: '', credit_amount: '' },
+    { account_id: '', debit_amount: '', credit_amount: '', party_type: 'none', party_id: '' },
+    { account_id: '', debit_amount: '', credit_amount: '', party_type: 'none', party_id: '' },
   ]);
 
   const { data: accounts = [] } = useQuery({
@@ -132,19 +131,27 @@ export const JournalEntriesPanel = () => {
         throw new Error(`Debits (${totalDebit.toFixed(2)}) must equal Credits (${totalCredit.toFixed(2)})`);
       }
 
-      const entries = validLines.map(line => ({
-        journal_id: journalId,
-        account_id: line.account_id,
-        debit_amount: parseFloat(line.debit_amount) || 0,
-        credit_amount: parseFloat(line.credit_amount) || 0,
-        currency_code: 'USD',
-        description: partyType !== 'none' && selectedPartyId 
-          ? `${description} [${partyType === 'customer' ? 'Customer' : 'Vendor'}: ${partyType === 'customer' ? customers.find(c => c.id === selectedPartyId)?.name : vendors.find(v => v.id === selectedPartyId)?.name}]`
-          : description,
-        reference_type: 'journal',
-        reference_id: partyType !== 'none' ? selectedPartyId : null,
-        created_by: user?.id,
-      }));
+      const entries = validLines.map(line => {
+        const partyName = line.party_type === 'customer' 
+          ? customers.find(c => c.id === line.party_id)?.name
+          : line.party_type === 'vendor'
+            ? vendors.find(v => v.id === line.party_id)?.name
+            : null;
+        
+        return {
+          journal_id: journalId,
+          account_id: line.account_id,
+          debit_amount: parseFloat(line.debit_amount) || 0,
+          credit_amount: parseFloat(line.credit_amount) || 0,
+          currency_code: 'USD',
+          description: partyName 
+            ? `${description} [${line.party_type === 'customer' ? 'Customer' : 'Vendor'}: ${partyName}]`
+            : description,
+          reference_type: 'journal',
+          reference_id: line.party_type !== 'none' ? line.party_id : null,
+          created_by: user?.id,
+        };
+      });
 
       const { error } = await supabase
         .from('ledger_entries')
@@ -166,17 +173,15 @@ export const JournalEntriesPanel = () => {
 
   const resetForm = () => {
     setDescription('');
-    setPartyType('none');
-    setSelectedPartyId('');
     setLines([
-      { account_id: '', debit_amount: '', credit_amount: '' },
-      { account_id: '', debit_amount: '', credit_amount: '' },
+      { account_id: '', debit_amount: '', credit_amount: '', party_type: 'none', party_id: '' },
+      { account_id: '', debit_amount: '', credit_amount: '', party_type: 'none', party_id: '' },
     ]);
     setIsDialogOpen(false);
   };
 
   const addLine = () => {
-    setLines([...lines, { account_id: '', debit_amount: '', credit_amount: '' }]);
+    setLines([...lines, { account_id: '', debit_amount: '', credit_amount: '', party_type: 'none', party_id: '' }]);
   };
 
   const removeLine = (index: number) => {
@@ -238,75 +243,14 @@ export const JournalEntriesPanel = () => {
                 />
               </div>
 
-              {/* Customer/Vendor Selection */}
-              <div className="space-y-3">
-                <Label>Related Party (Optional)</Label>
-                <RadioGroup 
-                  value={partyType} 
-                  onValueChange={(value: 'none' | 'customer' | 'vendor') => {
-                    setPartyType(value);
-                    setSelectedPartyId('');
-                  }}
-                  className="flex gap-4"
-                >
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="none" id="party-none" />
-                    <Label htmlFor="party-none" className="cursor-pointer">None</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="customer" id="party-customer" />
-                    <Label htmlFor="party-customer" className="cursor-pointer flex items-center gap-1">
-                      <Users className="w-4 h-4" />
-                      Customer
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="vendor" id="party-vendor" />
-                    <Label htmlFor="party-vendor" className="cursor-pointer flex items-center gap-1">
-                      <Building2 className="w-4 h-4" />
-                      Vendor
-                    </Label>
-                  </div>
-                </RadioGroup>
-
-                {partyType === 'customer' && (
-                  <Select value={selectedPartyId} onValueChange={setSelectedPartyId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select customer" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {customers.map((customer) => (
-                        <SelectItem key={customer.id} value={customer.id}>
-                          {customer.name} {customer.email && `(${customer.email})`}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-
-                {partyType === 'vendor' && (
-                  <Select value={selectedPartyId} onValueChange={setSelectedPartyId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select vendor" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {vendors.map((vendor) => (
-                        <SelectItem key={vendor.id} value={vendor.id}>
-                          {vendor.name} {vendor.email && `(${vendor.email})`}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              </div>
-
               <div className="border rounded-lg overflow-hidden">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[40%]">Account</TableHead>
-                      <TableHead className="text-right">Debit</TableHead>
-                      <TableHead className="text-right">Credit</TableHead>
+                      <TableHead className="w-[30%]">Account</TableHead>
+                      <TableHead className="w-[25%]">Customer/Vendor</TableHead>
+                      <TableHead className="text-right w-[18%]">Debit</TableHead>
+                      <TableHead className="text-right w-[18%]">Credit</TableHead>
                       <TableHead className="w-[50px]"></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -327,6 +271,57 @@ export const JournalEntriesPanel = () => {
                                   {acc.code} - {acc.name}
                                 </SelectItem>
                               ))}
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell>
+                          <Select
+                            value={line.party_type !== 'none' ? `${line.party_type}:${line.party_id}` : 'none'}
+                            onValueChange={(value) => {
+                              if (value === 'none') {
+                                updateLine(index, 'party_type', 'none');
+                                updateLine(index, 'party_id', '');
+                              } else {
+                                const [type, id] = value.split(':');
+                                const updated = [...lines];
+                                updated[index] = { 
+                                  ...updated[index], 
+                                  party_type: type as 'customer' | 'vendor', 
+                                  party_id: id 
+                                };
+                                setLines(updated);
+                              }
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="None" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">None</SelectItem>
+                              {customers.length > 0 && (
+                                <>
+                                  <SelectItem value="__customers_header" disabled className="font-semibold text-muted-foreground">
+                                    <span className="flex items-center gap-1"><Users className="w-3 h-3" /> Customers</span>
+                                  </SelectItem>
+                                  {customers.map((c) => (
+                                    <SelectItem key={`customer:${c.id}`} value={`customer:${c.id}`}>
+                                      {c.name}
+                                    </SelectItem>
+                                  ))}
+                                </>
+                              )}
+                              {vendors.length > 0 && (
+                                <>
+                                  <SelectItem value="__vendors_header" disabled className="font-semibold text-muted-foreground">
+                                    <span className="flex items-center gap-1"><Building2 className="w-3 h-3" /> Vendors</span>
+                                  </SelectItem>
+                                  {vendors.map((v) => (
+                                    <SelectItem key={`vendor:${v.id}`} value={`vendor:${v.id}`}>
+                                      {v.name}
+                                    </SelectItem>
+                                  ))}
+                                </>
+                              )}
                             </SelectContent>
                           </Select>
                         </TableCell>
@@ -366,6 +361,7 @@ export const JournalEntriesPanel = () => {
                     ))}
                     <TableRow className="bg-muted/50">
                       <TableCell className="font-semibold">Total</TableCell>
+                      <TableCell></TableCell>
                       <TableCell className="text-right font-mono font-semibold">
                         {totalDebit.toFixed(2)}
                       </TableCell>
