@@ -1,3 +1,4 @@
+import { forwardRef } from "react";
 import { motion } from "framer-motion";
 import { ArrowUpRight, ArrowDownLeft, RefreshCw, Wallet } from "lucide-react";
 
@@ -15,7 +16,7 @@ interface TransactionItemProps {
   description?: string;
 }
 
-const TransactionItem = ({ 
+const TransactionItem = forwardRef<HTMLDivElement, TransactionItemProps>(({ 
   type, 
   status, 
   amount, 
@@ -24,7 +25,7 @@ const TransactionItem = ({
   recipient, 
   date,
   description 
-}: TransactionItemProps) => {
+}, ref) => {
   const getIcon = () => {
     switch (type) {
       case 'send':
@@ -75,6 +76,7 @@ const TransactionItem = ({
 
   return (
     <motion.div
+      ref={ref}
       initial={{ opacity: 0, x: -20 }}
       animate={{ opacity: 1, x: 0 }}
       whileHover={{ backgroundColor: 'hsl(var(--muted) / 0.3)' }}
@@ -107,6 +109,8 @@ const TransactionItem = ({
       </div>
     </motion.div>
   );
-};
+});
+
+TransactionItem.displayName = 'TransactionItem';
 
 export default TransactionItem;

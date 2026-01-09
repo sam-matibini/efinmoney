@@ -50,8 +50,9 @@ const ExchangePage = () => {
     setIsLoading(true);
 
     try {
-      const response = await supabase.functions.invoke('fx-engine/execute', {
+      const response = await supabase.functions.invoke('fx-engine', {
         body: {
+          action: 'execute',
           from_wallet_id: fromWallet.wallet_id,
           to_wallet_id: toWallet.wallet_id,
           from_currency: fromWallet.currency_code,
