@@ -6,7 +6,8 @@ import { useWallets } from "@/hooks/useWallets";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Plus, Wallet, TrendingUp } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import CreateWalletModal from "@/components/modals/CreateWalletModal";
 
 const WalletsPage = () => {
   const { data: wallets, isLoading } = useWallets();
@@ -32,10 +33,12 @@ const WalletsPage = () => {
               <h1 className="text-2xl font-display font-bold text-foreground">My Wallets</h1>
               <p className="text-muted-foreground">Manage your multi-currency wallets</p>
             </div>
-            <Button>
-              <Plus className="w-4 h-4 mr-2" />
-              Add Wallet
-            </Button>
+            <CreateWalletModal>
+              <Button>
+                <Plus className="w-4 h-4 mr-2" />
+                Add Wallet
+              </Button>
+            </CreateWalletModal>
           </div>
 
           {/* Total Balance Card */}
@@ -90,10 +93,12 @@ const WalletsPage = () => {
                 <Wallet className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
                 <h3 className="text-lg font-semibold mb-2">No Wallets Yet</h3>
                 <p className="text-muted-foreground mb-4">Create your first wallet to start managing your money</p>
-                <Button>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Create Wallet
-                </Button>
+                <CreateWalletModal>
+                  <Button>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Create Wallet
+                  </Button>
+                </CreateWalletModal>
               </CardContent>
             </Card>
           )}
