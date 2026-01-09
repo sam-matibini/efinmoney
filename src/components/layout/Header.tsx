@@ -18,10 +18,10 @@ const Header = () => {
 
   const navItems = [
     { label: 'Dashboard', href: '/' },
-    { label: 'Wallets', href: '#' },
-    { label: 'Send', href: '#' },
-    { label: 'Exchange', href: '#' },
-    { label: 'Cards', href: '#' },
+    { label: 'Wallets', href: '/wallets' },
+    { label: 'Send', href: '/send' },
+    { label: 'Exchange', href: '/exchange' },
+    { label: 'Cards', href: '/cards' },
   ];
 
   if (isFinance) {
