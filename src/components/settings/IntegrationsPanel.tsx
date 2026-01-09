@@ -2,41 +2,32 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { 
   CreditCard, 
   Smartphone, 
   Building2, 
   Globe, 
-  Key, 
   RefreshCw,
   CheckCircle2,
   XCircle,
   AlertCircle,
   Settings2,
-  ExternalLink,
-  Eye,
-  EyeOff
 } from "lucide-react";
 import { useState } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { toast } from "sonner";
+import { StripeConfig } from "./integrations/StripeConfig";
+import { VisaDirectConfig } from "./integrations/VisaDirectConfig";
+import { MobileMoneyConfig } from "./integrations/MobileMoneyConfig";
+import { ComplianceConfig } from "./integrations/ComplianceConfig";
+import { BankingConfig } from "./integrations/BankingConfig";
+
+type ConfigView = 
+  | { type: "list" }
+  | { type: "stripe" }
+  | { type: "visa_direct" }
+  | { type: "mobile_money"; provider: "mpesa" | "mtn_momo" | "airtel_money" }
+  | { type: "compliance"; provider: "chainalysis" | "onfido" | "sumsub" }
+  | { type: "banking"; provider: "plaid" | "wise" };
 
 interface Integration {
   id: string;
@@ -206,9 +197,25 @@ const categoryLabels: Record<string, string> = {
 };
 
 export function IntegrationsPanel() {
-  const [selectedIntegration, setSelectedIntegration] = useState<Integration | null>(null);
-  const [showApiKey, setShowApiKey] = useState(false);
-  const [configOpen, setConfigOpen] = useState(false);
+  const [currentView, setCurrentView] = useState<ConfigView>({ type: "list" });
+
+  const handleConfigure = (integrationId: string) => {
+    switch (integrationId) {
+      case "stripe": setCurrentView({ type: "stripe" }); break;
+      case "visa_direct": setCurrentView({ type: "visa_direct" }); break;
+      case "mpesa": setCurrentView({ type: "mobile_money", provider: "mpesa" }); break;
+      case "mtn_momo": setCurrentView({ type: "mobile_money", provider: "mtn_momo" }); break;
+      case "airtel_money": setCurrentView({ type: "mobile_money", provider: "airtel_money" }); break;
+      case "chainalysis": setCurrentView({ type: "compliance", provider: "chainalysis" }); break;
+      case "onfido": setCurrentView({ type: "compliance", provider: "onfido" }); break;
+      case "sumsub": setCurrentView({ type: "compliance", provider: "sumsub" }); break;
+      case "plaid": setCurrentView({ type: "banking", provider: "plaid" }); break;
+      case "wise": setCurrentView({ type: "banking", provider: "wise" }); break;
+      default: toast.info("Configuration page coming soon");
+    }
+  };
+
+  const goBack = () => setCurrentView({ type: "list" });
 
   const getStatusBadge = (status: Integration["status"]) => {
     switch (status) {
@@ -221,17 +228,20 @@ export function IntegrationsPanel() {
     }
   };
 
-  const handleTestConnection = (integration: Integration) => {
-    toast.promise(
-      new Promise((resolve) => setTimeout(resolve, 2000)),
-      {
-        loading: `Testing connection to ${integration.name}...`,
-        success: `${integration.name} connection successful!`,
-        error: `Failed to connect to ${integration.name}`
-      }
-    );
-  };
+  const groupedIntegrations = integrations.reduce((acc, integration) => {
+    if (!acc[integration.category]) {
+      acc[integration.category] = [];
+    }
+    acc[integration.category].push(integration);
+    return acc;
+  }, {} as Record<string, Integration[]>);
 
+  // Render provider-specific config pages
+  if (currentView.type === "stripe") return <StripeConfig onBack={goBack} />;
+  if (currentView.type === "visa_direct") return <VisaDirectConfig onBack={goBack} />;
+  if (currentView.type === "mobile_money") return <MobileMoneyConfig onBack={goBack} provider={currentView.provider} />;
+  if (currentView.type === "compliance") return <ComplianceConfig onBack={goBack} provider={currentView.provider} />;
+  if (currentView.type === "banking") return <BankingConfig onBack={goBack} provider={currentView.provider} />;
   const handleSync = (integration: Integration) => {
     toast.promise(
       new Promise((resolve) => setTimeout(resolve, 1500)),
@@ -242,14 +252,6 @@ export function IntegrationsPanel() {
       }
     );
   };
-
-  const groupedIntegrations = integrations.reduce((acc, integration) => {
-    if (!acc[integration.category]) {
-      acc[integration.category] = [];
-    }
-    acc[integration.category].push(integration);
-    return acc;
-  }, {} as Record<string, Integration[]>);
 
   return (
     <div className="space-y-6">
@@ -339,122 +341,14 @@ export function IntegrationsPanel() {
                         <RefreshCw className="h-4 w-4" />
                       </Button>
                     )}
-                    <Dialog open={configOpen && selectedIntegration?.id === integration.id} onOpenChange={(open) => {
-                      setConfigOpen(open);
-                      if (open) setSelectedIntegration(integration);
-                    }}>
-                      <DialogTrigger asChild>
-                        <Button variant="outline" size="sm">
-                          <Settings2 className="h-4 w-4 mr-2" />
-                          Configure
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="sm:max-w-[500px]">
-                        <DialogHeader>
-                          <DialogTitle className="flex items-center gap-2">
-                            {integration.icon}
-                            Configure {integration.name}
-                          </DialogTitle>
-                          <DialogDescription>
-                            Manage API credentials and settings for this integration
-                          </DialogDescription>
-                        </DialogHeader>
-                        <div className="space-y-4 py-4">
-                          <div className="space-y-2">
-                            <Label>Environment</Label>
-                            <Select defaultValue={integration.environment}>
-                              <SelectTrigger>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="sandbox">Sandbox</SelectItem>
-                                <SelectItem value="production">Production</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          
-                          <div className="space-y-2">
-                            <Label>API Key</Label>
-                            <div className="flex gap-2">
-                              <div className="relative flex-1">
-                                <Input
-                                  type={showApiKey ? "text" : "password"}
-                                  placeholder="Enter API key"
-                                  defaultValue={integration.apiKeyConfigured ? "sk_live_***********************" : ""}
-                                />
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="absolute right-0 top-0 h-full"
-                                  onClick={() => setShowApiKey(!showApiKey)}
-                                >
-                                  {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                                </Button>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label>Secret Key</Label>
-                            <div className="flex gap-2">
-                              <div className="relative flex-1">
-                                <Input
-                                  type="password"
-                                  placeholder="Enter secret key"
-                                  defaultValue={integration.apiKeyConfigured ? "sk_secret_***********************" : ""}
-                                />
-                              </div>
-                            </div>
-                          </div>
-
-                          {integration.webhookUrl && (
-                            <div className="space-y-2">
-                              <Label>Webhook URL</Label>
-                              <div className="flex gap-2">
-                                <Input
-                                  readOnly
-                                  value={integration.webhookUrl}
-                                  className="font-mono text-xs"
-                                />
-                                <Button
-                                  variant="outline"
-                                  size="icon"
-                                  onClick={() => {
-                                    navigator.clipboard.writeText(integration.webhookUrl!);
-                                    toast.success("Webhook URL copied!");
-                                  }}
-                                >
-                                  <ExternalLink className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </div>
-                          )}
-
-                          <div className="space-y-2">
-                            <Label>Webhook Secret</Label>
-                            <Input
-                              type="password"
-                              placeholder="Enter webhook secret"
-                            />
-                          </div>
-                        </div>
-                        <DialogFooter className="flex gap-2">
-                          <Button
-                            variant="outline"
-                            onClick={() => handleTestConnection(integration)}
-                          >
-                            <Key className="h-4 w-4 mr-2" />
-                            Test Connection
-                          </Button>
-                          <Button onClick={() => {
-                            toast.success(`${integration.name} configuration saved!`);
-                            setConfigOpen(false);
-                          }}>
-                            Save Changes
-                          </Button>
-                        </DialogFooter>
-                      </DialogContent>
-                    </Dialog>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleConfigure(integration.id)}
+                    >
+                      <Settings2 className="h-4 w-4 mr-2" />
+                      Configure
+                    </Button>
                   </div>
                 </div>
               ))}
