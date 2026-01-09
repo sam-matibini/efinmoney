@@ -164,8 +164,24 @@ serve(async (req) => {
     }
 
     const userId = claimsData.user.id;
+    
+    // Parse body first to check for action
+    let body: Record<string, unknown> = {};
+    if (req.method === 'POST') {
+      try {
+        body = await req.json();
+      } catch {
+        return new Response(
+          JSON.stringify({ error: 'Invalid JSON body' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+    
+    // Get action from body or URL path
     const url = new URL(req.url);
-    const action = url.pathname.split('/').pop();
+    const pathAction = url.pathname.split('/').pop();
+    const action = (body.action as string) || pathAction;
 
     // GET QUOTE
     if (req.method === 'POST' && action === 'quote') {
@@ -175,16 +191,6 @@ serve(async (req) => {
         return new Response(
           JSON.stringify({ error: 'Rate limit exceeded. Please try again later.' }),
           { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Retry-After': String(rateCheck.retryAfter || 60) } }
-        );
-      }
-
-      let body: unknown;
-      try {
-        body = await req.json();
-      } catch {
-        return new Response(
-          JSON.stringify({ error: 'Invalid JSON body' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
@@ -265,16 +271,6 @@ serve(async (req) => {
         return new Response(
           JSON.stringify({ error: 'Rate limit exceeded. You can execute a maximum of 10 swaps every 5 minutes.' }),
           { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Retry-After': String(rateCheck.retryAfter || 300) } }
-        );
-      }
-
-      let body: unknown;
-      try {
-        body = await req.json();
-      } catch {
-        return new Response(
-          JSON.stringify({ error: 'Invalid JSON body' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
