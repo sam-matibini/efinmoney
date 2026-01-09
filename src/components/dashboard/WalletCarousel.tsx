@@ -13,9 +13,9 @@ const WalletCarousel = () => {
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-display font-semibold text-foreground">My Wallets</h2>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           {[1, 2, 3, 4].map((i) => (
-            <Skeleton key={i} className="h-[180px] rounded-2xl" />
+            <Skeleton key={i} className="h-[160px] sm:h-[180px] rounded-2xl" />
           ))}
         </div>
       </section>
@@ -46,7 +46,7 @@ const WalletCarousel = () => {
         </button>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {displayWallets.map((wallet, index) => (
           <motion.div
             key={wallet.currency}
