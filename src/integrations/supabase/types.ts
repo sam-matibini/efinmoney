@@ -518,6 +518,65 @@ export type Database = {
         }
         Relationships: []
       }
+      customer_communications: {
+        Row: {
+          channel: string
+          content: string
+          created_at: string
+          created_by: string | null
+          customer_id: string | null
+          direction: string
+          id: string
+          metadata: Json | null
+          read_at: string | null
+          sent_at: string | null
+          status: string
+          subject: string | null
+          template_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          channel: string
+          content: string
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string | null
+          direction: string
+          id?: string
+          metadata?: Json | null
+          read_at?: string | null
+          sent_at?: string | null
+          status?: string
+          subject?: string | null
+          template_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          channel?: string
+          content?: string
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string | null
+          direction?: string
+          id?: string
+          metadata?: Json | null
+          read_at?: string | null
+          sent_at?: string | null
+          status?: string
+          subject?: string | null
+          template_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_communications_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customer_documents: {
         Row: {
           customer_id: string
@@ -756,6 +815,87 @@ export type Database = {
           website?: string | null
         }
         Relationships: []
+      }
+      disputes: {
+        Row: {
+          amount: number | null
+          assigned_to: string | null
+          created_at: string
+          created_by: string | null
+          currency_code: string | null
+          customer_id: string | null
+          customer_statement: string | null
+          dispute_type: string
+          evidence_urls: string[] | null
+          id: string
+          priority: string
+          reason: string
+          resolution: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          status: string
+          transaction_id: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          amount?: number | null
+          assigned_to?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency_code?: string | null
+          customer_id?: string | null
+          customer_statement?: string | null
+          dispute_type: string
+          evidence_urls?: string[] | null
+          id?: string
+          priority?: string
+          reason: string
+          resolution?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          transaction_id?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          amount?: number | null
+          assigned_to?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency_code?: string | null
+          customer_id?: string | null
+          customer_statement?: string | null
+          dispute_type?: string
+          evidence_urls?: string[] | null
+          id?: string
+          priority?: string
+          reason?: string
+          resolution?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          transaction_id?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "disputes_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "disputes_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transfers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       fx_rates: {
         Row: {
@@ -1024,6 +1164,57 @@ export type Database = {
           },
         ]
       }
+      maker_checker_requests: {
+        Row: {
+          action: string
+          checked_at: string | null
+          checker_id: string | null
+          checker_notes: string | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string
+          expires_at: string | null
+          id: string
+          maker_id: string
+          reason: string | null
+          request_data: Json
+          request_type: string
+          status: string
+        }
+        Insert: {
+          action: string
+          checked_at?: string | null
+          checker_id?: string | null
+          checker_notes?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type: string
+          expires_at?: string | null
+          id?: string
+          maker_id: string
+          reason?: string | null
+          request_data: Json
+          request_type: string
+          status?: string
+        }
+        Update: {
+          action?: string
+          checked_at?: string | null
+          checker_id?: string | null
+          checker_notes?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string
+          expires_at?: string | null
+          id?: string
+          maker_id?: string
+          reason?: string | null
+          request_data?: Json
+          request_type?: string
+          status?: string
+        }
+        Relationships: []
+      }
       onboarding_steps: {
         Row: {
           created_at: string
@@ -1057,6 +1248,39 @@ export type Database = {
           name?: string
           requires_document?: boolean
           step_order?: number
+        }
+        Relationships: []
+      }
+      operations_kpis: {
+        Row: {
+          calculated_at: string
+          dimensions: Json | null
+          id: string
+          metric_name: string
+          metric_unit: string | null
+          metric_value: number
+          period_end: string
+          period_start: string
+        }
+        Insert: {
+          calculated_at?: string
+          dimensions?: Json | null
+          id?: string
+          metric_name: string
+          metric_unit?: string | null
+          metric_value: number
+          period_end: string
+          period_start: string
+        }
+        Update: {
+          calculated_at?: string
+          dimensions?: Json | null
+          id?: string
+          metric_name?: string
+          metric_unit?: string | null
+          metric_value?: number
+          period_end?: string
+          period_start?: string
         }
         Relationships: []
       }
@@ -1326,6 +1550,80 @@ export type Database = {
           },
         ]
       }
+      regulatory_reports: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          filing_deadline: string | null
+          id: string
+          jurisdiction: string
+          narrative: string | null
+          reference_number: string | null
+          regulator_acknowledgment: string | null
+          related_transfers: string[] | null
+          report_data: Json
+          report_type: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          subject_customer_id: string | null
+          subject_user_id: string | null
+          submitted_at: string | null
+          submitted_by: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          filing_deadline?: string | null
+          id?: string
+          jurisdiction: string
+          narrative?: string | null
+          reference_number?: string | null
+          regulator_acknowledgment?: string | null
+          related_transfers?: string[] | null
+          report_data?: Json
+          report_type: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          subject_customer_id?: string | null
+          subject_user_id?: string | null
+          submitted_at?: string | null
+          submitted_by?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          filing_deadline?: string | null
+          id?: string
+          jurisdiction?: string
+          narrative?: string | null
+          reference_number?: string | null
+          regulator_acknowledgment?: string | null
+          related_transfers?: string[] | null
+          report_data?: Json
+          report_type?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          subject_customer_id?: string | null
+          subject_user_id?: string | null
+          submitted_at?: string | null
+          submitted_by?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "regulatory_reports_subject_customer_id_fkey"
+            columns: ["subject_customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sales_invoice_items: {
         Row: {
           account_id: string | null
@@ -1441,6 +1739,62 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      transaction_interventions: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          executed_at: string | null
+          id: string
+          initiated_by: string
+          intervention_type: string
+          new_provider: string | null
+          old_provider: string | null
+          reason: string
+          result: string | null
+          status: string
+          transfer_id: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          executed_at?: string | null
+          id?: string
+          initiated_by: string
+          intervention_type: string
+          new_provider?: string | null
+          old_provider?: string | null
+          reason: string
+          result?: string | null
+          status?: string
+          transfer_id: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          executed_at?: string | null
+          id?: string
+          initiated_by?: string
+          intervention_type?: string
+          new_provider?: string | null
+          old_provider?: string | null
+          reason?: string
+          result?: string | null
+          status?: string
+          transfer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transaction_interventions_transfer_id_fkey"
+            columns: ["transfer_id"]
+            isOneToOne: false
+            referencedRelation: "transfers"
             referencedColumns: ["id"]
           },
         ]
@@ -1610,6 +1964,59 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      wallet_operations: {
+        Row: {
+          approval_required: boolean
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          id: string
+          new_status: string | null
+          notes: string | null
+          operation_type: string
+          performed_by: string
+          previous_status: string | null
+          reason: string
+          wallet_id: string
+        }
+        Insert: {
+          approval_required?: boolean
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          id?: string
+          new_status?: string | null
+          notes?: string | null
+          operation_type: string
+          performed_by: string
+          previous_status?: string | null
+          reason: string
+          wallet_id: string
+        }
+        Update: {
+          approval_required?: boolean
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          id?: string
+          new_status?: string | null
+          notes?: string | null
+          operation_type?: string
+          performed_by?: string
+          previous_status?: string | null
+          reason?: string
+          wallet_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wallet_operations_wallet_id_fkey"
+            columns: ["wallet_id"]
+            isOneToOne: false
+            referencedRelation: "wallets"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       wallets: {
         Row: {
