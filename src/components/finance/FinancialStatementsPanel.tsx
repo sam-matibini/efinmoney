@@ -7,12 +7,22 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Calendar } from "@/components/ui/calendar";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
-import { format, subDays, startOfMonth, endOfMonth, subMonths, startOfYear, endOfYear, subYears, startOfQuarter, endOfQuarter, subQuarters } from "date-fns";
-import { ChevronDown, ChevronRight, Calendar as CalendarIcon, Download, FileText, TrendingUp, TrendingDown, DollarSign, Wallet, Building2 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { format, subDays, startOfMonth, endOfMonth, subMonths, startOfYear, endOfYear, subYears, startOfQuarter, endOfQuarter, subQuarters, differenceInDays } from "date-fns";
+import { ChevronDown, ChevronRight, Calendar as CalendarIcon, Download, FileText, TrendingUp, TrendingDown, DollarSign, Wallet, Building2, GitCompare } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+type CompareConfig = {
+  enabled: boolean;
+  compareType: 'previous_periods' | 'previous_years';
+  numberOfPeriods: number;
+  arrangeLatestFirst: boolean;
+};
 
 interface AccountBalance {
   id: string;
@@ -61,7 +71,61 @@ export const FinancialStatementsPanel = () => {
   const [reportPeriod, setReportPeriod] = useState("year_to_date");
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['Current Assets', 'Current Liabilities', 'Operating Revenue', 'Operating Expenses', 'Equity']));
   const [showZeroBalances, setShowZeroBalances] = useState(false);
-  const [comparisonPeriod, setComparisonPeriod] = useState<'none' | 'previous_period' | 'previous_year'>('none');
+  const [compareDialogOpen, setCompareDialogOpen] = useState(false);
+  const [compareConfig, setCompareConfig] = useState<CompareConfig>({
+    enabled: false,
+    compareType: 'previous_periods',
+    numberOfPeriods: 1,
+    arrangeLatestFirst: false,
+  });
+  const [tempCompareConfig, setTempCompareConfig] = useState<CompareConfig>(compareConfig);
+
+  // Calculate comparison periods based on config
+  const getComparisonPeriods = (): DateRange[] => {
+    if (!compareConfig.enabled) return [];
+    
+    const periods: DateRange[] = [];
+    const periodLengthDays = differenceInDays(dateRange.to, dateRange.from);
+    
+    for (let i = 1; i <= compareConfig.numberOfPeriods; i++) {
+      if (compareConfig.compareType === 'previous_years') {
+        const fromDate = subYears(dateRange.from, i);
+        const toDate = subYears(dateRange.to, i);
+        periods.push({ from: fromDate, to: toDate });
+      } else {
+        // Previous periods - shift back by the period length
+        const fromDate = subDays(dateRange.from, periodLengthDays * i + i);
+        const toDate = subDays(dateRange.to, periodLengthDays * i + i);
+        periods.push({ from: fromDate, to: toDate });
+      }
+    }
+    
+    return compareConfig.arrangeLatestFirst ? periods : periods.reverse();
+  };
+
+  const comparisonPeriods = getComparisonPeriods();
+
+  const handleApplyCompare = () => {
+    setCompareConfig({ ...tempCompareConfig, enabled: true });
+    setCompareDialogOpen(false);
+  };
+
+  const handleCancelCompare = () => {
+    setTempCompareConfig(compareConfig);
+    setCompareDialogOpen(false);
+  };
+
+  const handleClearCompare = () => {
+    const clearedConfig: CompareConfig = {
+      enabled: false,
+      compareType: 'previous_periods',
+      numberOfPeriods: 1,
+      arrangeLatestFirst: false,
+    };
+    setCompareConfig(clearedConfig);
+    setTempCompareConfig(clearedConfig);
+    setCompareDialogOpen(false);
+  };
 
   const handlePeriodChange = (period: string) => {
     setReportPeriod(period);
@@ -116,44 +180,83 @@ export const FinancialStatementsPanel = () => {
     setExpandedSections(new Set());
   };
 
+  // Fetch balance data for a specific date range
+  const fetchBalances = async (range: DateRange) => {
+    const { data: accounts, error: accountsError } = await supabase
+      .from('ledger_accounts')
+      .select('id, code, name, account_type, parent_id')
+      .eq('is_active', true)
+      .order('code');
+
+    if (accountsError) throw accountsError;
+
+    const { data: entries, error: entriesError } = await supabase
+      .from('ledger_entries')
+      .select('account_id, debit_amount, credit_amount, created_at')
+      .gte('created_at', range.from.toISOString())
+      .lte('created_at', range.to.toISOString());
+
+    if (entriesError) throw entriesError;
+
+    const balanceMap = new Map<string, number>();
+    (entries || []).forEach(entry => {
+      const current = balanceMap.get(entry.account_id) || 0;
+      balanceMap.set(
+        entry.account_id,
+        current + Number(entry.debit_amount || 0) - Number(entry.credit_amount || 0)
+      );
+    });
+
+    return (accounts || []).map(account => ({
+      id: account.id,
+      code: account.code,
+      name: account.name,
+      account_type: account.account_type,
+      parent_id: account.parent_id,
+      balance: balanceMap.get(account.id) || 0,
+    }));
+  };
+
   const { data: accountBalances = [], isLoading } = useQuery({
     queryKey: ['financial-statements', dateRange],
-    queryFn: async () => {
-      const { data: accounts, error: accountsError } = await supabase
-        .from('ledger_accounts')
-        .select('id, code, name, account_type, parent_id')
-        .eq('is_active', true)
-        .order('code');
-
-      if (accountsError) throw accountsError;
-
-      const { data: entries, error: entriesError } = await supabase
-        .from('ledger_entries')
-        .select('account_id, debit_amount, credit_amount, created_at')
-        .gte('created_at', dateRange.from.toISOString())
-        .lte('created_at', dateRange.to.toISOString());
-
-      if (entriesError) throw entriesError;
-
-      const balanceMap = new Map<string, number>();
-      (entries || []).forEach(entry => {
-        const current = balanceMap.get(entry.account_id) || 0;
-        balanceMap.set(
-          entry.account_id,
-          current + Number(entry.debit_amount || 0) - Number(entry.credit_amount || 0)
-        );
-      });
-
-      return (accounts || []).map(account => ({
-        id: account.id,
-        code: account.code,
-        name: account.name,
-        account_type: account.account_type,
-        parent_id: account.parent_id,
-        balance: balanceMap.get(account.id) || 0,
-      }));
-    },
+    queryFn: () => fetchBalances(dateRange),
   });
+
+  // Fetch comparison period data
+  const { data: comparisonData = [] } = useQuery({
+    queryKey: ['financial-statements-comparison', dateRange, compareConfig],
+    queryFn: async () => {
+      if (!compareConfig.enabled || comparisonPeriods.length === 0) return [];
+      
+      const results = await Promise.all(
+        comparisonPeriods.map(period => fetchBalances(period))
+      );
+      return results;
+    },
+    enabled: compareConfig.enabled && comparisonPeriods.length > 0,
+  });
+
+  // Helper to get comparison balance for an account
+  const getComparisonBalance = (accountCode: string, periodIndex: number): number => {
+    if (!comparisonData[periodIndex]) return 0;
+    const account = comparisonData[periodIndex].find(a => a.code === accountCode);
+    return account?.balance || 0;
+  };
+
+  // Calculate comparison totals
+  const getComparisonCategoryTotal = (type: string, prefixes: string[], periodIndex: number): number => {
+    if (!comparisonData[periodIndex]) return 0;
+    return comparisonData[periodIndex]
+      .filter(a => a.account_type === type && prefixes.some(p => a.code.startsWith(p)))
+      .reduce((sum, a) => sum + (type === 'liability' || type === 'income' ? Math.abs(a.balance) : a.balance), 0);
+  };
+
+  const getComparisonTypeTotal = (type: string, periodIndex: number): number => {
+    if (!comparisonData[periodIndex]) return 0;
+    return comparisonData[periodIndex]
+      .filter(a => a.account_type === type)
+      .reduce((sum, a) => sum + (type === 'liability' || type === 'income' ? Math.abs(a.balance) : a.balance), 0);
+  };
 
   const getAccountsByCategory = (type: string, prefixes: string[]) => {
     return accountBalances.filter(a => {
@@ -192,6 +295,14 @@ export const FinancialStatementsPanel = () => {
     }).format(amount);
   };
 
+  // Format period label for comparison columns
+  const formatPeriodLabel = (period: DateRange): string => {
+    if (compareConfig.compareType === 'previous_years') {
+      return format(period.to, 'yyyy');
+    }
+    return `${format(period.from, 'MMM d')} - ${format(period.to, 'MMM d')}`;
+  };
+
   const renderAccountSection = (
     title: string,
     type: string,
@@ -201,6 +312,7 @@ export const FinancialStatementsPanel = () => {
     const accounts = getAccountsByCategory(type, prefixes);
     const total = getCategoryTotal(type, prefixes);
     const isExpanded = expandedSections.has(title);
+    const hasComparison = compareConfig.enabled && comparisonPeriods.length > 0;
 
     return (
       <Collapsible open={isExpanded} onOpenChange={() => toggleSection(title)}>
@@ -214,7 +326,14 @@ export const FinancialStatementsPanel = () => {
                 {accounts.length} accounts
               </Badge>
             </div>
-            <span className="font-mono font-semibold">{formatCurrency(total)}</span>
+            <div className="flex items-center gap-4">
+              {hasComparison && comparisonPeriods.map((period, idx) => (
+                <span key={idx} className="font-mono text-sm text-muted-foreground">
+                  {formatCurrency(getComparisonCategoryTotal(type, prefixes, idx))}
+                </span>
+              ))}
+              <span className="font-mono font-semibold min-w-[100px] text-right">{formatCurrency(total)}</span>
+            </div>
           </div>
         </CollapsibleTrigger>
         <CollapsibleContent>
@@ -222,24 +341,56 @@ export const FinancialStatementsPanel = () => {
             {accounts.length === 0 ? (
               <p className="text-muted-foreground text-sm py-2 pl-4">No entries in this category</p>
             ) : (
-              accounts.map(account => (
-                <div 
-                  key={account.code} 
-                  className="flex justify-between items-center py-1.5 px-3 border-l-2 border-muted hover:bg-muted/30 transition-colors"
-                >
-                  <span className="text-sm">
-                    <span className="text-muted-foreground font-mono mr-2">{account.code}</span>
-                    {account.name}
-                  </span>
-                  <span className="font-mono text-sm">
-                    {formatCurrency(type === 'liability' || type === 'income' ? Math.abs(account.balance) : account.balance)}
-                  </span>
-                </div>
-              ))
+              accounts.map(account => {
+                const currentBalance = type === 'liability' || type === 'income' ? Math.abs(account.balance) : account.balance;
+                return (
+                  <div 
+                    key={account.code} 
+                    className="flex justify-between items-center py-1.5 px-3 border-l-2 border-muted hover:bg-muted/30 transition-colors"
+                  >
+                    <span className="text-sm flex-1">
+                      <span className="text-muted-foreground font-mono mr-2">{account.code}</span>
+                      {account.name}
+                    </span>
+                    <div className="flex items-center gap-4">
+                      {hasComparison && comparisonPeriods.map((period, idx) => {
+                        const compBalance = getComparisonBalance(account.code, idx);
+                        const displayBalance = type === 'liability' || type === 'income' ? Math.abs(compBalance) : compBalance;
+                        return (
+                          <span key={idx} className="font-mono text-sm text-muted-foreground min-w-[90px] text-right">
+                            {formatCurrency(displayBalance)}
+                          </span>
+                        );
+                      })}
+                      <span className="font-mono text-sm min-w-[100px] text-right">
+                        {formatCurrency(currentBalance)}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })
             )}
           </div>
         </CollapsibleContent>
       </Collapsible>
+    );
+  };
+
+  // Render column headers when comparison is enabled
+  const renderColumnHeaders = () => {
+    if (!compareConfig.enabled || comparisonPeriods.length === 0) return null;
+    
+    return (
+      <div className="flex items-center justify-end gap-4 mb-2 px-3 text-xs font-medium text-muted-foreground border-b pb-2">
+        {comparisonPeriods.map((period, idx) => (
+          <span key={idx} className="min-w-[90px] text-right">
+            {formatPeriodLabel(period)}
+          </span>
+        ))}
+        <span className="min-w-[100px] text-right font-semibold text-foreground">
+          Current Period
+        </span>
+      </div>
     );
   };
 
@@ -313,16 +464,101 @@ export const FinancialStatementsPanel = () => {
                 </PopoverContent>
               </Popover>
 
-              <Select value={comparisonPeriod} onValueChange={(v: any) => setComparisonPeriod(v)}>
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue placeholder="Compare" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No Comparison</SelectItem>
-                  <SelectItem value="previous_period">vs Prior Period</SelectItem>
-                  <SelectItem value="previous_year">vs Prior Year</SelectItem>
-                </SelectContent>
-              </Select>
+              {/* Compare With Dialog */}
+              <Dialog open={compareDialogOpen} onOpenChange={setCompareDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button 
+                    variant={compareConfig.enabled ? "default" : "outline"} 
+                    size="sm"
+                    className="gap-2"
+                    onClick={() => setTempCompareConfig(compareConfig)}
+                  >
+                    <GitCompare className="h-4 w-4" />
+                    Compare With
+                    {compareConfig.enabled && (
+                      <Badge variant="secondary" className="ml-1 text-xs">
+                        {compareConfig.numberOfPeriods} {compareConfig.compareType === 'previous_years' ? 'yr' : 'period'}
+                      </Badge>
+                    )}
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[400px]">
+                  <DialogHeader>
+                    <DialogTitle>Compare With</DialogTitle>
+                    <DialogDescription>
+                      Compare current period with previous periods or years
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label>Compare Based on Period/Year</Label>
+                      <Select 
+                        value={tempCompareConfig.compareType} 
+                        onValueChange={(value: 'previous_periods' | 'previous_years') => 
+                          setTempCompareConfig(prev => ({ ...prev, compareType: value }))
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="previous_periods">Previous Period(s)</SelectItem>
+                          <SelectItem value="previous_years">Previous Year(s)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label>
+                        Number of {tempCompareConfig.compareType === 'previous_years' ? 'Year(s)' : 'Period(s)'}
+                      </Label>
+                      <Select 
+                        value={String(tempCompareConfig.numberOfPeriods)} 
+                        onValueChange={(value) => 
+                          setTempCompareConfig(prev => ({ ...prev, numberOfPeriods: parseInt(value) }))
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1">1</SelectItem>
+                          <SelectItem value="2">2</SelectItem>
+                          <SelectItem value="3">3</SelectItem>
+                          <SelectItem value="4">4</SelectItem>
+                          <SelectItem value="5">5</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id="arrangeLatestFirst"
+                        checked={tempCompareConfig.arrangeLatestFirst}
+                        onCheckedChange={(checked) => 
+                          setTempCompareConfig(prev => ({ ...prev, arrangeLatestFirst: checked as boolean }))
+                        }
+                      />
+                      <Label htmlFor="arrangeLatestFirst" className="text-sm font-normal cursor-pointer">
+                        Arrange period/year from latest to oldest
+                      </Label>
+                    </div>
+                  </div>
+                  <DialogFooter className="flex gap-2 sm:gap-0">
+                    {compareConfig.enabled && (
+                      <Button variant="ghost" onClick={handleClearCompare} className="mr-auto">
+                        Clear
+                      </Button>
+                    )}
+                    <Button variant="outline" onClick={handleCancelCompare}>
+                      Cancel
+                    </Button>
+                    <Button onClick={handleApplyCompare}>
+                      Apply
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </div>
           </div>
         </CardHeader>
@@ -370,6 +606,9 @@ export const FinancialStatementsPanel = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Column Headers */}
+              {renderColumnHeaders()}
+              
               {/* Assets */}
               <div className="space-y-2">
                 <h3 className="font-bold text-lg flex items-center gap-2 border-b pb-2">
@@ -383,7 +622,14 @@ export const FinancialStatementsPanel = () => {
                 ))}
                 <div className="flex justify-between items-center py-3 px-3 bg-blue-500/10 rounded-lg font-bold">
                   <span>Total Assets</span>
-                  <span className="font-mono">{formatCurrency(totalAssets)}</span>
+                  <div className="flex items-center gap-4">
+                    {compareConfig.enabled && comparisonPeriods.map((_, idx) => (
+                      <span key={idx} className="font-mono text-sm text-muted-foreground min-w-[90px] text-right">
+                        {formatCurrency(getComparisonTypeTotal('asset', idx))}
+                      </span>
+                    ))}
+                    <span className="font-mono min-w-[100px] text-right">{formatCurrency(totalAssets)}</span>
+                  </div>
                 </div>
               </div>
 
@@ -400,7 +646,14 @@ export const FinancialStatementsPanel = () => {
                 ))}
                 <div className="flex justify-between items-center py-3 px-3 bg-orange-500/10 rounded-lg font-bold">
                   <span>Total Liabilities</span>
-                  <span className="font-mono">{formatCurrency(totalLiabilities)}</span>
+                  <div className="flex items-center gap-4">
+                    {compareConfig.enabled && comparisonPeriods.map((_, idx) => (
+                      <span key={idx} className="font-mono text-sm text-muted-foreground min-w-[90px] text-right">
+                        {formatCurrency(getComparisonTypeTotal('liability', idx))}
+                      </span>
+                    ))}
+                    <span className="font-mono min-w-[100px] text-right">{formatCurrency(totalLiabilities)}</span>
+                  </div>
                 </div>
               </div>
 
@@ -411,15 +664,40 @@ export const FinancialStatementsPanel = () => {
                   Equity
                 </h3>
                 {renderAccountSection('Equity', 'equity', ACCOUNT_CATEGORIES.equity.Equity, <DollarSign className="h-4 w-4 text-green-500" />)}
-                <div className="flex justify-between items-center py-2 px-3 border-l-2 border-muted">
+                <div className="flex justify-between items-center py-2 px-3 border-l-2 border-muted ml-6">
                   <span className="text-sm italic">Retained Earnings (Net Income)</span>
-                  <span className={cn("font-mono text-sm", netIncome >= 0 ? "text-green-600" : "text-red-600")}>
-                    {formatCurrency(netIncome)}
-                  </span>
+                  <div className="flex items-center gap-4">
+                    {compareConfig.enabled && comparisonPeriods.map((_, idx) => {
+                      const compIncome = getComparisonTypeTotal('income', idx);
+                      const compExpenses = getComparisonTypeTotal('expense', idx);
+                      const compNetIncome = compIncome - compExpenses;
+                      return (
+                        <span key={idx} className={cn("font-mono text-sm min-w-[90px] text-right", compNetIncome >= 0 ? "text-green-600" : "text-red-600")}>
+                          {formatCurrency(compNetIncome)}
+                        </span>
+                      );
+                    })}
+                    <span className={cn("font-mono text-sm min-w-[100px] text-right", netIncome >= 0 ? "text-green-600" : "text-red-600")}>
+                      {formatCurrency(netIncome)}
+                    </span>
+                  </div>
                 </div>
                 <div className="flex justify-between items-center py-3 px-3 bg-green-500/10 rounded-lg font-bold">
                   <span>Total Equity</span>
-                  <span className="font-mono">{formatCurrency(totalEquity + netIncome)}</span>
+                  <div className="flex items-center gap-4">
+                    {compareConfig.enabled && comparisonPeriods.map((_, idx) => {
+                      const compEquity = getComparisonTypeTotal('equity', idx);
+                      const compIncome = getComparisonTypeTotal('income', idx);
+                      const compExpenses = getComparisonTypeTotal('expense', idx);
+                      const compNetIncome = compIncome - compExpenses;
+                      return (
+                        <span key={idx} className="font-mono text-sm text-muted-foreground min-w-[90px] text-right">
+                          {formatCurrency(compEquity + compNetIncome)}
+                        </span>
+                      );
+                    })}
+                    <span className="font-mono min-w-[100px] text-right">{formatCurrency(totalEquity + netIncome)}</span>
+                  </div>
                 </div>
               </div>
 
@@ -427,7 +705,21 @@ export const FinancialStatementsPanel = () => {
               <div className="pt-4 border-t-2">
                 <div className="flex justify-between items-center py-3 px-3 bg-primary/10 rounded-lg font-bold text-lg">
                   <span>Total Liabilities & Equity</span>
-                  <span className="font-mono">{formatCurrency(totalLiabilities + totalEquity + netIncome)}</span>
+                  <div className="flex items-center gap-4">
+                    {compareConfig.enabled && comparisonPeriods.map((_, idx) => {
+                      const compLiab = getComparisonTypeTotal('liability', idx);
+                      const compEquity = getComparisonTypeTotal('equity', idx);
+                      const compIncome = getComparisonTypeTotal('income', idx);
+                      const compExpenses = getComparisonTypeTotal('expense', idx);
+                      const compNetIncome = compIncome - compExpenses;
+                      return (
+                        <span key={idx} className="font-mono text-sm text-muted-foreground min-w-[90px] text-right">
+                          {formatCurrency(compLiab + compEquity + compNetIncome)}
+                        </span>
+                      );
+                    })}
+                    <span className="font-mono min-w-[100px] text-right">{formatCurrency(totalLiabilities + totalEquity + netIncome)}</span>
+                  </div>
                 </div>
                 {Math.abs(totalAssets - (totalLiabilities + totalEquity + netIncome)) > 0.01 && (
                   <p className="text-xs text-destructive mt-2">
@@ -449,6 +741,9 @@ export const FinancialStatementsPanel = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Column Headers */}
+              {renderColumnHeaders()}
+              
               {/* Revenue */}
               <div className="space-y-2">
                 <h3 className="font-bold text-lg flex items-center gap-2 border-b pb-2">
@@ -462,7 +757,14 @@ export const FinancialStatementsPanel = () => {
                 ))}
                 <div className="flex justify-between items-center py-3 px-3 bg-green-500/10 rounded-lg font-bold">
                   <span>Total Revenue</span>
-                  <span className="font-mono text-green-600">{formatCurrency(totalIncome)}</span>
+                  <div className="flex items-center gap-4">
+                    {compareConfig.enabled && comparisonPeriods.map((_, idx) => (
+                      <span key={idx} className="font-mono text-sm text-green-600/70 min-w-[90px] text-right">
+                        {formatCurrency(getComparisonTypeTotal('income', idx))}
+                      </span>
+                    ))}
+                    <span className="font-mono text-green-600 min-w-[100px] text-right">{formatCurrency(totalIncome)}</span>
+                  </div>
                 </div>
               </div>
 
@@ -479,7 +781,14 @@ export const FinancialStatementsPanel = () => {
                 ))}
                 <div className="flex justify-between items-center py-3 px-3 bg-red-500/10 rounded-lg font-bold">
                   <span>Total Expenses</span>
-                  <span className="font-mono text-red-600">{formatCurrency(totalExpenses)}</span>
+                  <div className="flex items-center gap-4">
+                    {compareConfig.enabled && comparisonPeriods.map((_, idx) => (
+                      <span key={idx} className="font-mono text-sm text-red-600/70 min-w-[90px] text-right">
+                        {formatCurrency(getComparisonTypeTotal('expense', idx))}
+                      </span>
+                    ))}
+                    <span className="font-mono text-red-600 min-w-[100px] text-right">{formatCurrency(totalExpenses)}</span>
+                  </div>
                 </div>
               </div>
 
@@ -487,9 +796,20 @@ export const FinancialStatementsPanel = () => {
               <div className="space-y-2">
                 <div className="flex justify-between items-center py-3 px-3 bg-muted rounded-lg">
                   <span className="font-semibold">Gross Profit</span>
-                  <span className="font-mono font-semibold">
-                    {formatCurrency(getCategoryTotal('income', ACCOUNT_CATEGORIES.income['Operating Revenue']) - getCategoryTotal('expense', ACCOUNT_CATEGORIES.expense['Cost of Sales']))}
-                  </span>
+                  <div className="flex items-center gap-4">
+                    {compareConfig.enabled && comparisonPeriods.map((_, idx) => {
+                      const compOpRevenue = getComparisonCategoryTotal('income', ACCOUNT_CATEGORIES.income['Operating Revenue'], idx);
+                      const compCOS = getComparisonCategoryTotal('expense', ACCOUNT_CATEGORIES.expense['Cost of Sales'], idx);
+                      return (
+                        <span key={idx} className="font-mono text-sm text-muted-foreground min-w-[90px] text-right">
+                          {formatCurrency(compOpRevenue - compCOS)}
+                        </span>
+                      );
+                    })}
+                    <span className="font-mono font-semibold min-w-[100px] text-right">
+                      {formatCurrency(getCategoryTotal('income', ACCOUNT_CATEGORIES.income['Operating Revenue']) - getCategoryTotal('expense', ACCOUNT_CATEGORIES.expense['Cost of Sales']))}
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -500,9 +820,21 @@ export const FinancialStatementsPanel = () => {
                   netIncome >= 0 ? "bg-green-500/20" : "bg-red-500/20"
                 )}>
                   <span>Net Income</span>
-                  <span className={cn("font-mono", netIncome >= 0 ? "text-green-600" : "text-red-600")}>
-                    {formatCurrency(netIncome)}
-                  </span>
+                  <div className="flex items-center gap-4">
+                    {compareConfig.enabled && comparisonPeriods.map((_, idx) => {
+                      const compIncome = getComparisonTypeTotal('income', idx);
+                      const compExpenses = getComparisonTypeTotal('expense', idx);
+                      const compNetIncome = compIncome - compExpenses;
+                      return (
+                        <span key={idx} className={cn("font-mono text-sm min-w-[90px] text-right", compNetIncome >= 0 ? "text-green-600/70" : "text-red-600/70")}>
+                          {formatCurrency(compNetIncome)}
+                        </span>
+                      );
+                    })}
+                    <span className={cn("font-mono min-w-[100px] text-right", netIncome >= 0 ? "text-green-600" : "text-red-600")}>
+                      {formatCurrency(netIncome)}
+                    </span>
+                  </div>
                 </div>
               </div>
             </CardContent>
