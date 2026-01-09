@@ -6,6 +6,7 @@ import { PricingSettingsPanel } from "@/components/settings/PricingSettingsPanel
 import { ModuleAccessPanel } from "@/components/settings/ModuleAccessPanel";
 import { SystemSettingsPanel } from "@/components/settings/SystemSettingsPanel";
 import { IntegrationsPanel } from "@/components/settings/IntegrationsPanel";
+import { CurrencyManagementPanel } from "@/components/settings/CurrencyManagementPanel";
 
 const SettingsDashboard = () => {
   return (
@@ -27,6 +28,7 @@ const SettingsDashboard = () => {
             <div className="overflow-x-auto pb-2">
               <TabsList className="inline-flex w-auto min-w-full lg:min-w-0">
                 <TabsTrigger value="pricing">Pricing & Fees</TabsTrigger>
+                <TabsTrigger value="currencies">Currencies</TabsTrigger>
                 <TabsTrigger value="modules">Module Access</TabsTrigger>
                 <TabsTrigger value="integrations">Integrations</TabsTrigger>
                 <TabsTrigger value="system">System Settings</TabsTrigger>
@@ -35,6 +37,10 @@ const SettingsDashboard = () => {
 
             <TabsContent value="pricing" className="space-y-4">
               <PricingSettingsPanel />
+            </TabsContent>
+
+            <TabsContent value="currencies" className="space-y-4">
+              <CurrencyManagementPanel />
             </TabsContent>
 
             <TabsContent value="modules" className="space-y-4">
