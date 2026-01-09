@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowUpRight, ArrowDownLeft } from "lucide-react";
 
 const statusColors: Record<string, string> = {
+  executed: 'bg-green-500/10 text-green-500',
   completed: 'bg-green-500/10 text-green-500',
   pending: 'bg-yellow-500/10 text-yellow-500',
   failed: 'bg-red-500/10 text-red-500',
@@ -31,7 +32,11 @@ export const CryptoTradesPanel = () => {
           status,
           created_at,
           executed_at,
-          pair_id
+          pair_id,
+          crypto_pairs (
+            base_currency,
+            quote_currency
+          )
         `)
         .order('created_at', { ascending: false })
         .limit(50);
@@ -69,6 +74,7 @@ export const CryptoTradesPanel = () => {
             <TableHeader>
               <TableRow>
                 <TableHead>Date</TableHead>
+                <TableHead>Pair</TableHead>
                 <TableHead>Side</TableHead>
                 <TableHead className="text-right">Base Amount</TableHead>
                 <TableHead className="text-right">Quote Amount</TableHead>
@@ -80,47 +86,53 @@ export const CryptoTradesPanel = () => {
             <TableBody>
               {trades.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="text-center text-muted-foreground">
                     No crypto trades found
                   </TableCell>
                 </TableRow>
               ) : (
-                trades.map((trade) => (
-                  <TableRow key={trade.id}>
-                    <TableCell className="whitespace-nowrap">
-                      {format(new Date(trade.created_at), 'MMM d, yyyy HH:mm')}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        {trade.side === 'buy' ? (
-                          <ArrowDownLeft className="w-4 h-4 text-green-500" />
-                        ) : (
-                          <ArrowUpRight className="w-4 h-4 text-red-500" />
-                        )}
-                        <span className={trade.side === 'buy' ? 'text-green-500' : 'text-red-500'}>
-                          {trade.side.toUpperCase()}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {Number(trade.base_amount).toFixed(6)}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {Number(trade.quote_amount).toFixed(2)}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {Number(trade.price).toFixed(2)}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {Number(trade.fee_amount).toFixed(4)} {trade.fee_currency || ''}
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={statusColors[trade.status] || statusColors.pending}>
-                        {trade.status}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                ))
+                trades.map((trade) => {
+                  const pair = trade.crypto_pairs as { base_currency: string; quote_currency: string } | null;
+                  return (
+                    <TableRow key={trade.id}>
+                      <TableCell className="whitespace-nowrap">
+                        {format(new Date(trade.created_at), 'MMM d, yyyy HH:mm')}
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        {pair ? `${pair.base_currency}/${pair.quote_currency}` : '-'}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          {trade.side === 'buy' ? (
+                            <ArrowDownLeft className="w-4 h-4 text-green-500" />
+                          ) : (
+                            <ArrowUpRight className="w-4 h-4 text-red-500" />
+                          )}
+                          <span className={trade.side === 'buy' ? 'text-green-500' : 'text-red-500'}>
+                            {trade.side.toUpperCase()}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        {Number(trade.base_amount).toFixed(6)} {pair?.base_currency || ''}
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        {Number(trade.quote_amount).toFixed(2)} {pair?.quote_currency || ''}
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        {Number(trade.price).toFixed(2)}
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        {Number(trade.fee_amount).toFixed(4)} {trade.fee_currency || ''}
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={statusColors[trade.status] || statusColors.pending}>
+                          {trade.status}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
               )}
             </TableBody>
           </Table>

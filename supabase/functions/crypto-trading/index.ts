@@ -454,6 +454,21 @@ serve(async (req) => {
         );
       }
 
+      // Validate against pair limits
+      const baseAmountCheck = amount_type === 'base' ? amount : amount / marketPrice;
+      if (baseAmountCheck < Number(pair.min_trade_amount)) {
+        return new Response(
+          JSON.stringify({ error: `Minimum trade amount is ${pair.min_trade_amount} ${pair.base_currency}` }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      if (pair.max_trade_amount && baseAmountCheck > Number(pair.max_trade_amount)) {
+        return new Response(
+          JSON.stringify({ error: `Maximum trade amount is ${pair.max_trade_amount} ${pair.base_currency}` }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
       let baseAmount: number, quoteAmount: number, feeAmount: number;
 
       if (side === 'buy') {
@@ -480,6 +495,23 @@ serve(async (req) => {
         }
       }
 
+      // Check wallet balance for the debit side
+      const sourceWalletId = side === 'buy' ? quoteWalletId : baseWalletId;
+      const sourceAmount = side === 'buy' ? quoteAmount : baseAmount;
+      
+      const { data: balanceData } = await supabase.rpc('get_wallet_balance', { p_wallet_id: sourceWalletId });
+      const currentBalance = Number(balanceData) || 0;
+      
+      if (currentBalance < sourceAmount) {
+        return new Response(
+          JSON.stringify({ error: 'Insufficient balance for this trade' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Generate journal ID for ledger entries
+      const journalId = crypto.randomUUID();
+
       const { data: trade, error: tradeError } = await supabase
         .from('crypto_trades')
         .insert({
@@ -488,6 +520,7 @@ serve(async (req) => {
           base_amount: baseAmount, quote_amount: quoteAmount,
           price: marketPrice, fee_amount: feeAmount,
           fee_currency: pair.quote_currency,
+          journal_id: journalId,
           status: 'executed', executed_at: new Date().toISOString()
         })
         .select().single();
@@ -498,6 +531,145 @@ serve(async (req) => {
           JSON.stringify({ error: 'Failed to execute trade. Please try again.' }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
+      }
+
+      // Look up ledger accounts for proper double-entry accounting
+      const { data: accounts } = await supabase
+        .from('ledger_accounts')
+        .select('id, code, name')
+        .in('code', ['1400', '2300', '4300']); // Crypto Custody, Crypto Liability, Crypto Trading Fees
+
+      const cryptoCustodyAccount = accounts?.find(a => a.code === '1400')?.id;
+      const cryptoLiabilityAccount = accounts?.find(a => a.code === '2300')?.id;
+      const tradingFeeAccount = accounts?.find(a => a.code === '4300')?.id;
+
+      if (!cryptoCustodyAccount || !cryptoLiabilityAccount || !tradingFeeAccount) {
+        console.error('Missing required ledger accounts for crypto trading');
+        // Trade was recorded, proceed without ledger entries
+        return new Response(
+          JSON.stringify({
+            success: true, trade,
+            message: side === 'buy' 
+              ? `Bought ${baseAmount.toFixed(8)} ${pair.base_currency} for ${quoteAmount.toFixed(2)} ${pair.quote_currency}`
+              : `Sold ${baseAmount.toFixed(8)} ${pair.base_currency} for ${quoteAmount.toFixed(2)} ${pair.quote_currency}`
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Create ledger entries for proper double-entry accounting
+      const ledgerEntries = [];
+      
+      if (side === 'buy') {
+        // User buys crypto with fiat/stablecoin
+        // Debit: Crypto Custody (asset increase - we hold more crypto for user)
+        ledgerEntries.push({
+          journal_id: journalId,
+          account_id: cryptoCustodyAccount,
+          wallet_id: baseWalletId,
+          currency_code: pair.base_currency,
+          debit_amount: baseAmount,
+          credit_amount: 0,
+          description: `Buy ${baseAmount.toFixed(8)} ${pair.base_currency} @ ${marketPrice.toFixed(2)}`,
+          reference_type: 'crypto_trade',
+          reference_id: trade.id
+        });
+        // Credit: Crypto Liability (liability increase - we owe user the crypto)
+        ledgerEntries.push({
+          journal_id: journalId,
+          account_id: cryptoLiabilityAccount,
+          wallet_id: baseWalletId,
+          currency_code: pair.base_currency,
+          debit_amount: 0,
+          credit_amount: baseAmount,
+          description: `Crypto liability for user purchase`,
+          reference_type: 'crypto_trade',
+          reference_id: trade.id
+        });
+        // Debit: User wallet liability (liability decrease - user owes us less)
+        ledgerEntries.push({
+          journal_id: journalId,
+          account_id: cryptoLiabilityAccount,
+          wallet_id: quoteWalletId,
+          currency_code: pair.quote_currency,
+          debit_amount: quoteAmount - feeAmount,
+          credit_amount: 0,
+          description: `Debit user ${pair.quote_currency} wallet for crypto purchase`,
+          reference_type: 'crypto_trade',
+          reference_id: trade.id
+        });
+        // Credit: Trading fee income
+        ledgerEntries.push({
+          journal_id: journalId,
+          account_id: tradingFeeAccount,
+          wallet_id: null,
+          currency_code: pair.quote_currency,
+          debit_amount: 0,
+          credit_amount: feeAmount,
+          description: `Trading fee on ${pair.base_currency}/${pair.quote_currency} buy`,
+          reference_type: 'crypto_trade',
+          reference_id: trade.id
+        });
+      } else {
+        // User sells crypto for fiat/stablecoin
+        // Credit: Crypto Custody (asset decrease - we hold less crypto)
+        ledgerEntries.push({
+          journal_id: journalId,
+          account_id: cryptoCustodyAccount,
+          wallet_id: baseWalletId,
+          currency_code: pair.base_currency,
+          debit_amount: 0,
+          credit_amount: baseAmount,
+          description: `Sell ${baseAmount.toFixed(8)} ${pair.base_currency} @ ${marketPrice.toFixed(2)}`,
+          reference_type: 'crypto_trade',
+          reference_id: trade.id
+        });
+        // Debit: Crypto Liability (liability decrease - we owe user less crypto)
+        ledgerEntries.push({
+          journal_id: journalId,
+          account_id: cryptoLiabilityAccount,
+          wallet_id: baseWalletId,
+          currency_code: pair.base_currency,
+          debit_amount: baseAmount,
+          credit_amount: 0,
+          description: `Reduce crypto liability from user sale`,
+          reference_type: 'crypto_trade',
+          reference_id: trade.id
+        });
+        // Credit: User wallet liability (liability increase - we owe user more fiat)
+        ledgerEntries.push({
+          journal_id: journalId,
+          account_id: cryptoLiabilityAccount,
+          wallet_id: quoteWalletId,
+          currency_code: pair.quote_currency,
+          debit_amount: 0,
+          credit_amount: quoteAmount,
+          description: `Credit user ${pair.quote_currency} wallet from crypto sale`,
+          reference_type: 'crypto_trade',
+          reference_id: trade.id
+        });
+        // Credit: Trading fee income
+        ledgerEntries.push({
+          journal_id: journalId,
+          account_id: tradingFeeAccount,
+          wallet_id: null,
+          currency_code: pair.quote_currency,
+          debit_amount: 0,
+          credit_amount: feeAmount,
+          description: `Trading fee on ${pair.base_currency}/${pair.quote_currency} sell`,
+          reference_type: 'crypto_trade',
+          reference_id: trade.id
+        });
+      }
+
+      // Insert ledger entries
+      const { error: ledgerError } = await supabase
+        .from('ledger_entries')
+        .insert(ledgerEntries);
+
+      if (ledgerError) {
+        console.error('Ledger entry error:', ledgerError);
+        // Trade was recorded, but ledger failed - log for reconciliation
       }
 
       return new Response(
