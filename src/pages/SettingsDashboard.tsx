@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PricingSettingsPanel } from "@/components/settings/PricingSettingsPanel";
 import { ModuleAccessPanel } from "@/components/settings/ModuleAccessPanel";
 import { SystemSettingsPanel } from "@/components/settings/SystemSettingsPanel";
+import { IntegrationsPanel } from "@/components/settings/IntegrationsPanel";
 
 const SettingsDashboard = () => {
   return (
@@ -27,6 +28,7 @@ const SettingsDashboard = () => {
               <TabsList className="inline-flex w-auto min-w-full lg:min-w-0">
                 <TabsTrigger value="pricing">Pricing & Fees</TabsTrigger>
                 <TabsTrigger value="modules">Module Access</TabsTrigger>
+                <TabsTrigger value="integrations">Integrations</TabsTrigger>
                 <TabsTrigger value="system">System Settings</TabsTrigger>
               </TabsList>
             </div>
@@ -37,6 +39,10 @@ const SettingsDashboard = () => {
 
             <TabsContent value="modules" className="space-y-4">
               <ModuleAccessPanel />
+            </TabsContent>
+
+            <TabsContent value="integrations" className="space-y-4">
+              <IntegrationsPanel />
             </TabsContent>
 
             <TabsContent value="system" className="space-y-4">
