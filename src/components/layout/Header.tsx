@@ -18,9 +18,9 @@ const Header = () => {
 
   const navItems = [
     { label: 'Dashboard', href: '/' },
-    { label: 'Wallets', href: '/wallets' },
     { label: 'Send', href: '/send' },
     { label: 'Exchange', href: '/exchange' },
+    { label: 'Wallets', href: '/wallets' },
     { label: 'Cards', href: '/cards' },
   ];
 
