@@ -94,8 +94,10 @@ async function fetchCryptoPrices(): Promise<Record<string, number>> {
   }
   
   try {
+    // Fetch all supported cryptocurrencies
+    const coinIds = 'bitcoin,ethereum,binancecoin,ripple,solana,cardano,dogecoin,polkadot,polygon,litecoin,avalanche-2,chainlink,uniswap,shiba-inu,tron,cosmos,tether,usd-coin';
     const response = await fetch(
-      'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,tether,usd-coin&vs_currencies=usd',
+      `https://api.coingecko.com/api/v3/simple/price?ids=${coinIds}&vs_currencies=usd`,
       { headers: { 'Accept': 'application/json' } }
     );
     
@@ -106,21 +108,59 @@ async function fetchCryptoPrices(): Promise<Record<string, number>> {
     const data = await response.json();
     
     const newPrices: Record<string, number> = {
+      // Bitcoin pairs
       'BTC_USD': data.bitcoin?.usd || 0,
       'BTC_USDT': data.bitcoin?.usd || 0,
+      // Ethereum pairs
+      'ETH_USD': data.ethereum?.usd || 0,
+      'ETH_USDT': data.ethereum?.usd || 0,
+      // Binance Coin pairs
+      'BNB_USD': data.binancecoin?.usd || 0,
+      'BNB_USDT': data.binancecoin?.usd || 0,
+      // XRP pairs
+      'XRP_USD': data.ripple?.usd || 0,
+      'XRP_USDT': data.ripple?.usd || 0,
+      // Solana pairs
+      'SOL_USD': data.solana?.usd || 0,
+      'SOL_USDT': data.solana?.usd || 0,
+      // Cardano pairs
+      'ADA_USD': data.cardano?.usd || 0,
+      // Dogecoin pairs
+      'DOGE_USD': data.dogecoin?.usd || 0,
+      // Polkadot pairs
+      'DOT_USD': data.polkadot?.usd || 0,
+      // Polygon pairs
+      'MATIC_USD': data['matic-network']?.usd || data.polygon?.usd || 0,
+      // Litecoin pairs
+      'LTC_USD': data.litecoin?.usd || 0,
+      // Avalanche pairs
+      'AVAX_USD': data['avalanche-2']?.usd || 0,
+      // Chainlink pairs
+      'LINK_USD': data.chainlink?.usd || 0,
+      // Uniswap pairs
+      'UNI_USD': data.uniswap?.usd || 0,
+      // Shiba Inu pairs
+      'SHIB_USD': data['shiba-inu']?.usd || 0,
+      // TRON pairs
+      'TRX_USD': data.tron?.usd || 0,
+      // Cosmos pairs
+      'ATOM_USD': data.cosmos?.usd || 0,
+      // Stablecoins
       'USDT_USD': data.tether?.usd || 1.0,
       'USDC_USD': data['usd-coin']?.usd || 1.0,
     };
     
+    // Log prices that have valid values
+    const validPrices: Record<string, number> = {};
     for (const [key, value] of Object.entries(newPrices)) {
-      if (!value || isNaN(value) || value <= 0) {
-        throw new Error(`Invalid price for ${key}: ${value}`);
+      if (value && !isNaN(value) && value > 0) {
+        validPrices[key] = value;
       }
     }
     
-    priceCache = { prices: newPrices, timestamp: now };
-    console.log('Fetched fresh crypto prices:', newPrices);
-    return newPrices;
+    priceCache = { prices: validPrices, timestamp: now };
+    console.log('Fetched fresh crypto prices:', Object.keys(validPrices).length, 'pairs');
+    return validPrices;
   } catch (error) {
     console.error('Failed to fetch crypto prices:', error);
     
