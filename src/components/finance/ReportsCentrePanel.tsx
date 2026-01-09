@@ -10,7 +10,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { format, subDays, startOfMonth, endOfMonth, subMonths } from "date-fns";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { format, subDays, startOfMonth, endOfMonth, subMonths, startOfYear, endOfYear, subYears } from "date-fns";
 import { 
   FileText, 
   Download, 
@@ -23,7 +26,8 @@ import {
   ArrowDownRight,
   FileSpreadsheet,
   BarChart3,
-  PieChart
+  PieChart,
+  GitCompare
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -32,12 +36,27 @@ type DateRange = {
   to: Date;
 };
 
+type CompareConfig = {
+  enabled: boolean;
+  compareType: 'previous_periods' | 'previous_years';
+  numberOfPeriods: number;
+  arrangeLatestFirst: boolean;
+};
+
 export const ReportsCentrePanel = () => {
   const [dateRange, setDateRange] = useState<DateRange>({
     from: startOfMonth(new Date()),
     to: endOfMonth(new Date()),
   });
   const [reportPeriod, setReportPeriod] = useState("this_month");
+  const [compareDialogOpen, setCompareDialogOpen] = useState(false);
+  const [compareConfig, setCompareConfig] = useState<CompareConfig>({
+    enabled: false,
+    compareType: 'previous_periods',
+    numberOfPeriods: 1,
+    arrangeLatestFirst: false,
+  });
+  const [tempCompareConfig, setTempCompareConfig] = useState<CompareConfig>(compareConfig);
 
   const handlePeriodChange = (period: string) => {
     setReportPeriod(period);
@@ -59,7 +78,39 @@ export const ReportsCentrePanel = () => {
       case "last_3_months":
         setDateRange({ from: subMonths(today, 3), to: today });
         break;
+      case "this_year":
+        setDateRange({ from: startOfYear(today), to: endOfYear(today) });
+        break;
+      case "last_year":
+        const lastYear = subYears(today, 1);
+        setDateRange({ from: startOfYear(lastYear), to: endOfYear(lastYear) });
+        break;
+      case "custom":
+        // Keep current range, user will select via calendar
+        break;
     }
+  };
+
+  const handleApplyCompare = () => {
+    setCompareConfig(tempCompareConfig);
+    setCompareDialogOpen(false);
+  };
+
+  const handleCancelCompare = () => {
+    setTempCompareConfig(compareConfig);
+    setCompareDialogOpen(false);
+  };
+
+  const handleClearCompare = () => {
+    const clearedConfig: CompareConfig = {
+      enabled: false,
+      compareType: 'previous_periods',
+      numberOfPeriods: 1,
+      arrangeLatestFirst: false,
+    };
+    setCompareConfig(clearedConfig);
+    setTempCompareConfig(clearedConfig);
+    setCompareDialogOpen(false);
   };
 
   // Fetch summary data
@@ -213,7 +264,7 @@ export const ReportsCentrePanel = () => {
               </CardTitle>
               <CardDescription>Generate and export financial reports</CardDescription>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <Select value={reportPeriod} onValueChange={handlePeriodChange}>
                 <SelectTrigger className="w-[180px]">
                   <SelectValue placeholder="Select period" />
@@ -224,6 +275,9 @@ export const ReportsCentrePanel = () => {
                   <SelectItem value="this_month">This Month</SelectItem>
                   <SelectItem value="last_month">Last Month</SelectItem>
                   <SelectItem value="last_3_months">Last 3 Months</SelectItem>
+                  <SelectItem value="this_year">This Year</SelectItem>
+                  <SelectItem value="last_year">Last Year</SelectItem>
+                  <SelectItem value="custom">Custom Range</SelectItem>
                 </SelectContent>
               </Select>
               <Popover>
@@ -233,7 +287,7 @@ export const ReportsCentrePanel = () => {
                     {format(dateRange.from, "MMM d")} - {format(dateRange.to, "MMM d, yyyy")}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="end">
+                <PopoverContent className="w-auto p-0 pointer-events-auto" align="end">
                   <Calendar
                     mode="range"
                     selected={{ from: dateRange.from, to: dateRange.to }}
@@ -244,9 +298,105 @@ export const ReportsCentrePanel = () => {
                       }
                     }}
                     numberOfMonths={2}
+                    className="pointer-events-auto"
                   />
                 </PopoverContent>
               </Popover>
+              
+              {/* Compare With Dialog */}
+              <Dialog open={compareDialogOpen} onOpenChange={setCompareDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button 
+                    variant={compareConfig.enabled ? "default" : "outline"} 
+                    className="gap-2"
+                    onClick={() => setTempCompareConfig(compareConfig)}
+                  >
+                    <GitCompare className="h-4 w-4" />
+                    Compare With
+                    {compareConfig.enabled && (
+                      <Badge variant="secondary" className="ml-1">
+                        {compareConfig.numberOfPeriods} {compareConfig.compareType === 'previous_years' ? 'yr' : 'period'}
+                      </Badge>
+                    )}
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[400px]">
+                  <DialogHeader>
+                    <DialogTitle>Compare With</DialogTitle>
+                    <DialogDescription>
+                      Compare current period with previous periods or years
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label>Compare Based on Period/Year</Label>
+                      <Select 
+                        value={tempCompareConfig.compareType} 
+                        onValueChange={(value: 'previous_periods' | 'previous_years') => 
+                          setTempCompareConfig(prev => ({ ...prev, compareType: value, enabled: true }))
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="previous_periods">Previous Period(s)</SelectItem>
+                          <SelectItem value="previous_years">Previous Year(s)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label>
+                        Number of {tempCompareConfig.compareType === 'previous_years' ? 'Year(s)' : 'Period(s)'}
+                      </Label>
+                      <Select 
+                        value={String(tempCompareConfig.numberOfPeriods)} 
+                        onValueChange={(value) => 
+                          setTempCompareConfig(prev => ({ ...prev, numberOfPeriods: parseInt(value), enabled: true }))
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1">1</SelectItem>
+                          <SelectItem value="2">2</SelectItem>
+                          <SelectItem value="3">3</SelectItem>
+                          <SelectItem value="4">4</SelectItem>
+                          <SelectItem value="5">5</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id="arrangeLatestFirst"
+                        checked={tempCompareConfig.arrangeLatestFirst}
+                        onCheckedChange={(checked) => 
+                          setTempCompareConfig(prev => ({ ...prev, arrangeLatestFirst: checked as boolean }))
+                        }
+                      />
+                      <Label htmlFor="arrangeLatestFirst" className="text-sm font-normal cursor-pointer">
+                        Arrange period/year from latest to oldest
+                      </Label>
+                    </div>
+                  </div>
+                  <DialogFooter className="flex gap-2 sm:gap-0">
+                    {compareConfig.enabled && (
+                      <Button variant="ghost" onClick={handleClearCompare} className="mr-auto">
+                        Clear
+                      </Button>
+                    )}
+                    <Button variant="outline" onClick={handleCancelCompare}>
+                      Cancel
+                    </Button>
+                    <Button onClick={handleApplyCompare}>
+                      Apply
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </div>
           </div>
         </CardHeader>
