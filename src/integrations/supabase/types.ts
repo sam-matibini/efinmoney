@@ -115,48 +115,75 @@ export type Database = {
       }
       bank_transactions: {
         Row: {
+          ai_confidence: number | null
           balance: number | null
           bank_account_id: string
+          categorized_at: string | null
           category: string | null
+          credit_account_id: string | null
           credit_amount: number | null
+          debit_account_id: string | null
           debit_amount: number | null
           description: string
           id: string
           import_batch_id: string | null
           imported_at: string
+          is_categorized: boolean
+          is_posted: boolean
+          journal_id: string | null
           post_date: string | null
+          posted_at: string | null
           raw_data: Json | null
           reference: string | null
+          rule_id: string | null
           transaction_date: string
         }
         Insert: {
+          ai_confidence?: number | null
           balance?: number | null
           bank_account_id: string
+          categorized_at?: string | null
           category?: string | null
+          credit_account_id?: string | null
           credit_amount?: number | null
+          debit_account_id?: string | null
           debit_amount?: number | null
           description: string
           id?: string
           import_batch_id?: string | null
           imported_at?: string
+          is_categorized?: boolean
+          is_posted?: boolean
+          journal_id?: string | null
           post_date?: string | null
+          posted_at?: string | null
           raw_data?: Json | null
           reference?: string | null
+          rule_id?: string | null
           transaction_date: string
         }
         Update: {
+          ai_confidence?: number | null
           balance?: number | null
           bank_account_id?: string
+          categorized_at?: string | null
           category?: string | null
+          credit_account_id?: string | null
           credit_amount?: number | null
+          debit_account_id?: string | null
           debit_amount?: number | null
           description?: string
           id?: string
           import_batch_id?: string | null
           imported_at?: string
+          is_categorized?: boolean
+          is_posted?: boolean
+          journal_id?: string | null
           post_date?: string | null
+          posted_at?: string | null
           raw_data?: Json | null
           reference?: string | null
+          rule_id?: string | null
           transaction_date?: string
         }
         Relationships: [
@@ -165,6 +192,27 @@ export type Database = {
             columns: ["bank_account_id"]
             isOneToOne: false
             referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bank_transactions_credit_account_id_fkey"
+            columns: ["credit_account_id"]
+            isOneToOne: false
+            referencedRelation: "ledger_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bank_transactions_debit_account_id_fkey"
+            columns: ["debit_account_id"]
+            isOneToOne: false
+            referencedRelation: "ledger_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bank_transactions_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_rules"
             referencedColumns: ["id"]
           },
         ]
@@ -1795,6 +1843,81 @@ export type Database = {
             columns: ["transfer_id"]
             isOneToOne: false
             referencedRelation: "transfers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      transaction_rules: {
+        Row: {
+          ai_confidence: number | null
+          ai_generated: boolean
+          auto_post: boolean
+          category: string | null
+          created_at: string
+          created_by: string | null
+          credit_account_id: string | null
+          debit_account_id: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          match_field: string
+          match_type: string
+          match_value: string
+          name: string
+          priority: number
+          updated_at: string
+        }
+        Insert: {
+          ai_confidence?: number | null
+          ai_generated?: boolean
+          auto_post?: boolean
+          category?: string | null
+          created_at?: string
+          created_by?: string | null
+          credit_account_id?: string | null
+          debit_account_id?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          match_field?: string
+          match_type?: string
+          match_value: string
+          name: string
+          priority?: number
+          updated_at?: string
+        }
+        Update: {
+          ai_confidence?: number | null
+          ai_generated?: boolean
+          auto_post?: boolean
+          category?: string | null
+          created_at?: string
+          created_by?: string | null
+          credit_account_id?: string | null
+          debit_account_id?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          match_field?: string
+          match_type?: string
+          match_value?: string
+          name?: string
+          priority?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transaction_rules_credit_account_id_fkey"
+            columns: ["credit_account_id"]
+            isOneToOne: false
+            referencedRelation: "ledger_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_rules_debit_account_id_fkey"
+            columns: ["debit_account_id"]
+            isOneToOne: false
+            referencedRelation: "ledger_accounts"
             referencedColumns: ["id"]
           },
         ]
