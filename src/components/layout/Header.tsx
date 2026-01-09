@@ -1,6 +1,8 @@
 import { motion } from "framer-motion";
-import { Bell, Search, User, LogOut } from "lucide-react";
+import { Bell, Search, User, LogOut, Shield, Wallet } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { useUserRoles } from "@/hooks/useUserRoles";
+import { Link, useLocation } from "react-router-dom";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,6 +13,24 @@ import {
 
 const Header = () => {
   const { signOut, user } = useAuth();
+  const { isAdmin, isFinance } = useUserRoles();
+  const location = useLocation();
+
+  const navItems = [
+    { label: 'Dashboard', href: '/' },
+    { label: 'Wallets', href: '#' },
+    { label: 'Send', href: '#' },
+    { label: 'Exchange', href: '#' },
+    { label: 'Cards', href: '#' },
+  ];
+
+  if (isFinance) {
+    navItems.push({ label: 'Finance', href: '/finance' });
+  }
+
+  if (isAdmin) {
+    navItems.push({ label: 'Admin', href: '/admin' });
+  }
 
   return (
     <header className="sticky top-0 z-50 glass border-b border-border/50">
@@ -20,30 +40,39 @@ const Header = () => {
           animate={{ opacity: 1, x: 0 }}
           className="flex items-center gap-3"
         >
-          <div className="gradient-primary w-10 h-10 rounded-xl flex items-center justify-center shadow-glow">
-            <span className="text-xl font-bold text-primary-foreground">e</span>
-          </div>
-          <span className="font-display font-bold text-xl text-foreground">eFinMoney</span>
+          <Link to="/" className="flex items-center gap-3">
+            <div className="gradient-primary w-10 h-10 rounded-xl flex items-center justify-center shadow-glow">
+              <span className="text-xl font-bold text-primary-foreground">e</span>
+            </div>
+            <span className="font-display font-bold text-xl text-foreground">eFinMoney</span>
+          </Link>
         </motion.div>
 
         <motion.nav 
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="hidden md:flex items-center gap-8"
+          className="hidden md:flex items-center gap-6"
         >
-          {['Dashboard', 'Wallets', 'Send', 'Exchange', 'Cards'].map((item, index) => (
-            <a
-              key={item}
-              href="#"
-              className={`text-sm font-medium transition-colors ${
-                index === 0 
-                  ? 'text-primary' 
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {item}
-            </a>
-          ))}
+          {navItems.map((item) => {
+            const isActive = item.href === '/' 
+              ? location.pathname === '/' 
+              : location.pathname.startsWith(item.href) && item.href !== '#';
+            return (
+              <Link
+                key={item.label}
+                to={item.href}
+                className={`text-sm font-medium transition-colors flex items-center gap-1.5 ${
+                  isActive 
+                    ? 'text-primary' 
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {item.label === 'Finance' && <Wallet className="w-4 h-4" />}
+                {item.label === 'Admin' && <Shield className="w-4 h-4" />}
+                {item.label}
+              </Link>
+            );
+          })}
         </motion.nav>
 
         <motion.div 
