@@ -13,13 +13,71 @@ interface TradeRequest {
   amount_type: 'base' | 'quote';
 }
 
-// Mock crypto prices (in production, fetch from exchange API)
-const CRYPTO_PRICES: Record<string, number> = {
-  'BTC_USD': 67500.00,
-  'BTC_USDT': 67480.00,
-  'USDT_USD': 1.0002,
-  'USDC_USD': 0.9998,
+// Price cache with timestamp for staleness check
+interface PriceCache {
+  prices: Record<string, number>;
+  timestamp: number;
+}
+
+let priceCache: PriceCache = {
+  prices: {},
+  timestamp: 0
 };
+
+const PRICE_CACHE_TTL_MS = 30000; // 30 seconds max staleness
+const MAX_TRADE_AMOUNT_USD = 10000; // Maximum trade limit for safety
+
+// Fetch real-time prices from CoinGecko
+async function fetchCryptoPrices(): Promise<Record<string, number>> {
+  const now = Date.now();
+  
+  // Return cached prices if still fresh
+  if (now - priceCache.timestamp < PRICE_CACHE_TTL_MS && Object.keys(priceCache.prices).length > 0) {
+    return priceCache.prices;
+  }
+  
+  try {
+    const response = await fetch(
+      'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,tether,usd-coin&vs_currencies=usd',
+      { headers: { 'Accept': 'application/json' } }
+    );
+    
+    if (!response.ok) {
+      throw new Error(`CoinGecko API error: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    
+    const newPrices: Record<string, number> = {
+      'BTC_USD': data.bitcoin?.usd || 0,
+      'BTC_USDT': data.bitcoin?.usd || 0, // BTC/USDT approximates BTC/USD
+      'USDT_USD': data.tether?.usd || 1.0,
+      'USDC_USD': data['usd-coin']?.usd || 1.0,
+    };
+    
+    // Validate prices are reasonable (non-zero, not NaN)
+    for (const [key, value] of Object.entries(newPrices)) {
+      if (!value || isNaN(value) || value <= 0) {
+        throw new Error(`Invalid price for ${key}: ${value}`);
+      }
+    }
+    
+    priceCache = { prices: newPrices, timestamp: now };
+    console.log('Fetched fresh crypto prices:', newPrices);
+    return newPrices;
+  } catch (error) {
+    console.error('Failed to fetch crypto prices:', error);
+    
+    // If cache exists and is less than 5 minutes old, use it with warning
+    if (priceCache.timestamp > 0 && now - priceCache.timestamp < 300000) {
+      console.warn('Using stale cached prices due to API failure');
+      return priceCache.prices;
+    }
+    
+    // No valid prices available
+    throw new Error('Unable to fetch current crypto prices. Trading is temporarily unavailable.');
+  }
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
