@@ -10,7 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Trash2, CheckCircle, XCircle } from "lucide-react";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Plus, Trash2, CheckCircle, XCircle, Users, Building2 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
@@ -25,6 +26,8 @@ export const JournalEntriesPanel = () => {
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [description, setDescription] = useState('');
+  const [partyType, setPartyType] = useState<'none' | 'customer' | 'vendor'>('none');
+  const [selectedPartyId, setSelectedPartyId] = useState('');
   const [lines, setLines] = useState<JournalLine[]>([
     { account_id: '', debit_amount: '', credit_amount: '' },
     { account_id: '', debit_amount: '', credit_amount: '' },
@@ -38,6 +41,32 @@ export const JournalEntriesPanel = () => {
         .select('id, code, name')
         .eq('is_active', true)
         .order('code');
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  const { data: customers = [] } = useQuery({
+    queryKey: ['customers-list'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('customers')
+        .select('id, name, email')
+        .eq('is_active', true)
+        .order('name');
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  const { data: vendors = [] } = useQuery({
+    queryKey: ['vendors-list'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('vendors')
+        .select('id, name, email')
+        .eq('is_active', true)
+        .order('name');
       if (error) throw error;
       return data || [];
     },
@@ -109,8 +138,11 @@ export const JournalEntriesPanel = () => {
         debit_amount: parseFloat(line.debit_amount) || 0,
         credit_amount: parseFloat(line.credit_amount) || 0,
         currency_code: 'USD',
-        description,
+        description: partyType !== 'none' && selectedPartyId 
+          ? `${description} [${partyType === 'customer' ? 'Customer' : 'Vendor'}: ${partyType === 'customer' ? customers.find(c => c.id === selectedPartyId)?.name : vendors.find(v => v.id === selectedPartyId)?.name}]`
+          : description,
         reference_type: 'journal',
+        reference_id: partyType !== 'none' ? selectedPartyId : null,
         created_by: user?.id,
       }));
 
@@ -134,6 +166,8 @@ export const JournalEntriesPanel = () => {
 
   const resetForm = () => {
     setDescription('');
+    setPartyType('none');
+    setSelectedPartyId('');
     setLines([
       { account_id: '', debit_amount: '', credit_amount: '' },
       { account_id: '', debit_amount: '', credit_amount: '' },
@@ -202,6 +236,68 @@ export const JournalEntriesPanel = () => {
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Enter journal entry description"
                 />
+              </div>
+
+              {/* Customer/Vendor Selection */}
+              <div className="space-y-3">
+                <Label>Related Party (Optional)</Label>
+                <RadioGroup 
+                  value={partyType} 
+                  onValueChange={(value: 'none' | 'customer' | 'vendor') => {
+                    setPartyType(value);
+                    setSelectedPartyId('');
+                  }}
+                  className="flex gap-4"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="none" id="party-none" />
+                    <Label htmlFor="party-none" className="cursor-pointer">None</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="customer" id="party-customer" />
+                    <Label htmlFor="party-customer" className="cursor-pointer flex items-center gap-1">
+                      <Users className="w-4 h-4" />
+                      Customer
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="vendor" id="party-vendor" />
+                    <Label htmlFor="party-vendor" className="cursor-pointer flex items-center gap-1">
+                      <Building2 className="w-4 h-4" />
+                      Vendor
+                    </Label>
+                  </div>
+                </RadioGroup>
+
+                {partyType === 'customer' && (
+                  <Select value={selectedPartyId} onValueChange={setSelectedPartyId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select customer" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {customers.map((customer) => (
+                        <SelectItem key={customer.id} value={customer.id}>
+                          {customer.name} {customer.email && `(${customer.email})`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+
+                {partyType === 'vendor' && (
+                  <Select value={selectedPartyId} onValueChange={setSelectedPartyId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select vendor" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {vendors.map((vendor) => (
+                        <SelectItem key={vendor.id} value={vendor.id}>
+                          {vendor.name} {vendor.email && `(${vendor.email})`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
 
               <div className="border rounded-lg overflow-hidden">
