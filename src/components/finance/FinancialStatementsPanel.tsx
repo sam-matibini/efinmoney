@@ -394,6 +394,328 @@ export const FinancialStatementsPanel = () => {
     );
   };
 
+  // Cash Flow Content Component - uses filtered date range
+  const CashFlowContent = ({ 
+    dateRange, 
+    expandedSections, 
+    toggleSection, 
+    formatCurrency,
+    compareConfig,
+    comparisonPeriods,
+  }: { 
+    dateRange: DateRange;
+    expandedSections: Set<string>;
+    toggleSection: (section: string) => void;
+    formatCurrency: (amount: number) => string;
+    compareConfig: CompareConfig;
+    comparisonPeriods: DateRange[];
+  }) => {
+    const { data: cashFlowData, isLoading: cfLoading } = useQuery({
+      queryKey: ['cash-flow-statement', dateRange],
+      queryFn: async () => {
+        const { data: entries, error: entriesError } = await supabase
+          .from('ledger_entries')
+          .select(`
+            account_id,
+            debit_amount,
+            credit_amount,
+            reference_type,
+            created_at
+          `)
+          .gte('created_at', dateRange.from.toISOString())
+          .lte('created_at', dateRange.to.toISOString());
+
+        if (entriesError) throw entriesError;
+
+        const { data: accounts, error: accountsError } = await supabase
+          .from('ledger_accounts')
+          .select('id, code, name, account_type');
+
+        if (accountsError) throw accountsError;
+
+        const accountMap = new Map(accounts?.map(a => [a.id, a]) || []);
+
+        let operatingInflows = 0;
+        let operatingOutflows = 0;
+        let investingInflows = 0;
+        let investingOutflows = 0;
+        let financingInflows = 0;
+        let financingOutflows = 0;
+
+        (entries || []).forEach(entry => {
+          const account = accountMap.get(entry.account_id);
+          if (!account) return;
+
+          const netFlow = Number(entry.credit_amount || 0) - Number(entry.debit_amount || 0);
+          const refType = entry.reference_type || '';
+
+          if (account.code.startsWith('11') || account.code.startsWith('12')) {
+            if (refType === 'transfer' || refType === 'fx') {
+              if (netFlow > 0) operatingInflows += netFlow;
+              else operatingOutflows += Math.abs(netFlow);
+            }
+          } else if (account.code.startsWith('14') || account.code.startsWith('15')) {
+            if (netFlow > 0) investingInflows += netFlow;
+            else investingOutflows += Math.abs(netFlow);
+          } else if (account.code.startsWith('21') || account.code.startsWith('22')) {
+            if (netFlow > 0) financingInflows += netFlow;
+            else financingOutflows += Math.abs(netFlow);
+          } else if (account.account_type === 'income') {
+            operatingInflows += Math.abs(netFlow);
+          } else if (account.account_type === 'expense') {
+            operatingOutflows += Math.abs(netFlow);
+          }
+        });
+
+        const operatingNet = operatingInflows - operatingOutflows;
+        const investingNet = investingInflows - investingOutflows;
+        const financingNet = financingInflows - financingOutflows;
+        const netChange = operatingNet + investingNet + financingNet;
+
+        return {
+          operating: { inflows: operatingInflows, outflows: operatingOutflows, net: operatingNet },
+          investing: { inflows: investingInflows, outflows: investingOutflows, net: investingNet },
+          financing: { inflows: financingInflows, outflows: financingOutflows, net: financingNet },
+          netChange,
+        };
+      },
+    });
+
+    // Fetch comparison cash flow data
+    const { data: comparisonCashFlow = [] } = useQuery({
+      queryKey: ['cash-flow-comparison', comparisonPeriods, compareConfig.enabled],
+      queryFn: async () => {
+        if (!compareConfig.enabled || comparisonPeriods.length === 0) return [];
+        
+        const results = await Promise.all(
+          comparisonPeriods.map(async (period) => {
+            const { data: entries } = await supabase
+              .from('ledger_entries')
+              .select('account_id, debit_amount, credit_amount, reference_type')
+              .gte('created_at', period.from.toISOString())
+              .lte('created_at', period.to.toISOString());
+
+            const { data: accounts } = await supabase
+              .from('ledger_accounts')
+              .select('id, code, account_type');
+
+            const accountMap = new Map(accounts?.map(a => [a.id, a]) || []);
+
+            let operatingInflows = 0, operatingOutflows = 0;
+            let investingInflows = 0, investingOutflows = 0;
+            let financingInflows = 0, financingOutflows = 0;
+
+            (entries || []).forEach(entry => {
+              const account = accountMap.get(entry.account_id);
+              if (!account) return;
+
+              const netFlow = Number(entry.credit_amount || 0) - Number(entry.debit_amount || 0);
+              const refType = entry.reference_type || '';
+
+              if (account.code.startsWith('11') || account.code.startsWith('12')) {
+                if (refType === 'transfer' || refType === 'fx') {
+                  if (netFlow > 0) operatingInflows += netFlow;
+                  else operatingOutflows += Math.abs(netFlow);
+                }
+              } else if (account.code.startsWith('14') || account.code.startsWith('15')) {
+                if (netFlow > 0) investingInflows += netFlow;
+                else investingOutflows += Math.abs(netFlow);
+              } else if (account.code.startsWith('21') || account.code.startsWith('22')) {
+                if (netFlow > 0) financingInflows += netFlow;
+                else financingOutflows += Math.abs(netFlow);
+              } else if (account.account_type === 'income') {
+                operatingInflows += Math.abs(netFlow);
+              } else if (account.account_type === 'expense') {
+                operatingOutflows += Math.abs(netFlow);
+              }
+            });
+
+            return {
+              operating: { inflows: operatingInflows, outflows: operatingOutflows, net: operatingInflows - operatingOutflows },
+              investing: { inflows: investingInflows, outflows: investingOutflows, net: investingInflows - investingOutflows },
+              financing: { inflows: financingInflows, outflows: financingOutflows, net: financingInflows - financingOutflows },
+              netChange: (operatingInflows - operatingOutflows) + (investingInflows - investingOutflows) + (financingInflows - financingOutflows),
+            };
+          })
+        );
+        return results;
+      },
+      enabled: compareConfig.enabled && comparisonPeriods.length > 0,
+    });
+
+    if (cfLoading) {
+      return (
+        <Card>
+          <CardHeader>
+            <CardTitle>Statement of Cash Flows</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {[...Array(4)].map((_, i) => (
+                <Skeleton key={i} className="h-16 w-full" />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    const data = cashFlowData || {
+      operating: { inflows: 0, outflows: 0, net: 0 },
+      investing: { inflows: 0, outflows: 0, net: 0 },
+      financing: { inflows: 0, outflows: 0, net: 0 },
+      netChange: 0,
+    };
+
+    const hasComparison = compareConfig.enabled && comparisonPeriods.length > 0;
+
+    const formatPeriodLabel = (period: DateRange): string => {
+      if (compareConfig.compareType === 'previous_years') {
+        return format(period.to, 'yyyy');
+      }
+      return `${format(period.from, 'MMM d')} - ${format(period.to, 'MMM d')}`;
+    };
+
+    const CashFlowSection = ({ 
+      title, 
+      inflows, 
+      outflows, 
+      net,
+      bgColor,
+      sectionKey,
+      compData,
+    }: { 
+      title: string; 
+      inflows: number; 
+      outflows: number; 
+      net: number;
+      bgColor: string;
+      sectionKey: 'operating' | 'investing' | 'financing';
+      compData: typeof comparisonCashFlow;
+    }) => (
+      <Collapsible open={expandedSections.has(title)} onOpenChange={() => toggleSection(title)}>
+        <CollapsibleTrigger className="w-full">
+          <div className={cn("flex items-center justify-between py-2 px-3 rounded-lg hover:opacity-80 transition-colors", bgColor)}>
+            <div className="flex items-center gap-2">
+              {expandedSections.has(title) ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              <span className="font-semibold">{title}</span>
+            </div>
+            <div className="flex items-center gap-4">
+              {hasComparison && compData.map((cd, idx) => (
+                <span key={idx} className="font-mono text-sm text-muted-foreground min-w-[90px] text-right">
+                  {formatCurrency(cd[sectionKey]?.net || 0)}
+                </span>
+              ))}
+              <span className={cn("font-mono font-semibold min-w-[100px] text-right", net >= 0 ? "text-green-600" : "text-red-600")}>
+                {formatCurrency(net)}
+              </span>
+            </div>
+          </div>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="ml-6 mt-2 space-y-2">
+            <div className="flex justify-between items-center py-1.5 px-3 border-l-2 border-muted">
+              <span className="text-sm">Cash Inflows</span>
+              <div className="flex items-center gap-4">
+                {hasComparison && compData.map((cd, idx) => (
+                  <span key={idx} className="font-mono text-sm text-muted-foreground min-w-[90px] text-right">
+                    {formatCurrency(cd[sectionKey]?.inflows || 0)}
+                  </span>
+                ))}
+                <span className="font-mono text-sm text-green-600 min-w-[100px] text-right">+{formatCurrency(inflows)}</span>
+              </div>
+            </div>
+            <div className="flex justify-between items-center py-1.5 px-3 border-l-2 border-muted">
+              <span className="text-sm">Cash Outflows</span>
+              <div className="flex items-center gap-4">
+                {hasComparison && compData.map((cd, idx) => (
+                  <span key={idx} className="font-mono text-sm text-muted-foreground min-w-[90px] text-right">
+                    -{formatCurrency(cd[sectionKey]?.outflows || 0)}
+                  </span>
+                ))}
+                <span className="font-mono text-sm text-red-600 min-w-[100px] text-right">-{formatCurrency(outflows)}</span>
+              </div>
+            </div>
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
+    );
+
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Statement of Cash Flows</CardTitle>
+          <CardDescription>
+            For the period {format(dateRange.from, 'MMMM d, yyyy')} to {format(dateRange.to, 'MMMM d, yyyy')}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {hasComparison && (
+            <div className="flex items-center justify-end gap-4 mb-2 px-3 text-xs font-medium text-muted-foreground border-b pb-2">
+              {comparisonPeriods.map((period, idx) => (
+                <span key={idx} className="min-w-[90px] text-right">
+                  {formatPeriodLabel(period)}
+                </span>
+              ))}
+              <span className="min-w-[100px] text-right font-semibold text-foreground">
+                Current Period
+              </span>
+            </div>
+          )}
+
+          <CashFlowSection
+            title="Cash Flows from Operating Activities"
+            inflows={data.operating.inflows}
+            outflows={data.operating.outflows}
+            net={data.operating.net}
+            bgColor="bg-blue-500/10"
+            sectionKey="operating"
+            compData={comparisonCashFlow}
+          />
+
+          <CashFlowSection
+            title="Cash Flows from Investing Activities"
+            inflows={data.investing.inflows}
+            outflows={data.investing.outflows}
+            net={data.investing.net}
+            bgColor="bg-purple-500/10"
+            sectionKey="investing"
+            compData={comparisonCashFlow}
+          />
+
+          <CashFlowSection
+            title="Cash Flows from Financing Activities"
+            inflows={data.financing.inflows}
+            outflows={data.financing.outflows}
+            net={data.financing.net}
+            bgColor="bg-orange-500/10"
+            sectionKey="financing"
+            compData={comparisonCashFlow}
+          />
+
+          <div className="pt-4 border-t-2">
+            <div className={cn(
+              "flex justify-between items-center py-4 px-4 rounded-lg font-bold text-lg",
+              data.netChange >= 0 ? "bg-green-500/20" : "bg-red-500/20"
+            )}>
+              <span>Net Change in Cash</span>
+              <div className="flex items-center gap-4">
+                {hasComparison && comparisonCashFlow.map((cd, idx) => (
+                  <span key={idx} className={cn("font-mono text-sm min-w-[90px] text-right", (cd.netChange || 0) >= 0 ? "text-green-600/70" : "text-red-600/70")}>
+                    {formatCurrency(cd.netChange || 0)}
+                  </span>
+                ))}
+                <span className={cn("font-mono min-w-[100px] text-right", data.netChange >= 0 ? "text-green-600" : "text-red-600")}>
+                  {formatCurrency(data.netChange)}
+                </span>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
   if (isLoading) {
     return (
       <Card>
@@ -843,107 +1165,14 @@ export const FinancialStatementsPanel = () => {
 
         {/* Cash Flow Statement */}
         <TabsContent value="cash-flow">
-          <Card>
-            <CardHeader>
-              <CardTitle>Statement of Cash Flows</CardTitle>
-              <CardDescription>
-                For the period {format(dateRange.from, 'MMMM d, yyyy')} to {format(dateRange.to, 'MMMM d, yyyy')}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Operating Activities */}
-              <Collapsible open={expandedSections.has('Operating Activities')} onOpenChange={() => toggleSection('Operating Activities')}>
-                <CollapsibleTrigger className="w-full">
-                  <div className="flex items-center justify-between py-2 px-3 bg-blue-500/10 rounded-lg hover:bg-blue-500/20 transition-colors">
-                    <div className="flex items-center gap-2">
-                      {expandedSections.has('Operating Activities') ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                      <span className="font-semibold">Cash Flows from Operating Activities</span>
-                    </div>
-                    <span className="font-mono font-semibold">{formatCurrency(netIncome)}</span>
-                  </div>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <div className="ml-6 mt-2 space-y-2">
-                    <div className="flex justify-between items-center py-1.5 px-3 border-l-2 border-muted">
-                      <span className="text-sm">Net Income</span>
-                      <span className="font-mono text-sm">{formatCurrency(netIncome)}</span>
-                    </div>
-                    <div className="flex justify-between items-center py-1.5 px-3 border-l-2 border-muted text-muted-foreground">
-                      <span className="text-sm italic">Adjustments for non-cash items</span>
-                      <span className="font-mono text-sm">-</span>
-                    </div>
-                    <div className="flex justify-between items-center py-1.5 px-3 border-l-2 border-muted text-muted-foreground">
-                      <span className="text-sm italic">Changes in working capital</span>
-                      <span className="font-mono text-sm">-</span>
-                    </div>
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-
-              {/* Investing Activities */}
-              <Collapsible open={expandedSections.has('Investing Activities')} onOpenChange={() => toggleSection('Investing Activities')}>
-                <CollapsibleTrigger className="w-full">
-                  <div className="flex items-center justify-between py-2 px-3 bg-purple-500/10 rounded-lg hover:bg-purple-500/20 transition-colors">
-                    <div className="flex items-center gap-2">
-                      {expandedSections.has('Investing Activities') ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                      <span className="font-semibold">Cash Flows from Investing Activities</span>
-                    </div>
-                    <span className="font-mono font-semibold text-muted-foreground">$0.00</span>
-                  </div>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <div className="ml-6 mt-2 space-y-2">
-                    <div className="flex justify-between items-center py-1.5 px-3 border-l-2 border-muted text-muted-foreground">
-                      <span className="text-sm italic">Purchase of fixed assets</span>
-                      <span className="font-mono text-sm">-</span>
-                    </div>
-                    <div className="flex justify-between items-center py-1.5 px-3 border-l-2 border-muted text-muted-foreground">
-                      <span className="text-sm italic">Sale of investments</span>
-                      <span className="font-mono text-sm">-</span>
-                    </div>
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-
-              {/* Financing Activities */}
-              <Collapsible open={expandedSections.has('Financing Activities')} onOpenChange={() => toggleSection('Financing Activities')}>
-                <CollapsibleTrigger className="w-full">
-                  <div className="flex items-center justify-between py-2 px-3 bg-orange-500/10 rounded-lg hover:bg-orange-500/20 transition-colors">
-                    <div className="flex items-center gap-2">
-                      {expandedSections.has('Financing Activities') ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                      <span className="font-semibold">Cash Flows from Financing Activities</span>
-                    </div>
-                    <span className="font-mono font-semibold text-muted-foreground">$0.00</span>
-                  </div>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <div className="ml-6 mt-2 space-y-2">
-                    <div className="flex justify-between items-center py-1.5 px-3 border-l-2 border-muted text-muted-foreground">
-                      <span className="text-sm italic">Proceeds from borrowings</span>
-                      <span className="font-mono text-sm">-</span>
-                    </div>
-                    <div className="flex justify-between items-center py-1.5 px-3 border-l-2 border-muted text-muted-foreground">
-                      <span className="text-sm italic">Dividends paid</span>
-                      <span className="font-mono text-sm">-</span>
-                    </div>
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-
-              {/* Net Change */}
-              <div className="pt-4 border-t-2">
-                <div className={cn(
-                  "flex justify-between items-center py-4 px-4 rounded-lg font-bold text-lg",
-                  netIncome >= 0 ? "bg-green-500/20" : "bg-red-500/20"
-                )}>
-                  <span>Net Change in Cash</span>
-                  <span className={cn("font-mono", netIncome >= 0 ? "text-green-600" : "text-red-600")}>
-                    {formatCurrency(netIncome)}
-                  </span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <CashFlowContent 
+            dateRange={dateRange} 
+            expandedSections={expandedSections}
+            toggleSection={toggleSection}
+            formatCurrency={formatCurrency}
+            compareConfig={compareConfig}
+            comparisonPeriods={comparisonPeriods}
+          />
         </TabsContent>
 
         {/* Statement of Changes in Equity */}
