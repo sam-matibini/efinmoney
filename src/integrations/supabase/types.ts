@@ -468,6 +468,54 @@ export type Database = {
         }
         Relationships: []
       }
+      customers: {
+        Row: {
+          address: string | null
+          created_at: string
+          credit_limit: number | null
+          currency_code: string | null
+          email: string | null
+          id: string
+          is_active: boolean
+          name: string
+          notes: string | null
+          payment_terms: number | null
+          phone: string | null
+          tax_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          created_at?: string
+          credit_limit?: number | null
+          currency_code?: string | null
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          notes?: string | null
+          payment_terms?: number | null
+          phone?: string | null
+          tax_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          created_at?: string
+          credit_limit?: number | null
+          currency_code?: string | null
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          notes?: string | null
+          payment_terms?: number | null
+          phone?: string | null
+          tax_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       fx_rates: {
         Row: {
           created_at: string
@@ -791,6 +839,128 @@ export type Database = {
           },
         ]
       }
+      purchase_bill_items: {
+        Row: {
+          account_id: string | null
+          amount: number
+          bill_id: string
+          created_at: string
+          description: string
+          id: string
+          quantity: number
+          tax_rate: number | null
+          unit_price: number
+        }
+        Insert: {
+          account_id?: string | null
+          amount: number
+          bill_id: string
+          created_at?: string
+          description: string
+          id?: string
+          quantity?: number
+          tax_rate?: number | null
+          unit_price: number
+        }
+        Update: {
+          account_id?: string | null
+          amount?: number
+          bill_id?: string
+          created_at?: string
+          description?: string
+          id?: string
+          quantity?: number
+          tax_rate?: number | null
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_bill_items_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "ledger_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_bill_items_bill_id_fkey"
+            columns: ["bill_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_bills"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      purchase_bills: {
+        Row: {
+          amount_paid: number
+          bill_number: string
+          created_at: string
+          created_by: string | null
+          currency_code: string
+          discount_amount: number
+          due_date: string
+          id: string
+          issue_date: string
+          journal_id: string | null
+          notes: string | null
+          status: Database["public"]["Enums"]["invoice_status"]
+          subtotal: number
+          tax_amount: number
+          total_amount: number
+          updated_at: string
+          vendor_id: string
+          vendor_reference: string | null
+        }
+        Insert: {
+          amount_paid?: number
+          bill_number: string
+          created_at?: string
+          created_by?: string | null
+          currency_code?: string
+          discount_amount?: number
+          due_date: string
+          id?: string
+          issue_date?: string
+          journal_id?: string | null
+          notes?: string | null
+          status?: Database["public"]["Enums"]["invoice_status"]
+          subtotal?: number
+          tax_amount?: number
+          total_amount?: number
+          updated_at?: string
+          vendor_id: string
+          vendor_reference?: string | null
+        }
+        Update: {
+          amount_paid?: number
+          bill_number?: string
+          created_at?: string
+          created_by?: string | null
+          currency_code?: string
+          discount_amount?: number
+          due_date?: string
+          id?: string
+          issue_date?: string
+          journal_id?: string | null
+          notes?: string | null
+          status?: Database["public"]["Enums"]["invoice_status"]
+          subtotal?: number
+          tax_amount?: number
+          total_amount?: number
+          updated_at?: string
+          vendor_id?: string
+          vendor_reference?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_bills_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rate_limits: {
         Row: {
           count: number
@@ -875,6 +1045,125 @@ export type Database = {
             columns: ["transfer_id"]
             isOneToOne: false
             referencedRelation: "transfers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sales_invoice_items: {
+        Row: {
+          account_id: string | null
+          amount: number
+          created_at: string
+          description: string
+          id: string
+          invoice_id: string
+          quantity: number
+          tax_rate: number | null
+          unit_price: number
+        }
+        Insert: {
+          account_id?: string | null
+          amount: number
+          created_at?: string
+          description: string
+          id?: string
+          invoice_id: string
+          quantity?: number
+          tax_rate?: number | null
+          unit_price: number
+        }
+        Update: {
+          account_id?: string | null
+          amount?: number
+          created_at?: string
+          description?: string
+          id?: string
+          invoice_id?: string
+          quantity?: number
+          tax_rate?: number | null
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_invoice_items_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "ledger_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_invoice_items_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "sales_invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sales_invoices: {
+        Row: {
+          amount_paid: number
+          created_at: string
+          created_by: string | null
+          currency_code: string
+          customer_id: string
+          discount_amount: number
+          due_date: string
+          id: string
+          invoice_number: string
+          issue_date: string
+          journal_id: string | null
+          notes: string | null
+          status: Database["public"]["Enums"]["invoice_status"]
+          subtotal: number
+          tax_amount: number
+          total_amount: number
+          updated_at: string
+        }
+        Insert: {
+          amount_paid?: number
+          created_at?: string
+          created_by?: string | null
+          currency_code?: string
+          customer_id: string
+          discount_amount?: number
+          due_date: string
+          id?: string
+          invoice_number: string
+          issue_date?: string
+          journal_id?: string | null
+          notes?: string | null
+          status?: Database["public"]["Enums"]["invoice_status"]
+          subtotal?: number
+          tax_amount?: number
+          total_amount?: number
+          updated_at?: string
+        }
+        Update: {
+          amount_paid?: number
+          created_at?: string
+          created_by?: string | null
+          currency_code?: string
+          customer_id?: string
+          discount_amount?: number
+          due_date?: string
+          id?: string
+          invoice_number?: string
+          issue_date?: string
+          journal_id?: string | null
+          notes?: string | null
+          status?: Database["public"]["Enums"]["invoice_status"]
+          subtotal?: number
+          tax_amount?: number
+          total_amount?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_invoices_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
             referencedColumns: ["id"]
           },
         ]
@@ -994,6 +1283,57 @@ export type Database = {
         }
         Relationships: []
       }
+      vendors: {
+        Row: {
+          address: string | null
+          bank_account: string | null
+          bank_name: string | null
+          created_at: string
+          currency_code: string | null
+          email: string | null
+          id: string
+          is_active: boolean
+          name: string
+          notes: string | null
+          payment_terms: number | null
+          phone: string | null
+          tax_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          bank_account?: string | null
+          bank_name?: string | null
+          created_at?: string
+          currency_code?: string | null
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          notes?: string | null
+          payment_terms?: number | null
+          phone?: string | null
+          tax_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          bank_account?: string | null
+          bank_name?: string | null
+          created_at?: string
+          currency_code?: string | null
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          notes?: string | null
+          payment_terms?: number | null
+          phone?: string | null
+          tax_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       wallets: {
         Row: {
           created_at: string
@@ -1096,6 +1436,13 @@ export type Database = {
         | "false_positive"
       app_role: "user" | "admin" | "compliance" | "support" | "finance"
       currency_type: "fiat" | "crypto"
+      invoice_status:
+        | "draft"
+        | "sent"
+        | "paid"
+        | "partial"
+        | "overdue"
+        | "cancelled"
       kyc_status: "pending" | "submitted" | "verified" | "rejected" | "expired"
       kyc_tier: "tier_0" | "tier_1" | "tier_2" | "tier_3"
       reconciliation_status:
@@ -1254,6 +1601,14 @@ export const Constants = {
       ],
       app_role: ["user", "admin", "compliance", "support", "finance"],
       currency_type: ["fiat", "crypto"],
+      invoice_status: [
+        "draft",
+        "sent",
+        "paid",
+        "partial",
+        "overdue",
+        "cancelled",
+      ],
       kyc_status: ["pending", "submitted", "verified", "rejected", "expired"],
       kyc_tier: ["tier_0", "tier_1", "tier_2", "tier_3"],
       reconciliation_status: [
