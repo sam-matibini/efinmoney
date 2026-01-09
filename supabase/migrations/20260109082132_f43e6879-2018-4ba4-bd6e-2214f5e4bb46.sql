@@ -1,0 +1,77 @@
+-- Add more popular cryptocurrencies
+INSERT INTO currencies (code, name, symbol, currency_type, decimal_places, is_active) VALUES
+  ('ETH', 'Ethereum', 'Ξ', 'crypto', 8, true),
+  ('BNB', 'Binance Coin', 'BNB', 'crypto', 8, true),
+  ('XRP', 'Ripple', 'XRP', 'crypto', 6, true),
+  ('SOL', 'Solana', 'SOL', 'crypto', 8, true),
+  ('ADA', 'Cardano', 'ADA', 'crypto', 6, true),
+  ('DOGE', 'Dogecoin', 'Ð', 'crypto', 8, true),
+  ('DOT', 'Polkadot', 'DOT', 'crypto', 8, true),
+  ('MATIC', 'Polygon', 'MATIC', 'crypto', 8, true),
+  ('LTC', 'Litecoin', 'Ł', 'crypto', 8, true),
+  ('AVAX', 'Avalanche', 'AVAX', 'crypto', 8, true),
+  ('LINK', 'Chainlink', 'LINK', 'crypto', 8, true),
+  ('UNI', 'Uniswap', 'UNI', 'crypto', 8, true),
+  ('SHIB', 'Shiba Inu', 'SHIB', 'crypto', 8, true),
+  ('TRX', 'TRON', 'TRX', 'crypto', 6, true),
+  ('ATOM', 'Cosmos', 'ATOM', 'crypto', 6, true)
+ON CONFLICT (code) DO NOTHING;
+
+-- Add more major world currencies that might be missing
+INSERT INTO currencies (code, name, symbol, currency_type, decimal_places, flag_emoji, is_active) VALUES
+  ('JPY', 'Japanese Yen', '¥', 'fiat', 0, '🇯🇵', true),
+  ('AUD', 'Australian Dollar', 'A$', 'fiat', 2, '🇦🇺', true),
+  ('NZD', 'New Zealand Dollar', 'NZ$', 'fiat', 2, '🇳🇿', true),
+  ('SGD', 'Singapore Dollar', 'S$', 'fiat', 2, '🇸🇬', true),
+  ('HKD', 'Hong Kong Dollar', 'HK$', 'fiat', 2, '🇭🇰', true),
+  ('KRW', 'South Korean Won', '₩', 'fiat', 0, '🇰🇷', true),
+  ('MXN', 'Mexican Peso', 'MX$', 'fiat', 2, '🇲🇽', true),
+  ('BRL', 'Brazilian Real', 'R$', 'fiat', 2, '🇧🇷', true),
+  ('SEK', 'Swedish Krona', 'kr', 'fiat', 2, '🇸🇪', true),
+  ('NOK', 'Norwegian Krone', 'kr', 'fiat', 2, '🇳🇴', true),
+  ('DKK', 'Danish Krone', 'kr', 'fiat', 2, '🇩🇰', true),
+  ('PLN', 'Polish Zloty', 'zł', 'fiat', 2, '🇵🇱', true),
+  ('THB', 'Thai Baht', '฿', 'fiat', 2, '🇹🇭', true),
+  ('PHP', 'Philippine Peso', '₱', 'fiat', 2, '🇵🇭', true),
+  ('IDR', 'Indonesian Rupiah', 'Rp', 'fiat', 0, '🇮🇩', true),
+  ('MYR', 'Malaysian Ringgit', 'RM', 'fiat', 2, '🇲🇾', true),
+  ('VND', 'Vietnamese Dong', '₫', 'fiat', 0, '🇻🇳', true),
+  ('PKR', 'Pakistani Rupee', '₨', 'fiat', 2, '🇵🇰', true),
+  ('BDT', 'Bangladeshi Taka', '৳', 'fiat', 2, '🇧🇩', true),
+  ('TRY', 'Turkish Lira', '₺', 'fiat', 2, '🇹🇷', true),
+  ('RUB', 'Russian Ruble', '₽', 'fiat', 2, '🇷🇺', true),
+  ('ILS', 'Israeli Shekel', '₪', 'fiat', 2, '🇮🇱', true),
+  ('SAR', 'Saudi Riyal', 'SR', 'fiat', 2, '🇸🇦', true),
+  ('QAR', 'Qatari Riyal', 'QR', 'fiat', 2, '🇶🇦', true),
+  ('KWD', 'Kuwaiti Dinar', 'KD', 'fiat', 3, '🇰🇼', true),
+  ('BHD', 'Bahraini Dinar', 'BD', 'fiat', 3, '🇧🇭', true),
+  ('OMR', 'Omani Rial', 'OMR', 'fiat', 3, '🇴🇲', true),
+  ('JOD', 'Jordanian Dinar', 'JD', 'fiat', 3, '🇯🇴', true),
+  ('CLP', 'Chilean Peso', 'CLP$', 'fiat', 0, '🇨🇱', true),
+  ('COP', 'Colombian Peso', 'COP$', 'fiat', 0, '🇨🇴', true),
+  ('ARS', 'Argentine Peso', 'AR$', 'fiat', 2, '🇦🇷', true),
+  ('PEN', 'Peruvian Sol', 'S/', 'fiat', 2, '🇵🇪', true)
+ON CONFLICT (code) DO NOTHING;
+
+-- Add crypto trading pairs for new cryptocurrencies
+INSERT INTO crypto_pairs (base_currency, quote_currency, min_trade_amount, trading_fee_percent, is_active) VALUES
+  ('ETH', 'USD', 0.001, 0.0035, true),
+  ('ETH', 'USDT', 0.001, 0.003, true),
+  ('BNB', 'USD', 0.01, 0.0035, true),
+  ('BNB', 'USDT', 0.01, 0.003, true),
+  ('XRP', 'USD', 1, 0.0035, true),
+  ('XRP', 'USDT', 1, 0.003, true),
+  ('SOL', 'USD', 0.01, 0.0035, true),
+  ('SOL', 'USDT', 0.01, 0.003, true),
+  ('ADA', 'USD', 1, 0.0035, true),
+  ('DOGE', 'USD', 10, 0.0035, true),
+  ('DOT', 'USD', 0.1, 0.0035, true),
+  ('LTC', 'USD', 0.01, 0.0035, true),
+  ('AVAX', 'USD', 0.01, 0.0035, true),
+  ('LINK', 'USD', 0.1, 0.0035, true),
+  ('UNI', 'USD', 0.1, 0.0035, true),
+  ('MATIC', 'USD', 1, 0.0035, true),
+  ('ATOM', 'USD', 0.1, 0.0035, true),
+  ('TRX', 'USD', 10, 0.0035, true),
+  ('SHIB', 'USD', 100000, 0.0035, true)
+ON CONFLICT DO NOTHING;
