@@ -15,6 +15,7 @@ import { StatementsPanel } from "@/components/finance/StatementsPanel";
 import { VendorsPanel } from "@/components/finance/VendorsPanel";
 import { SalesInvoicesPanel } from "@/components/finance/SalesInvoicesPanel";
 import { PurchaseBillsPanel } from "@/components/finance/PurchaseBillsPanel";
+import { ReportsCentrePanel } from "@/components/finance/ReportsCentrePanel";
 
 const FinanceDashboard = () => {
   return (
@@ -35,15 +36,15 @@ const FinanceDashboard = () => {
           <Tabs defaultValue="accounting" className="space-y-4">
             <div className="overflow-x-auto pb-2">
               <TabsList className="inline-flex w-auto min-w-full lg:min-w-0">
-                <TabsTrigger value="accounting">Accounting</TabsTrigger>
-                <TabsTrigger value="banking">Banking</TabsTrigger>
-                <TabsTrigger value="statements">Statements</TabsTrigger>
-                <TabsTrigger value="vendors">Vendors</TabsTrigger>
-                <TabsTrigger value="invoices">Invoices</TabsTrigger>
-                <TabsTrigger value="bills">Bills</TabsTrigger>
-                <TabsTrigger value="fx">FX</TabsTrigger>
-                <TabsTrigger value="crypto">Crypto</TabsTrigger>
-              </TabsList>
+              <TabsTrigger value="accounting">Accounting</TabsTrigger>
+              <TabsTrigger value="banking">Banking</TabsTrigger>
+              <TabsTrigger value="reports">Reports</TabsTrigger>
+              <TabsTrigger value="vendors">Vendors</TabsTrigger>
+              <TabsTrigger value="invoices">Invoices</TabsTrigger>
+              <TabsTrigger value="bills">Bills</TabsTrigger>
+              <TabsTrigger value="fx">FX</TabsTrigger>
+              <TabsTrigger value="crypto">Crypto</TabsTrigger>
+            </TabsList>
             </div>
 
             <TabsContent value="accounting" className="space-y-4">
@@ -88,8 +89,8 @@ const FinanceDashboard = () => {
               </Tabs>
             </TabsContent>
 
-            <TabsContent value="statements" className="space-y-4">
-              <StatementsPanel />
+            <TabsContent value="reports" className="space-y-4">
+              <ReportsCentrePanel />
             </TabsContent>
 
             <TabsContent value="vendors" className="space-y-4">

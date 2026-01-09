@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Bell, Search, User, LogOut, Shield, Wallet, Settings } from "lucide-react";
+import { Bell, Search, User, LogOut, Shield, Wallet, Settings, Cog } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRoles } from "@/hooks/useUserRoles";
 import { Link, useLocation } from "react-router-dom";
@@ -34,6 +34,7 @@ const Header = () => {
 
   if (isAdmin) {
     navItems.push({ label: 'Admin', href: '/admin' });
+    navItems.push({ label: 'Settings', href: '/settings' });
   }
 
   return (
@@ -74,6 +75,7 @@ const Header = () => {
                 {item.label === 'Finance' && <Wallet className="w-4 h-4" />}
                 {item.label === 'Operations' && <Settings className="w-4 h-4" />}
                 {item.label === 'Admin' && <Shield className="w-4 h-4" />}
+                {item.label === 'Settings' && <Cog className="w-4 h-4" />}
                 {item.label}
               </Link>
             );
