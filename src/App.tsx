@@ -10,6 +10,10 @@ import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import FinanceDashboard from "./pages/FinanceDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
+import WalletsPage from "./pages/WalletsPage";
+import SendPage from "./pages/SendPage";
+import ExchangePage from "./pages/ExchangePage";
+import CardsPage from "./pages/CardsPage";
 
 const queryClient = new QueryClient();
 
@@ -86,6 +90,38 @@ const AppRoutes = () => (
       element={
         <ProtectedRoute>
           <Index />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/wallets"
+      element={
+        <ProtectedRoute>
+          <WalletsPage />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/send"
+      element={
+        <ProtectedRoute>
+          <SendPage />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/exchange"
+      element={
+        <ProtectedRoute>
+          <ExchangePage />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/cards"
+      element={
+        <ProtectedRoute>
+          <CardsPage />
         </ProtectedRoute>
       }
     />
