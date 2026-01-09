@@ -24,17 +24,17 @@ const Index = () => {
     <div className="min-h-screen bg-background pb-24 md:pb-8">
       <Header />
       
-      <main className="container px-4 py-6">
+      <main className="container px-4 py-4 sm:py-6">
         {/* Hero Welcome */}
         <motion.section 
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-8"
+          className="mb-6 sm:mb-8"
         >
-          <h1 className="text-2xl md:text-3xl font-display font-bold text-foreground mb-2">
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-display font-bold text-foreground mb-1 sm:mb-2">
             {greeting}, {firstName} 👋
           </h1>
-          <p className="text-muted-foreground">
+          <p className="text-sm sm:text-base text-muted-foreground">
             Your money is working across multiple currencies
           </p>
         </motion.section>
@@ -49,7 +49,7 @@ const Index = () => {
         <QuickActions />
 
         {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
           <div className="lg:col-span-2">
             <RecentTransactions />
           </div>

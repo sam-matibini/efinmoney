@@ -25,14 +25,14 @@ const QuickAction = ({ icon: Icon, label, onClick, variant = 'default' }: QuickA
       whileHover={{ scale: 1.05, y: -2 }}
       whileTap={{ scale: 0.95 }}
       onClick={onClick}
-      className={`flex flex-col items-center gap-3 p-6 rounded-2xl transition-all ${getStyles()}`}
+      className={`w-full flex flex-col items-center gap-3 p-4 sm:p-6 rounded-2xl transition-all ${getStyles()}`}
     >
-      <div className={`p-4 rounded-xl ${
+      <div className={`p-3 sm:p-4 rounded-xl ${
         variant === 'default' ? 'bg-muted' : 'bg-foreground/10'
       }`}>
-        <Icon className="w-6 h-6" />
+        <Icon className="w-5 h-5 sm:w-6 sm:h-6" />
       </div>
-      <span className="text-sm font-medium">{label}</span>
+      <span className="text-xs sm:text-sm font-medium text-center">{label}</span>
     </motion.button>
   );
 };

@@ -12,7 +12,7 @@ const QuickActions = () => {
       <motion.div 
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="grid grid-cols-3 md:grid-cols-6 gap-3"
+        className="grid grid-cols-3 sm:grid-cols-6 gap-2 sm:gap-3"
       >
         <motion.div
           initial={{ opacity: 0, scale: 0.8 }}
