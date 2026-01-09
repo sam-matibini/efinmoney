@@ -10,6 +10,7 @@ import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import FinanceDashboard from "./pages/FinanceDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
+import OperationsDashboard from "./pages/OperationsDashboard";
 import WalletsPage from "./pages/WalletsPage";
 import SendPage from "./pages/SendPage";
 import ExchangePage from "./pages/ExchangePage";
@@ -139,6 +140,14 @@ const AppRoutes = () => (
       element={
         <RoleProtectedRoute allowedRoles={['admin']}>
           <AdminDashboard />
+        </RoleProtectedRoute>
+      }
+    />
+    <Route
+      path="/operations"
+      element={
+        <RoleProtectedRoute allowedRoles={['admin', 'compliance', 'finance']}>
+          <OperationsDashboard />
         </RoleProtectedRoute>
       }
     />

@@ -2,7 +2,6 @@ import { motion } from "framer-motion";
 import Header from "@/components/layout/Header";
 import MobileNav from "@/components/layout/MobileNav";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LedgerEntriesPanel } from "@/components/finance/LedgerEntriesPanel";
 import { ReconciliationPanel } from "@/components/finance/ReconciliationPanel";
 import { FxTradesPanel } from "@/components/finance/FxTradesPanel";
 import { CryptoTradesPanel } from "@/components/finance/CryptoTradesPanel";
@@ -18,13 +17,6 @@ import { VendorsPanel } from "@/components/finance/VendorsPanel";
 import { SalesInvoicesPanel } from "@/components/finance/SalesInvoicesPanel";
 import { PurchaseBillsPanel } from "@/components/finance/PurchaseBillsPanel";
 import { CrmCustomersPanel } from "@/components/crm/CrmCustomersPanel";
-import { TransactionMonitoringPanel } from "@/components/operations/TransactionMonitoringPanel";
-import { DisputesPanel } from "@/components/operations/DisputesPanel";
-import { WalletOperationsPanel } from "@/components/operations/WalletOperationsPanel";
-import { OperationsKPIsPanel } from "@/components/operations/OperationsKPIsPanel";
-import { RegulatoryReportsPanel } from "@/components/operations/RegulatoryReportsPanel";
-import { CommunicationsPanel } from "@/components/operations/CommunicationsPanel";
-import { MakerCheckerPanel } from "@/components/operations/MakerCheckerPanel";
 
 const FinanceDashboard = () => {
   return (
@@ -60,13 +52,6 @@ const FinanceDashboard = () => {
                 <TabsTrigger value="reconciliation">Recon</TabsTrigger>
                 <TabsTrigger value="fx">FX</TabsTrigger>
                 <TabsTrigger value="crypto">Crypto</TabsTrigger>
-                <TabsTrigger value="txn-monitor">Txn Monitor</TabsTrigger>
-                <TabsTrigger value="disputes">Disputes</TabsTrigger>
-                <TabsTrigger value="wallet-ops">Wallet Ops</TabsTrigger>
-                <TabsTrigger value="kpis">KPIs</TabsTrigger>
-                <TabsTrigger value="reg-reports">Reports</TabsTrigger>
-                <TabsTrigger value="comms">Comms</TabsTrigger>
-                <TabsTrigger value="maker-checker">Approvals</TabsTrigger>
               </TabsList>
             </div>
 
@@ -128,34 +113,6 @@ const FinanceDashboard = () => {
 
             <TabsContent value="crypto" className="space-y-4">
               <CryptoTradesPanel />
-            </TabsContent>
-
-            <TabsContent value="txn-monitor" className="space-y-4">
-              <TransactionMonitoringPanel />
-            </TabsContent>
-
-            <TabsContent value="disputes" className="space-y-4">
-              <DisputesPanel />
-            </TabsContent>
-
-            <TabsContent value="wallet-ops" className="space-y-4">
-              <WalletOperationsPanel />
-            </TabsContent>
-
-            <TabsContent value="kpis" className="space-y-4">
-              <OperationsKPIsPanel />
-            </TabsContent>
-
-            <TabsContent value="reg-reports" className="space-y-4">
-              <RegulatoryReportsPanel />
-            </TabsContent>
-
-            <TabsContent value="comms" className="space-y-4">
-              <CommunicationsPanel />
-            </TabsContent>
-
-            <TabsContent value="maker-checker" className="space-y-4">
-              <MakerCheckerPanel />
             </TabsContent>
           </Tabs>
         </motion.div>
