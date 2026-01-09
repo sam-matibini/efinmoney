@@ -14,6 +14,7 @@ import WalletsPage from "./pages/WalletsPage";
 import SendPage from "./pages/SendPage";
 import ExchangePage from "./pages/ExchangePage";
 import CardsPage from "./pages/CardsPage";
+import CustomerPortalPage from "./pages/CustomerPortalPage";
 
 const queryClient = new QueryClient();
 
@@ -148,6 +149,10 @@ const AppRoutes = () => (
           <Auth />
         </PublicRoute>
       }
+    />
+    <Route
+      path="/portal"
+      element={<CustomerPortalPage />}
     />
     <Route path="*" element={<NotFound />} />
   </Routes>
