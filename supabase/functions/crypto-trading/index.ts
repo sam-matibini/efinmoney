@@ -128,13 +128,24 @@ serve(async (req) => {
         );
       }
 
+      // Fetch real-time prices
+      let cryptoPrices: Record<string, number>;
+      try {
+        cryptoPrices = await fetchCryptoPrices();
+      } catch (priceError) {
+        return new Response(
+          JSON.stringify({ error: 'Price service temporarily unavailable' }),
+          { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
       // Add current prices
       const pairsWithPrices = pairs.map(pair => {
         const priceKey = `${pair.base_currency}_${pair.quote_currency}`;
         return {
           ...pair,
-          current_price: CRYPTO_PRICES[priceKey] || 1,
-          price_change_24h: (Math.random() - 0.5) * 5 // Mock 24h change
+          current_price: cryptoPrices[priceKey] || 1,
+          price_change_24h: 0 // Would need historical data for real 24h change
         };
       });
 
@@ -162,8 +173,19 @@ serve(async (req) => {
         );
       }
 
+      // Fetch real-time prices
+      let cryptoPrices: Record<string, number>;
+      try {
+        cryptoPrices = await fetchCryptoPrices();
+      } catch (priceError) {
+        return new Response(
+          JSON.stringify({ error: 'Price service temporarily unavailable' }),
+          { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
       const priceKey = `${pair.base_currency}_${pair.quote_currency}`;
-      const marketPrice = CRYPTO_PRICES[priceKey] || 1;
+      const marketPrice = cryptoPrices[priceKey] || 1;
       const tradingFee = Number(pair.trading_fee_percent);
 
       let baseAmount: number;
@@ -263,9 +285,31 @@ serve(async (req) => {
         quoteWalletId = newWallet?.id;
       }
 
+      // Fetch real-time prices
+      let cryptoPrices: Record<string, number>;
+      try {
+        cryptoPrices = await fetchCryptoPrices();
+      } catch (priceError) {
+        return new Response(
+          JSON.stringify({ error: 'Price service temporarily unavailable' }),
+          { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
       const priceKey = `${pair.base_currency}_${pair.quote_currency}`;
-      const marketPrice = CRYPTO_PRICES[priceKey] || 1;
+      const marketPrice = cryptoPrices[priceKey] || 1;
       const tradingFee = Number(pair.trading_fee_percent);
+
+      // Validate trade amount limits
+      const estimatedUsdValue = amount_type === 'quote' ? amount : amount * marketPrice;
+      if (estimatedUsdValue > MAX_TRADE_AMOUNT_USD) {
+        return new Response(
+          JSON.stringify({ 
+            error: `Trade amount exceeds maximum limit of $${MAX_TRADE_AMOUNT_USD.toLocaleString()}` 
+          }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
 
       let baseAmount: number;
       let quoteAmount: number;
