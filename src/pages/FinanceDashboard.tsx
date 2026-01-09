@@ -17,6 +17,7 @@ import { VendorsPanel } from "@/components/finance/VendorsPanel";
 import { SalesInvoicesPanel } from "@/components/finance/SalesInvoicesPanel";
 import { PurchaseBillsPanel } from "@/components/finance/PurchaseBillsPanel";
 import { ReportsCentrePanel } from "@/components/finance/ReportsCentrePanel";
+import { SalesTaxPanel } from "@/components/finance/SalesTaxPanel";
 
 const FinanceDashboard = () => {
   return (
@@ -40,6 +41,7 @@ const FinanceDashboard = () => {
               <TabsTrigger value="accounting">Accounting</TabsTrigger>
               <TabsTrigger value="banking">Banking</TabsTrigger>
               <TabsTrigger value="reports">Reports</TabsTrigger>
+              <TabsTrigger value="sales-tax">Sales Tax</TabsTrigger>
               <TabsTrigger value="vendors">Vendors</TabsTrigger>
               <TabsTrigger value="invoices">Invoices</TabsTrigger>
               <TabsTrigger value="bills">Bills</TabsTrigger>
@@ -107,6 +109,10 @@ const FinanceDashboard = () => {
                   <ReportsCentrePanel />
                 </TabsContent>
               </Tabs>
+            </TabsContent>
+
+            <TabsContent value="sales-tax" className="space-y-4">
+              <SalesTaxPanel />
             </TabsContent>
 
             <TabsContent value="vendors" className="space-y-4">

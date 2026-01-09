@@ -1091,6 +1091,59 @@ export type Database = {
           },
         ]
       }
+      input_tax_credits: {
+        Row: {
+          claimed_in_filing_id: string | null
+          created_at: string
+          created_by: string | null
+          expense_amount: number
+          expense_date: string
+          expense_description: string
+          id: string
+          invoice_reference: string | null
+          is_claimed: boolean
+          tax_amount: number
+          tax_type: Database["public"]["Enums"]["tax_type"]
+          vendor_id: string | null
+        }
+        Insert: {
+          claimed_in_filing_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          expense_amount: number
+          expense_date: string
+          expense_description: string
+          id?: string
+          invoice_reference?: string | null
+          is_claimed?: boolean
+          tax_amount: number
+          tax_type: Database["public"]["Enums"]["tax_type"]
+          vendor_id?: string | null
+        }
+        Update: {
+          claimed_in_filing_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          expense_amount?: number
+          expense_date?: string
+          expense_description?: string
+          id?: string
+          invoice_reference?: string | null
+          is_claimed?: boolean
+          tax_amount?: number
+          tax_type?: Database["public"]["Enums"]["tax_type"]
+          vendor_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "input_tax_credits_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ledger_accounts: {
         Row: {
           account_type: Database["public"]["Enums"]["account_type"]
@@ -1791,6 +1844,272 @@ export type Database = {
           },
         ]
       }
+      tax_filings: {
+        Row: {
+          adjustments: number
+          approved_at: string | null
+          approved_by: string | null
+          cra_confirmation: string | null
+          created_at: string
+          filed_at: string | null
+          filing_period_end: string
+          filing_period_start: string
+          filing_reference: string | null
+          id: string
+          input_tax_credits: number
+          net_tax_payable: number
+          notes: string | null
+          payment_date: string | null
+          payment_reference: string | null
+          prepared_at: string | null
+          prepared_by: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: Database["public"]["Enums"]["tax_filing_status"]
+          tax_collected: number
+          tax_type: Database["public"]["Enums"]["tax_type"]
+          updated_at: string
+        }
+        Insert: {
+          adjustments?: number
+          approved_at?: string | null
+          approved_by?: string | null
+          cra_confirmation?: string | null
+          created_at?: string
+          filed_at?: string | null
+          filing_period_end: string
+          filing_period_start: string
+          filing_reference?: string | null
+          id?: string
+          input_tax_credits?: number
+          net_tax_payable?: number
+          notes?: string | null
+          payment_date?: string | null
+          payment_reference?: string | null
+          prepared_at?: string | null
+          prepared_by?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["tax_filing_status"]
+          tax_collected?: number
+          tax_type: Database["public"]["Enums"]["tax_type"]
+          updated_at?: string
+        }
+        Update: {
+          adjustments?: number
+          approved_at?: string | null
+          approved_by?: string | null
+          cra_confirmation?: string | null
+          created_at?: string
+          filed_at?: string | null
+          filing_period_end?: string
+          filing_period_start?: string
+          filing_reference?: string | null
+          id?: string
+          input_tax_credits?: number
+          net_tax_payable?: number
+          notes?: string | null
+          payment_date?: string | null
+          payment_reference?: string | null
+          prepared_at?: string | null
+          prepared_by?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["tax_filing_status"]
+          tax_collected?: number
+          tax_type?: Database["public"]["Enums"]["tax_type"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      tax_rates: {
+        Row: {
+          created_at: string
+          effective_from: string
+          effective_to: string | null
+          id: string
+          is_active: boolean
+          province_code: string
+          province_name: string
+          rate: number
+          tax_type: Database["public"]["Enums"]["tax_type"]
+        }
+        Insert: {
+          created_at?: string
+          effective_from?: string
+          effective_to?: string | null
+          id?: string
+          is_active?: boolean
+          province_code: string
+          province_name: string
+          rate: number
+          tax_type: Database["public"]["Enums"]["tax_type"]
+        }
+        Update: {
+          created_at?: string
+          effective_from?: string
+          effective_to?: string | null
+          id?: string
+          is_active?: boolean
+          province_code?: string
+          province_name?: string
+          rate?: number
+          tax_type?: Database["public"]["Enums"]["tax_type"]
+        }
+        Relationships: []
+      }
+      tax_registrations: {
+        Row: {
+          created_at: string
+          effective_from: string
+          effective_to: string | null
+          filing_frequency: Database["public"]["Enums"]["tax_filing_frequency"]
+          id: string
+          is_active: boolean
+          legal_name: string
+          registration_number: string
+          tax_type: Database["public"]["Enums"]["tax_type"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          effective_from?: string
+          effective_to?: string | null
+          filing_frequency?: Database["public"]["Enums"]["tax_filing_frequency"]
+          id?: string
+          is_active?: boolean
+          legal_name: string
+          registration_number: string
+          tax_type: Database["public"]["Enums"]["tax_type"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          effective_from?: string
+          effective_to?: string | null
+          filing_frequency?: Database["public"]["Enums"]["tax_filing_frequency"]
+          id?: string
+          is_active?: boolean
+          legal_name?: string
+          registration_number?: string
+          tax_type?: Database["public"]["Enums"]["tax_type"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      tax_transactions: {
+        Row: {
+          created_at: string
+          customer_id: string | null
+          gst_amount: number | null
+          gst_rate: number | null
+          hst_amount: number | null
+          hst_rate: number | null
+          id: string
+          invoice_number: string | null
+          is_refunded: boolean
+          journal_id: string | null
+          province_code: string
+          pst_amount: number | null
+          pst_rate: number | null
+          qst_amount: number | null
+          qst_rate: number | null
+          refunded_at: string | null
+          taxable_amount: number
+          total_tax: number
+          total_with_tax: number
+          transaction_id: string
+          transaction_type: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          customer_id?: string | null
+          gst_amount?: number | null
+          gst_rate?: number | null
+          hst_amount?: number | null
+          hst_rate?: number | null
+          id?: string
+          invoice_number?: string | null
+          is_refunded?: boolean
+          journal_id?: string | null
+          province_code: string
+          pst_amount?: number | null
+          pst_rate?: number | null
+          qst_amount?: number | null
+          qst_rate?: number | null
+          refunded_at?: string | null
+          taxable_amount: number
+          total_tax?: number
+          total_with_tax: number
+          transaction_id: string
+          transaction_type: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string | null
+          gst_amount?: number | null
+          gst_rate?: number | null
+          hst_amount?: number | null
+          hst_rate?: number | null
+          id?: string
+          invoice_number?: string | null
+          is_refunded?: boolean
+          journal_id?: string | null
+          province_code?: string
+          pst_amount?: number | null
+          pst_rate?: number | null
+          qst_amount?: number | null
+          qst_rate?: number | null
+          refunded_at?: string | null
+          taxable_amount?: number
+          total_tax?: number
+          total_with_tax?: number
+          transaction_id?: string
+          transaction_type?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tax_transactions_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      taxable_services: {
+        Row: {
+          created_at: string
+          description: string | null
+          exemption_reason: string | null
+          id: string
+          is_taxable: boolean
+          service_code: string
+          service_name: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          exemption_reason?: string | null
+          id?: string
+          is_taxable?: boolean
+          service_code: string
+          service_name: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          exemption_reason?: string | null
+          id?: string
+          is_taxable?: boolean
+          service_code?: string
+          service_name?: string
+        }
+        Relationships: []
+      }
       transaction_interventions: {
         Row: {
           approved_at: string | null
@@ -2259,6 +2578,14 @@ export type Database = {
         | "unmatched"
         | "exception"
         | "resolved"
+      tax_filing_frequency: "monthly" | "quarterly" | "annually"
+      tax_filing_status:
+        | "draft"
+        | "pending_review"
+        | "approved"
+        | "filed"
+        | "paid"
+      tax_type: "GST" | "HST" | "QST" | "PST" | "RST"
       trade_side: "buy" | "sell"
       trade_status: "pending" | "executed" | "cancelled" | "failed"
       transfer_status:
@@ -2426,6 +2753,15 @@ export const Constants = {
         "exception",
         "resolved",
       ],
+      tax_filing_frequency: ["monthly", "quarterly", "annually"],
+      tax_filing_status: [
+        "draft",
+        "pending_review",
+        "approved",
+        "filed",
+        "paid",
+      ],
+      tax_type: ["GST", "HST", "QST", "PST", "RST"],
       trade_side: ["buy", "sell"],
       trade_status: ["pending", "executed", "cancelled", "failed"],
       transfer_status: [
