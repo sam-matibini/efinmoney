@@ -11,8 +11,6 @@ import NotFound from "./pages/NotFound";
 import FinanceDashboard from "./pages/FinanceDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
 import OperationsDashboard from "./pages/OperationsDashboard";
-import AccountingDashboard from "./pages/AccountingDashboard";
-import BankingDashboard from "./pages/BankingDashboard";
 import WalletsPage from "./pages/WalletsPage";
 import SendPage from "./pages/SendPage";
 import ExchangePage from "./pages/ExchangePage";
@@ -134,22 +132,6 @@ const AppRoutes = () => (
       element={
         <RoleProtectedRoute allowedRoles={['admin', 'finance']}>
           <FinanceDashboard />
-        </RoleProtectedRoute>
-      }
-    />
-    <Route
-      path="/accounting"
-      element={
-        <RoleProtectedRoute allowedRoles={['admin', 'finance']}>
-          <AccountingDashboard />
-        </RoleProtectedRoute>
-      }
-    />
-    <Route
-      path="/banking"
-      element={
-        <RoleProtectedRoute allowedRoles={['admin', 'finance']}>
-          <BankingDashboard />
         </RoleProtectedRoute>
       }
     />

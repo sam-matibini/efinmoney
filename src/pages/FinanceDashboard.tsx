@@ -2,6 +2,13 @@ import { motion } from "framer-motion";
 import Header from "@/components/layout/Header";
 import MobileNav from "@/components/layout/MobileNav";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ChartOfAccountsPanel } from "@/components/finance/ChartOfAccountsPanel";
+import { JournalEntriesPanel } from "@/components/finance/JournalEntriesPanel";
+import { GeneralLedgerPanel } from "@/components/finance/GeneralLedgerPanel";
+import { TrialBalancePanel } from "@/components/finance/TrialBalancePanel";
+import { BankAccountsPanel } from "@/components/finance/BankAccountsPanel";
+import { BankTransactionsPanel } from "@/components/finance/BankTransactionsPanel";
+import { ReconciliationPanel } from "@/components/finance/ReconciliationPanel";
 import { FxTradesPanel } from "@/components/finance/FxTradesPanel";
 import { CryptoTradesPanel } from "@/components/finance/CryptoTradesPanel";
 import { StatementsPanel } from "@/components/finance/StatementsPanel";
@@ -22,12 +29,14 @@ const FinanceDashboard = () => {
         >
           <div>
             <h1 className="text-2xl font-display font-bold text-foreground">Finance Dashboard</h1>
-            <p className="text-muted-foreground">Financial statements, trading & payables/receivables</p>
+            <p className="text-muted-foreground">Accounting, banking & financial management</p>
           </div>
 
-          <Tabs defaultValue="statements" className="space-y-4">
+          <Tabs defaultValue="accounting" className="space-y-4">
             <div className="overflow-x-auto pb-2">
               <TabsList className="inline-flex w-auto min-w-full lg:min-w-0">
+                <TabsTrigger value="accounting">Accounting</TabsTrigger>
+                <TabsTrigger value="banking">Banking</TabsTrigger>
                 <TabsTrigger value="statements">Statements</TabsTrigger>
                 <TabsTrigger value="vendors">Vendors</TabsTrigger>
                 <TabsTrigger value="invoices">Invoices</TabsTrigger>
@@ -36,6 +45,48 @@ const FinanceDashboard = () => {
                 <TabsTrigger value="crypto">Crypto</TabsTrigger>
               </TabsList>
             </div>
+
+            <TabsContent value="accounting" className="space-y-4">
+              <Tabs defaultValue="coa" className="space-y-4">
+                <TabsList>
+                  <TabsTrigger value="coa">Chart of Accounts</TabsTrigger>
+                  <TabsTrigger value="journal">Journal Entries</TabsTrigger>
+                  <TabsTrigger value="gl">General Ledger</TabsTrigger>
+                  <TabsTrigger value="tb">Trial Balance</TabsTrigger>
+                </TabsList>
+                <TabsContent value="coa">
+                  <ChartOfAccountsPanel />
+                </TabsContent>
+                <TabsContent value="journal">
+                  <JournalEntriesPanel />
+                </TabsContent>
+                <TabsContent value="gl">
+                  <GeneralLedgerPanel />
+                </TabsContent>
+                <TabsContent value="tb">
+                  <TrialBalancePanel />
+                </TabsContent>
+              </Tabs>
+            </TabsContent>
+
+            <TabsContent value="banking" className="space-y-4">
+              <Tabs defaultValue="accounts" className="space-y-4">
+                <TabsList>
+                  <TabsTrigger value="accounts">Bank Accounts</TabsTrigger>
+                  <TabsTrigger value="transactions">Transactions</TabsTrigger>
+                  <TabsTrigger value="reconciliation">Reconciliation</TabsTrigger>
+                </TabsList>
+                <TabsContent value="accounts">
+                  <BankAccountsPanel />
+                </TabsContent>
+                <TabsContent value="transactions">
+                  <BankTransactionsPanel />
+                </TabsContent>
+                <TabsContent value="reconciliation">
+                  <ReconciliationPanel />
+                </TabsContent>
+              </Tabs>
+            </TabsContent>
 
             <TabsContent value="statements" className="space-y-4">
               <StatementsPanel />
