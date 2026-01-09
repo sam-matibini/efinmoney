@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { useState } from "react";
 import Header from "@/components/layout/Header";
 import MobileNav from "@/components/layout/MobileNav";
 import WalletCard from "@/components/ui/WalletCard";
@@ -9,10 +10,22 @@ import { Button } from "@/components/ui/button";
 import { Plus, Wallet, TrendingUp } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import CreateWalletModal from "@/components/modals/CreateWalletModal";
+import EditWalletModal from "@/components/modals/EditWalletModal";
+import DeleteWalletModal from "@/components/modals/DeleteWalletModal";
+
+type WalletModalData = {
+  walletId: string;
+  currency: string;
+  balance: number;
+  symbol: string;
+  flag: string;
+} | null;
 
 const WalletsPage = () => {
   const { data: wallets, isLoading } = useWallets();
-  const { setDefault, toggleFreeze } = useWalletManagement();
+  const [editWallet, setEditWallet] = useState<WalletModalData>(null);
+  const [deleteWallet, setDeleteWallet] = useState<WalletModalData>(null);
+  const { setDefault, toggleFreeze, updateWallet, deleteWallet: deleteWalletFn } = useWalletManagement();
 
   const totalBalance = wallets?.reduce((sum, w) => {
     // Convert to USD equivalent (simplified)
@@ -94,6 +107,8 @@ const WalletsPage = () => {
                     status={wallet.status}
                     onSetDefault={setDefault}
                     onToggleFreeze={(id, freeze) => toggleFreeze({ walletId: id, freeze })}
+                    onEdit={(w) => setEditWallet(w)}
+                    onDelete={(w) => setDeleteWallet(w)}
                   />
                 </motion.div>
               ))}
@@ -120,6 +135,22 @@ const WalletsPage = () => {
       </main>
 
       <MobileNav />
+
+      {/* Edit Wallet Modal */}
+      <EditWalletModal
+        isOpen={!!editWallet}
+        onClose={() => setEditWallet(null)}
+        wallet={editWallet}
+        onSave={updateWallet}
+      />
+
+      {/* Delete Wallet Modal */}
+      <DeleteWalletModal
+        isOpen={!!deleteWallet}
+        onClose={() => setDeleteWallet(null)}
+        wallet={deleteWallet}
+        onDelete={(walletId) => deleteWalletFn(walletId, deleteWallet?.balance || 0)}
+      />
     </div>
   );
 };
