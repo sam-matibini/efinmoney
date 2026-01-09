@@ -12,7 +12,7 @@ import { ReconciliationPanel } from "@/components/finance/ReconciliationPanel";
 import { TransactionRulesPanel } from "@/components/finance/TransactionRulesPanel";
 import { FxTradesPanel } from "@/components/finance/FxTradesPanel";
 import { CryptoTradesPanel } from "@/components/finance/CryptoTradesPanel";
-import { StatementsPanel } from "@/components/finance/StatementsPanel";
+import { FinancialStatementsPanel } from "@/components/finance/FinancialStatementsPanel";
 import { VendorsPanel } from "@/components/finance/VendorsPanel";
 import { SalesInvoicesPanel } from "@/components/finance/SalesInvoicesPanel";
 import { PurchaseBillsPanel } from "@/components/finance/PurchaseBillsPanel";
@@ -95,7 +95,18 @@ const FinanceDashboard = () => {
             </TabsContent>
 
             <TabsContent value="reports" className="space-y-4">
-              <ReportsCentrePanel />
+              <Tabs defaultValue="statements" className="space-y-4">
+                <TabsList>
+                  <TabsTrigger value="statements">Financial Statements</TabsTrigger>
+                  <TabsTrigger value="centre">Reports Centre</TabsTrigger>
+                </TabsList>
+                <TabsContent value="statements">
+                  <FinancialStatementsPanel />
+                </TabsContent>
+                <TabsContent value="centre">
+                  <ReportsCentrePanel />
+                </TabsContent>
+              </Tabs>
             </TabsContent>
 
             <TabsContent value="vendors" className="space-y-4">
