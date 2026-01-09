@@ -4,9 +4,9 @@ import { Link, useLocation } from "react-router-dom";
 
 const navItems = [
   { icon: Home, label: 'Home', href: '/' },
-  { icon: Wallet, label: 'Wallets', href: '/wallets' },
   { icon: Send, label: 'Send', href: '/send' },
   { icon: RefreshCw, label: 'Exchange', href: '/exchange' },
+  { icon: Wallet, label: 'Wallets', href: '/wallets' },
   { icon: CreditCard, label: 'Cards', href: '/cards' },
 ];
 

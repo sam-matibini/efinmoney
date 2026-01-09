@@ -146,34 +146,36 @@ export const PricingSettingsPanel = () => {
           {fxLoading ? (
             <Skeleton className="h-40" />
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Currency Pair</TableHead>
-                  <TableHead>Market Rate</TableHead>
-                  <TableHead>Markup %</TableHead>
-                  <TableHead>Effective Rate</TableHead>
-                  <TableHead>Last Updated</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {fxRates?.slice(0, 10).map((rate) => (
-                  <TableRow key={rate.id}>
-                    <TableCell className="font-medium">
-                      {rate.from_currency}/{rate.to_currency}
-                    </TableCell>
-                    <TableCell>{rate.rate.toFixed(4)}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{(rate.markup_rate * 100).toFixed(2)}%</Badge>
-                    </TableCell>
-                    <TableCell className="font-medium">{rate.effective_rate.toFixed(4)}</TableCell>
-                    <TableCell className="text-muted-foreground text-sm">
-                      {new Date(rate.valid_from).toLocaleDateString()}
-                    </TableCell>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="whitespace-nowrap">Currency Pair</TableHead>
+                    <TableHead className="whitespace-nowrap">Market Rate</TableHead>
+                    <TableHead className="whitespace-nowrap">Markup %</TableHead>
+                    <TableHead className="whitespace-nowrap">Effective Rate</TableHead>
+                    <TableHead className="whitespace-nowrap">Last Updated</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {fxRates?.slice(0, 10).map((rate) => (
+                    <TableRow key={rate.id}>
+                      <TableCell className="font-medium whitespace-nowrap">
+                        {rate.from_currency}/{rate.to_currency}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">{rate.rate.toFixed(4)}</TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        <Badge variant="outline">{(rate.markup_rate * 100).toFixed(2)}%</Badge>
+                      </TableCell>
+                      <TableCell className="font-medium whitespace-nowrap">{rate.effective_rate.toFixed(4)}</TableCell>
+                      <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
+                        {new Date(rate.valid_from).toLocaleDateString()}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -191,87 +193,89 @@ export const PricingSettingsPanel = () => {
           {cryptoLoading ? (
             <Skeleton className="h-40" />
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Trading Pair</TableHead>
-                  <TableHead>Trading Fee %</TableHead>
-                  <TableHead>Min Trade</TableHead>
-                  <TableHead>Max Trade</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {cryptoPairs?.map((pair) => (
-                  <TableRow key={pair.id}>
-                    <TableCell className="font-medium">
-                      {pair.base_currency}/{pair.quote_currency}
-                    </TableCell>
-                    <TableCell>
-                      {editingPair === pair.id ? (
-                        <Input
-                          type="number"
-                          value={editValues.trading_fee_percent}
-                          onChange={(e) => setEditValues({ ...editValues, trading_fee_percent: e.target.value })}
-                          className="w-24"
-                          step="0.01"
-                        />
-                      ) : (
-                        <Badge variant="outline">{pair.trading_fee_percent}%</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {editingPair === pair.id ? (
-                        <Input
-                          type="number"
-                          value={editValues.min_trade_amount}
-                          onChange={(e) => setEditValues({ ...editValues, min_trade_amount: e.target.value })}
-                          className="w-24"
-                        />
-                      ) : (
-                        pair.min_trade_amount
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {editingPair === pair.id ? (
-                        <Input
-                          type="number"
-                          value={editValues.max_trade_amount}
-                          onChange={(e) => setEditValues({ ...editValues, max_trade_amount: e.target.value })}
-                          className="w-24"
-                          placeholder="No limit"
-                        />
-                      ) : (
-                        pair.max_trade_amount || 'No limit'
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Switch
-                        checked={pair.is_active}
-                        onCheckedChange={() => handleToggleActive(pair.id, pair.is_active)}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      {editingPair === pair.id ? (
-                        <div className="flex gap-2">
-                          <Button size="sm" onClick={() => handleSave(pair.id)}>
-                            <Save className="h-4 w-4" />
-                          </Button>
-                          <Button size="sm" variant="ghost" onClick={() => setEditingPair(null)}>
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ) : (
-                        <Button size="sm" variant="ghost" onClick={() => handleEdit(pair.id, pair)}>
-                          <Edit2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </TableCell>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="whitespace-nowrap">Trading Pair</TableHead>
+                    <TableHead className="whitespace-nowrap">Trading Fee %</TableHead>
+                    <TableHead className="whitespace-nowrap">Min Trade</TableHead>
+                    <TableHead className="whitespace-nowrap">Max Trade</TableHead>
+                    <TableHead className="whitespace-nowrap">Status</TableHead>
+                    <TableHead className="whitespace-nowrap">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {cryptoPairs?.map((pair) => (
+                    <TableRow key={pair.id}>
+                      <TableCell className="font-medium whitespace-nowrap">
+                        {pair.base_currency}/{pair.quote_currency}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        {editingPair === pair.id ? (
+                          <Input
+                            type="number"
+                            value={editValues.trading_fee_percent}
+                            onChange={(e) => setEditValues({ ...editValues, trading_fee_percent: e.target.value })}
+                            className="w-20"
+                            step="0.01"
+                          />
+                        ) : (
+                          <Badge variant="outline">{pair.trading_fee_percent}%</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        {editingPair === pair.id ? (
+                          <Input
+                            type="number"
+                            value={editValues.min_trade_amount}
+                            onChange={(e) => setEditValues({ ...editValues, min_trade_amount: e.target.value })}
+                            className="w-20"
+                          />
+                        ) : (
+                          pair.min_trade_amount
+                        )}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        {editingPair === pair.id ? (
+                          <Input
+                            type="number"
+                            value={editValues.max_trade_amount}
+                            onChange={(e) => setEditValues({ ...editValues, max_trade_amount: e.target.value })}
+                            className="w-20"
+                            placeholder="No limit"
+                          />
+                        ) : (
+                          pair.max_trade_amount || 'No limit'
+                        )}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        <Switch
+                          checked={pair.is_active}
+                          onCheckedChange={() => handleToggleActive(pair.id, pair.is_active)}
+                        />
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        {editingPair === pair.id ? (
+                          <div className="flex gap-2">
+                            <Button size="sm" onClick={() => handleSave(pair.id)}>
+                              <Save className="h-4 w-4" />
+                            </Button>
+                            <Button size="sm" variant="ghost" onClick={() => setEditingPair(null)}>
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button size="sm" variant="ghost" onClick={() => handleEdit(pair.id, pair)}>
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>
