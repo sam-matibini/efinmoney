@@ -1,23 +1,48 @@
 import { motion } from "framer-motion";
-import { ArrowUpRight, ArrowDownLeft, MoreHorizontal } from "lucide-react";
+import { ArrowUpRight, ArrowDownLeft, MoreHorizontal, Star, Snowflake, Play } from "lucide-react";
 import SendMoneyModal from "@/components/modals/SendMoneyModal";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface WalletCardProps {
+  walletId?: string;
   currency: string;
   balance: number;
   symbol: string;
   flag: string;
   change?: number;
   isMain?: boolean;
+  isDefault?: boolean;
+  status?: 'active' | 'frozen' | 'suspended' | 'closed';
+  onSetDefault?: (walletId: string) => void;
+  onToggleFreeze?: (walletId: string, freeze: boolean) => void;
 }
 
-const WalletCard = ({ currency, balance, symbol, flag, change = 0, isMain = false }: WalletCardProps) => {
+const WalletCard = ({ 
+  walletId,
+  currency, 
+  balance, 
+  symbol, 
+  flag, 
+  change = 0, 
+  isMain = false,
+  isDefault = false,
+  status = 'active',
+  onSetDefault,
+  onToggleFreeze,
+}: WalletCardProps) => {
   const formatBalance = (value: number) => {
     return new Intl.NumberFormat('en-US', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(value);
   };
+
+  const isFrozen = status === 'frozen';
 
   return (
     <motion.div
@@ -29,7 +54,7 @@ const WalletCard = ({ currency, balance, symbol, flag, change = 0, isMain = fals
         isMain 
           ? 'gradient-primary shadow-glow min-h-[160px] sm:min-h-[180px]' 
           : 'glass shadow-card'
-      }`}
+      } ${isFrozen ? 'opacity-75' : ''}`}
     >
       {isMain && (
         <div className="absolute inset-0 opacity-20">
@@ -37,22 +62,69 @@ const WalletCard = ({ currency, balance, symbol, flag, change = 0, isMain = fals
           <div className="absolute -bottom-8 -left-8 h-32 w-32 rounded-full bg-foreground/10 blur-2xl" />
         </div>
       )}
+
+      {/* Frozen overlay */}
+      {isFrozen && (
+        <div className="absolute inset-0 bg-muted/30 backdrop-blur-[1px] z-10 flex items-center justify-center">
+          <div className="flex items-center gap-2 bg-background/80 px-3 py-1.5 rounded-full">
+            <Snowflake className="w-4 h-4 text-blue-500" />
+            <span className="text-sm font-medium text-muted-foreground">Frozen</span>
+          </div>
+        </div>
+      )}
       
-      <div className="relative z-10">
+      <div className="relative z-20">
         <div className="flex items-center justify-between mb-3 sm:mb-4">
           <div className="flex items-center gap-2 sm:gap-3">
             <span className="text-xl sm:text-2xl">{flag}</span>
             <span className={`font-display font-semibold text-sm sm:text-base ${isMain ? 'text-primary-foreground' : 'text-foreground'}`}>
               {currency}
             </span>
+            {isDefault && (
+              <span className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${
+                isMain ? 'bg-primary-foreground/20 text-primary-foreground' : 'bg-primary/10 text-primary'
+              }`}>
+                <Star className="w-3 h-3 fill-current" />
+                Default
+              </span>
+            )}
           </div>
-          <button className={`p-1.5 sm:p-2 rounded-full transition-colors ${
-            isMain 
-              ? 'hover:bg-foreground/10' 
-              : 'hover:bg-muted'
-          }`}>
-            <MoreHorizontal className={`w-4 h-4 sm:w-5 sm:h-5 ${isMain ? 'text-primary-foreground/70' : 'text-muted-foreground'}`} />
-          </button>
+          {walletId && (onSetDefault || onToggleFreeze) && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className={`p-1.5 sm:p-2 rounded-full transition-colors ${
+                  isMain 
+                    ? 'hover:bg-foreground/10' 
+                    : 'hover:bg-muted'
+                }`}>
+                  <MoreHorizontal className={`w-4 h-4 sm:w-5 sm:h-5 ${isMain ? 'text-primary-foreground/70' : 'text-muted-foreground'}`} />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {onSetDefault && !isDefault && (
+                  <DropdownMenuItem onClick={() => onSetDefault(walletId)}>
+                    <Star className="w-4 h-4 mr-2" />
+                    Set as Default
+                  </DropdownMenuItem>
+                )}
+                {onToggleFreeze && (
+                  <DropdownMenuItem onClick={() => onToggleFreeze(walletId, !isFrozen)}>
+                    {isFrozen ? (
+                      <>
+                        <Play className="w-4 h-4 mr-2" />
+                        Unfreeze Wallet
+                      </>
+                    ) : (
+                      <>
+                        <Snowflake className="w-4 h-4 mr-2" />
+                        Freeze Wallet
+                      </>
+                    )}
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
 
         <div className="mb-3 sm:mb-4">
@@ -80,11 +152,12 @@ const WalletCard = ({ currency, balance, symbol, flag, change = 0, isMain = fals
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
+              disabled={isFrozen}
               className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-medium transition-colors ${
                 isMain 
                   ? 'bg-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/30' 
                   : 'bg-primary text-primary-foreground hover:bg-primary/90'
-              }`}
+              } disabled:opacity-50 disabled:cursor-not-allowed`}
             >
               <ArrowUpRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               Send
@@ -93,11 +166,12 @@ const WalletCard = ({ currency, balance, symbol, flag, change = 0, isMain = fals
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
+            disabled={isFrozen}
             className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-medium transition-colors ${
               isMain 
                 ? 'bg-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/30' 
                 : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-            }`}
+            } disabled:opacity-50 disabled:cursor-not-allowed`}
           >
             <ArrowDownLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             Receive

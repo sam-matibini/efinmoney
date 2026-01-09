@@ -3,6 +3,7 @@ import Header from "@/components/layout/Header";
 import MobileNav from "@/components/layout/MobileNav";
 import WalletCard from "@/components/ui/WalletCard";
 import { useWallets } from "@/hooks/useWallets";
+import { useWalletManagement } from "@/hooks/useWalletManagement";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Plus, Wallet, TrendingUp } from "lucide-react";
@@ -11,12 +12,20 @@ import CreateWalletModal from "@/components/modals/CreateWalletModal";
 
 const WalletsPage = () => {
   const { data: wallets, isLoading } = useWallets();
+  const { setDefault, toggleFreeze } = useWalletManagement();
 
   const totalBalance = wallets?.reduce((sum, w) => {
     // Convert to USD equivalent (simplified)
     const rate = w.currency_code === 'CAD' ? 0.74 : 1;
     return sum + Number(w.balance) * rate;
   }, 0) || 0;
+
+  // Sort wallets: default first, then by balance
+  const sortedWallets = wallets?.slice().sort((a, b) => {
+    if (a.is_default && !b.is_default) return -1;
+    if (!a.is_default && b.is_default) return 1;
+    return Number(b.balance) - Number(a.balance);
+  });
 
   return (
     <div className="min-h-screen bg-background pb-24 md:pb-8">
@@ -67,7 +76,7 @@ const WalletsPage = () => {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {wallets?.map((wallet, index) => (
+              {sortedWallets?.map((wallet, index) => (
                 <motion.div
                   key={wallet.wallet_id}
                   initial={{ opacity: 0, y: 20 }}
@@ -75,11 +84,16 @@ const WalletsPage = () => {
                   transition={{ delay: index * 0.1 }}
                 >
                   <WalletCard
+                    walletId={wallet.wallet_id}
                     currency={wallet.currency_code}
                     balance={Number(wallet.balance)}
                     symbol={wallet.symbol}
                     flag={wallet.flag_emoji || '💰'}
                     isMain={index === 0}
+                    isDefault={wallet.is_default}
+                    status={wallet.status}
+                    onSetDefault={setDefault}
+                    onToggleFreeze={(id, freeze) => toggleFreeze({ walletId: id, freeze })}
                   />
                 </motion.div>
               ))}
