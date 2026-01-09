@@ -791,6 +791,27 @@ export type Database = {
           },
         ]
       }
+      rate_limits: {
+        Row: {
+          count: number
+          created_at: string
+          expires_at: string
+          key: string
+        }
+        Insert: {
+          count?: number
+          created_at?: string
+          expires_at: string
+          key: string
+        }
+        Update: {
+          count?: number
+          created_at?: string
+          expires_at?: string
+          key?: string
+        }
+        Relationships: []
+      }
       reconciliation_records: {
         Row: {
           bank_transaction_id: string | null
@@ -1016,6 +1037,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_rate_limit: {
+        Args: {
+          p_key: string
+          p_max_requests: number
+          p_window_seconds: number
+        }
+        Returns: boolean
+      }
       execute_fx_swap: {
         Args: {
           p_effective_rate: number
@@ -1050,6 +1079,10 @@ export type Database = {
       run_compliance_checks: {
         Args: { p_transfer_id: string }
         Returns: number
+      }
+      validate_compliance_parameters: {
+        Args: { p_parameters: Json; p_rule_type: string }
+        Returns: boolean
       }
     }
     Enums: {

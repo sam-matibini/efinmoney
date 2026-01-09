@@ -6,6 +6,12 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Rate limiting configuration - stricter for expensive operations
+const RATE_LIMITS = {
+  'auto-match': { requests: 2, window: 300 },    // 2 per 5 minutes
+  'status': { requests: 30, window: 60 }         // 30 per minute
+};
+
 // Validation helpers
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
@@ -18,7 +24,6 @@ function isValidISODate(str: unknown): str is string {
   if (typeof str !== 'string' || !ISO_DATE_REGEX.test(str)) {
     return false;
   }
-  // Validate the date is actually valid
   const date = new Date(str);
   return !isNaN(date.getTime());
 }
@@ -48,7 +53,6 @@ function validateReconciliationRequest(body: unknown): { valid: true; data: Reco
     return { valid: false, error: 'Invalid date_to: must be in YYYY-MM-DD format' };
   }
   
-  // Validate date range
   if (date_from && date_to) {
     const from = new Date(date_from);
     const to = new Date(date_to);
@@ -57,13 +61,34 @@ function validateReconciliationRequest(body: unknown): { valid: true; data: Reco
     }
   }
   
+  return { valid: true, data: { bank_account_id, date_from: date_from as string | undefined, date_to: date_to as string | undefined } };
+}
+
+// Rate limiting helper
+async function checkRateLimit(
+  supabase: any,
+  userId: string,
+  action: string
+): Promise<{ allowed: boolean; retryAfter?: number }> {
+  const limit = RATE_LIMITS[action as keyof typeof RATE_LIMITS];
+  if (!limit) return { allowed: true };
+  
+  const key = `bank-reconciliation:${action}:${userId}`;
+  
+  const { data, error } = await supabase.rpc('check_rate_limit', {
+    p_key: key,
+    p_max_requests: limit.requests,
+    p_window_seconds: limit.window
+  });
+  
+  if (error) {
+    console.error('Rate limit check error:', error);
+    return { allowed: true };
+  }
+  
   return { 
-    valid: true, 
-    data: { 
-      bank_account_id, 
-      date_from: date_from as string | undefined, 
-      date_to: date_to as string | undefined 
-    } 
+    allowed: data === true,
+    retryAfter: data === false ? limit.window : undefined
   };
 }
 
@@ -84,10 +109,8 @@ serve(async (req) => {
       );
     }
 
-    // Use service role for bank reconciliation (admin function)
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     
-    // Verify the user has finance or admin role
     const userSupabase = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, {
       global: { headers: { Authorization: authHeader } }
     });
@@ -102,7 +125,6 @@ serve(async (req) => {
       );
     }
 
-    // Check role
     const { data: roleData } = await supabase
       .from('user_roles')
       .select('role')
@@ -121,6 +143,15 @@ serve(async (req) => {
 
     // RUN AUTO-RECONCILIATION
     if (req.method === 'POST' && action === 'auto-match') {
+      // Check rate limit - very strict for this expensive operation
+      const rateCheck = await checkRateLimit(supabase, userData.user.id, 'auto-match');
+      if (!rateCheck.allowed) {
+        return new Response(
+          JSON.stringify({ error: 'Rate limit exceeded. You can run reconciliation at most twice every 5 minutes.' }),
+          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Retry-After': String(rateCheck.retryAfter || 300) } }
+        );
+      }
+
       let body: unknown;
       try {
         body = await req.json();
@@ -141,7 +172,6 @@ serve(async (req) => {
 
       const { bank_account_id, date_from, date_to } = validation.data;
 
-      // Verify bank account exists
       const { data: bankAccount, error: bankAccountError } = await supabase
         .from('bank_accounts')
         .select('id')
@@ -155,12 +185,7 @@ serve(async (req) => {
         );
       }
 
-      // Get unmatched bank transactions
-      let query = supabase
-        .from('bank_transactions')
-        .select('*')
-        .eq('bank_account_id', bank_account_id);
-
+      let query = supabase.from('bank_transactions').select('*').eq('bank_account_id', bank_account_id);
       if (date_from) query = query.gte('transaction_date', date_from);
       if (date_to) query = query.lte('transaction_date', date_to);
 
@@ -174,7 +199,6 @@ serve(async (req) => {
         );
       }
 
-      // Get already reconciled transaction IDs
       const { data: reconciledIds } = await supabase
         .from('reconciliation_records')
         .select('bank_transaction_id')
@@ -187,42 +211,27 @@ serve(async (req) => {
       let unmatchedCount = 0;
 
       for (const bankTxn of unmatchedTxns) {
-        // Try to match by reference (transfer ID in description)
         const uuidPattern = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
         const match = bankTxn.description?.match(uuidPattern) || bankTxn.reference?.match(uuidPattern);
 
         if (match) {
           const potentialTransferId = match[0];
-          
-          // Check if this is a valid transfer
-          const { data: transfer } = await supabase
-            .from('transfers')
-            .select('*')
-            .eq('id', potentialTransferId)
-            .single();
+          const { data: transfer } = await supabase.from('transfers').select('*').eq('id', potentialTransferId).single();
 
           if (transfer) {
-            // Create reconciliation record
-            await supabase
-              .from('reconciliation_records')
-              .insert({
-                bank_transaction_id: bankTxn.id,
-                transfer_id: transfer.id,
-                matched_amount: bankTxn.credit_amount || bankTxn.debit_amount,
-                status: 'matched',
-                match_confidence: 95,
-                match_reason: 'Reference ID match'
-              });
-            
+            await supabase.from('reconciliation_records').insert({
+              bank_transaction_id: bankTxn.id, transfer_id: transfer.id,
+              matched_amount: bankTxn.credit_amount || bankTxn.debit_amount,
+              status: 'matched', match_confidence: 95, match_reason: 'Reference ID match'
+            });
             matchedCount++;
             continue;
           }
         }
 
-        // Try fuzzy matching by amount and date
         const txnAmount = bankTxn.credit_amount || bankTxn.debit_amount;
         const txnDate = new Date(bankTxn.transaction_date);
-        const dateTolerance = 2; // days
+        const dateTolerance = 2;
 
         const { data: potentialMatches } = await supabase
           .from('transfers')
@@ -233,59 +242,32 @@ serve(async (req) => {
           .eq('status', 'completed');
 
         if (potentialMatches && potentialMatches.length === 1) {
-          // Single match - high confidence
-          await supabase
-            .from('reconciliation_records')
-            .insert({
-              bank_transaction_id: bankTxn.id,
-              transfer_id: potentialMatches[0].id,
-              matched_amount: txnAmount,
-              status: 'matched',
-              match_confidence: 80,
-              match_reason: 'Amount and date match (single)'
-            });
-          
+          await supabase.from('reconciliation_records').insert({
+            bank_transaction_id: bankTxn.id, transfer_id: potentialMatches[0].id,
+            matched_amount: txnAmount, status: 'matched', match_confidence: 80,
+            match_reason: 'Amount and date match (single)'
+          });
           matchedCount++;
         } else if (potentialMatches && potentialMatches.length > 1) {
-          // Multiple potential matches - needs review
-          await supabase
-            .from('reconciliation_records')
-            .insert({
-              bank_transaction_id: bankTxn.id,
-              matched_amount: txnAmount,
-              status: 'exception',
-              match_confidence: 50,
-              exception_reason: `Multiple potential matches found (${potentialMatches.length})`
-            });
-          
+          await supabase.from('reconciliation_records').insert({
+            bank_transaction_id: bankTxn.id, matched_amount: txnAmount, status: 'exception',
+            match_confidence: 50, exception_reason: `Multiple potential matches found (${potentialMatches.length})`
+          });
           unmatchedCount++;
         } else {
-          // No match found
-          await supabase
-            .from('reconciliation_records')
-            .insert({
-              bank_transaction_id: bankTxn.id,
-              matched_amount: txnAmount,
-              status: 'unmatched',
-              match_confidence: 0,
-              exception_reason: 'No matching transfer found'
-            });
-          
+          await supabase.from('reconciliation_records').insert({
+            bank_transaction_id: bankTxn.id, matched_amount: txnAmount, status: 'unmatched',
+            match_confidence: 0, exception_reason: 'No matching transfer found'
+          });
           unmatchedCount++;
         }
       }
 
-      // Update last reconciled timestamp
-      await supabase
-        .from('bank_accounts')
-        .update({ last_reconciled_at: new Date().toISOString() })
-        .eq('id', bank_account_id);
+      await supabase.from('bank_accounts').update({ last_reconciled_at: new Date().toISOString() }).eq('id', bank_account_id);
 
       return new Response(
         JSON.stringify({
-          success: true,
-          matched: matchedCount,
-          unmatched: unmatchedCount,
+          success: true, matched: matchedCount, unmatched: unmatchedCount,
           total_processed: unmatchedTxns.length,
           message: `Reconciliation complete: ${matchedCount} matched, ${unmatchedCount} need review`
         }),
@@ -295,9 +277,17 @@ serve(async (req) => {
 
     // GET RECONCILIATION STATUS
     if (req.method === 'GET' && action === 'status') {
+      // Check rate limit
+      const rateCheck = await checkRateLimit(supabase, userData.user.id, 'status');
+      if (!rateCheck.allowed) {
+        return new Response(
+          JSON.stringify({ error: 'Rate limit exceeded. Please try again later.' }),
+          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Retry-After': String(rateCheck.retryAfter || 60) } }
+        );
+      }
+
       const bankAccountId = url.searchParams.get('bank_account_id');
 
-      // Validate bank_account_id if provided
       if (bankAccountId && !isValidUUID(bankAccountId)) {
         return new Response(
           JSON.stringify({ error: 'Invalid bank_account_id: must be a valid UUID' }),
@@ -305,26 +295,16 @@ serve(async (req) => {
         );
       }
 
-      let query = supabase
-        .from('reconciliation_records')
-        .select('status, bank_transaction_id');
+      let query = supabase.from('reconciliation_records').select('status, bank_transaction_id');
 
       if (bankAccountId) {
-        // Get transactions for this bank account
-        const { data: bankTxns } = await supabase
-          .from('bank_transactions')
-          .select('id')
-          .eq('bank_account_id', bankAccountId);
-        
+        const { data: bankTxns } = await supabase.from('bank_transactions').select('id').eq('bank_account_id', bankAccountId);
         const txnIds = bankTxns?.map(t => t.id) || [];
         if (txnIds.length > 0) {
           query = query.in('bank_transaction_id', txnIds);
         } else {
-          // No transactions for this account
           return new Response(
-            JSON.stringify({ 
-              summary: { matched: 0, unmatched: 0, exception: 0, pending: 0 } 
-            }),
+            JSON.stringify({ summary: { matched: 0, unmatched: 0, exception: 0, pending: 0 } }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
@@ -340,13 +320,7 @@ serve(async (req) => {
         );
       }
 
-      const summary = {
-        matched: 0,
-        unmatched: 0,
-        exception: 0,
-        pending: 0
-      };
-
+      const summary = { matched: 0, unmatched: 0, exception: 0, pending: 0 };
       stats?.forEach(s => {
         if (s.status in summary) {
           summary[s.status as keyof typeof summary]++;
