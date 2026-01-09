@@ -9,6 +9,11 @@ import { CryptoTradesPanel } from "@/components/finance/CryptoTradesPanel";
 import { TrialBalancePanel } from "@/components/finance/TrialBalancePanel";
 import { GeneralLedgerPanel } from "@/components/finance/GeneralLedgerPanel";
 import { FinancialStatementsPanel } from "@/components/finance/FinancialStatementsPanel";
+import { ChartOfAccountsPanel } from "@/components/finance/ChartOfAccountsPanel";
+import { JournalEntriesPanel } from "@/components/finance/JournalEntriesPanel";
+import { CashFlowPanel } from "@/components/finance/CashFlowPanel";
+import { BankAccountsPanel } from "@/components/finance/BankAccountsPanel";
+import { BankTransactionsPanel } from "@/components/finance/BankTransactionsPanel";
 
 const FinanceDashboard = () => {
   return (
@@ -23,22 +28,32 @@ const FinanceDashboard = () => {
         >
           <div>
             <h1 className="text-2xl font-display font-bold text-foreground">Finance Dashboard</h1>
-            <p className="text-muted-foreground">Manage ledger, reconciliation, trades, and financial reports</p>
+            <p className="text-muted-foreground">Complete accounting & financial management</p>
           </div>
 
-          <Tabs defaultValue="ledger" className="space-y-4">
-            <TabsList className="grid w-full grid-cols-4 lg:grid-cols-7 lg:w-auto lg:inline-flex">
-              <TabsTrigger value="ledger">Ledger</TabsTrigger>
-              <TabsTrigger value="gl">GL</TabsTrigger>
-              <TabsTrigger value="tb">Trial Balance</TabsTrigger>
-              <TabsTrigger value="statements">Statements</TabsTrigger>
-              <TabsTrigger value="reconciliation">Recon</TabsTrigger>
-              <TabsTrigger value="fx">FX</TabsTrigger>
-              <TabsTrigger value="crypto">Crypto</TabsTrigger>
-            </TabsList>
+          <Tabs defaultValue="coa" className="space-y-4">
+            <div className="overflow-x-auto pb-2">
+              <TabsList className="inline-flex w-auto min-w-full lg:min-w-0">
+                <TabsTrigger value="coa">COA</TabsTrigger>
+                <TabsTrigger value="journal">Journal</TabsTrigger>
+                <TabsTrigger value="gl">GL</TabsTrigger>
+                <TabsTrigger value="tb">TB</TabsTrigger>
+                <TabsTrigger value="statements">Statements</TabsTrigger>
+                <TabsTrigger value="cashflow">Cash Flow</TabsTrigger>
+                <TabsTrigger value="bank-accounts">Banks</TabsTrigger>
+                <TabsTrigger value="bank-txns">Bank Txns</TabsTrigger>
+                <TabsTrigger value="reconciliation">Recon</TabsTrigger>
+                <TabsTrigger value="fx">FX</TabsTrigger>
+                <TabsTrigger value="crypto">Crypto</TabsTrigger>
+              </TabsList>
+            </div>
 
-            <TabsContent value="ledger" className="space-y-4">
-              <LedgerEntriesPanel />
+            <TabsContent value="coa" className="space-y-4">
+              <ChartOfAccountsPanel />
+            </TabsContent>
+
+            <TabsContent value="journal" className="space-y-4">
+              <JournalEntriesPanel />
             </TabsContent>
 
             <TabsContent value="gl" className="space-y-4">
@@ -51,6 +66,18 @@ const FinanceDashboard = () => {
 
             <TabsContent value="statements" className="space-y-4">
               <FinancialStatementsPanel />
+            </TabsContent>
+
+            <TabsContent value="cashflow" className="space-y-4">
+              <CashFlowPanel />
+            </TabsContent>
+
+            <TabsContent value="bank-accounts" className="space-y-4">
+              <BankAccountsPanel />
+            </TabsContent>
+
+            <TabsContent value="bank-txns" className="space-y-4">
+              <BankTransactionsPanel />
             </TabsContent>
 
             <TabsContent value="reconciliation" className="space-y-4">
