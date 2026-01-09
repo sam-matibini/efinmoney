@@ -16,7 +16,6 @@ import { BankTransactionsPanel } from "@/components/finance/BankTransactionsPane
 import { VendorsPanel } from "@/components/finance/VendorsPanel";
 import { SalesInvoicesPanel } from "@/components/finance/SalesInvoicesPanel";
 import { PurchaseBillsPanel } from "@/components/finance/PurchaseBillsPanel";
-import { CrmCustomersPanel } from "@/components/crm/CrmCustomersPanel";
 
 const FinanceDashboard = () => {
   return (
@@ -31,13 +30,12 @@ const FinanceDashboard = () => {
         >
           <div>
             <h1 className="text-2xl font-display font-bold text-foreground">Finance Dashboard</h1>
-            <p className="text-muted-foreground">Complete accounting, CRM & financial management</p>
+            <p className="text-muted-foreground">Complete accounting & financial management</p>
           </div>
 
-          <Tabs defaultValue="crm" className="space-y-4">
+          <Tabs defaultValue="coa" className="space-y-4">
             <div className="overflow-x-auto pb-2">
               <TabsList className="inline-flex w-auto min-w-full lg:min-w-0">
-                <TabsTrigger value="crm">CRM</TabsTrigger>
                 <TabsTrigger value="coa">COA</TabsTrigger>
                 <TabsTrigger value="journal">Journal</TabsTrigger>
                 <TabsTrigger value="gl">GL</TabsTrigger>
@@ -54,10 +52,6 @@ const FinanceDashboard = () => {
                 <TabsTrigger value="crypto">Crypto</TabsTrigger>
               </TabsList>
             </div>
-
-            <TabsContent value="crm" className="space-y-4">
-              <CrmCustomersPanel />
-            </TabsContent>
 
             <TabsContent value="coa" className="space-y-4">
               <ChartOfAccountsPanel />
