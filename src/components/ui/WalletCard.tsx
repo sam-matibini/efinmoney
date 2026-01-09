@@ -1,10 +1,11 @@
 import { motion } from "framer-motion";
-import { ArrowUpRight, ArrowDownLeft, MoreHorizontal, Star, Snowflake, Play } from "lucide-react";
+import { ArrowUpRight, ArrowDownLeft, MoreHorizontal, Star, Snowflake, Play, Pencil, Trash2 } from "lucide-react";
 import SendMoneyModal from "@/components/modals/SendMoneyModal";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
@@ -20,6 +21,8 @@ interface WalletCardProps {
   status?: 'active' | 'frozen' | 'suspended' | 'closed';
   onSetDefault?: (walletId: string) => void;
   onToggleFreeze?: (walletId: string, freeze: boolean) => void;
+  onEdit?: (wallet: { walletId: string; currency: string; balance: number; symbol: string; flag: string }) => void;
+  onDelete?: (wallet: { walletId: string; currency: string; balance: number; symbol: string; flag: string }) => void;
 }
 
 const WalletCard = ({ 
@@ -34,6 +37,8 @@ const WalletCard = ({
   status = 'active',
   onSetDefault,
   onToggleFreeze,
+  onEdit,
+  onDelete,
 }: WalletCardProps) => {
   const formatBalance = (value: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -89,7 +94,7 @@ const WalletCard = ({
               </span>
             )}
           </div>
-          {walletId && (onSetDefault || onToggleFreeze) && (
+          {walletId && (onSetDefault || onToggleFreeze || onEdit || onDelete) && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className={`p-1.5 sm:p-2 rounded-full transition-colors ${
@@ -120,6 +125,24 @@ const WalletCard = ({
                         Freeze Wallet
                       </>
                     )}
+                  </DropdownMenuItem>
+                )}
+                {(onEdit || onDelete) && (onSetDefault || onToggleFreeze) && (
+                  <DropdownMenuSeparator />
+                )}
+                {onEdit && (
+                  <DropdownMenuItem onClick={() => onEdit({ walletId, currency, balance, symbol, flag })}>
+                    <Pencil className="w-4 h-4 mr-2" />
+                    Edit Wallet
+                  </DropdownMenuItem>
+                )}
+                {onDelete && (
+                  <DropdownMenuItem 
+                    onClick={() => onDelete({ walletId, currency, balance, symbol, flag })}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Delete Wallet
                   </DropdownMenuItem>
                 )}
               </DropdownMenuContent>

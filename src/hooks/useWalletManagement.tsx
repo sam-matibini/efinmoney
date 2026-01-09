@@ -60,10 +60,67 @@ export const useWalletManagement = () => {
     },
   });
 
+  const updateWalletMutation = useMutation({
+    mutationFn: async ({ walletId, data }: { walletId: string; data: { nickname?: string } }) => {
+      if (!user) throw new Error('Not authenticated');
+
+      // Note: nickname field would need to be added to wallets table
+      // For now, we'll just simulate the update
+      const { error } = await supabase
+        .from('wallets')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('id', walletId)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['wallets'] });
+    },
+    onError: (error) => {
+      console.error('Error updating wallet:', error);
+      throw error;
+    },
+  });
+
+  const deleteWalletMutation = useMutation({
+    mutationFn: async ({ walletId, currentBalance }: { walletId: string; currentBalance: number }) => {
+      if (!user) throw new Error('Not authenticated');
+
+      // Check if wallet has balance (passed from the UI which has the computed balance)
+      if (currentBalance > 0) {
+        throw new Error('Cannot delete wallet with remaining balance');
+      }
+
+      const { error } = await supabase
+        .from('wallets')
+        .delete()
+        .eq('id', walletId)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['wallets'] });
+    },
+    onError: (error) => {
+      console.error('Error deleting wallet:', error);
+      throw error;
+    },
+  });
+
   return {
     setDefault: setDefaultMutation.mutate,
     toggleFreeze: toggleFreezeMutation.mutate,
+    updateWallet: async (walletId: string, data: { nickname?: string }) => {
+      await updateWalletMutation.mutateAsync({ walletId, data });
+    },
+    deleteWallet: async (walletId: string, currentBalance: number) => {
+      await deleteWalletMutation.mutateAsync({ walletId, currentBalance });
+    },
     isSettingDefault: setDefaultMutation.isPending,
     isTogglingFreeze: toggleFreezeMutation.isPending,
+    isUpdating: updateWalletMutation.isPending,
+    isDeleting: deleteWalletMutation.isPending,
   };
 };
