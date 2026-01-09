@@ -14,6 +14,10 @@ import { JournalEntriesPanel } from "@/components/finance/JournalEntriesPanel";
 import { CashFlowPanel } from "@/components/finance/CashFlowPanel";
 import { BankAccountsPanel } from "@/components/finance/BankAccountsPanel";
 import { BankTransactionsPanel } from "@/components/finance/BankTransactionsPanel";
+import { CustomersPanel } from "@/components/finance/CustomersPanel";
+import { VendorsPanel } from "@/components/finance/VendorsPanel";
+import { SalesInvoicesPanel } from "@/components/finance/SalesInvoicesPanel";
+import { PurchaseBillsPanel } from "@/components/finance/PurchaseBillsPanel";
 
 const FinanceDashboard = () => {
   return (
@@ -40,6 +44,10 @@ const FinanceDashboard = () => {
                 <TabsTrigger value="tb">TB</TabsTrigger>
                 <TabsTrigger value="statements">Statements</TabsTrigger>
                 <TabsTrigger value="cashflow">Cash Flow</TabsTrigger>
+                <TabsTrigger value="customers">Customers</TabsTrigger>
+                <TabsTrigger value="vendors">Vendors</TabsTrigger>
+                <TabsTrigger value="invoices">Invoices</TabsTrigger>
+                <TabsTrigger value="bills">Bills</TabsTrigger>
                 <TabsTrigger value="bank-accounts">Banks</TabsTrigger>
                 <TabsTrigger value="bank-txns">Bank Txns</TabsTrigger>
                 <TabsTrigger value="reconciliation">Recon</TabsTrigger>
@@ -70,6 +78,22 @@ const FinanceDashboard = () => {
 
             <TabsContent value="cashflow" className="space-y-4">
               <CashFlowPanel />
+            </TabsContent>
+
+            <TabsContent value="customers" className="space-y-4">
+              <CustomersPanel />
+            </TabsContent>
+
+            <TabsContent value="vendors" className="space-y-4">
+              <VendorsPanel />
+            </TabsContent>
+
+            <TabsContent value="invoices" className="space-y-4">
+              <SalesInvoicesPanel />
+            </TabsContent>
+
+            <TabsContent value="bills" className="space-y-4">
+              <PurchaseBillsPanel />
             </TabsContent>
 
             <TabsContent value="bank-accounts" className="space-y-4">
