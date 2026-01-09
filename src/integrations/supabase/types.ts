@@ -1403,6 +1403,7 @@ export type Database = {
           currency_code: string
           currency_name: string
           flag_emoji: string
+          is_default: boolean
           status: Database["public"]["Enums"]["wallet_status"]
           symbol: string
           wallet_id: string
