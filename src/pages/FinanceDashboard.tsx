@@ -9,6 +9,7 @@ import { TrialBalancePanel } from "@/components/finance/TrialBalancePanel";
 import { BankAccountsPanel } from "@/components/finance/BankAccountsPanel";
 import { BankTransactionsPanel } from "@/components/finance/BankTransactionsPanel";
 import { ReconciliationPanel } from "@/components/finance/ReconciliationPanel";
+import { TransactionRulesPanel } from "@/components/finance/TransactionRulesPanel";
 import { FxTradesPanel } from "@/components/finance/FxTradesPanel";
 import { CryptoTradesPanel } from "@/components/finance/CryptoTradesPanel";
 import { StatementsPanel } from "@/components/finance/StatementsPanel";
@@ -75,6 +76,7 @@ const FinanceDashboard = () => {
                 <TabsList>
                   <TabsTrigger value="accounts">Bank Accounts</TabsTrigger>
                   <TabsTrigger value="transactions">Transactions</TabsTrigger>
+                  <TabsTrigger value="rules">Transaction Rules</TabsTrigger>
                   <TabsTrigger value="reconciliation">Reconciliation</TabsTrigger>
                 </TabsList>
                 <TabsContent value="accounts">
@@ -82,6 +84,9 @@ const FinanceDashboard = () => {
                 </TabsContent>
                 <TabsContent value="transactions">
                   <BankTransactionsPanel />
+                </TabsContent>
+                <TabsContent value="rules">
+                  <TransactionRulesPanel />
                 </TabsContent>
                 <TabsContent value="reconciliation">
                   <ReconciliationPanel />
