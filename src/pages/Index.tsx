@@ -42,6 +42,9 @@ const Index = () => {
         {/* Stats Overview */}
         <StatsOverview />
 
+        {/* Wallet Carousel */}
+        <WalletCarousel />
+
         {/* Quick Actions */}
         <QuickActions />
 
@@ -54,9 +57,6 @@ const Index = () => {
             <ExchangeRates />
           </div>
         </div>
-
-        {/* Wallet Carousel */}
-        <WalletCarousel />
       </main>
 
       <MobileNav />
