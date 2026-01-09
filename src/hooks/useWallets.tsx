@@ -10,6 +10,7 @@ export interface Wallet {
   flag_emoji: string | null;
   balance: number;
   status: 'active' | 'frozen' | 'suspended' | 'closed';
+  is_default: boolean;
 }
 
 export const useWallets = () => {
