@@ -27,7 +27,7 @@ const Auth = () => {
         if (error) {
           toast.error(error.message);
         } else {
-          toast.success("Account created! Welcome to FlowPay.");
+          toast.success("Account created! Welcome to eFinMoney.");
           navigate("/");
         }
       } else {
@@ -61,16 +61,16 @@ const Auth = () => {
           >
             <div className="flex items-center gap-3 mb-12">
               <div className="w-12 h-12 rounded-xl bg-primary-foreground/20 flex items-center justify-center">
-                <span className="text-2xl font-bold text-primary-foreground">₿</span>
+                <span className="text-2xl font-bold text-primary-foreground">e</span>
               </div>
-              <span className="font-display font-bold text-2xl text-primary-foreground">FlowPay</span>
+              <span className="font-display font-bold text-2xl text-primary-foreground">eFinMoney</span>
             </div>
 
             <h1 className="text-4xl font-display font-bold text-primary-foreground mb-6 leading-tight">
               Send money across borders,<br />instantly.
             </h1>
             <p className="text-lg text-primary-foreground/80 mb-8 max-w-md">
-              Multi-currency wallets, FX trading, crypto, and mobile money transfers to Africa. Bank-grade security.
+              Multi-currency wallets, FX trading, crypto, and mobile money transfers. Bank-grade security.
             </p>
 
             <div className="grid grid-cols-2 gap-4 max-w-md">
@@ -100,9 +100,9 @@ const Auth = () => {
           {/* Mobile Logo */}
           <div className="flex items-center gap-3 mb-8 lg:hidden">
             <div className="gradient-primary w-10 h-10 rounded-xl flex items-center justify-center shadow-glow">
-              <span className="text-xl font-bold text-primary-foreground">₿</span>
+              <span className="text-xl font-bold text-primary-foreground">e</span>
             </div>
-            <span className="font-display font-bold text-xl text-foreground">FlowPay</span>
+            <span className="font-display font-bold text-xl text-foreground">eFinMoney</span>
           </div>
 
           <div className="mb-8">
