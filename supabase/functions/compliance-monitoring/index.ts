@@ -6,6 +6,111 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Validation helpers
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const VALID_ALERT_STATUSES = ['open', 'investigating', 'escalated', 'resolved', 'false_positive'] as const;
+const VALID_SEVERITIES = ['low', 'medium', 'high', 'critical'] as const;
+const MAX_LIMIT = 100;
+const DEFAULT_LIMIT = 50;
+
+function isValidUUID(str: unknown): str is string {
+  return typeof str === 'string' && UUID_REGEX.test(str);
+}
+
+function isValidAlertStatus(str: unknown): str is typeof VALID_ALERT_STATUSES[number] {
+  return typeof str === 'string' && VALID_ALERT_STATUSES.includes(str as typeof VALID_ALERT_STATUSES[number]);
+}
+
+function isValidSeverity(str: unknown): str is typeof VALID_SEVERITIES[number] {
+  return typeof str === 'string' && VALID_SEVERITIES.includes(str as typeof VALID_SEVERITIES[number]);
+}
+
+function parseLimit(value: string | null): number {
+  if (!value) return DEFAULT_LIMIT;
+  const parsed = parseInt(value, 10);
+  if (isNaN(parsed) || parsed < 1) return DEFAULT_LIMIT;
+  return Math.min(parsed, MAX_LIMIT);
+}
+
+interface AlertUpdateRequest {
+  alert_id: string;
+  status: typeof VALID_ALERT_STATUSES[number];
+  notes?: string;
+}
+
+interface SarGenerateRequest {
+  alert_ids: string[];
+  jurisdiction?: string;
+}
+
+function validateAlertUpdateRequest(body: unknown): { valid: true; data: AlertUpdateRequest } | { valid: false; error: string } {
+  if (!body || typeof body !== 'object') {
+    return { valid: false, error: 'Invalid request body' };
+  }
+  
+  const { alert_id, status, notes } = body as Record<string, unknown>;
+  
+  if (!isValidUUID(alert_id)) {
+    return { valid: false, error: 'Invalid alert_id: must be a valid UUID' };
+  }
+  
+  if (!isValidAlertStatus(status)) {
+    return { valid: false, error: `Invalid status: must be one of ${VALID_ALERT_STATUSES.join(', ')}` };
+  }
+  
+  if (notes !== undefined && typeof notes !== 'string') {
+    return { valid: false, error: 'Invalid notes: must be a string' };
+  }
+  
+  if (notes && notes.length > 5000) {
+    return { valid: false, error: 'Notes too long: maximum 5000 characters' };
+  }
+  
+  return { 
+    valid: true, 
+    data: { alert_id, status, notes: notes as string | undefined } 
+  };
+}
+
+function validateSarRequest(body: unknown): { valid: true; data: SarGenerateRequest } | { valid: false; error: string } {
+  if (!body || typeof body !== 'object') {
+    return { valid: false, error: 'Invalid request body' };
+  }
+  
+  const { alert_ids, jurisdiction } = body as Record<string, unknown>;
+  
+  if (!Array.isArray(alert_ids)) {
+    return { valid: false, error: 'Invalid alert_ids: must be an array' };
+  }
+  
+  if (alert_ids.length === 0) {
+    return { valid: false, error: 'alert_ids cannot be empty' };
+  }
+  
+  if (alert_ids.length > 50) {
+    return { valid: false, error: 'Too many alert_ids: maximum 50' };
+  }
+  
+  for (const id of alert_ids) {
+    if (!isValidUUID(id)) {
+      return { valid: false, error: `Invalid alert_id in array: ${id}` };
+    }
+  }
+  
+  if (jurisdiction !== undefined && typeof jurisdiction !== 'string') {
+    return { valid: false, error: 'Invalid jurisdiction: must be a string' };
+  }
+  
+  if (jurisdiction && jurisdiction.length > 50) {
+    return { valid: false, error: 'Jurisdiction too long: maximum 50 characters' };
+  }
+  
+  return { 
+    valid: true, 
+    data: { alert_ids: alert_ids as string[], jurisdiction: jurisdiction as string | undefined } 
+  };
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -116,7 +221,22 @@ serve(async (req) => {
     if (req.method === 'GET' && action === 'alerts') {
       const status = url.searchParams.get('status');
       const severity = url.searchParams.get('severity');
-      const limit = parseInt(url.searchParams.get('limit') || '50');
+      const limit = parseLimit(url.searchParams.get('limit'));
+
+      // Validate filter parameters
+      if (status && !isValidAlertStatus(status)) {
+        return new Response(
+          JSON.stringify({ error: `Invalid status: must be one of ${VALID_ALERT_STATUSES.join(', ')}` }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (severity && !isValidSeverity(severity)) {
+        return new Response(
+          JSON.stringify({ error: `Invalid severity: must be one of ${VALID_SEVERITIES.join(', ')}` }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
 
       let query = supabase
         .from('compliance_alerts')
@@ -135,6 +255,7 @@ serve(async (req) => {
       const { data: alerts, error } = await query;
 
       if (error) {
+        console.error('Failed to fetch alerts:', error);
         return new Response(
           JSON.stringify({ error: 'Failed to fetch alerts' }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -149,8 +270,25 @@ serve(async (req) => {
 
     // UPDATE ALERT STATUS
     if (req.method === 'PATCH' && action === 'alerts') {
-      const body = await req.json();
-      const { alert_id, status, notes } = body;
+      let body: unknown;
+      try {
+        body = await req.json();
+      } catch {
+        return new Response(
+          JSON.stringify({ error: 'Invalid JSON body' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const validation = validateAlertUpdateRequest(body);
+      if (!validation.valid) {
+        return new Response(
+          JSON.stringify({ error: validation.error }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const { alert_id, status, notes } = validation.data;
 
       const updateData: Record<string, unknown> = { status };
       if (notes) updateData.notes = notes;
@@ -168,6 +306,7 @@ serve(async (req) => {
         .single();
 
       if (error) {
+        console.error('Failed to update alert:', error);
         return new Response(
           JSON.stringify({ error: 'Failed to update alert' }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -182,8 +321,25 @@ serve(async (req) => {
 
     // GENERATE SAR (Suspicious Activity Report)
     if (req.method === 'POST' && action === 'generate-sar') {
-      const body = await req.json();
-      const { alert_ids, jurisdiction } = body;
+      let body: unknown;
+      try {
+        body = await req.json();
+      } catch {
+        return new Response(
+          JSON.stringify({ error: 'Invalid JSON body' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const validation = validateSarRequest(body);
+      if (!validation.valid) {
+        return new Response(
+          JSON.stringify({ error: validation.error }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const { alert_ids, jurisdiction } = validation.data;
 
       // Get alert details
       const { data: alerts } = await supabase
@@ -234,6 +390,7 @@ serve(async (req) => {
         .single();
 
       if (error) {
+        console.error('Failed to generate report:', error);
         return new Response(
           JSON.stringify({ error: 'Failed to generate report' }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -256,7 +413,14 @@ serve(async (req) => {
 
       if (!userId) {
         return new Response(
-          JSON.stringify({ error: 'user_id required' }),
+          JSON.stringify({ error: 'user_id parameter is required' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (!isValidUUID(userId)) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid user_id: must be a valid UUID' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -320,9 +484,8 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Compliance monitoring error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return new Response(
-      JSON.stringify({ error: 'Internal server error', details: errorMessage }),
+      JSON.stringify({ error: 'Service temporarily unavailable' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

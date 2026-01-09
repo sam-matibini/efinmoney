@@ -6,11 +6,67 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Validation helpers
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const VALID_SIDES = ['buy', 'sell'] as const;
+const VALID_AMOUNT_TYPES = ['base', 'quote'] as const;
+const MAX_TRADE_AMOUNT = 1000000; // Maximum amount per trade
+const MIN_TRADE_AMOUNT = 0.00000001; // Minimum amount (satoshi level)
+
+function isValidUUID(str: string): boolean {
+  return typeof str === 'string' && UUID_REGEX.test(str);
+}
+
+function isValidAmount(amount: unknown): amount is number {
+  return typeof amount === 'number' && 
+         !isNaN(amount) && 
+         isFinite(amount) && 
+         amount >= MIN_TRADE_AMOUNT && 
+         amount <= MAX_TRADE_AMOUNT;
+}
+
+function isValidSide(side: unknown): side is 'buy' | 'sell' {
+  return typeof side === 'string' && VALID_SIDES.includes(side as 'buy' | 'sell');
+}
+
+function isValidAmountType(type: unknown): type is 'base' | 'quote' {
+  return typeof type === 'string' && VALID_AMOUNT_TYPES.includes(type as 'base' | 'quote');
+}
+
 interface TradeRequest {
   pair_id: string;
   side: 'buy' | 'sell';
   amount: number;
   amount_type: 'base' | 'quote';
+}
+
+function validateTradeRequest(body: unknown): { valid: true; data: TradeRequest } | { valid: false; error: string } {
+  if (!body || typeof body !== 'object') {
+    return { valid: false, error: 'Invalid request body' };
+  }
+  
+  const { pair_id, side, amount, amount_type } = body as Record<string, unknown>;
+  
+  if (!pair_id || !isValidUUID(pair_id as string)) {
+    return { valid: false, error: 'Invalid pair_id: must be a valid UUID' };
+  }
+  
+  if (!isValidSide(side)) {
+    return { valid: false, error: 'Invalid side: must be "buy" or "sell"' };
+  }
+  
+  if (!isValidAmount(amount)) {
+    return { valid: false, error: `Invalid amount: must be a number between ${MIN_TRADE_AMOUNT} and ${MAX_TRADE_AMOUNT}` };
+  }
+  
+  if (!isValidAmountType(amount_type)) {
+    return { valid: false, error: 'Invalid amount_type: must be "base" or "quote"' };
+  }
+  
+  return { 
+    valid: true, 
+    data: { pair_id: pair_id as string, side, amount: amount as number, amount_type } 
+  };
 }
 
 // Price cache with timestamp for staleness check
@@ -122,8 +178,9 @@ serve(async (req) => {
         .eq('is_active', true);
 
       if (error) {
+        console.error('Failed to fetch pairs:', error);
         return new Response(
-          JSON.stringify({ error: 'Failed to fetch pairs' }),
+          JSON.stringify({ error: 'Failed to fetch trading pairs' }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -133,19 +190,25 @@ serve(async (req) => {
       try {
         cryptoPrices = await fetchCryptoPrices();
       } catch (priceError) {
+        console.error('Price fetch error:', priceError);
         return new Response(
           JSON.stringify({ error: 'Price service temporarily unavailable' }),
           { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
-      // Add current prices
+      // Add current prices - fail if price not available
       const pairsWithPrices = pairs.map(pair => {
         const priceKey = `${pair.base_currency}_${pair.quote_currency}`;
+        const price = cryptoPrices[priceKey];
+        if (!price || price <= 0) {
+          console.warn(`No valid price for pair ${priceKey}`);
+        }
         return {
           ...pair,
-          current_price: cryptoPrices[priceKey] || 1,
-          price_change_24h: 0 // Would need historical data for real 24h change
+          current_price: price || null,
+          price_available: !!price && price > 0,
+          price_change_24h: 0
         };
       });
 
@@ -157,8 +220,25 @@ serve(async (req) => {
 
     // GET QUOTE
     if (req.method === 'POST' && action === 'quote') {
-      const body: TradeRequest = await req.json();
-      const { pair_id, side, amount, amount_type } = body;
+      let body: unknown;
+      try {
+        body = await req.json();
+      } catch {
+        return new Response(
+          JSON.stringify({ error: 'Invalid JSON body' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const validation = validateTradeRequest(body);
+      if (!validation.valid) {
+        return new Response(
+          JSON.stringify({ error: validation.error }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const { pair_id, side, amount, amount_type } = validation.data;
 
       const { data: pair, error: pairError } = await supabase
         .from('crypto_pairs')
@@ -178,6 +258,7 @@ serve(async (req) => {
       try {
         cryptoPrices = await fetchCryptoPrices();
       } catch (priceError) {
+        console.error('Price fetch error:', priceError);
         return new Response(
           JSON.stringify({ error: 'Price service temporarily unavailable' }),
           { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -185,7 +266,16 @@ serve(async (req) => {
       }
 
       const priceKey = `${pair.base_currency}_${pair.quote_currency}`;
-      const marketPrice = cryptoPrices[priceKey] || 1;
+      const marketPrice = cryptoPrices[priceKey];
+      
+      // SECURITY: Fail explicitly if price not available - never use fallback
+      if (!marketPrice || marketPrice <= 0) {
+        return new Response(
+          JSON.stringify({ error: `Price unavailable for ${priceKey}. Trading temporarily disabled.` }),
+          { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
       const tradingFee = Number(pair.trading_fee_percent);
 
       let baseAmount: number;
@@ -238,8 +328,25 @@ serve(async (req) => {
 
     // EXECUTE TRADE
     if (req.method === 'POST' && action === 'execute') {
-      const body: TradeRequest = await req.json();
-      const { pair_id, side, amount, amount_type } = body;
+      let body: unknown;
+      try {
+        body = await req.json();
+      } catch {
+        return new Response(
+          JSON.stringify({ error: 'Invalid JSON body' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const validation = validateTradeRequest(body);
+      if (!validation.valid) {
+        return new Response(
+          JSON.stringify({ error: validation.error }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const { pair_id, side, amount, amount_type } = validation.data;
 
       const { data: pair, error: pairError } = await supabase
         .from('crypto_pairs')
@@ -290,6 +397,7 @@ serve(async (req) => {
       try {
         cryptoPrices = await fetchCryptoPrices();
       } catch (priceError) {
+        console.error('Price fetch error:', priceError);
         return new Response(
           JSON.stringify({ error: 'Price service temporarily unavailable' }),
           { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -297,7 +405,16 @@ serve(async (req) => {
       }
 
       const priceKey = `${pair.base_currency}_${pair.quote_currency}`;
-      const marketPrice = cryptoPrices[priceKey] || 1;
+      const marketPrice = cryptoPrices[priceKey];
+      
+      // SECURITY: Fail explicitly if price not available
+      if (!marketPrice || marketPrice <= 0) {
+        return new Response(
+          JSON.stringify({ error: `Price unavailable for ${priceKey}. Trading temporarily disabled.` }),
+          { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
       const tradingFee = Number(pair.trading_fee_percent);
 
       // Validate trade amount limits
@@ -360,8 +477,9 @@ serve(async (req) => {
         .single();
 
       if (tradeError) {
+        console.error('Trade execution error:', tradeError);
         return new Response(
-          JSON.stringify({ error: 'Failed to execute trade', details: tradeError.message }),
+          JSON.stringify({ error: 'Failed to execute trade. Please try again.' }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -385,9 +503,8 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Crypto trading error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return new Response(
-      JSON.stringify({ error: 'Internal server error', details: errorMessage }),
+      JSON.stringify({ error: 'Service temporarily unavailable' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

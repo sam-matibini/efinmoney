@@ -6,6 +6,28 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Validation helpers
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const CURRENCY_CODE_REGEX = /^[A-Z]{3,4}$/;
+const MAX_AMOUNT = 1000000; // Maximum amount per transaction
+const MIN_AMOUNT = 0.01;
+
+function isValidUUID(str: unknown): str is string {
+  return typeof str === 'string' && UUID_REGEX.test(str);
+}
+
+function isValidCurrencyCode(str: unknown): str is string {
+  return typeof str === 'string' && CURRENCY_CODE_REGEX.test(str);
+}
+
+function isValidAmount(amount: unknown): amount is number {
+  return typeof amount === 'number' && 
+         !isNaN(amount) && 
+         isFinite(amount) && 
+         amount >= MIN_AMOUNT && 
+         amount <= MAX_AMOUNT;
+}
+
 interface FxQuoteRequest {
   from_currency: string;
   to_currency: string;
@@ -18,6 +40,64 @@ interface FxExecuteRequest {
   from_currency: string;
   to_currency: string;
   from_amount: number;
+}
+
+function validateQuoteRequest(body: unknown): { valid: true; data: FxQuoteRequest } | { valid: false; error: string } {
+  if (!body || typeof body !== 'object') {
+    return { valid: false, error: 'Invalid request body' };
+  }
+  
+  const { from_currency, to_currency, amount } = body as Record<string, unknown>;
+  
+  if (!isValidCurrencyCode(from_currency)) {
+    return { valid: false, error: 'Invalid from_currency: must be 3-4 uppercase letters' };
+  }
+  
+  if (!isValidCurrencyCode(to_currency)) {
+    return { valid: false, error: 'Invalid to_currency: must be 3-4 uppercase letters' };
+  }
+  
+  if (!isValidAmount(amount)) {
+    return { valid: false, error: `Invalid amount: must be a number between ${MIN_AMOUNT} and ${MAX_AMOUNT}` };
+  }
+  
+  return { 
+    valid: true, 
+    data: { from_currency, to_currency, amount: amount as number } 
+  };
+}
+
+function validateExecuteRequest(body: unknown): { valid: true; data: FxExecuteRequest } | { valid: false; error: string } {
+  if (!body || typeof body !== 'object') {
+    return { valid: false, error: 'Invalid request body' };
+  }
+  
+  const { from_wallet_id, to_wallet_id, from_currency, to_currency, from_amount } = body as Record<string, unknown>;
+  
+  if (!isValidUUID(from_wallet_id)) {
+    return { valid: false, error: 'Invalid from_wallet_id: must be a valid UUID' };
+  }
+  
+  if (!isValidUUID(to_wallet_id)) {
+    return { valid: false, error: 'Invalid to_wallet_id: must be a valid UUID' };
+  }
+  
+  if (!isValidCurrencyCode(from_currency)) {
+    return { valid: false, error: 'Invalid from_currency: must be 3-4 uppercase letters' };
+  }
+  
+  if (!isValidCurrencyCode(to_currency)) {
+    return { valid: false, error: 'Invalid to_currency: must be 3-4 uppercase letters' };
+  }
+  
+  if (!isValidAmount(from_amount)) {
+    return { valid: false, error: `Invalid from_amount: must be a number between ${MIN_AMOUNT} and ${MAX_AMOUNT}` };
+  }
+  
+  return { 
+    valid: true, 
+    data: { from_wallet_id, to_wallet_id, from_currency, to_currency, from_amount: from_amount as number } 
+  };
 }
 
 serve(async (req) => {
@@ -59,16 +139,25 @@ serve(async (req) => {
 
     // GET QUOTE - Lock rate for 60 seconds
     if (req.method === 'POST' && action === 'quote') {
-      const body: FxQuoteRequest = await req.json();
-      const { from_currency, to_currency, amount } = body;
-
-      // Validate input
-      if (!from_currency || !to_currency || !amount || amount <= 0) {
+      let body: unknown;
+      try {
+        body = await req.json();
+      } catch {
         return new Response(
-          JSON.stringify({ error: 'Invalid request parameters' }),
+          JSON.stringify({ error: 'Invalid JSON body' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
+
+      const validation = validateQuoteRequest(body);
+      if (!validation.valid) {
+        return new Response(
+          JSON.stringify({ error: validation.error }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const { from_currency, to_currency, amount } = validation.data;
 
       // Get current FX rate
       const { data: rateData, error: rateError } = await supabase
@@ -143,8 +232,25 @@ serve(async (req) => {
 
     // EXECUTE SWAP
     if (req.method === 'POST' && action === 'execute') {
-      const body: FxExecuteRequest = await req.json();
-      const { from_wallet_id, to_wallet_id, from_currency, to_currency, from_amount } = body;
+      let body: unknown;
+      try {
+        body = await req.json();
+      } catch {
+        return new Response(
+          JSON.stringify({ error: 'Invalid JSON body' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const validation = validateExecuteRequest(body);
+      if (!validation.valid) {
+        return new Response(
+          JSON.stringify({ error: validation.error }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const { from_wallet_id, to_wallet_id, from_currency, to_currency, from_amount } = validation.data;
 
       // Validate wallets belong to user
       const { data: fromWallet, error: fromError } = await supabase
@@ -208,7 +314,7 @@ serve(async (req) => {
       if (swapError) {
         console.error('FX swap error:', swapError);
         return new Response(
-          JSON.stringify({ error: 'Failed to execute swap', details: swapError.message }),
+          JSON.stringify({ error: 'Failed to execute swap. Please try again.' }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -236,6 +342,10 @@ serve(async (req) => {
         .select()
         .single();
 
+      if (txError) {
+        console.error('FX transaction recording error:', txError);
+      }
+
       return new Response(
         JSON.stringify({
           success: true,
@@ -253,9 +363,8 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('FX Engine error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return new Response(
-      JSON.stringify({ error: 'Internal server error', details: errorMessage }),
+      JSON.stringify({ error: 'Service temporarily unavailable' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

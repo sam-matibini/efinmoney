@@ -6,10 +6,65 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Validation helpers
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+
+function isValidUUID(str: unknown): str is string {
+  return typeof str === 'string' && UUID_REGEX.test(str);
+}
+
+function isValidISODate(str: unknown): str is string {
+  if (typeof str !== 'string' || !ISO_DATE_REGEX.test(str)) {
+    return false;
+  }
+  // Validate the date is actually valid
+  const date = new Date(str);
+  return !isNaN(date.getTime());
+}
+
 interface ReconciliationRequest {
   bank_account_id: string;
   date_from?: string;
   date_to?: string;
+}
+
+function validateReconciliationRequest(body: unknown): { valid: true; data: ReconciliationRequest } | { valid: false; error: string } {
+  if (!body || typeof body !== 'object') {
+    return { valid: false, error: 'Invalid request body' };
+  }
+  
+  const { bank_account_id, date_from, date_to } = body as Record<string, unknown>;
+  
+  if (!isValidUUID(bank_account_id)) {
+    return { valid: false, error: 'Invalid bank_account_id: must be a valid UUID' };
+  }
+  
+  if (date_from !== undefined && !isValidISODate(date_from)) {
+    return { valid: false, error: 'Invalid date_from: must be in YYYY-MM-DD format' };
+  }
+  
+  if (date_to !== undefined && !isValidISODate(date_to)) {
+    return { valid: false, error: 'Invalid date_to: must be in YYYY-MM-DD format' };
+  }
+  
+  // Validate date range
+  if (date_from && date_to) {
+    const from = new Date(date_from);
+    const to = new Date(date_to);
+    if (from > to) {
+      return { valid: false, error: 'date_from cannot be after date_to' };
+    }
+  }
+  
+  return { 
+    valid: true, 
+    data: { 
+      bank_account_id, 
+      date_from: date_from as string | undefined, 
+      date_to: date_to as string | undefined 
+    } 
+  };
 }
 
 serve(async (req) => {
@@ -66,8 +121,39 @@ serve(async (req) => {
 
     // RUN AUTO-RECONCILIATION
     if (req.method === 'POST' && action === 'auto-match') {
-      const body: ReconciliationRequest = await req.json();
-      const { bank_account_id, date_from, date_to } = body;
+      let body: unknown;
+      try {
+        body = await req.json();
+      } catch {
+        return new Response(
+          JSON.stringify({ error: 'Invalid JSON body' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const validation = validateReconciliationRequest(body);
+      if (!validation.valid) {
+        return new Response(
+          JSON.stringify({ error: validation.error }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const { bank_account_id, date_from, date_to } = validation.data;
+
+      // Verify bank account exists
+      const { data: bankAccount, error: bankAccountError } = await supabase
+        .from('bank_accounts')
+        .select('id')
+        .eq('id', bank_account_id)
+        .single();
+
+      if (bankAccountError || !bankAccount) {
+        return new Response(
+          JSON.stringify({ error: 'Bank account not found' }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
 
       // Get unmatched bank transactions
       let query = supabase
@@ -81,6 +167,7 @@ serve(async (req) => {
       const { data: bankTxns, error: bankError } = await query;
 
       if (bankError) {
+        console.error('Failed to fetch bank transactions:', bankError);
         return new Response(
           JSON.stringify({ error: 'Failed to fetch bank transactions' }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -210,10 +297,48 @@ serve(async (req) => {
     if (req.method === 'GET' && action === 'status') {
       const bankAccountId = url.searchParams.get('bank_account_id');
 
-      const { data: stats, error } = await supabase
+      // Validate bank_account_id if provided
+      if (bankAccountId && !isValidUUID(bankAccountId)) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid bank_account_id: must be a valid UUID' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      let query = supabase
         .from('reconciliation_records')
-        .select('status')
-        .eq('bank_transaction_id', bankAccountId ? bankAccountId : undefined);
+        .select('status, bank_transaction_id');
+
+      if (bankAccountId) {
+        // Get transactions for this bank account
+        const { data: bankTxns } = await supabase
+          .from('bank_transactions')
+          .select('id')
+          .eq('bank_account_id', bankAccountId);
+        
+        const txnIds = bankTxns?.map(t => t.id) || [];
+        if (txnIds.length > 0) {
+          query = query.in('bank_transaction_id', txnIds);
+        } else {
+          // No transactions for this account
+          return new Response(
+            JSON.stringify({ 
+              summary: { matched: 0, unmatched: 0, exception: 0, pending: 0 } 
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      }
+
+      const { data: stats, error } = await query;
+
+      if (error) {
+        console.error('Failed to fetch reconciliation status:', error);
+        return new Response(
+          JSON.stringify({ error: 'Failed to fetch reconciliation status' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
 
       const summary = {
         matched: 0,
@@ -241,9 +366,8 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Reconciliation error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return new Response(
-      JSON.stringify({ error: 'Internal server error', details: errorMessage }),
+      JSON.stringify({ error: 'Service temporarily unavailable' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
