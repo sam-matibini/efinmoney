@@ -11,7 +11,7 @@ import { useWallets } from "@/hooks/useWallets";
 import { useFxRates } from "@/hooks/useFxRates";
 import { useCreateTransfer } from "@/hooks/useTransfers";
 import { toast } from "sonner";
-import { Send, ArrowRight, CheckCircle, Users, Clock, Shield } from "lucide-react";
+import { Send, ArrowRight, CheckCircle, Users, Clock, Shield, Wallet, Landmark, CreditCard } from "lucide-react";
 
 const targetCountries = [
   { code: 'KES', country: 'Kenya', flag: '🇰🇪', method: 'M-Pesa', payout: 'mpesa' },
@@ -21,8 +21,11 @@ const targetCountries = [
   { code: 'BIF', country: 'Burundi', flag: '🇧🇮', method: 'Lumicash', payout: 'lumicash' },
 ];
 
+type FundingSource = 'wallet' | 'bank' | 'card';
+
 const SendPage = () => {
   const [step, setStep] = useState(1);
+  const [fundingSource, setFundingSource] = useState<FundingSource>('wallet');
   const [amount, setAmount] = useState("");
   const [selectedWalletId, setSelectedWalletId] = useState("");
   const [targetCountryCode, setTargetCountryCode] = useState("KES");
@@ -36,8 +39,12 @@ const SendPage = () => {
   const selectedWallet = wallets?.find(w => w.wallet_id === selectedWalletId) || wallets?.[0];
   const targetCountry = targetCountries.find(c => c.code === targetCountryCode) || targetCountries[0];
 
+  // For bank/card we default to CAD
+  const sourceCurrency = fundingSource === 'wallet' ? (selectedWallet?.currency_code || 'CAD') : 'CAD';
+  const sourceSymbol = fundingSource === 'wallet' ? (selectedWallet?.symbol || 'C$') : 'C$';
+
   const fxRate = fxRates?.find(
-    r => r.from_currency === selectedWallet?.currency_code && r.to_currency === targetCountry.code
+    r => r.from_currency === sourceCurrency && r.to_currency === targetCountry.code
   );
 
   const effectiveRate = fxRate ? Number(fxRate.effective_rate) : 
@@ -46,21 +53,23 @@ const SendPage = () => {
      targetCountry.code === 'TZS' ? 2505.00 :
      targetCountry.code === 'ZMW' ? 26.85 : 2850.00);
 
-  const fee = parseFloat(amount) > 0 ? 2.99 : 0;
+  const baseFee = 2.99;
+  const cardFee = fundingSource === 'card' ? 1.50 : 0;
+  const fee = parseFloat(amount) > 0 ? baseFee + cardFee : 0;
   const receivedAmount = parseFloat(amount) > 0 ? (parseFloat(amount) - fee) * effectiveRate : 0;
 
   const handleSubmit = async () => {
-    if (!selectedWallet) return;
+    if (fundingSource === 'wallet' && !selectedWallet) return;
 
     try {
       await createTransfer.mutateAsync({
-        sender_wallet_id: selectedWallet.wallet_id,
+        sender_wallet_id: fundingSource === 'wallet' ? selectedWallet!.wallet_id : wallets?.[0]?.wallet_id || '',
         recipient_name: recipientName,
         recipient_phone: recipientPhone,
         recipient_country: targetCountry.code,
         transfer_type: 'mobile_money',
         payout_method: targetCountry.payout,
-        source_currency: selectedWallet.currency_code,
+        source_currency: sourceCurrency,
         target_currency: targetCountry.code,
         source_amount: parseFloat(amount),
         target_amount: receivedAmount,
@@ -80,9 +89,13 @@ const SendPage = () => {
     setAmount("");
     setRecipientName("");
     setRecipientPhone("");
+    setFundingSource('wallet');
   };
 
-  const isStep1Valid = parseFloat(amount) > 0 && selectedWallet && parseFloat(amount) <= Number(selectedWallet.balance);
+  const isStep1Valid = parseFloat(amount) > 0 && (
+    fundingSource !== 'wallet' || 
+    (selectedWallet && parseFloat(amount) <= Number(selectedWallet.balance))
+  );
   const isStep2Valid = recipientName.length > 2 && recipientPhone.length > 8;
 
   return (
@@ -121,27 +134,99 @@ const SendPage = () => {
                 <CardTitle>Enter Amount</CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
+                {/* Funding Source Selection */}
                 <div className="space-y-2">
-                  <Label>From Wallet</Label>
-                  <Select value={selectedWalletId || selectedWallet?.wallet_id} onValueChange={setSelectedWalletId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select wallet" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {wallets?.map((w) => (
-                        <SelectItem key={w.wallet_id} value={w.wallet_id}>
-                          {w.flag_emoji} {w.currency_code} - {w.symbol}{Number(w.balance).toFixed(2)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label>Pay From</Label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <Button
+                      type="button"
+                      variant={fundingSource === 'wallet' ? 'default' : 'outline'}
+                      className="flex flex-col items-center gap-1 h-auto py-3"
+                      onClick={() => setFundingSource('wallet')}
+                    >
+                      <Wallet className="w-5 h-5" />
+                      <span className="text-xs">Wallet</span>
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={fundingSource === 'bank' ? 'default' : 'outline'}
+                      className="flex flex-col items-center gap-1 h-auto py-3"
+                      onClick={() => setFundingSource('bank')}
+                    >
+                      <Landmark className="w-5 h-5" />
+                      <span className="text-xs">Bank</span>
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={fundingSource === 'card' ? 'default' : 'outline'}
+                      className="flex flex-col items-center gap-1 h-auto py-3"
+                      onClick={() => setFundingSource('card')}
+                    >
+                      <CreditCard className="w-5 h-5" />
+                      <span className="text-xs">Card</span>
+                    </Button>
+                  </div>
                 </div>
+
+                {/* Wallet Selection - only show when wallet is selected */}
+                {fundingSource === 'wallet' && (
+                  <div className="space-y-2">
+                    <Label>From Wallet</Label>
+                    <Select value={selectedWalletId || selectedWallet?.wallet_id} onValueChange={setSelectedWalletId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select wallet" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {wallets?.map((w) => (
+                          <SelectItem key={w.wallet_id} value={w.wallet_id}>
+                            {w.flag_emoji} {w.currency_code} - {w.symbol}{Number(w.balance).toFixed(2)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {/* Bank Account Selection */}
+                {fundingSource === 'bank' && (
+                  <div className="space-y-2">
+                    <Label>From Bank Account</Label>
+                    <Select defaultValue="td_chequing">
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select bank account" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="td_chequing">🏦 TD Chequing ••••4521</SelectItem>
+                        <SelectItem value="rbc_savings">🏦 RBC Savings ••••7832</SelectItem>
+                        <SelectItem value="bmo_chequing">🏦 BMO Chequing ••••1256</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">Transfers from bank may take 1-2 business days</p>
+                  </div>
+                )}
+
+                {/* Credit Card Selection */}
+                {fundingSource === 'card' && (
+                  <div className="space-y-2">
+                    <Label>From Credit Card</Label>
+                    <Select defaultValue="visa_5678">
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select credit card" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="visa_5678">💳 Visa ••••5678</SelectItem>
+                        <SelectItem value="mc_9012">💳 Mastercard ••••9012</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">+$1.50 card processing fee applies</p>
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <Label>You Send</Label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg text-muted-foreground">
-                      {selectedWallet?.symbol || '$'}
+                      {sourceSymbol}
                     </span>
                     <Input
                       type="number"
@@ -151,9 +236,11 @@ const SendPage = () => {
                       className="pl-10 text-2xl h-14"
                     />
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    Available: {selectedWallet?.symbol}{Number(selectedWallet?.balance || 0).toFixed(2)}
-                  </p>
+                  {fundingSource === 'wallet' && (
+                    <p className="text-sm text-muted-foreground">
+                      Available: {selectedWallet?.symbol}{Number(selectedWallet?.balance || 0).toFixed(2)}
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex justify-center">
@@ -184,7 +271,8 @@ const SendPage = () => {
                     {receivedAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {targetCountry.code}
                   </p>
                   <p className="text-sm text-muted-foreground mt-2">
-                    Rate: 1 {selectedWallet?.currency_code || 'USD'} = {effectiveRate.toFixed(2)} {targetCountry.code} • Fee: ${fee.toFixed(2)}
+                    Rate: 1 {sourceCurrency} = {effectiveRate.toFixed(2)} {targetCountry.code} • Fee: ${fee.toFixed(2)}
+                    {fundingSource === 'card' && <span className="text-xs"> (incl. $1.50 card fee)</span>}
                   </p>
                 </div>
 
