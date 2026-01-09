@@ -14,10 +14,10 @@ import { JournalEntriesPanel } from "@/components/finance/JournalEntriesPanel";
 import { CashFlowPanel } from "@/components/finance/CashFlowPanel";
 import { BankAccountsPanel } from "@/components/finance/BankAccountsPanel";
 import { BankTransactionsPanel } from "@/components/finance/BankTransactionsPanel";
-import { CustomersPanel } from "@/components/finance/CustomersPanel";
 import { VendorsPanel } from "@/components/finance/VendorsPanel";
 import { SalesInvoicesPanel } from "@/components/finance/SalesInvoicesPanel";
 import { PurchaseBillsPanel } from "@/components/finance/PurchaseBillsPanel";
+import { CrmCustomersPanel } from "@/components/crm/CrmCustomersPanel";
 
 const FinanceDashboard = () => {
   return (
@@ -32,19 +32,19 @@ const FinanceDashboard = () => {
         >
           <div>
             <h1 className="text-2xl font-display font-bold text-foreground">Finance Dashboard</h1>
-            <p className="text-muted-foreground">Complete accounting & financial management</p>
+            <p className="text-muted-foreground">Complete accounting, CRM & financial management</p>
           </div>
 
-          <Tabs defaultValue="coa" className="space-y-4">
+          <Tabs defaultValue="crm" className="space-y-4">
             <div className="overflow-x-auto pb-2">
               <TabsList className="inline-flex w-auto min-w-full lg:min-w-0">
+                <TabsTrigger value="crm">CRM</TabsTrigger>
                 <TabsTrigger value="coa">COA</TabsTrigger>
                 <TabsTrigger value="journal">Journal</TabsTrigger>
                 <TabsTrigger value="gl">GL</TabsTrigger>
                 <TabsTrigger value="tb">TB</TabsTrigger>
                 <TabsTrigger value="statements">Statements</TabsTrigger>
                 <TabsTrigger value="cashflow">Cash Flow</TabsTrigger>
-                <TabsTrigger value="customers">Customers</TabsTrigger>
                 <TabsTrigger value="vendors">Vendors</TabsTrigger>
                 <TabsTrigger value="invoices">Invoices</TabsTrigger>
                 <TabsTrigger value="bills">Bills</TabsTrigger>
@@ -55,6 +55,10 @@ const FinanceDashboard = () => {
                 <TabsTrigger value="crypto">Crypto</TabsTrigger>
               </TabsList>
             </div>
+
+            <TabsContent value="crm" className="space-y-4">
+              <CrmCustomersPanel />
+            </TabsContent>
 
             <TabsContent value="coa" className="space-y-4">
               <ChartOfAccountsPanel />
@@ -78,10 +82,6 @@ const FinanceDashboard = () => {
 
             <TabsContent value="cashflow" className="space-y-4">
               <CashFlowPanel />
-            </TabsContent>
-
-            <TabsContent value="customers" className="space-y-4">
-              <CustomersPanel />
             </TabsContent>
 
             <TabsContent value="vendors" className="space-y-4">

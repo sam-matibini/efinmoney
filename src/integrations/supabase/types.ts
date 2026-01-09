@@ -304,6 +304,56 @@ export type Database = {
         }
         Relationships: []
       }
+      crm_activities: {
+        Row: {
+          activity_type: string
+          assigned_to: string | null
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          customer_id: string
+          description: string | null
+          due_date: string | null
+          id: string
+          subject: string
+          updated_at: string
+        }
+        Insert: {
+          activity_type: string
+          assigned_to?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer_id: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          subject: string
+          updated_at?: string
+        }
+        Update: {
+          activity_type?: string
+          assigned_to?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          subject?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_activities_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       crypto_pairs: {
         Row: {
           base_currency: string
@@ -468,51 +518,242 @@ export type Database = {
         }
         Relationships: []
       }
-      customers: {
+      customer_documents: {
         Row: {
-          address: string | null
-          created_at: string
-          credit_limit: number | null
-          currency_code: string | null
-          email: string | null
+          customer_id: string
+          document_type: string
+          file_name: string
+          file_path: string
+          file_size: number | null
           id: string
-          is_active: boolean
-          name: string
+          mime_type: string | null
+          onboarding_id: string | null
+          rejection_reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          uploaded_at: string
+        }
+        Insert: {
+          customer_id: string
+          document_type: string
+          file_name: string
+          file_path: string
+          file_size?: number | null
+          id?: string
+          mime_type?: string | null
+          onboarding_id?: string | null
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          uploaded_at?: string
+        }
+        Update: {
+          customer_id?: string
+          document_type?: string
+          file_name?: string
+          file_path?: string
+          file_size?: number | null
+          id?: string
+          mime_type?: string | null
+          onboarding_id?: string | null
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          uploaded_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_documents_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_documents_onboarding_id_fkey"
+            columns: ["onboarding_id"]
+            isOneToOne: false
+            referencedRelation: "customer_onboarding"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_onboarding: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          customer_id: string
+          id: string
           notes: string | null
-          payment_terms: number | null
-          phone: string | null
-          tax_id: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          step_id: string
           updated_at: string
         }
         Insert: {
-          address?: string | null
+          completed_at?: string | null
           created_at?: string
-          credit_limit?: number | null
-          currency_code?: string | null
-          email?: string | null
+          customer_id: string
           id?: string
-          is_active?: boolean
-          name: string
           notes?: string | null
-          payment_terms?: number | null
-          phone?: string | null
-          tax_id?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          step_id: string
           updated_at?: string
         }
         Update: {
+          completed_at?: string | null
+          created_at?: string
+          customer_id?: string
+          id?: string
+          notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          step_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_onboarding_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_onboarding_step_id_fkey"
+            columns: ["step_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_steps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_portal_access: {
+        Row: {
+          access_token: string | null
+          created_at: string
+          customer_id: string
+          id: string
+          is_active: boolean
+          last_login_at: string | null
+          token_expires_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          access_token?: string | null
+          created_at?: string
+          customer_id: string
+          id?: string
+          is_active?: boolean
+          last_login_at?: string | null
+          token_expires_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          access_token?: string | null
+          created_at?: string
+          customer_id?: string
+          id?: string
+          is_active?: boolean
+          last_login_at?: string | null
+          token_expires_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_portal_access_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: true
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customers: {
+        Row: {
+          address: string | null
+          company_type: string | null
+          created_at: string
+          credit_limit: number | null
+          currency_code: string | null
+          date_of_incorporation: string | null
+          email: string | null
+          id: string
+          industry: string | null
+          is_active: boolean
+          kyc_status: string | null
+          kyc_verified_at: string | null
+          kyc_verified_by: string | null
+          name: string
+          notes: string | null
+          onboarding_completed_at: string | null
+          onboarding_started_at: string | null
+          payment_terms: number | null
+          phone: string | null
+          registration_number: string | null
+          risk_level: string | null
+          tax_id: string | null
+          updated_at: string
+          website: string | null
+        }
+        Insert: {
           address?: string | null
+          company_type?: string | null
           created_at?: string
           credit_limit?: number | null
           currency_code?: string | null
+          date_of_incorporation?: string | null
           email?: string | null
           id?: string
+          industry?: string | null
           is_active?: boolean
-          name?: string
+          kyc_status?: string | null
+          kyc_verified_at?: string | null
+          kyc_verified_by?: string | null
+          name: string
           notes?: string | null
+          onboarding_completed_at?: string | null
+          onboarding_started_at?: string | null
           payment_terms?: number | null
           phone?: string | null
+          registration_number?: string | null
+          risk_level?: string | null
           tax_id?: string | null
           updated_at?: string
+          website?: string | null
+        }
+        Update: {
+          address?: string | null
+          company_type?: string | null
+          created_at?: string
+          credit_limit?: number | null
+          currency_code?: string | null
+          date_of_incorporation?: string | null
+          email?: string | null
+          id?: string
+          industry?: string | null
+          is_active?: boolean
+          kyc_status?: string | null
+          kyc_verified_at?: string | null
+          kyc_verified_by?: string | null
+          name?: string
+          notes?: string | null
+          onboarding_completed_at?: string | null
+          onboarding_started_at?: string | null
+          payment_terms?: number | null
+          phone?: string | null
+          registration_number?: string | null
+          risk_level?: string | null
+          tax_id?: string | null
+          updated_at?: string
+          website?: string | null
         }
         Relationships: []
       }
@@ -782,6 +1023,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      onboarding_steps: {
+        Row: {
+          created_at: string
+          description: string | null
+          document_type: string | null
+          id: string
+          is_active: boolean
+          is_required: boolean
+          name: string
+          requires_document: boolean
+          step_order: number
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          document_type?: string | null
+          id?: string
+          is_active?: boolean
+          is_required?: boolean
+          name: string
+          requires_document?: boolean
+          step_order: number
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          document_type?: string | null
+          id?: string
+          is_active?: boolean
+          is_required?: boolean
+          name?: string
+          requires_document?: boolean
+          step_order?: number
+        }
+        Relationships: []
       }
       profiles: {
         Row: {
