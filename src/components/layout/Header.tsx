@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Bell, Search, User, LogOut, Shield, Wallet, Settings, BookOpen, Building2 } from "lucide-react";
+import { Bell, Search, User, LogOut, Shield, Wallet, Settings } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRoles } from "@/hooks/useUserRoles";
 import { Link, useLocation } from "react-router-dom";
@@ -25,8 +25,6 @@ const Header = () => {
   ];
 
   if (isFinance || isAdmin) {
-    navItems.push({ label: 'Accounting', href: '/accounting' });
-    navItems.push({ label: 'Banking', href: '/banking' });
     navItems.push({ label: 'Finance', href: '/finance' });
   }
 
@@ -73,8 +71,6 @@ const Header = () => {
                     : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
-                {item.label === 'Accounting' && <BookOpen className="w-4 h-4" />}
-                {item.label === 'Banking' && <Building2 className="w-4 h-4" />}
                 {item.label === 'Finance' && <Wallet className="w-4 h-4" />}
                 {item.label === 'Operations' && <Settings className="w-4 h-4" />}
                 {item.label === 'Admin' && <Shield className="w-4 h-4" />}
