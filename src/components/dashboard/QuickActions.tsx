@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { Send, Download, RefreshCw, Smartphone, CreditCard, PiggyBank } from "lucide-react";
 import QuickAction from "@/components/ui/QuickAction";
 import SendMoneyModal from "@/components/modals/SendMoneyModal";
+import ExchangeModal from "@/components/modals/ExchangeModal";
 
 const QuickActions = () => {
   return (
@@ -38,7 +39,11 @@ const QuickActions = () => {
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.1 }}
         >
-          <QuickAction icon={RefreshCw} label="Exchange" variant="default" />
+          <ExchangeModal>
+            <div>
+              <QuickAction icon={RefreshCw} label="Exchange" variant="default" />
+            </div>
+          </ExchangeModal>
         </motion.div>
         
         <motion.div

@@ -53,6 +53,388 @@ export type Database = {
         }
         Relationships: []
       }
+      bank_accounts: {
+        Row: {
+          account_name: string
+          account_number: string
+          account_type: string
+          bank_name: string
+          created_at: string
+          currency_code: string
+          id: string
+          is_active: boolean
+          last_reconciled_at: string | null
+          ledger_account_id: string | null
+          routing_number: string | null
+          swift_code: string | null
+        }
+        Insert: {
+          account_name: string
+          account_number: string
+          account_type?: string
+          bank_name: string
+          created_at?: string
+          currency_code: string
+          id?: string
+          is_active?: boolean
+          last_reconciled_at?: string | null
+          ledger_account_id?: string | null
+          routing_number?: string | null
+          swift_code?: string | null
+        }
+        Update: {
+          account_name?: string
+          account_number?: string
+          account_type?: string
+          bank_name?: string
+          created_at?: string
+          currency_code?: string
+          id?: string
+          is_active?: boolean
+          last_reconciled_at?: string | null
+          ledger_account_id?: string | null
+          routing_number?: string | null
+          swift_code?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bank_accounts_currency_code_fkey"
+            columns: ["currency_code"]
+            isOneToOne: false
+            referencedRelation: "currencies"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "bank_accounts_ledger_account_id_fkey"
+            columns: ["ledger_account_id"]
+            isOneToOne: false
+            referencedRelation: "ledger_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bank_transactions: {
+        Row: {
+          balance: number | null
+          bank_account_id: string
+          category: string | null
+          credit_amount: number | null
+          debit_amount: number | null
+          description: string
+          id: string
+          import_batch_id: string | null
+          imported_at: string
+          post_date: string | null
+          raw_data: Json | null
+          reference: string | null
+          transaction_date: string
+        }
+        Insert: {
+          balance?: number | null
+          bank_account_id: string
+          category?: string | null
+          credit_amount?: number | null
+          debit_amount?: number | null
+          description: string
+          id?: string
+          import_batch_id?: string | null
+          imported_at?: string
+          post_date?: string | null
+          raw_data?: Json | null
+          reference?: string | null
+          transaction_date: string
+        }
+        Update: {
+          balance?: number | null
+          bank_account_id?: string
+          category?: string | null
+          credit_amount?: number | null
+          debit_amount?: number | null
+          description?: string
+          id?: string
+          import_batch_id?: string | null
+          imported_at?: string
+          post_date?: string | null
+          raw_data?: Json | null
+          reference?: string | null
+          transaction_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bank_transactions_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      compliance_alerts: {
+        Row: {
+          alert_data: Json
+          assigned_to: string | null
+          created_at: string
+          id: string
+          notes: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          rule_id: string
+          severity: Database["public"]["Enums"]["alert_severity"]
+          status: Database["public"]["Enums"]["alert_status"]
+          transfer_id: string | null
+          user_id: string
+        }
+        Insert: {
+          alert_data?: Json
+          assigned_to?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          rule_id: string
+          severity: Database["public"]["Enums"]["alert_severity"]
+          status?: Database["public"]["Enums"]["alert_status"]
+          transfer_id?: string | null
+          user_id: string
+        }
+        Update: {
+          alert_data?: Json
+          assigned_to?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          rule_id?: string
+          severity?: Database["public"]["Enums"]["alert_severity"]
+          status?: Database["public"]["Enums"]["alert_status"]
+          transfer_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "compliance_alerts_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "compliance_rules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "compliance_alerts_transfer_id_fkey"
+            columns: ["transfer_id"]
+            isOneToOne: false
+            referencedRelation: "transfers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      compliance_reports: {
+        Row: {
+          created_at: string
+          filed_at: string | null
+          filed_by: string | null
+          id: string
+          jurisdiction: string
+          report_data: Json
+          report_type: string
+          reporting_period_end: string
+          reporting_period_start: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          filed_at?: string | null
+          filed_by?: string | null
+          id?: string
+          jurisdiction: string
+          report_data?: Json
+          report_type: string
+          reporting_period_end: string
+          reporting_period_start: string
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          filed_at?: string | null
+          filed_by?: string | null
+          id?: string
+          jurisdiction?: string
+          report_data?: Json
+          report_type?: string
+          reporting_period_end?: string
+          reporting_period_start?: string
+          status?: string
+        }
+        Relationships: []
+      }
+      compliance_rules: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          parameters: Json
+          rule_code: string
+          rule_name: string
+          rule_type: string
+          severity: Database["public"]["Enums"]["alert_severity"]
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          parameters?: Json
+          rule_code: string
+          rule_name: string
+          rule_type: string
+          severity?: Database["public"]["Enums"]["alert_severity"]
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          parameters?: Json
+          rule_code?: string
+          rule_name?: string
+          rule_type?: string
+          severity?: Database["public"]["Enums"]["alert_severity"]
+        }
+        Relationships: []
+      }
+      crypto_pairs: {
+        Row: {
+          base_currency: string
+          created_at: string
+          id: string
+          is_active: boolean
+          max_trade_amount: number | null
+          min_trade_amount: number
+          quote_currency: string
+          trading_fee_percent: number
+        }
+        Insert: {
+          base_currency: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          max_trade_amount?: number | null
+          min_trade_amount?: number
+          quote_currency: string
+          trading_fee_percent?: number
+        }
+        Update: {
+          base_currency?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          max_trade_amount?: number | null
+          min_trade_amount?: number
+          quote_currency?: string
+          trading_fee_percent?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crypto_pairs_base_currency_fkey"
+            columns: ["base_currency"]
+            isOneToOne: false
+            referencedRelation: "currencies"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "crypto_pairs_quote_currency_fkey"
+            columns: ["quote_currency"]
+            isOneToOne: false
+            referencedRelation: "currencies"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
+      crypto_trades: {
+        Row: {
+          base_amount: number
+          base_wallet_id: string | null
+          created_at: string
+          executed_at: string | null
+          fee_amount: number
+          fee_currency: string | null
+          id: string
+          journal_id: string | null
+          pair_id: string
+          price: number
+          quote_amount: number
+          quote_wallet_id: string | null
+          side: Database["public"]["Enums"]["trade_side"]
+          status: Database["public"]["Enums"]["trade_status"]
+          user_id: string
+        }
+        Insert: {
+          base_amount: number
+          base_wallet_id?: string | null
+          created_at?: string
+          executed_at?: string | null
+          fee_amount?: number
+          fee_currency?: string | null
+          id?: string
+          journal_id?: string | null
+          pair_id: string
+          price: number
+          quote_amount: number
+          quote_wallet_id?: string | null
+          side: Database["public"]["Enums"]["trade_side"]
+          status?: Database["public"]["Enums"]["trade_status"]
+          user_id: string
+        }
+        Update: {
+          base_amount?: number
+          base_wallet_id?: string | null
+          created_at?: string
+          executed_at?: string | null
+          fee_amount?: number
+          fee_currency?: string | null
+          id?: string
+          journal_id?: string | null
+          pair_id?: string
+          price?: number
+          quote_amount?: number
+          quote_wallet_id?: string | null
+          side?: Database["public"]["Enums"]["trade_side"]
+          status?: Database["public"]["Enums"]["trade_status"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crypto_trades_base_wallet_id_fkey"
+            columns: ["base_wallet_id"]
+            isOneToOne: false
+            referencedRelation: "wallets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crypto_trades_fee_currency_fkey"
+            columns: ["fee_currency"]
+            isOneToOne: false
+            referencedRelation: "currencies"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "crypto_trades_pair_id_fkey"
+            columns: ["pair_id"]
+            isOneToOne: false
+            referencedRelation: "crypto_pairs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crypto_trades_quote_wallet_id_fkey"
+            columns: ["quote_wallet_id"]
+            isOneToOne: false
+            referencedRelation: "wallets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       currencies: {
         Row: {
           code: string
@@ -137,6 +519,98 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "currencies"
             referencedColumns: ["code"]
+          },
+        ]
+      }
+      fx_transactions: {
+        Row: {
+          created_at: string
+          effective_rate: number
+          executed_at: string | null
+          fee_amount: number
+          from_amount: number
+          from_currency: string
+          from_wallet_id: string
+          id: string
+          journal_id: string | null
+          market_rate: number
+          markup_rate: number
+          rate_expires_at: string
+          rate_locked_at: string
+          status: Database["public"]["Enums"]["trade_status"]
+          to_amount: number
+          to_currency: string
+          to_wallet_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          effective_rate: number
+          executed_at?: string | null
+          fee_amount?: number
+          from_amount: number
+          from_currency: string
+          from_wallet_id: string
+          id?: string
+          journal_id?: string | null
+          market_rate: number
+          markup_rate?: number
+          rate_expires_at: string
+          rate_locked_at?: string
+          status?: Database["public"]["Enums"]["trade_status"]
+          to_amount: number
+          to_currency: string
+          to_wallet_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          effective_rate?: number
+          executed_at?: string | null
+          fee_amount?: number
+          from_amount?: number
+          from_currency?: string
+          from_wallet_id?: string
+          id?: string
+          journal_id?: string | null
+          market_rate?: number
+          markup_rate?: number
+          rate_expires_at?: string
+          rate_locked_at?: string
+          status?: Database["public"]["Enums"]["trade_status"]
+          to_amount?: number
+          to_currency?: string
+          to_wallet_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fx_transactions_from_currency_fkey"
+            columns: ["from_currency"]
+            isOneToOne: false
+            referencedRelation: "currencies"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "fx_transactions_from_wallet_id_fkey"
+            columns: ["from_wallet_id"]
+            isOneToOne: false
+            referencedRelation: "wallets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fx_transactions_to_currency_fkey"
+            columns: ["to_currency"]
+            isOneToOne: false
+            referencedRelation: "currencies"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "fx_transactions_to_wallet_id_fkey"
+            columns: ["to_wallet_id"]
+            isOneToOne: false
+            referencedRelation: "wallets"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -317,6 +791,73 @@ export type Database = {
           },
         ]
       }
+      reconciliation_records: {
+        Row: {
+          bank_transaction_id: string | null
+          created_at: string
+          exception_reason: string | null
+          id: string
+          ledger_entry_id: string | null
+          match_confidence: number | null
+          match_reason: string | null
+          matched_amount: number | null
+          resolved_at: string | null
+          resolved_by: string | null
+          status: Database["public"]["Enums"]["reconciliation_status"]
+          transfer_id: string | null
+        }
+        Insert: {
+          bank_transaction_id?: string | null
+          created_at?: string
+          exception_reason?: string | null
+          id?: string
+          ledger_entry_id?: string | null
+          match_confidence?: number | null
+          match_reason?: string | null
+          matched_amount?: number | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: Database["public"]["Enums"]["reconciliation_status"]
+          transfer_id?: string | null
+        }
+        Update: {
+          bank_transaction_id?: string | null
+          created_at?: string
+          exception_reason?: string | null
+          id?: string
+          ledger_entry_id?: string | null
+          match_confidence?: number | null
+          match_reason?: string | null
+          matched_amount?: number | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: Database["public"]["Enums"]["reconciliation_status"]
+          transfer_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reconciliation_records_bank_transaction_id_fkey"
+            columns: ["bank_transaction_id"]
+            isOneToOne: false
+            referencedRelation: "bank_transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reconciliation_records_ledger_entry_id_fkey"
+            columns: ["ledger_entry_id"]
+            isOneToOne: false
+            referencedRelation: "ledger_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reconciliation_records_transfer_id_fkey"
+            columns: ["transfer_id"]
+            isOneToOne: false
+            referencedRelation: "transfers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       transfers: {
         Row: {
           completed_at: string | null
@@ -475,6 +1016,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      execute_fx_swap: {
+        Args: {
+          p_effective_rate: number
+          p_fee_amount?: number
+          p_from_amount: number
+          p_from_wallet_id: string
+          p_to_wallet_id: string
+          p_user_id: string
+        }
+        Returns: string
+      }
       get_user_wallet_balances: {
         Args: { p_user_id: string }
         Returns: {
@@ -495,13 +1047,32 @@ export type Database = {
         }
         Returns: boolean
       }
+      run_compliance_checks: {
+        Args: { p_transfer_id: string }
+        Returns: number
+      }
     }
     Enums: {
       account_type: "asset" | "liability" | "income" | "expense" | "equity"
+      alert_severity: "low" | "medium" | "high" | "critical"
+      alert_status:
+        | "open"
+        | "investigating"
+        | "escalated"
+        | "resolved"
+        | "false_positive"
       app_role: "user" | "admin" | "compliance" | "support" | "finance"
       currency_type: "fiat" | "crypto"
       kyc_status: "pending" | "submitted" | "verified" | "rejected" | "expired"
       kyc_tier: "tier_0" | "tier_1" | "tier_2" | "tier_3"
+      reconciliation_status:
+        | "pending"
+        | "matched"
+        | "unmatched"
+        | "exception"
+        | "resolved"
+      trade_side: "buy" | "sell"
+      trade_status: "pending" | "executed" | "cancelled" | "failed"
       transfer_status:
         | "initiated"
         | "funded"
@@ -640,10 +1211,27 @@ export const Constants = {
   public: {
     Enums: {
       account_type: ["asset", "liability", "income", "expense", "equity"],
+      alert_severity: ["low", "medium", "high", "critical"],
+      alert_status: [
+        "open",
+        "investigating",
+        "escalated",
+        "resolved",
+        "false_positive",
+      ],
       app_role: ["user", "admin", "compliance", "support", "finance"],
       currency_type: ["fiat", "crypto"],
       kyc_status: ["pending", "submitted", "verified", "rejected", "expired"],
       kyc_tier: ["tier_0", "tier_1", "tier_2", "tier_3"],
+      reconciliation_status: [
+        "pending",
+        "matched",
+        "unmatched",
+        "exception",
+        "resolved",
+      ],
+      trade_side: ["buy", "sell"],
+      trade_status: ["pending", "executed", "cancelled", "failed"],
       transfer_status: [
         "initiated",
         "funded",

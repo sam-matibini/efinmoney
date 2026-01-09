@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { TrendingUp, TrendingDown, RefreshCw } from "lucide-react";
 import { useFxRates } from "@/hooks/useFxRates";
 import { Skeleton } from "@/components/ui/skeleton";
+import ExchangeModal from "@/components/modals/ExchangeModal";
 
 const countryFlags: Record<string, string> = {
   KES: '🇰🇪',
@@ -87,13 +88,15 @@ const ExchangeRates = () => {
         ))}
       </div>
 
-      <motion.button
-        whileHover={{ scale: 1.02 }}
-        whileTap={{ scale: 0.98 }}
-        className="w-full mt-4 py-3 rounded-xl gradient-primary text-primary-foreground font-medium shadow-glow"
-      >
-        Exchange Now
-      </motion.button>
+      <ExchangeModal>
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          className="w-full mt-4 py-3 rounded-xl gradient-primary text-primary-foreground font-medium shadow-glow"
+        >
+          Exchange Now
+        </motion.button>
+      </ExchangeModal>
     </section>
   );
 };
