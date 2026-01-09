@@ -12,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import { ArrowDownLeft, ArrowUpRight, Sparkles, CheckCircle2, Send, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
+import { BankTransactionImport } from "./BankTransactionImport";
 
 export const BankTransactionsPanel = () => {
   const { user } = useAuth();
@@ -230,18 +231,26 @@ export const BankTransactionsPanel = () => {
           <CardTitle>Bank Transactions</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
-            <SelectTrigger className="w-full md:w-[400px]">
-              <SelectValue placeholder="Select a bank account" />
-            </SelectTrigger>
-            <SelectContent>
-              {bankAccounts.map((account) => (
-                <SelectItem key={account.id} value={account.id}>
-                  {account.account_name} ({account.bank_name})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex flex-wrap items-center gap-3">
+            <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
+              <SelectTrigger className="w-full md:w-[400px]">
+                <SelectValue placeholder="Select a bank account" />
+              </SelectTrigger>
+              <SelectContent>
+                {bankAccounts.map((account) => (
+                  <SelectItem key={account.id} value={account.id}>
+                    {account.account_name} ({account.bank_name})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {selectedAccountId && (
+              <BankTransactionImport
+                bankAccountId={selectedAccountId}
+                onImportComplete={() => queryClient.invalidateQueries({ queryKey: ['bank-transactions', selectedAccountId] })}
+              />
+            )}
+          </div>
 
           {selectedAccountId && transactions.length > 0 && (
             <div className="flex flex-wrap gap-2">
