@@ -4,18 +4,18 @@ import { X, ChevronDown, ArrowRight, AlertCircle, CheckCircle } from "lucide-rea
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-
-const currencies = [
-  { code: 'USD', name: 'US Dollar', symbol: '$', flag: '🇺🇸', balance: 12458.32 },
-  { code: 'CAD', name: 'Canadian Dollar', symbol: 'C$', flag: '🇨🇦', balance: 8234.50 },
-];
+import { useWallets } from "@/hooks/useWallets";
+import { useFxRates } from "@/hooks/useFxRates";
+import { useCurrencies } from "@/hooks/useCurrencies";
+import { useCreateTransfer } from "@/hooks/useTransfers";
+import { toast } from "sonner";
 
 const targetCountries = [
-  { code: 'KES', country: 'Kenya', flag: '🇰🇪', rate: 153.45, method: 'M-Pesa' },
-  { code: 'UGX', country: 'Uganda', flag: '🇺🇬', rate: 3742.50, method: 'Mobile Money' },
-  { code: 'TZS', country: 'Tanzania', flag: '🇹🇿', rate: 2505.00, method: 'M-Pesa' },
-  { code: 'ZMW', country: 'Zambia', flag: '🇿🇲', rate: 26.85, method: 'MTN Mobile' },
-  { code: 'BIF', country: 'Burundi', flag: '🇧🇮', rate: 2850.00, method: 'Lumicash' },
+  { code: 'KES', country: 'Kenya', flag: '🇰🇪', method: 'M-Pesa', payout: 'mpesa' },
+  { code: 'UGX', country: 'Uganda', flag: '🇺🇬', method: 'Mobile Money', payout: 'airtel_money' },
+  { code: 'TZS', country: 'Tanzania', flag: '🇹🇿', method: 'M-Pesa', payout: 'mpesa' },
+  { code: 'ZMW', country: 'Zambia', flag: '🇿🇲', method: 'MTN Mobile', payout: 'mtn_mobile' },
+  { code: 'BIF', country: 'Burundi', flag: '🇧🇮', method: 'Lumicash', payout: 'lumicash' },
 ];
 
 interface SendMoneyModalProps {
@@ -25,7 +25,7 @@ interface SendMoneyModalProps {
 const SendMoneyModal = ({ children }: SendMoneyModalProps) => {
   const [step, setStep] = useState(1);
   const [amount, setAmount] = useState("");
-  const [sourceCurrency, setSourceCurrency] = useState(currencies[0]);
+  const [selectedWalletId, setSelectedWalletId] = useState<string | null>(null);
   const [targetCountry, setTargetCountry] = useState(targetCountries[0]);
   const [recipientName, setRecipientName] = useState("");
   const [recipientPhone, setRecipientPhone] = useState("");
@@ -33,9 +33,27 @@ const SendMoneyModal = ({ children }: SendMoneyModalProps) => {
   const [showTargetDropdown, setShowTargetDropdown] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
 
+  const { data: wallets } = useWallets();
+  const { data: fxRates } = useFxRates();
+  const createTransfer = useCreateTransfer();
+
+  const selectedWallet = wallets?.find(w => w.wallet_id === selectedWalletId) || wallets?.[0];
+  
+  // Get FX rate for the selected currencies
+  const fxRate = fxRates?.find(
+    r => r.from_currency === selectedWallet?.currency_code && r.to_currency === targetCountry.code
+  );
+
+  const effectiveRate = fxRate ? Number(fxRate.effective_rate) : 
+    (targetCountry.code === 'KES' ? 153.45 :
+     targetCountry.code === 'UGX' ? 3742.50 :
+     targetCountry.code === 'TZS' ? 2505.00 :
+     targetCountry.code === 'ZMW' ? 26.85 :
+     targetCountry.code === 'BIF' ? 2850.00 : 1);
+
   const fee = parseFloat(amount) > 0 ? 2.99 : 0;
   const receivedAmount = parseFloat(amount) > 0 
-    ? (parseFloat(amount) - fee) * targetCountry.rate 
+    ? (parseFloat(amount) - fee) * effectiveRate 
     : 0;
 
   const formatNumber = (num: number) => {
@@ -53,22 +71,56 @@ const SendMoneyModal = ({ children }: SendMoneyModalProps) => {
     if (step > 1) setStep(step - 1);
   };
 
-  const handleSubmit = () => {
-    setStep(4);
-    setTimeout(() => {
-      setIsOpen(false);
-      setStep(1);
-      setAmount("");
-      setRecipientName("");
-      setRecipientPhone("");
-    }, 3000);
+  const handleSubmit = async () => {
+    if (!selectedWallet) {
+      toast.error("Please select a wallet");
+      return;
+    }
+
+    try {
+      await createTransfer.mutateAsync({
+        sender_wallet_id: selectedWallet.wallet_id,
+        recipient_name: recipientName,
+        recipient_phone: recipientPhone,
+        recipient_country: targetCountry.code,
+        transfer_type: 'mobile_money',
+        payout_method: targetCountry.payout,
+        source_currency: selectedWallet.currency_code,
+        target_currency: targetCountry.code,
+        source_amount: parseFloat(amount),
+        target_amount: receivedAmount,
+        exchange_rate: effectiveRate,
+        fee_amount: fee,
+      });
+
+      setStep(4);
+      setTimeout(() => {
+        setIsOpen(false);
+        resetForm();
+      }, 3000);
+    } catch (error) {
+      toast.error("Failed to create transfer. Please try again.");
+    }
   };
 
-  const isStep1Valid = parseFloat(amount) > 0 && parseFloat(amount) <= sourceCurrency.balance;
+  const resetForm = () => {
+    setStep(1);
+    setAmount("");
+    setRecipientName("");
+    setRecipientPhone("");
+    setSelectedWalletId(null);
+  };
+
+  const isStep1Valid = parseFloat(amount) > 0 && 
+    selectedWallet && 
+    parseFloat(amount) <= Number(selectedWallet.balance);
   const isStep2Valid = recipientName.length > 2 && recipientPhone.length > 8;
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <Dialog open={isOpen} onOpenChange={(open) => {
+      setIsOpen(open);
+      if (!open) resetForm();
+    }}>
       <DialogTrigger asChild>
         {children}
       </DialogTrigger>
@@ -97,26 +149,26 @@ const SendMoneyModal = ({ children }: SendMoneyModalProps) => {
                       onClick={() => setShowSourceDropdown(!showSourceDropdown)}
                       className="flex items-center gap-2 px-4 py-3 rounded-xl bg-secondary hover:bg-secondary/80 transition-colors"
                     >
-                      <span className="text-lg">{sourceCurrency.flag}</span>
-                      <span className="font-medium text-foreground">{sourceCurrency.code}</span>
+                      <span className="text-lg">{selectedWallet?.flag_emoji || '💰'}</span>
+                      <span className="font-medium text-foreground">{selectedWallet?.currency_code || 'USD'}</span>
                       <ChevronDown className="w-4 h-4 text-muted-foreground" />
                     </button>
-                    {showSourceDropdown && (
+                    {showSourceDropdown && wallets && (
                       <div className="absolute top-full left-0 mt-2 w-48 bg-popover border border-border rounded-xl shadow-elevated z-50">
-                        {currencies.map((curr) => (
+                        {wallets.map((wallet) => (
                           <button
-                            key={curr.code}
+                            key={wallet.wallet_id}
                             onClick={() => {
-                              setSourceCurrency(curr);
+                              setSelectedWalletId(wallet.wallet_id);
                               setShowSourceDropdown(false);
                             }}
                             className="flex items-center gap-3 w-full px-4 py-3 hover:bg-muted transition-colors first:rounded-t-xl last:rounded-b-xl"
                           >
-                            <span>{curr.flag}</span>
+                            <span>{wallet.flag_emoji || '💰'}</span>
                             <div className="text-left">
-                              <p className="font-medium text-foreground">{curr.code}</p>
+                              <p className="font-medium text-foreground">{wallet.currency_code}</p>
                               <p className="text-xs text-muted-foreground">
-                                {curr.symbol}{formatNumber(curr.balance)}
+                                {wallet.symbol}{formatNumber(Number(wallet.balance))}
                               </p>
                             </div>
                           </button>
@@ -133,7 +185,7 @@ const SendMoneyModal = ({ children }: SendMoneyModalProps) => {
                   />
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  Available: {sourceCurrency.symbol}{formatNumber(sourceCurrency.balance)}
+                  Available: {selectedWallet?.symbol || '$'}{formatNumber(Number(selectedWallet?.balance || 0))}
                 </p>
               </div>
 
@@ -183,7 +235,7 @@ const SendMoneyModal = ({ children }: SendMoneyModalProps) => {
                   </div>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  Rate: 1 {sourceCurrency.code} = {formatNumber(targetCountry.rate)} {targetCountry.code}
+                  Rate: 1 {selectedWallet?.currency_code || 'USD'} = {formatNumber(effectiveRate)} {targetCountry.code}
                 </p>
               </div>
 
@@ -191,7 +243,7 @@ const SendMoneyModal = ({ children }: SendMoneyModalProps) => {
                 <div className="p-4 rounded-xl bg-muted/50 space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Transfer fee</span>
-                    <span className="text-foreground">{sourceCurrency.symbol}{fee.toFixed(2)}</span>
+                    <span className="text-foreground">{selectedWallet?.symbol || '$'}{fee.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Delivery</span>
@@ -282,10 +334,10 @@ const SendMoneyModal = ({ children }: SendMoneyModalProps) => {
                 <div className="text-center mb-6">
                   <p className="text-sm text-muted-foreground mb-1">Sending</p>
                   <p className="text-3xl font-display font-bold text-foreground">
-                    {sourceCurrency.symbol}{formatNumber(parseFloat(amount))}
+                    {selectedWallet?.symbol || '$'}{formatNumber(parseFloat(amount))}
                   </p>
                   <div className="flex items-center justify-center gap-2 mt-2">
-                    <span className="text-lg">{sourceCurrency.flag}</span>
+                    <span className="text-lg">{selectedWallet?.flag_emoji || '🇺🇸'}</span>
                     <ArrowRight className="w-4 h-4 text-muted-foreground" />
                     <span className="text-lg">{targetCountry.flag}</span>
                   </div>
@@ -326,9 +378,10 @@ const SendMoneyModal = ({ children }: SendMoneyModalProps) => {
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={handleSubmit}
-                  className="flex-1 py-4 rounded-xl gradient-primary text-primary-foreground font-medium shadow-glow"
+                  disabled={createTransfer.isPending}
+                  className="flex-1 py-4 rounded-xl gradient-primary text-primary-foreground font-medium shadow-glow disabled:opacity-50"
                 >
-                  Confirm & Send
+                  {createTransfer.isPending ? 'Processing...' : 'Confirm & Send'}
                 </motion.button>
               </div>
             </motion.div>
@@ -351,10 +404,10 @@ const SendMoneyModal = ({ children }: SendMoneyModalProps) => {
                 <CheckCircle className="w-10 h-10 text-primary-foreground" />
               </motion.div>
               <h3 className="text-xl font-display font-bold text-foreground mb-2">
-                Money Sent!
+                Transfer Initiated!
               </h3>
               <p className="text-muted-foreground">
-                {recipientName} will receive {formatNumber(receivedAmount)} {targetCountry.code} instantly via {targetCountry.method}
+                {recipientName} will receive {formatNumber(receivedAmount)} {targetCountry.code} via {targetCountry.method}
               </p>
             </motion.div>
           )}

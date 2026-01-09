@@ -1,0 +1,100 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from './useAuth';
+
+export interface Transfer {
+  id: string;
+  sender_id: string;
+  sender_wallet_id: string;
+  recipient_name: string;
+  recipient_phone: string | null;
+  recipient_account: string | null;
+  recipient_country: string;
+  transfer_type: 'internal' | 'mobile_money' | 'bank' | 'crypto';
+  payout_method: string | null;
+  source_currency: string;
+  target_currency: string;
+  source_amount: number;
+  target_amount: number;
+  exchange_rate: number;
+  fee_amount: number;
+  status: 'initiated' | 'funded' | 'processing' | 'completed' | 'failed' | 'reversed' | 'expired';
+  provider_reference: string | null;
+  failure_reason: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateTransferInput {
+  sender_wallet_id: string;
+  recipient_name: string;
+  recipient_phone?: string;
+  recipient_account?: string;
+  recipient_country: string;
+  transfer_type: 'internal' | 'mobile_money' | 'bank' | 'crypto';
+  payout_method?: string;
+  source_currency: string;
+  target_currency: string;
+  source_amount: number;
+  target_amount: number;
+  exchange_rate: number;
+  fee_amount: number;
+}
+
+export const useTransfers = (limit = 10) => {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['transfers', user?.id, limit],
+    queryFn: async (): Promise<Transfer[]> => {
+      if (!user) return [];
+
+      const { data, error } = await supabase
+        .from('transfers')
+        .select('*')
+        .eq('sender_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (error) {
+        console.error('Error fetching transfers:', error);
+        throw error;
+      }
+
+      return data || [];
+    },
+    enabled: !!user,
+  });
+};
+
+export const useCreateTransfer = () => {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: CreateTransferInput): Promise<Transfer> => {
+      if (!user) throw new Error('User not authenticated');
+
+      const { data, error } = await supabase
+        .from('transfers')
+        .insert({
+          sender_id: user.id,
+          ...input,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error creating transfer:', error);
+        throw error;
+      }
+
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['transfers'] });
+      queryClient.invalidateQueries({ queryKey: ['wallets'] });
+    },
+  });
+};
