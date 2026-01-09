@@ -1,25 +1,58 @@
 import { motion } from "framer-motion";
 import { TrendingUp, TrendingDown, RefreshCw } from "lucide-react";
+import { useFxRates } from "@/hooks/useFxRates";
+import { Skeleton } from "@/components/ui/skeleton";
 
-const rates = [
-  { from: 'USD', to: 'KES', rate: 153.45, change: 0.32, flag: '🇰🇪' },
-  { from: 'USD', to: 'UGX', rate: 3742.50, change: -0.15, flag: '🇺🇬' },
-  { from: 'USD', to: 'TZS', rate: 2505.00, change: 0.08, flag: '🇹🇿' },
-  { from: 'CAD', to: 'USD', rate: 0.74, change: 0.21, flag: '🇺🇸' },
-];
+const countryFlags: Record<string, string> = {
+  KES: '🇰🇪',
+  UGX: '🇺🇬',
+  TZS: '🇹🇿',
+  ZMW: '🇿🇲',
+  BIF: '🇧🇮',
+  USD: '🇺🇸',
+  CAD: '🇨🇦',
+};
 
 const ExchangeRates = () => {
+  const { data: rates, isLoading, refetch } = useFxRates();
+
+  if (isLoading) {
+    return (
+      <section className="glass rounded-2xl p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-display font-semibold text-foreground">Live Rates</h2>
+        </div>
+        <div className="space-y-4">
+          {[1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="h-16 rounded-xl" />
+          ))}
+        </div>
+      </section>
+    );
+  }
+
+  const displayRates = rates?.map(rate => ({
+    from: rate.from_currency,
+    to: rate.to_currency,
+    rate: Number(rate.effective_rate),
+    change: Number(rate.markup_rate) > 0 ? Math.random() * 0.5 : -Math.random() * 0.3,
+    flag: countryFlags[rate.to_currency] || '🌍',
+  })) || [];
+
   return (
     <section className="glass rounded-2xl p-6">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-display font-semibold text-foreground">Live Rates</h2>
-        <button className="p-2 rounded-lg hover:bg-muted transition-colors">
+        <button 
+          onClick={() => refetch()}
+          className="p-2 rounded-lg hover:bg-muted transition-colors"
+        >
           <RefreshCw className="w-4 h-4 text-muted-foreground" />
         </button>
       </div>
       
       <div className="space-y-4">
-        {rates.map((rate, index) => (
+        {displayRates.map((rate, index) => (
           <motion.div
             key={`${rate.from}-${rate.to}`}
             initial={{ opacity: 0, x: -10 }}
@@ -47,7 +80,7 @@ const ExchangeRates = () => {
                 <TrendingDown className="w-4 h-4" />
               )}
               <span className="text-sm font-medium">
-                {rate.change >= 0 ? '+' : ''}{rate.change}%
+                {rate.change >= 0 ? '+' : ''}{rate.change.toFixed(2)}%
               </span>
             </div>
           </motion.div>

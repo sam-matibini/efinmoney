@@ -1,27 +1,53 @@
 import { motion } from "framer-motion";
 import WalletCard from "@/components/ui/WalletCard";
-import { ChevronRight } from "lucide-react";
-
-const wallets = [
-  { currency: 'USD', balance: 12458.32, symbol: '$', flag: '🇺🇸', change: 2.4, isMain: true },
-  { currency: 'CAD', balance: 8234.50, symbol: 'C$', flag: '🇨🇦', change: -0.8 },
-  { currency: 'KES', balance: 156780.00, symbol: 'KSh', flag: '🇰🇪', change: 1.2 },
-  { currency: 'USDT', balance: 5420.00, symbol: '₮', flag: '₿', change: 0.1 },
-];
+import { ChevronRight, Plus } from "lucide-react";
+import { useWallets } from "@/hooks/useWallets";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const WalletCarousel = () => {
+  const { data: wallets, isLoading } = useWallets();
+
+  if (isLoading) {
+    return (
+      <section className="mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-display font-semibold text-foreground">My Wallets</h2>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="h-[180px] rounded-2xl" />
+          ))}
+        </div>
+      </section>
+    );
+  }
+
+  const displayWallets = wallets && wallets.length > 0 
+    ? wallets.map((w, index) => ({
+        currency: w.currency_code,
+        balance: Number(w.balance),
+        symbol: w.symbol,
+        flag: w.flag_emoji || '💰',
+        change: 0,
+        isMain: index === 0,
+      }))
+    : [
+        { currency: 'USD', balance: 0, symbol: '$', flag: '🇺🇸', change: 0, isMain: true },
+        { currency: 'CAD', balance: 0, symbol: 'C$', flag: '🇨🇦', change: 0, isMain: false },
+      ];
+
   return (
     <section className="mb-8">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-display font-semibold text-foreground">My Wallets</h2>
         <button className="flex items-center gap-1 text-sm text-primary hover:text-primary/80 transition-colors">
-          View All
-          <ChevronRight className="w-4 h-4" />
+          <Plus className="w-4 h-4" />
+          Add Wallet
         </button>
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {wallets.map((wallet, index) => (
+        {displayWallets.map((wallet, index) => (
           <motion.div
             key={wallet.currency}
             initial={{ opacity: 0, y: 20 }}
