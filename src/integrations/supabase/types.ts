@@ -1318,6 +1318,42 @@ export type Database = {
           },
         ]
       }
+      linked_funding_sources: {
+        Row: {
+          created_at: string
+          currency_code: string
+          display_name: string
+          id: string
+          institution: string | null
+          is_active: boolean
+          last_four: string
+          source_type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          currency_code?: string
+          display_name: string
+          id?: string
+          institution?: string | null
+          is_active?: boolean
+          last_four: string
+          source_type: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          currency_code?: string
+          display_name?: string
+          id?: string
+          institution?: string | null
+          is_active?: boolean
+          last_four?: string
+          source_type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       maker_checker_requests: {
         Row: {
           action: string
@@ -1435,6 +1471,30 @@ export type Database = {
           metric_value?: number
           period_end?: string
           period_start?: string
+        }
+        Relationships: []
+      }
+      pricing_config: {
+        Row: {
+          description: string | null
+          key: string
+          updated_at: string
+          updated_by: string | null
+          value: number
+        }
+        Insert: {
+          description?: string | null
+          key: string
+          updated_at?: string
+          updated_by?: string | null
+          value: number
+        }
+        Update: {
+          description?: string | null
+          key?: string
+          updated_at?: string
+          updated_by?: string | null
+          value?: number
         }
         Relationships: []
       }
