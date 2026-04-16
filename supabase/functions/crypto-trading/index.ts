@@ -238,10 +238,26 @@ serve(async (req) => {
 
     const userId = claimsData.user.id;
     const url = new URL(req.url);
-    const action = url.pathname.split('/').pop();
+    const pathAction = url.pathname.split('/').pop();
 
-    // GET PAIRS
-    if (req.method === 'GET' && action === 'pairs') {
+    // Parse body once for action detection (POST only)
+    let body: Record<string, unknown> = {};
+    if (req.method === 'POST') {
+      try {
+        body = await req.json();
+      } catch {
+        return new Response(
+          JSON.stringify({ error: 'Invalid JSON body' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    // Action priority: body.action > url path segment
+    const action = (body.action as string) || pathAction;
+
+    // GET PAIRS (supports both GET path-based and POST body action)
+    if (action === 'pairs') {
       // Check rate limit
       const rateCheck = await checkRateLimit(serviceClient, userId, 'pairs');
       if (!rateCheck.allowed) {
