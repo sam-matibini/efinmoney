@@ -217,6 +217,59 @@ export type Database = {
           },
         ]
       }
+      cards: {
+        Row: {
+          card_network: string
+          card_type: string
+          cardholder_name: string
+          created_at: string
+          expires_at: string
+          id: string
+          last_four: string
+          spending_limit: number
+          status: string
+          updated_at: string
+          user_id: string
+          wallet_id: string | null
+        }
+        Insert: {
+          card_network?: string
+          card_type?: string
+          cardholder_name: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          last_four: string
+          spending_limit?: number
+          status?: string
+          updated_at?: string
+          user_id: string
+          wallet_id?: string | null
+        }
+        Update: {
+          card_network?: string
+          card_type?: string
+          cardholder_name?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          last_four?: string
+          spending_limit?: number
+          status?: string
+          updated_at?: string
+          user_id?: string
+          wallet_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cards_wallet_id_fkey"
+            columns: ["wallet_id"]
+            isOneToOne: false
+            referencedRelation: "wallets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       compliance_alerts: {
         Row: {
           alert_data: Json
