@@ -13,7 +13,7 @@ import { useCreateTransfer } from "@/hooks/useTransfers";
 import { useFundingSources } from "@/hooks/useFundingSources";
 import { usePricingConfig } from "@/hooks/usePricingConfig";
 import { toast } from "sonner";
-import { Send, ArrowRight, CheckCircle, Users, Clock, Shield, Wallet, Landmark, CreditCard, AlertCircle } from "lucide-react";
+import { ArrowRight, CheckCircle, Users, Clock, Shield, Wallet, Landmark, CreditCard, AlertCircle } from "lucide-react";
 
 const targetCountries = [
   { code: 'KES', country: 'Kenya', flag: '🇰🇪', method: 'M-Pesa', payout: 'mpesa' },
@@ -303,12 +303,20 @@ const SendPage = () => {
                 <div className="p-4 rounded-xl bg-muted">
                   <p className="text-sm text-muted-foreground mb-1">They receive</p>
                   <p className="text-3xl font-display font-bold text-foreground">
-                    {receivedAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {targetCountry.code}
+                    {rateAvailable
+                      ? `${receivedAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${targetCountry.code}`
+                      : 'Rate unavailable'}
                   </p>
-                  <p className="text-sm text-muted-foreground mt-2">
-                    Rate: 1 {sourceCurrency} = {effectiveRate.toFixed(2)} {targetCountry.code} • Fee: ${fee.toFixed(2)}
-                    {fundingSource === 'card' && <span className="text-xs"> (incl. $1.50 card fee)</span>}
-                  </p>
+                  {rateAvailable ? (
+                    <p className="text-sm text-muted-foreground mt-2">
+                      Rate: 1 {sourceCurrency} = {effectiveRate.toFixed(2)} {targetCountry.code} • Fee: {sourceSymbol}{fee.toFixed(2)}
+                      {fundingSource === 'card' && cardFee > 0 && <span className="text-xs"> (incl. {sourceSymbol}{cardFee.toFixed(2)} card fee)</span>}
+                    </p>
+                  ) : (
+                    <p className="text-sm text-muted-foreground mt-2">
+                      No FX rate available for {sourceCurrency} → {targetCountry.code}. Please choose a different funding source or destination.
+                    </p>
+                  )}
                 </div>
 
                 <Button className="w-full" size="lg" onClick={() => setStep(2)} disabled={!isStep1Valid}>
