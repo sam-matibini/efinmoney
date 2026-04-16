@@ -312,23 +312,13 @@ serve(async (req) => {
     }
 
     // GET QUOTE
-    if (req.method === 'POST' && action === 'quote') {
+    if (action === 'quote') {
       // Check rate limit
       const rateCheck = await checkRateLimit(serviceClient, userId, 'quote');
       if (!rateCheck.allowed) {
         return new Response(
           JSON.stringify({ error: 'Rate limit exceeded. Please try again later.' }),
           { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Retry-After': String(rateCheck.retryAfter || 60) } }
-        );
-      }
-
-      let body: unknown;
-      try {
-        body = await req.json();
-      } catch {
-        return new Response(
-          JSON.stringify({ error: 'Invalid JSON body' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
