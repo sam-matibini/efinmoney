@@ -409,23 +409,13 @@ serve(async (req) => {
     }
 
     // EXECUTE TRADE
-    if (req.method === 'POST' && action === 'execute') {
+    if (action === 'execute') {
       // Check rate limit - stricter for executions
       const rateCheck = await checkRateLimit(serviceClient, userId, 'execute');
       if (!rateCheck.allowed) {
         return new Response(
           JSON.stringify({ error: 'Rate limit exceeded. You can execute a maximum of 10 trades every 5 minutes.' }),
           { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Retry-After': String(rateCheck.retryAfter || 300) } }
-        );
-      }
-
-      let body: unknown;
-      try {
-        body = await req.json();
-      } catch {
-        return new Response(
-          JSON.stringify({ error: 'Invalid JSON body' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
