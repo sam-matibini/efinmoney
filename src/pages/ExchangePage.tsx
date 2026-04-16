@@ -36,11 +36,12 @@ const FxTradingPanel = () => {
     r => r.from_currency === fromWallet?.currency_code && r.to_currency === toWallet?.currency_code
   );
 
-  const effectiveRate = fxRate ? Number(fxRate.effective_rate) : 
-    (fromWallet?.currency_code === 'USD' && toWallet?.currency_code === 'CAD' ? 1.35 : 1);
+  const effectiveRate = fxRate ? Number(fxRate.effective_rate) : null;
 
   const fee = parseFloat(amount) > 0 ? parseFloat(amount) * 0.005 : 0;
-  const receivedAmount = parseFloat(amount) > 0 ? (parseFloat(amount) - fee) * effectiveRate : 0;
+  const receivedAmount = effectiveRate && parseFloat(amount) > 0
+    ? (parseFloat(amount) - fee) * effectiveRate
+    : 0;
 
   const handleSwap = () => {
     const temp = fromWalletId;
@@ -50,6 +51,10 @@ const FxTradingPanel = () => {
 
   const handleExchange = async () => {
     if (!fromWallet || !toWallet) return;
+    if (!effectiveRate) {
+      toast.error(`No exchange rate available for ${fromWallet.currency_code} → ${toWallet.currency_code}`);
+      return;
+    }
 
     setIsLoading(true);
 
@@ -65,19 +70,25 @@ const FxTradingPanel = () => {
         }
       });
 
-      if (response.error) throw new Error(response.error.message);
+      // Surface server-side error message if present
+      const serverError = (response.data as any)?.error;
+      if (response.error || serverError) {
+        const msg = serverError || response.error?.message || 'Exchange failed';
+        throw new Error(msg);
+      }
 
       setSuccess(true);
       queryClient.invalidateQueries({ queryKey: ['wallets'] });
+      queryClient.invalidateQueries({ queryKey: ['fx_rates'] });
       toast.success('Exchange completed successfully!');
 
       setTimeout(() => {
         setSuccess(false);
         setAmount("");
       }, 3000);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Exchange error:', error);
-      toast.error('Exchange failed. Please try again.');
+      toast.error(error?.message || 'Exchange failed. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -87,6 +98,7 @@ const FxTradingPanel = () => {
     fromWallet && 
     toWallet &&
     fromWallet.wallet_id !== toWallet.wallet_id &&
+    !!effectiveRate &&
     parseFloat(amount) <= Number(fromWallet.balance);
 
   if (success) {
