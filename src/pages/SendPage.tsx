@@ -201,17 +201,28 @@ const SendPage = () => {
                 {fundingSource === 'bank' && (
                   <div className="space-y-2">
                     <Label>From Bank Account</Label>
-                    <Select defaultValue="td_chequing">
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select bank account" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="td_chequing">🏦 TD Chequing ••••4521</SelectItem>
-                        <SelectItem value="rbc_savings">🏦 RBC Savings ••••7832</SelectItem>
-                        <SelectItem value="bmo_chequing">🏦 BMO Chequing ••••1256</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-muted-foreground">Transfers from bank may take 1-2 business days</p>
+                    {bankSources.length > 0 ? (
+                      <>
+                        <Select value={selectedSourceId || bankSources[0]?.id} onValueChange={setSelectedSourceId}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select bank account" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {bankSources.map((s) => (
+                              <SelectItem key={s.id} value={s.id}>
+                                🏦 {s.institution ? `${s.institution} ` : ''}{s.display_name} ••••{s.last_four}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground">Transfers from bank may take 1-2 business days</p>
+                      </>
+                    ) : (
+                      <div className="flex items-start gap-2 p-3 rounded-lg border border-dashed border-border bg-muted/40">
+                        <AlertCircle className="w-4 h-4 mt-0.5 text-muted-foreground shrink-0" />
+                        <p className="text-sm text-muted-foreground">No bank accounts linked yet. Link a bank in Settings to fund transfers from your bank.</p>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -219,16 +230,30 @@ const SendPage = () => {
                 {fundingSource === 'card' && (
                   <div className="space-y-2">
                     <Label>From Credit Card</Label>
-                    <Select defaultValue="visa_5678">
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select credit card" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="visa_5678">💳 Visa ••••5678</SelectItem>
-                        <SelectItem value="mc_9012">💳 Mastercard ••••9012</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-muted-foreground">+$1.50 card processing fee applies</p>
+                    {cardSources.length > 0 ? (
+                      <>
+                        <Select value={selectedSourceId || cardSources[0]?.id} onValueChange={setSelectedSourceId}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select credit card" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {cardSources.map((s) => (
+                              <SelectItem key={s.id} value={s.id}>
+                                💳 {s.display_name} ••••{s.last_four}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {cardFee > 0 && (
+                          <p className="text-xs text-muted-foreground">+${cardFee.toFixed(2)} card processing fee applies</p>
+                        )}
+                      </>
+                    ) : (
+                      <div className="flex items-start gap-2 p-3 rounded-lg border border-dashed border-border bg-muted/40">
+                        <AlertCircle className="w-4 h-4 mt-0.5 text-muted-foreground shrink-0" />
+                        <p className="text-sm text-muted-foreground">No cards linked yet. Add a card in Settings to fund transfers from a card.</p>
+                      </div>
+                    )}
                   </div>
                 )}
 
