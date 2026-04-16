@@ -10,7 +10,7 @@ export interface Transfer {
   recipient_phone: string | null;
   recipient_account: string | null;
   recipient_country: string;
-  transfer_type: 'internal' | 'mobile_money' | 'bank' | 'crypto';
+  transfer_type: 'internal' | 'mobile_money' | 'bank' | 'crypto' | 'bill_payment';
   payout_method: string | null;
   source_currency: string;
   target_currency: string;
@@ -32,7 +32,7 @@ export interface CreateTransferInput {
   recipient_phone?: string;
   recipient_account?: string;
   recipient_country: string;
-  transfer_type: 'internal' | 'mobile_money' | 'bank' | 'crypto';
+  transfer_type: 'internal' | 'mobile_money' | 'bank' | 'crypto' | 'bill_payment';
   payout_method?: string;
   source_currency: string;
   target_currency: string;
