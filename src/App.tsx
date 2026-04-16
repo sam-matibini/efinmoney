@@ -17,6 +17,9 @@ import SendPage from "./pages/SendPage";
 import ExchangePage from "./pages/ExchangePage";
 import CardsPage from "./pages/CardsPage";
 import CustomerPortalPage from "./pages/CustomerPortalPage";
+import ProfileSettingsPage from "./pages/ProfileSettingsPage";
+import KYCPage from "./pages/KYCPage";
+import SecurityPage from "./pages/SecurityPage";
 
 const queryClient = new QueryClient();
 
@@ -171,6 +174,30 @@ const AppRoutes = () => (
     <Route
       path="/portal"
       element={<CustomerPortalPage />}
+    />
+    <Route
+      path="/profile"
+      element={
+        <ProtectedRoute>
+          <ProfileSettingsPage />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/kyc"
+      element={
+        <ProtectedRoute>
+          <KYCPage />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/security"
+      element={
+        <ProtectedRoute>
+          <SecurityPage />
+        </ProtectedRoute>
+      }
     />
     <Route path="*" element={<NotFound />} />
   </Routes>

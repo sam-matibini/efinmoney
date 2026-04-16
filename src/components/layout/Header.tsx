@@ -1,8 +1,9 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { Bell, Search, User, LogOut, Shield, Wallet, Settings, Cog } from "lucide-react";
+import { Search, User, LogOut, Shield, Wallet, Settings, Cog } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRoles } from "@/hooks/useUserRoles";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,11 +11,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import NotificationsPanel from "@/components/header/NotificationsPanel";
+import SearchModal from "@/components/header/SearchModal";
 
 const Header = () => {
   const { signOut, user } = useAuth();
   const { isAdmin, isFinance, isCompliance } = useUserRoles();
   const location = useLocation();
+  const navigate = useNavigate();
+  const [searchOpen, setSearchOpen] = useState(false);
 
   const navItems = [
     { label: 'Dashboard', href: '/' },
@@ -87,14 +92,14 @@ const Header = () => {
           animate={{ opacity: 1, x: 0 }}
           className="flex items-center gap-2"
         >
-          <button className="p-2.5 rounded-xl hover:bg-muted transition-colors">
+          <button
+            onClick={() => setSearchOpen(true)}
+            className="p-2.5 rounded-xl hover:bg-muted transition-colors"
+          >
             <Search className="w-5 h-5 text-muted-foreground" />
           </button>
-          <button className="relative p-2.5 rounded-xl hover:bg-muted transition-colors">
-            <Bell className="w-5 h-5 text-muted-foreground" />
-            <span className="absolute top-2 right-2 w-2 h-2 bg-accent rounded-full" />
-          </button>
-          
+          <NotificationsPanel />
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="ml-2 p-1 rounded-xl bg-secondary hover:bg-secondary/80 transition-colors">
@@ -109,9 +114,9 @@ const Header = () => {
                 <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
               </div>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>Profile Settings</DropdownMenuItem>
-              <DropdownMenuItem>KYC Verification</DropdownMenuItem>
-              <DropdownMenuItem>Security</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate('/profile')}>Profile Settings</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate('/kyc')}>KYC Verification</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate('/security')}>Security</DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={signOut} className="text-destructive focus:text-destructive">
                 <LogOut className="w-4 h-4 mr-2" />
@@ -121,6 +126,7 @@ const Header = () => {
           </DropdownMenu>
         </motion.div>
       </div>
+      <SearchModal open={searchOpen} onOpenChange={setSearchOpen} />
     </header>
   );
 };
