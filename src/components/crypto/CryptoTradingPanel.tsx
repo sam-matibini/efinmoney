@@ -64,11 +64,17 @@ export const CryptoTradingPanel = () => {
       const { data: session } = await supabase.auth.getSession();
       if (!session.session) throw new Error('Not authenticated');
 
-      const response = await supabase.functions.invoke('crypto-trading/pairs', {
-        method: 'GET',
+      const response = await supabase.functions.invoke('crypto-trading', {
+        body: { action: 'pairs' },
       });
 
-      if (response.error) throw new Error(response.error.message);
+      if (response.error) {
+        const msg = (response.data as any)?.error || response.error.message || 'Failed to load pairs';
+        throw new Error(msg);
+      }
+      if ((response.data as any)?.error) {
+        throw new Error((response.data as any).error);
+      }
       return response.data.pairs as CryptoPair[];
     },
     refetchInterval: 30000, // Refresh prices every 30 seconds
@@ -81,8 +87,9 @@ export const CryptoTradingPanel = () => {
     mutationFn: async () => {
       if (!selectedPairId || !amount) throw new Error('Missing required fields');
       
-      const response = await supabase.functions.invoke('crypto-trading/quote', {
+      const response = await supabase.functions.invoke('crypto-trading', {
         body: {
+          action: 'quote',
           pair_id: selectedPairId,
           side,
           amount: parseFloat(amount),
@@ -90,7 +97,13 @@ export const CryptoTradingPanel = () => {
         },
       });
 
-      if (response.error) throw new Error(response.error.message);
+      if (response.error) {
+        const msg = (response.data as any)?.error || response.error.message || 'Failed to get quote';
+        throw new Error(msg);
+      }
+      if ((response.data as any)?.error) {
+        throw new Error((response.data as any).error);
+      }
       return response.data as Quote;
     },
     onSuccess: (data) => {
@@ -107,8 +120,9 @@ export const CryptoTradingPanel = () => {
     mutationFn: async () => {
       if (!quote) throw new Error('No active quote');
       
-      const response = await supabase.functions.invoke('crypto-trading/execute', {
+      const response = await supabase.functions.invoke('crypto-trading', {
         body: {
+          action: 'execute',
           pair_id: quote.pair_id,
           side: quote.side,
           amount: amountType === 'base' ? quote.base_amount : quote.quote_amount,
@@ -116,7 +130,13 @@ export const CryptoTradingPanel = () => {
         },
       });
 
-      if (response.error) throw new Error(response.error.message);
+      if (response.error) {
+        const msg = (response.data as any)?.error || response.error.message || 'Trade failed';
+        throw new Error(msg);
+      }
+      if ((response.data as any)?.error) {
+        throw new Error((response.data as any).error);
+      }
       return response.data;
     },
     onSuccess: (data) => {
