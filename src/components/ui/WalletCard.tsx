@@ -1,6 +1,8 @@
 import { motion } from "framer-motion";
+import { useState } from "react";
 import { ArrowUpRight, ArrowDownLeft, MoreHorizontal, Star, Snowflake, Play, Pencil, Trash2 } from "lucide-react";
 import SendMoneyModal from "@/components/modals/SendMoneyModal";
+import ReceiveMoneyModal from "@/components/modals/ReceiveMoneyModal";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -40,6 +42,7 @@ const WalletCard = ({
   onEdit,
   onDelete,
 }: WalletCardProps) => {
+  const [receiveOpen, setReceiveOpen] = useState(false);
   const formatBalance = (value: number) => {
     return new Intl.NumberFormat('en-US', {
       minimumFractionDigits: 2,
@@ -189,7 +192,8 @@ const WalletCard = ({
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            disabled={isFrozen}
+            disabled={isFrozen || !walletId}
+            onClick={() => walletId && setReceiveOpen(true)}
             className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-medium transition-colors ${
               isMain 
                 ? 'bg-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/30' 
@@ -201,6 +205,14 @@ const WalletCard = ({
           </motion.button>
         </div>
       </div>
+
+      {walletId && (
+        <ReceiveMoneyModal
+          isOpen={receiveOpen}
+          onClose={() => setReceiveOpen(false)}
+          wallet={{ walletId, currency, balance, symbol, flag }}
+        />
+      )}
     </motion.div>
   );
 };
