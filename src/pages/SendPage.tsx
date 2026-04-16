@@ -10,8 +10,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useWallets } from "@/hooks/useWallets";
 import { useFxRates } from "@/hooks/useFxRates";
 import { useCreateTransfer } from "@/hooks/useTransfers";
+import { useFundingSources } from "@/hooks/useFundingSources";
+import { usePricingConfig } from "@/hooks/usePricingConfig";
 import { toast } from "sonner";
-import { Send, ArrowRight, CheckCircle, Users, Clock, Shield, Wallet, Landmark, CreditCard } from "lucide-react";
+import { ArrowRight, CheckCircle, Users, Clock, Shield, Wallet, Landmark, CreditCard, AlertCircle } from "lucide-react";
 
 const targetCountries = [
   { code: 'KES', country: 'Kenya', flag: '🇰🇪', method: 'M-Pesa', payout: 'mpesa' },
@@ -31,32 +33,40 @@ const SendPage = () => {
   const [targetCountryCode, setTargetCountryCode] = useState("KES");
   const [recipientName, setRecipientName] = useState("");
   const [recipientPhone, setRecipientPhone] = useState("");
+  const [selectedSourceId, setSelectedSourceId] = useState<string>("");
 
   const { data: wallets } = useWallets();
   const { data: fxRates } = useFxRates();
+  const { data: bankSources = [] } = useFundingSources('bank');
+  const { data: cardSources = [] } = useFundingSources('card');
+  const { data: pricing } = usePricingConfig();
   const createTransfer = useCreateTransfer();
 
   const selectedWallet = wallets?.find(w => w.wallet_id === selectedWalletId) || wallets?.[0];
   const targetCountry = targetCountries.find(c => c.code === targetCountryCode) || targetCountries[0];
 
-  // For bank/card we default to CAD
-  const sourceCurrency = fundingSource === 'wallet' ? (selectedWallet?.currency_code || 'CAD') : 'CAD';
-  const sourceSymbol = fundingSource === 'wallet' ? (selectedWallet?.symbol || 'C$') : 'C$';
+  const activeSources = fundingSource === 'bank' ? bankSources : fundingSource === 'card' ? cardSources : [];
+  const selectedExternalSource = activeSources.find(s => s.id === selectedSourceId) || activeSources[0];
+
+  const sourceCurrency = fundingSource === 'wallet'
+    ? (selectedWallet?.currency_code || 'CAD')
+    : (selectedExternalSource?.currency_code || 'CAD');
+  const sourceSymbol = fundingSource === 'wallet' ? (selectedWallet?.symbol || 'C$') : '$';
 
   const fxRate = fxRates?.find(
     r => r.from_currency === sourceCurrency && r.to_currency === targetCountry.code
   );
+  const effectiveRate = fxRate ? Number(fxRate.effective_rate) : 0;
+  const rateAvailable = !!fxRate;
 
-  const effectiveRate = fxRate ? Number(fxRate.effective_rate) : 
-    (targetCountry.code === 'KES' ? 153.45 :
-     targetCountry.code === 'UGX' ? 3742.50 :
-     targetCountry.code === 'TZS' ? 2505.00 :
-     targetCountry.code === 'ZMW' ? 26.85 : 2850.00);
-
-  const baseFee = 2.99;
-  const cardFee = fundingSource === 'card' ? 1.50 : 0;
+  const baseFee = pricing?.transfer_base_fee ?? 0;
+  const cardFee = fundingSource === 'card' ? (pricing?.transfer_card_surcharge ?? 0) : 0;
   const fee = parseFloat(amount) > 0 ? baseFee + cardFee : 0;
-  const receivedAmount = parseFloat(amount) > 0 ? (parseFloat(amount) - fee) * effectiveRate : 0;
+  const receivedAmount = parseFloat(amount) > 0 && rateAvailable
+    ? (parseFloat(amount) - fee) * effectiveRate
+    : 0;
+
+  const noLinkedSource = (fundingSource === 'bank' || fundingSource === 'card') && activeSources.length === 0;
 
   const handleSubmit = async () => {
     if (fundingSource === 'wallet' && !selectedWallet) return;
@@ -92,8 +102,8 @@ const SendPage = () => {
     setFundingSource('wallet');
   };
 
-  const isStep1Valid = parseFloat(amount) > 0 && (
-    fundingSource !== 'wallet' || 
+  const isStep1Valid = parseFloat(amount) > 0 && rateAvailable && !noLinkedSource && (
+    fundingSource !== 'wallet' ||
     (selectedWallet && parseFloat(amount) <= Number(selectedWallet.balance))
   );
   const isStep2Valid = recipientName.length > 2 && recipientPhone.length > 8;
@@ -191,17 +201,28 @@ const SendPage = () => {
                 {fundingSource === 'bank' && (
                   <div className="space-y-2">
                     <Label>From Bank Account</Label>
-                    <Select defaultValue="td_chequing">
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select bank account" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="td_chequing">🏦 TD Chequing ••••4521</SelectItem>
-                        <SelectItem value="rbc_savings">🏦 RBC Savings ••••7832</SelectItem>
-                        <SelectItem value="bmo_chequing">🏦 BMO Chequing ••••1256</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-muted-foreground">Transfers from bank may take 1-2 business days</p>
+                    {bankSources.length > 0 ? (
+                      <>
+                        <Select value={selectedSourceId || bankSources[0]?.id} onValueChange={setSelectedSourceId}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select bank account" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {bankSources.map((s) => (
+                              <SelectItem key={s.id} value={s.id}>
+                                🏦 {s.institution ? `${s.institution} ` : ''}{s.display_name} ••••{s.last_four}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground">Transfers from bank may take 1-2 business days</p>
+                      </>
+                    ) : (
+                      <div className="flex items-start gap-2 p-3 rounded-lg border border-dashed border-border bg-muted/40">
+                        <AlertCircle className="w-4 h-4 mt-0.5 text-muted-foreground shrink-0" />
+                        <p className="text-sm text-muted-foreground">No bank accounts linked yet. Link a bank in Settings to fund transfers from your bank.</p>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -209,16 +230,30 @@ const SendPage = () => {
                 {fundingSource === 'card' && (
                   <div className="space-y-2">
                     <Label>From Credit Card</Label>
-                    <Select defaultValue="visa_5678">
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select credit card" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="visa_5678">💳 Visa ••••5678</SelectItem>
-                        <SelectItem value="mc_9012">💳 Mastercard ••••9012</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-muted-foreground">+$1.50 card processing fee applies</p>
+                    {cardSources.length > 0 ? (
+                      <>
+                        <Select value={selectedSourceId || cardSources[0]?.id} onValueChange={setSelectedSourceId}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select credit card" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {cardSources.map((s) => (
+                              <SelectItem key={s.id} value={s.id}>
+                                💳 {s.display_name} ••••{s.last_four}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {cardFee > 0 && (
+                          <p className="text-xs text-muted-foreground">+${cardFee.toFixed(2)} card processing fee applies</p>
+                        )}
+                      </>
+                    ) : (
+                      <div className="flex items-start gap-2 p-3 rounded-lg border border-dashed border-border bg-muted/40">
+                        <AlertCircle className="w-4 h-4 mt-0.5 text-muted-foreground shrink-0" />
+                        <p className="text-sm text-muted-foreground">No cards linked yet. Add a card in Settings to fund transfers from a card.</p>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -268,12 +303,20 @@ const SendPage = () => {
                 <div className="p-4 rounded-xl bg-muted">
                   <p className="text-sm text-muted-foreground mb-1">They receive</p>
                   <p className="text-3xl font-display font-bold text-foreground">
-                    {receivedAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {targetCountry.code}
+                    {rateAvailable
+                      ? `${receivedAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${targetCountry.code}`
+                      : 'Rate unavailable'}
                   </p>
-                  <p className="text-sm text-muted-foreground mt-2">
-                    Rate: 1 {sourceCurrency} = {effectiveRate.toFixed(2)} {targetCountry.code} • Fee: ${fee.toFixed(2)}
-                    {fundingSource === 'card' && <span className="text-xs"> (incl. $1.50 card fee)</span>}
-                  </p>
+                  {rateAvailable ? (
+                    <p className="text-sm text-muted-foreground mt-2">
+                      Rate: 1 {sourceCurrency} = {effectiveRate.toFixed(2)} {targetCountry.code} • Fee: {sourceSymbol}{fee.toFixed(2)}
+                      {fundingSource === 'card' && cardFee > 0 && <span className="text-xs"> (incl. {sourceSymbol}{cardFee.toFixed(2)} card fee)</span>}
+                    </p>
+                  ) : (
+                    <p className="text-sm text-muted-foreground mt-2">
+                      No FX rate available for {sourceCurrency} → {targetCountry.code}. Please choose a different funding source or destination.
+                    </p>
+                  )}
                 </div>
 
                 <Button className="w-full" size="lg" onClick={() => setStep(2)} disabled={!isStep1Valid}>
