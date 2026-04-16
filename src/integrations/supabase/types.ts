@@ -2751,7 +2751,12 @@ export type Database = {
         | "failed"
         | "reversed"
         | "expired"
-      transfer_type: "internal" | "mobile_money" | "bank" | "crypto"
+      transfer_type:
+        | "internal"
+        | "mobile_money"
+        | "bank"
+        | "crypto"
+        | "bill_payment"
       wallet_status: "active" | "frozen" | "suspended" | "closed"
     }
     CompositeTypes: {
@@ -2928,7 +2933,13 @@ export const Constants = {
         "reversed",
         "expired",
       ],
-      transfer_type: ["internal", "mobile_money", "bank", "crypto"],
+      transfer_type: [
+        "internal",
+        "mobile_money",
+        "bank",
+        "crypto",
+        "bill_payment",
+      ],
       wallet_status: ["active", "frozen", "suspended", "closed"],
     },
   },

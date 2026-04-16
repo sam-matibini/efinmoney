@@ -1,0 +1,1 @@
+ALTER TYPE public.transfer_type ADD VALUE IF NOT EXISTS 'bill_payment';
