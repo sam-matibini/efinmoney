@@ -10,8 +10,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useWallets } from "@/hooks/useWallets";
 import { useFxRates } from "@/hooks/useFxRates";
 import { useCreateTransfer } from "@/hooks/useTransfers";
+import { useFundingSources } from "@/hooks/useFundingSources";
+import { usePricingConfig } from "@/hooks/usePricingConfig";
 import { toast } from "sonner";
-import { Send, ArrowRight, CheckCircle, Users, Clock, Shield, Wallet, Landmark, CreditCard } from "lucide-react";
+import { Send, ArrowRight, CheckCircle, Users, Clock, Shield, Wallet, Landmark, CreditCard, AlertCircle } from "lucide-react";
 
 const targetCountries = [
   { code: 'KES', country: 'Kenya', flag: '🇰🇪', method: 'M-Pesa', payout: 'mpesa' },
@@ -31,32 +33,40 @@ const SendPage = () => {
   const [targetCountryCode, setTargetCountryCode] = useState("KES");
   const [recipientName, setRecipientName] = useState("");
   const [recipientPhone, setRecipientPhone] = useState("");
+  const [selectedSourceId, setSelectedSourceId] = useState<string>("");
 
   const { data: wallets } = useWallets();
   const { data: fxRates } = useFxRates();
+  const { data: bankSources = [] } = useFundingSources('bank');
+  const { data: cardSources = [] } = useFundingSources('card');
+  const { data: pricing } = usePricingConfig();
   const createTransfer = useCreateTransfer();
 
   const selectedWallet = wallets?.find(w => w.wallet_id === selectedWalletId) || wallets?.[0];
   const targetCountry = targetCountries.find(c => c.code === targetCountryCode) || targetCountries[0];
 
-  // For bank/card we default to CAD
-  const sourceCurrency = fundingSource === 'wallet' ? (selectedWallet?.currency_code || 'CAD') : 'CAD';
-  const sourceSymbol = fundingSource === 'wallet' ? (selectedWallet?.symbol || 'C$') : 'C$';
+  const activeSources = fundingSource === 'bank' ? bankSources : fundingSource === 'card' ? cardSources : [];
+  const selectedExternalSource = activeSources.find(s => s.id === selectedSourceId) || activeSources[0];
+
+  const sourceCurrency = fundingSource === 'wallet'
+    ? (selectedWallet?.currency_code || 'CAD')
+    : (selectedExternalSource?.currency_code || 'CAD');
+  const sourceSymbol = fundingSource === 'wallet' ? (selectedWallet?.symbol || 'C$') : '$';
 
   const fxRate = fxRates?.find(
     r => r.from_currency === sourceCurrency && r.to_currency === targetCountry.code
   );
+  const effectiveRate = fxRate ? Number(fxRate.effective_rate) : 0;
+  const rateAvailable = !!fxRate;
 
-  const effectiveRate = fxRate ? Number(fxRate.effective_rate) : 
-    (targetCountry.code === 'KES' ? 153.45 :
-     targetCountry.code === 'UGX' ? 3742.50 :
-     targetCountry.code === 'TZS' ? 2505.00 :
-     targetCountry.code === 'ZMW' ? 26.85 : 2850.00);
-
-  const baseFee = 2.99;
-  const cardFee = fundingSource === 'card' ? 1.50 : 0;
+  const baseFee = pricing?.transfer_base_fee ?? 0;
+  const cardFee = fundingSource === 'card' ? (pricing?.transfer_card_surcharge ?? 0) : 0;
   const fee = parseFloat(amount) > 0 ? baseFee + cardFee : 0;
-  const receivedAmount = parseFloat(amount) > 0 ? (parseFloat(amount) - fee) * effectiveRate : 0;
+  const receivedAmount = parseFloat(amount) > 0 && rateAvailable
+    ? (parseFloat(amount) - fee) * effectiveRate
+    : 0;
+
+  const noLinkedSource = (fundingSource === 'bank' || fundingSource === 'card') && activeSources.length === 0;
 
   const handleSubmit = async () => {
     if (fundingSource === 'wallet' && !selectedWallet) return;
@@ -92,8 +102,8 @@ const SendPage = () => {
     setFundingSource('wallet');
   };
 
-  const isStep1Valid = parseFloat(amount) > 0 && (
-    fundingSource !== 'wallet' || 
+  const isStep1Valid = parseFloat(amount) > 0 && rateAvailable && !noLinkedSource && (
+    fundingSource !== 'wallet' ||
     (selectedWallet && parseFloat(amount) <= Number(selectedWallet.balance))
   );
   const isStep2Valid = recipientName.length > 2 && recipientPhone.length > 8;
