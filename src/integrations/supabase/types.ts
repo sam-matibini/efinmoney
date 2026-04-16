@@ -1957,6 +1957,48 @@ export type Database = {
           },
         ]
       }
+      savings_goals: {
+        Row: {
+          created_at: string
+          currency_code: string
+          current_amount: number
+          id: string
+          name: string
+          source_wallet_id: string | null
+          status: string
+          target_amount: number
+          target_date: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          currency_code?: string
+          current_amount?: number
+          id?: string
+          name: string
+          source_wallet_id?: string | null
+          status?: string
+          target_amount: number
+          target_date?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          currency_code?: string
+          current_amount?: number
+          id?: string
+          name?: string
+          source_wallet_id?: string | null
+          status?: string
+          target_amount?: number
+          target_date?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       tax_filings: {
         Row: {
           adjustments: number
@@ -2709,7 +2751,12 @@ export type Database = {
         | "failed"
         | "reversed"
         | "expired"
-      transfer_type: "internal" | "mobile_money" | "bank" | "crypto"
+      transfer_type:
+        | "internal"
+        | "mobile_money"
+        | "bank"
+        | "crypto"
+        | "bill_payment"
       wallet_status: "active" | "frozen" | "suspended" | "closed"
     }
     CompositeTypes: {
@@ -2886,7 +2933,13 @@ export const Constants = {
         "reversed",
         "expired",
       ],
-      transfer_type: ["internal", "mobile_money", "bank", "crypto"],
+      transfer_type: [
+        "internal",
+        "mobile_money",
+        "bank",
+        "crypto",
+        "bill_payment",
+      ],
       wallet_status: ["active", "frozen", "suspended", "closed"],
     },
   },
