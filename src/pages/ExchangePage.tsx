@@ -196,7 +196,11 @@ const FxTradingPanel = () => {
             <div className="p-4 rounded-xl bg-muted/50 space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Exchange Rate</span>
-                <span>1 {fromWallet?.currency_code} = {effectiveRate.toFixed(4)} {toWallet?.currency_code}</span>
+                <span>
+                  {effectiveRate
+                    ? `1 ${fromWallet?.currency_code} = ${effectiveRate.toFixed(4)} ${toWallet?.currency_code}`
+                    : <span className="text-destructive">Rate unavailable</span>}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Fee (0.5%)</span>
