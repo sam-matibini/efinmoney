@@ -238,10 +238,26 @@ serve(async (req) => {
 
     const userId = claimsData.user.id;
     const url = new URL(req.url);
-    const action = url.pathname.split('/').pop();
+    const pathAction = url.pathname.split('/').pop();
 
-    // GET PAIRS
-    if (req.method === 'GET' && action === 'pairs') {
+    // Parse body once for action detection (POST only)
+    let body: Record<string, unknown> = {};
+    if (req.method === 'POST') {
+      try {
+        body = await req.json();
+      } catch {
+        return new Response(
+          JSON.stringify({ error: 'Invalid JSON body' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    // Action priority: body.action > url path segment
+    const action = (body.action as string) || pathAction;
+
+    // GET PAIRS (supports both GET path-based and POST body action)
+    if (action === 'pairs') {
       // Check rate limit
       const rateCheck = await checkRateLimit(serviceClient, userId, 'pairs');
       if (!rateCheck.allowed) {
@@ -296,23 +312,13 @@ serve(async (req) => {
     }
 
     // GET QUOTE
-    if (req.method === 'POST' && action === 'quote') {
+    if (action === 'quote') {
       // Check rate limit
       const rateCheck = await checkRateLimit(serviceClient, userId, 'quote');
       if (!rateCheck.allowed) {
         return new Response(
           JSON.stringify({ error: 'Rate limit exceeded. Please try again later.' }),
           { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Retry-After': String(rateCheck.retryAfter || 60) } }
-        );
-      }
-
-      let body: unknown;
-      try {
-        body = await req.json();
-      } catch {
-        return new Response(
-          JSON.stringify({ error: 'Invalid JSON body' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
@@ -403,23 +409,13 @@ serve(async (req) => {
     }
 
     // EXECUTE TRADE
-    if (req.method === 'POST' && action === 'execute') {
+    if (action === 'execute') {
       // Check rate limit - stricter for executions
       const rateCheck = await checkRateLimit(serviceClient, userId, 'execute');
       if (!rateCheck.allowed) {
         return new Response(
           JSON.stringify({ error: 'Rate limit exceeded. You can execute a maximum of 10 trades every 5 minutes.' }),
           { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Retry-After': String(rateCheck.retryAfter || 300) } }
-        );
-      }
-
-      let body: unknown;
-      try {
-        body = await req.json();
-      } catch {
-        return new Response(
-          JSON.stringify({ error: 'Invalid JSON body' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
@@ -702,14 +698,17 @@ serve(async (req) => {
         });
       }
 
-      // Insert ledger entries
-      const { error: ledgerError } = await supabase
+      // Insert ledger entries using service client (fee entries have wallet_id=null and need admin/finance role)
+      const { error: ledgerError } = await serviceClient
         .from('ledger_entries')
-        .insert(ledgerEntries);
+        .insert(ledgerEntries.map(e => ({ ...e, created_by: userId })));
 
       if (ledgerError) {
         console.error('Ledger entry error:', ledgerError);
-        // Trade was recorded, but ledger failed - log for reconciliation
+        return new Response(
+          JSON.stringify({ error: `Trade recorded but balance update failed: ${ledgerError.message}` }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
 
       return new Response(

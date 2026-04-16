@@ -30,6 +30,8 @@ export const useFxRates = () => {
 
       return data || [];
     },
+    refetchInterval: 60000, // refresh every 60s
+    staleTime: 30000,
   });
 };
 
