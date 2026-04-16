@@ -698,14 +698,17 @@ serve(async (req) => {
         });
       }
 
-      // Insert ledger entries
-      const { error: ledgerError } = await supabase
+      // Insert ledger entries using service client (fee entries have wallet_id=null and need admin/finance role)
+      const { error: ledgerError } = await serviceClient
         .from('ledger_entries')
-        .insert(ledgerEntries);
+        .insert(ledgerEntries.map(e => ({ ...e, created_by: userId })));
 
       if (ledgerError) {
         console.error('Ledger entry error:', ledgerError);
-        // Trade was recorded, but ledger failed - log for reconciliation
+        return new Response(
+          JSON.stringify({ error: `Trade recorded but balance update failed: ${ledgerError.message}` }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
 
       return new Response(
