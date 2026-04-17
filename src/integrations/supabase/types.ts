@@ -1197,6 +1197,33 @@ export type Database = {
           },
         ]
       }
+      integration_settings: {
+        Row: {
+          config: Json
+          id: string
+          is_enabled: boolean
+          key: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          config?: Json
+          id?: string
+          is_enabled?: boolean
+          key: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          config?: Json
+          id?: string
+          is_enabled?: boolean
+          key?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       ledger_accounts: {
         Row: {
           account_type: Database["public"]["Enums"]["account_type"]

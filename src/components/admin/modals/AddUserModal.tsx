@@ -45,40 +45,24 @@ const AddUserModal = ({ isOpen, onClose }: AddUserModalProps) => {
 
   const createUserMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
-      // Create a profile entry (user_id will be set when they authenticate)
-      // For admin-created users, we create a placeholder profile
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .insert({
-          user_id: crypto.randomUUID(), // Placeholder until actual auth
-          email: data.email,
-          full_name: data.fullName,
-          phone_number: data.phoneNumber || null,
-          country_code: data.countryCode || null,
-          kyc_status: data.kycStatus,
-          kyc_tier: data.kycTier,
-          risk_score: data.riskScore,
-        })
-        .select()
-        .single();
-
-      if (profileError) throw profileError;
-
-      // Add roles if any
-      if (data.roles.length > 0 && profile) {
-        const roleInserts = data.roles.map(role => ({
-          user_id: profile.user_id,
-          role: role as 'user' | 'admin' | 'compliance' | 'support' | 'finance',
-        }));
-
-        const { error: rolesError } = await supabase
-          .from('user_roles')
-          .insert(roleInserts);
-
-        if (rolesError) throw rolesError;
-      }
-
-      return profile;
+      const { data: result, error } = await supabase.functions.invoke(
+        'admin-create-user',
+        {
+          body: {
+            email: data.email,
+            fullName: data.fullName,
+            phoneNumber: data.phoneNumber,
+            countryCode: data.countryCode,
+            kycStatus: data.kycStatus,
+            kycTier: data.kycTier,
+            riskScore: data.riskScore,
+            roles: data.roles,
+          },
+        }
+      );
+      if (error) throw error;
+      if (result?.error) throw new Error(result.error);
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-profiles'] });

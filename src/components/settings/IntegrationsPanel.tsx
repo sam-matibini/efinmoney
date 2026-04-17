@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { StripeConfig } from "./integrations/StripeConfig";
 import { VisaDirectConfig } from "./integrations/VisaDirectConfig";
 import { MobileMoneyConfig } from "./integrations/MobileMoneyConfig";
@@ -198,6 +200,36 @@ const categoryLabels: Record<string, string> = {
 
 export function IntegrationsPanel() {
   const [currentView, setCurrentView] = useState<ConfigView>({ type: "list" });
+  const queryClient = useQueryClient();
+
+  const { data: settings = [] } = useQuery({
+    queryKey: ["integration_settings"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("integration_settings")
+        .select("key, is_enabled");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const settingsMap = new Map(
+    (settings as { key: string; is_enabled: boolean }[]).map((s) => [s.key, s.is_enabled])
+  );
+
+  const toggleMutation = useMutation({
+    mutationFn: async ({ key, enabled }: { key: string; enabled: boolean }) => {
+      const { error } = await supabase
+        .from("integration_settings")
+        .upsert({ key, is_enabled: enabled }, { onConflict: "key" });
+      if (error) throw error;
+    },
+    onSuccess: (_d, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["integration_settings"] });
+      toast.success(`Integration ${vars.enabled ? "enabled" : "disabled"}`);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   const handleConfigure = (integrationId: string) => {
     switch (integrationId) {
@@ -329,8 +361,11 @@ export function IntegrationsPanel() {
                   </div>
                   <div className="flex items-center gap-2">
                     <Switch
-                      checked={integration.enabled}
-                      onCheckedChange={() => toast.success(`${integration.name} ${integration.enabled ? 'disabled' : 'enabled'}`)}
+                      checked={settingsMap.get(integration.id) ?? integration.enabled}
+                      disabled={toggleMutation.isPending}
+                      onCheckedChange={(checked) =>
+                        toggleMutation.mutate({ key: integration.id, enabled: checked })
+                      }
                     />
                     {integration.status === "connected" && (
                       <Button
