@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useWallets } from "@/hooks/useWallets";
-import { useFxRates } from "@/hooks/useFxRates";
+import { useFxRates, useFxRatesLastUpdated } from "@/hooks/useFxRates";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -232,16 +232,42 @@ const FxTradingPanel = () => {
       </Card>
 
       {/* Live Rates */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
+      <LiveFxRatesCard />
+    </div>
+  );
+};
+
+const formatRelative = (iso: string | null) => {
+  if (!iso) return "never";
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins} minute${mins === 1 ? "" : "s"} ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  const days = Math.floor(hours / 24);
+  return `${days} day${days === 1 ? "" : "s"} ago`;
+};
+
+const LiveFxRatesCard = () => {
+  const { data: fxRates } = useFxRates();
+  const { data: lastUpdated } = useFxRatesLastUpdated();
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center justify-between text-base">
+          <span className="flex items-center gap-2">
             <TrendingUp className="w-4 h-4" />
             Live FX Rates
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {fxRates?.slice(0, 4).map((rate) => (
+          </span>
+          <span className="text-xs font-normal text-muted-foreground">
+            Updated {formatRelative(lastUpdated ?? null)}
+          </span>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-3">
+          {fxRates?.slice(0, 4).map((rate) => (
               <div key={rate.id} className="flex justify-between items-center text-sm">
                 <span>{rate.from_currency} → {rate.to_currency}</span>
                 <span className="font-mono">{Number(rate.effective_rate).toFixed(4)}</span>
