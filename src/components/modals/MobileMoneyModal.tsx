@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useWallets } from "@/hooks/useWallets";
 import { useCreateTransfer } from "@/hooks/useTransfers";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 interface MobileMoneyModalProps {
@@ -55,7 +56,7 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
       return;
     }
     try {
-      await createTransfer.mutateAsync({
+      const transfer = await createTransfer.mutateAsync({
         sender_wallet_id: wallet.wallet_id,
         recipient_name: recipientName.trim(),
         recipient_phone: phone.trim(),
@@ -69,7 +70,29 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
         exchange_rate: 1,
         fee_amount: 0,
       });
-      toast.success('Mobile money transfer initiated');
+
+      // For Kenyan M-Pesa, trigger the live payout edge function
+      if (network === 'mpesa' && net.country === 'KE') {
+        const { data, error } = await supabase.functions.invoke('mpesa-payout', {
+          body: {
+            transfer_id: transfer.id,
+            phone_number: phone.trim(),
+            amount_kes: result.data.amount,
+            reference: recipientName.trim(),
+          },
+        });
+        if (error) throw error;
+        if (data?.stub) {
+          toast.success('Transfer queued (M-Pesa credentials pending)');
+        } else if (data?.success) {
+          toast.success('M-Pesa payout initiated');
+        } else {
+          throw new Error(data?.error || 'M-Pesa payout failed');
+        }
+      } else {
+        toast.success('Mobile money transfer initiated');
+      }
+
       setOpen(false);
       setPhone(''); setRecipientName(''); setAmount('');
     } catch (e) {
