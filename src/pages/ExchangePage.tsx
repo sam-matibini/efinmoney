@@ -279,7 +279,6 @@ const LiveFxRatesCard = () => {
           </div>
         </CardContent>
       </Card>
-    </div>
   );
 };
 
