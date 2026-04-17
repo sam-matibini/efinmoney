@@ -2,3 +2,6 @@ project_id = "hgmskcvaeadnyovbroup"
 
 [functions.refresh-fx-rates]
 verify_jwt = false
+
+[functions.mpesa-webhook]
+verify_jwt = false

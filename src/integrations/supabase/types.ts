@@ -2710,6 +2710,56 @@ export type Database = {
           },
         ]
       }
+      webhooks_inbox: {
+        Row: {
+          event_type: string | null
+          external_reference: string | null
+          headers: Json | null
+          id: string
+          payload: Json
+          processed_at: string | null
+          processing_error: string | null
+          provider: string
+          received_at: string
+          status: string
+          transfer_id: string | null
+        }
+        Insert: {
+          event_type?: string | null
+          external_reference?: string | null
+          headers?: Json | null
+          id?: string
+          payload: Json
+          processed_at?: string | null
+          processing_error?: string | null
+          provider: string
+          received_at?: string
+          status?: string
+          transfer_id?: string | null
+        }
+        Update: {
+          event_type?: string | null
+          external_reference?: string | null
+          headers?: Json | null
+          id?: string
+          payload?: Json
+          processed_at?: string | null
+          processing_error?: string | null
+          provider?: string
+          received_at?: string
+          status?: string
+          transfer_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhooks_inbox_transfer_id_fkey"
+            columns: ["transfer_id"]
+            isOneToOne: false
+            referencedRelation: "transfers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
