@@ -361,8 +361,11 @@ export function IntegrationsPanel() {
                   </div>
                   <div className="flex items-center gap-2">
                     <Switch
-                      checked={integration.enabled}
-                      onCheckedChange={() => toast.success(`${integration.name} ${integration.enabled ? 'disabled' : 'enabled'}`)}
+                      checked={settingsMap.get(integration.id) ?? integration.enabled}
+                      disabled={toggleMutation.isPending}
+                      onCheckedChange={(checked) =>
+                        toggleMutation.mutate({ key: integration.id, enabled: checked })
+                      }
                     />
                     {integration.status === "connected" && (
                       <Button
