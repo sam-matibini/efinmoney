@@ -1,6 +1,7 @@
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { User, Session } from '@supabase/supabase-js';
+import { identifyUser, resetAnalytics, track } from '@/lib/analytics';
 
 interface AuthContextType {
   user: User | null;
@@ -25,6 +26,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
+        if (session?.user) {
+          identifyUser(session.user.id, { email: session.user.email });
+        } else if (event === 'SIGNED_OUT') {
+          resetAnalytics();
+        }
       }
     );
 
@@ -57,6 +63,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (!error) {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
+          track('user_signed_up', { email });
           await supabase
             .from('profiles')
             .update({ full_name: fullName })
