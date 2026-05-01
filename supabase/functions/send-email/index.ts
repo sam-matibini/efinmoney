@@ -7,7 +7,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-const FROM = "eFinMoney <onboarding@resend.dev>";
+const FROM = "eFinMoney <noreply@efinsuite.com>";
 
 function welcomeHtml(name: string) {
   return `
