@@ -2805,6 +2805,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      invoke_send_email: {
+        Args: { p_data: Json; p_to: string; p_type: string }
+        Returns: undefined
+      }
       run_compliance_checks: {
         Args: { p_transfer_id: string }
         Returns: number

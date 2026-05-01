@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
+import { track } from '@/lib/analytics';
 
 export interface Transfer {
   id: string;
@@ -92,7 +93,18 @@ export const useCreateTransfer = () => {
 
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      track('transfer_initiated', {
+        transfer_id: data.id,
+        source_amount: data.source_amount,
+        source_currency: data.source_currency,
+        target_currency: data.target_currency,
+        recipient_country: data.recipient_country,
+        transfer_type: data.transfer_type,
+      });
+      if (data.status === 'completed') {
+        track('transfer_completed', { transfer_id: data.id });
+      }
       queryClient.invalidateQueries({ queryKey: ['transfers'] });
       queryClient.invalidateQueries({ queryKey: ['wallets'] });
     },

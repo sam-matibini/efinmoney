@@ -104,7 +104,10 @@ export const OnboardingWizard = () => {
         .eq('id', onboardingId);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
+      if (variables.status === 'completed' || variables.status === 'in_progress') {
+        import('@/lib/analytics').then(({ track }) => track('kyc_submitted', { status: variables.status }));
+      }
       queryClient.invalidateQueries({ queryKey: ['customer-onboarding', customerId] });
     },
   });
