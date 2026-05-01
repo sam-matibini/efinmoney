@@ -4,13 +4,9 @@ let initialized = false;
 
 export function initAnalytics() {
   if (initialized) return;
-  const key = import.meta.env.VITE_POSTHOG_KEY as string | undefined;
-  if (!key) {
-    // PostHog key not exposed to frontend — analytics disabled.
-    return;
-  }
+  const key = "phc_zHNNgGYc5C2xLdvnmfszNcqcKRE2btWTGDAVpzw8zcRz";
   posthog.init(key, {
-    api_host: (import.meta.env.VITE_POSTHOG_HOST as string) || "https://us.i.posthog.com",
+    api_host: "https://us.i.posthog.com",
     capture_pageview: true,
     capture_pageleave: true,
     person_profiles: "identified_only",
