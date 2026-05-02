@@ -62,6 +62,8 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
 
+  let currentTransferId: string | null = null;
+  let currentUserId: string | null = null;
   try {
     // Auth check
     const authHeader = req.headers.get("Authorization");
