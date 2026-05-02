@@ -33,10 +33,24 @@ async function getDarajaToken(env: "sandbox" | "production"): Promise<string> {
 
   const auth = btoa(`${key}:${secret}`);
   const res = await fetch(`${host}/oauth/v1/generate/token?grant_type=client_credentials`, {
-    headers: { Authorization: `Basic ${auth}` },
+    headers: { Authorization: `Basic ${auth}`, Accept: "application/json" },
   });
-  if (!res.ok) throw new Error(`Daraja auth failed: ${res.status} ${await res.text()}`);
-  const data = await res.json();
+  const bodyText = await res.text();
+  if (!res.ok) {
+    throw new Error(`Daraja auth failed (${res.status}): ${bodyText || "empty response"}. Verify MPESA_CONSUMER_KEY/SECRET match the ${env} app on developer.safaricom.co.ke.`);
+  }
+  if (!bodyText) {
+    throw new Error("Daraja auth returned empty body. Check that the app is active in the Safaricom developer portal.");
+  }
+  let data: any;
+  try {
+    data = JSON.parse(bodyText);
+  } catch {
+    throw new Error(`Daraja auth returned non-JSON: ${bodyText.slice(0, 200)}`);
+  }
+  if (!data.access_token) {
+    throw new Error(`Daraja auth missing access_token: ${bodyText.slice(0, 200)}`);
+  }
   return data.access_token;
 }
 
