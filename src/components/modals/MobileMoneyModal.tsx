@@ -103,8 +103,10 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
 
       setOpen(false);
       setPhone(''); setRecipientName(''); setAmount('');
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Failed to create transfer');
+    } catch (e: any) {
+      const msg = e?.message || e?.error_description || e?.details || e?.hint || 'Failed to create transfer';
+      console.error('Mobile money transfer error:', e);
+      toast.error(msg);
     }
   };
 
