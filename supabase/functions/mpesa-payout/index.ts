@@ -82,6 +82,8 @@ Deno.serve(async (req) => {
 
     const body: PayoutRequest = await req.json();
     const { transfer_id, phone_number, amount_kes, reference, remarks } = body;
+    currentTransferId = transfer_id;
+    currentUserId = user.id;
 
     if (!transfer_id || !phone_number || !amount_kes || amount_kes <= 0) {
       return new Response(JSON.stringify({ error: "Invalid payload" }), {
