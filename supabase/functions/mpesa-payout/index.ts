@@ -33,10 +33,24 @@ async function getDarajaToken(env: "sandbox" | "production"): Promise<string> {
 
   const auth = btoa(`${key}:${secret}`);
   const res = await fetch(`${host}/oauth/v1/generate/token?grant_type=client_credentials`, {
-    headers: { Authorization: `Basic ${auth}` },
+    headers: { Authorization: `Basic ${auth}`, Accept: "application/json" },
   });
-  if (!res.ok) throw new Error(`Daraja auth failed: ${res.status} ${await res.text()}`);
-  const data = await res.json();
+  const bodyText = await res.text();
+  if (!res.ok) {
+    throw new Error(`Daraja auth failed (${res.status}): ${bodyText || "empty response"}. Verify MPESA_CONSUMER_KEY/SECRET match the ${env} app on developer.safaricom.co.ke.`);
+  }
+  if (!bodyText) {
+    throw new Error("Daraja auth returned empty body. Check that the app is active in the Safaricom developer portal.");
+  }
+  let data: any;
+  try {
+    data = JSON.parse(bodyText);
+  } catch {
+    throw new Error(`Daraja auth returned non-JSON: ${bodyText.slice(0, 200)}`);
+  }
+  if (!data.access_token) {
+    throw new Error(`Daraja auth missing access_token: ${bodyText.slice(0, 200)}`);
+  }
   return data.access_token;
 }
 
@@ -48,6 +62,8 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
 
+  let currentTransferId: string | null = null;
+  let currentUserId: string | null = null;
   try {
     // Auth check
     const authHeader = req.headers.get("Authorization");
@@ -66,6 +82,8 @@ Deno.serve(async (req) => {
 
     const body: PayoutRequest = await req.json();
     const { transfer_id, phone_number, amount_kes, reference, remarks } = body;
+    currentTransferId = transfer_id;
+    currentUserId = user.id;
 
     if (!transfer_id || !phone_number || !amount_kes || amount_kes <= 0) {
       return new Response(JSON.stringify({ error: "Invalid payload" }), {
@@ -179,8 +197,26 @@ Deno.serve(async (req) => {
   } catch (err) {
     console.error("mpesa-payout error:", err);
     const msg = err instanceof Error ? err.message : "Unknown error";
+    if (currentTransferId) {
+      try {
+        await supabase.from("transfers").update({
+          status: "failed",
+          failure_reason: msg.slice(0, 500),
+        }).eq("id", currentTransferId);
+        if (currentUserId) {
+          await supabase.from("notifications").insert({
+            user_id: currentUserId,
+            title: "M-Pesa transfer failed",
+            message: msg.slice(0, 300),
+            type: "error",
+          });
+        }
+      } catch (e) {
+        console.error("Failed to mark transfer failed:", e);
+      }
+    }
     return new Response(JSON.stringify({ success: false, error: msg }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });
