@@ -197,8 +197,26 @@ Deno.serve(async (req) => {
   } catch (err) {
     console.error("mpesa-payout error:", err);
     const msg = err instanceof Error ? err.message : "Unknown error";
+    if (currentTransferId) {
+      try {
+        await supabase.from("transfers").update({
+          status: "failed",
+          failure_reason: msg.slice(0, 500),
+        }).eq("id", currentTransferId);
+        if (currentUserId) {
+          await supabase.from("notifications").insert({
+            user_id: currentUserId,
+            title: "M-Pesa transfer failed",
+            message: msg.slice(0, 300),
+            type: "error",
+          });
+        }
+      } catch (e) {
+        console.error("Failed to mark transfer failed:", e);
+      }
+    }
     return new Response(JSON.stringify({ success: false, error: msg }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });
