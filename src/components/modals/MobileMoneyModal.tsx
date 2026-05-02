@@ -55,6 +55,14 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
       toast.error('Select a source wallet');
       return;
     }
+    if (Number(wallet.balance) <= 0) {
+      toast.error(`Insufficient ${wallet.currency_code} wallet balance. Please deposit funds first.`);
+      return;
+    }
+    if (Number(wallet.balance) < result.data.amount) {
+      toast.error(`Insufficient wallet balance. Available: ${wallet.symbol}${Number(wallet.balance).toLocaleString()}`);
+      return;
+    }
     try {
       const transfer = await createTransfer.mutateAsync({
         sender_wallet_id: wallet.wallet_id,
