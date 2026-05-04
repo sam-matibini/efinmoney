@@ -68,6 +68,13 @@ function PaymentElementForm({
         clientSecret,
         confirmParams: {
           return_url: window.location.origin + "/deposit/complete",
+          payment_method_data: {
+            billing_details: {
+              address: {
+                country: "CA",
+              },
+            },
+          },
         },
         redirect: "if_required",
       });
@@ -134,7 +141,14 @@ function PaymentElementForm({
             options={{
               layout: { type: "tabs", defaultCollapsed: false },
               wallets: { applePay: "never", googlePay: "never" },
-              fields: { billingDetails: { address: { country: "never", postalCode: "auto" } } },
+              fields: {
+                billingDetails: {
+                  email: "never",
+                  phone: "never",
+                  name: "never",
+                  address: "never",
+                },
+              },
               terms: { card: "never" },
             }}
           />
