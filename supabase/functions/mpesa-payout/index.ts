@@ -177,6 +177,8 @@ Deno.serve(async (req) => {
       Occasion: reference || transfer_id.slice(0, 8),
     };
 
+    console.log(`B2C request: env=${env}, shortcode=${shortcode}, initiator=${initiatorName}, msisdn=${msisdn}, amount=${payload.Amount}`);
+
     const res = await fetch(`${host}/mpesa/b2c/v1/paymentrequest`, {
       method: "POST",
       headers: {
