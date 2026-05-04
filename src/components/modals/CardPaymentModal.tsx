@@ -25,20 +25,22 @@ const CardPaymentModal = ({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {children && <DialogTrigger asChild>{children}</DialogTrigger>}
-      <DialogContent className="max-w-md">
-        <DialogHeader>
+      <DialogContent className="max-w-md max-h-[85vh] flex flex-col p-0">
+        <DialogHeader className="px-6 pt-6 pb-2">
           <DialogTitle className="flex items-center gap-2">
             <CreditCard className="w-5 h-5" /> {title}
           </DialogTitle>
         </DialogHeader>
-        <CardPaymentForm
-          defaultWalletId={defaultWalletId}
-          defaultAmount={defaultAmount}
-          lockAmount={lockAmount}
-          onSuccess={(info) => {
-            onSuccess?.(info);
-          }}
-        />
+        <div className="overflow-y-auto px-6 pb-6 flex-1">
+          <CardPaymentForm
+            defaultWalletId={defaultWalletId}
+            defaultAmount={defaultAmount}
+            lockAmount={lockAmount}
+            onSuccess={(info) => {
+              onSuccess?.(info);
+            }}
+          />
+        </div>
       </DialogContent>
     </Dialog>
   );
