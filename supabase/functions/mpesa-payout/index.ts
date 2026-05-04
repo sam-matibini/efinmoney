@@ -109,7 +109,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const env = (Deno.env.get("MPESA_ENVIRONMENT") || "sandbox") as "sandbox" | "production";
+    const env = ((Deno.env.get("MPESA_ENVIRONMENT") || "sandbox").trim().toLowerCase()) as "sandbox" | "production";
     const shortcode = Deno.env.get("MPESA_SHORTCODE");
     const initiatorName = Deno.env.get("MPESA_INITIATOR_NAME");
     const securityCredential = Deno.env.get("MPESA_SECURITY_CREDENTIAL");
