@@ -129,6 +129,7 @@ function InnerForm({
       }
 
       await queryClient.invalidateQueries({ queryKey: ["wallets"] });
+      await queryClient.invalidateQueries({ queryKey: ["ledger-deposits"] });
 
       const result = { amount: amountNum, currency, walletId: wallet.wallet_id };
       setSuccess({ amount: amountNum, currency });
