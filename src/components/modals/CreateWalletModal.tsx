@@ -1,13 +1,16 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useCurrencies } from "@/hooks/useCurrencies";
 import { useWallets } from "@/hooks/useWallets";
 import { useCreateWallet } from "@/hooks/useCreateWallet";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Check, Wallet } from "lucide-react";
+import { Check, Search, Wallet } from "lucide-react";
 import { toast } from "sonner";
+
+const POPULAR_CODES = ["NGN", "USD", "CAD", "KES", "GBP", "EUR", "GHS", "UGX", "TZS", "ZMW"];
 
 interface CreateWalletModalProps {
   children: React.ReactNode;
