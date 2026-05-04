@@ -68,6 +68,13 @@ function PaymentElementForm({
         clientSecret,
         confirmParams: {
           return_url: window.location.origin + "/deposit/complete",
+          payment_method_data: {
+            billing_details: {
+              address: {
+                country: "CA",
+              },
+            },
+          },
         },
         redirect: "if_required",
       });
