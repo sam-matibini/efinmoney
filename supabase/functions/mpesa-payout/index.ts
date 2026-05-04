@@ -129,9 +129,9 @@ Deno.serve(async (req) => {
     }
 
     const env = ((Deno.env.get("MPESA_ENVIRONMENT") || "sandbox").trim().toLowerCase()) as "sandbox" | "production";
-    const shortcode = Deno.env.get("MPESA_SHORTCODE");
-    const initiatorName = Deno.env.get("MPESA_INITIATOR_NAME");
-    const securityCredential = Deno.env.get("MPESA_SECURITY_CREDENTIAL");
+    const shortcode = Deno.env.get("MPESA_SHORTCODE")?.trim();
+    const initiatorName = Deno.env.get("MPESA_INITIATOR_NAME")?.trim();
+    const securityCredential = Deno.env.get("MPESA_SECURITY_CREDENTIAL")?.trim();
     const projectId = Deno.env.get("SUPABASE_PROJECT_ID") || Deno.env.get("SUPABASE_URL")?.match(/https:\/\/([^.]+)/)?.[1];
 
     // Graceful fallback if M-Pesa secrets are not yet configured
@@ -176,6 +176,8 @@ Deno.serve(async (req) => {
       ResultURL: `${callbackBase}?type=result&transfer_id=${transfer_id}`,
       Occasion: reference || transfer_id.slice(0, 8),
     };
+
+    console.log(`B2C request: env=${env}, shortcode=${shortcode}, initiator=${initiatorName}, msisdn=${msisdn}, amount=${payload.Amount}`);
 
     const res = await fetch(`${host}/mpesa/b2c/v1/paymentrequest`, {
       method: "POST",
