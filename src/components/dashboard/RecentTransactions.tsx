@@ -57,7 +57,41 @@ const RecentTransactions = () => {
     enabled: !!user,
   });
 
-  const isLoading = loadingTransfers || loadingDeposits;
+  // FX swaps: fetch user's wallet ids first, then ledger entries that touch them
+  const { data: fxSwaps, isLoading: loadingFx } = useQuery({
+    queryKey: ["ledger-fx", user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      const { data: wallets } = await supabase
+        .from("wallets")
+        .select("id")
+        .eq("user_id", user.id);
+      const ids = (wallets ?? []).map((w) => w.id);
+      if (ids.length === 0) return [];
+      const { data, error } = await supabase
+        .from("ledger_entries")
+        .select("id, journal_id, created_at, debit_amount, credit_amount, currency_code, wallet_id")
+        .eq("reference_type", "fx")
+        .in("wallet_id", ids)
+        .order("created_at", { ascending: false })
+        .limit(20);
+      if (error) {
+        console.error("Error fetching fx swaps:", error);
+        return [];
+      }
+      // Group by journal_id, keep credit (received) leg
+      const byJournal = new Map<string, any>();
+      for (const e of data ?? []) {
+        if (Number(e.credit_amount) > 0 && !byJournal.has(e.journal_id)) {
+          byJournal.set(e.journal_id, e);
+        }
+      }
+      return Array.from(byJournal.values()).slice(0, 5);
+    },
+    enabled: !!user,
+  });
+
+  const isLoading = loadingTransfers || loadingDeposits || loadingFx;
 
   if (isLoading) {
     return (
