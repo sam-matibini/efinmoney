@@ -132,32 +132,34 @@ function PaymentElementForm({
             onReady={() => setElementReady(true)}
             onLoaderStart={() => setElementReady(false)}
             options={{
-              layout: {
-                type: "tabs",
-                defaultCollapsed: false,
-              },
+              layout: { type: "tabs", defaultCollapsed: false },
+              wallets: { applePay: "never", googlePay: "never" },
+              fields: { billingDetails: { address: { country: "never", postalCode: "auto" } } },
+              terms: { card: "never" },
             }}
           />
         </div>
       </div>
 
-      <Button type="submit" size="lg" className="w-full" disabled={!canSubmit}>
-        {processing ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing…
-          </>
-        ) : isInitializing ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Initializing payment…
-          </>
-        ) : (
-          ctaLabel ?? `Pay $${amount.toFixed(2)}`
-        )}
-      </Button>
+      <div className="sticky bottom-0 -mx-1 px-1 pt-3 pb-1 bg-background/95 backdrop-blur-sm space-y-2 border-t border-border/40">
+        <Button type="submit" size="lg" className="w-full" disabled={!canSubmit}>
+          {processing ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing…
+            </>
+          ) : isInitializing ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Initializing payment…
+            </>
+          ) : (
+            ctaLabel ?? `Pay $${amount.toFixed(2)}`
+          )}
+        </Button>
 
-      <p className="flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground">
-        <Lock className="h-3 w-3" /> Secured with bank-grade encryption
-      </p>
+        <p className="flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground">
+          <Lock className="h-3 w-3" /> Secured with bank-grade encryption
+        </p>
+      </div>
     </form>
   );
 }
