@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
+import { useEffect, useMemo, useState } from "react";
+import { CardElement, Elements, useElements, useStripe } from "@stripe/react-stripe-js";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,183 +20,41 @@ interface Props {
   ctaLabel?: string;
 }
 
-function PaymentElementForm({
-  amount,
-  currency,
-  walletId,
-  clientSecret,
-  isInitializing,
-  onSuccess,
-  ctaLabel,
-}: {
-  amount: number;
-  currency: string;
-  walletId: string;
-  clientSecret: string | null;
-  isInitializing: boolean;
-  onSuccess?: (info: { amount: number; currency: string; walletId: string }) => void;
-  ctaLabel?: string;
-}) {
-  const stripe = useStripe();
-  const elements = useElements();
-  const queryClient = useQueryClient();
-  const [processing, setProcessing] = useState(false);
-  const [elementReady, setElementReady] = useState(false);
-  const [success, setSuccess] = useState<{ amount: number; currency: string } | null>(null);
+const CARD_ELEMENT_OPTIONS = {
+  hidePostalCode: true,
+  style: {
+    base: {
+      color: "#ffffff",
+      fontSize: "16px",
+      fontFamily: "Inter, system-ui, sans-serif",
+      "::placeholder": { color: "#6b7280" },
+      iconColor: "#ffffff",
+    },
+    invalid: {
+      color: "#ef4444",
+      iconColor: "#ef4444",
+    },
+  },
+} as const;
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
-    if (!stripe || !elements) {
-      toast.error("Secure payment form is still loading");
-      return;
-    }
-
-    if (!clientSecret) {
-      toast.error("Payment is still initializing");
-      return;
-    }
-
-    setProcessing(true);
-
-    try {
-      const { error: submitError } = await elements.submit();
-      if (submitError) throw new Error(submitError.message);
-
-      const { error: confirmError, paymentIntent } = await stripe.confirmPayment({
-        elements,
-        clientSecret,
-        confirmParams: {
-          return_url: window.location.origin + "/deposit/complete",
-          payment_method_data: {
-            billing_details: {
-              address: {
-                country: "CA",
-              },
-            },
-          },
-        },
-        redirect: "if_required",
-      });
-
-      if (confirmError) throw new Error(confirmError.message);
-      if (paymentIntent?.status !== "succeeded") {
-        throw new Error(`Payment ${paymentIntent?.status ?? "not completed"}`);
-      }
-
-      const { data, error } = await supabase.functions.invoke("stripe-payment-intent", {
-        body: {
-          action: "confirm",
-          paymentIntentId: paymentIntent.id,
-        },
-      });
-
-      if (error || !data?.success) {
-        throw new Error(error?.message || data?.error || "Failed to credit wallet");
-      }
-
-      await queryClient.invalidateQueries({ queryKey: ["wallets"] });
-
-      const result = { amount, currency, walletId };
-      setSuccess({ amount, currency });
-      onSuccess?.(result);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Payment failed");
-    } finally {
-      setProcessing(false);
-    }
-  };
-
-  const canSubmit = !!stripe && !!elements && !!clientSecret && !isInitializing && !processing;
-
-  if (success) {
-    return (
-      <div className="space-y-3 py-6 text-center">
-        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-          <CheckCircle2 className="h-8 w-8 text-primary" />
-        </div>
-        <h3 className="text-xl font-display font-bold text-foreground">Payment successful!</h3>
-        <p className="text-sm text-muted-foreground">
-          Payment successful! ${success.amount.toFixed(2)} added to your {success.currency} wallet
-        </p>
-      </div>
-    );
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="space-y-2">
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <span>Card details</span>
-          {(isInitializing || !elementReady) && (
-            <span className="inline-flex items-center gap-1.5">
-              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading secure form…
-            </span>
-          )}
-        </div>
-        <div className="rounded-lg border border-border bg-muted/30 p-3">
-          <PaymentElement
-            onReady={() => setElementReady(true)}
-            onLoaderStart={() => setElementReady(false)}
-            options={{
-              layout: { type: "tabs", defaultCollapsed: false },
-              wallets: { applePay: "never", googlePay: "never" },
-              fields: {
-                billingDetails: {
-                  email: "never",
-                  phone: "never",
-                  name: "never",
-                  address: "never",
-                },
-              },
-              terms: { card: "never" },
-            }}
-          />
-        </div>
-      </div>
-
-      <div className="sticky bottom-0 -mx-1 px-1 pt-3 pb-1 bg-background/95 backdrop-blur-sm space-y-2 border-t border-border/40">
-        <Button type="submit" size="lg" className="w-full" disabled={!canSubmit}>
-          {processing ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing…
-            </>
-          ) : isInitializing ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Initializing payment…
-            </>
-          ) : (
-            ctaLabel ?? `Pay $${amount.toFixed(2)}`
-          )}
-        </Button>
-
-        <p className="flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground">
-          <Lock className="h-3 w-3" /> Secured with bank-grade encryption
-        </p>
-      </div>
-    </form>
-  );
-}
-
-export default function CardPaymentForm({
+function InnerForm({
+  wallets,
   defaultWalletId,
   defaultAmount,
   lockAmount,
-  showWalletSelect = true,
+  showWalletSelect,
   onSuccess,
   ctaLabel,
-}: Props) {
-  const { data: wallets } = useWallets();
+}: Props & { wallets: ReturnType<typeof useWallets>["data"] }) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const queryClient = useQueryClient();
+
   const [selectedWalletId, setSelectedWalletId] = useState<string | undefined>(defaultWalletId);
   const [amount, setAmount] = useState(defaultAmount ? String(defaultAmount) : "");
-  const [stripeReady, setStripeReady] = useState<Awaited<ReturnType<typeof getStripe>> | null>(null);
-  const [clientSecret, setClientSecret] = useState<string | null>(null);
-  const [isInitializing, setIsInitializing] = useState(false);
-  const requestIdRef = useRef(0);
-
-  useEffect(() => {
-    getStripe().then(setStripeReady);
-  }, []);
+  const [processing, setProcessing] = useState(false);
+  const [cardReady, setCardReady] = useState(false);
+  const [success, setSuccess] = useState<{ amount: number; currency: string } | null>(null);
 
   useEffect(() => {
     if (defaultAmount !== undefined) setAmount(String(defaultAmount));
@@ -209,20 +67,33 @@ export default function CardPaymentForm({
   const wallet = wallets?.find((item) => item.wallet_id === (selectedWalletId ?? defaultWalletId)) ?? wallets?.[0];
   const currency = wallet?.currency_code ?? "USD";
   const amountNum = parseFloat(amount) || 0;
-  const normalizedAmount = Math.max(Math.round(amountNum * 100), 100);
 
-  useEffect(() => {
-    if (!wallet?.wallet_id || amountNum <= 0) {
-      setClientSecret(null);
-      setIsInitializing(false);
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!stripe || !elements) {
+      toast.error("Secure payment form is still loading");
+      return;
+    }
+    if (!wallet?.wallet_id) {
+      toast.error("Please select a wallet");
+      return;
+    }
+    if (amountNum <= 0) {
+      toast.error("Enter a valid amount");
       return;
     }
 
-    const currentRequestId = ++requestIdRef.current;
-    setIsInitializing(true);
+    const card = elements.getElement(CardElement);
+    if (!card) {
+      toast.error("Card field not ready");
+      return;
+    }
 
-    const timer = window.setTimeout(async () => {
-      const { data, error } = await supabase.functions.invoke("stripe-payment-intent", {
+    setProcessing(true);
+
+    try {
+      const { data: createData, error: createErr } = await supabase.functions.invoke("stripe-payment-intent", {
         body: {
           action: "create",
           walletId: wallet.wallet_id,
@@ -231,64 +102,62 @@ export default function CardPaymentForm({
         },
       });
 
-      if (requestIdRef.current !== currentRequestId) return;
-
-      if (error || !data?.clientSecret) {
-        setClientSecret(null);
-        setIsInitializing(false);
-        toast.error(error?.message || data?.error || "Failed to initialize payment");
-        return;
+      if (createErr || !createData?.clientSecret) {
+        throw new Error(createErr?.message || createData?.error || "Failed to initialize payment");
       }
 
-      setClientSecret(data.clientSecret);
-      setIsInitializing(false);
-    }, 300);
-
-    return () => window.clearTimeout(timer);
-  }, [wallet?.wallet_id, amountNum, currency]);
-
-  const elementsOptions = useMemo(() => ({
-    mode: "payment" as const,
-    currency: currency.toLowerCase(),
-    amount: normalizedAmount,
-    appearance: {
-      theme: "night" as const,
-      variables: {
-        colorPrimary: "hsl(var(--primary))",
-        colorBackground: "hsl(var(--muted) / 0.3)",
-        colorText: "hsl(var(--foreground))",
-        colorDanger: "hsl(var(--destructive))",
-        colorTextSecondary: "hsl(var(--muted-foreground))",
-        borderRadius: "8px",
-        fontFamily: "Inter, system-ui, sans-serif",
-      },
-      rules: {
-        ".Input": {
-          backgroundColor: "hsl(var(--muted) / 0.3)",
-          border: "1px solid hsl(var(--border))",
-          boxShadow: "none",
+      const { error: confirmError, paymentIntent } = await stripe.confirmCardPayment(createData.clientSecret, {
+        payment_method: {
+          card,
+          billing_details: {
+            address: { country: "CA" },
+          },
         },
-        ".Tab": {
-          border: "1px solid hsl(var(--border))",
-          backgroundColor: "hsl(var(--background))",
-        },
-        ".Tab--selected": {
-          backgroundColor: "hsl(var(--accent))",
-        },
-      },
-    },
-  }), [currency, normalizedAmount]);
+      });
 
-  if (!stripeReady) {
+      if (confirmError) throw new Error(confirmError.message);
+      if (paymentIntent?.status !== "succeeded") {
+        throw new Error(`Payment ${paymentIntent?.status ?? "not completed"}`);
+      }
+
+      const { data, error } = await supabase.functions.invoke("stripe-payment-intent", {
+        body: { action: "confirm", paymentIntentId: paymentIntent.id },
+      });
+
+      if (error || !data?.success) {
+        throw new Error(error?.message || data?.error || "Failed to credit wallet");
+      }
+
+      await queryClient.invalidateQueries({ queryKey: ["wallets"] });
+
+      const result = { amount: amountNum, currency, walletId: wallet.wallet_id };
+      setSuccess({ amount: amountNum, currency });
+      onSuccess?.(result);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Payment failed");
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  if (success) {
     return (
-      <div className="flex items-center justify-center py-6 text-muted-foreground">
-        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading secure form…
+      <div className="space-y-3 py-6 text-center">
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+          <CheckCircle2 className="h-8 w-8 text-primary" />
+        </div>
+        <h3 className="text-xl font-display font-bold text-foreground">Payment successful!</h3>
+        <p className="text-sm text-muted-foreground">
+          ${success.amount.toFixed(2)} added to your {success.currency} wallet
+        </p>
       </div>
     );
   }
 
+  const canSubmit = !!stripe && !!elements && cardReady && !processing && amountNum > 0 && !!wallet?.wallet_id;
+
   return (
-    <div className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4">
       {showWalletSelect && wallets && wallets.length > 0 && (
         <div className="space-y-2">
           <Label className="text-xs">Deposit into wallet</Label>
@@ -322,23 +191,74 @@ export default function CardPaymentForm({
         />
       </div>
 
-      <Elements stripe={stripeReady} options={elementsOptions} key={`${currency}-${normalizedAmount}`}>
-        {wallet?.wallet_id && amountNum > 0 ? (
-          <PaymentElementForm
-            amount={amountNum}
-            currency={currency}
-            walletId={wallet.wallet_id}
-            clientSecret={clientSecret}
-            isInitializing={isInitializing}
-            onSuccess={onSuccess}
-            ctaLabel={ctaLabel}
-          />
-        ) : (
-          <div className="rounded-lg border border-dashed border-border bg-muted/20 px-4 py-8 text-center text-sm text-muted-foreground">
-            Enter an amount to load the secure card form.
-          </div>
-        )}
-      </Elements>
-    </div>
+      <div className="space-y-2">
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <span>Card details</span>
+          {!cardReady && (
+            <span className="inline-flex items-center gap-1.5">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…
+            </span>
+          )}
+        </div>
+        <div className="rounded-lg border border-border bg-muted/30 px-3 py-3.5">
+          <CardElement options={CARD_ELEMENT_OPTIONS} onReady={() => setCardReady(true)} />
+        </div>
+      </div>
+
+      <div className="sticky bottom-0 -mx-1 px-1 pt-3 pb-1 bg-background/95 backdrop-blur-sm space-y-2 border-t border-border/40">
+        <Button type="submit" size="lg" className="w-full" disabled={!canSubmit}>
+          {processing ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing…
+            </>
+          ) : (
+            ctaLabel ?? `Pay $${amountNum.toFixed(2)}`
+          )}
+        </Button>
+
+        <p className="flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground">
+          <Lock className="h-3 w-3" /> Secured with bank-grade encryption
+        </p>
+      </div>
+    </form>
+  );
+}
+
+export default function CardPaymentForm(props: Props) {
+  const { data: wallets } = useWallets();
+  const [stripeReady, setStripeReady] = useState<Awaited<ReturnType<typeof getStripe>> | null>(null);
+
+  useEffect(() => {
+    getStripe().then(setStripeReady);
+  }, []);
+
+  const elementsOptions = useMemo(
+    () => ({
+      appearance: {
+        theme: "night" as const,
+        variables: {
+          colorPrimary: "hsl(var(--primary))",
+          colorBackground: "hsl(var(--muted) / 0.3)",
+          colorText: "hsl(var(--foreground))",
+          colorDanger: "hsl(var(--destructive))",
+          fontFamily: "Inter, system-ui, sans-serif",
+        },
+      },
+    }),
+    [],
+  );
+
+  if (!stripeReady) {
+    return (
+      <div className="flex items-center justify-center py-6 text-muted-foreground">
+        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading secure form…
+      </div>
+    );
+  }
+
+  return (
+    <Elements stripe={stripeReady} options={elementsOptions}>
+      <InnerForm {...props} wallets={wallets} />
+    </Elements>
   );
 }
