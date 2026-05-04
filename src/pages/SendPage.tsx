@@ -230,31 +230,25 @@ const SendPage = () => {
                 {/* Credit Card Selection */}
                 {fundingSource === 'card' && (
                   <div className="space-y-2">
-                    <Label>From Credit Card</Label>
-                    {cardSources.length > 0 ? (
-                      <>
-                        <Select value={selectedSourceId || cardSources[0]?.id} onValueChange={setSelectedSourceId}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select credit card" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {cardSources.map((s) => (
-                              <SelectItem key={s.id} value={s.id}>
-                                💳 {s.display_name} ••••{s.last_four}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        {cardFee > 0 && (
-                          <p className="text-xs text-muted-foreground">+${cardFee.toFixed(2)} card processing fee applies</p>
-                        )}
-                      </>
-                    ) : (
-                      <div className="flex items-start gap-2 p-3 rounded-lg border border-dashed border-border bg-muted/40">
-                        <AlertCircle className="w-4 h-4 mt-0.5 text-muted-foreground shrink-0" />
-                        <p className="text-sm text-muted-foreground">No cards linked yet. Add a card in Settings to fund transfers from a card.</p>
-                      </div>
-                    )}
+                    <Label>Pay with Card</Label>
+                    <div className="p-3 rounded-lg border border-border bg-muted/40 space-y-2">
+                      <p className="text-sm text-foreground">
+                        Securely charge your card. Funds will be added to your {wallets?.[0]?.currency_code || 'wallet'} wallet, then sent.
+                      </p>
+                      <CardPaymentModal
+                        title="Fund Transfer with Card"
+                        defaultWalletId={wallets?.[0]?.wallet_id}
+                        defaultAmount={parseFloat(amount) || undefined}
+                      >
+                        <Button type="button" variant="secondary" className="w-full" disabled={!(parseFloat(amount) > 0)}>
+                          <CreditCard className="w-4 h-4 mr-2" />
+                          {parseFloat(amount) > 0 ? `Pay ${sourceSymbol}${parseFloat(amount).toFixed(2)} with Card` : 'Enter an amount first'}
+                        </Button>
+                      </CardPaymentModal>
+                      {cardFee > 0 && (
+                        <p className="text-xs text-muted-foreground">+${cardFee.toFixed(2)} card processing fee applies</p>
+                      )}
+                    </div>
                   </div>
                 )}
 
