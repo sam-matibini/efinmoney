@@ -113,6 +113,7 @@ const DepositModal = ({ children }: DepositModalProps) => {
             </TabsContent>
           </Tabs>
         )}
+        </div>
       </DialogContent>
     </Dialog>
   );
