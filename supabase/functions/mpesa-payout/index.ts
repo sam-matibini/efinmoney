@@ -23,18 +23,22 @@ function normalizeMsisdn(phone: string): string {
 }
 
 async function getDarajaToken(env: "sandbox" | "production"): Promise<string> {
-  const key = Deno.env.get("MPESA_CONSUMER_KEY");
-  const secret = Deno.env.get("MPESA_CONSUMER_SECRET");
+  // Trim to defend against trailing newlines/spaces pasted into secrets
+  const key = (Deno.env.get("MPESA_CONSUMER_KEY") || "").trim();
+  const secret = (Deno.env.get("MPESA_CONSUMER_SECRET") || "").trim();
   if (!key || !secret) throw new Error("MPESA_CONSUMER_KEY/SECRET not configured");
 
   const host = env === "production"
     ? "https://api.safaricom.co.ke"
     : "https://sandbox.safaricom.co.ke";
 
+  console.log(`Daraja auth: env=${env}, host=${host}, key_len=${key.length}, secret_len=${secret.length}`);
+
   const auth = btoa(`${key}:${secret}`);
   const res = await fetch(`${host}/oauth/v1/generate/token?grant_type=client_credentials`, {
     headers: { Authorization: `Basic ${auth}`, Accept: "application/json" },
   });
+  console.log(`Daraja auth response: status=${res.status}, content-type=${res.headers.get("content-type")}, content-length=${res.headers.get("content-length")}`);
   const bodyText = await res.text();
   if (!res.ok) {
     throw new Error(`Daraja auth failed (${res.status}): ${bodyText || "empty response"}. Verify MPESA_CONSUMER_KEY/SECRET match the ${env} app on developer.safaricom.co.ke.`);
