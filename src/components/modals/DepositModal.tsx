@@ -1,11 +1,21 @@
 import { useState } from "react";
-import { Copy, Check, Building2, Landmark } from "lucide-react";
+import { Copy, Check, Building2, Landmark, CreditCard } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
+import type { StripeCardElementOptions } from "@stripe/stripe-js";
+import { getStripe } from "@/lib/stripe";
 import { useWallets } from "@/hooks/useWallets";
 import { useAuth } from "@/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
+import { Loader2, Lock, CheckCircle2 } from "lucide-react";
+import { useEffect } from "react";
 import { toast } from "sonner";
 
 interface DepositModalProps {
