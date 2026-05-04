@@ -67,7 +67,7 @@ const SendPage = () => {
     ? (parseFloat(amount) - fee) * effectiveRate
     : 0;
 
-  const noLinkedSource = (fundingSource === 'bank' || fundingSource === 'card') && activeSources.length === 0;
+  const noLinkedSource = fundingSource === 'bank' && activeSources.length === 0;
 
   const handleSubmit = async () => {
     if (fundingSource === 'wallet' && !selectedWallet) return;
