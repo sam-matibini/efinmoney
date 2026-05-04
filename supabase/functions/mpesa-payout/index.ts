@@ -35,27 +35,46 @@ async function getDarajaToken(env: "sandbox" | "production"): Promise<string> {
   console.log(`Daraja auth: env=${env}, host=${host}, key_len=${key.length}, secret_len=${secret.length}`);
 
   const auth = btoa(`${key}:${secret}`);
-  const res = await fetch(`${host}/oauth/v1/generate/token?grant_type=client_credentials`, {
-    headers: { Authorization: `Basic ${auth}`, Accept: "application/json" },
-  });
-  console.log(`Daraja auth response: status=${res.status}, content-type=${res.headers.get("content-type")}, content-length=${res.headers.get("content-length")}`);
-  const bodyText = await res.text();
-  if (!res.ok) {
-    throw new Error(`Daraja auth failed (${res.status}): ${bodyText || "empty response"}. Verify MPESA_CONSUMER_KEY/SECRET match the ${env} app on developer.safaricom.co.ke.`);
+  const authUrls = [
+    `${host}/oauth/v1/generate?grant_type=client_credentials`,
+    `${host}/oauth/v1/generate/token?grant_type=client_credentials`,
+  ];
+
+  let lastFailure = "Daraja auth failed before a response was read.";
+
+  for (const url of authUrls) {
+    const res = await fetch(url, {
+      headers: { Authorization: `Basic ${auth}`, Accept: "application/json" },
+    });
+    console.log(`Daraja auth response: url=${url}, status=${res.status}, content-type=${res.headers.get("content-type")}, content-length=${res.headers.get("content-length")}`);
+    const bodyText = await res.text();
+
+    if (!res.ok) {
+      lastFailure = `Daraja auth failed (${res.status}) at ${url}: ${bodyText || "empty response"}`;
+      continue;
+    }
+
+    if (!bodyText) {
+      lastFailure = `Daraja auth returned empty body at ${url}`;
+      continue;
+    }
+
+    let data: any;
+    try {
+      data = JSON.parse(bodyText);
+    } catch {
+      lastFailure = `Daraja auth returned non-JSON at ${url}: ${bodyText.slice(0, 200)}`;
+      continue;
+    }
+
+    if (data.access_token) {
+      return data.access_token;
+    }
+
+    lastFailure = `Daraja auth missing access_token at ${url}: ${bodyText.slice(0, 200)}`;
   }
-  if (!bodyText) {
-    throw new Error("Daraja auth returned empty body. Check that the app is active in the Safaricom developer portal.");
-  }
-  let data: any;
-  try {
-    data = JSON.parse(bodyText);
-  } catch {
-    throw new Error(`Daraja auth returned non-JSON: ${bodyText.slice(0, 200)}`);
-  }
-  if (!data.access_token) {
-    throw new Error(`Daraja auth missing access_token: ${bodyText.slice(0, 200)}`);
-  }
-  return data.access_token;
+
+  throw new Error(`${lastFailure}. Verify MPESA_CONSUMER_KEY/SECRET match the ${env} app on the Safaricom developer portal.`);
 }
 
 Deno.serve(async (req) => {
