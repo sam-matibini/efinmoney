@@ -20,6 +20,7 @@ import CustomerPortalPage from "./pages/CustomerPortalPage";
 import ProfileSettingsPage from "./pages/ProfileSettingsPage";
 import KYCPage from "./pages/KYCPage";
 import SecurityPage from "./pages/SecurityPage";
+import DepositComplete from "./pages/DepositComplete";
 
 const queryClient = new QueryClient();
 
@@ -199,6 +200,7 @@ const AppRoutes = () => (
         </ProtectedRoute>
       }
     />
+    <Route path="/deposit/complete" element={<DepositComplete />} />
     <Route path="*" element={<NotFound />} />
   </Routes>
 );
