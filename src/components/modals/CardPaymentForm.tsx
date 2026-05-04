@@ -197,12 +197,16 @@ export default function CardPaymentForm({
         <div className="flex items-center justify-center py-6 text-muted-foreground">
           <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Loading secure form…
         </div>
-      ) : wallet && amountNum > 0 ? (
-        <Elements stripe={stripeReady}>
-          <InnerForm walletId={wallet.wallet_id} amount={amountNum} currency={currency} onDone={handleDone} ctaLabel={ctaLabel} />
-        </Elements>
       ) : (
-        <Button disabled className="w-full" size="lg">Enter an amount to continue</Button>
+        <Elements stripe={stripeReady}>
+          <InnerForm
+            walletId={wallet?.wallet_id}
+            amount={amountNum}
+            currency={currency}
+            onDone={handleDone}
+            ctaLabel={ctaLabel}
+          />
+        </Elements>
       )}
     </div>
   );
