@@ -141,7 +141,14 @@ function PaymentElementForm({
             options={{
               layout: { type: "tabs", defaultCollapsed: false },
               wallets: { applePay: "never", googlePay: "never" },
-              fields: { billingDetails: { address: { country: "never", postalCode: "auto" } } },
+              fields: {
+                billingDetails: {
+                  email: "never",
+                  phone: "never",
+                  name: "never",
+                  address: "never",
+                },
+              },
               terms: { card: "never" },
             }}
           />
