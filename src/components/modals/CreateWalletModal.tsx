@@ -20,16 +20,78 @@ const CreateWalletModal = ({ children }: CreateWalletModalProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedCurrency, setSelectedCurrency] = useState<string | null>(null);
 
+  const [search, setSearch] = useState("");
+
   const { data: currencies, isLoading: currenciesLoading } = useCurrencies();
   const { data: wallets } = useWallets();
   const createWallet = useCreateWallet();
 
-  // Filter out currencies user already has wallets for
-  const existingCurrencies = new Set(wallets?.map(w => w.currency_code) || []);
-  const availableCurrencies = currencies?.filter(c => !existingCurrencies.has(c.code)) || [];
+  const existingCurrencies = new Set(wallets?.map((w) => w.currency_code) || []);
+  const availableCurrencies = useMemo(
+    () => (currencies || []).filter((c) => !existingCurrencies.has(c.code)),
+    [currencies, wallets],
+  );
+
+  const { popular, others } = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const filtered = q
+      ? availableCurrencies.filter(
+          (c) => c.code.toLowerCase().includes(q) || c.name.toLowerCase().includes(q),
+        )
+      : availableCurrencies;
+    const popularSet = new Set(POPULAR_CODES);
+    const popular = POPULAR_CODES
+      .map((code) => filtered.find((c) => c.code === code))
+      .filter(Boolean) as typeof filtered;
+    const others = filtered
+      .filter((c) => !popularSet.has(c.code))
+      .sort((a, b) => a.code.localeCompare(b.code));
+    return { popular, others };
+  }, [availableCurrencies, search]);
 
   const handleCreate = async () => {
     if (!selectedCurrency) return;
+
+    try {
+      await createWallet.mutateAsync(selectedCurrency);
+      toast.success(`${selectedCurrency} wallet created successfully!`);
+      setIsOpen(false);
+      setSelectedCurrency(null);
+      setSearch("");
+    } catch (error) {
+      toast.error("Failed to create wallet. Please try again.");
+    }
+  };
+
+  const renderCurrency = (currency: typeof availableCurrencies[number]) => (
+    <motion.button
+      key={currency.code}
+      whileHover={{ scale: 1.01 }}
+      whileTap={{ scale: 0.99 }}
+      onClick={() => setSelectedCurrency(currency.code)}
+      className={`w-full flex items-center justify-between p-4 rounded-xl transition-all ${
+        selectedCurrency === currency.code
+          ? "bg-primary/20 border-2 border-primary"
+          : "bg-secondary hover:bg-secondary/80 border-2 border-transparent"
+      }`}
+    >
+      <div className="flex items-center gap-3">
+        <span className="text-2xl">{currency.flag_emoji || "💰"}</span>
+        <div className="text-left">
+          <p className="font-medium text-foreground">{currency.code}</p>
+          <p className="text-sm text-muted-foreground">{currency.name}</p>
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="text-sm text-muted-foreground capitalize">{currency.currency_type}</span>
+        {selectedCurrency === currency.code && (
+          <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center">
+            <Check className="w-4 h-4 text-primary-foreground" />
+          </div>
+        )}
+      </div>
+    </motion.button>
+  );
 
     try {
       await createWallet.mutateAsync(selectedCurrency);
