@@ -49,10 +49,11 @@ const DepositModal = ({ children }: DepositModalProps) => {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Deposit Funds</DialogTitle>
         </DialogHeader>
+        <div className="overflow-y-auto -mx-6 px-6 flex-1">
 
         {isLoading ? (
           <div className="space-y-3"><Skeleton className="h-12" /><Skeleton className="h-16" /></div>
