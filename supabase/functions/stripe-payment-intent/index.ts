@@ -84,11 +84,12 @@ Deno.serve(async (req) => {
       const amount = intent.amount / 100;
       const currency = intent.currency.toUpperCase();
 
-      // Idempotency: skip if already recorded
+      // Idempotency: skip if already recorded (match by stripe id in description)
       const { data: existing } = await admin
         .from("ledger_entries")
         .select("id")
-        .eq("reference_id", intent.id)
+        .eq("reference_type", "stripe_deposit")
+        .ilike("description", `%${intent.id}%`)
         .limit(1);
       if (existing && existing.length > 0) {
         return json({ success: true, alreadyProcessed: true });
@@ -115,6 +116,8 @@ Deno.serve(async (req) => {
       }
 
       const journalId = crypto.randomUUID();
+      const refId = crypto.randomUUID();
+      const desc = `Card deposit via Stripe (${intent.id})`;
       const entries = [
         {
           journal_id: journalId,
@@ -123,9 +126,9 @@ Deno.serve(async (req) => {
           currency_code: currency,
           debit_amount: amount,
           credit_amount: 0,
-          description: `Card deposit via Stripe (${intent.id})`,
+          description: desc,
           reference_type: "stripe_deposit",
-          reference_id: intent.id,
+          reference_id: refId,
           created_by: userId,
         },
         {
@@ -135,9 +138,9 @@ Deno.serve(async (req) => {
           currency_code: currency,
           debit_amount: 0,
           credit_amount: amount,
-          description: `Card deposit via Stripe (${intent.id})`,
+          description: desc,
           reference_type: "stripe_deposit",
-          reference_id: intent.id,
+          reference_id: refId,
           created_by: userId,
         },
       ];
