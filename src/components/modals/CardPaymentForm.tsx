@@ -43,7 +43,7 @@ function InnerForm({
   onDone,
   ctaLabel,
 }: {
-  walletId: string;
+  walletId: string | undefined;
   amount: number;
   currency: string;
   onDone: (info: { amount: number; currency: string; walletId: string }) => void;
@@ -57,6 +57,7 @@ function InnerForm({
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!stripe || !elements) return;
+    if (!walletId) { toast.error("Select a wallet"); return; }
     if (amount <= 0) { toast.error("Enter an amount"); return; }
     setProcessing(true);
     try {
@@ -91,6 +92,8 @@ function InnerForm({
     }
   };
 
+  const canSubmit = !!stripe && !!walletId && amount > 0 && !processing;
+
   return (
     <form onSubmit={submit} className="space-y-4">
       <div className="space-y-2">
@@ -103,8 +106,10 @@ function InnerForm({
           <CardElement options={cardElementOptions} />
         </div>
       </div>
-      <Button type="submit" disabled={!stripe || processing} className="w-full" size="lg">
-        {processing ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Processing…</>) : (ctaLabel ?? `Pay ${currency} ${amount.toFixed(2)}`)}
+      <Button type="submit" disabled={!canSubmit} className="w-full" size="lg">
+        {processing ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Processing…</>) : (
+          amount > 0 ? (ctaLabel ?? `Pay ${currency} ${amount.toFixed(2)}`) : "Enter an amount to continue"
+        )}
       </Button>
       <p className="text-[11px] text-muted-foreground flex items-center justify-center gap-1.5">
         <Lock className="w-3 h-3" /> Secured with bank-grade encryption
@@ -192,12 +197,16 @@ export default function CardPaymentForm({
         <div className="flex items-center justify-center py-6 text-muted-foreground">
           <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Loading secure form…
         </div>
-      ) : wallet && amountNum > 0 ? (
-        <Elements stripe={stripeReady}>
-          <InnerForm walletId={wallet.wallet_id} amount={amountNum} currency={currency} onDone={handleDone} ctaLabel={ctaLabel} />
-        </Elements>
       ) : (
-        <Button disabled className="w-full" size="lg">Enter an amount to continue</Button>
+        <Elements stripe={stripeReady}>
+          <InnerForm
+            walletId={wallet?.wallet_id}
+            amount={amountNum}
+            currency={currency}
+            onDone={handleDone}
+            ctaLabel={ctaLabel}
+          />
+        </Elements>
       )}
     </div>
   );
