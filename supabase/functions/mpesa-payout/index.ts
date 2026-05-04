@@ -129,9 +129,9 @@ Deno.serve(async (req) => {
     }
 
     const env = ((Deno.env.get("MPESA_ENVIRONMENT") || "sandbox").trim().toLowerCase()) as "sandbox" | "production";
-    const shortcode = Deno.env.get("MPESA_SHORTCODE");
-    const initiatorName = Deno.env.get("MPESA_INITIATOR_NAME");
-    const securityCredential = Deno.env.get("MPESA_SECURITY_CREDENTIAL");
+    const shortcode = Deno.env.get("MPESA_SHORTCODE")?.trim();
+    const initiatorName = Deno.env.get("MPESA_INITIATOR_NAME")?.trim();
+    const securityCredential = Deno.env.get("MPESA_SECURITY_CREDENTIAL")?.trim();
     const projectId = Deno.env.get("SUPABASE_PROJECT_ID") || Deno.env.get("SUPABASE_URL")?.match(/https:\/\/([^.]+)/)?.[1];
 
     // Graceful fallback if M-Pesa secrets are not yet configured
