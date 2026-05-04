@@ -16,6 +16,10 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
+    const url = new URL(req.url);
+    if (req.method === "GET" && url.searchParams.get("action") === "publishable_key") {
+      return json({ publishableKey: Deno.env.get("STRIPE_PUBLISHABLE_KEY") ?? "" });
+    }
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return json({ error: "Unauthorized" }, 401);
