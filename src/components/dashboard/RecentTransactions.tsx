@@ -134,7 +134,20 @@ const RecentTransactions = () => {
     createdAt: d.created_at,
   }));
 
-  const items = [...transferItems, ...depositItems]
+  const fxItems: Item[] = (fxSwaps ?? []).map((f: any) => ({
+    key: `fx-${f.id}`,
+    type: "receive",
+    status: "completed",
+    amount: Number(f.credit_amount),
+    currency: f.currency_code,
+    symbol: currencySymbol(f.currency_code),
+    recipient: "Currency Exchange",
+    date: formatDistanceToNow(new Date(f.created_at), { addSuffix: true }),
+    description: `Swapped to ${f.currency_code}`,
+    createdAt: f.created_at,
+  }));
+
+  const items = [...transferItems, ...depositItems, ...fxItems]
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, 5);
 
