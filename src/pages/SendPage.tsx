@@ -73,7 +73,7 @@ const SendPage = () => {
     if (fundingSource === 'wallet' && !selectedWallet) return;
 
     try {
-      await createTransfer.mutateAsync({
+      const transfer = await createTransfer.mutateAsync({
         sender_wallet_id: fundingSource === 'wallet' ? selectedWallet!.wallet_id : wallets?.[0]?.wallet_id || '',
         recipient_name: recipientName,
         recipient_phone: recipientPhone,
@@ -88,10 +88,19 @@ const SendPage = () => {
         fee_amount: fee,
       });
 
+      // Post ledger entries and trigger payout
+      const { supabase } = await import('@/integrations/supabase/client');
+      const { data, error } = await supabase.functions.invoke('execute-transfer', {
+        body: { transfer_id: transfer.id },
+      });
+      if (error || (data as any)?.error) {
+        throw new Error((data as any)?.error || error?.message || 'Payout failed');
+      }
+
       setStep(3);
-      toast.success('Transfer initiated successfully!');
-    } catch (error) {
-      toast.error('Transfer failed. Please try again.');
+      toast.success('Transfer sent successfully!');
+    } catch (error: any) {
+      toast.error(error?.message || 'Transfer failed. Please try again.');
     }
   };
 
