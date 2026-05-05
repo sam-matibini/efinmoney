@@ -14,6 +14,73 @@ interface SavingsModalProps {
   children: React.ReactNode;
 }
 
+const GoalRow = ({ goal }: { goal: SavingsGoal }) => {
+  const [adding, setAdding] = useState(false);
+  const [amt, setAmt] = useState('');
+  const contribute = useContributeToGoal();
+  const del = useDeleteSavingsGoal();
+  const pct = Math.min(100, (Number(goal.current_amount) / Number(goal.target_amount)) * 100);
+
+  const handleAdd = async () => {
+    const n = parseFloat(amt);
+    if (!n || n <= 0) { toast.error('Enter a valid amount'); return; }
+    try {
+      await contribute.mutateAsync({ goal, amount: n });
+      toast.success(`Added ${goal.currency_code} ${n.toLocaleString()}`);
+      setAmt(''); setAdding(false);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Failed to add');
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!confirm(`Delete goal "${goal.name}"?`)) return;
+    try {
+      await del.mutateAsync(goal.id);
+      toast.success('Goal deleted');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Failed to delete');
+    }
+  };
+
+  return (
+    <div className="p-3 rounded-lg bg-muted/40 space-y-2">
+      <div className="flex items-center justify-between text-sm">
+        <span className="font-medium">{goal.name}</span>
+        <span className="text-muted-foreground text-xs">
+          {goal.currency_code} {Number(goal.current_amount).toLocaleString()} / {Number(goal.target_amount).toLocaleString()}
+        </span>
+      </div>
+      <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+        <div className="h-full bg-primary transition-all" style={{ width: `${pct}%` }} />
+      </div>
+      {adding ? (
+        <div className="flex gap-2">
+          <Input
+            type="number"
+            placeholder="Amount"
+            value={amt}
+            onChange={e => setAmt(e.target.value)}
+            className="h-8"
+            autoFocus
+          />
+          <Button size="sm" onClick={handleAdd} disabled={contribute.isPending}>Add</Button>
+          <Button size="sm" variant="ghost" onClick={() => { setAdding(false); setAmt(''); }}>Cancel</Button>
+        </div>
+      ) : (
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" className="flex-1 h-8" onClick={() => setAdding(true)}>
+            <Plus className="w-3 h-3 mr-1" /> Add funds
+          </Button>
+          <Button size="sm" variant="ghost" className="h-8" onClick={handleDelete} disabled={del.isPending}>
+            <Trash2 className="w-3 h-3" />
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const schema = z.object({
   name: z.string().trim().min(1, 'Goal name is required').max(100),
   target_amount: z.number().positive('Target must be greater than 0').max(1e9, 'Target too large'),
