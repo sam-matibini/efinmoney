@@ -68,25 +68,12 @@ const SavingsModal = ({ children }: SavingsModalProps) => {
           </DialogTitle>
         </DialogHeader>
 
-        {goals && goals.length > 0 && (
-          <div className="space-y-2 mb-2">
+        {goals && goals.filter(g => g.status === 'active').length > 0 && (
+          <div className="space-y-2 mb-2 max-h-64 overflow-y-auto">
             <p className="text-xs text-muted-foreground">Your active goals</p>
-            {goals.filter(g => g.status === 'active').slice(0, 3).map(g => {
-              const pct = Math.min(100, (Number(g.current_amount) / Number(g.target_amount)) * 100);
-              return (
-                <div key={g.id} className="p-3 rounded-lg bg-muted/40">
-                  <div className="flex items-center justify-between text-sm mb-1">
-                    <span className="font-medium">{g.name}</span>
-                    <span className="text-muted-foreground">
-                      {g.currency_code} {Number(g.current_amount).toLocaleString()} / {Number(g.target_amount).toLocaleString()}
-                    </span>
-                  </div>
-                  <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                    <div className="h-full bg-primary" style={{ width: `${pct}%` }} />
-                  </div>
-                </div>
-              );
-            })}
+            {goals.filter(g => g.status === 'active').map(g => (
+              <GoalRow key={g.id} goal={g} />
+            ))}
           </div>
         )}
 
