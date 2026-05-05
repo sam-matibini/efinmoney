@@ -80,6 +80,7 @@ const FxTradingPanel = () => {
       setSuccess(true);
       queryClient.invalidateQueries({ queryKey: ['wallets'] });
       queryClient.invalidateQueries({ queryKey: ['fx_rates'] });
+      queryClient.invalidateQueries({ queryKey: ['ledger-fx'] });
       toast.success('Exchange completed successfully!');
 
       setTimeout(() => {
