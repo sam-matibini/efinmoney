@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { z } from "zod";
-import { PiggyBank } from "lucide-react";
+import { PiggyBank, Plus, Trash2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useWallets } from "@/hooks/useWallets";
-import { useCreateSavingsGoal, useSavingsGoals } from "@/hooks/useSavingsGoals";
+import { useCreateSavingsGoal, useSavingsGoals, useContributeToGoal, useDeleteSavingsGoal, type SavingsGoal } from "@/hooks/useSavingsGoals";
 import { toast } from "sonner";
 
 interface SavingsModalProps {
