@@ -1,0 +1,207 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+// Map destination currency -> mobile money payable account code
+const PAYABLE_BY_CURRENCY: Record<string, string> = {
+  KES: "2120",
+  UGX: "2121",
+  TZS: "2122",
+  ZMW: "2123",
+  BIF: "2124",
+  NGN: "2125",
+};
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  const supabase = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+  );
+
+  try {
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "Missing authorization" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const { data: { user } } = await supabase.auth.getUser(authHeader.replace("Bearer ", ""));
+    if (!user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { transfer_id } = await req.json();
+    if (!transfer_id) {
+      return new Response(JSON.stringify({ error: "transfer_id required" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Load transfer
+    const { data: transfer, error: tErr } = await supabase
+      .from("transfers")
+      .select("*")
+      .eq("id", transfer_id)
+      .eq("sender_id", user.id)
+      .single();
+
+    if (tErr || !transfer) {
+      return new Response(JSON.stringify({ error: "Transfer not found" }), {
+        status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (transfer.status !== "initiated") {
+      return new Response(JSON.stringify({ error: `Transfer already ${transfer.status}` }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Idempotency: skip if already has a journal posted
+    const { data: existing } = await supabase
+      .from("ledger_entries")
+      .select("id")
+      .eq("reference_type", "transfer")
+      .eq("reference_id", transfer_id)
+      .limit(1);
+
+    if (!existing || existing.length === 0) {
+      // Look up accounts
+      const { data: liabAcc } = await supabase
+        .from("ledger_accounts")
+        .select("id")
+        .like("code", "21%")
+        .eq("currency_code", transfer.source_currency)
+        .limit(1)
+        .single();
+
+      const payableCode = PAYABLE_BY_CURRENCY[transfer.target_currency];
+      const { data: payableAcc } = payableCode
+        ? await supabase.from("ledger_accounts").select("id").eq("code", payableCode).maybeSingle()
+        : { data: null };
+
+      const { data: feeAcc } = await supabase
+        .from("ledger_accounts").select("id").eq("code", "4200").maybeSingle();
+
+      if (!liabAcc) {
+        return new Response(JSON.stringify({ error: `No ledger account for ${transfer.source_currency}` }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const journalId = crypto.randomUUID();
+      const totalDebit = Number(transfer.source_amount) + Number(transfer.fee_amount || 0);
+
+      const entries: any[] = [
+        {
+          journal_id: journalId,
+          account_id: liabAcc.id,
+          wallet_id: transfer.sender_wallet_id,
+          currency_code: transfer.source_currency,
+          debit_amount: totalDebit,
+          credit_amount: 0,
+          description: `Transfer to ${transfer.recipient_name} (${transfer.recipient_country})`,
+          reference_type: "transfer",
+          reference_id: transfer_id,
+          created_by: user.id,
+        },
+      ];
+
+      if (payableAcc) {
+        entries.push({
+          journal_id: journalId,
+          account_id: payableAcc.id,
+          wallet_id: null,
+          currency_code: transfer.target_currency,
+          debit_amount: 0,
+          credit_amount: Number(transfer.target_amount),
+          description: `Payable to ${transfer.recipient_name}`,
+          reference_type: "transfer",
+          reference_id: transfer_id,
+          created_by: user.id,
+        });
+      }
+
+      if (feeAcc && Number(transfer.fee_amount) > 0) {
+        entries.push({
+          journal_id: journalId,
+          account_id: feeAcc.id,
+          wallet_id: null,
+          currency_code: transfer.source_currency,
+          debit_amount: 0,
+          credit_amount: Number(transfer.fee_amount),
+          description: "Transfer fee revenue",
+          reference_type: "transfer",
+          reference_id: transfer_id,
+          created_by: user.id,
+        });
+      }
+
+      const { error: leErr } = await supabase.from("ledger_entries").insert(entries);
+      if (leErr) {
+        console.error("Ledger insert error:", leErr);
+        await supabase.from("transfers").update({
+          status: "failed",
+          failure_reason: leErr.message,
+        }).eq("id", transfer_id);
+        return new Response(JSON.stringify({ error: "Failed to post ledger" }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
+    // Mark funded
+    await supabase.from("transfers").update({ status: "funded" }).eq("id", transfer_id);
+
+    // Trigger payout. For Kenya KES via M-Pesa we call the real function;
+    // others run in stub mode (mark processing → completed shortly).
+    let payoutResult: any = { stub: true };
+    try {
+      if (transfer.target_currency === "KES" && transfer.payout_method === "mpesa") {
+        const res = await fetch(
+          `${Deno.env.get("SUPABASE_URL")}/functions/v1/mpesa-payout`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: authHeader,
+            },
+            body: JSON.stringify({
+              transfer_id,
+              phone_number: transfer.recipient_phone,
+              amount_kes: Number(transfer.target_amount),
+              reference: transfer_id.slice(0, 8),
+            }),
+          },
+        );
+        payoutResult = await res.json();
+      } else {
+        // Stub payout for other corridors — mark processing then completed
+        await supabase.from("transfers").update({
+          status: "completed",
+          provider_reference: `STUB-${transfer_id.slice(0, 8)}`,
+          completed_at: new Date().toISOString(),
+        }).eq("id", transfer_id);
+        payoutResult = { stub: true, message: `${transfer.target_currency} payout simulated (live API not configured).` };
+      }
+    } catch (e) {
+      console.error("Payout trigger error:", e);
+    }
+
+    return new Response(JSON.stringify({ success: true, payout: payoutResult }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (err) {
+    console.error("execute-transfer error:", err);
+    return new Response(JSON.stringify({ error: err instanceof Error ? err.message : "Unknown error" }), {
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+});
