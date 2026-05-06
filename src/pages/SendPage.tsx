@@ -15,6 +15,7 @@ import { usePricingConfig } from "@/hooks/usePricingConfig";
 import { toast } from "sonner";
 import { ArrowRight, CheckCircle, Users, Clock, Shield, Wallet, Landmark, CreditCard, AlertCircle } from "lucide-react";
 import CardPaymentForm from "@/components/modals/CardPaymentForm";
+import { Link } from "react-router-dom";
 
 const targetCountries = [
   { code: 'KES', country: 'Kenya', flag: '🇰🇪', method: 'M-Pesa', payout: 'mpesa', symbol: 'KSh' },
