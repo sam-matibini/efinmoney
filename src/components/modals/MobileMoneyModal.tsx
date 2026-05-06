@@ -53,7 +53,9 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
 
   const wallet = wallets?.find(w => w.wallet_id === walletId) || wallets?.[0];
   const net = networks.find(n => n.value === network)!;
-  const flutterwavePublicKey = import.meta.env.VITE_FLW_PUBLIC_KEY?.trim();
+  const flutterwavePublicKey =
+    import.meta.env.VITE_FLW_PUBLIC_KEY?.trim() ||
+    "FLWPUBK_TEST-b6b1a9a088a3bae587f81e8faccffb26-X";
 
   const checkoutConfig = useMemo(() => {
     if (!flutterwavePublicKey || !wallet || !user) return null;
@@ -154,13 +156,13 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
             const success = ['successful', 'completed', 'success'].includes(status);
             const updatePayload = success
               ? {
-                  status: 'completed',
+                  status: 'completed' as const,
                   provider_reference: response.flw_ref || String(response.transaction_id || checkoutConfig.tx_ref),
                   failure_reason: null,
                   completed_at: new Date().toISOString(),
                 }
               : {
-                  status: 'failed',
+                  status: 'failed' as const,
                   provider_reference: response.flw_ref || null,
                   failure_reason: response.status || 'Checkout failed',
                 };
