@@ -22,6 +22,7 @@ const currencySymbol = (code: string) =>
 
 interface Item {
   key: string;
+  transferId?: string;
   type: "send" | "receive";
   status: "completed" | "failed" | "pending";
   amount: number;
@@ -110,6 +111,7 @@ const RecentTransactions = () => {
 
   const transferItems: Item[] = (transfers ?? []).map((t) => ({
     key: `t-${t.id}`,
+    transferId: t.id,
     type: "send",
     status: (t.status === "completed" ? "completed" : t.status === "failed" ? "failed" : "pending"),
     amount: Number(t.source_amount),
@@ -158,10 +160,10 @@ const RecentTransactions = () => {
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-display font-semibold text-foreground">Recent Transactions</h2>
         {hasItems && (
-          <button className="flex items-center gap-1 text-sm text-primary hover:text-primary/80 transition-colors">
+          <Link to="/transfers" className="flex items-center gap-1 text-sm text-primary hover:text-primary/80 transition-colors">
             View All
             <ChevronRight className="w-4 h-4" />
-          </button>
+          </Link>
         )}
       </div>
 
@@ -183,13 +185,8 @@ const RecentTransactions = () => {
         </div>
       ) : (
         <div className="space-y-1">
-          {items.map((item, index) => (
-            <motion.div
-              key={item.key}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.05 }}
-            >
+          {items.map((item, index) => {
+            const inner = (
               <TransactionItem
                 type={item.type}
                 status={item.status}
@@ -200,8 +197,20 @@ const RecentTransactions = () => {
                 date={item.date}
                 description={item.description}
               />
-            </motion.div>
-          ))}
+            );
+            return (
+              <motion.div
+                key={item.key}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.05 }}
+              >
+                {item.transferId ? (
+                  <Link to={`/transfers/${item.transferId}`} className="block">{inner}</Link>
+                ) : inner}
+              </motion.div>
+            );
+          })}
         </div>
       )}
     </section>

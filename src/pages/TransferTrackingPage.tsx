@@ -1,0 +1,275 @@
+import { useEffect, useState } from "react";
+import { useParams, Link } from "react-router-dom";
+import { motion } from "framer-motion";
+import { CheckCircle2, Loader2, Circle, Share2, ArrowLeft, AlertCircle } from "lucide-react";
+import Header from "@/components/layout/Header";
+import MobileNav from "@/components/layout/MobileNav";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import type { Transfer } from "@/hooks/useTransfers";
+import { toast } from "sonner";
+import { format, formatDistanceToNow } from "date-fns";
+
+const refOf = (id: string) => `EFM-${id.replace(/-/g, "").slice(0, 8).toUpperCase()}`;
+
+const currencySymbol = (code: string) => {
+  const map: Record<string, string> = {
+    USD: "$", CAD: "C$", EUR: "€", GBP: "£", NGN: "₦",
+    KES: "KSh", UGX: "USh", TZS: "TSh", ZMW: "ZK", BIF: "FBu",
+  };
+  return map[code] || code + " ";
+};
+
+const statusMeta = (status: string) => {
+  switch (status) {
+    case "completed":
+      return { label: "Completed", className: "bg-green-500/20 text-green-500 border-green-500/40" };
+    case "failed":
+    case "reversed":
+    case "expired":
+      return { label: status[0].toUpperCase() + status.slice(1), className: "bg-destructive/20 text-destructive border-destructive/40" };
+    case "processing":
+    case "funded":
+      return { label: "Processing", className: "bg-yellow-500/20 text-yellow-500 border-yellow-500/40" };
+    default:
+      return { label: "Initiated", className: "bg-blue-500/20 text-blue-500 border-blue-500/40" };
+  }
+};
+
+interface TimelineStep {
+  key: string;
+  label: string;
+  state: "done" | "current" | "future" | "failed";
+  timestamp?: string;
+}
+
+const buildTimeline = (t: Transfer): TimelineStep[] => {
+  const created = t.created_at;
+  const updated = t.updated_at;
+  const completed = t.completed_at;
+  const status = t.status;
+  const failed = ["failed", "reversed", "expired"].includes(status);
+
+  const steps: TimelineStep[] = [
+    { key: "init", label: "Transfer Initiated", state: "done", timestamp: created },
+    { key: "funded", label: "Payment Received", state: "future" },
+    { key: "processing", label: "Processing Payout", state: "future" },
+    { key: "delivered", label: "Delivered to Recipient", state: "future" },
+  ];
+
+  if (status === "initiated") {
+    steps[1].state = "current";
+  } else if (status === "funded") {
+    steps[1].state = "done"; steps[1].timestamp = updated;
+    steps[2].state = "current";
+  } else if (status === "processing") {
+    steps[1].state = "done"; steps[1].timestamp = updated;
+    steps[2].state = "current";
+  } else if (status === "completed") {
+    steps[1].state = "done"; steps[1].timestamp = updated;
+    steps[2].state = "done"; steps[2].timestamp = updated;
+    steps[3].state = "done"; steps[3].timestamp = completed || updated;
+  } else if (failed) {
+    // mark current step as failed
+    const idx = status === "expired" ? 1 : 2;
+    steps[idx].state = "failed";
+    steps[idx].timestamp = updated;
+  }
+
+  return steps;
+};
+
+const TransferTrackingPage = () => {
+  const { id } = useParams<{ id: string }>();
+  const { user } = useAuth();
+  const [transfer, setTransfer] = useState<Transfer | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+
+  useEffect(() => {
+    if (!id || !user) return;
+    let cancelled = false;
+
+    const load = async () => {
+      const { data, error } = await supabase
+        .from("transfers")
+        .select("*")
+        .eq("id", id)
+        .maybeSingle();
+      if (cancelled) return;
+      if (error || !data) {
+        setNotFound(true);
+      } else {
+        setTransfer(data as Transfer);
+      }
+      setLoading(false);
+    };
+    load();
+
+    const channel = supabase
+      .channel(`transfer-${id}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "transfers", filter: `id=eq.${id}` },
+        (payload) => {
+          setTransfer(payload.new as Transfer);
+          toast.info(`Transfer status: ${(payload.new as Transfer).status}`);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
+  }, [id, user]);
+
+  const handleShare = async () => {
+    const url = window.location.href;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "Track my transfer", url });
+      } else {
+        await navigator.clipboard.writeText(url);
+        toast.success("Tracking link copied");
+      }
+    } catch {
+      // user cancelled
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-background pb-24 md:pb-8">
+      <Header />
+      <main className="container px-4 py-6 max-w-3xl mx-auto space-y-6">
+        <Button asChild variant="ghost" size="sm" className="gap-2">
+          <Link to="/transfers"><ArrowLeft className="w-4 h-4" /> All transfers</Link>
+        </Button>
+
+        {loading ? (
+          <Skeleton className="h-64 rounded-2xl" />
+        ) : notFound || !transfer ? (
+          <Card>
+            <CardContent className="py-12 text-center space-y-3">
+              <AlertCircle className="w-10 h-10 mx-auto text-muted-foreground" />
+              <h2 className="text-lg font-semibold">Transfer not found</h2>
+              <p className="text-sm text-muted-foreground">We couldn't find this transfer.</p>
+              <Button asChild><Link to="/transfers">View all transfers</Link></Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <>
+            {/* Header */}
+            <Card>
+              <CardHeader className="flex flex-row items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs text-muted-foreground">Reference</p>
+                  <CardTitle className="font-display">{refOf(transfer.id)}</CardTitle>
+                  <Badge variant="outline" className={`mt-2 ${statusMeta(transfer.status).className}`}>
+                    {statusMeta(transfer.status).label}
+                  </Badge>
+                </div>
+                <Button variant="outline" size="sm" onClick={handleShare} className="gap-2">
+                  <Share2 className="w-4 h-4" /> Share
+                </Button>
+              </CardHeader>
+            </Card>
+
+            {/* Timeline */}
+            <Card>
+              <CardHeader><CardTitle>Tracking Timeline</CardTitle></CardHeader>
+              <CardContent>
+                <ol className="space-y-6">
+                  {buildTimeline(transfer).map((step, i) => (
+                    <motion.li
+                      key={step.key}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: i * 0.08 }}
+                      className="flex gap-4"
+                    >
+                      <div className="flex flex-col items-center">
+                        {step.state === "done" && (
+                          <CheckCircle2 className="w-6 h-6 text-green-500" />
+                        )}
+                        {step.state === "current" && (
+                          <div className="relative">
+                            <Loader2 className="w-6 h-6 text-primary animate-spin" />
+                            <span className="absolute inset-0 rounded-full bg-primary/30 animate-ping" />
+                          </div>
+                        )}
+                        {step.state === "future" && (
+                          <Circle className="w-6 h-6 text-muted-foreground/40" />
+                        )}
+                        {step.state === "failed" && (
+                          <AlertCircle className="w-6 h-6 text-destructive" />
+                        )}
+                        {i < 3 && (
+                          <div className={`w-0.5 flex-1 mt-1 min-h-8 ${step.state === "done" ? "bg-green-500/50" : "bg-muted"}`} />
+                        )}
+                      </div>
+                      <div className="pb-4">
+                        <p className={`font-medium ${
+                          step.state === "future" ? "text-muted-foreground" :
+                          step.state === "failed" ? "text-destructive" : "text-foreground"
+                        }`}>
+                          {step.label}
+                        </p>
+                        {step.timestamp && (
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {format(new Date(step.timestamp), "MMM d, yyyy 'at' h:mm a")}
+                          </p>
+                        )}
+                      </div>
+                    </motion.li>
+                  ))}
+                </ol>
+                {transfer.failure_reason && (
+                  <div className="mt-4 p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-sm text-destructive">
+                    {transfer.failure_reason}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Details */}
+            <Card>
+              <CardHeader><CardTitle>Transfer Details</CardTitle></CardHeader>
+              <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                <Detail label="Amount Sent" value={`${currencySymbol(transfer.source_currency)}${Number(transfer.source_amount).toLocaleString("en-US", { minimumFractionDigits: 2 })} ${transfer.source_currency}`} />
+                <Detail label="Recipient Receives" value={`${currencySymbol(transfer.target_currency)}${Number(transfer.target_amount).toLocaleString("en-US", { minimumFractionDigits: 2 })} ${transfer.target_currency}`} />
+                <Detail label="Exchange Rate" value={`1 ${transfer.source_currency} = ${Number(transfer.exchange_rate).toFixed(4)} ${transfer.target_currency}`} />
+                <Detail label="Fee" value={`${currencySymbol(transfer.source_currency)}${Number(transfer.fee_amount).toFixed(2)}`} />
+                <Detail label="Recipient" value={transfer.recipient_name} />
+                <Detail label="Phone" value={transfer.recipient_phone || "—"} />
+                <Detail label="Destination" value={transfer.recipient_country} />
+                <Detail label="Payout Method" value={transfer.payout_method || transfer.transfer_type} />
+                <Detail
+                  label="Estimated Delivery"
+                  value={transfer.status === "completed"
+                    ? `Delivered ${formatDistanceToNow(new Date(transfer.completed_at || transfer.updated_at), { addSuffix: true })}`
+                    : "Within minutes"}
+                />
+                <Detail label="Initiated" value={format(new Date(transfer.created_at), "MMM d, yyyy h:mm a")} />
+              </CardContent>
+            </Card>
+          </>
+        )}
+      </main>
+      <MobileNav />
+    </div>
+  );
+};
+
+const Detail = ({ label, value }: { label: string; value: string }) => (
+  <div>
+    <p className="text-xs text-muted-foreground">{label}</p>
+    <p className="font-medium text-foreground">{value}</p>
+  </div>
+);
+
+export default TransferTrackingPage;

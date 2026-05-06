@@ -21,6 +21,8 @@ import ProfileSettingsPage from "./pages/ProfileSettingsPage";
 import KYCPage from "./pages/KYCPage";
 import SecurityPage from "./pages/SecurityPage";
 import DepositComplete from "./pages/DepositComplete";
+import TransferTrackingPage from "./pages/TransferTrackingPage";
+import TransfersListPage from "./pages/TransfersListPage";
 
 const queryClient = new QueryClient();
 
@@ -197,6 +199,22 @@ const AppRoutes = () => (
       element={
         <ProtectedRoute>
           <SecurityPage />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/transfers"
+      element={
+        <ProtectedRoute>
+          <TransfersListPage />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/transfers/:id"
+      element={
+        <ProtectedRoute>
+          <TransferTrackingPage />
         </ProtectedRoute>
       }
     />

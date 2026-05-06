@@ -15,6 +15,7 @@ import { usePricingConfig } from "@/hooks/usePricingConfig";
 import { toast } from "sonner";
 import { ArrowRight, CheckCircle, Users, Clock, Shield, Wallet, Landmark, CreditCard, AlertCircle } from "lucide-react";
 import CardPaymentForm from "@/components/modals/CardPaymentForm";
+import { Link } from "react-router-dom";
 
 const targetCountries = [
   { code: 'KES', country: 'Kenya', flag: '🇰🇪', method: 'M-Pesa', payout: 'mpesa', symbol: 'KSh' },
@@ -35,6 +36,7 @@ const SendPage = () => {
   const [recipientName, setRecipientName] = useState("");
   const [recipientPhone, setRecipientPhone] = useState("");
   const [selectedSourceId, setSelectedSourceId] = useState<string>("");
+  const [lastTransferId, setLastTransferId] = useState<string | null>(null);
 
   const { data: wallets } = useWallets();
   const { data: fxRates } = useFxRates();
@@ -104,6 +106,7 @@ const SendPage = () => {
         throw new Error((data as any)?.error || error?.message || 'Payout failed');
       }
 
+      setLastTransferId(transfer.id);
       setStep(3);
       toast.success('Transfer sent successfully!');
     } catch (error: any) {
@@ -418,7 +421,14 @@ const SendPage = () => {
                 <p className="text-muted-foreground mb-6">
                   {sourceSymbol}{parsedAmount.toFixed(2)} is on its way to {recipientName}
                 </p>
-                <Button onClick={resetForm}>Send Another</Button>
+                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                  {lastTransferId && (
+                    <Button asChild>
+                      <Link to={`/transfers/${lastTransferId}`}>Track your transfer</Link>
+                    </Button>
+                  )}
+                  <Button variant="outline" onClick={resetForm}>Send Another</Button>
+                </div>
               </CardContent>
             </Card>
           )}
