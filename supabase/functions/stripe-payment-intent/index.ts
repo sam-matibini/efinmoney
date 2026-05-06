@@ -49,6 +49,9 @@ Deno.serve(async (req) => {
       if (!amount || amount <= 0 || !currency || !walletId) {
         return json({ error: "Invalid input" }, 400);
       }
+      if (amount > 999999.99) {
+        return json({ error: "Amount must be no more than $999,999.99 per transaction" }, 400);
+      }
 
       // Verify wallet ownership
       const { data: wallet } = await admin
@@ -154,7 +157,9 @@ Deno.serve(async (req) => {
     return json({ error: "Unknown action" }, 400);
   } catch (e) {
     console.error("stripe-payment-intent error:", e);
-    return json({ error: (e as Error).message }, 500);
+    const msg = (e as Error).message ?? "Unknown error";
+    const status = /amount_too_large|no more than/i.test(msg) ? 400 : 500;
+    return json({ error: msg }, status);
   }
 });
 
