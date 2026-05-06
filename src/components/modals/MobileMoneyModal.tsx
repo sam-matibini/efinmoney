@@ -141,7 +141,8 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
       handleFlutterPayment({
         callback: async (response) => {
           try {
-            const success = ['successful', 'completed', 'success'].includes((response.status || '').toLowerCase());
+            const status = (response.status || '').toLowerCase();
+            const success = ['successful', 'completed', 'success'].includes(status);
             const updatePayload = success
               ? {
                   status: 'completed',
@@ -179,7 +180,11 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
 
             await supabase.from('notifications').insert(notification);
 
-            toast.success(success ? 'Transfer completed successfully' : 'Transfer was not completed');
+            if (success) {
+              toast.success('Transfer completed successfully');
+            } else {
+              toast.error(response.status || 'Transfer was not completed');
+            }
             closePaymentModal();
 
             if (success) {
@@ -281,7 +286,7 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
             <Label htmlFor="mm-amount">Amount ({wallet?.currency_code || ''})</Label>
             <Input id="mm-amount" type="number" min="0" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} />
           </div>
-          <p className="text-xs text-muted-foreground">You’ll complete this mobile money payment in Flutterwave’s secure checkout.</p>
+          <p className="text-xs text-muted-foreground">You’ll complete this mobile money payment in Flutterwave’s secure checkout. Supported networks are handled there directly.</p>
           <Button className="w-full" onClick={handleSubmit} disabled={createTransfer.isPending || isLaunchingCheckout}>
             {createTransfer.isPending || isLaunchingCheckout ? (<><LoaderCircle className="mr-2 h-4 w-4 animate-spin" />Opening checkout…</>) : 'Pay with Flutterwave'}
           </Button>
