@@ -421,7 +421,14 @@ const SendPage = () => {
                 <p className="text-muted-foreground mb-6">
                   {sourceSymbol}{parsedAmount.toFixed(2)} is on its way to {recipientName}
                 </p>
-                <Button onClick={resetForm}>Send Another</Button>
+                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                  {lastTransferId && (
+                    <Button asChild>
+                      <Link to={`/transfers/${lastTransferId}`}>Track your transfer</Link>
+                    </Button>
+                  )}
+                  <Button variant="outline" onClick={resetForm}>Send Another</Button>
+                </div>
               </CardContent>
             </Card>
           )}
