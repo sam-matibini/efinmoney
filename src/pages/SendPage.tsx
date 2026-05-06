@@ -1,5 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
+import { useSearchParams } from "react-router-dom";
+import ContactsPickerModal from "@/components/modals/ContactsPickerModal";
+import AddBeneficiaryModal from "@/components/modals/AddBeneficiaryModal";
+import { useBeneficiaries, recordTransferRecipient, type Beneficiary } from "@/hooks/useBeneficiaries";
+import { useAuth } from "@/hooks/useAuth";
+import { UserPlus } from "lucide-react";
 import Header from "@/components/layout/Header";
 import MobileNav from "@/components/layout/MobileNav";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
