@@ -202,6 +202,22 @@ const AppRoutes = () => (
         </ProtectedRoute>
       }
     />
+    <Route
+      path="/transfers"
+      element={
+        <ProtectedRoute>
+          <TransfersListPage />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/transfers/:id"
+      element={
+        <ProtectedRoute>
+          <TransferTrackingPage />
+        </ProtectedRoute>
+      }
+    />
     <Route path="/deposit/complete" element={<DepositComplete />} />
     <Route path="*" element={<NotFound />} />
   </Routes>
