@@ -156,13 +156,13 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
             const success = ['successful', 'completed', 'success'].includes(status);
             const updatePayload = success
               ? {
-                  status: 'completed',
+                  status: 'completed' as const,
                   provider_reference: response.flw_ref || String(response.transaction_id || checkoutConfig.tx_ref),
                   failure_reason: null,
                   completed_at: new Date().toISOString(),
                 }
               : {
-                  status: 'failed',
+                  status: 'failed' as const,
                   provider_reference: response.flw_ref || null,
                   failure_reason: response.status || 'Checkout failed',
                 };
