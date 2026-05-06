@@ -3,7 +3,7 @@ project_id = "hgmskcvaeadnyovbroup"
 [functions.refresh-fx-rates]
 verify_jwt = false
 
-[functions.mpesa-webhook]
+[functions.flutterwave-webhook]
 verify_jwt = false
 
 [functions.send-email]
