@@ -16,9 +16,9 @@ interface MobileMoneyModalProps {
 }
 
 const networks = [
-  { value: 'mpesa', label: 'M-Pesa', country: 'KE' },
-  { value: 'mtn_mobile', label: 'MTN Mobile Money', country: 'UG' },
-  { value: 'airtel_money', label: 'Airtel Money', country: 'TZ' },
+  { value: 'mpesa', label: 'M-Pesa (Kenya)', country: 'KE', currency: 'KES' },
+  { value: 'mtn_mobile', label: 'MTN Mobile Money (Uganda)', country: 'UG', currency: 'UGX' },
+  { value: 'airtel_money', label: 'Airtel Money (Tanzania)', country: 'TZ', currency: 'TZS' },
 ];
 
 const schema = z.object({
