@@ -43,6 +43,13 @@ const SendPage = () => {
   const [recipientPhone, setRecipientPhone] = useState("");
   const [selectedSourceId, setSelectedSourceId] = useState<string>("");
   const [lastTransferId, setLastTransferId] = useState<string | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [savePromptOpen, setSavePromptOpen] = useState(false);
+  const [pickedBeneficiaryId, setPickedBeneficiaryId] = useState<string | null>(null);
+
+  const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { data: beneficiaries } = useBeneficiaries();
 
   const { data: wallets } = useWallets();
   const { data: fxRates } = useFxRates();
