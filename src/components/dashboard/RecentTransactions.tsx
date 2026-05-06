@@ -185,13 +185,8 @@ const RecentTransactions = () => {
         </div>
       ) : (
         <div className="space-y-1">
-          {items.map((item, index) => (
-            <motion.div
-              key={item.key}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.05 }}
-            >
+          {items.map((item, index) => {
+            const inner = (
               <TransactionItem
                 type={item.type}
                 status={item.status}
@@ -202,8 +197,20 @@ const RecentTransactions = () => {
                 date={item.date}
                 description={item.description}
               />
-            </motion.div>
-          ))}
+            );
+            return (
+              <motion.div
+                key={item.key}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.05 }}
+              >
+                {item.transferId ? (
+                  <Link to={`/transfers/${item.transferId}`} className="block">{inner}</Link>
+                ) : inner}
+              </motion.div>
+            );
+          })}
         </div>
       )}
     </section>
