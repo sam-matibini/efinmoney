@@ -331,17 +331,26 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
             <div className="rounded-lg bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
               Paying <span className="text-foreground font-medium">{wallet?.symbol}{Number(amount || 0).toLocaleString()}</span> to {recipientName} ({phone})
             </div>
-            <div className="relative min-h-[420px] rounded-lg border border-border bg-background overflow-hidden flw-embed-host">
+            <div className="relative h-[460px] rounded-lg border border-border overflow-hidden flw-embed-host" style={{ backgroundColor: "#0f172a" }}>
               {isLoading && (
-                <div className="absolute inset-0 flex items-center justify-center">
+                <div className="absolute inset-0 flex items-center justify-center z-10">
                   <LoaderCircle className="h-5 w-5 animate-spin text-muted-foreground" />
                 </div>
               )}
-              <div id={EMBED_CONTAINER_ID} className="w-full" />
+              {/* Clipping window: hides Flutterwave's test-mode banner + header by shifting the iframe up */}
+              <div className="absolute inset-0 overflow-hidden">
+                <div id={EMBED_CONTAINER_ID} className="flw-embed-shift" />
+              </div>
             </div>
+            <p className="text-[10px] text-muted-foreground text-center">Secured by Flutterwave</p>
             <style>{`
-              .flw-embed-host iframe { width: 100% !important; min-height: 420px; background: transparent !important; }
-              .flw-embed-host [class*="test-mode"], .flw-embed-host [class*="TestMode"] { display: none !important; }
+              .flw-embed-host .flw-embed-shift { margin-top: -150px; height: 720px; }
+              .flw-embed-host iframe {
+                width: 100% !important;
+                height: 720px !important;
+                background: #0f172a !important;
+                border: 0 !important;
+              }
             `}</style>
           </div>
         )}
