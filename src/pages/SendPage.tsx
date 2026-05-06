@@ -489,6 +489,11 @@ const SendPage = () => {
                       <Link to={`/transfers/${lastTransferId}`}>Track your transfer</Link>
                     </Button>
                   )}
+                  {lastTransferId && (
+                    <Button variant="outline" onClick={() => downloadTransferReceipt(lastTransferId)}>
+                      Download Receipt
+                    </Button>
+                  )}
                   <Button variant="outline" onClick={resetForm}>Send Another</Button>
                 </div>
               </CardContent>
