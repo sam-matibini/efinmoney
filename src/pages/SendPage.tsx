@@ -513,6 +513,33 @@ const SendPage = () => {
         </motion.div>
       </main>
 
+      <ContactsPickerModal
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        onSelect={applyBeneficiary}
+      />
+      <AddBeneficiaryModal
+        open={savePromptOpen}
+        onOpenChange={setSavePromptOpen}
+        editing={{
+          id: "",
+          user_id: "",
+          name: recipientName,
+          phone: recipientPhone,
+          country_code: targetCountry.code,
+          payout_method: targetCountry.payout,
+          network: null,
+          bank_name: null,
+          bank_account: null,
+          currency_code: targetCountry.code,
+          nickname: null,
+          avatar_initials: null,
+          transfer_count: 0,
+          last_sent_at: null,
+          created_at: "",
+          updated_at: "",
+        } as any}
+      />
       <MobileNav />
     </div>
   );
