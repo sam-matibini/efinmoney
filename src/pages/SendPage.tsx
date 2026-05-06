@@ -35,6 +35,7 @@ const SendPage = () => {
   const [recipientName, setRecipientName] = useState("");
   const [recipientPhone, setRecipientPhone] = useState("");
   const [selectedSourceId, setSelectedSourceId] = useState<string>("");
+  const [lastTransferId, setLastTransferId] = useState<string | null>(null);
 
   const { data: wallets } = useWallets();
   const { data: fxRates } = useFxRates();
