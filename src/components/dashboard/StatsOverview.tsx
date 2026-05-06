@@ -140,34 +140,46 @@ const StatsOverview = () => {
   ];
 
   return (
-    <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
-      {stats.map((stat, index) => (
-        <motion.div
-          key={stat.label}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: index * 0.1 }}
-          className="glass rounded-2xl p-4 sm:p-5"
-        >
-          <div className="flex items-start justify-between mb-2 sm:mb-3">
-            <div className="p-1.5 sm:p-2 rounded-lg bg-primary/10">
-              <stat.icon className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
+    <TooltipProvider>
+      <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
+        {stats.map((stat, index) => (
+          <motion.div
+            key={stat.label}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: index * 0.1 }}
+            className="glass rounded-2xl p-4 sm:p-5"
+          >
+            <div className="flex items-start justify-between mb-2 sm:mb-3">
+              <div className="p-1.5 sm:p-2 rounded-lg bg-primary/10">
+                <stat.icon className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
+              </div>
+              {stat.warn && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <AlertTriangle className="w-4 h-4 text-amber-500 cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    Some wallets excluded — rate unavailable
+                  </TooltipContent>
+                </Tooltip>
+              )}
             </div>
-          </div>
-          {stat.loading ? (
-            <Skeleton className="h-7 sm:h-8 w-20 sm:w-24 mb-1" />
-          ) : (
-            <h3 className="text-lg sm:text-2xl font-display font-bold text-foreground mb-1 truncate">
-              {stat.value}
-            </h3>
-          )}
-          <p className="text-xs sm:text-sm text-muted-foreground">{stat.label}</p>
-          <p className={`text-xs mt-1 ${stat.positive ? 'text-primary' : 'text-destructive'}`}>
-            {stat.change}
-          </p>
-        </motion.div>
-      ))}
-    </section>
+            {stat.loading ? (
+              <Skeleton className="h-7 sm:h-8 w-20 sm:w-24 mb-1" />
+            ) : (
+              <h3 className="text-lg sm:text-2xl font-display font-bold text-foreground mb-1 truncate">
+                {stat.value}
+              </h3>
+            )}
+            <p className="text-xs sm:text-sm text-muted-foreground">{stat.label}</p>
+            <p className={`text-xs mt-1 ${stat.positive ? 'text-primary' : 'text-destructive'}`}>
+              {stat.change}
+            </p>
+          </motion.div>
+        ))}
+      </section>
+    </TooltipProvider>
   );
 };
 
