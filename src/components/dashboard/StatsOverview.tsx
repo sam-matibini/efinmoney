@@ -50,27 +50,34 @@ const StatsOverview = () => {
   const { data: wallets, isLoading: walletsLoading } = useWallets();
   const { data: transfers, isLoading: transfersLoading } = useTransfers(500);
   const { data: profile, isLoading: profileLoading } = useProfile();
+  const { data: fxRates, isLoading: fxLoading } = useFxRates();
 
-  // Current total balance in USD
-  const totalBalance = wallets?.reduce(
-    (sum, w) => sum + toUsd(Number(w.balance), w.currency_code),
-    0
-  ) || 0;
+  const rateMap = buildUsdRateMap(fxRates || []);
 
-  // Estimate balance 30 days ago using transfer history.
-  // current = past + net_credits - net_debits → past = current - (credits - debits)
-  // We only have outbound transfers in this hook, so approximate:
-  // past ≈ current + sum(outbound transfers in last 30d in USD)
+  // Convert each wallet to USD; track those without a rate
+  let totalBalance = 0;
+  let excludedWallets = 0;
+  for (const w of wallets || []) {
+    const usd = convertToUsd(Number(w.balance), w.currency_code, rateMap);
+    if (usd === null) {
+      if (Number(w.balance) > 0) excludedWallets++;
+    } else {
+      totalBalance += usd;
+    }
+  }
+
+  // Past balance estimate using transfer outflow (USD-converted, skip unknowns)
   let growthLabel = 'N/A';
   let growthPositive = true;
   if (transfers && transfers.length > 0 && totalBalance > 0) {
     const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
     const recent = transfers.filter(t => new Date(t.created_at).getTime() >= cutoff);
     if (recent.length > 0) {
-      const outflowUsd = recent.reduce(
-        (s, t) => s + toUsd(Number(t.source_amount), t.source_currency),
-        0
-      );
+      let outflowUsd = 0;
+      for (const t of recent) {
+        const usd = convertToUsd(Number(t.source_amount), t.source_currency, rateMap);
+        if (usd !== null) outflowUsd += usd;
+      }
       const past = totalBalance + outflowUsd;
       if (past > 0) {
         const pct = ((totalBalance - past) / past) * 100;
@@ -94,14 +101,17 @@ const StatsOverview = () => {
   const kycTier = profile?.kyc_tier || '';
   const isVerified = kycStatus === 'verified' || kycStatus === 'approved';
 
+  const formattedTotal = `≈ $${totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`;
+
   const stats = [
     {
       label: 'Total Balance',
-      value: `$${totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      value: formattedTotal,
       change: growthLabel,
       icon: growthPositive ? TrendingUp : TrendingDown,
       positive: growthPositive,
-      loading: walletsLoading || transfersLoading,
+      loading: walletsLoading || transfersLoading || fxLoading,
+      warn: excludedWallets > 0,
     },
     {
       label: 'Recipients',
