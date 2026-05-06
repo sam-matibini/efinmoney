@@ -142,7 +142,7 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved }: Props) =>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button onClick={handleSave} disabled={isPending}>
-            {isPending ? "Saving..." : editing ? "Save Changes" : "Add Contact"}
+            {isPending ? "Saving..." : editing?.id ? "Save Changes" : "Add Contact"}
           </Button>
         </DialogFooter>
       </DialogContent>
