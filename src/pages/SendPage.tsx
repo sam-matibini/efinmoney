@@ -105,6 +105,7 @@ const SendPage = () => {
         throw new Error((data as any)?.error || error?.message || 'Payout failed');
       }
 
+      setLastTransferId(transfer.id);
       setStep(3);
       toast.success('Transfer sent successfully!');
     } catch (error: any) {
