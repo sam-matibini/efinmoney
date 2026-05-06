@@ -23,6 +23,7 @@ import SecurityPage from "./pages/SecurityPage";
 import DepositComplete from "./pages/DepositComplete";
 import TransferTrackingPage from "./pages/TransferTrackingPage";
 import TransfersListPage from "./pages/TransfersListPage";
+import ContactsPage from "./pages/ContactsPage";
 
 const queryClient = new QueryClient();
 
@@ -215,6 +216,14 @@ const AppRoutes = () => (
       element={
         <ProtectedRoute>
           <TransferTrackingPage />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/contacts"
+      element={
+        <ProtectedRoute>
+          <ContactsPage />
         </ProtectedRoute>
       }
     />

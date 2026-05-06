@@ -217,6 +217,63 @@ export type Database = {
           },
         ]
       }
+      beneficiaries: {
+        Row: {
+          avatar_initials: string | null
+          bank_account: string | null
+          bank_name: string | null
+          country_code: string | null
+          created_at: string
+          currency_code: string | null
+          id: string
+          last_sent_at: string | null
+          name: string
+          network: string | null
+          nickname: string | null
+          payout_method: string | null
+          phone: string | null
+          transfer_count: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_initials?: string | null
+          bank_account?: string | null
+          bank_name?: string | null
+          country_code?: string | null
+          created_at?: string
+          currency_code?: string | null
+          id?: string
+          last_sent_at?: string | null
+          name: string
+          network?: string | null
+          nickname?: string | null
+          payout_method?: string | null
+          phone?: string | null
+          transfer_count?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_initials?: string | null
+          bank_account?: string | null
+          bank_name?: string | null
+          country_code?: string | null
+          created_at?: string
+          currency_code?: string | null
+          id?: string
+          last_sent_at?: string | null
+          name?: string
+          network?: string | null
+          nickname?: string | null
+          payout_method?: string | null
+          phone?: string | null
+          transfer_count?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       cards: {
         Row: {
           card_network: string

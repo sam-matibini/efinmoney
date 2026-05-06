@@ -24,6 +24,7 @@ const Header = () => {
   const navItems = [
     { label: 'Dashboard', href: '/' },
     { label: 'Send', href: '/send' },
+    { label: 'Contacts', href: '/contacts' },
     { label: 'Exchange', href: '/exchange' },
     { label: 'Wallets', href: '/wallets' },
     { label: 'Cards', href: '/cards' },

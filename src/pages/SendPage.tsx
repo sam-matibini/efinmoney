@@ -1,5 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
+import { useSearchParams } from "react-router-dom";
+import ContactsPickerModal from "@/components/modals/ContactsPickerModal";
+import AddBeneficiaryModal from "@/components/modals/AddBeneficiaryModal";
+import { useBeneficiaries, recordTransferRecipient, type Beneficiary } from "@/hooks/useBeneficiaries";
+import { useAuth } from "@/hooks/useAuth";
+
 import Header from "@/components/layout/Header";
 import MobileNav from "@/components/layout/MobileNav";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,6 +43,13 @@ const SendPage = () => {
   const [recipientPhone, setRecipientPhone] = useState("");
   const [selectedSourceId, setSelectedSourceId] = useState<string>("");
   const [lastTransferId, setLastTransferId] = useState<string | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [savePromptOpen, setSavePromptOpen] = useState(false);
+  const [pickedBeneficiaryId, setPickedBeneficiaryId] = useState<string | null>(null);
+
+  const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { data: beneficiaries } = useBeneficiaries();
 
   const { data: wallets } = useWallets();
   const { data: fxRates } = useFxRates();
@@ -107,6 +120,24 @@ const SendPage = () => {
       }
 
       setLastTransferId(transfer.id);
+
+      // Update beneficiary record (or prompt to save new one)
+      if (user) {
+        try {
+          const { isNew } = await recordTransferRecipient({
+            user_id: user.id,
+            name: recipientName,
+            phone: recipientPhone,
+            country_code: targetCountry.code,
+            payout_method: targetCountry.payout,
+            currency_code: targetCountry.code,
+          });
+          if (isNew && !pickedBeneficiaryId) {
+            setSavePromptOpen(true);
+          }
+        } catch { /* non-fatal */ }
+      }
+
       setStep(3);
       toast.success('Transfer sent successfully!');
     } catch (error: any) {
@@ -114,12 +145,35 @@ const SendPage = () => {
     }
   };
 
+  const applyBeneficiary = (b: Beneficiary) => {
+    setRecipientName(b.name);
+    if (b.phone) setRecipientPhone(b.phone);
+    if (b.country_code) setTargetCountryCode(b.country_code);
+    setPickedBeneficiaryId(b.id);
+  };
+
+  // Prefill from ?beneficiaryId= and jump to step 2
+  useEffect(() => {
+    const bid = searchParams.get("beneficiaryId");
+    if (bid && beneficiaries) {
+      const b = beneficiaries.find((x) => x.id === bid);
+      if (b) {
+        applyBeneficiary(b);
+        setStep(2);
+        searchParams.delete("beneficiaryId");
+        setSearchParams(searchParams, { replace: true });
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [beneficiaries]);
+
   const resetForm = () => {
     setStep(1);
     setAmount("");
     setRecipientName("");
     setRecipientPhone("");
     setFundingSource('wallet');
+    setPickedBeneficiaryId(null);
   };
 
   const isStep1Valid = parsedAmount > 0 && rateAvailable && !noLinkedSource && !insufficientFunds && (
@@ -375,6 +429,14 @@ const SendPage = () => {
                 <CardTitle>Recipient Details</CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full gap-2"
+                  onClick={() => setPickerOpen(true)}
+                >
+                  <Users className="w-4 h-4" /> Choose from contacts
+                </Button>
                 <div className="space-y-2">
                   <Label>Recipient Name</Label>
                   <Input
@@ -451,6 +513,33 @@ const SendPage = () => {
         </motion.div>
       </main>
 
+      <ContactsPickerModal
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        onSelect={applyBeneficiary}
+      />
+      <AddBeneficiaryModal
+        open={savePromptOpen}
+        onOpenChange={setSavePromptOpen}
+        editing={{
+          id: "",
+          user_id: "",
+          name: recipientName,
+          phone: recipientPhone,
+          country_code: targetCountry.code,
+          payout_method: targetCountry.payout,
+          network: null,
+          bank_name: null,
+          bank_account: null,
+          currency_code: targetCountry.code,
+          nickname: null,
+          avatar_initials: null,
+          transfer_count: 0,
+          last_sent_at: null,
+          created_at: "",
+          updated_at: "",
+        } as any}
+      />
       <MobileNav />
     </div>
   );
