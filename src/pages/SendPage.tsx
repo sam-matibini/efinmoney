@@ -416,7 +416,7 @@ const SendPage = () => {
                 </motion.div>
                 <h3 className="text-2xl font-display font-bold mb-2">Transfer Sent!</h3>
                 <p className="text-muted-foreground mb-6">
-                  {selectedWallet?.symbol}{amount} is on its way to {recipientName}
+                  {sourceSymbol}{parsedAmount.toFixed(2)} is on its way to {recipientName}
                 </p>
                 <Button onClick={resetForm}>Send Another</Button>
               </CardContent>
