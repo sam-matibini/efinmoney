@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { CheckCircle2, Loader2, Circle, Share2, ArrowLeft, AlertCircle } from "lucide-react";
+import { CheckCircle2, Loader2, Circle, Share2, ArrowLeft, AlertCircle, Download } from "lucide-react";
+import { downloadTransferReceipt } from "@/lib/receipt";
 import Header from "@/components/layout/Header";
 import MobileNav from "@/components/layout/MobileNav";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -173,9 +174,14 @@ const TransferTrackingPage = () => {
                     {statusMeta(transfer.status).label}
                   </Badge>
                 </div>
-                <Button variant="outline" size="sm" onClick={handleShare} className="gap-2">
-                  <Share2 className="w-4 h-4" /> Share
-                </Button>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={() => downloadTransferReceipt(transfer.id)} className="gap-2">
+                    <Download className="w-4 h-4" /> Receipt
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={handleShare} className="gap-2">
+                    <Share2 className="w-4 h-4" /> Share
+                  </Button>
+                </div>
               </CardHeader>
             </Card>
 

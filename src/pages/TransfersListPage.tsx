@@ -9,7 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTransfers } from "@/hooks/useTransfers";
-import { ChevronRight, Inbox, Search } from "lucide-react";
+import { ChevronRight, Inbox, Search, Download } from "lucide-react";
+import { downloadTransferReceipt } from "@/lib/receipt";
 import { format } from "date-fns";
 
 const refOf = (id: string) => `EFM-${id.replace(/-/g, "").slice(0, 8).toUpperCase()}`;
@@ -102,6 +103,14 @@ const TransfersListPage = () => {
                           </p>
                           <Badge variant="outline" className={`text-[10px] ${statusBadge(t.status)}`}>{t.status}</Badge>
                         </div>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); downloadTransferReceipt(t.id); }}
+                          className="p-2 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground"
+                          title="Download receipt"
+                        >
+                          <Download className="w-4 h-4" />
+                        </button>
                         <ChevronRight className="w-4 h-4 text-muted-foreground" />
                       </div>
                     </Link>

@@ -4,6 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import ContactsPickerModal from "@/components/modals/ContactsPickerModal";
 import AddBeneficiaryModal from "@/components/modals/AddBeneficiaryModal";
 import { useBeneficiaries, recordTransferRecipient, type Beneficiary } from "@/hooks/useBeneficiaries";
+import { downloadTransferReceipt } from "@/lib/receipt";
 import { useAuth } from "@/hooks/useAuth";
 
 import Header from "@/components/layout/Header";
@@ -487,6 +488,11 @@ const SendPage = () => {
                   {lastTransferId && (
                     <Button asChild>
                       <Link to={`/transfers/${lastTransferId}`}>Track your transfer</Link>
+                    </Button>
+                  )}
+                  {lastTransferId && (
+                    <Button variant="outline" onClick={() => downloadTransferReceipt(lastTransferId)}>
+                      Download Receipt
                     </Button>
                   )}
                   <Button variant="outline" onClick={resetForm}>Send Another</Button>
