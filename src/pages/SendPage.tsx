@@ -14,14 +14,14 @@ import { useFundingSources } from "@/hooks/useFundingSources";
 import { usePricingConfig } from "@/hooks/usePricingConfig";
 import { toast } from "sonner";
 import { ArrowRight, CheckCircle, Users, Clock, Shield, Wallet, Landmark, CreditCard, AlertCircle } from "lucide-react";
-import CardPaymentModal from "@/components/modals/CardPaymentModal";
+import CardPaymentForm from "@/components/modals/CardPaymentForm";
 
 const targetCountries = [
-  { code: 'KES', country: 'Kenya', flag: '🇰🇪', method: 'M-Pesa', payout: 'mpesa' },
-  { code: 'UGX', country: 'Uganda', flag: '🇺🇬', method: 'Mobile Money', payout: 'airtel_money' },
-  { code: 'TZS', country: 'Tanzania', flag: '🇹🇿', method: 'M-Pesa', payout: 'mpesa' },
-  { code: 'ZMW', country: 'Zambia', flag: '🇿🇲', method: 'MTN Mobile', payout: 'mtn_mobile' },
-  { code: 'BIF', country: 'Burundi', flag: '🇧🇮', method: 'Lumicash', payout: 'lumicash' },
+  { code: 'KES', country: 'Kenya', flag: '🇰🇪', method: 'M-Pesa', payout: 'mpesa', symbol: 'KSh' },
+  { code: 'UGX', country: 'Uganda', flag: '🇺🇬', method: 'Mobile Money', payout: 'airtel_money', symbol: 'USh' },
+  { code: 'TZS', country: 'Tanzania', flag: '🇹🇿', method: 'M-Pesa', payout: 'mpesa', symbol: 'TSh' },
+  { code: 'ZMW', country: 'Zambia', flag: '🇿🇲', method: 'MTN Mobile', payout: 'mtn_mobile', symbol: 'ZK' },
+  { code: 'BIF', country: 'Burundi', flag: '🇧🇮', method: 'Lumicash', payout: 'lumicash', symbol: 'FBu' },
 ];
 
 type FundingSource = 'wallet' | 'bank' | 'card';
