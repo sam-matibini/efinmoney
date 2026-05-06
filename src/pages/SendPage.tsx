@@ -120,6 +120,24 @@ const SendPage = () => {
       }
 
       setLastTransferId(transfer.id);
+
+      // Update beneficiary record (or prompt to save new one)
+      if (user) {
+        try {
+          const { isNew } = await recordTransferRecipient({
+            user_id: user.id,
+            name: recipientName,
+            phone: recipientPhone,
+            country_code: targetCountry.code,
+            payout_method: targetCountry.payout,
+            currency_code: targetCountry.code,
+          });
+          if (isNew && !pickedBeneficiaryId) {
+            setSavePromptOpen(true);
+          }
+        } catch { /* non-fatal */ }
+      }
+
       setStep(3);
       toast.success('Transfer sent successfully!');
     } catch (error: any) {
