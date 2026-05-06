@@ -85,13 +85,13 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
   }, [amount, flutterwavePublicKey, network, phone, recipientName, user, wallet]);
 
   const handleFlutterPayment = useFlutterwave(checkoutConfig || {
-    public_key: '',
+    public_key: 'disabled',
     tx_ref: 'disabled',
     amount: 0,
     currency: 'USD',
     payment_options: 'mobilemoney',
-    customer: { email: '', phone_number: '', name: '' },
-    customizations: { title: 'eFinMoney Mobile Money', description: '', logo: '' },
+    customer: { email: 'disabled@efin.money', phone_number: '0000000000', name: 'Disabled' },
+    customizations: { title: 'eFinMoney Mobile Money', description: 'Disabled', logo: `${window.location.origin}/favicon.ico` },
   });
 
   const handleSubmit = async () => {
