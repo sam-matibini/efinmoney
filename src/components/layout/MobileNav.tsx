@@ -1,11 +1,11 @@
 import { motion } from "framer-motion";
-import { Home, Wallet, Send, RefreshCw, CreditCard } from "lucide-react";
+import { Home, Wallet, Send, Users, CreditCard } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 
 const navItems = [
   { icon: Home, label: 'Home', href: '/' },
   { icon: Send, label: 'Send', href: '/send' },
-  { icon: RefreshCw, label: 'Exchange', href: '/exchange' },
+  { icon: Users, label: 'Contacts', href: '/contacts' },
   { icon: Wallet, label: 'Wallets', href: '/wallets' },
   { icon: CreditCard, label: 'Cards', href: '/cards' },
 ];
