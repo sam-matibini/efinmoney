@@ -13,6 +13,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { closePaymentModal, useFlutterwave } from "flutterwave-react-v3";
 
+const getErrorMessage = (error: unknown, fallback: string) => {
+  if (error instanceof Error && error.message) return error.message;
+  if (typeof error === 'object' && error !== null) {
+    const candidate = error as { error_description?: string; details?: string; hint?: string; message?: string };
+    return candidate.message || candidate.error_description || candidate.details || candidate.hint || fallback;
+  }
+  return fallback;
+};
+
 interface MobileMoneyModalProps {
   children: React.ReactNode;
 }
@@ -194,9 +203,9 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
               setAmount('');
               setWalletId('');
             }
-          } catch (callbackError: any) {
+          } catch (callbackError: unknown) {
             console.error('Flutterwave callback error:', callbackError);
-            toast.error(callbackError?.message || 'Unable to update transfer status');
+            toast.error(getErrorMessage(callbackError, 'Unable to update transfer status'));
           } finally {
             setIsLaunchingCheckout(false);
           }
@@ -236,9 +245,9 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
           }
         },
       });
-    } catch (e: any) {
+    } catch (e: unknown) {
       setIsLaunchingCheckout(false);
-      const msg = e?.message || e?.error_description || e?.details || e?.hint || 'Failed to create transfer';
+      const msg = getErrorMessage(e, 'Failed to create transfer');
       console.error('Mobile money transfer error:', e);
       toast.error(msg);
     }
