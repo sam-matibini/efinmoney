@@ -75,10 +75,11 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved }: Props) =>
     };
 
     try {
-      const saved = editing
-        ? await update.mutateAsync({ id: editing.id, ...payload })
+      const isEdit = !!editing?.id;
+      const saved = isEdit
+        ? await update.mutateAsync({ id: editing!.id, ...payload })
         : await create.mutateAsync(payload);
-      toast.success(editing ? "Contact updated" : "Contact saved");
+      toast.success(isEdit ? "Contact updated" : "Contact saved");
       onSaved?.(saved);
       onOpenChange(false);
     } catch (e: any) {
