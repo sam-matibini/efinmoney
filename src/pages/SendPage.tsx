@@ -234,34 +234,48 @@ const SendPage = () => {
                         <p className="text-xs text-muted-foreground">Transfers from bank may take 1-2 business days</p>
                       </>
                     ) : (
-                      <div className="flex items-start gap-2 p-3 rounded-lg border border-dashed border-border bg-muted/40">
-                        <AlertCircle className="w-4 h-4 mt-0.5 text-muted-foreground shrink-0" />
-                        <p className="text-sm text-muted-foreground">No bank accounts linked yet. Link a bank in Settings to fund transfers from your bank.</p>
+                      <div className="space-y-2 p-3 rounded-lg border border-dashed border-border bg-muted/40">
+                        <div className="flex items-start gap-2">
+                          <AlertCircle className="w-4 h-4 mt-0.5 text-muted-foreground shrink-0" />
+                          <p className="text-sm text-muted-foreground">
+                            No bank accounts linked. You can fund this transfer using your wallet or card instead.
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          className="w-full"
+                          onClick={() => setFundingSource('wallet')}
+                        >
+                          <Wallet className="w-4 h-4 mr-2" />
+                          Use Wallet Instead
+                        </Button>
                       </div>
                     )}
                   </div>
                 )}
 
-                {/* Credit Card Selection */}
+                {/* Credit Card Inline Form */}
                 {fundingSource === 'card' && (
                   <div className="space-y-2">
                     <Label>Pay with Card</Label>
-                    <div className="p-3 rounded-lg border border-border bg-muted/40 space-y-2">
-                      <p className="text-sm text-foreground">
-                        Securely charge your card. Funds will be added to your {wallets?.[0]?.currency_code || 'wallet'} wallet, then sent.
+                    <div className="p-3 rounded-lg border border-border bg-muted/40 space-y-3">
+                      <p className="text-xs text-muted-foreground">
+                        Securely charge your card. Funds are added to your {wallets?.[0]?.currency_code || 'wallet'} wallet, then the transfer continues.
                       </p>
-                      <CardPaymentModal
-                        title="Fund Transfer with Card"
+                      <CardPaymentForm
                         defaultWalletId={wallets?.[0]?.wallet_id}
-                        defaultAmount={parseFloat(amount) || undefined}
-                      >
-                        <Button type="button" variant="secondary" className="w-full" disabled={!(parseFloat(amount) > 0)}>
-                          <CreditCard className="w-4 h-4 mr-2" />
-                          {parseFloat(amount) > 0 ? `Pay ${sourceSymbol}${parseFloat(amount).toFixed(2)} with Card` : 'Enter an amount first'}
-                        </Button>
-                      </CardPaymentModal>
+                        defaultAmount={parsedAmount > 0 ? parsedAmount : undefined}
+                        ctaLabel={parsedAmount > 0 ? `Pay ${sourceSymbol}${parsedAmount.toFixed(2)} & Continue` : 'Enter an amount above'}
+                        onSuccess={() => {
+                          toast.success('Card charged. Continue to recipient details.');
+                          setFundingSource('wallet');
+                          setStep(2);
+                        }}
+                      />
                       {cardFee > 0 && (
-                        <p className="text-xs text-muted-foreground">+${cardFee.toFixed(2)} card processing fee applies</p>
+                        <p className="text-xs text-muted-foreground">+{sourceSymbol}{cardFee.toFixed(2)} card processing fee applies</p>
                       )}
                     </div>
                   </div>
@@ -275,16 +289,29 @@ const SendPage = () => {
                     </span>
                     <Input
                       type="number"
+                      min="0"
+                      step="0.01"
                       placeholder="0.00"
                       value={amount}
-                      onChange={(e) => setAmount(e.target.value)}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        // Block negative values
+                        if (v === '' || parseFloat(v) >= 0) setAmount(v);
+                      }}
                       className="pl-10 text-2xl h-14"
                     />
                   </div>
-                  {fundingSource === 'wallet' && (
-                    <p className="text-sm text-muted-foreground">
-                      Available: {selectedWallet?.symbol}{Number(selectedWallet?.balance || 0).toFixed(2)}
-                    </p>
+                  {fundingSource === 'wallet' && selectedWallet && (
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm text-muted-foreground">
+                        Available: {selectedWallet.symbol}{Number(selectedWallet.balance).toFixed(2)}
+                      </p>
+                      {insufficientFunds && (
+                        <p className="text-sm font-medium text-destructive flex items-center gap-1">
+                          <AlertCircle className="w-3.5 h-3.5" /> Insufficient balance
+                        </p>
+                      )}
+                    </div>
                   )}
                 </div>
 
@@ -303,7 +330,7 @@ const SendPage = () => {
                     <SelectContent>
                       {targetCountries.map((c) => (
                         <SelectItem key={c.code} value={c.code}>
-                          {c.flag} {c.country} ({c.method})
+                          {c.flag} {c.country} · {c.method}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -314,7 +341,7 @@ const SendPage = () => {
                   <p className="text-sm text-muted-foreground mb-1">They receive</p>
                   <p className="text-3xl font-display font-bold text-foreground">
                     {rateAvailable
-                      ? `${receivedAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${targetCountry.code}`
+                      ? `${targetSymbol} ${receivedAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                       : 'Rate unavailable'}
                   </p>
                   {rateAvailable ? (
@@ -329,9 +356,11 @@ const SendPage = () => {
                   )}
                 </div>
 
-                <Button className="w-full" size="lg" onClick={() => setStep(2)} disabled={!isStep1Valid}>
-                  Continue
-                </Button>
+                {fundingSource !== 'card' && (
+                  <Button className="w-full" size="lg" onClick={() => setStep(2)} disabled={!isStep1Valid}>
+                    Continue
+                  </Button>
+                )}
               </CardContent>
             </Card>
           )}
