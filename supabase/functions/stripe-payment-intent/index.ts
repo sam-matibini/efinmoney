@@ -49,6 +49,9 @@ Deno.serve(async (req) => {
       if (!amount || amount <= 0 || !currency || !walletId) {
         return json({ error: "Invalid input" }, 400);
       }
+      if (amount > 999999.99) {
+        return json({ error: "Amount must be no more than $999,999.99 per transaction" }, 400);
+      }
 
       // Verify wallet ownership
       const { data: wallet } = await admin
