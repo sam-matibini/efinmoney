@@ -88,7 +88,7 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
           transfer_id: transfer.id,
           phone_number: phone.trim(),
           amount: result.data.amount,
-          currency: wallet.currency_code,
+          currency: net.currency,
           network: networkMap[network] || 'mpesa',
           recipient_name: recipientName.trim(),
         },
