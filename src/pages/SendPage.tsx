@@ -50,9 +50,12 @@ const SendPage = () => {
   const selectedExternalSource = activeSources.find(s => s.id === selectedSourceId) || activeSources[0];
 
   const sourceCurrency = fundingSource === 'wallet'
-    ? (selectedWallet?.currency_code || 'CAD')
-    : (selectedExternalSource?.currency_code || 'CAD');
-  const sourceSymbol = fundingSource === 'wallet' ? (selectedWallet?.symbol || 'C$') : '$';
+    ? (selectedWallet?.currency_code || 'USD')
+    : (selectedExternalSource?.currency_code || 'USD');
+  const sourceSymbol = fundingSource === 'wallet'
+    ? (selectedWallet?.symbol || '$')
+    : (selectedExternalSource?.currency_code === 'CAD' ? 'C$' : '$');
+  const targetSymbol = targetCountry.symbol || targetCountry.code;
 
   const fxRate = fxRates?.find(
     r => r.from_currency === sourceCurrency && r.to_currency === targetCountry.code
@@ -60,14 +63,19 @@ const SendPage = () => {
   const effectiveRate = fxRate ? Number(fxRate.effective_rate) : 0;
   const rateAvailable = !!fxRate;
 
+  const parsedAmount = Math.max(0, parseFloat(amount) || 0);
   const baseFee = pricing?.transfer_base_fee ?? 0;
   const cardFee = fundingSource === 'card' ? (pricing?.transfer_card_surcharge ?? 0) : 0;
-  const fee = parseFloat(amount) > 0 ? baseFee + cardFee : 0;
-  const receivedAmount = parseFloat(amount) > 0 && rateAvailable
-    ? (parseFloat(amount) - fee) * effectiveRate
+  const fee = parsedAmount > 0 ? baseFee + cardFee : 0;
+  const receivedAmount = parsedAmount > 0 && rateAvailable
+    ? Math.max(0, (parsedAmount - fee) * effectiveRate)
     : 0;
 
   const noLinkedSource = fundingSource === 'bank' && activeSources.length === 0;
+  const insufficientFunds = fundingSource === 'wallet'
+    && !!selectedWallet
+    && parsedAmount > 0
+    && parsedAmount > Number(selectedWallet.balance);
 
   const handleSubmit = async () => {
     if (fundingSource === 'wallet' && !selectedWallet) return;
@@ -82,13 +90,12 @@ const SendPage = () => {
         payout_method: targetCountry.payout,
         source_currency: sourceCurrency,
         target_currency: targetCountry.code,
-        source_amount: parseFloat(amount),
+        source_amount: parsedAmount,
         target_amount: receivedAmount,
         exchange_rate: effectiveRate,
         fee_amount: fee,
       });
 
-      // Post ledger entries and trigger payout
       const { supabase } = await import('@/integrations/supabase/client');
       const { data, error } = await supabase.functions.invoke('execute-transfer', {
         body: { transfer_id: transfer.id },
@@ -112,9 +119,8 @@ const SendPage = () => {
     setFundingSource('wallet');
   };
 
-  const isStep1Valid = parseFloat(amount) > 0 && rateAvailable && !noLinkedSource && (
-    fundingSource !== 'wallet' ||
-    (selectedWallet && parseFloat(amount) <= Number(selectedWallet.balance))
+  const isStep1Valid = parsedAmount > 0 && rateAvailable && !noLinkedSource && !insufficientFunds && (
+    fundingSource !== 'card' // card funds before continue (handled in card flow)
   );
   const isStep2Valid = recipientName.length > 2 && recipientPhone.length > 8;
 
