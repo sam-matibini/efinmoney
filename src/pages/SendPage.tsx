@@ -4,6 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import ContactsPickerModal from "@/components/modals/ContactsPickerModal";
 import AddBeneficiaryModal from "@/components/modals/AddBeneficiaryModal";
 import { useBeneficiaries, recordTransferRecipient, type Beneficiary } from "@/hooks/useBeneficiaries";
+import { downloadTransferReceipt } from "@/lib/receipt";
 import { useAuth } from "@/hooks/useAuth";
 
 import Header from "@/components/layout/Header";
