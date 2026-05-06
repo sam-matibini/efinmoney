@@ -160,10 +160,10 @@ const RecentTransactions = () => {
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-display font-semibold text-foreground">Recent Transactions</h2>
         {hasItems && (
-          <button className="flex items-center gap-1 text-sm text-primary hover:text-primary/80 transition-colors">
+          <Link to="/transfers" className="flex items-center gap-1 text-sm text-primary hover:text-primary/80 transition-colors">
             View All
             <ChevronRight className="w-4 h-4" />
-          </button>
+          </Link>
         )}
       </div>
 
