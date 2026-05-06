@@ -26,7 +26,7 @@ const WalletCarousel = () => {
     ? wallets.map((w, index) => ({
         currency: w.currency_code,
         balance: Number(w.balance),
-        symbol: w.symbol,
+        symbol: w.symbol || `${w.currency_code} `,
         flag: w.flag_emoji || '💰',
         change: 0,
         isMain: index === 0,
