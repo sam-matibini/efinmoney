@@ -111,6 +111,7 @@ const RecentTransactions = () => {
 
   const transferItems: Item[] = (transfers ?? []).map((t) => ({
     key: `t-${t.id}`,
+    transferId: t.id,
     type: "send",
     status: (t.status === "completed" ? "completed" : t.status === "failed" ? "failed" : "pending"),
     amount: Number(t.source_amount),
