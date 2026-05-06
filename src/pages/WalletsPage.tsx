@@ -1,14 +1,16 @@
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Header from "@/components/layout/Header";
 import MobileNav from "@/components/layout/MobileNav";
 import WalletCard from "@/components/ui/WalletCard";
 import { useWallets } from "@/hooks/useWallets";
 import { useWalletManagement } from "@/hooks/useWalletManagement";
+import { useFxRates } from "@/hooks/useFxRates";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Plus, Wallet, TrendingUp } from "lucide-react";
+import { Plus, Wallet, TrendingUp, AlertTriangle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import CreateWalletModal from "@/components/modals/CreateWalletModal";
 import EditWalletModal from "@/components/modals/EditWalletModal";
 import DeleteWalletModal from "@/components/modals/DeleteWalletModal";
@@ -23,17 +25,42 @@ type WalletModalData = {
 
 const WalletsPage = () => {
   const { data: wallets, isLoading } = useWallets();
+  const { data: fxRates } = useFxRates();
   const [editWallet, setEditWallet] = useState<WalletModalData>(null);
   const [deleteWallet, setDeleteWallet] = useState<WalletModalData>(null);
   const { setDefault, toggleFreeze, updateWallet, deleteWallet: deleteWalletFn } = useWalletManagement();
 
-  const totalBalance = wallets?.reduce((sum, w) => {
-    // Convert to USD equivalent (simplified)
-    const rate = w.currency_code === 'CAD' ? 0.74 : 1;
-    return sum + Number(w.balance) * rate;
-  }, 0) || 0;
+  const usdRateMap = useMemo(() => {
+    const map = new Map<string, number>();
+    map.set("USD", 1);
+    for (const r of fxRates ?? []) {
+      if (r.to_currency === "USD" && !map.has(r.from_currency)) {
+        map.set(r.from_currency, Number(r.effective_rate));
+      }
+    }
+    for (const r of fxRates ?? []) {
+      if (r.from_currency === "USD" && !map.has(r.to_currency)) {
+        const v = Number(r.effective_rate);
+        if (v > 0) map.set(r.to_currency, 1 / v);
+      }
+    }
+    return map;
+  }, [fxRates]);
 
-  // Sort wallets: default first, then by balance
+  const { totalUsd, excludedCount } = useMemo(() => {
+    let total = 0;
+    let excluded = 0;
+    for (const w of wallets ?? []) {
+      const rate = usdRateMap.get(w.currency_code);
+      if (rate == null) {
+        excluded += 1;
+        continue;
+      }
+      total += Number(w.balance) * rate;
+    }
+    return { totalUsd: total, excludedCount: excluded };
+  }, [wallets, usdRateMap]);
+
   const sortedWallets = wallets?.slice().sort((a, b) => {
     if (a.is_default && !b.is_default) return -1;
     if (!a.is_default && b.is_default) return 1;
@@ -69,9 +96,21 @@ const WalletsPage = () => {
               <div className="flex items-center gap-3 mb-2">
                 <Wallet className="w-6 h-6" />
                 <span className="text-primary-foreground/70">Total Balance (USD Equivalent)</span>
+                {excludedCount > 0 && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <AlertTriangle className="w-4 h-4 text-yellow-300" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        {excludedCount} wallet{excludedCount === 1 ? "" : "s"} excluded — exchange rate unavailable
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
               </div>
               <p className="text-4xl font-display font-bold">
-                ${totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                ≈ ${totalUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
               </p>
               <div className="flex items-center gap-2 mt-2 text-primary-foreground/70">
                 <TrendingUp className="w-4 h-4" />
