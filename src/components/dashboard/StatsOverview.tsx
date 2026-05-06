@@ -1,17 +1,38 @@
 import { motion } from "framer-motion";
-import { TrendingUp, TrendingDown, Users, Globe, Shield } from "lucide-react";
+import { TrendingUp, TrendingDown, Users, Globe, Shield, AlertTriangle } from "lucide-react";
 import { useWallets } from "@/hooks/useWallets";
 import { useTransfers } from "@/hooks/useTransfers";
 import { useProfile } from "@/hooks/useProfile";
+import { useFxRates } from "@/hooks/useFxRates";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
-// Approximate USD conversion for headline display only
-const toUsd = (amount: number, currency: string) => {
-  if (currency === 'USD') return amount;
-  if (currency === 'CAD') return amount * 0.74;
-  if (currency === 'EUR') return amount * 1.08;
-  if (currency === 'GBP') return amount * 1.27;
-  return amount * 0.01;
+// Build a lookup of latest from→USD rates
+const buildUsdRateMap = (rates: { from_currency: string; to_currency: string; effective_rate: number }[]) => {
+  const map = new Map<string, number>();
+  map.set('USD', 1);
+  for (const r of rates) {
+    if (r.to_currency === 'USD' && !map.has(r.from_currency)) {
+      map.set(r.from_currency, Number(r.effective_rate));
+    }
+  }
+  // Derive inverse rates if only USD->X exists
+  for (const r of rates) {
+    if (r.from_currency === 'USD' && !map.has(r.to_currency) && Number(r.effective_rate) > 0) {
+      map.set(r.to_currency, 1 / Number(r.effective_rate));
+    }
+  }
+  return map;
+};
+
+const convertToUsd = (
+  amount: number,
+  currency: string,
+  rateMap: Map<string, number>
+): number | null => {
+  const r = rateMap.get(currency);
+  if (r === undefined) return null;
+  return amount * r;
 };
 
 const formatKycTier = (tier: string) => {
