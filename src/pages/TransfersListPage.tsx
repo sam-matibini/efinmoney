@@ -103,6 +103,14 @@ const TransfersListPage = () => {
                           </p>
                           <Badge variant="outline" className={`text-[10px] ${statusBadge(t.status)}`}>{t.status}</Badge>
                         </div>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); downloadTransferReceipt(t.id); }}
+                          className="p-2 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground"
+                          title="Download receipt"
+                        >
+                          <Download className="w-4 h-4" />
+                        </button>
                         <ChevronRight className="w-4 h-4 text-muted-foreground" />
                       </div>
                     </Link>
