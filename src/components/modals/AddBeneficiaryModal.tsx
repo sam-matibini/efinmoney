@@ -93,7 +93,7 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved }: Props) =>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>{editing ? "Edit Contact" : "Add Contact"}</DialogTitle>
+          <DialogTitle>{editing?.id ? "Edit Contact" : "Add Contact"}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-2">
