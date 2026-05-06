@@ -79,26 +79,27 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
         fee_amount: 0,
       });
 
-      // For Kenyan M-Pesa, trigger the live payout edge function
-      if (network === 'mpesa' && net.country === 'KE') {
-        const { data, error } = await supabase.functions.invoke('mpesa-payout', {
-          body: {
-            transfer_id: transfer.id,
-            phone_number: phone.trim(),
-            amount_kes: result.data.amount,
-            reference: recipientName.trim(),
-          },
-        });
-        if (error) throw error;
-        if (data?.stub) {
-          toast.success('Transfer queued (M-Pesa credentials pending)');
-        } else if (data?.success) {
-          toast.success('M-Pesa payout initiated');
-        } else {
-          throw new Error(data?.error || 'M-Pesa payout failed');
-        }
+      // Trigger Flutterwave payout for all networks
+      const networkMap: Record<string, string> = {
+        mpesa: 'mpesa', mtn_mobile: 'mtn', airtel_money: 'airtel',
+      };
+      const { data, error } = await supabase.functions.invoke('flutterwave-payout', {
+        body: {
+          transfer_id: transfer.id,
+          phone_number: phone.trim(),
+          amount: result.data.amount,
+          currency: wallet.currency_code,
+          network: networkMap[network] || 'mpesa',
+          recipient_name: recipientName.trim(),
+        },
+      });
+      if (error) throw error;
+      if (data?.stub) {
+        toast.success('Transfer queued (Flutterwave credentials pending)');
+      } else if (data?.success) {
+        toast.success('Mobile money payout initiated');
       } else {
-        toast.success('Mobile money transfer initiated');
+        throw new Error(data?.error || 'Payout failed');
       }
 
       setOpen(false);

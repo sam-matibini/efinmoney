@@ -160,37 +160,41 @@ Deno.serve(async (req) => {
     // Mark funded
     await supabase.from("transfers").update({ status: "funded" }).eq("id", transfer_id);
 
-    // Trigger payout. For Kenya KES via M-Pesa we call the real function;
-    // others run in stub mode (mark processing → completed shortly).
+    // Trigger payout via Flutterwave for all African corridors
     let payoutResult: any = { stub: true };
     try {
-      if (transfer.target_currency === "KES" && transfer.payout_method === "mpesa") {
-        const res = await fetch(
-          `${Deno.env.get("SUPABASE_URL")}/functions/v1/mpesa-payout`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: authHeader,
-            },
-            body: JSON.stringify({
-              transfer_id,
-              phone_number: transfer.recipient_phone,
-              amount_kes: Number(transfer.target_amount),
-              reference: transfer_id.slice(0, 8),
-            }),
+      // Map our payout_method to Flutterwave network identifier
+      const networkMap: Record<string, string> = {
+        mpesa: "mpesa",
+        mtn_mobile: "mtn",
+        mtn: "mtn",
+        airtel_money: "airtel",
+        airtel: "airtel",
+        vodafone: "vodafone",
+        tigo: "tigo",
+        lumicash: "mtn",
+      };
+      const network = networkMap[transfer.payout_method] || "mpesa";
+
+      const res = await fetch(
+        `${Deno.env.get("SUPABASE_URL")}/functions/v1/flutterwave-payout`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: authHeader,
           },
-        );
-        payoutResult = await res.json();
-      } else {
-        // Stub payout for other corridors — mark processing then completed
-        await supabase.from("transfers").update({
-          status: "completed",
-          provider_reference: `STUB-${transfer_id.slice(0, 8)}`,
-          completed_at: new Date().toISOString(),
-        }).eq("id", transfer_id);
-        payoutResult = { stub: true, message: `${transfer.target_currency} payout simulated (live API not configured).` };
-      }
+          body: JSON.stringify({
+            transfer_id,
+            phone_number: transfer.recipient_phone,
+            amount: Number(transfer.target_amount),
+            currency: transfer.target_currency,
+            network,
+            recipient_name: transfer.recipient_name,
+          }),
+        },
+      );
+      payoutResult = await res.json();
     } catch (e) {
       console.error("Payout trigger error:", e);
     }
