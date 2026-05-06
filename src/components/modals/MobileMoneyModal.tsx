@@ -230,6 +230,7 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
             }
           } catch (closeError) {
             console.error('Flutterwave close handler error:', closeError);
+            toast.error('Transfer checkout was closed before completion');
           } finally {
             setIsLaunchingCheckout(false);
           }
