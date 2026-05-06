@@ -145,12 +145,35 @@ const SendPage = () => {
     }
   };
 
+  const applyBeneficiary = (b: Beneficiary) => {
+    setRecipientName(b.name);
+    if (b.phone) setRecipientPhone(b.phone);
+    if (b.country_code) setTargetCountryCode(b.country_code);
+    setPickedBeneficiaryId(b.id);
+  };
+
+  // Prefill from ?beneficiaryId= and jump to step 2
+  useEffect(() => {
+    const bid = searchParams.get("beneficiaryId");
+    if (bid && beneficiaries) {
+      const b = beneficiaries.find((x) => x.id === bid);
+      if (b) {
+        applyBeneficiary(b);
+        setStep(2);
+        searchParams.delete("beneficiaryId");
+        setSearchParams(searchParams, { replace: true });
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [beneficiaries]);
+
   const resetForm = () => {
     setStep(1);
     setAmount("");
     setRecipientName("");
     setRecipientPhone("");
     setFundingSource('wallet');
+    setPickedBeneficiaryId(null);
   };
 
   const isStep1Valid = parsedAmount > 0 && rateAvailable && !noLinkedSource && !insufficientFunds && (
