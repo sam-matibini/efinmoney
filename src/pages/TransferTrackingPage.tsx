@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { CheckCircle2, Loader2, Circle, Share2, ArrowLeft, AlertCircle } from "lucide-react";
+import { CheckCircle2, Loader2, Circle, Share2, ArrowLeft, AlertCircle, Download } from "lucide-react";
+import { downloadTransferReceipt } from "@/lib/receipt";
 import Header from "@/components/layout/Header";
 import MobileNav from "@/components/layout/MobileNav";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
