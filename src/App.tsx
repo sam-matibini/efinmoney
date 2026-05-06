@@ -219,6 +219,14 @@ const AppRoutes = () => (
         </ProtectedRoute>
       }
     />
+    <Route
+      path="/contacts"
+      element={
+        <ProtectedRoute>
+          <ContactsPage />
+        </ProtectedRoute>
+      }
+    />
     <Route path="/deposit/complete" element={<DepositComplete />} />
     <Route path="*" element={<NotFound />} />
   </Routes>
