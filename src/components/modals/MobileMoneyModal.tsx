@@ -203,6 +203,7 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
         },
         onClose: async () => {
           try {
+            closePaymentModal();
             const { data: latestTransfer } = await supabase
               .from('transfers')
               .select('status')
