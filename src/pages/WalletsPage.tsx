@@ -96,9 +96,21 @@ const WalletsPage = () => {
               <div className="flex items-center gap-3 mb-2">
                 <Wallet className="w-6 h-6" />
                 <span className="text-primary-foreground/70">Total Balance (USD Equivalent)</span>
+                {excludedCount > 0 && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <AlertTriangle className="w-4 h-4 text-yellow-300" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        {excludedCount} wallet{excludedCount === 1 ? "" : "s"} excluded — exchange rate unavailable
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
               </div>
               <p className="text-4xl font-display font-bold">
-                ${totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                ≈ ${totalUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
               </p>
               <div className="flex items-center gap-2 mt-2 text-primary-foreground/70">
                 <TrendingUp className="w-4 h-4" />
