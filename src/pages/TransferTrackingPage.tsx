@@ -174,9 +174,14 @@ const TransferTrackingPage = () => {
                     {statusMeta(transfer.status).label}
                   </Badge>
                 </div>
-                <Button variant="outline" size="sm" onClick={handleShare} className="gap-2">
-                  <Share2 className="w-4 h-4" /> Share
-                </Button>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={() => downloadTransferReceipt(transfer.id)} className="gap-2">
+                    <Download className="w-4 h-4" /> Receipt
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={handleShare} className="gap-2">
+                    <Share2 className="w-4 h-4" /> Share
+                  </Button>
+                </div>
               </CardHeader>
             </Card>
 
