@@ -53,7 +53,9 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
 
   const wallet = wallets?.find(w => w.wallet_id === walletId) || wallets?.[0];
   const net = networks.find(n => n.value === network)!;
-  const flutterwavePublicKey = import.meta.env.VITE_FLW_PUBLIC_KEY?.trim();
+  const flutterwavePublicKey =
+    import.meta.env.VITE_FLW_PUBLIC_KEY?.trim() ||
+    "FLWPUBK_TEST-b6b1a9a088a3bae587f81e8faccffb26-X";
 
   const checkoutConfig = useMemo(() => {
     if (!flutterwavePublicKey || !wallet || !user) return null;
