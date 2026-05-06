@@ -429,6 +429,14 @@ const SendPage = () => {
                 <CardTitle>Recipient Details</CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full gap-2"
+                  onClick={() => setPickerOpen(true)}
+                >
+                  <Users className="w-4 h-4" /> Choose from contacts
+                </Button>
                 <div className="space-y-2">
                   <Label>Recipient Name</Label>
                   <Input
