@@ -22,6 +22,7 @@ const currencySymbol = (code: string) =>
 
 interface Item {
   key: string;
+  transferId?: string;
   type: "send" | "receive";
   status: "completed" | "failed" | "pending";
   amount: number;
