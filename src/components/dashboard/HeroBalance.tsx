@@ -193,8 +193,11 @@ const HeroBalance = () => {
             {positive ? "+" : ""}
             {todayChange.toFixed(2)}% today
           </span>
-          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-muted text-foreground/70">
-            <WalletIcon className="w-3 h-3" /> {walletCount} {walletCount === 1 ? "wallet" : "wallets"}
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold bg-muted text-foreground/80">
+            {(wallets || []).slice(0, 6).map((w) => (
+              <span key={w.wallet_id} title={w.currency_code}>{w.flag_emoji || "💰"}</span>
+            ))}
+            {walletCount === 0 && <WalletIcon className="w-3 h-3" />}
           </span>
           <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
             <Activity className="w-3 h-3" /> Active

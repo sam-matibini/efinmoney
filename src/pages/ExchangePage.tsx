@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { RefreshCw, ArrowUpDown, TrendingUp, CheckCircle, Bitcoin, DollarSign } from "lucide-react";
 import { CryptoTradingPanel } from "@/components/crypto/CryptoTradingPanel";
+import { flagForCurrency } from "@/lib/flags";
 
 const FxTradingPanel = () => {
   const [amount, setAmount] = useState("");
@@ -22,6 +23,7 @@ const FxTradingPanel = () => {
   const [toWalletId, setToWalletId] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [swapRotation, setSwapRotation] = useState(0);
 
   const { data: wallets } = useWallets();
   const { data: fxRates } = useFxRates();
@@ -47,6 +49,7 @@ const FxTradingPanel = () => {
     const temp = fromWalletId;
     setFromWalletId(toWalletId);
     setToWalletId(temp);
+    setSwapRotation((r) => r + 180);
   };
 
   const handleExchange = async () => {
@@ -136,7 +139,8 @@ const FxTradingPanel = () => {
               <SelectContent>
                 {fiatWallets?.filter(w => w.wallet_id !== toWalletId).map((w) => (
                   <SelectItem key={w.wallet_id} value={w.wallet_id}>
-                    {w.flag_emoji} {w.currency_code} - {w.symbol}{Number(w.balance).toFixed(2)}
+                    <span className="text-2xl mr-1.5 align-middle">{w.flag_emoji}</span>
+                    <span className="align-middle">{w.currency_code} - {w.symbol}{Number(w.balance).toFixed(2)}</span>
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -160,14 +164,17 @@ const FxTradingPanel = () => {
 
           {/* Swap Button */}
           <div className="flex justify-center">
-            <Button
-              variant="outline"
-              size="icon"
-              className="rounded-full"
+            <motion.button
+              type="button"
               onClick={handleSwap}
+              animate={{ rotate: swapRotation }}
+              transition={{ type: "spring", stiffness: 260, damping: 18 }}
+              whileTap={{ scale: 0.9 }}
+              className="w-10 h-10 rounded-full border border-border bg-background hover:bg-muted flex items-center justify-center"
+              aria-label="Swap currencies"
             >
               <ArrowUpDown className="w-4 h-4" />
-            </Button>
+            </motion.button>
           </div>
 
           {/* To */}
@@ -180,7 +187,8 @@ const FxTradingPanel = () => {
               <SelectContent>
                 {fiatWallets?.filter(w => w.wallet_id !== fromWalletId).map((w) => (
                   <SelectItem key={w.wallet_id} value={w.wallet_id}>
-                    {w.flag_emoji} {w.currency_code} - {w.symbol}{Number(w.balance).toFixed(2)}
+                    <span className="text-2xl mr-1.5 align-middle">{w.flag_emoji}</span>
+                    <span className="align-middle">{w.currency_code} - {w.symbol}{Number(w.balance).toFixed(2)}</span>
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -270,7 +278,7 @@ const LiveFxRatesCard = () => {
         <div className="space-y-3">
           {fxRates?.slice(0, 4).map((rate) => (
               <div key={rate.id} className="flex justify-between items-center text-sm">
-                <span>{rate.from_currency} → {rate.to_currency}</span>
+                <span>{flagForCurrency(rate.from_currency)} {rate.from_currency} → {flagForCurrency(rate.to_currency)} {rate.to_currency}</span>
                 <span className="font-mono">{Number(rate.effective_rate).toFixed(4)}</span>
               </div>
             ))}

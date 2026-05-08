@@ -84,7 +84,7 @@ const WalletCard = ({
       <div className="relative z-20">
         <div className="flex items-center justify-between mb-3 sm:mb-4">
           <div className="flex items-center gap-2 sm:gap-3">
-            <span className="text-xl sm:text-2xl">{flag}</span>
+            <span className="text-3xl sm:text-[32px] leading-none drop-shadow-sm">{flag}</span>
             <span className={`font-display font-semibold text-sm sm:text-base ${isMain ? 'text-primary-foreground' : 'text-foreground'}`}>
               {currency}
             </span>

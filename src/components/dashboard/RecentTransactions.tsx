@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import { flagForCountryName, flagForCurrency } from "@/lib/flags";
 import { formatDistanceToNow } from "date-fns";
 
 const payoutMethodNames: Record<string, string> = {
@@ -132,7 +133,7 @@ const RecentTransactions = () => {
     amount: Number(t.source_amount),
     currency: t.source_currency,
     symbol: currencySymbol(t.source_currency),
-    recipient: t.recipient_name,
+    recipient: `${flagForCountryName(t.recipient_country)} ${t.recipient_name}`,
     date: formatDistanceToNow(new Date(t.created_at), { addSuffix: true }),
     description: `${payoutMethodNames[t.payout_method || ""] || "Transfer"} · ${t.recipient_country}`,
     createdAt: t.created_at,
@@ -145,7 +146,7 @@ const RecentTransactions = () => {
     amount: Number(d.credit_amount),
     currency: d.currency_code,
     symbol: currencySymbol(d.currency_code),
-    recipient: "Card Top-up",
+    recipient: `${flagForCurrency(d.currency_code)} Card Top-up`,
     date: formatDistanceToNow(new Date(d.created_at), { addSuffix: true }),
     description: "Funds added via Stripe",
     createdAt: d.created_at,
@@ -158,7 +159,7 @@ const RecentTransactions = () => {
     amount: Number(f.credit_amount),
     currency: f.currency_code,
     symbol: currencySymbol(f.currency_code),
-    recipient: "Currency Exchange",
+    recipient: `${flagForCurrency(f.currency_code)} Currency Exchange`,
     date: formatDistanceToNow(new Date(f.created_at), { addSuffix: true }),
     description: `Swapped to ${f.currency_code}`,
     createdAt: f.created_at,
