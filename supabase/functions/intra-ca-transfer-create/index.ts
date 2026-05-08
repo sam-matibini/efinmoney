@@ -47,14 +47,21 @@ Deno.serve(async (req) => {
     let pi: any = null;
     let stripeError: string | null = null;
     if (stripeKey && pa.institution_number && pa.branch_number && pa.account_number) {
+      const isTestMode = stripeKey.startsWith("sk_test_");
+      // In Stripe test mode, real Plaid account numbers are rejected.
+      // Use Stripe's documented test account number instead.
+      const acctNumber = isTestMode ? "000123456789" : pa.account_number;
+      const instNumber = isTestMode ? "001" : pa.institution_number;
+      const transitNumber = isTestMode ? "11000" : pa.branch_number;
+
       const params = new URLSearchParams();
       params.append("amount", String(Math.round(Number(amount_cad) * 100)));
       params.append("currency", "cad");
       params.append("payment_method_types[]", "acss_debit");
       params.append("payment_method_data[type]", "acss_debit");
-      params.append("payment_method_data[acss_debit][institution_number]", pa.institution_number);
-      params.append("payment_method_data[acss_debit][transit_number]", pa.branch_number);
-      params.append("payment_method_data[acss_debit][account_number]", pa.account_number);
+      params.append("payment_method_data[acss_debit][institution_number]", instNumber);
+      params.append("payment_method_data[acss_debit][transit_number]", transitNumber);
+      params.append("payment_method_data[acss_debit][account_number]", acctNumber);
       params.append("payment_method_data[billing_details][name]", user.user_metadata?.full_name || user.email || "eFinMoney user");
       params.append("payment_method_data[billing_details][email]", user.email || "");
       params.append("payment_method_options[acss_debit][mandate_options][payment_schedule]", "sporadic");
