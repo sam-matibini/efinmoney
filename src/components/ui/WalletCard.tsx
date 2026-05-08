@@ -42,7 +42,7 @@ const WalletCard = ({
   onEdit,
   onDelete,
 }: WalletCardProps) => {
-  const [receiveOpen, setReceiveOpen] = useState(false);
+  const [topUpOpen, setTopUpOpen] = useState(false);
   const formatBalance = (value: number) => {
     return new Intl.NumberFormat('en-US', {
       minimumFractionDigits: 2,
