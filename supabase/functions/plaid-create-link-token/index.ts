@@ -21,12 +21,16 @@ Deno.serve(async (req) => {
     const { data: { user } } = await supabase.auth.getUser(auth.replace("Bearer ", ""));
     if (!user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
+    const clientId = (Deno.env.get("PLAID_CLIENT_ID") || "").trim();
+    const secret = (Deno.env.get("PLAID_SECRET") || "").trim();
+    console.log("Plaid request", { env: PLAID_ENV, base: PLAID_BASE, clientIdLen: clientId.length, secretLen: secret.length });
+
     const res = await fetch(`${PLAID_BASE}/link/token/create`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        client_id: Deno.env.get("PLAID_CLIENT_ID"),
-        secret: Deno.env.get("PLAID_SECRET"),
+        client_id: clientId,
+        secret: secret,
         client_name: "eFinMoney",
         language: "en",
         country_codes: ["CA"],
