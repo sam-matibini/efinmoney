@@ -159,7 +159,7 @@ const RecentTransactions = () => {
     amount: Number(f.credit_amount),
     currency: f.currency_code,
     symbol: currencySymbol(f.currency_code),
-    recipient: "Currency Exchange",
+    recipient: `${flagForCurrency(f.currency_code)} Currency Exchange`,
     date: formatDistanceToNow(new Date(f.created_at), { addSuffix: true }),
     description: `Swapped to ${f.currency_code}`,
     createdAt: f.created_at,
