@@ -26,7 +26,7 @@ const Header = () => {
   const navItems = [
     { label: 'Dashboard', href: '/' },
     { label: 'Send', href: '/send' },
-    { label: 'Top up CA', href: '/transfers/canada' },
+    { label: '🇨🇦 Top up', href: '/transfers/canada' },
     { label: 'Contacts', href: '/contacts' },
     { label: 'Exchange', href: '/exchange' },
     { label: 'Wallets', href: '/wallets' },
