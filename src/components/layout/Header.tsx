@@ -140,10 +140,15 @@ const Header = () => {
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="ml-1 p-1 rounded-xl bg-secondary hover:bg-secondary/80 transition-colors group">
+              <button className="ml-1 p-1 pr-2 rounded-xl bg-secondary hover:bg-secondary/80 transition-colors group flex items-center gap-1.5">
                 <div className="relative w-8 h-8 rounded-lg gradient-primary flex items-center justify-center transition-shadow group-hover:shadow-[0_0_0_4px_hsl(var(--primary)/0.2)]">
                   <User className="w-4 h-4 text-primary-foreground" />
                 </div>
+                {defaultWallet?.flag_emoji && (
+                  <span className="text-base leading-none" title={`Default: ${defaultWallet.currency_code}`}>
+                    {defaultWallet.flag_emoji}
+                  </span>
+                )}
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
