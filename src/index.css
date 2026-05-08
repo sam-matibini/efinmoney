@@ -60,6 +60,40 @@
     --sidebar-border: 214 32% 91%;
     --sidebar-ring: 160 84% 39%;
   }
+
+  .dark {
+    --background: 222 47% 8%;
+    --foreground: 210 40% 98%;
+    --card: 222 47% 11%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222 47% 11%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 160 84% 45%;
+    --primary-foreground: 222 47% 8%;
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 160 60% 20%;
+    --accent-foreground: 160 84% 90%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217 33% 20%;
+    --input: 217 33% 20%;
+    --ring: 160 84% 45%;
+    --gradient-card: linear-gradient(145deg, hsl(222 47% 11%) 0%, hsl(217 33% 14%) 100%);
+    --shadow-card: 0 1px 3px hsl(0 0% 0% / 0.3), 0 1px 2px hsl(0 0% 0% / 0.2);
+    --shadow-elevated: 0 10px 30px -10px hsl(0 0% 0% / 0.5), 0 4px 12px -4px hsl(0 0% 0% / 0.3);
+    --sidebar-background: 222 47% 11%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-accent: 217 33% 17%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 217 33% 20%;
+  }
+
+  html {
+    transition: background-color 300ms ease, color 300ms ease;
+  }
 }
 
 @layer base {
@@ -163,5 +197,29 @@
     animation: ripple 600ms linear;
     background-color: rgba(255, 255, 255, 0.5);
     pointer-events: none;
+  }
+
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+  @keyframes wave {
+    0%, 60%, 100% { transform: rotate(0deg); }
+    10%, 30% { transform: rotate(14deg); }
+    20% { transform: rotate(-8deg); }
+    40% { transform: rotate(-4deg); }
+    50% { transform: rotate(10deg); }
+  }
+
+  @keyframes bell-shake {
+    0%, 100% { transform: rotate(0); }
+    15% { transform: rotate(-12deg); }
+    30% { transform: rotate(10deg); }
+    45% { transform: rotate(-8deg); }
+    60% { transform: rotate(6deg); }
+    75% { transform: rotate(-3deg); }
+  }
+  .animate-bell-shake {
+    animation: bell-shake 1.6s ease-in-out infinite;
+    transform-origin: top center;
   }
 }

@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { motion } from "framer-motion";
-import { Search, User, LogOut, Shield, Wallet, Settings, Cog } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Search, User, LogOut, Shield, Wallet, Settings, Cog, X } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRoles } from "@/hooks/useUserRoles";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import NotificationsPanel from "@/components/header/NotificationsPanel";
 import SearchModal from "@/components/header/SearchModal";
+import ThemeToggle from "@/components/theme/ThemeToggle";
 
 const Header = () => {
   const { signOut, user } = useAuth();
@@ -20,6 +21,7 @@ const Header = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [searchOpen, setSearchOpen] = useState(false);
+  const [searchExpanded, setSearchExpanded] = useState(false);
 
   const navItems = [
     { label: 'Dashboard', href: '/' },
@@ -94,18 +96,49 @@ const Header = () => {
           animate={{ opacity: 1, x: 0 }}
           className="flex items-center gap-2"
         >
-          <button
-            onClick={() => setSearchOpen(true)}
-            className="p-2.5 rounded-xl hover:bg-muted transition-colors"
-          >
-            <Search className="w-5 h-5 text-muted-foreground" />
-          </button>
+          <div className="relative flex items-center">
+            <AnimatePresence initial={false}>
+              {searchExpanded && (
+                <motion.input
+                  key="search-input"
+                  initial={{ width: 0, opacity: 0 }}
+                  animate={{ width: 220, opacity: 1 }}
+                  exit={{ width: 0, opacity: 0 }}
+                  transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                  autoFocus
+                  placeholder="Search..."
+                  onBlur={() => setSearchExpanded(false)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      setSearchExpanded(false);
+                      setSearchOpen(true);
+                    }
+                    if (e.key === "Escape") setSearchExpanded(false);
+                  }}
+                  className="h-10 rounded-xl border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 mr-1"
+                />
+              )}
+            </AnimatePresence>
+            <button
+              onClick={() => setSearchExpanded((v) => !v)}
+              className="p-2.5 rounded-xl hover:bg-muted transition-colors"
+              aria-label="Search"
+            >
+              {searchExpanded ? (
+                <X className="w-5 h-5 text-muted-foreground" />
+              ) : (
+                <Search className="w-5 h-5 text-muted-foreground" />
+              )}
+            </button>
+          </div>
+
+          <ThemeToggle />
           <NotificationsPanel />
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="ml-2 p-1 rounded-xl bg-secondary hover:bg-secondary/80 transition-colors">
-                <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
+              <button className="ml-1 p-1 rounded-xl bg-secondary hover:bg-secondary/80 transition-colors group">
+                <div className="relative w-8 h-8 rounded-lg gradient-primary flex items-center justify-center transition-shadow group-hover:shadow-[0_0_0_4px_hsl(var(--primary)/0.2)]">
                   <User className="w-4 h-4 text-primary-foreground" />
                 </div>
               </button>

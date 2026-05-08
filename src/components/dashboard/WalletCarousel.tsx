@@ -1,11 +1,54 @@
 import { motion } from "framer-motion";
-import WalletCard from "@/components/ui/WalletCard";
-import { ChevronRight, Plus } from "lucide-react";
+import { useRef, useState, useEffect } from "react";
+import { Plus, Send, Download, ArrowUpRight } from "lucide-react";
+import { Link } from "react-router-dom";
 import { useWallets } from "@/hooks/useWallets";
 import { Skeleton } from "@/components/ui/skeleton";
+import SendMoneyModal from "@/components/modals/SendMoneyModal";
+import CardPaymentModal from "@/components/modals/CardPaymentModal";
+import CreateWalletModal from "@/components/modals/CreateWalletModal";
+
+const gradients: Record<string, string> = {
+  USD: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+  CAD: "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)",
+  NGN: "linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)",
+  GBP: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)",
+  EUR: "linear-gradient(135deg, #06b6d4 0%, #0e7490 100%)",
+  KES: "linear-gradient(135deg, #f59e0b 0%, #b45309 100%)",
+};
+
+const fallbackGradient = "linear-gradient(135deg, #475569 0%, #1e293b 100%)";
+
+const formatBalance = (value: number) =>
+  new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
 
 const WalletCarousel = () => {
   const { data: wallets, isLoading } = useWallets();
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [topUpWalletId, setTopUpWalletId] = useState<string | null>(null);
+
+  // Track active card via scroll position
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const handler = () => {
+      const cardWidth = el.firstElementChild
+        ? (el.firstElementChild as HTMLElement).offsetWidth + 16
+        : 320;
+      const idx = Math.round(el.scrollLeft / cardWidth);
+      setActiveIndex(idx);
+    };
+    el.addEventListener("scroll", handler, { passive: true });
+    return () => el.removeEventListener("scroll", handler);
+  }, [wallets]);
+
+  const scrollToIndex = (idx: number) => {
+    const el = scrollRef.current;
+    if (!el || !el.firstElementChild) return;
+    const cardWidth = (el.firstElementChild as HTMLElement).offsetWidth + 16;
+    el.scrollTo({ left: idx * cardWidth, behavior: "smooth" });
+  };
 
   if (isLoading) {
     return (
@@ -13,52 +56,140 @@ const WalletCarousel = () => {
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-display font-semibold text-foreground">My Wallets</h2>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          {[1, 2, 3, 4].map((i) => (
-            <Skeleton key={i} className="h-[160px] sm:h-[180px] rounded-2xl" />
+        <div className="flex gap-4 overflow-hidden">
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-52 min-w-[300px] rounded-2xl skeleton-shimmer" />
           ))}
         </div>
       </section>
     );
   }
 
-  const displayWallets = wallets && wallets.length > 0 
-    ? wallets.map((w, index) => ({
-        currency: w.currency_code,
-        balance: Number(w.balance),
-        symbol: w.symbol || `${w.currency_code} `,
-        flag: w.flag_emoji || '💰',
-        change: 0,
-        isMain: index === 0,
-      }))
-    : [
-        { currency: 'USD', balance: 0, symbol: '$', flag: '🇺🇸', change: 0, isMain: true },
-        { currency: 'CAD', balance: 0, symbol: 'C$', flag: '🇨🇦', change: 0, isMain: false },
-      ];
+  const list = wallets || [];
 
   return (
     <section className="mb-8">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-display font-semibold text-foreground">My Wallets</h2>
-        <button className="flex items-center gap-1 text-sm text-primary hover:text-primary/80 transition-colors">
-          <Plus className="w-4 h-4" />
-          Add Wallet
-        </button>
+        <CreateWalletModal>
+          <button className="flex items-center gap-1 text-sm text-primary hover:text-primary/80 font-medium transition-colors">
+            <Plus className="w-4 h-4" />
+            Add Wallet
+          </button>
+        </CreateWalletModal>
       </div>
+
+      <div
+        ref={scrollRef}
+        className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4 snap-x snap-mandatory scroll-smooth no-scrollbar"
+        style={{ scrollbarWidth: "none" }}
+      >
+        {list.map((w, idx) => {
+          const isActive = idx === activeIndex;
+          const gradient = gradients[w.currency_code] || fallbackGradient;
+          return (
+            <motion.div
+              key={w.wallet_id}
+              initial={{ opacity: 0, y: 30 }}
+              animate={{
+                opacity: 1,
+                y: 0,
+                scale: isActive ? 1.02 : 1,
+              }}
+              transition={{ delay: idx * 0.08, duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+              className="snap-center min-w-[280px] sm:min-w-[340px] aspect-[1.6/1] rounded-2xl relative overflow-hidden text-white shadow-xl"
+              style={{ background: gradient }}
+            >
+              {/* Decorative orbs */}
+              <div className="absolute -top-10 -right-10 h-40 w-40 rounded-full bg-white/10 blur-2xl" />
+              <div className="absolute -bottom-10 -left-10 h-32 w-32 rounded-full bg-white/5 blur-xl" />
+
+              <div className="relative h-full p-5 flex flex-col justify-between">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl">{w.flag_emoji || "💰"}</span>
+                    <div>
+                      <p className="font-display font-semibold text-sm">{w.currency_code}</p>
+                      <p className="text-[10px] uppercase tracking-wider text-white/60">{w.currency_name}</p>
+                    </div>
+                  </div>
+                  {w.is_default && (
+                    <span className="text-[10px] uppercase tracking-wider bg-white/20 px-2 py-0.5 rounded-full">
+                      Default
+                    </span>
+                  )}
+                </div>
+
+                <div>
+                  <p className="text-xs text-white/70 mb-1">Available Balance</p>
+                  <h3 className="text-3xl font-display font-bold tracking-tight">
+                    {w.symbol}
+                    {formatBalance(Number(w.balance))}
+                  </h3>
+                </div>
+
+                <div className="flex gap-2">
+                  <SendMoneyModal>
+                    <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/20 hover:bg-white/30 text-xs font-medium transition-colors backdrop-blur-sm">
+                      <Send className="w-3.5 h-3.5" />
+                      Send
+                    </button>
+                  </SendMoneyModal>
+                  <Link
+                    to="/wallets"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/20 hover:bg-white/30 text-xs font-medium transition-colors backdrop-blur-sm"
+                  >
+                    <ArrowUpRight className="w-3.5 h-3.5" />
+                    Receive
+                  </Link>
+                  <button
+                    onClick={() => setTopUpWalletId(w.wallet_id)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white text-foreground hover:bg-white/90 text-xs font-semibold transition-colors"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    Top up
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          );
+        })}
+
+        {list.length === 0 && (
+          <CreateWalletModal>
+            <button className="snap-center min-w-[280px] sm:min-w-[340px] aspect-[1.6/1] rounded-2xl border-2 border-dashed border-border flex flex-col items-center justify-center gap-2 text-muted-foreground hover:text-primary hover:border-primary transition-colors">
+              <Plus className="w-8 h-8" />
+              <span className="font-medium">Create your first wallet</span>
+            </button>
+          </CreateWalletModal>
+        )}
+      </div>
+
+      {/* Dots indicator */}
+      {list.length > 1 && (
+        <div className="flex items-center justify-center gap-1.5 mt-2">
+          {list.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => scrollToIndex(i)}
+              aria-label={`Go to wallet ${i + 1}`}
+              className={`h-1.5 rounded-full transition-all ${
+                i === activeIndex ? "w-6 bg-primary" : "w-1.5 bg-muted-foreground/30"
+              }`}
+            />
+          ))}
+        </div>
+      )}
+
+      {topUpWalletId && (
+        <CardPaymentModal
+          open={!!topUpWalletId}
+          onOpenChange={(o) => !o && setTopUpWalletId(null)}
+          defaultWalletId={topUpWalletId}
+          title="Top up wallet"
+        />
+      )}
       
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        {displayWallets.map((wallet, index) => (
-          <motion.div
-            key={wallet.currency}
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: index * 0.1, duration: 0.4, ease: "easeOut" }}
-            className="hover-lift rounded-2xl"
-          >
-            <WalletCard {...wallet} />
-          </motion.div>
-        ))}
-      </div>
     </section>
   );
 };
