@@ -144,8 +144,7 @@ export default function CanadaTransferPage() {
         <Alert className="mb-6 border-primary/30 bg-primary/5">
           <Info className="h-4 w-4" />
           <AlertDescription>
-            <strong>Sandbox mode.</strong> Use Plaid test creds: username <code className="font-mono">user_good</code>, password <code className="font-mono">pass_good</code>.
-            Pick any Canadian bank (e.g. RBC, TD). Stripe will simulate the PAD debit instantly.
+            <strong>Live mode.</strong> You will link your real Canadian bank account through Plaid and authorize a Pre-Authorized Debit (PAD). Funds will be debited from your actual account.
           </AlertDescription>
         </Alert>
 
@@ -170,7 +169,7 @@ export default function CanadaTransferPage() {
                     {a.institution_number ? (
                       <span className="ml-2"> · EFT {a.institution_number}-{a.branch_number}</span>
                     ) : (
-                      <span className="ml-2 text-amber-500">· No EFT numbers (sandbox limitation)</span>
+                      <span className="ml-2 text-amber-500">· No EFT numbers available</span>
                     )}
                   </div>
                 </div>
@@ -207,7 +206,7 @@ export default function CanadaTransferPage() {
               </Select>
               {missingEft && (
                 <p className="text-xs text-amber-500">
-                  This sandbox account has no EFT numbers — Stripe PAD will fail. Try linking with a different test institution.
+                  This account is missing EFT routing numbers — Stripe PAD cannot be initiated. Try linking a different account.
                 </p>
               )}
             </div>
