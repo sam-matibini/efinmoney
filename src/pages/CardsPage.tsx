@@ -125,7 +125,7 @@ const CardsPage = () => {
                           <div className="flex justify-between items-start mb-8">
                             <div>
                               <Badge variant="secondary" className="bg-primary-foreground/20 text-primary-foreground border-0 capitalize">
-                                {card.card_type}
+                                {card.card_type === "debit_visa" ? "Debit Visa" : card.card_type}
                               </Badge>
                               <p className="text-primary-foreground/70 text-xs mt-1">
                                 {card.cardholder_name}
@@ -172,8 +172,8 @@ const CardsPage = () => {
                           <div className="mb-6">
                             <div className="flex items-center gap-2">
                               <p className="font-mono text-xl tracking-wider">
-                                {showCardNumbers[card.id]
-                                  ? `4532 1234 5678 ${card.last_four}`
+                                {showCardNumbers[card.id] && card.card_number
+                                  ? card.card_number.replace(/(.{4})/g, "$1 ").trim()
                                   : `•••• •••• •••• ${card.last_four}`}
                               </p>
                               <button
