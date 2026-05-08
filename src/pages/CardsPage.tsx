@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import EditCardModal from "@/components/modals/EditCardModal";
 import DeleteCardModal from "@/components/modals/DeleteCardModal";
 import AddCardModal from "@/components/modals/AddCardModal";
+import CardPaymentModal from "@/components/modals/CardPaymentModal";
 import { useCards, useCardMutations, type Card as CardRow } from "@/hooks/useCards";
 import {
   DropdownMenu,
@@ -33,6 +34,7 @@ const CardsPage = () => {
   const [editCard, setEditCard] = useState<CardRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<CardRow | null>(null);
   const [addOpen, setAddOpen] = useState(false);
+  const [fundCard, setFundCard] = useState<CardRow | null>(null);
 
   const toggleCardNumber = (cardId: string) => {
     setShowCardNumbers((prev) => ({ ...prev, [cardId]: !prev[cardId] }));
@@ -234,15 +236,26 @@ const CardsPage = () => {
                     </Card>
 
                     <div className="flex gap-2 mt-3">
-                      <Button
-                        variant={isFrozen ? "default" : "outline"}
-                        size="sm"
-                        className="flex-1"
-                        onClick={() => handleToggleFreeze(card)}
-                      >
-                        <Snowflake className="w-4 h-4 mr-1" />
-                        {isFrozen ? "Unfreeze" : "Freeze"}
-                      </Button>
+                      {card.funding_source === "external" ? (
+                        <Button
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => setFundCard(card)}
+                        >
+                          <CreditCard className="w-4 h-4 mr-1" />
+                          Fund Wallet
+                        </Button>
+                      ) : (
+                        <Button
+                          variant={isFrozen ? "default" : "outline"}
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => handleToggleFreeze(card)}
+                        >
+                          <Snowflake className="w-4 h-4 mr-1" />
+                          {isFrozen ? "Unfreeze" : "Freeze"}
+                        </Button>
+                      )}
                       <Button
                         variant="outline"
                         size="sm"
@@ -368,6 +381,14 @@ const CardsPage = () => {
             : null
         }
         onDelete={(id) => deleteCard.mutate(id)}
+      />
+
+      <CardPaymentModal
+        open={!!fundCard}
+        onOpenChange={(o) => { if (!o) setFundCard(null); }}
+        defaultWalletId={fundCard?.wallet_id ?? undefined}
+        title={fundCard ? `Fund wallet with •••• ${fundCard.last_four}` : "Fund Wallet"}
+        onSuccess={() => setFundCard(null)}
       />
     </div>
   );
