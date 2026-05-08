@@ -82,7 +82,44 @@ export default {
         },
         float: {
           "0%, 100%": { transform: "translateY(0)" },
-          "50%": { transform: "translateY(-10px)" },
+          "50%": { transform: "translateY(-12px)" },
+        },
+        "float-slow": {
+          "0%, 100%": { transform: "translateY(0) rotate(0deg)" },
+          "50%": { transform: "translateY(-20px) rotate(6deg)" },
+        },
+        "bubble-up": {
+          "0%": { transform: "translateY(20px) scale(0.6)", opacity: "0" },
+          "20%": { opacity: "0.6" },
+          "100%": { transform: "translateY(-120vh) scale(1.2)", opacity: "0" },
+        },
+        marquee: {
+          "0%": { transform: "translateX(0)" },
+          "100%": { transform: "translateX(-50%)" },
+        },
+        ripple: {
+          "0%": { transform: "scale(0)", opacity: "0.6" },
+          "100%": { transform: "scale(4)", opacity: "0" },
+        },
+        "slide-in-left": {
+          "0%": { opacity: "0", transform: "translateX(-30px)" },
+          "100%": { opacity: "1", transform: "translateX(0)" },
+        },
+        "slide-in-right": {
+          "0%": { opacity: "0", transform: "translateX(30px)" },
+          "100%": { opacity: "1", transform: "translateX(0)" },
+        },
+        "slide-up": {
+          "0%": { opacity: "0", transform: "translateY(20px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+        "fade-in": {
+          "0%": { opacity: "0" },
+          "100%": { opacity: "1" },
+        },
+        "scale-in": {
+          "0%": { opacity: "0", transform: "scale(0.95)" },
+          "100%": { opacity: "1", transform: "scale(1)" },
         },
         pulse: {
           "0%, 100%": { opacity: "1" },
@@ -92,8 +129,17 @@ export default {
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
-        shimmer: "shimmer 2s linear infinite",
-        float: "float 3s ease-in-out infinite",
+        shimmer: "shimmer 1.6s linear infinite",
+        float: "float 4s ease-in-out infinite",
+        "float-slow": "float-slow 8s ease-in-out infinite",
+        "bubble-up": "bubble-up 12s linear infinite",
+        marquee: "marquee 30s linear infinite",
+        ripple: "ripple 600ms linear",
+        "slide-in-left": "slide-in-left 0.5s ease-out both",
+        "slide-in-right": "slide-in-right 0.5s ease-out both",
+        "slide-up": "slide-up 0.5s ease-out both",
+        "fade-in": "fade-in 0.5s ease-out both",
+        "scale-in": "scale-in 0.25s ease-out both",
         pulse: "pulse 2s ease-in-out infinite",
       },
     },
