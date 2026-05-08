@@ -11,7 +11,7 @@ export interface Transfer {
   recipient_phone: string | null;
   recipient_account: string | null;
   recipient_country: string;
-  transfer_type: 'internal' | 'mobile_money' | 'bank' | 'crypto' | 'bill_payment';
+  transfer_type: 'internal' | 'mobile_money' | 'bank' | 'crypto' | 'bill_payment' | 'domestic_canada';
   payout_method: string | null;
   source_currency: string;
   target_currency: string;
