@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, type Variants } from "framer-motion";
 import { useSearchParams } from "react-router-dom";
 import ContactsPickerModal from "@/components/modals/ContactsPickerModal";
 import AddBeneficiaryModal from "@/components/modals/AddBeneficiaryModal";
@@ -40,16 +40,14 @@ const targetCountries = [
 type FundingSource = 'wallet' | 'bank' | 'card';
 
 // Stagger helpers for form fields
-const fieldVariants = {
+const fieldVariants: Variants = {
   hidden: { opacity: 0, y: 12 },
   show: (i: number) => ({
     opacity: 1,
     y: 0,
-    transition: { delay: i * 0.05, duration: 0.3, ease: [0.16, 1, 0.3, 1] },
+    transition: { delay: i * 0.05, duration: 0.3, ease: [0.16, 1, 0.3, 1] as any },
   }),
 };
-
-const stepDirection = { current: 1 };
 
 const SendPage = () => {
   const [step, setStep] = useState(1);
