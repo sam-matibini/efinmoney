@@ -169,7 +169,7 @@ export default function CanadaTransferPage() {
                     {a.institution_number ? (
                       <span className="ml-2"> · EFT {a.institution_number}-{a.branch_number}</span>
                     ) : (
-                      <span className="ml-2 text-amber-500">· No EFT numbers (sandbox limitation)</span>
+                      <span className="ml-2 text-amber-500">· No EFT numbers available</span>
                     )}
                   </div>
                 </div>
