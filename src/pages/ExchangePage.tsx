@@ -163,14 +163,17 @@ const FxTradingPanel = () => {
 
           {/* Swap Button */}
           <div className="flex justify-center">
-            <Button
-              variant="outline"
-              size="icon"
-              className="rounded-full"
+            <motion.button
+              type="button"
               onClick={handleSwap}
+              animate={{ rotate: swapRotation }}
+              transition={{ type: "spring", stiffness: 260, damping: 18 }}
+              whileTap={{ scale: 0.9 }}
+              className="w-10 h-10 rounded-full border border-border bg-background hover:bg-muted flex items-center justify-center"
+              aria-label="Swap currencies"
             >
               <ArrowUpDown className="w-4 h-4" />
-            </Button>
+            </motion.button>
           </div>
 
           {/* To */}
