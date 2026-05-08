@@ -26,6 +26,7 @@ import { Link } from "react-router-dom";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
+import CanadaSendFlow from "@/components/send/CanadaSendFlow";
 
 const targetCountries = [
   { code: 'KES', country: 'Kenya', flag: '🇰🇪', method: 'M-Pesa', payout: 'mpesa', symbol: 'KSh' },
