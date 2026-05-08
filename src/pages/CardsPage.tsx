@@ -190,7 +190,7 @@ const CardsPage = () => {
                             </div>
                           </div>
 
-                          <div className="flex justify-between items-end">
+                          <div className="flex justify-between items-end gap-3">
                             <div>
                               <p className="text-primary-foreground/70 text-xs mb-1">Spending Limit</p>
                               <p className="text-2xl font-display font-bold">
@@ -199,9 +199,36 @@ const CardsPage = () => {
                             </div>
                             <div className="text-right">
                               <p className="text-primary-foreground/70 text-xs mb-1">Expires</p>
-                              <p className="font-mono">{formatExpires(card.expires_at)}</p>
+                              <p className="font-mono">
+                                {card.expiry_month && card.expiry_year
+                                  ? `${String(card.expiry_month).padStart(2, "0")}/${String(card.expiry_year).slice(-2)}`
+                                  : formatExpires(card.expires_at)}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-primary-foreground/70 text-xs mb-1">CVV</p>
+                              <p className="font-mono">
+                                {showCardNumbers[card.id] && card.cvv ? card.cvv : "•••"}
+                              </p>
                             </div>
                           </div>
+                          {card.card_number && (
+                            <button
+                              onClick={async () => {
+                                const exp = card.expiry_month && card.expiry_year
+                                  ? `${String(card.expiry_month).padStart(2, "0")}/${String(card.expiry_year).slice(-2)}`
+                                  : formatExpires(card.expires_at);
+                                await navigator.clipboard.writeText(
+                                  `Number: ${card.card_number}\nExpiry: ${exp}\nCVV: ${card.cvv ?? ""}`
+                                );
+                                toast.success("Card details copied");
+                              }}
+                              className="absolute bottom-3 right-3 z-30 p-1.5 rounded-md bg-primary-foreground/10 hover:bg-primary-foreground/20 text-primary-foreground/80"
+                              title="Copy card details"
+                            >
+                              <Copy className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </div>
                       </CardContent>
                     </Card>
