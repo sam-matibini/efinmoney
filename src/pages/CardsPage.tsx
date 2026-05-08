@@ -111,89 +111,75 @@ const CardsPage = () => {
               </CardContent>
             </Card>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {cards.map((card, index) => {
+            <CardStack
+              cards={cards}
+              flipped={flipped}
+              onToggleFlip={toggleFlip}
+              renderActions={(card) => {
                 const isFrozen = card.status === "frozen";
                 const isExternal = card.funding_source === "external";
                 return (
-                  <motion.div
-                    key={card.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.08 }}
-                    className="space-y-4"
-                  >
-                    <FlipCard
-                      card={card}
-                      flipped={!!flipped[card.id]}
-                      onToggle={() => toggleFlip(card.id)}
-                      index={index}
-                    />
-
-                    <div className="flex items-start justify-center gap-6 pt-1">
-                      {isExternal ? (
-                        <ActionTile
-                          icon={<CreditCard className="w-5 h-5" />}
-                          label="Fund wallet"
-                          onClick={() => setFundCard(card)}
-                        />
-                      ) : (
-                        <ActionTile
-                          icon={isFrozen ? <Unlock className="w-5 h-5" /> : <Lock className="w-5 h-5" />}
-                          label={isFrozen ? "Unlock card" : "Lock card"}
-                          onClick={() => handleToggleFreeze(card)}
-                        />
-                      )}
-
+                  <div className="flex items-start justify-center gap-6 pt-1">
+                    {isExternal ? (
                       <ActionTile
                         icon={<CreditCard className="w-5 h-5" />}
-                        label="Card details"
-                        onClick={() => toggleFlip(card.id)}
+                        label="Fund wallet"
+                        onClick={() => setFundCard(card)}
                       />
-
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <button className="flex flex-col items-center gap-1.5 group">
-                            <span className="w-12 h-12 rounded-2xl flex items-center justify-center border bg-card group-hover:bg-accent transition-colors">
-                              <Settings className="w-5 h-5" />
-                            </span>
-                            <span className="text-xs text-muted-foreground">Settings</span>
-                          </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="center">
-                          <DropdownMenuItem onClick={() => setEditCard(card)}>
-                            <Settings className="w-4 h-4 mr-2" />
-                            Edit card
+                    ) : (
+                      <ActionTile
+                        icon={isFrozen ? <Unlock className="w-5 h-5" /> : <Lock className="w-5 h-5" />}
+                        label={isFrozen ? "Unlock card" : "Lock card"}
+                        onClick={() => handleToggleFreeze(card)}
+                      />
+                    )}
+                    <ActionTile
+                      icon={<CreditCard className="w-5 h-5" />}
+                      label="Card details"
+                      onClick={() => toggleFlip(card.id)}
+                    />
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button className="flex flex-col items-center gap-1.5 group">
+                          <span className="w-12 h-12 rounded-2xl flex items-center justify-center border bg-card group-hover:bg-accent transition-colors">
+                            <Settings className="w-5 h-5" />
+                          </span>
+                          <span className="text-xs text-muted-foreground">Settings</span>
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="center">
+                        <DropdownMenuItem onClick={() => setEditCard(card)}>
+                          <Settings className="w-4 h-4 mr-2" />
+                          Edit card
+                        </DropdownMenuItem>
+                        {!isExternal && (
+                          <DropdownMenuItem onClick={() => handleToggleFreeze(card)}>
+                            <Snowflake className="w-4 h-4 mr-2" />
+                            {isFrozen ? "Unfreeze" : "Freeze"} card
                           </DropdownMenuItem>
-                          {!isExternal && (
-                            <DropdownMenuItem onClick={() => handleToggleFreeze(card)}>
-                              <Snowflake className="w-4 h-4 mr-2" />
-                              {isFrozen ? "Unfreeze" : "Freeze"} card
-                            </DropdownMenuItem>
-                          )}
-                          {card.card_type === "virtual" && (
-                            <DropdownMenuItem
-                              onClick={() => updateCard.mutate({ id: card.id, card_type: "physical" })}
-                            >
-                              <CreditCard className="w-4 h-4 mr-2" />
-                              Request physical
-                            </DropdownMenuItem>
-                          )}
-                          <DropdownMenuSeparator />
+                        )}
+                        {card.card_type === "virtual" && (
                           <DropdownMenuItem
-                            onClick={() => setDeleteTarget(card)}
-                            className="text-destructive focus:text-destructive"
+                            onClick={() => updateCard.mutate({ id: card.id, card_type: "physical" })}
                           >
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            Delete card
+                            <CreditCard className="w-4 h-4 mr-2" />
+                            Request physical
                           </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </motion.div>
+                        )}
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => setDeleteTarget(card)}
+                          className="text-destructive focus:text-destructive"
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Delete card
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 );
-              })}
-            </div>
+              }}
+            />
           )}
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
