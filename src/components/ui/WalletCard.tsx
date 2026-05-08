@@ -1,8 +1,8 @@
 import { motion } from "framer-motion";
 import { useState } from "react";
-import { ArrowUpRight, ArrowDownLeft, MoreHorizontal, Star, Snowflake, Play, Pencil, Trash2 } from "lucide-react";
+import { ArrowUpRight, Plus, MoreHorizontal, Star, Snowflake, Play, Pencil, Trash2 } from "lucide-react";
 import SendMoneyModal from "@/components/modals/SendMoneyModal";
-import ReceiveMoneyModal from "@/components/modals/ReceiveMoneyModal";
+import CardPaymentModal from "@/components/modals/CardPaymentModal";
 import {
   DropdownMenu,
   DropdownMenuContent,
