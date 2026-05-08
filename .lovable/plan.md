@@ -1,39 +1,49 @@
 ## Goal
-Switch the Plaid integration on `/transfers/canada` from **Sandbox** to **Production** so real Canadian bank accounts can be linked and debited via Stripe PAD.
 
-## Important warnings before proceeding
+Expand the "Add New Card" flow on `/cards` to match the eFinMoney issuance guide: support new card types (Debit, Debit Visa, Credit Card), generate full card details (number, expiry, CVV), and enforce wallet-based controls.
 
-1. **Plaid Production access must be approved.** Plaid does not grant Production access by default — you have to request it from your Plaid dashboard (Team Settings → Request Production Access) and Plaid reviews your company, use case, and compliance posture. If your account is not yet approved, the secret will keep returning `INVALID_API_KEYS` no matter what we do in code.
-2. **Production credentials are different from Sandbox.** They live under a separate row in https://dashboard.plaid.com/developers/keys with the environment selector set to **Production**. The `client_id` is the same across environments, but each environment has its **own secret**.
-3. **Real money & real PAD mandates.** Once switched, every "Transfer" click on `/transfers/canada` initiates a real Pre-Authorized Debit on the linked Canadian bank account through Stripe. The sandbox helper banner ("use `user_good`/`pass_good`") will be misleading and must be removed.
-4. **Stripe must also be in live mode.** The PAD debit is executed by `intra-ca-transfer-create` via Stripe. If `STRIPE_SECRET_KEY` is still a `sk_test_...` key, the debit will fail or be a test charge. To go truly live end-to-end, Stripe needs to be live too.
+## Changes
 
-## What will change
+### 1. Database (migration)
+- Extend `cards.card_type` CHECK constraint to allow: `virtual`, `physical`, `debit`, `debit_visa`, `credit`.
+- Add columns:
+  - `card_number_last16 text` — full 16-digit PAN (display masked except for the owner; we already RLS-restrict to `auth.uid() = user_id`).
+  - `cvv text` — 3-digit code.
+  - `expiry_month int`, `expiry_year int` (kept alongside existing `expires_at` for clean MM/YY formatting).
+  - `funding_source text` — `wallet` for debit/debit_visa, `credit_line` for credit.
+  - `credit_limit numeric` — nullable, used when type = `credit`.
+- Keep RLS as-is (owner-only read). No change to admin policy.
 
-### 1. Environment variables (no UI for you to click — I'll prompt you)
-- Update `PLAID_ENV` from `sandbox` → `production`
-- Update `PLAID_SECRET` to the **Production secret** from the Plaid dashboard
-- Confirm `PLAID_CLIENT_ID` is correct (usually unchanged, but worth re-pasting)
+### 2. Hook (`src/hooks/useCards.tsx`)
+- Update `Card` interface with new fields.
+- In `createCard`:
+  - Generate a realistic 16-digit PAN with network-specific BIN prefix (Visa `4`, Mastercard `5`) + Luhn check digit.
+  - Generate random 3-digit CVV.
+  - Compute expiry MM/YY (today + 4 years).
+  - Validate: for `debit`/`debit_visa`, `wallet_id` is required and wallet balance must be > 0 (read via existing `wallets` query).
+  - For `credit`, require `credit_limit`.
 
-### 2. Frontend copy on `/transfers/canada` (`src/pages/CanadaTransferPage.tsx`)
-- Remove the yellow "Sandbox mode — use user_good / pass_good" alert
-- Replace it with a Production notice that emphasizes: real bank link, real PAD authorization, funds debited from your actual account
-- Remove the "sandbox limitation" wording on the EFT-numbers warning since Production returns real institution/branch/account numbers
+### 3. UI (`src/components/modals/AddCardModal.tsx`)
+- Replace Card Type options with: Debit, Debit Visa, Credit Card (drop legacy virtual/physical from the picker but keep them valid in DB for backward compatibility).
+- Conditional fields:
+  - Debit / Debit Visa → require Linked Wallet; show wallet balance hint.
+  - Credit Card → hide Linked Wallet, show "Credit Limit" instead of (or alongside) Spending Limit.
+- Show a review summary block before the Create button (cardholder, type, network, wallet/credit, limit).
+- After creation, show a success state revealing the generated card number, expiry, and CVV with a copy button and a "Done" action. Numbers are masked by default with reveal toggle (already present pattern on `CardsPage`).
 
-### 3. Edge function `supabase/functions/plaid-create-link-token/index.ts`
-- No code change required — it already reads `PLAID_ENV` dynamically and builds `https://${PLAID_ENV}.plaid.com`
-- It will automatically hit `https://production.plaid.com` once the secret flips
+### 4. Cards display (`src/pages/CardsPage.tsx`)
+- Use the stored full PAN (when revealed) instead of the hard-coded `4532 1234 5678 ····`.
+- Use stored MM/YY when present; fall back to `expires_at`.
+- Render new card-type labels (Debit / Debit Visa / Credit) in the badge.
 
-### 4. Edge function `supabase/functions/plaid-exchange-token/index.ts`
-- I'll re-read it during build to confirm it also uses `PLAID_ENV` dynamically (same pattern). If it has `sandbox` hardcoded anywhere, I'll fix it.
+### 5. Internal controls (client-side checks before submit)
+- Block submit with toast if: wallet not selected for debit types, wallet balance is zero, credit limit missing for credit type, or cardholder name is empty.
 
-## Steps once you approve
+## Out of scope
+- No real card issuer integration (Stripe Issuing, Marqeta, etc.). PAN/CVV are generated locally for prototype/demo purposes — same approach already used for `last_four`.
+- No changes to freeze/edit/delete flows.
 
-1. I'll prompt you to update the three secrets (`PLAID_ENV`, `PLAID_SECRET`, optionally `PLAID_CLIENT_ID`) via a secure form.
-2. I'll update the page copy on `/transfers/canada`.
-3. I'll verify `plaid-exchange-token` is environment-agnostic.
-4. I'll re-test `plaid-create-link-token` with curl. If Plaid still returns `INVALID_API_KEYS`, that confirms your Production access hasn't been granted yet by Plaid — and the only fix is requesting it from them.
-
-## Confirm before I proceed
-- Has Plaid **already approved** Production access for your company?
-- Is your **Stripe key live** (`sk_live_...`), or do you want to keep Stripe in test while Plaid is live (works but the debit side will be simulated)?
+## Technical notes
+- Luhn generator + Visa/Mastercard BIN logic added inline in `useCards.tsx`.
+- `funding_source` defaults to `wallet` so existing rows stay valid.
+- New CHECK constraint replaces the old one in a single migration.
