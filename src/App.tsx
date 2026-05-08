@@ -103,7 +103,8 @@ const AppRoutes = () => {
     <AnimatePresence mode="wait">
       <PageTransition key={location.pathname}>
         <Routes location={location}>
-          <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+          <Route path="/" element={<RootRoute />} />
+          <Route path="/dashboard" element={<ProtectedRoute><Index /></ProtectedRoute>} />
           <Route path="/wallets" element={<ProtectedRoute><WalletsPage /></ProtectedRoute>} />
           <Route path="/send" element={<ProtectedRoute><SendPage /></ProtectedRoute>} />
           <Route path="/exchange" element={<ProtectedRoute><ExchangePage /></ProtectedRoute>} />
