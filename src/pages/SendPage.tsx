@@ -197,8 +197,10 @@ const SendPage = () => {
         >
           <div className="text-center">
             <h1 className="text-2xl font-display font-bold text-foreground">Send Money</h1>
-            <p className="text-muted-foreground">Fast transfers to Africa</p>
+            <p className="text-muted-foreground">Choose how you'd like to send</p>
           </div>
+
+          <SendTabs />
 
           {/* Progress Steps */}
           <div className="flex items-center justify-center gap-2">
