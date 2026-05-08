@@ -34,6 +34,7 @@ const CardsPage = () => {
   const [editCard, setEditCard] = useState<CardRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<CardRow | null>(null);
   const [addOpen, setAddOpen] = useState(false);
+  const [fundCard, setFundCard] = useState<CardRow | null>(null);
 
   const toggleCardNumber = (cardId: string) => {
     setShowCardNumbers((prev) => ({ ...prev, [cardId]: !prev[cardId] }));
