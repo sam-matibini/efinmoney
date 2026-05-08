@@ -539,6 +539,8 @@ const SendPage = () => {
               <p className="text-sm font-medium">24/7 Support</p>
             </div>
           </div>
+            </TabsContent>
+          </Tabs>
         </motion.div>
       </main>
 
