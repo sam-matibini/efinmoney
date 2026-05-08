@@ -14,6 +14,7 @@ import {
 import NotificationsPanel from "@/components/header/NotificationsPanel";
 import SearchModal from "@/components/header/SearchModal";
 import ThemeToggle from "@/components/theme/ThemeToggle";
+import { useWallets } from "@/hooks/useWallets";
 
 const Header = () => {
   const { signOut, user } = useAuth();
