@@ -156,7 +156,7 @@ const StatsOverview = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
-            className="glass rounded-2xl p-4 sm:p-5"
+            className="glass rounded-2xl p-4 sm:p-5 hover-lift"
           >
             <div className="flex items-start justify-between mb-2 sm:mb-3">
               <div className="p-1.5 sm:p-2 rounded-lg bg-primary/10">
@@ -175,6 +175,14 @@ const StatsOverview = () => {
             </div>
             {stat.loading ? (
               <Skeleton className="h-7 sm:h-8 w-20 sm:w-24 mb-1" />
+            ) : stat.animated && stat.label === 'Total Balance' ? (
+              <h3 className="text-lg sm:text-2xl font-display font-bold text-foreground mb-1 truncate">
+                <AnimatedNumber value={stat.numericValue as number} decimals={2} prefix="≈ $" suffix=" USD" />
+              </h3>
+            ) : stat.animated ? (
+              <h3 className="text-lg sm:text-2xl font-display font-bold text-foreground mb-1 truncate">
+                <AnimatedNumber value={stat.numericValue as number} decimals={0} />
+              </h3>
             ) : (
               <h3 className="text-lg sm:text-2xl font-display font-bold text-foreground mb-1 truncate">
                 {stat.value}
