@@ -11,6 +11,7 @@ import DeleteCardModal from "@/components/modals/DeleteCardModal";
 import AddCardModal from "@/components/modals/AddCardModal";
 import CardPaymentModal from "@/components/modals/CardPaymentModal";
 import FlipCard from "@/components/cards/FlipCard";
+import CardStack from "@/components/cards/CardStack";
 import { useCards, useCardMutations, type Card as CardRow } from "@/hooks/useCards";
 import {
   DropdownMenu,
