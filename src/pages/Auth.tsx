@@ -1,11 +1,55 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Eye, EyeOff, Mail, Lock, User, ArrowRight, Shield } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, User, ArrowRight, Shield, Zap, Globe2, DollarSign, Euro, Bitcoin } from "lucide-react";
+import RippleButton from "@/components/ui/RippleButton";
+
+const FEATURE_CARDS = [
+  { icon: Zap, emoji: "💸", title: "Instant Transfers", desc: "Send money in seconds, not days" },
+  { icon: Shield, emoji: "🔒", title: "Bank-Grade Security", desc: "End-to-end encryption & 2FA" },
+  { icon: Globe2, emoji: "🌍", title: "50+ Countries", desc: "Reach recipients across the globe" },
+];
+
+const FX_TICKER = [
+  "USD → KES  128.45",
+  "CAD → NGN  580.10",
+  "USD → GHS  15.20",
+  "EUR → ZAR  19.85",
+  "GBP → INR  105.30",
+  "USD → CAD  1.36",
+  "USD → EUR  0.92",
+  "CAD → USD  0.74",
+];
+
+const FLOATING_ICONS = [
+  { Icon: DollarSign, top: "12%", left: "10%", delay: 0, size: 28 },
+  { Icon: Euro, top: "70%", left: "8%", delay: 1.5, size: 24 },
+  { Icon: Globe2, top: "20%", left: "75%", delay: 0.8, size: 32 },
+  { Icon: Bitcoin, top: "75%", left: "78%", delay: 2.2, size: 26 },
+  { Icon: DollarSign, top: "45%", left: "85%", delay: 3, size: 20 },
+];
+
+const Typewriter = ({ text, delay = 0, className }: { text: string; delay?: number; className?: string }) => {
+  const chars = useMemo(() => text.split(""), [text]);
+  return (
+    <span className={className}>
+      {chars.map((c, i) => (
+        <motion.span
+          key={i}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: delay + i * 0.04, duration: 0.01 }}
+        >
+          {c}
+        </motion.span>
+      ))}
+    </span>
+  );
+};
 
 const Auth = () => {
   const [isSignUp, setIsSignUp] = useState(false);
@@ -17,24 +61,37 @@ const Auth = () => {
   const { signIn, signUp } = useAuth();
   const navigate = useNavigate();
 
+  // Stable bubble positions/delays
+  const bubbles = useMemo(
+    () =>
+      Array.from({ length: 14 }).map((_, i) => ({
+        left: `${(i * 7 + 5) % 95}%`,
+        size: 8 + ((i * 11) % 22),
+        delay: (i * 0.7) % 12,
+        duration: 9 + ((i * 1.3) % 8),
+      })),
+    [],
+  );
+
+  useEffect(() => {
+    document.title = isSignUp ? "Create account · eFinMoney" : "Sign in · eFinMoney";
+  }, [isSignUp]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-
     try {
       if (isSignUp) {
         const { error } = await signUp(email, password, fullName);
-        if (error) {
-          toast.error(error.message);
-        } else {
+        if (error) toast.error(error.message);
+        else {
           toast.success("Account created! Welcome to eFinMoney.");
           navigate("/");
         }
       } else {
         const { error } = await signIn(email, password);
-        if (error) {
-          toast.error(error.message);
-        } else {
+        if (error) toast.error(error.message);
+        else {
           toast.success("Welcome back!");
           navigate("/");
         }
@@ -46,58 +103,122 @@ const Auth = () => {
 
   return (
     <div className="min-h-screen bg-background flex">
-      {/* Left Panel - Branding */}
-      <div className="hidden lg:flex lg:w-1/2 gradient-primary relative overflow-hidden">
-        <div className="absolute inset-0">
-          <div className="absolute -right-32 -top-32 h-96 w-96 rounded-full bg-foreground/5 blur-3xl" />
-          <div className="absolute -bottom-32 -left-32 h-80 w-80 rounded-full bg-foreground/5 blur-3xl" />
+      {/* ====== LEFT PANEL ====== */}
+      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden text-white"
+        style={{ background: "linear-gradient(135deg, hsl(160 84% 39%) 0%, hsl(160 84% 28%) 100%)" }}>
+
+        {/* Radial highlight */}
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute -right-40 -top-40 h-[28rem] w-[28rem] rounded-full bg-white/10 blur-3xl" />
+          <div className="absolute -bottom-40 -left-32 h-96 w-96 rounded-full bg-white/5 blur-3xl" />
         </div>
-        
-        <div className="relative z-10 flex flex-col justify-center px-16">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
+
+        {/* Floating icons */}
+        {FLOATING_ICONS.map(({ Icon, top, left, delay, size }, i) => (
+          <div
+            key={i}
+            className="absolute text-white/15 animate-float-slow pointer-events-none"
+            style={{ top, left, animationDelay: `${delay}s` }}
           >
-            <div className="flex items-center gap-3 mb-12">
-              <div className="w-12 h-12 rounded-xl bg-primary-foreground/20 flex items-center justify-center">
-                <span className="text-2xl font-bold text-primary-foreground">e</span>
-              </div>
-              <span className="font-display font-bold text-2xl text-primary-foreground">eFinMoney</span>
+            <Icon size={size} strokeWidth={1.5} />
+          </div>
+        ))}
+
+        {/* Bubbles */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          {bubbles.map((b, i) => (
+            <span
+              key={i}
+              className="absolute bottom-0 rounded-full bg-white/15 animate-bubble-up"
+              style={{
+                left: b.left,
+                width: b.size,
+                height: b.size,
+                animationDelay: `${b.delay}s`,
+                animationDuration: `${b.duration}s`,
+              }}
+            />
+          ))}
+        </div>
+
+        {/* Content */}
+        <div className="relative z-10 flex flex-col justify-between px-14 py-14 w-full">
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="flex items-center gap-3"
+          >
+            <div className="w-11 h-11 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
+              <span className="text-2xl font-bold">e</span>
             </div>
+            <span className="font-display font-bold text-2xl">eFinMoney</span>
+          </motion.div>
 
-            <h1 className="text-4xl font-display font-bold text-primary-foreground mb-6 leading-tight">
-              Send money across borders,<br />instantly.
+          <div className="max-w-md">
+            <h1 className="text-4xl xl:text-5xl font-display font-bold leading-tight mb-5">
+              <Typewriter text="Send money across borders," delay={0.3} />
+              <br />
+              <span className="text-white/90">
+                <Typewriter text="instantly." delay={1.5} />
+              </span>
             </h1>
-            <p className="text-lg text-primary-foreground/80 mb-8 max-w-md">
-              Multi-currency wallets, FX trading, crypto, and mobile money transfers. Bank-grade security.
-            </p>
+            <motion.p
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 2.1, duration: 0.5 }}
+              className="text-lg text-white/80 mb-8"
+            >
+              Multi-currency wallets, FX, crypto, and mobile money — all in one premium fintech experience.
+            </motion.p>
 
-            <div className="grid grid-cols-2 gap-4 max-w-md">
-              {[
-                { icon: Shield, label: 'Bank-Grade Security' },
-                { icon: ArrowRight, label: 'Instant Transfers' },
-              ].map((item, index) => (
-                <div key={index} className="flex items-center gap-3 text-primary-foreground/90">
-                  <div className="p-2 rounded-lg bg-primary-foreground/10">
-                    <item.icon className="w-5 h-5" />
+            <div className="space-y-3">
+              {FEATURE_CARDS.map((f, i) => (
+                <motion.div
+                  key={f.title}
+                  initial={{ opacity: 0, x: -30 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 2.4 + i * 0.18, duration: 0.5, ease: "easeOut" }}
+                  whileHover={{ x: 4 }}
+                  className="flex items-center gap-4 p-4 rounded-2xl bg-white/10 backdrop-blur-md border border-white/15"
+                >
+                  <div className="text-2xl">{f.emoji}</div>
+                  <div>
+                    <div className="font-semibold">{f.title}</div>
+                    <div className="text-sm text-white/75">{f.desc}</div>
                   </div>
-                  <span className="text-sm font-medium">{item.label}</span>
-                </div>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+
+          {/* Live ticker */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 3, duration: 0.6 }}
+            className="relative w-full overflow-hidden rounded-xl bg-white/10 backdrop-blur-md border border-white/15 py-3"
+          >
+            <div className="flex w-max animate-marquee whitespace-nowrap">
+              {[...FX_TICKER, ...FX_TICKER].map((line, i) => (
+                <span key={i} className="mx-6 text-sm font-medium text-white/90">
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-300 mr-2 animate-pulse" />
+                  {line}
+                </span>
               ))}
             </div>
           </motion.div>
         </div>
       </div>
 
-      {/* Right Panel - Auth Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
+      {/* ====== RIGHT PANEL ====== */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-10 bg-background">
         <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
           className="w-full max-w-md"
         >
-          {/* Mobile Logo */}
           <div className="flex items-center gap-3 mb-8 lg:hidden">
             <div className="gradient-primary w-10 h-10 rounded-xl flex items-center justify-center shadow-glow">
               <span className="text-xl font-bold text-primary-foreground">e</span>
@@ -106,17 +227,15 @@ const Auth = () => {
           </div>
 
           <div className="mb-8">
-            <h2 className="text-2xl font-display font-bold text-foreground mb-2">
+            <h2 className="text-3xl font-display font-bold text-foreground mb-2">
               {isSignUp ? "Create your account" : "Welcome back"}
             </h2>
             <p className="text-muted-foreground">
-              {isSignUp 
-                ? "Start sending money in minutes" 
-                : "Sign in to access your wallets"}
+              {isSignUp ? "Start sending money in minutes" : "Sign in to access your wallets"}
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-5">
             <AnimatePresence mode="wait">
               {isSignUp && (
                 <motion.div
@@ -125,7 +244,7 @@ const Auth = () => {
                   exit={{ opacity: 0, height: 0 }}
                   className="space-y-2"
                 >
-                  <Label htmlFor="fullName" className="text-muted-foreground">Full Name</Label>
+                  <Label htmlFor="fullName" className="text-foreground/80">Full Name</Label>
                   <div className="relative">
                     <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                     <Input
@@ -134,7 +253,7 @@ const Auth = () => {
                       placeholder="John Doe"
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
-                      className="pl-12 h-12 bg-secondary border-none text-foreground"
+                      className="pl-12 h-12 bg-secondary border-border focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/30 transition-all"
                       required={isSignUp}
                     />
                   </div>
@@ -143,7 +262,7 @@ const Auth = () => {
             </AnimatePresence>
 
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-muted-foreground">Email</Label>
+              <Label htmlFor="email" className="text-foreground/80">Email</Label>
               <div className="relative">
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                 <Input
@@ -152,14 +271,14 @@ const Auth = () => {
                   placeholder="you@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="pl-12 h-12 bg-secondary border-none text-foreground"
+                  className="pl-12 h-12 bg-secondary border-border focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/30 transition-all"
                   required
                 />
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password" className="text-muted-foreground">Password</Label>
+              <Label htmlFor="password" className="text-foreground/80">Password</Label>
               <div className="relative">
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                 <Input
@@ -168,7 +287,7 @@ const Auth = () => {
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="pl-12 pr-12 h-12 bg-secondary border-none text-foreground"
+                  className="pl-12 pr-12 h-12 bg-secondary border-border focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/30 transition-all"
                   required
                   minLength={6}
                 />
@@ -182,25 +301,23 @@ const Auth = () => {
               </div>
             </div>
 
-            <motion.button
+            <RippleButton
               type="submit"
               disabled={isLoading}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              className="w-full h-12 rounded-xl gradient-primary text-primary-foreground font-medium shadow-glow disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full h-12 rounded-xl gradient-primary text-primary-foreground font-medium shadow-glow disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-transform hover:-translate-y-0.5 active:translate-y-0"
             >
               {isLoading ? (
-                <div className="w-5 h-5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               ) : (
                 <>
                   {isSignUp ? "Create Account" : "Sign In"}
                   <ArrowRight className="w-5 h-5" />
                 </>
               )}
-            </motion.button>
+            </RippleButton>
           </form>
 
-          <div className="mt-8 text-center">
+          <div className="mt-6 text-center">
             <p className="text-muted-foreground">
               {isSignUp ? "Already have an account?" : "Don't have an account?"}
               <button
@@ -211,6 +328,21 @@ const Auth = () => {
               </button>
             </p>
           </div>
+
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.6 }}
+            className="mt-8 pt-6 border-t border-border text-center"
+          >
+            <p className="text-xs text-muted-foreground mb-2">
+              Trusted by 10,000+ users across 50 countries
+            </p>
+            <div className="flex justify-center gap-2 text-xl">
+              <span>🇨🇦</span><span>🇺🇸</span><span>🇬🇧</span><span>🇰🇪</span>
+              <span>🇳🇬</span><span>🇬🇭</span><span>🇿🇦</span>
+            </div>
+          </motion.div>
 
           {isSignUp && (
             <p className="mt-6 text-center text-xs text-muted-foreground">
