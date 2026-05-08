@@ -16,116 +16,231 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useCardMutations } from "@/hooks/useCards";
+import { useCardMutations, type Card as CardRow, type CardType, type CardNetwork } from "@/hooks/useCards";
 import { useWallets } from "@/hooks/useWallets";
+import { Copy, Check, Eye, EyeOff } from "lucide-react";
+import { toast } from "sonner";
 
 interface AddCardModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
+const formatPan = (pan: string) => pan.replace(/(.{4})/g, "$1 ").trim();
+
 const AddCardModal = ({ isOpen, onClose }: AddCardModalProps) => {
   const { createCard } = useCardMutations();
   const { data: wallets } = useWallets();
 
-  const [cardType, setCardType] = useState<"virtual" | "physical">("virtual");
-  const [cardNetwork, setCardNetwork] = useState<"visa" | "mastercard">("visa");
+  const [cardType, setCardType] = useState<CardType>("debit");
+  const [cardNetwork, setCardNetwork] = useState<CardNetwork>("visa");
   const [cardholderName, setCardholderName] = useState("");
   const [spendingLimit, setSpendingLimit] = useState("5000");
+  const [creditLimit, setCreditLimit] = useState("10000");
   const [walletId, setWalletId] = useState<string>("");
 
+  const [createdCard, setCreatedCard] = useState<CardRow | null>(null);
+  const [reveal, setReveal] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const isCredit = cardType === "credit";
+
   const reset = () => {
-    setCardType("virtual");
+    setCardType("debit");
     setCardNetwork("visa");
     setCardholderName("");
     setSpendingLimit("5000");
+    setCreditLimit("10000");
     setWalletId("");
+    setCreatedCard(null);
+    setReveal(false);
+    setCopied(false);
   };
 
-  const handleSubmit = async () => {
-    if (!cardholderName.trim()) return;
-    await createCard.mutateAsync({
-      card_type: cardType,
-      card_network: cardNetwork,
-      cardholder_name: cardholderName.trim(),
-      spending_limit: Number(spendingLimit) || 5000,
-      wallet_id: walletId || null,
-    });
+  const handleClose = () => {
     reset();
     onClose();
   };
 
+  const selectedWallet = wallets?.find((w) => w.wallet_id === walletId);
+
+  const handleSubmit = async () => {
+    if (!cardholderName.trim()) {
+      toast.error("Cardholder name is required");
+      return;
+    }
+    if (!isCredit && !walletId) {
+      toast.error("Select a linked wallet");
+      return;
+    }
+    if (!isCredit && selectedWallet && Number(selectedWallet.balance) <= 0) {
+      toast.error("Selected wallet has no available balance");
+      return;
+    }
+    if (isCredit && (!creditLimit || Number(creditLimit) <= 0)) {
+      toast.error("Enter a valid credit limit");
+      return;
+    }
+
+    try {
+      const card = await createCard.mutateAsync({
+        card_type: cardType,
+        card_network: cardNetwork,
+        cardholder_name: cardholderName.trim(),
+        spending_limit: Number(spendingLimit) || 5000,
+        credit_limit: isCredit ? Number(creditLimit) : null,
+        wallet_id: isCredit ? null : walletId,
+      });
+      setCreatedCard(card);
+    } catch {
+      // toast handled in hook
+    }
+  };
+
+  const copyDetails = async () => {
+    if (!createdCard?.card_number) return;
+    const text = `Card: ${createdCard.card_number}\nExpiry: ${String(createdCard.expiry_month).padStart(2, "0")}/${String(createdCard.expiry_year).slice(-2)}\nCVV: ${createdCard.cvv}`;
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={(o) => { if (!o) { reset(); onClose(); } }}>
-      <DialogContent className="sm:max-w-[425px] bg-card border-border">
+    <Dialog open={isOpen} onOpenChange={(o) => { if (!o) handleClose(); }}>
+      <DialogContent className="sm:max-w-[460px] bg-card border-border">
         <DialogHeader>
-          <DialogTitle className="font-display">Add New Card</DialogTitle>
+          <DialogTitle className="font-display">
+            {createdCard ? "Card Created" : "Add New Card"}
+          </DialogTitle>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="space-y-2">
-            <Label>Cardholder Name</Label>
-            <Input
-              placeholder="JOHN DOE"
-              value={cardholderName}
-              onChange={(e) => setCardholderName(e.target.value.toUpperCase())}
-            />
-          </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label>Card Type</Label>
-              <Select value={cardType} onValueChange={(v) => setCardType(v as "virtual" | "physical")}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="virtual">Virtual</SelectItem>
-                  <SelectItem value="physical">Physical</SelectItem>
-                </SelectContent>
-              </Select>
+        {createdCard ? (
+          <div className="space-y-4 py-2">
+            <div className="rounded-xl p-5 bg-gradient-to-br from-primary to-primary/60 text-primary-foreground">
+              <div className="flex justify-between items-start mb-6">
+                <span className="text-xs uppercase opacity-80">{createdCard.card_type.replace("_", " ")}</span>
+                <span className="text-sm capitalize">{createdCard.card_network}</span>
+              </div>
+              <div className="flex items-center gap-2 mb-4">
+                <p className="font-mono text-lg tracking-wider">
+                  {reveal && createdCard.card_number
+                    ? formatPan(createdCard.card_number)
+                    : `•••• •••• •••• ${createdCard.last_four}`}
+                </p>
+                <button onClick={() => setReveal((r) => !r)} className="p-1 hover:bg-primary-foreground/10 rounded">
+                  {reveal ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              <div className="flex justify-between text-sm">
+                <div>
+                  <p className="opacity-70 text-xs">Cardholder</p>
+                  <p className="font-medium">{createdCard.cardholder_name}</p>
+                </div>
+                <div>
+                  <p className="opacity-70 text-xs">Expires</p>
+                  <p className="font-mono">
+                    {String(createdCard.expiry_month).padStart(2, "0")}/{String(createdCard.expiry_year).slice(-2)}
+                  </p>
+                </div>
+                <div>
+                  <p className="opacity-70 text-xs">CVV</p>
+                  <p className="font-mono">{reveal ? createdCard.cvv : "•••"}</p>
+                </div>
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label>Network</Label>
-              <Select value={cardNetwork} onValueChange={(v) => setCardNetwork(v as "visa" | "mastercard")}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="visa">Visa</SelectItem>
-                  <SelectItem value="mastercard">Mastercard</SelectItem>
-                </SelectContent>
-              </Select>
+
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={copyDetails}>
+                {copied ? <Check className="w-4 h-4 mr-2" /> : <Copy className="w-4 h-4 mr-2" />}
+                {copied ? "Copied" : "Copy details"}
+              </Button>
+              <Button className="flex-1" onClick={handleClose}>Done</Button>
             </div>
-          </div>
 
-          <div className="space-y-2">
-            <Label>Linked Wallet</Label>
-            <Select value={walletId} onValueChange={setWalletId}>
-              <SelectTrigger><SelectValue placeholder="Select a wallet" /></SelectTrigger>
-              <SelectContent>
-                {wallets?.map((w) => (
-                  <SelectItem key={w.wallet_id} value={w.wallet_id}>
-                    {w.flag_emoji} {w.currency_code} — {w.symbol}{Number(w.balance).toFixed(2)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <p className="text-xs text-muted-foreground text-center">
+              Save these details now. CVV will be masked after closing.
+            </p>
           </div>
+        ) : (
+          <>
+            <div className="grid gap-4 py-4">
+              <div className="space-y-2">
+                <Label>Cardholder Name</Label>
+                <Input
+                  placeholder="JOHN DOE"
+                  value={cardholderName}
+                  onChange={(e) => setCardholderName(e.target.value.toUpperCase())}
+                  maxLength={50}
+                />
+              </div>
 
-          <div className="space-y-2">
-            <Label>Spending Limit ($)</Label>
-            <Input
-              type="number"
-              value={spendingLimit}
-              onChange={(e) => setSpendingLimit(e.target.value)}
-            />
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => { reset(); onClose(); }}>Cancel</Button>
-          <Button
-            onClick={handleSubmit}
-            disabled={!cardholderName.trim() || createCard.isPending}
-          >
-            {createCard.isPending ? "Creating..." : "Create Card"}
-          </Button>
-        </DialogFooter>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label>Card Type</Label>
+                  <Select value={cardType} onValueChange={(v) => setCardType(v as CardType)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="debit">Debit</SelectItem>
+                      <SelectItem value="debit_visa">Debit Visa</SelectItem>
+                      <SelectItem value="credit">Credit Card</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Network</Label>
+                  <Select value={cardNetwork} onValueChange={(v) => setCardNetwork(v as CardNetwork)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="visa">Visa</SelectItem>
+                      <SelectItem value="mastercard">Mastercard</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {!isCredit && (
+                <div className="space-y-2">
+                  <Label>Linked Wallet</Label>
+                  <Select value={walletId} onValueChange={setWalletId}>
+                    <SelectTrigger><SelectValue placeholder="Select a wallet" /></SelectTrigger>
+                    <SelectContent>
+                      {wallets?.map((w) => (
+                        <SelectItem key={w.wallet_id} value={w.wallet_id}>
+                          {w.flag_emoji} {w.currency_code} — {w.symbol}{Number(w.balance).toFixed(2)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {selectedWallet && Number(selectedWallet.balance) <= 0 && (
+                    <p className="text-xs text-destructive">Wallet has zero available balance.</p>
+                  )}
+                </div>
+              )}
+
+              {isCredit ? (
+                <div className="space-y-2">
+                  <Label>Credit Limit ($)</Label>
+                  <Input type="number" value={creditLimit} onChange={(e) => setCreditLimit(e.target.value)} />
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label>Spending Limit ($)</Label>
+                  <Input type="number" value={spendingLimit} onChange={(e) => setSpendingLimit(e.target.value)} />
+                </div>
+              )}
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={handleClose}>Cancel</Button>
+              <Button
+                onClick={handleSubmit}
+                disabled={!cardholderName.trim() || createCard.isPending}
+              >
+                {createCard.isPending ? "Creating..." : "Create Card"}
+              </Button>
+            </DialogFooter>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );
