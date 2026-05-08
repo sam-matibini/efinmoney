@@ -48,6 +48,7 @@ const FxTradingPanel = () => {
     const temp = fromWalletId;
     setFromWalletId(toWalletId);
     setToWalletId(temp);
+    setSwapRotation((r) => r + 180);
   };
 
   const handleExchange = async () => {
