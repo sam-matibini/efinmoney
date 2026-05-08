@@ -200,7 +200,25 @@ const SendPage = () => {
             <p className="text-muted-foreground">Choose how you'd like to send</p>
           </div>
 
-          <SendTabs />
+          <Tabs
+            value={searchParams.get('mode') === 'canada' ? 'canada' : 'international'}
+            onValueChange={(v) => {
+              const next = new URLSearchParams(searchParams);
+              if (v === 'canada') next.set('mode', 'canada'); else next.delete('mode');
+              setSearchParams(next, { replace: true });
+            }}
+            className="w-full"
+          >
+            <TabsList className="grid w-full grid-cols-2 h-12">
+              <TabsTrigger value="international" className="gap-1">🌍 Send Internationally</TabsTrigger>
+              <TabsTrigger value="canada" className="gap-1">🇨🇦 Send in Canada</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="canada" className="mt-6">
+              <CanadaSendFlow />
+            </TabsContent>
+
+            <TabsContent value="international" className="mt-6 space-y-6">
 
           {/* Progress Steps */}
           <div className="flex items-center justify-center gap-2">
