@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { Header } from "@/components/layout/Header";
+import Header from "@/components/layout/Header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,7 +28,7 @@ interface PlaidAccountRow {
 
 export default function CanadaTransferPage() {
   const { user } = useAuth();
-  const { wallets } = useWallets();
+  const { data: wallets } = useWallets();
   const qc = useQueryClient();
   const [linkToken, setLinkToken] = useState<string | null>(null);
   const [linking, setLinking] = useState(false);
