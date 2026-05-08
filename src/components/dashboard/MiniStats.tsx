@@ -45,7 +45,7 @@ const MiniStats = () => {
     if (!goals || goals.length === 0) return { pct: 0, label: "No goal" };
     const g = goals[0];
     const pct = Math.min(100, (Number(g.current_amount) / Math.max(1, Number(g.target_amount))) * 100);
-    return { pct, label: g.goal_name || "Savings" };
+    return { pct, label: g.name || "Savings" };
   }, [goals]);
 
   const tier = profile?.kyc_tier?.replace(/[^0-9]/g, "") || "0";

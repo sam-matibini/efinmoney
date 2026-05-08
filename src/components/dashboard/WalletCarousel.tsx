@@ -7,7 +7,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import SendMoneyModal from "@/components/modals/SendMoneyModal";
 import CardPaymentModal from "@/components/modals/CardPaymentModal";
 import CreateWalletModal from "@/components/modals/CreateWalletModal";
-import { useState as useReactState } from "react";
 
 const gradients: Record<string, string> = {
   USD: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
@@ -27,8 +26,7 @@ const WalletCarousel = () => {
   const { data: wallets, isLoading } = useWallets();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [activeIndex, setActiveIndex] = useState(0);
-  const [topUpWalletId, setTopUpWalletId] = useReactState<string | null>(null);
-  const [createOpen, setCreateOpen] = useState(false);
+  const [topUpWalletId, setTopUpWalletId] = useState<string | null>(null);
 
   // Track active card via scroll position
   useEffect(() => {
