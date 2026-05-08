@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import { flagForCountryName, flagForCurrency } from "@/lib/flags";
 import { formatDistanceToNow } from "date-fns";
 
 const payoutMethodNames: Record<string, string> = {
