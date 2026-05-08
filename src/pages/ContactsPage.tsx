@@ -98,19 +98,22 @@ const ContactsPage = () => {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.03 }}
               >
-                <Card className="h-full">
+                <Card className="h-full relative overflow-hidden">
+                  <span className="absolute top-3 right-3 text-3xl leading-none drop-shadow-sm" aria-hidden>
+                    {flagFor(c.country_code)}
+                  </span>
                   <CardContent className="p-5 space-y-4">
                     <div className="flex items-center gap-3">
                       <div className="w-12 h-12 rounded-full gradient-primary flex items-center justify-center text-primary-foreground font-display font-bold">
                         {c.avatar_initials || c.name.slice(0, 2).toUpperCase()}
                       </div>
-                      <div className="min-w-0 flex-1">
+                      <div className="min-w-0 flex-1 pr-8">
                         <p className="font-medium truncate">{c.nickname || c.name}</p>
                         {c.nickname && (
                           <p className="text-xs text-muted-foreground truncate">{c.name}</p>
                         )}
                         <p className="text-xs text-muted-foreground truncate">
-                          {flagFor(c.country_code)} {methodLabel(c)}
+                          {methodLabel(c)}
                         </p>
                       </div>
                     </div>
