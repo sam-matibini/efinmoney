@@ -1,57 +1,39 @@
+## Goal
+Switch the Plaid integration on `/transfers/canada` from **Sandbox** to **Production** so real Canadian bank accounts can be linked and debited via Stripe PAD.
 
+## Important warnings before proceeding
 
-# Plan: Create KNOWN_ISSUES.md Documentation
+1. **Plaid Production access must be approved.** Plaid does not grant Production access by default — you have to request it from your Plaid dashboard (Team Settings → Request Production Access) and Plaid reviews your company, use case, and compliance posture. If your account is not yet approved, the secret will keep returning `INVALID_API_KEYS` no matter what we do in code.
+2. **Production credentials are different from Sandbox.** They live under a separate row in https://dashboard.plaid.com/developers/keys with the environment selector set to **Production**. The `client_id` is the same across environments, but each environment has its **own secret**.
+3. **Real money & real PAD mandates.** Once switched, every "Transfer" click on `/transfers/canada` initiates a real Pre-Authorized Debit on the linked Canadian bank account through Stripe. The sandbox helper banner ("use `user_good`/`pass_good`") will be misleading and must be removed.
+4. **Stripe must also be in live mode.** The PAD debit is executed by `intra-ca-transfer-create` via Stripe. If `STRIPE_SECRET_KEY` is still a `sk_test_...` key, the debit will fail or be a test charge. To go truly live end-to-end, Stripe needs to be live too.
 
-## Overview
-Create a comprehensive `KNOWN_ISSUES.md` file documenting all hardcoded/non-functional features found across the app, organized by section, with remediation guidance for each.
+## What will change
 
-## Issues Identified
+### 1. Environment variables (no UI for you to click — I'll prompt you)
+- Update `PLAID_ENV` from `sandbox` → `production`
+- Update `PLAID_SECRET` to the **Production secret** from the Plaid dashboard
+- Confirm `PLAID_CLIENT_ID` is correct (usually unchanged, but worth re-pasting)
 
-### 1. Cards Section — Fully Hardcoded
-- Cards stored in local `useState` with mock data (lines 38-61 of `CardsPage.tsx`)
-- No database table for cards; no persistence across sessions
-- "New Card" button has no create flow
-- "Request Physical Card" button is non-functional
-- Lock/freeze/edit/delete only work in-memory (lost on refresh)
+### 2. Frontend copy on `/transfers/canada` (`src/pages/CanadaTransferPage.tsx`)
+- Remove the yellow "Sandbox mode — use user_good / pass_good" alert
+- Replace it with a Production notice that emphasizes: real bank link, real PAD authorization, funds debited from your actual account
+- Remove the "sandbox limitation" wording on the EFT-numbers warning since Production returns real institution/branch/account numbers
 
-### 2. Wallet Section — Receive Button Non-Functional
-- `WalletCard.tsx` line 189-201: "Receive" button is a plain `<motion.button>` with no `onClick` handler or modal
-- "Send" button correctly wraps in `<SendMoneyModal>`, but "Receive" does nothing
+### 3. Edge function `supabase/functions/plaid-create-link-token/index.ts`
+- No code change required — it already reads `PLAID_ENV` dynamically and builds `https://${PLAID_ENV}.plaid.com`
+- It will automatically hit `https://production.plaid.com` once the secret flips
 
-### 3. Exchange Tab — Crypto Buy/Sell Fails
-- `CryptoTradingPanel.tsx`: The edge function call uses path `crypto-trading/pairs` (sub-path routing), which may not be supported by the edge function deployment
-- FX Currency tab: Uses `fx-engine` edge function — same potential issue; also fallback hardcoded rates if no DB rates exist
-- Both tabs show UI but actual execution likely fails silently or with errors
+### 4. Edge function `supabase/functions/plaid-exchange-token/index.ts`
+- I'll re-read it during build to confirm it also uses `PLAID_ENV` dynamically (same pattern). If it has `sandbox` hardcoded anywhere, I'll fix it.
 
-### 4. Send Page — Hardcoded Elements
-- Bank accounts list (lines 194-202): Hardcoded "TD Chequing", "RBC Savings", "BMO Chequing"
-- Credit cards list (lines 210-219): Hardcoded "Visa ••••5678", "Mastercard ••••9012"
-- FX rates have hardcoded fallbacks (lines 50-54) if no DB rates
-- Bank/card funding sources don't actually process payments
+## Steps once you approve
 
-### 5. Dashboard — Hardcoded/Mock Data
-- `RecentTransactions.tsx` lines 46-75: Falls back to hardcoded mock transactions when no real transfers exist
-- `StatsOverview.tsx` line 47: Countries defaults to hardcoded "8" if no data
-- `StatsOverview.tsx` line 31: "+12.5%" change is hardcoded, not calculated
-- `StatsOverview.tsx` line 54: KYC status hardcoded as "Verified, Tier 3"
+1. I'll prompt you to update the three secrets (`PLAID_ENV`, `PLAID_SECRET`, optionally `PLAID_CLIENT_ID`) via a secure form.
+2. I'll update the page copy on `/transfers/canada`.
+3. I'll verify `plaid-exchange-token` is environment-agnostic.
+4. I'll re-test `plaid-create-link-token` with curl. If Plaid still returns `INVALID_API_KEYS`, that confirms your Production access hasn't been granted yet by Plaid — and the only fix is requesting it from them.
 
-### 6. Header/Notifications — Non-Functional
-- `Header.tsx` line 90: Search button has no handler
-- `Header.tsx` line 93-96: Bell/notification icon shows a hardcoded red dot, no notification system
-- Profile dropdown items (Profile Settings, KYC Verification, Security) have no linked pages
-
-### 7. Dashboard Quick Actions — Placeholders
-- `QuickActions.tsx`: "Deposit", "Mobile Money", "Pay Bills", "Savings" buttons are non-functional (no onClick or modal)
-
-## File to Create
-- **`KNOWN_ISSUES.md`** — Full documentation of each issue with:
-  - Description of the problem
-  - Affected files and line references
-  - Severity (cosmetic, partial, non-functional)
-  - Recommended fix approach (database table, edge function, modal, etc.)
-
-## Technical Details
-- Single markdown file creation, no code changes
-- Organized by app section for easy navigation
-- Includes a priority matrix (critical → low)
-
+## Confirm before I proceed
+- Has Plaid **already approved** Production access for your company?
+- Is your **Stripe key live** (`sk_live_...`), or do you want to keep Stripe in test while Plaid is live (works but the debit side will be simulated)?
