@@ -5,7 +5,9 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const PLAID_ENV = (Deno.env.get("PLAID_ENV") || "sandbox").trim();
+const ALLOWED_ENVS = new Set(["sandbox", "development", "production"]);
+const RAW_ENV = (Deno.env.get("PLAID_ENV") || "production").trim().toLowerCase();
+const PLAID_ENV = ALLOWED_ENVS.has(RAW_ENV) ? RAW_ENV : "production";
 const PLAID_BASE = `https://${PLAID_ENV}.plaid.com`;
 
 async function plaid(path: string, body: Record<string, unknown>) {
