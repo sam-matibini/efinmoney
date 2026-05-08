@@ -6,6 +6,7 @@ import { useProfile } from "@/hooks/useProfile";
 import { useFxRates } from "@/hooks/useFxRates";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import AnimatedNumber from "@/components/ui/AnimatedNumber";
 
 // Build a lookup of latest from→USD rates
 const buildUsdRateMap = (rates: { from_currency: string; to_currency: string; effective_rate: number }[]) => {
