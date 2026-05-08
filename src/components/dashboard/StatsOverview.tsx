@@ -108,6 +108,8 @@ const StatsOverview = () => {
     {
       label: 'Total Balance',
       value: formattedTotal,
+      numericValue: totalBalance,
+      animated: true,
       change: growthLabel,
       icon: growthPositive ? TrendingUp : TrendingDown,
       positive: growthPositive,
@@ -117,6 +119,8 @@ const StatsOverview = () => {
     {
       label: 'Recipients',
       value: uniqueRecipients.toString(),
+      numericValue: uniqueRecipients,
+      animated: true,
       change: uniqueRecipients === 0 ? 'No saved contacts' : 'Saved contacts',
       icon: Users,
       positive: true,
@@ -125,6 +129,8 @@ const StatsOverview = () => {
     {
       label: 'Countries',
       value: uniqueCountries.toString(),
+      numericValue: uniqueCountries,
+      animated: true,
       change: uniqueCountries === 0 ? 'No corridors yet' : 'Active corridors',
       icon: Globe,
       positive: true,
@@ -133,6 +139,7 @@ const StatsOverview = () => {
     {
       label: 'KYC Status',
       value: profile ? (isVerified ? 'Verified' : formatKycStatus(kycStatus) || 'Unverified') : 'Unverified',
+      animated: false,
       change: profile && kycTier ? formatKycTier(kycTier) : '—',
       icon: Shield,
       positive: isVerified,
