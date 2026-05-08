@@ -1281,6 +1281,69 @@ export type Database = {
         }
         Relationships: []
       }
+      intra_ca_transfers: {
+        Row: {
+          amount_cad: number
+          created_at: string
+          description: string | null
+          destination_wallet_id: string | null
+          failure_reason: string | null
+          id: string
+          plaid_account_id: string | null
+          reference: string
+          status: string
+          stripe_payment_intent_id: string | null
+          stripe_status: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount_cad: number
+          created_at?: string
+          description?: string | null
+          destination_wallet_id?: string | null
+          failure_reason?: string | null
+          id?: string
+          plaid_account_id?: string | null
+          reference?: string
+          status?: string
+          stripe_payment_intent_id?: string | null
+          stripe_status?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount_cad?: number
+          created_at?: string
+          description?: string | null
+          destination_wallet_id?: string | null
+          failure_reason?: string | null
+          id?: string
+          plaid_account_id?: string | null
+          reference?: string
+          status?: string
+          stripe_payment_intent_id?: string | null
+          stripe_status?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "intra_ca_transfers_destination_wallet_id_fkey"
+            columns: ["destination_wallet_id"]
+            isOneToOne: false
+            referencedRelation: "wallets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "intra_ca_transfers_plaid_account_id_fkey"
+            columns: ["plaid_account_id"]
+            isOneToOne: false
+            referencedRelation: "plaid_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ledger_accounts: {
         Row: {
           account_type: Database["public"]["Enums"]["account_type"]
@@ -1585,6 +1648,101 @@ export type Database = {
           metric_value?: number
           period_end?: string
           period_start?: string
+        }
+        Relationships: []
+      }
+      plaid_accounts: {
+        Row: {
+          account_number: string | null
+          branch_number: string | null
+          created_at: string
+          currency_code: string | null
+          id: string
+          institution_number: string | null
+          item_id: string
+          mask: string | null
+          name: string
+          official_name: string | null
+          plaid_account_id: string
+          subtype: string | null
+          type: string | null
+          user_id: string
+        }
+        Insert: {
+          account_number?: string | null
+          branch_number?: string | null
+          created_at?: string
+          currency_code?: string | null
+          id?: string
+          institution_number?: string | null
+          item_id: string
+          mask?: string | null
+          name: string
+          official_name?: string | null
+          plaid_account_id: string
+          subtype?: string | null
+          type?: string | null
+          user_id: string
+        }
+        Update: {
+          account_number?: string | null
+          branch_number?: string | null
+          created_at?: string
+          currency_code?: string | null
+          id?: string
+          institution_number?: string | null
+          item_id?: string
+          mask?: string | null
+          name?: string
+          official_name?: string | null
+          plaid_account_id?: string
+          subtype?: string | null
+          type?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plaid_accounts_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "plaid_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      plaid_items: {
+        Row: {
+          access_token: string
+          created_at: string
+          id: string
+          institution_id: string | null
+          institution_name: string | null
+          item_id: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          created_at?: string
+          id?: string
+          institution_id?: string | null
+          institution_name?: string | null
+          item_id: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          created_at?: string
+          id?: string
+          institution_id?: string | null
+          institution_name?: string | null
+          item_id?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
