@@ -193,24 +193,25 @@ const WalletCard = ({
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             disabled={isFrozen || !walletId}
-            onClick={() => walletId && setReceiveOpen(true)}
+            onClick={() => walletId && setTopUpOpen(true)}
             className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-medium transition-colors ${
               isMain 
                 ? 'bg-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/30' 
                 : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
             } disabled:opacity-50 disabled:cursor-not-allowed`}
           >
-            <ArrowDownLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-            Receive
+            <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            Top-up
           </motion.button>
         </div>
       </div>
 
       {walletId && (
-        <ReceiveMoneyModal
-          isOpen={receiveOpen}
-          onClose={() => setReceiveOpen(false)}
-          wallet={{ walletId, currency, balance, symbol, flag }}
+        <CardPaymentModal
+          open={topUpOpen}
+          onOpenChange={setTopUpOpen}
+          defaultWalletId={walletId}
+          title={`Top up ${currency} wallet`}
         />
       )}
     </motion.div>
