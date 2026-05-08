@@ -206,7 +206,7 @@ export default function CanadaTransferPage() {
               </Select>
               {missingEft && (
                 <p className="text-xs text-amber-500">
-                  This sandbox account has no EFT numbers — Stripe PAD will fail. Try linking with a different test institution.
+                  This account is missing EFT routing numbers — Stripe PAD cannot be initiated. Try linking a different account.
                 </p>
               )}
             </div>
