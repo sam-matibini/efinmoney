@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
-import { Send, Download, RefreshCw, Smartphone, CreditCard, PiggyBank } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Send, Download, RefreshCw, Smartphone, CreditCard, PiggyBank, MapPin } from "lucide-react";
 import QuickAction from "@/components/ui/QuickAction";
 import SendMoneyModal from "@/components/modals/SendMoneyModal";
 import ExchangeModal from "@/components/modals/ExchangeModal";
@@ -8,13 +9,18 @@ import MobileMoneyModal from "@/components/modals/MobileMoneyModal";
 import PayBillsModal from "@/components/modals/PayBillsModal";
 import SavingsModal from "@/components/modals/SavingsModal";
 
-const items = [
-  { Modal: SendMoneyModal, icon: Send, label: "Send Money", variant: "primary" as const },
-  { Modal: DepositModal, icon: Download, label: "Deposit", variant: "default" as const },
-  { Modal: ExchangeModal, icon: RefreshCw, label: "Exchange", variant: "default" as const },
-  { Modal: MobileMoneyModal, icon: Smartphone, label: "Mobile Money", variant: "accent" as const },
-  { Modal: PayBillsModal, icon: CreditCard, label: "Pay Bills", variant: "default" as const },
-  { Modal: SavingsModal, icon: PiggyBank, label: "Savings", variant: "default" as const },
+type Item =
+  | { kind: "modal"; Modal: any; icon: any; label: string; variant: "primary" | "default" | "accent" }
+  | { kind: "link"; to: string; icon: any; label: string; variant: "primary" | "default" | "accent" };
+
+const items: Item[] = [
+  { kind: "modal", Modal: SendMoneyModal, icon: Send, label: "Send Money", variant: "primary" },
+  { kind: "link", to: "/send?mode=canada", icon: MapPin, label: "🇨🇦 Send in Canada", variant: "accent" },
+  { kind: "modal", Modal: DepositModal, icon: Download, label: "Deposit", variant: "default" },
+  { kind: "modal", Modal: ExchangeModal, icon: RefreshCw, label: "Exchange", variant: "default" },
+  { kind: "modal", Modal: MobileMoneyModal, icon: Smartphone, label: "Mobile Money", variant: "default" },
+  { kind: "modal", Modal: PayBillsModal, icon: CreditCard, label: "Pay Bills", variant: "default" },
+  { kind: "modal", Modal: SavingsModal, icon: PiggyBank, label: "Savings", variant: "default" },
 ];
 
 const QuickActions = () => {
