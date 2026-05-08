@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import EditCardModal from "@/components/modals/EditCardModal";
 import DeleteCardModal from "@/components/modals/DeleteCardModal";
 import AddCardModal from "@/components/modals/AddCardModal";
+import CardPaymentModal from "@/components/modals/CardPaymentModal";
 import { useCards, useCardMutations, type Card as CardRow } from "@/hooks/useCards";
 import {
   DropdownMenu,
