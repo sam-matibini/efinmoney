@@ -144,8 +144,7 @@ export default function CanadaTransferPage() {
         <Alert className="mb-6 border-primary/30 bg-primary/5">
           <Info className="h-4 w-4" />
           <AlertDescription>
-            <strong>Sandbox mode.</strong> Use Plaid test creds: username <code className="font-mono">user_good</code>, password <code className="font-mono">pass_good</code>.
-            Pick any Canadian bank (e.g. RBC, TD). Stripe will simulate the PAD debit instantly.
+            <strong>Live mode.</strong> You will link your real Canadian bank account through Plaid and authorize a Pre-Authorized Debit (PAD). Funds will be debited from your actual account.
           </AlertDescription>
         </Alert>
 
