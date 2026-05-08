@@ -24,6 +24,7 @@ import DepositComplete from "./pages/DepositComplete";
 import TransferTrackingPage from "./pages/TransferTrackingPage";
 import TransfersListPage from "./pages/TransfersListPage";
 import ContactsPage from "./pages/ContactsPage";
+import CanadaTransferPage from "./pages/CanadaTransferPage";
 
 const queryClient = new QueryClient();
 
@@ -224,6 +225,14 @@ const AppRoutes = () => (
       element={
         <ProtectedRoute>
           <ContactsPage />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/transfers/canada"
+      element={
+        <ProtectedRoute>
+          <CanadaTransferPage />
         </ProtectedRoute>
       }
     />
