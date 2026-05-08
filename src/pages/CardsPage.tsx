@@ -234,15 +234,26 @@ const CardsPage = () => {
                     </Card>
 
                     <div className="flex gap-2 mt-3">
-                      <Button
-                        variant={isFrozen ? "default" : "outline"}
-                        size="sm"
-                        className="flex-1"
-                        onClick={() => handleToggleFreeze(card)}
-                      >
-                        <Snowflake className="w-4 h-4 mr-1" />
-                        {isFrozen ? "Unfreeze" : "Freeze"}
-                      </Button>
+                      {card.funding_source === "external" ? (
+                        <Button
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => setFundCard(card)}
+                        >
+                          <CreditCard className="w-4 h-4 mr-1" />
+                          Fund Wallet
+                        </Button>
+                      ) : (
+                        <Button
+                          variant={isFrozen ? "default" : "outline"}
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => handleToggleFreeze(card)}
+                        >
+                          <Snowflake className="w-4 h-4 mr-1" />
+                          {isFrozen ? "Unfreeze" : "Freeze"}
+                        </Button>
+                      )}
                       <Button
                         variant="outline"
                         size="sm"
