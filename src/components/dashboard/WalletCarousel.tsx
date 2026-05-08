@@ -107,7 +107,7 @@ const WalletCarousel = () => {
               <div className="relative h-full p-5 flex flex-col justify-between">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="text-2xl">{w.flag_emoji || "💰"}</span>
+                    <span className="text-3xl drop-shadow-sm">{w.flag_emoji || "💰"}</span>
                     <div>
                       <p className="font-display font-semibold text-sm">{w.currency_code}</p>
                       <p className="text-[10px] uppercase tracking-wider text-white/60">{w.currency_name}</p>
