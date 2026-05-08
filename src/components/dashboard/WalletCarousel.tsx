@@ -71,13 +71,12 @@ const WalletCarousel = () => {
     <section className="mb-8">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-display font-semibold text-foreground">My Wallets</h2>
-        <button
-          onClick={() => setCreateOpen(true)}
-          className="flex items-center gap-1 text-sm text-primary hover:text-primary/80 font-medium transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          Add Wallet
-        </button>
+        <CreateWalletModal>
+          <button className="flex items-center gap-1 text-sm text-primary hover:text-primary/80 font-medium transition-colors">
+            <Plus className="w-4 h-4" />
+            Add Wallet
+          </button>
+        </CreateWalletModal>
       </div>
 
       <div
@@ -157,13 +156,12 @@ const WalletCarousel = () => {
         })}
 
         {list.length === 0 && (
-          <button
-            onClick={() => setCreateOpen(true)}
-            className="snap-center min-w-[280px] sm:min-w-[340px] aspect-[1.6/1] rounded-2xl border-2 border-dashed border-border flex flex-col items-center justify-center gap-2 text-muted-foreground hover:text-primary hover:border-primary transition-colors"
-          >
-            <Plus className="w-8 h-8" />
-            <span className="font-medium">Create your first wallet</span>
-          </button>
+          <CreateWalletModal>
+            <button className="snap-center min-w-[280px] sm:min-w-[340px] aspect-[1.6/1] rounded-2xl border-2 border-dashed border-border flex flex-col items-center justify-center gap-2 text-muted-foreground hover:text-primary hover:border-primary transition-colors">
+              <Plus className="w-8 h-8" />
+              <span className="font-medium">Create your first wallet</span>
+            </button>
+          </CreateWalletModal>
         )}
       </div>
 
@@ -191,7 +189,7 @@ const WalletCarousel = () => {
           title="Top up wallet"
         />
       )}
-      <CreateWalletModal open={createOpen} onOpenChange={setCreateOpen} />
+      
     </section>
   );
 };
