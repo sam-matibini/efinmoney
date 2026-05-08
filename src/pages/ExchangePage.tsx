@@ -22,6 +22,7 @@ const FxTradingPanel = () => {
   const [toWalletId, setToWalletId] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [swapRotation, setSwapRotation] = useState(0);
 
   const { data: wallets } = useWallets();
   const { data: fxRates } = useFxRates();
