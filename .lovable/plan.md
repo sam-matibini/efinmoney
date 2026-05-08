@@ -1,51 +1,84 @@
 ## Goal
-Redesign the Cards page to match a Shakepay-style experience: a clean branded card face that **flips on tap** to reveal the sensitive details (number, expiry, CVV), plus a row of compact action icons (**Lock card**, **Card details**, **Settings**) under each card.
+Convert the entire app from a dark theme to a polished light theme (keeping #10b981 green as the brand) and add Revolut/Wise-grade animations to the auth/landing page, dashboard, and global UI.
 
-## Scope
-Frontend-only changes to the existing Cards page and a new card component. No DB or API changes — we keep using the current `useCards` hook, `funding_source`, `card_number`, `cvv`, `expiry_month/year` fields already in place.
+## 1. Global light theme (foundation)
+Edit `src/index.css` to replace every CSS variable with light-theme HSL values. Because every component already uses semantic tokens (`bg-background`, `text-foreground`, `bg-card`, `border-border`, …), flipping the tokens flips the whole app.
 
-## What changes
+New tokens (HSL):
+- `--background` 0 0% 100% (#FFFFFF)
+- `--foreground` 222 47% 11% (#0F172A)
+- `--card` 210 40% 96% (≈ #F1F5F9) with `--card-foreground` = foreground
+- `--muted` 210 40% 96%, `--muted-foreground` 215 16% 47% (#475569)
+- `--border` / `--input` 214 32% 91% (#E2E8F0)
+- `--secondary` 210 40% 98% (#F8FAFC)
+- `--primary` stays 160 84% 39% (#10b981), `--primary-foreground` white
+- `--popover` white, `--sidebar-background` 210 40% 98%
+- New shadows: `--shadow-card: 0 1px 3px hsl(222 47% 11% / 0.08)`, `--shadow-elevated: 0 10px 30px -10px hsl(222 47% 11% / 0.12)`, `--shadow-glow: 0 0 30px -8px hsl(160 84% 39% / 0.35)`
+- Keep `--gradient-primary` as `linear-gradient(135deg,#10b981,#059669)`
+- Update `--gradient-card` and `--gradient-hero` to light variants
+- `.glass` utility → `bg-white/70 backdrop-blur-xl border-border`
+- Remove the `.dark` override so the app stays light everywhere
 
-### 1. New component `src/components/cards/FlipCard.tsx`
-- Two faces wrapped in a 3D flip container (Tailwind + inline `transform-style: preserve-3d` / `backface-visibility: hidden`, animated via framer-motion `rotateY`).
-- **Front face** — Shakepay-inspired:
-  - Brand wordmark "efinMoney" top-left
-  - Large centered logo/mascot (use existing app icon or a simple monogram glyph — no new asset generation)
-  - Network mark bottom-right ("VISA" / "Mastercard" wordmark)
-  - Solid brand-color background (use `--primary` token; alternate accent color for second card via existing gradient utility)
-  - Frozen / Cancelled overlay badge preserved
-- **Back face**:
-  - Magnetic stripe bar
-  - Cardholder name
-  - Card number (formatted in groups of 4) with copy button
-  - Expiry (MM/YY) and CVV with copy buttons
-  - Spending limit line
-  - Small "Tap to flip back" hint
-- Click anywhere on the card toggles flip. Action buttons below do **not** trigger a flip (stop propagation).
-- For `funding_source === 'external'` cards (no stored PAN/CVV): back face shows only `•••• last_four`, expiry, and a note "Full details not stored — used for funding only."
+## 2. Reusable animation primitives
+Add to `tailwind.config.ts` (extending existing keyframes):
+- `float`, `float-slow`, `bubble-up`, `shimmer`, `marquee`, `ripple`, `slide-in-left`, `slide-in-right`, `slide-up`, `count-up`, plus matching `animation` entries.
+- New utility `.hover-lift` → `transition-all duration-200 hover:-translate-y-0.5 hover:shadow-elevated`.
+- `.skeleton-shimmer` utility using a gradient + `animate-shimmer`.
+- `.story-link` underline animation (already documented).
 
-### 2. `src/pages/CardsPage.tsx`
-- Replace the current inline card markup with `<FlipCard card={...} />`.
-- Replace the current 3-button row (Freeze / Settings / Delete) with a Shakepay-style **icon button row**:
-  - **Lock card** (lock/unlock icon) → toggles freeze
-  - **Card details** (credit-card icon) → flips the card to the back
-  - **Settings** (gear icon) → opens `EditCardModal`
-  - For external cards, replace "Lock card" with **Fund Wallet** (keeps existing funding flow)
-- Each icon sits in a rounded white/surface tile with a label underneath, matching the reference image.
-- Keep the dropdown menu (with Delete, Request Physical, etc.) accessible from the Settings icon's secondary menu, so no functionality is lost.
-- Remove the now-redundant reveal-eye and copy-corner buttons on the front face (they live on the back face instead).
+Create small helpers:
+- `src/components/ui/AnimatedNumber.tsx` — count-up using `framer-motion`'s `animate`/`useMotionValue` (framer-motion is already installed).
+- `src/components/ui/PageTransition.tsx` — wraps route content in `motion.div` with fade/slide for page transitions; applied in `App.tsx` around routes.
 
-### 3. Styling
-- Use existing semantic tokens (`bg-primary`, `text-primary-foreground`, `bg-card`, `border`, etc.) — no hard-coded colors.
-- Add a small utility in `src/index.css` for `perspective` and `backface-hidden` if not already present.
-- Maintain dark-mode contrast and current responsive grid (`md:grid-cols-2`).
+## 3. Auth/landing page redesign (`src/pages/Auth.tsx`)
+Left panel (green):
+- Background `bg-gradient-to-br from-[hsl(160_84%_39%)] to-[hsl(160_84%_30%)]` with overlay radial highlight.
+- Background layer: floating SVG icons (globe, dollar, euro, naira) using `motion.div` with `animate-float` at varying delays; absolute-positioned bubbles (12 small circles) animating upward with `animate-bubble-up` and randomized delays.
+- Heading: framer-motion typewriter (character-by-character reveal) for the main title; subtitle slides up after.
+- 3 feature cards (`💸 Instant Transfers`, `🔒 Bank-Grade Security`, `🌍 50+ Countries`) using `motion.div` with `slide-in-left` staggered (delay 0.3 / 0.5 / 0.7s), white/10 glass card style.
+- Bottom: continuous marquee ticker with hard-coded sample FX pairs scrolling right-to-left via `animate-marquee` (CSS-only, duplicated content for seamless loop).
+
+Right panel (form):
+- White card with subtle border + soft shadow, fades in on mount.
+- Inputs get focus ring glow: `focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:border-primary` plus a subtle `transition-shadow`.
+- Sign In button: add ripple on click via small inline component (creates a `<span>` at click coords with `animate-ripple`).
+- Below form: "Trusted by 10,000+ users across 50 countries" with flag emojis 🇨🇦 🇺🇸 🇬🇧 🇰🇪 🇳🇬 🇬🇭 🇿🇦.
+
+## 4. Dashboard animations (`src/pages/Index.tsx` + dashboard components)
+- `StatsOverview`: wrap each stat number in `<AnimatedNumber value={…} />` for the count-up effect.
+- `WalletCarousel` / wallet list: each card wrapped in `motion.div` with `initial={{x:-20,opacity:0}} animate={{x:0,opacity:1}}` and `transition={{ delay: i*0.1 }}`.
+- `QuickActions`: stagger fade-up (`initial={{y:20,opacity:0}}`, delay `i*0.08`).
+- `RecentTransactions`: list items slide in from right with stagger.
+- Pages: route-level `PageTransition` wrapper for fade between routes.
+
+## 5. Global polish
+- Update `src/components/ui/button.tsx` default + premium variants to add `transition-all hover:-translate-y-0.5 hover:shadow-elevated active:translate-y-0`.
+- `src/components/ui/dialog.tsx` content already has Radix data-state animations; keep, but add `.scale-in` + `.fade-in` overrides via class to ensure scale 0.95→1.
+- `src/components/ui/skeleton.tsx`: replace `animate-pulse` with the shimmer gradient utility for premium feel.
+- Add `.story-link` class to nav links in `src/components/NavLink.tsx` and `src/components/layout/Header.tsx`.
+- Hover on cards: add `hover-lift` class to `Card` usages where they're clickable (wallets, quick actions, dashboard cards).
+
+## 6. Files touched
+- `src/index.css` — full token + utility overhaul
+- `tailwind.config.ts` — add keyframes/animations/utilities
+- `src/components/ui/AnimatedNumber.tsx` (new)
+- `src/components/ui/PageTransition.tsx` (new)
+- `src/components/ui/RippleButton.tsx` (new, small wrapper used in Auth)
+- `src/pages/Auth.tsx` — full redesign
+- `src/App.tsx` — wrap routes in `PageTransition`
+- `src/components/dashboard/StatsOverview.tsx`
+- `src/components/dashboard/WalletCarousel.tsx`
+- `src/components/dashboard/QuickActions.tsx`
+- `src/components/dashboard/RecentTransactions.tsx`
+- `src/components/ui/button.tsx`
+- `src/components/ui/skeleton.tsx`
+- `src/components/NavLink.tsx`
 
 ## Out of scope
-- Custom card-art uploads, multiple themes per card, NFC/Apple Pay flows.
-- Generating a new mascot illustration (we'll use a simple monogram "e" glyph; we can swap to a generated mascot later if requested).
-- Any change to card issuance, Plaid funding, or backend logic.
+- No backend, schema, or business-logic changes.
+- No new design tokens beyond the light palette + a few animation utilities.
+- No icon-library swap or font change (keeps Space Grotesk + Inter).
+- Won't audit every component's hardcoded colors; semantic tokens cover the vast majority. If specific screens still look dark after the swap, those are quick follow-ups.
 
-## Files touched
-- **new**: `src/components/cards/FlipCard.tsx`
-- **edit**: `src/pages/CardsPage.tsx`
-- **edit (small)**: `src/index.css` (perspective utilities, only if needed)
+## Approval
+Reply approve to proceed; I'll implement in one pass.
