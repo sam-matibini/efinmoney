@@ -201,9 +201,9 @@ const RecentTransactions = () => {
             return (
               <motion.div
                 key={item.key}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.05 }}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: index * 0.06, duration: 0.35, ease: "easeOut" }}
               >
                 {item.transferId ? (
                   <Link to={`/transfers/${item.transferId}`} className="block">{inner}</Link>

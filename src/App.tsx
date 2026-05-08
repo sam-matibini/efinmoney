@@ -2,9 +2,11 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { AnimatePresence } from "framer-motion";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { useUserRoles } from "@/hooks/useUserRoles";
+import PageTransition from "@/components/ui/PageTransition";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
@@ -94,152 +96,37 @@ const PublicRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
-const AppRoutes = () => (
-  <Routes>
-    <Route
-      path="/"
-      element={
-        <ProtectedRoute>
-          <Index />
-        </ProtectedRoute>
-      }
-    />
-    <Route
-      path="/wallets"
-      element={
-        <ProtectedRoute>
-          <WalletsPage />
-        </ProtectedRoute>
-      }
-    />
-    <Route
-      path="/send"
-      element={
-        <ProtectedRoute>
-          <SendPage />
-        </ProtectedRoute>
-      }
-    />
-    <Route
-      path="/exchange"
-      element={
-        <ProtectedRoute>
-          <ExchangePage />
-        </ProtectedRoute>
-      }
-    />
-    <Route
-      path="/cards"
-      element={
-        <ProtectedRoute>
-          <CardsPage />
-        </ProtectedRoute>
-      }
-    />
-    <Route
-      path="/finance"
-      element={
-        <RoleProtectedRoute allowedRoles={['admin', 'finance']}>
-          <FinanceDashboard />
-        </RoleProtectedRoute>
-      }
-    />
-    <Route
-      path="/admin"
-      element={
-        <RoleProtectedRoute allowedRoles={['admin']}>
-          <AdminDashboard />
-        </RoleProtectedRoute>
-      }
-    />
-    <Route
-      path="/settings"
-      element={
-        <RoleProtectedRoute allowedRoles={['admin']}>
-          <SettingsDashboard />
-        </RoleProtectedRoute>
-      }
-    />
-    <Route
-      path="/operations"
-      element={
-        <RoleProtectedRoute allowedRoles={['admin', 'compliance', 'finance']}>
-          <OperationsDashboard />
-        </RoleProtectedRoute>
-      }
-    />
-    <Route
-      path="/auth"
-      element={
-        <PublicRoute>
-          <Auth />
-        </PublicRoute>
-      }
-    />
-    <Route
-      path="/portal"
-      element={<CustomerPortalPage />}
-    />
-    <Route
-      path="/profile"
-      element={
-        <ProtectedRoute>
-          <ProfileSettingsPage />
-        </ProtectedRoute>
-      }
-    />
-    <Route
-      path="/kyc"
-      element={
-        <ProtectedRoute>
-          <KYCPage />
-        </ProtectedRoute>
-      }
-    />
-    <Route
-      path="/security"
-      element={
-        <ProtectedRoute>
-          <SecurityPage />
-        </ProtectedRoute>
-      }
-    />
-    <Route
-      path="/transfers"
-      element={
-        <ProtectedRoute>
-          <TransfersListPage />
-        </ProtectedRoute>
-      }
-    />
-    <Route
-      path="/transfers/:id"
-      element={
-        <ProtectedRoute>
-          <TransferTrackingPage />
-        </ProtectedRoute>
-      }
-    />
-    <Route
-      path="/contacts"
-      element={
-        <ProtectedRoute>
-          <ContactsPage />
-        </ProtectedRoute>
-      }
-    />
-    <Route
-      path="/transfers/canada"
-      element={
-        <ProtectedRoute>
-          <CanadaTransferPage />
-        </ProtectedRoute>
-      }
-    />
-    <Route path="/deposit/complete" element={<DepositComplete />} />
-    <Route path="*" element={<NotFound />} />
-  </Routes>
-);
+const AppRoutes = () => {
+  const location = useLocation();
+  return (
+    <AnimatePresence mode="wait">
+      <PageTransition key={location.pathname}>
+        <Routes location={location}>
+          <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+          <Route path="/wallets" element={<ProtectedRoute><WalletsPage /></ProtectedRoute>} />
+          <Route path="/send" element={<ProtectedRoute><SendPage /></ProtectedRoute>} />
+          <Route path="/exchange" element={<ProtectedRoute><ExchangePage /></ProtectedRoute>} />
+          <Route path="/cards" element={<ProtectedRoute><CardsPage /></ProtectedRoute>} />
+          <Route path="/finance" element={<RoleProtectedRoute allowedRoles={['admin', 'finance']}><FinanceDashboard /></RoleProtectedRoute>} />
+          <Route path="/admin" element={<RoleProtectedRoute allowedRoles={['admin']}><AdminDashboard /></RoleProtectedRoute>} />
+          <Route path="/settings" element={<RoleProtectedRoute allowedRoles={['admin']}><SettingsDashboard /></RoleProtectedRoute>} />
+          <Route path="/operations" element={<RoleProtectedRoute allowedRoles={['admin', 'compliance', 'finance']}><OperationsDashboard /></RoleProtectedRoute>} />
+          <Route path="/auth" element={<PublicRoute><Auth /></PublicRoute>} />
+          <Route path="/portal" element={<CustomerPortalPage />} />
+          <Route path="/profile" element={<ProtectedRoute><ProfileSettingsPage /></ProtectedRoute>} />
+          <Route path="/kyc" element={<ProtectedRoute><KYCPage /></ProtectedRoute>} />
+          <Route path="/security" element={<ProtectedRoute><SecurityPage /></ProtectedRoute>} />
+          <Route path="/transfers" element={<ProtectedRoute><TransfersListPage /></ProtectedRoute>} />
+          <Route path="/transfers/:id" element={<ProtectedRoute><TransferTrackingPage /></ProtectedRoute>} />
+          <Route path="/contacts" element={<ProtectedRoute><ContactsPage /></ProtectedRoute>} />
+          <Route path="/transfers/canada" element={<ProtectedRoute><CanadaTransferPage /></ProtectedRoute>} />
+          <Route path="/deposit/complete" element={<DepositComplete />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </PageTransition>
+    </AnimatePresence>
+  );
+};
 
 const App = () => (
   <QueryClientProvider client={queryClient}>

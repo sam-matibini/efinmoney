@@ -6,6 +6,7 @@ import { useProfile } from "@/hooks/useProfile";
 import { useFxRates } from "@/hooks/useFxRates";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import AnimatedNumber from "@/components/ui/AnimatedNumber";
 
 // Build a lookup of latest from→USD rates
 const buildUsdRateMap = (rates: { from_currency: string; to_currency: string; effective_rate: number }[]) => {
@@ -107,6 +108,8 @@ const StatsOverview = () => {
     {
       label: 'Total Balance',
       value: formattedTotal,
+      numericValue: totalBalance,
+      animated: true,
       change: growthLabel,
       icon: growthPositive ? TrendingUp : TrendingDown,
       positive: growthPositive,
@@ -116,6 +119,8 @@ const StatsOverview = () => {
     {
       label: 'Recipients',
       value: uniqueRecipients.toString(),
+      numericValue: uniqueRecipients,
+      animated: true,
       change: uniqueRecipients === 0 ? 'No saved contacts' : 'Saved contacts',
       icon: Users,
       positive: true,
@@ -124,6 +129,8 @@ const StatsOverview = () => {
     {
       label: 'Countries',
       value: uniqueCountries.toString(),
+      numericValue: uniqueCountries,
+      animated: true,
       change: uniqueCountries === 0 ? 'No corridors yet' : 'Active corridors',
       icon: Globe,
       positive: true,
@@ -132,6 +139,7 @@ const StatsOverview = () => {
     {
       label: 'KYC Status',
       value: profile ? (isVerified ? 'Verified' : formatKycStatus(kycStatus) || 'Unverified') : 'Unverified',
+      animated: false,
       change: profile && kycTier ? formatKycTier(kycTier) : '—',
       icon: Shield,
       positive: isVerified,
@@ -148,7 +156,7 @@ const StatsOverview = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
-            className="glass rounded-2xl p-4 sm:p-5"
+            className="glass rounded-2xl p-4 sm:p-5 hover-lift"
           >
             <div className="flex items-start justify-between mb-2 sm:mb-3">
               <div className="p-1.5 sm:p-2 rounded-lg bg-primary/10">
@@ -167,6 +175,14 @@ const StatsOverview = () => {
             </div>
             {stat.loading ? (
               <Skeleton className="h-7 sm:h-8 w-20 sm:w-24 mb-1" />
+            ) : stat.animated && stat.label === 'Total Balance' ? (
+              <h3 className="text-lg sm:text-2xl font-display font-bold text-foreground mb-1 truncate">
+                <AnimatedNumber value={stat.numericValue as number} decimals={2} prefix="≈ $" suffix=" USD" />
+              </h3>
+            ) : stat.animated ? (
+              <h3 className="text-lg sm:text-2xl font-display font-bold text-foreground mb-1 truncate">
+                <AnimatedNumber value={stat.numericValue as number} decimals={0} />
+              </h3>
             ) : (
               <h3 className="text-lg sm:text-2xl font-display font-bold text-foreground mb-1 truncate">
                 {stat.value}
