@@ -172,8 +172,8 @@ const CardsPage = () => {
                           <div className="mb-6">
                             <div className="flex items-center gap-2">
                               <p className="font-mono text-xl tracking-wider">
-                                {showCardNumbers[card.id]
-                                  ? `4532 1234 5678 ${card.last_four}`
+                                {showCardNumbers[card.id] && card.card_number
+                                  ? card.card_number.replace(/(.{4})/g, "$1 ").trim()
                                   : `•••• •••• •••• ${card.last_four}`}
                               </p>
                               <button
