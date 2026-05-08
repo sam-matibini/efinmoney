@@ -382,6 +382,14 @@ const CardsPage = () => {
         }
         onDelete={(id) => deleteCard.mutate(id)}
       />
+
+      <CardPaymentModal
+        open={!!fundCard}
+        onOpenChange={(o) => { if (!o) setFundCard(null); }}
+        defaultWalletId={fundCard?.wallet_id ?? undefined}
+        title={fundCard ? `Fund wallet with •••• ${fundCard.last_four}` : "Fund Wallet"}
+        onSuccess={() => setFundCard(null)}
+      />
     </div>
   );
 };
