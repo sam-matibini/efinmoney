@@ -3105,6 +3105,7 @@ export type Database = {
         | "bank"
         | "crypto"
         | "bill_payment"
+        | "domestic_canada"
       wallet_status: "active" | "frozen" | "suspended" | "closed"
     }
     CompositeTypes: {
@@ -3287,6 +3288,7 @@ export const Constants = {
         "bank",
         "crypto",
         "bill_payment",
+        "domestic_canada",
       ],
       wallet_status: ["active", "frozen", "suspended", "closed"],
     },

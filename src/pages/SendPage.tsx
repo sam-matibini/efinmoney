@@ -20,9 +20,13 @@ import { useCreateTransfer } from "@/hooks/useTransfers";
 import { useFundingSources } from "@/hooks/useFundingSources";
 import { usePricingConfig } from "@/hooks/usePricingConfig";
 import { toast } from "sonner";
-import { ArrowRight, CheckCircle, Users, Clock, Shield, Wallet, Landmark, CreditCard, AlertCircle } from "lucide-react";
+import { ArrowRight, CheckCircle, Users, Clock, Shield, Wallet, Landmark, CreditCard, AlertCircle, Mail, Globe, MapPin } from "lucide-react";
 import CardPaymentForm from "@/components/modals/CardPaymentForm";
 import { Link } from "react-router-dom";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import { supabase } from "@/integrations/supabase/client";
+import CanadaSendFlow from "@/components/send/CanadaSendFlow";
 
 const targetCountries = [
   { code: 'KES', country: 'Kenya', flag: '🇰🇪', method: 'M-Pesa', payout: 'mpesa', symbol: 'KSh' },
@@ -194,8 +198,28 @@ const SendPage = () => {
         >
           <div className="text-center">
             <h1 className="text-2xl font-display font-bold text-foreground">Send Money</h1>
-            <p className="text-muted-foreground">Fast transfers to Africa</p>
+            <p className="text-muted-foreground">Choose how you'd like to send</p>
           </div>
+
+          <Tabs
+            value={searchParams.get('mode') === 'canada' ? 'canada' : 'international'}
+            onValueChange={(v) => {
+              const next = new URLSearchParams(searchParams);
+              if (v === 'canada') next.set('mode', 'canada'); else next.delete('mode');
+              setSearchParams(next, { replace: true });
+            }}
+            className="w-full"
+          >
+            <TabsList className="grid w-full grid-cols-2 h-12">
+              <TabsTrigger value="international" className="gap-1">🌍 Send Internationally</TabsTrigger>
+              <TabsTrigger value="canada" className="gap-1">🇨🇦 Send in Canada</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="canada" className="mt-6">
+              <CanadaSendFlow />
+            </TabsContent>
+
+            <TabsContent value="international" className="mt-6 space-y-6">
 
           {/* Progress Steps */}
           <div className="flex items-center justify-center gap-2">
@@ -516,6 +540,8 @@ const SendPage = () => {
               <p className="text-sm font-medium">24/7 Support</p>
             </div>
           </div>
+            </TabsContent>
+          </Tabs>
         </motion.div>
       </main>
 
