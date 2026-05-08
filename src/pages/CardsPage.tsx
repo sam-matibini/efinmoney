@@ -125,7 +125,7 @@ const CardsPage = () => {
                           <div className="flex justify-between items-start mb-8">
                             <div>
                               <Badge variant="secondary" className="bg-primary-foreground/20 text-primary-foreground border-0 capitalize">
-                                {card.card_type}
+                                {card.card_type === "debit_visa" ? "Debit Visa" : card.card_type}
                               </Badge>
                               <p className="text-primary-foreground/70 text-xs mt-1">
                                 {card.cardholder_name}
