@@ -5,7 +5,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const PLAID_ENV = Deno.env.get("PLAID_ENV") || "sandbox";
+const PLAID_ENV = (Deno.env.get("PLAID_ENV") || "sandbox").trim();
 const PLAID_BASE = `https://${PLAID_ENV}.plaid.com`;
 
 Deno.serve(async (req) => {
