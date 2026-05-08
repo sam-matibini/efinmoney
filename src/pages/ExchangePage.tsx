@@ -277,7 +277,7 @@ const LiveFxRatesCard = () => {
         <div className="space-y-3">
           {fxRates?.slice(0, 4).map((rate) => (
               <div key={rate.id} className="flex justify-between items-center text-sm">
-                <span>{rate.from_currency} → {rate.to_currency}</span>
+                <span>{flagForCurrency(rate.from_currency)} {rate.from_currency} → {flagForCurrency(rate.to_currency)} {rate.to_currency}</span>
                 <span className="font-mono">{Number(rate.effective_rate).toFixed(4)}</span>
               </div>
             ))}
