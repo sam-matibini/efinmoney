@@ -3,19 +3,49 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { toast } from 'sonner';
 
+export type CardType = 'virtual' | 'physical' | 'debit' | 'debit_visa' | 'credit';
+export type CardNetwork = 'visa' | 'mastercard';
+
 export interface Card {
   id: string;
   user_id: string;
-  card_type: 'virtual' | 'physical';
-  card_network: 'visa' | 'mastercard';
+  card_type: CardType;
+  card_network: CardNetwork;
   last_four: string;
+  card_number: string | null;
+  cvv: string | null;
+  expiry_month: number | null;
+  expiry_year: number | null;
   cardholder_name: string;
   status: 'active' | 'frozen' | 'cancelled';
   spending_limit: number;
+  credit_limit: number | null;
+  funding_source: string;
   wallet_id: string | null;
   expires_at: string;
   created_at: string;
 }
+
+// Generate a 16-digit PAN with valid Luhn check digit
+const generatePan = (network: CardNetwork): string => {
+  const prefix = network === 'visa' ? '4' : '5' + Math.floor(1 + Math.random() * 5);
+  let body = prefix;
+  while (body.length < 15) body += Math.floor(Math.random() * 10);
+  // Luhn checksum
+  let sum = 0;
+  for (let i = 0; i < body.length; i++) {
+    let d = parseInt(body[body.length - 1 - i], 10);
+    if (i % 2 === 0) {
+      d *= 2;
+      if (d > 9) d -= 9;
+    }
+    sum += d;
+  }
+  const check = (10 - (sum % 10)) % 10;
+  return body + check;
+};
+
+const generateCvv = () => String(Math.floor(100 + Math.random() * 900));
 
 export const useCards = () => {
   const { user } = useAuth();
@@ -44,14 +74,29 @@ export const useCardMutations = () => {
 
   const createCard = useMutation({
     mutationFn: async (input: {
-      card_type: 'virtual' | 'physical';
-      card_network: 'visa' | 'mastercard';
+      card_type: CardType;
+      card_network: CardNetwork;
       cardholder_name: string;
       spending_limit?: number;
+      credit_limit?: number | null;
       wallet_id?: string | null;
     }) => {
       if (!user) throw new Error('Not authenticated');
-      const last_four = String(Math.floor(1000 + Math.random() * 9000));
+
+      const isCredit = input.card_type === 'credit';
+      if (!isCredit && !input.wallet_id) {
+        throw new Error('A linked wallet is required for debit cards');
+      }
+      if (isCredit && !input.credit_limit) {
+        throw new Error('Credit limit is required for credit cards');
+      }
+
+      const pan = generatePan(input.card_network);
+      const cvv = generateCvv();
+      const now = new Date();
+      const expYear = now.getFullYear() + 4;
+      const expMonth = now.getMonth() + 1;
+
       const { data, error } = await supabase
         .from('cards')
         .insert({
@@ -59,14 +104,20 @@ export const useCardMutations = () => {
           card_type: input.card_type,
           card_network: input.card_network,
           cardholder_name: input.cardholder_name,
-          last_four,
+          last_four: pan.slice(-4),
+          card_number: pan,
+          cvv,
+          expiry_month: expMonth,
+          expiry_year: expYear,
           spending_limit: input.spending_limit ?? 5000,
-          wallet_id: input.wallet_id ?? null,
+          credit_limit: isCredit ? input.credit_limit : null,
+          funding_source: isCredit ? 'credit_line' : 'wallet',
+          wallet_id: isCredit ? null : input.wallet_id,
         })
         .select()
         .single();
       if (error) throw error;
-      return data;
+      return data as Card;
     },
     onSuccess: () => {
       toast.success('Card created');
