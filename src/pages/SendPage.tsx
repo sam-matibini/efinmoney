@@ -20,9 +20,12 @@ import { useCreateTransfer } from "@/hooks/useTransfers";
 import { useFundingSources } from "@/hooks/useFundingSources";
 import { usePricingConfig } from "@/hooks/usePricingConfig";
 import { toast } from "sonner";
-import { ArrowRight, CheckCircle, Users, Clock, Shield, Wallet, Landmark, CreditCard, AlertCircle } from "lucide-react";
+import { ArrowRight, CheckCircle, Users, Clock, Shield, Wallet, Landmark, CreditCard, AlertCircle, Mail, Globe, MapPin } from "lucide-react";
 import CardPaymentForm from "@/components/modals/CardPaymentForm";
 import { Link } from "react-router-dom";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import { supabase } from "@/integrations/supabase/client";
 
 const targetCountries = [
   { code: 'KES', country: 'Kenya', flag: '🇰🇪', method: 'M-Pesa', payout: 'mpesa', symbol: 'KSh' },
