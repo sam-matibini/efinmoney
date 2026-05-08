@@ -28,18 +28,24 @@ const QuickActions = () => {
     <section className="mb-8">
       <h2 className="text-lg font-display font-semibold text-foreground mb-4">Quick Actions</h2>
 
-      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 sm:gap-3">
-        {items.map(({ Modal, icon, label, variant }, i) => (
+      <div className="grid grid-cols-3 sm:grid-cols-7 gap-2 sm:gap-3">
+        {items.map((item, i) => (
           <motion.div
-            key={label}
+            key={item.label}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.08, duration: 0.4, ease: "easeOut" }}
             className="hover-lift rounded-2xl"
           >
-            <Modal>
-              <div><QuickAction icon={icon} label={label} variant={variant} /></div>
-            </Modal>
+            {item.kind === "modal" ? (
+              <item.Modal>
+                <div><QuickAction icon={item.icon} label={item.label} variant={item.variant} /></div>
+              </item.Modal>
+            ) : (
+              <Link to={item.to} className="block">
+                <QuickAction icon={item.icon} label={item.label} variant={item.variant} />
+              </Link>
+            )}
           </motion.div>
         ))}
       </div>
