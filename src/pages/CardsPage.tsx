@@ -97,24 +97,26 @@ const CardsPage = () => {
               ))}
             </div>
           ) : !cards || cards.length === 0 ? (
-            <Card>
-              <CardContent className="py-16 text-center">
-                <CreditCard className="w-14 h-14 mx-auto mb-4 text-muted-foreground" />
-                <h3 className="text-xl font-display font-semibold mb-2">No Cards Yet</h3>
-                <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-                  Create your first virtual or physical card to start spending securely worldwide.
-                </p>
-                <Button onClick={() => setAddOpen(true)}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add your first card
-                </Button>
-              </CardContent>
-            </Card>
+            <div className="max-w-md mx-auto py-8">
+              <motion.button
+                onClick={() => setAddOpen(true)}
+                animate={{ scale: [1, 1.02, 1], opacity: [0.85, 1, 0.85] }}
+                transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
+                className="w-full aspect-[1.586/1] rounded-2xl border-2 border-dashed border-muted-foreground/40 flex flex-col items-center justify-center gap-3 text-muted-foreground hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors"
+              >
+                <div className="w-14 h-14 rounded-full border-2 border-current flex items-center justify-center">
+                  <Plus className="w-7 h-7" />
+                </div>
+                <span className="text-base font-medium">Add your first card</span>
+                <span className="text-xs text-muted-foreground">Virtual or physical, ready in seconds</span>
+              </motion.button>
+            </div>
           ) : (
             <CardStack
               cards={cards}
               flipped={flipped}
               onToggleFlip={toggleFlip}
+              onAddCard={() => setAddOpen(true)}
               renderActions={(card) => {
                 const isFrozen = card.status === "frozen";
                 const isExternal = card.funding_source === "external";
