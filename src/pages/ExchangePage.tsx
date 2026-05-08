@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { RefreshCw, ArrowUpDown, TrendingUp, CheckCircle, Bitcoin, DollarSign } from "lucide-react";
 import { CryptoTradingPanel } from "@/components/crypto/CryptoTradingPanel";
+import { flagForCurrency } from "@/lib/flags";
 
 const FxTradingPanel = () => {
   const [amount, setAmount] = useState("");
