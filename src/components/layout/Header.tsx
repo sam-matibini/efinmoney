@@ -19,6 +19,8 @@ import { useWallets } from "@/hooks/useWallets";
 const Header = () => {
   const { signOut, user } = useAuth();
   const { isAdmin, isFinance, isCompliance } = useUserRoles();
+  const { data: wallets } = useWallets();
+  const defaultWallet = wallets?.find((w) => w.is_default) || wallets?.[0];
   const location = useLocation();
   const navigate = useNavigate();
   const [searchOpen, setSearchOpen] = useState(false);
