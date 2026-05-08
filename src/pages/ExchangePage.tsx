@@ -181,7 +181,8 @@ const FxTradingPanel = () => {
               <SelectContent>
                 {fiatWallets?.filter(w => w.wallet_id !== fromWalletId).map((w) => (
                   <SelectItem key={w.wallet_id} value={w.wallet_id}>
-                    {w.flag_emoji} {w.currency_code} - {w.symbol}{Number(w.balance).toFixed(2)}
+                    <span className="text-2xl mr-1.5 align-middle">{w.flag_emoji}</span>
+                    <span className="align-middle">{w.currency_code} - {w.symbol}{Number(w.balance).toFixed(2)}</span>
                   </SelectItem>
                 ))}
               </SelectContent>
