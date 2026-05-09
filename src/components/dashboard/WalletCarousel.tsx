@@ -1,4 +1,4 @@
-import { motion } from "framer-motion";
+import { motion, useMotionValue, useTransform } from "framer-motion";
 import { useRef, useState, useEffect } from "react";
 import { Plus, Send, Download, ArrowUpRight } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -7,6 +7,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import SendMoneyModal from "@/components/modals/SendMoneyModal";
 import CardPaymentModal from "@/components/modals/CardPaymentModal";
 import CreateWalletModal from "@/components/modals/CreateWalletModal";
+import AnimatedNumber from "@/components/ui/AnimatedNumber";
+import { flagForCurrency } from "@/lib/flags";
 
 const gradients: Record<string, string> = {
   USD: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
