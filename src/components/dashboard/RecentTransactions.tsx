@@ -39,24 +39,27 @@ interface Item {
   createdAt: string;
 }
 
-const KIND_META: Record<Kind, { Icon: any; bg: string; sign: string; amountColor: string }> = {
+const KIND_META: Record<Kind, { Icon: any; bg: string; sign: string; amountColor: string; border: string }> = {
   receive: {
     Icon: ArrowDownLeft,
     bg: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
     sign: "+",
     amountColor: "text-emerald-600 dark:text-emerald-400",
+    border: "border-l-emerald-500",
   },
   send: {
     Icon: ArrowUpRight,
     bg: "bg-rose-500/15 text-rose-600 dark:text-rose-400",
     sign: "-",
     amountColor: "text-rose-600 dark:text-rose-400",
+    border: "border-l-rose-500",
   },
   exchange: {
     Icon: RefreshCw,
     bg: "bg-blue-500/15 text-blue-600 dark:text-blue-400",
     sign: "↔ ",
     amountColor: "text-blue-600 dark:text-blue-400",
+    border: "border-l-blue-500",
   },
 };
 
