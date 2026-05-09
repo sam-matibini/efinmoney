@@ -165,7 +165,7 @@ const MiniStats = () => {
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: i * 0.08, duration: 0.4 }}
-          className={cardClass}
+          className={`${cardClass} ${cardBg[s.key] || ""}`}
         >
           <div className="flex items-start justify-between mb-2">
             <p className="text-xs font-medium text-muted-foreground">{s.label}</p>
