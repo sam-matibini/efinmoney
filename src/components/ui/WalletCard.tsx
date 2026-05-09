@@ -173,7 +173,7 @@ const WalletCard = ({
           <h2 className={`text-2xl sm:text-3xl font-display font-bold tracking-tight ${
             isMain ? 'text-primary-foreground' : 'text-foreground'
           }`}>
-            {symbol}{formatBalance(balance)}
+            <AnimatedNumber value={balance} prefix={symbol} decimals={2} duration={1100} />
           </h2>
           {change !== 0 && (
             <p className={`text-xs sm:text-sm mt-1 ${
