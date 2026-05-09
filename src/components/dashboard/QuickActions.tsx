@@ -76,12 +76,12 @@ const QuickActions = () => {
             {item.kind === "modal" ? (
               <item.Modal>
                 <div>
-                  <ButtonInner icon={item.icon} label={item.label} color={item.color} />
+                  <ButtonInner icon={item.icon} label={item.label} color={item.color} badge={item.label === "Mobile" ? "!" : undefined} />
                 </div>
               </item.Modal>
             ) : (
               <Link to={item.to}>
-                <ButtonInner icon={item.icon} label={item.label} color={item.color} />
+                <ButtonInner icon={item.icon} label={item.label} color={item.color} badge={item.label === "Mobile" ? "!" : undefined} />
               </Link>
             )}
           </motion.div>
