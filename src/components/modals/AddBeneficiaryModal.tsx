@@ -3,19 +3,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useCreateBeneficiary, useUpdateBeneficiary, type Beneficiary } from "@/hooks/useBeneficiaries";
 import { toast } from "sonner";
-
-const COUNTRIES = [
-  { code: "KES", country: "Kenya", flag: "🇰🇪", method: "M-Pesa", payout: "mpesa" },
-  { code: "UGX", country: "Uganda", flag: "🇺🇬", method: "Mobile Money", payout: "airtel_money" },
-  { code: "TZS", country: "Tanzania", flag: "🇹🇿", method: "M-Pesa", payout: "mpesa" },
-  { code: "ZMW", country: "Zambia", flag: "🇿🇲", method: "MTN Mobile", payout: "mtn_mobile" },
-  { code: "BIF", country: "Burundi", flag: "🇧🇮", method: "Lumicash", payout: "lumicash" },
-  { code: "NGN", country: "Nigeria", flag: "🇳🇬", method: "Bank/Mobile", payout: "bank" },
-];
+import CountryPicker from "@/components/ui/CountryPicker";
+import { COUNTRIES, findCountryById, findCountryByCode, type CountryInfo } from "@/lib/countries";
 
 interface Props {
   open: boolean;
@@ -29,7 +21,7 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved }: Props) =>
   const update = useUpdateBeneficiary();
   const [name, setName] = useState("");
   const [nickname, setNickname] = useState("");
-  const [countryCode, setCountryCode] = useState("KES");
+  const [countryId, setCountryId] = useState<string>("Kenya");
   const [method, setMethod] = useState<"mobile" | "bank">("mobile");
   const [phone, setPhone] = useState("");
   const [bankName, setBankName] = useState("");
@@ -39,7 +31,9 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved }: Props) =>
     if (open) {
       setName(editing?.name || "");
       setNickname(editing?.nickname || "");
-      setCountryCode(editing?.country_code || "KES");
+      // Try to resolve a unique country id; fall back to first match by currency code.
+      const fromCode = editing?.country_code ? findCountryByCode(editing.country_code) : undefined;
+      setCountryId(fromCode?.id || "Kenya");
       setMethod(editing?.bank_account ? "bank" : "mobile");
       setPhone(editing?.phone || "");
       setBankName(editing?.bank_name || "");
@@ -47,7 +41,7 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved }: Props) =>
     }
   }, [open, editing]);
 
-  const country = COUNTRIES.find((c) => c.code === countryCode) || COUNTRIES[0];
+  const country = findCountryById(countryId) || COUNTRIES[0];
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -106,14 +100,7 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved }: Props) =>
           </div>
           <div className="space-y-2">
             <Label>Country</Label>
-            <Select value={countryCode} onValueChange={setCountryCode}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {COUNTRIES.map((c) => (
-                  <SelectItem key={c.code} value={c.code}>{c.flag} {c.country}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <CountryPicker value={countryId} onChange={(c) => setCountryId(c.id)} />
           </div>
           <Tabs value={method} onValueChange={(v) => setMethod(v as any)}>
             <TabsList className="grid grid-cols-2 w-full">

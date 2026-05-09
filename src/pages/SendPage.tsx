@@ -20,7 +20,7 @@ import { useCreateTransfer } from "@/hooks/useTransfers";
 import { useFundingSources } from "@/hooks/useFundingSources";
 import { usePricingConfig } from "@/hooks/usePricingConfig";
 import { toast } from "sonner";
-import { ArrowRight, CheckCircle, Users, Clock, Shield, Wallet, Landmark, CreditCard, AlertCircle } from "lucide-react";
+import { ArrowRight, CheckCircle, Users, Clock, Shield, Wallet, Landmark, CreditCard, AlertCircle, X } from "lucide-react";
 import CardPaymentForm from "@/components/modals/CardPaymentForm";
 import { Link } from "react-router-dom";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -28,14 +28,12 @@ import CanadaSendFlow from "@/components/send/CanadaSendFlow";
 import AnimatedNumber from "@/components/ui/AnimatedNumber";
 import AnimatedCheck from "@/components/ui/AnimatedCheck";
 import ParticleBurst from "@/components/ui/ParticleBurst";
-
-const targetCountries = [
-  { code: 'KES', country: 'Kenya', flag: '🇰🇪', method: 'M-Pesa', payout: 'mpesa', symbol: 'KSh' },
-  { code: 'UGX', country: 'Uganda', flag: '🇺🇬', method: 'Mobile Money', payout: 'airtel_money', symbol: 'USh' },
-  { code: 'TZS', country: 'Tanzania', flag: '🇹🇿', method: 'M-Pesa', payout: 'mpesa', symbol: 'TSh' },
-  { code: 'ZMW', country: 'Zambia', flag: '🇿🇲', method: 'MTN Mobile', payout: 'mtn_mobile', symbol: 'ZK' },
-  { code: 'BIF', country: 'Burundi', flag: '🇧🇮', method: 'Lumicash', payout: 'lumicash', symbol: 'FBu' },
-];
+import CountryPicker from "@/components/ui/CountryPicker";
+import { findCountryById, findCountryByCode, COUNTRIES } from "@/lib/countries";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 type FundingSource = 'wallet' | 'bank' | 'card';
 
@@ -55,13 +53,14 @@ const SendPage = () => {
   const [fundingSource, setFundingSource] = useState<FundingSource>('wallet');
   const [amount, setAmount] = useState("");
   const [selectedWalletId, setSelectedWalletId] = useState("");
-  const [targetCountryCode, setTargetCountryCode] = useState("KES");
+  const [targetCountryId, setTargetCountryId] = useState<string>("Kenya");
   const [recipientName, setRecipientName] = useState("");
   const [recipientPhone, setRecipientPhone] = useState("");
   const [selectedSourceId, setSelectedSourceId] = useState<string>("");
   const [lastTransferId, setLastTransferId] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [savePromptOpen, setSavePromptOpen] = useState(false);
+  const [savePromptOpen, setSavePromptOpen] = useState(false);   // Yes/No confirm
+  const [saveModalOpen, setSaveModalOpen] = useState(false);     // pre-filled Add modal
   const [pickedBeneficiaryId, setPickedBeneficiaryId] = useState<string | null>(null);
 
   const { user } = useAuth();
@@ -76,7 +75,7 @@ const SendPage = () => {
   const createTransfer = useCreateTransfer();
 
   const selectedWallet = wallets?.find(w => w.wallet_id === selectedWalletId) || wallets?.[0];
-  const targetCountry = targetCountries.find(c => c.code === targetCountryCode) || targetCountries[0];
+  const targetCountry = findCountryById(targetCountryId) || COUNTRIES[0];
 
   const activeSources = fundingSource === 'bank' ? bankSources : fundingSource === 'card' ? cardSources : [];
   const selectedExternalSource = activeSources.find(s => s.id === selectedSourceId) || activeSources[0];
@@ -169,7 +168,10 @@ const SendPage = () => {
   const applyBeneficiary = (b: Beneficiary) => {
     setRecipientName(b.name);
     if (b.phone) setRecipientPhone(b.phone);
-    if (b.country_code) setTargetCountryCode(b.country_code);
+    if (b.country_code) {
+      const c = findCountryByCode(b.country_code);
+      if (c) setTargetCountryId(c.id);
+    }
     setPickedBeneficiaryId(b.id);
   };
 
@@ -505,25 +507,10 @@ const SendPage = () => {
 
                                     <motion.div custom={4} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
                                       <Label>Destination</Label>
-                                      <Select value={targetCountryCode} onValueChange={setTargetCountryCode}>
-                                        <SelectTrigger className="transition-all focus:ring-2 focus:ring-primary/40">
-                                          <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          {targetCountries.map((c, i) => (
-                                            <SelectItem key={c.code} value={c.code}>
-                                              <motion.span
-                                                initial={{ opacity: 0, x: -6 }}
-                                                animate={{ opacity: 1, x: 0 }}
-                                                transition={{ delay: i * 0.04, duration: 0.2 }}
-                                                className="inline-flex items-center gap-2"
-                                              >
-                                                <span>{c.flag}</span> {c.country} · {c.method}
-                                              </motion.span>
-                                            </SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
+                                      <CountryPicker
+                                        value={targetCountryId}
+                                        onChange={(c) => setTargetCountryId(c.id)}
+                                      />
                                     </motion.div>
 
                                     <motion.div
@@ -620,9 +607,30 @@ const SendPage = () => {
                                         className="w-full gap-2"
                                         onClick={() => setPickerOpen(true)}
                                       >
-                                        <Users className="w-4 h-4" /> Choose from contacts
+                                        <Users className="w-4 h-4" /> 👤 Choose from saved contacts
                                       </Button>
                                     </motion.div>
+
+                                    {pickedBeneficiaryId && (
+                                      <motion.div
+                                        initial={{ opacity: 0, y: -6 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        className="flex items-center justify-between gap-3 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300"
+                                      >
+                                        <span className="inline-flex items-center gap-2 text-sm font-medium">
+                                          <CheckCircle className="w-4 h-4" /> Contact selected ✓ — {recipientName}
+                                        </span>
+                                        <button
+                                          type="button"
+                                          onClick={() => { setPickedBeneficiaryId(null); setRecipientName(""); setRecipientPhone(""); }}
+                                          className="text-emerald-700/80 dark:text-emerald-300/80 hover:opacity-100 opacity-70"
+                                          aria-label="Clear selected contact"
+                                        >
+                                          <X className="w-4 h-4" />
+                                        </button>
+                                      </motion.div>
+                                    )}
+
                                     <motion.div custom={1} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
                                       <Label>Recipient Name</Label>
                                       <Input
@@ -777,9 +785,27 @@ const SendPage = () => {
         onOpenChange={setPickerOpen}
         onSelect={applyBeneficiary}
       />
+
+      <AlertDialog open={savePromptOpen} onOpenChange={setSavePromptOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>💾 Save {recipientName || "this recipient"} as a contact?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Save them for faster sending next time — no need to re-enter their details.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>No, thanks</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { setSavePromptOpen(false); setSaveModalOpen(true); }}>
+              Yes, save contact
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <AddBeneficiaryModal
-        open={savePromptOpen}
-        onOpenChange={setSavePromptOpen}
+        open={saveModalOpen}
+        onOpenChange={setSaveModalOpen}
         editing={{
           id: "",
           user_id: "",

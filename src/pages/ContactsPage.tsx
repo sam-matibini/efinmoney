@@ -127,7 +127,7 @@ const ContactsPage = () => {
                     </div>
                     <div className="flex gap-2">
                       <Button size="sm" className="flex-1 gap-1" onClick={() => handleSendTo(c)}>
-                        <Send className="w-3.5 h-3.5" /> Send
+                        <Send className="w-3.5 h-3.5" /> Send Money →
                       </Button>
                       <Button size="sm" variant="outline" onClick={() => { setEditing(c); setModalOpen(true); }}>
                         <Pencil className="w-3.5 h-3.5" />
