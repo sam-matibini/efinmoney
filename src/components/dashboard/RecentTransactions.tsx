@@ -226,7 +226,7 @@ const RecentTransactions = () => {
             {items.map((item, index) => {
               const meta = KIND_META[item.kind];
               const inner = (
-                <div className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted/60 transition-colors cursor-pointer">
+                <div className={`group/tx flex items-center gap-3 p-3 rounded-xl hover:bg-muted/60 transition-colors cursor-pointer border-l-4 ${meta.border}`}>
                   <div className={`shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${meta.bg}`}>
                     <meta.Icon className="w-5 h-5" />
                   </div>
@@ -236,8 +236,22 @@ const RecentTransactions = () => {
                       {item.description} · {item.date}
                     </p>
                   </div>
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      const ref = item.transferId || item.key;
+                      navigator.clipboard.writeText(ref);
+                      toast.success("Reference copied");
+                    }}
+                    className="opacity-0 group-hover/tx:opacity-100 transition-opacity p-1.5 rounded-md hover:bg-muted"
+                    aria-label="Copy reference"
+                    title="Copy reference"
+                  >
+                    <Copy className="w-3.5 h-3.5 text-muted-foreground" />
+                  </button>
                   <div className="text-right shrink-0">
-                    <p className={`font-display font-semibold ${meta.amountColor}`}>
+                    <p className={`text-base sm:text-lg font-display font-bold tabular-nums ${meta.amountColor}`}>
                       {meta.sign}
                       {item.symbol}
                       {item.amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
