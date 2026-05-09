@@ -22,21 +22,42 @@ const items: Item[] = [
   { kind: "modal", Modal: SavingsModal, icon: PiggyBank, label: "Savings", color: "bg-teal-500/15 text-teal-600 dark:text-teal-400" },
 ];
 
-const ButtonInner = ({ icon: Icon, label, color }: { icon: any; label: string; color: string }) => (
-  <motion.div
-    whileHover={{ y: -4 }}
-    whileTap={{ scale: 0.95 }}
-    transition={{ type: "spring", stiffness: 380, damping: 18 }}
-    className="flex flex-col items-center gap-2 cursor-pointer"
-  >
-    <div
-      className={`w-14 h-14 rounded-2xl flex items-center justify-center ${color} shadow-sm transition-shadow group-hover:shadow-md`}
+const ICON_VARIANTS: Record<string, any> = {
+  Send: { rest: { x: 0, rotate: 0 }, hover: { x: 3, rotate: -8 } },
+  Exchange: { rest: { rotate: 0 }, hover: { rotate: 180 } },
+  Deposit: { rest: { y: 0 }, hover: { y: 3 } },
+  Domestic: { rest: { scale: 1 }, hover: { scale: 1.15 } },
+};
+
+const ButtonInner = ({ icon: Icon, label, color, badge }: { icon: any; label: string; color: string; badge?: string }) => {
+  const variant = ICON_VARIANTS[label] || { rest: { y: 0 }, hover: { y: -2 } };
+  return (
+    <motion.div
+      whileHover="hover"
+      initial="rest"
+      animate="rest"
+      whileTap={{ scale: 0.95 }}
+      transition={{ type: "spring", stiffness: 380, damping: 18 }}
+      className="flex flex-col items-center gap-2 cursor-pointer"
     >
-      <Icon className="w-6 h-6" />
-    </div>
-    <span className="text-xs font-medium text-foreground whitespace-nowrap">{label}</span>
-  </motion.div>
-);
+      <div
+        className={`relative w-14 h-14 rounded-2xl flex items-center justify-center ${color} shadow-sm transition-all group-hover:shadow-md group-hover:bg-gradient-to-br group-hover:from-primary/20 group-hover:to-primary/5 overflow-hidden`}
+      >
+        <motion.span variants={variant} transition={{ type: "spring", stiffness: 400, damping: 14 }} className="inline-flex">
+          <Icon className="w-6 h-6" />
+        </motion.span>
+        {badge && (
+          <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 text-[10px] font-bold bg-rose-500 text-white rounded-full flex items-center justify-center ring-2 ring-background animate-pulse">
+            {badge}
+          </span>
+        )}
+        {/* ripple on tap */}
+        <span className="ripple-host absolute inset-0" />
+      </div>
+      <span className="text-xs font-medium text-foreground whitespace-nowrap">{label}</span>
+    </motion.div>
+  );
+};
 
 const QuickActions = () => {
   return (
