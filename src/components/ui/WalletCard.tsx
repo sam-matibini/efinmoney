@@ -58,12 +58,25 @@ const WalletCard = ({
       animate={{ opacity: 1, y: 0 }}
       whileHover={{ scale: 1.02, y: -4 }}
       transition={{ duration: 0.3 }}
-      className={`relative overflow-hidden rounded-2xl p-4 sm:p-6 ${
+      className={`group relative overflow-hidden rounded-2xl p-4 sm:p-6 ${
         isMain 
           ? 'gradient-primary shadow-glow min-h-[160px] sm:min-h-[180px]' 
           : 'glass shadow-card'
       } ${isFrozen ? 'opacity-75' : ''}`}
     >
+      {/* Big country flag top-right */}
+      <span className="pointer-events-none select-none absolute top-3 right-3 text-[40px] leading-none drop-shadow-md z-10">
+        {flag}
+      </span>
+
+      {/* Shine sweep on hover */}
+      <span className="pointer-events-none absolute inset-y-0 -left-1/2 w-1/2 bg-gradient-to-r from-transparent via-white/15 to-transparent animate-shine" />
+
+      {/* Floating bubbles */}
+      <span className="pointer-events-none absolute top-8 left-12 w-2 h-2 rounded-full bg-white/30 animate-bubble-drift" />
+      <span className="pointer-events-none absolute top-20 left-28 w-1.5 h-1.5 rounded-full bg-white/25 animate-bubble-drift" style={{ animationDelay: '2s' }} />
+      <span className="pointer-events-none absolute bottom-10 left-20 w-2.5 h-2.5 rounded-full bg-white/20 animate-bubble-drift" style={{ animationDelay: '4s' }} />
+
       {isMain && (
         <div className="absolute inset-0 opacity-20">
           <div className="absolute -right-8 -top-8 h-40 w-40 rounded-full bg-foreground/10 blur-3xl" />
