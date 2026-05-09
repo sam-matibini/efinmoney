@@ -10,6 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import AnimatedNumber from "@/components/ui/AnimatedNumber";
 
 interface WalletCardProps {
   walletId?: string;
