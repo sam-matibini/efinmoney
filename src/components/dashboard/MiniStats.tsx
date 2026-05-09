@@ -131,9 +131,21 @@ const MiniStats = () => {
       content: (
         <>
           <p className="text-2xl font-display font-bold text-foreground">Tier {tierNum}</p>
+          {/* Tier progress dots */}
+          <div className="flex items-center gap-1 mt-2">
+            {[0, 1, 2, 3].map((t) => (
+              <div
+                key={t}
+                className={`h-1.5 flex-1 rounded-full ${t <= tierNum ? "bg-primary" : "bg-muted"}`}
+              />
+            ))}
+          </div>
           {tierNum < 3 ? (
-            <Link to="/kyc" className="text-xs text-primary font-medium mt-2 inline-block hover:underline">
-              Upgrade tier →
+            <Link
+              to="/kyc"
+              className="mt-3 inline-flex items-center justify-center w-full px-2 py-1.5 rounded-lg bg-primary text-primary-foreground text-[11px] font-semibold animate-glow-pulse hover:bg-primary/90 transition-colors"
+            >
+              Upgrade to Tier {tierNum + 1} →
             </Link>
           ) : (
             <p className="text-xs text-muted-foreground mt-2">Max tier reached</p>
