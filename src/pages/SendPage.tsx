@@ -167,7 +167,10 @@ const SendPage = () => {
   const applyBeneficiary = (b: Beneficiary) => {
     setRecipientName(b.name);
     if (b.phone) setRecipientPhone(b.phone);
-    if (b.country_code) setTargetCountryCode(b.country_code);
+    if (b.country_code) {
+      const c = findCountryByCode(b.country_code);
+      if (c) setTargetCountryId(c.id);
+    }
     setPickedBeneficiaryId(b.id);
   };
 
@@ -503,25 +506,10 @@ const SendPage = () => {
 
                                     <motion.div custom={4} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
                                       <Label>Destination</Label>
-                                      <Select value={targetCountryCode} onValueChange={setTargetCountryCode}>
-                                        <SelectTrigger className="transition-all focus:ring-2 focus:ring-primary/40">
-                                          <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          {targetCountries.map((c, i) => (
-                                            <SelectItem key={c.code} value={c.code}>
-                                              <motion.span
-                                                initial={{ opacity: 0, x: -6 }}
-                                                animate={{ opacity: 1, x: 0 }}
-                                                transition={{ delay: i * 0.04, duration: 0.2 }}
-                                                className="inline-flex items-center gap-2"
-                                              >
-                                                <span>{c.flag}</span> {c.country} · {c.method}
-                                              </motion.span>
-                                            </SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
+                                      <CountryPicker
+                                        value={targetCountryId}
+                                        onChange={(c) => setTargetCountryId(c.id)}
+                                      />
                                     </motion.div>
 
                                     <motion.div
