@@ -20,7 +20,7 @@ import { useCreateTransfer } from "@/hooks/useTransfers";
 import { useFundingSources } from "@/hooks/useFundingSources";
 import { usePricingConfig } from "@/hooks/usePricingConfig";
 import { toast } from "sonner";
-import { ArrowRight, CheckCircle, Users, Clock, Shield, Wallet, Landmark, CreditCard, AlertCircle } from "lucide-react";
+import { ArrowRight, CheckCircle, Users, Clock, Shield, Wallet, Landmark, CreditCard, AlertCircle, X } from "lucide-react";
 import CardPaymentForm from "@/components/modals/CardPaymentForm";
 import { Link } from "react-router-dom";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -28,14 +28,12 @@ import CanadaSendFlow from "@/components/send/CanadaSendFlow";
 import AnimatedNumber from "@/components/ui/AnimatedNumber";
 import AnimatedCheck from "@/components/ui/AnimatedCheck";
 import ParticleBurst from "@/components/ui/ParticleBurst";
-
-const targetCountries = [
-  { code: 'KES', country: 'Kenya', flag: '🇰🇪', method: 'M-Pesa', payout: 'mpesa', symbol: 'KSh' },
-  { code: 'UGX', country: 'Uganda', flag: '🇺🇬', method: 'Mobile Money', payout: 'airtel_money', symbol: 'USh' },
-  { code: 'TZS', country: 'Tanzania', flag: '🇹🇿', method: 'M-Pesa', payout: 'mpesa', symbol: 'TSh' },
-  { code: 'ZMW', country: 'Zambia', flag: '🇿🇲', method: 'MTN Mobile', payout: 'mtn_mobile', symbol: 'ZK' },
-  { code: 'BIF', country: 'Burundi', flag: '🇧🇮', method: 'Lumicash', payout: 'lumicash', symbol: 'FBu' },
-];
+import CountryPicker from "@/components/ui/CountryPicker";
+import { findCountryById, findCountryByCode, COUNTRIES } from "@/lib/countries";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 type FundingSource = 'wallet' | 'bank' | 'card';
 
