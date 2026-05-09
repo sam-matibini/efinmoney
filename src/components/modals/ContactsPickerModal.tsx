@@ -49,7 +49,11 @@ const ContactsPickerModal = ({ open, onOpenChange, onSelect }: Props) => {
           ) : filtered.length === 0 ? (
             <div className="py-8 text-center space-y-2">
               <Users className="w-8 h-8 mx-auto text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">No contacts found.</p>
+              <p className="text-sm text-muted-foreground">
+                {(contacts || []).length === 0
+                  ? "No contacts yet — they'll appear here after your first transfer."
+                  : "No contacts match your search."}
+              </p>
             </div>
           ) : (
             <ul className="divide-y divide-border">
