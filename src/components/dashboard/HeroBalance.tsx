@@ -86,19 +86,39 @@ const HeroBalance = () => {
   const positive = todayChange >= 0;
   const walletCount = wallets?.length ?? 0;
 
+  const monthlyBudgetPct = 65; // decorative progress
+
   return (
     <motion.section
       initial={{ opacity: 0, y: -16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-      className="relative overflow-hidden rounded-3xl border border-border mb-8"
+      className="relative overflow-hidden rounded-3xl border border-border mb-8 animate-hero-shift"
       style={{
-        background:
-          "linear-gradient(135deg, hsl(var(--background)) 0%, hsl(160 84% 96%) 100%)",
+        backgroundImage:
+          "linear-gradient(120deg, hsl(var(--background)) 0%, hsl(160 84% 96%) 50%, hsl(var(--background)) 100%)",
       }}
     >
       <div className="absolute -top-20 -right-20 h-64 w-64 rounded-full bg-primary/10 blur-3xl pointer-events-none" />
       <div className="absolute -bottom-16 -left-16 h-56 w-56 rounded-full bg-primary/5 blur-3xl pointer-events-none" />
+
+      {/* Floating currency symbols (decorative) */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        {["💵", "💷", "💶", "₦", "🪙", "$", "€"].map((sym, i) => (
+          <span
+            key={i}
+            className="absolute text-3xl animate-currency-float"
+            style={{
+              left: `${(i * 13 + 8) % 92}%`,
+              bottom: "-30px",
+              animationDelay: `${i * 1.4}s`,
+              animationDuration: `${8 + (i % 3) * 2}s`,
+            }}
+          >
+            {sym}
+          </span>
+        ))}
+      </div>
 
       <div className="relative p-6 sm:p-10">
         {/* Greeting with waving emoji */}
@@ -119,24 +139,33 @@ const HeroBalance = () => {
           </span>
         </motion.div>
 
-        {/* Massive balance */}
+        {/* Massive balance with progress arc */}
         <motion.div
           initial={{ opacity: 0, scale: 0.96 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.15, duration: 0.5 }}
-          className="text-center mb-2"
+          className="text-center mb-2 relative"
         >
           {walletsLoading ? (
             <Skeleton className="h-16 w-72 mx-auto" />
           ) : (
             <h2 className="text-5xl sm:text-6xl md:text-7xl font-display font-bold tracking-tight text-foreground">
-              ≈ <AnimatedNumber value={totalUsd} prefix="$" decimals={2} duration={1400} />
+              ≈ <AnimatedBalance value={totalUsd} />
             </h2>
           )}
           <p className="text-sm text-muted-foreground mt-2">Total Portfolio Value</p>
+
+          {/* Decorative monthly budget arc */}
+          <div className="mt-4 flex items-center justify-center gap-3">
+            <BudgetArc pct={monthlyBudgetPct} />
+            <div className="text-left">
+              <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Monthly budget</p>
+              <p className="text-sm font-semibold text-foreground">{monthlyBudgetPct}% used</p>
+            </div>
+          </div>
         </motion.div>
 
-        {/* Sparkline */}
+        {/* Sparkline area chart */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -144,11 +173,11 @@ const HeroBalance = () => {
           className="h-20 sm:h-24 mt-4 -mx-2"
         >
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={sparkData}>
+            <AreaChart data={sparkData}>
               <defs>
-                <linearGradient id="hero-spark" x1="0" y1="0" x2="1" y2="0">
-                  <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                  <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={1} />
+                <linearGradient id="hero-area" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#10b981" stopOpacity={0.55} />
+                  <stop offset="100%" stopColor="#10b981" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <Tooltip
@@ -163,16 +192,16 @@ const HeroBalance = () => {
                 labelStyle={{ color: "hsl(var(--muted-foreground))" }}
                 formatter={(v: number) => [`$${v.toLocaleString("en-US", { maximumFractionDigits: 2 })}`, "Balance"]}
               />
-              <Line
+              <Area
                 type="monotone"
                 dataKey="value"
-                stroke="url(#hero-spark)"
+                stroke="#10b981"
                 strokeWidth={2.5}
-                dot={false}
+                fill="url(#hero-area)"
                 isAnimationActive
-                animationDuration={1200}
+                animationDuration={1400}
               />
-            </LineChart>
+            </AreaChart>
           </ResponsiveContainer>
         </motion.div>
 
@@ -195,9 +224,10 @@ const HeroBalance = () => {
             {todayChange.toFixed(2)}% today
           </span>
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold bg-muted text-foreground/80">
-            {(wallets || []).slice(0, 6).map((w) => (
-              <span key={w.wallet_id} title={w.currency_code}>{w.flag_emoji || "💰"}</span>
-            ))}
+            {(wallets || []).slice(0, 6).map((w) => {
+              const f = flagForCurrency(w.currency_code);
+              return <span key={w.wallet_id} title={w.currency_code}>{f !== "🌍" ? f : (w.flag_emoji || "💰")}</span>;
+            })}
             {walletCount === 0 && <WalletIcon className="w-3 h-3" />}
           </span>
           <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
@@ -206,6 +236,38 @@ const HeroBalance = () => {
         </motion.div>
       </div>
     </motion.section>
+  );
+};
+
+const AnimatedBalance = ({ value }: { value: number }) => {
+  // Lightweight inline count-up using a ref-less rAF
+  const formatted = `$${value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return <motion.span
+    key={value}
+    initial={{ opacity: 0, y: 6 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ duration: 0.5 }}
+  >{formatted}</motion.span>;
+};
+
+const BudgetArc = ({ pct }: { pct: number }) => {
+  const r = 22;
+  const c = 2 * Math.PI * r;
+  const offset = c - (pct / 100) * c;
+  return (
+    <svg width="56" height="56" viewBox="0 0 56 56" className="-rotate-90">
+      <circle cx="28" cy="28" r={r} fill="none" stroke="hsl(var(--muted))" strokeWidth="5" />
+      <motion.circle
+        cx="28" cy="28" r={r} fill="none"
+        stroke="hsl(var(--primary))"
+        strokeWidth="5"
+        strokeLinecap="round"
+        strokeDasharray={c}
+        initial={{ strokeDashoffset: c }}
+        animate={{ strokeDashoffset: offset }}
+        transition={{ duration: 1.4, ease: [0.16, 1, 0.3, 1] }}
+      />
+    </svg>
   );
 };
 
