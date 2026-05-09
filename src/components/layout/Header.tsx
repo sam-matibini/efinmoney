@@ -26,6 +26,14 @@ const Header = () => {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchExpanded, setSearchExpanded] = useState(false);
 
+  const hour = new Date().getHours();
+  const greeting =
+    hour < 5 ? { emoji: "🌙", text: "Good night" }
+    : hour < 12 ? { emoji: "🌅", text: "Good morning" }
+    : hour < 17 ? { emoji: "☀️", text: "Good afternoon" }
+    : hour < 21 ? { emoji: "🌆", text: "Good evening" }
+    : { emoji: "🌙", text: "Good night" };
+
   const navItems = [
     { label: 'Dashboard', href: '/' },
     { label: 'Send', href: '/send' },
