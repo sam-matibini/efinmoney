@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
-import { ArrowDownLeft, ArrowUpRight, RefreshCw, Inbox, Send, ChevronRight } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, RefreshCw, Inbox, Send, ChevronRight, Copy } from "lucide-react";
 import { useTransfers } from "@/hooks/useTransfers";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { flagForCountryName, flagForCurrency } from "@/lib/flags";
 import { formatDistanceToNow } from "date-fns";
+import { toast } from "sonner";
 
 const payoutMethodNames: Record<string, string> = {
   mpesa: "M-Pesa",
