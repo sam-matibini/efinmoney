@@ -59,7 +59,8 @@ const SendPage = () => {
   const [selectedSourceId, setSelectedSourceId] = useState<string>("");
   const [lastTransferId, setLastTransferId] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [savePromptOpen, setSavePromptOpen] = useState(false);
+  const [savePromptOpen, setSavePromptOpen] = useState(false);   // Yes/No confirm
+  const [saveModalOpen, setSaveModalOpen] = useState(false);     // pre-filled Add modal
   const [pickedBeneficiaryId, setPickedBeneficiaryId] = useState<string | null>(null);
 
   const { user } = useAuth();
@@ -606,9 +607,30 @@ const SendPage = () => {
                                         className="w-full gap-2"
                                         onClick={() => setPickerOpen(true)}
                                       >
-                                        <Users className="w-4 h-4" /> Choose from contacts
+                                        <Users className="w-4 h-4" /> 👤 Choose from saved contacts
                                       </Button>
                                     </motion.div>
+
+                                    {pickedBeneficiaryId && (
+                                      <motion.div
+                                        initial={{ opacity: 0, y: -6 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        className="flex items-center justify-between gap-3 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300"
+                                      >
+                                        <span className="inline-flex items-center gap-2 text-sm font-medium">
+                                          <CheckCircle className="w-4 h-4" /> Contact selected ✓ — {recipientName}
+                                        </span>
+                                        <button
+                                          type="button"
+                                          onClick={() => { setPickedBeneficiaryId(null); setRecipientName(""); setRecipientPhone(""); }}
+                                          className="text-emerald-700/80 dark:text-emerald-300/80 hover:opacity-100 opacity-70"
+                                          aria-label="Clear selected contact"
+                                        >
+                                          <X className="w-4 h-4" />
+                                        </button>
+                                      </motion.div>
+                                    )}
+
                                     <motion.div custom={1} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
                                       <Label>Recipient Name</Label>
                                       <Input
