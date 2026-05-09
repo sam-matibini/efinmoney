@@ -55,34 +55,36 @@ const ExchangeRates = () => {
             className="flex gap-3 w-max animate-marquee hover:[animation-play-state:paused] px-6"
           >
             {marqueeList.map((r, i) => (
-              <button
-                key={`${r.from}-${r.to}-${i}`}
-                onClick={() =>
-                  navigate(`/exchange?from=${r.from}&to=${r.to}`)
-                }
-                className="shrink-0 flex items-center gap-3 px-4 py-3 rounded-xl border border-border bg-background hover:border-primary/50 hover:shadow-md transition-all"
-              >
-                <span className="text-lg leading-none">
-                  {flagOf[r.from] || "🌍"} <span className="text-muted-foreground/60 mx-0.5">→</span> {flagOf[r.to] || "🌍"}
-                </span>
-                <div className="text-left">
-                  <p className="text-xs font-semibold text-foreground">
-                    {r.from}/{r.to}
-                  </p>
-                  <p className="text-[11px] text-muted-foreground tabular-nums">
-                    {r.rate.toLocaleString("en-US", { maximumFractionDigits: 4 })}
-                  </p>
-                </div>
-                <span
-                  className={`inline-flex items-center gap-0.5 text-[11px] font-semibold ${
-                    r.change >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
-                  }`}
+              <div key={`${r.from}-${r.to}-${i}`} className="flex items-center gap-3">
+                <button
+                  onClick={() =>
+                    navigate(`/exchange?from=${r.from}&to=${r.to}`)
+                  }
+                  className="shrink-0 flex items-center gap-3 px-4 py-3 rounded-xl border border-border bg-background hover:border-primary/50 hover:shadow-md transition-all"
                 >
-                  {r.change >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                  {r.change >= 0 ? "+" : ""}
-                  {r.change.toFixed(2)}%
-                </span>
-              </button>
+                  <span className="text-lg leading-none">
+                    {flagOf[r.from] || "🌍"} <span className="text-muted-foreground/60 mx-0.5">→</span> {flagOf[r.to] || "🌍"}
+                  </span>
+                  <div className="text-left">
+                    <p className="text-xs font-semibold text-foreground">
+                      {r.from}/{r.to}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground tabular-nums">
+                      {r.rate.toLocaleString("en-US", { maximumFractionDigits: 4 })}
+                    </p>
+                  </div>
+                  <span
+                    className={`inline-flex items-center gap-0.5 text-[11px] font-semibold ${
+                      r.change >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
+                    }`}
+                  >
+                    {r.change >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                    {r.change >= 0 ? "↑ +" : "↓ "}
+                    {Math.abs(r.change).toFixed(2)}%
+                  </span>
+                </button>
+                <span className="text-border select-none">|</span>
+              </div>
             ))}
           </motion.div>
         </div>
