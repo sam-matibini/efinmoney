@@ -53,7 +53,7 @@ const SendPage = () => {
   const [fundingSource, setFundingSource] = useState<FundingSource>('wallet');
   const [amount, setAmount] = useState("");
   const [selectedWalletId, setSelectedWalletId] = useState("");
-  const [targetCountryCode, setTargetCountryCode] = useState("KES");
+  const [targetCountryId, setTargetCountryId] = useState<string>("Kenya");
   const [recipientName, setRecipientName] = useState("");
   const [recipientPhone, setRecipientPhone] = useState("");
   const [selectedSourceId, setSelectedSourceId] = useState<string>("");
@@ -74,7 +74,7 @@ const SendPage = () => {
   const createTransfer = useCreateTransfer();
 
   const selectedWallet = wallets?.find(w => w.wallet_id === selectedWalletId) || wallets?.[0];
-  const targetCountry = targetCountries.find(c => c.code === targetCountryCode) || targetCountries[0];
+  const targetCountry = findCountryById(targetCountryId) || COUNTRIES[0];
 
   const activeSources = fundingSource === 'bank' ? bankSources : fundingSource === 'card' ? cardSources : [];
   const selectedExternalSource = activeSources.find(s => s.id === selectedSourceId) || activeSources[0];
