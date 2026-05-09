@@ -9,6 +9,13 @@ import { Link } from "react-router-dom";
 const cardClass =
   "group relative overflow-hidden rounded-2xl bg-card border border-border p-4 transition-all hover:-translate-y-1 hover:shadow-lg";
 
+const cardBg: Record<string, string> = {
+  sent: "bg-gradient-to-br from-emerald-500/5 to-transparent",
+  corridors: "bg-gradient-to-br from-blue-500/5 to-transparent",
+  savings: "bg-gradient-to-br from-teal-500/5 to-transparent",
+  kyc: "bg-gradient-to-br from-amber-500/10 to-transparent",
+};
+
 const MiniStats = () => {
   const { data: transfers } = useTransfers(500);
   const { data: profile } = useProfile();
