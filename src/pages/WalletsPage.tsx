@@ -14,6 +14,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import CreateWalletModal from "@/components/modals/CreateWalletModal";
 import EditWalletModal from "@/components/modals/EditWalletModal";
 import DeleteWalletModal from "@/components/modals/DeleteWalletModal";
+import { flagForCurrency } from "@/lib/flags";
 
 type WalletModalData = {
   walletId: string;
