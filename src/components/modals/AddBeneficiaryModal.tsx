@@ -3,19 +3,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useCreateBeneficiary, useUpdateBeneficiary, type Beneficiary } from "@/hooks/useBeneficiaries";
 import { toast } from "sonner";
-
-const COUNTRIES = [
-  { code: "KES", country: "Kenya", flag: "🇰🇪", method: "M-Pesa", payout: "mpesa" },
-  { code: "UGX", country: "Uganda", flag: "🇺🇬", method: "Mobile Money", payout: "airtel_money" },
-  { code: "TZS", country: "Tanzania", flag: "🇹🇿", method: "M-Pesa", payout: "mpesa" },
-  { code: "ZMW", country: "Zambia", flag: "🇿🇲", method: "MTN Mobile", payout: "mtn_mobile" },
-  { code: "BIF", country: "Burundi", flag: "🇧🇮", method: "Lumicash", payout: "lumicash" },
-  { code: "NGN", country: "Nigeria", flag: "🇳🇬", method: "Bank/Mobile", payout: "bank" },
-];
+import CountryPicker from "@/components/ui/CountryPicker";
+import { COUNTRIES, findCountryById, findCountryByCode, type CountryInfo } from "@/lib/countries";
 
 interface Props {
   open: boolean;
