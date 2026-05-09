@@ -21,7 +21,7 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved }: Props) =>
   const update = useUpdateBeneficiary();
   const [name, setName] = useState("");
   const [nickname, setNickname] = useState("");
-  const [countryCode, setCountryCode] = useState("KES");
+  const [countryId, setCountryId] = useState<string>("Kenya");
   const [method, setMethod] = useState<"mobile" | "bank">("mobile");
   const [phone, setPhone] = useState("");
   const [bankName, setBankName] = useState("");
@@ -31,7 +31,9 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved }: Props) =>
     if (open) {
       setName(editing?.name || "");
       setNickname(editing?.nickname || "");
-      setCountryCode(editing?.country_code || "KES");
+      // Try to resolve a unique country id; fall back to first match by currency code.
+      const fromCode = editing?.country_code ? findCountryByCode(editing.country_code) : undefined;
+      setCountryId(fromCode?.id || "Kenya");
       setMethod(editing?.bank_account ? "bank" : "mobile");
       setPhone(editing?.phone || "");
       setBankName(editing?.bank_name || "");
@@ -39,7 +41,7 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved }: Props) =>
     }
   }, [open, editing]);
 
-  const country = COUNTRIES.find((c) => c.code === countryCode) || COUNTRIES[0];
+  const country = findCountryById(countryId) || COUNTRIES[0];
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -98,14 +100,7 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved }: Props) =>
           </div>
           <div className="space-y-2">
             <Label>Country</Label>
-            <Select value={countryCode} onValueChange={setCountryCode}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {COUNTRIES.map((c) => (
-                  <SelectItem key={c.code} value={c.code}>{c.flag} {c.country}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <CountryPicker value={countryId} onChange={(c) => setCountryId(c.id)} />
           </div>
           <Tabs value={method} onValueChange={(v) => setMethod(v as any)}>
             <TabsList className="grid grid-cols-2 w-full">
