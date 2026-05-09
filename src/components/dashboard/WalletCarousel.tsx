@@ -204,4 +204,39 @@ const WalletCarousel = () => {
   );
 };
 
+interface TiltCardProps {
+  idx: number;
+  isActive: boolean;
+  gradient: string;
+  children: React.ReactNode;
+}
+
+const TiltCard = ({ idx, isActive, gradient, children }: TiltCardProps) => {
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+  const rotateX = useTransform(y, [-50, 50], [5, -5]);
+  const rotateY = useTransform(x, [-50, 50], [-5, 5]);
+
+  const handleMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    x.set(e.clientX - rect.left - rect.width / 2);
+    y.set(e.clientY - rect.top - rect.height / 2);
+  };
+  const reset = () => { x.set(0); y.set(0); };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 30 }}
+      animate={{ opacity: 1, y: 0, scale: isActive ? 1.02 : 1 }}
+      transition={{ delay: idx * 0.08, duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+      onMouseMove={handleMove}
+      onMouseLeave={reset}
+      style={{ background: gradient, rotateX, rotateY, transformPerspective: 1000 }}
+      className="group snap-center min-w-[280px] sm:min-w-[340px] aspect-[1.6/1] rounded-2xl relative overflow-hidden text-white shadow-xl"
+    >
+      {children}
+    </motion.div>
+  );
+};
+
 export default WalletCarousel;
