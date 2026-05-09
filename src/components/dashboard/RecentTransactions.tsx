@@ -179,7 +179,13 @@ const RecentTransactions = () => {
   return (
     <section className="rounded-2xl bg-card border border-border p-6">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-display font-semibold text-foreground">Recent Transactions</h2>
+        <div className="flex items-center gap-3">
+          <h2 className="text-lg font-display font-semibold text-foreground">Recent Transactions</h2>
+          <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-live-pulse" />
+            Live
+          </span>
+        </div>
         {hasItems && (
           <Link
             to="/transfers"
