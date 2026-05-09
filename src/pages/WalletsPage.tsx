@@ -141,7 +141,7 @@ const WalletsPage = () => {
                     currency={wallet.currency_code}
                     balance={Number(wallet.balance)}
                     symbol={wallet.symbol}
-                    flag={(() => { const f = require('@/lib/flags').flagForCurrency(wallet.currency_code); return f !== '🌍' ? f : (wallet.flag_emoji || '💰'); })()}
+                    flag={flagForCurrency(wallet.currency_code) !== '🌍' ? flagForCurrency(wallet.currency_code) : (wallet.flag_emoji || '💰')}
                     isMain={index === 0}
                     isDefault={wallet.is_default}
                     status={wallet.status}
