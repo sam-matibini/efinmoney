@@ -1,11 +1,12 @@
 import { motion } from "framer-motion";
 import { useMemo } from "react";
-import { LineChart, Line, ResponsiveContainer, Tooltip } from "recharts";
+import { AreaChart, Area, ResponsiveContainer, Tooltip } from "recharts";
 import { TrendingUp, TrendingDown, Wallet as WalletIcon, Activity } from "lucide-react";
 import { useWallets } from "@/hooks/useWallets";
 import { useTransfers } from "@/hooks/useTransfers";
 import { useFxRates } from "@/hooks/useFxRates";
 import { Skeleton } from "@/components/ui/skeleton";
+import { flagForCurrency } from "@/lib/flags";
 import AnimatedNumber from "@/components/ui/AnimatedNumber";
 import { useAuth } from "@/hooks/useAuth";
 
