@@ -89,9 +89,15 @@ const MiniStats = () => {
       content: (
         <>
           <p className="text-2xl font-display font-bold text-foreground">{corridors.length}</p>
-          <div className="flex items-center gap-1 mt-2 text-lg">
-            {corridors.slice(0, 5).map((c) => (
-              <span key={c}>{flagFor(c)}</span>
+          <div className="flex items-center mt-2">
+            {corridors.slice(0, 5).map((c, i) => (
+              <span
+                key={c}
+                className="text-lg inline-flex items-center justify-center w-7 h-7 rounded-full bg-background border border-border shadow-sm"
+                style={{ marginLeft: i === 0 ? 0 : -8, zIndex: 10 - i }}
+              >
+                {flagFor(c)}
+              </span>
             ))}
             {corridors.length === 0 && <span className="text-xs text-muted-foreground">None yet</span>}
           </div>
