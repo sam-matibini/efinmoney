@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
-import { ArrowDownLeft, ArrowUpRight, RefreshCw, Inbox, Send, ChevronRight } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, RefreshCw, Inbox, Send, ChevronRight, Copy } from "lucide-react";
 import { useTransfers } from "@/hooks/useTransfers";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { flagForCountryName, flagForCurrency } from "@/lib/flags";
 import { formatDistanceToNow } from "date-fns";
+import { toast } from "sonner";
 
 const payoutMethodNames: Record<string, string> = {
   mpesa: "M-Pesa",
@@ -38,24 +39,27 @@ interface Item {
   createdAt: string;
 }
 
-const KIND_META: Record<Kind, { Icon: any; bg: string; sign: string; amountColor: string }> = {
+const KIND_META: Record<Kind, { Icon: any; bg: string; sign: string; amountColor: string; border: string }> = {
   receive: {
     Icon: ArrowDownLeft,
     bg: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
     sign: "+",
     amountColor: "text-emerald-600 dark:text-emerald-400",
+    border: "border-l-emerald-500",
   },
   send: {
     Icon: ArrowUpRight,
     bg: "bg-rose-500/15 text-rose-600 dark:text-rose-400",
     sign: "-",
     amountColor: "text-rose-600 dark:text-rose-400",
+    border: "border-l-rose-500",
   },
   exchange: {
     Icon: RefreshCw,
     bg: "bg-blue-500/15 text-blue-600 dark:text-blue-400",
     sign: "↔ ",
     amountColor: "text-blue-600 dark:text-blue-400",
+    border: "border-l-blue-500",
   },
 };
 
@@ -175,7 +179,13 @@ const RecentTransactions = () => {
   return (
     <section className="rounded-2xl bg-card border border-border p-6">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-display font-semibold text-foreground">Recent Transactions</h2>
+        <div className="flex items-center gap-3">
+          <h2 className="text-lg font-display font-semibold text-foreground">Recent Transactions</h2>
+          <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-live-pulse" />
+            Live
+          </span>
+        </div>
         {hasItems && (
           <Link
             to="/transfers"
@@ -216,7 +226,7 @@ const RecentTransactions = () => {
             {items.map((item, index) => {
               const meta = KIND_META[item.kind];
               const inner = (
-                <div className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted/60 transition-colors cursor-pointer">
+                <div className={`group/tx flex items-center gap-3 p-3 rounded-xl hover:bg-muted/60 transition-colors cursor-pointer border-l-4 ${meta.border}`}>
                   <div className={`shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${meta.bg}`}>
                     <meta.Icon className="w-5 h-5" />
                   </div>
@@ -226,8 +236,22 @@ const RecentTransactions = () => {
                       {item.description} · {item.date}
                     </p>
                   </div>
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      const ref = item.transferId || item.key;
+                      navigator.clipboard.writeText(ref);
+                      toast.success("Reference copied");
+                    }}
+                    className="opacity-0 group-hover/tx:opacity-100 transition-opacity p-1.5 rounded-md hover:bg-muted"
+                    aria-label="Copy reference"
+                    title="Copy reference"
+                  >
+                    <Copy className="w-3.5 h-3.5 text-muted-foreground" />
+                  </button>
                   <div className="text-right shrink-0">
-                    <p className={`font-display font-semibold ${meta.amountColor}`}>
+                    <p className={`text-base sm:text-lg font-display font-bold tabular-nums ${meta.amountColor}`}>
                       {meta.sign}
                       {item.symbol}
                       {item.amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}

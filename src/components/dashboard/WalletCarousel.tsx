@@ -1,4 +1,4 @@
-import { motion } from "framer-motion";
+import { motion, useMotionValue, useTransform } from "framer-motion";
 import { useRef, useState, useEffect } from "react";
 import { Plus, Send, Download, ArrowUpRight } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -7,6 +7,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import SendMoneyModal from "@/components/modals/SendMoneyModal";
 import CardPaymentModal from "@/components/modals/CardPaymentModal";
 import CreateWalletModal from "@/components/modals/CreateWalletModal";
+import AnimatedNumber from "@/components/ui/AnimatedNumber";
+import { flagForCurrency } from "@/lib/flags";
 
 const gradients: Record<string, string> = {
   USD: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
@@ -87,19 +89,28 @@ const WalletCarousel = () => {
         {list.map((w, idx) => {
           const isActive = idx === activeIndex;
           const gradient = gradients[w.currency_code] || fallbackGradient;
+          const flag = flagForCurrency(w.currency_code) !== "🌍" ? flagForCurrency(w.currency_code) : (w.flag_emoji || "💰");
           return (
-            <motion.div
+            <TiltCard
               key={w.wallet_id}
-              initial={{ opacity: 0, y: 30 }}
-              animate={{
-                opacity: 1,
-                y: 0,
-                scale: isActive ? 1.02 : 1,
-              }}
-              transition={{ delay: idx * 0.08, duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
-              className="snap-center min-w-[280px] sm:min-w-[340px] aspect-[1.6/1] rounded-2xl relative overflow-hidden text-white shadow-xl"
-              style={{ background: gradient }}
+              idx={idx}
+              isActive={isActive}
+              gradient={gradient}
             >
+              {/* Big flag top right */}
+              <span className="absolute top-3 right-3 text-[40px] leading-none drop-shadow-md select-none pointer-events-none z-10">
+                {flag}
+              </span>
+
+              {/* Floating bubbles */}
+              <span className="absolute top-6 left-10 w-2 h-2 rounded-full bg-white/40 animate-bubble-drift" style={{ animationDelay: "0s" }} />
+              <span className="absolute top-16 left-24 w-1.5 h-1.5 rounded-full bg-white/30 animate-bubble-drift" style={{ animationDelay: "1.5s" }} />
+              <span className="absolute bottom-12 left-16 w-2.5 h-2.5 rounded-full bg-white/25 animate-bubble-drift" style={{ animationDelay: "3s" }} />
+              <span className="absolute bottom-20 right-24 w-1.5 h-1.5 rounded-full bg-white/35 animate-bubble-drift" style={{ animationDelay: "4.5s" }} />
+
+              {/* Diagonal shine on hover */}
+              <span className="pointer-events-none absolute inset-y-0 -left-1/2 w-1/2 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shine" />
+
               {/* Decorative orbs */}
               <div className="absolute -top-10 -right-10 h-40 w-40 rounded-full bg-white/10 blur-2xl" />
               <div className="absolute -bottom-10 -left-10 h-32 w-32 rounded-full bg-white/5 blur-xl" />
@@ -107,14 +118,14 @@ const WalletCarousel = () => {
               <div className="relative h-full p-5 flex flex-col justify-between">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="text-3xl drop-shadow-sm">{w.flag_emoji || "💰"}</span>
+                    <span className="text-3xl drop-shadow-sm">{flag}</span>
                     <div>
                       <p className="font-display font-semibold text-sm">{w.currency_code}</p>
                       <p className="text-[10px] uppercase tracking-wider text-white/60">{w.currency_name}</p>
                     </div>
                   </div>
                   {w.is_default && (
-                    <span className="text-[10px] uppercase tracking-wider bg-white/20 px-2 py-0.5 rounded-full">
+                    <span className="text-[10px] uppercase tracking-wider bg-white/20 px-2 py-0.5 rounded-full mr-12">
                       Default
                     </span>
                   )}
@@ -123,8 +134,7 @@ const WalletCarousel = () => {
                 <div>
                   <p className="text-xs text-white/70 mb-1">Available Balance</p>
                   <h3 className="text-3xl font-display font-bold tracking-tight">
-                    {w.symbol}
-                    {formatBalance(Number(w.balance))}
+                    <AnimatedNumber value={Number(w.balance)} prefix={w.symbol} decimals={2} duration={1100} />
                   </h3>
                 </div>
 
@@ -151,7 +161,7 @@ const WalletCarousel = () => {
                   </button>
                 </div>
               </div>
-            </motion.div>
+            </TiltCard>
           );
         })}
 
@@ -191,6 +201,41 @@ const WalletCarousel = () => {
       )}
       
     </section>
+  );
+};
+
+interface TiltCardProps {
+  idx: number;
+  isActive: boolean;
+  gradient: string;
+  children: React.ReactNode;
+}
+
+const TiltCard = ({ idx, isActive, gradient, children }: TiltCardProps) => {
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+  const rotateX = useTransform(y, [-50, 50], [5, -5]);
+  const rotateY = useTransform(x, [-50, 50], [-5, 5]);
+
+  const handleMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    x.set(e.clientX - rect.left - rect.width / 2);
+    y.set(e.clientY - rect.top - rect.height / 2);
+  };
+  const reset = () => { x.set(0); y.set(0); };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 30 }}
+      animate={{ opacity: 1, y: 0, scale: isActive ? 1.02 : 1 }}
+      transition={{ delay: idx * 0.08, duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+      onMouseMove={handleMove}
+      onMouseLeave={reset}
+      style={{ background: gradient, rotateX, rotateY, transformPerspective: 1000 }}
+      className="group snap-center min-w-[280px] sm:min-w-[340px] aspect-[1.6/1] rounded-2xl relative overflow-hidden text-white shadow-xl"
+    >
+      {children}
+    </motion.div>
   );
 };
 

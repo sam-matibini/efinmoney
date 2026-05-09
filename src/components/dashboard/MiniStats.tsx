@@ -9,6 +9,13 @@ import { Link } from "react-router-dom";
 const cardClass =
   "group relative overflow-hidden rounded-2xl bg-card border border-border p-4 transition-all hover:-translate-y-1 hover:shadow-lg";
 
+const cardBg: Record<string, string> = {
+  sent: "bg-gradient-to-br from-emerald-500/5 to-transparent",
+  corridors: "bg-gradient-to-br from-blue-500/5 to-transparent",
+  savings: "bg-gradient-to-br from-teal-500/5 to-transparent",
+  kyc: "bg-gradient-to-br from-amber-500/10 to-transparent",
+};
+
 const MiniStats = () => {
   const { data: transfers } = useTransfers(500);
   const { data: profile } = useProfile();
@@ -82,9 +89,15 @@ const MiniStats = () => {
       content: (
         <>
           <p className="text-2xl font-display font-bold text-foreground">{corridors.length}</p>
-          <div className="flex items-center gap-1 mt-2 text-lg">
-            {corridors.slice(0, 5).map((c) => (
-              <span key={c}>{flagFor(c)}</span>
+          <div className="flex items-center mt-2">
+            {corridors.slice(0, 5).map((c, i) => (
+              <span
+                key={c}
+                className="text-lg inline-flex items-center justify-center w-7 h-7 rounded-full bg-background border border-border shadow-sm"
+                style={{ marginLeft: i === 0 ? 0 : -8, zIndex: 10 - i }}
+              >
+                {flagFor(c)}
+              </span>
             ))}
             {corridors.length === 0 && <span className="text-xs text-muted-foreground">None yet</span>}
           </div>
@@ -118,9 +131,21 @@ const MiniStats = () => {
       content: (
         <>
           <p className="text-2xl font-display font-bold text-foreground">Tier {tierNum}</p>
+          {/* Tier progress dots */}
+          <div className="flex items-center gap-1 mt-2">
+            {[0, 1, 2, 3].map((t) => (
+              <div
+                key={t}
+                className={`h-1.5 flex-1 rounded-full ${t <= tierNum ? "bg-primary" : "bg-muted"}`}
+              />
+            ))}
+          </div>
           {tierNum < 3 ? (
-            <Link to="/kyc" className="text-xs text-primary font-medium mt-2 inline-block hover:underline">
-              Upgrade tier →
+            <Link
+              to="/kyc"
+              className="mt-3 inline-flex items-center justify-center w-full px-2 py-1.5 rounded-lg bg-primary text-primary-foreground text-[11px] font-semibold animate-glow-pulse hover:bg-primary/90 transition-colors"
+            >
+              Upgrade to Tier {tierNum + 1} →
             </Link>
           ) : (
             <p className="text-xs text-muted-foreground mt-2">Max tier reached</p>
@@ -140,7 +165,7 @@ const MiniStats = () => {
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: i * 0.08, duration: 0.4 }}
-          className={cardClass}
+          className={`${cardClass} ${cardBg[s.key] || ""}`}
         >
           <div className="flex items-start justify-between mb-2">
             <p className="text-xs font-medium text-muted-foreground">{s.label}</p>

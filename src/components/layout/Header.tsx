@@ -26,6 +26,14 @@ const Header = () => {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchExpanded, setSearchExpanded] = useState(false);
 
+  const hour = new Date().getHours();
+  const greeting =
+    hour < 5 ? { emoji: "🌙", text: "Good night" }
+    : hour < 12 ? { emoji: "🌅", text: "Good morning" }
+    : hour < 17 ? { emoji: "☀️", text: "Good afternoon" }
+    : hour < 21 ? { emoji: "🌆", text: "Good evening" }
+    : { emoji: "🌙", text: "Good night" };
+
   const navItems = [
     { label: 'Dashboard', href: '/' },
     { label: 'Send', href: '/send' },
@@ -63,6 +71,10 @@ const Header = () => {
             </div>
             <span className="font-display font-bold text-xl text-foreground">eFinMoney</span>
           </Link>
+          <span className="hidden lg:inline-flex items-center gap-1.5 ml-2 pl-3 border-l border-border text-sm font-medium text-muted-foreground">
+            <span className="text-base">{greeting.emoji}</span>
+            {greeting.text}
+          </span>
         </motion.div>
 
         <motion.nav 

@@ -14,6 +14,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import CreateWalletModal from "@/components/modals/CreateWalletModal";
 import EditWalletModal from "@/components/modals/EditWalletModal";
 import DeleteWalletModal from "@/components/modals/DeleteWalletModal";
+import { flagForCurrency } from "@/lib/flags";
 
 type WalletModalData = {
   walletId: string;
@@ -140,7 +141,7 @@ const WalletsPage = () => {
                     currency={wallet.currency_code}
                     balance={Number(wallet.balance)}
                     symbol={wallet.symbol}
-                    flag={wallet.flag_emoji || '💰'}
+                    flag={flagForCurrency(wallet.currency_code) !== '🌍' ? flagForCurrency(wallet.currency_code) : (wallet.flag_emoji || '💰')}
                     isMain={index === 0}
                     isDefault={wallet.is_default}
                     status={wallet.status}
