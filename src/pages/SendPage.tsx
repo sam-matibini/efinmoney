@@ -785,9 +785,27 @@ const SendPage = () => {
         onOpenChange={setPickerOpen}
         onSelect={applyBeneficiary}
       />
+
+      <AlertDialog open={savePromptOpen} onOpenChange={setSavePromptOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>💾 Save {recipientName || "this recipient"} as a contact?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Save them for faster sending next time — no need to re-enter their details.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>No, thanks</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { setSavePromptOpen(false); setSaveModalOpen(true); }}>
+              Yes, save contact
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <AddBeneficiaryModal
-        open={savePromptOpen}
-        onOpenChange={setSavePromptOpen}
+        open={saveModalOpen}
+        onOpenChange={setSaveModalOpen}
         editing={{
           id: "",
           user_id: "",
