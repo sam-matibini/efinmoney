@@ -358,7 +358,7 @@ export type Database = {
           severity: Database["public"]["Enums"]["alert_severity"]
           status: Database["public"]["Enums"]["alert_status"]
           transfer_id: string | null
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           alert_data?: Json
@@ -372,7 +372,7 @@ export type Database = {
           severity: Database["public"]["Enums"]["alert_severity"]
           status?: Database["public"]["Enums"]["alert_status"]
           transfer_id?: string | null
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           alert_data?: Json
@@ -386,7 +386,7 @@ export type Database = {
           severity?: Database["public"]["Enums"]["alert_severity"]
           status?: Database["public"]["Enums"]["alert_status"]
           transfer_id?: string | null
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -594,7 +594,7 @@ export type Database = {
           quote_wallet_id: string | null
           side: Database["public"]["Enums"]["trade_side"]
           status: Database["public"]["Enums"]["trade_status"]
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           base_amount: number
@@ -611,7 +611,7 @@ export type Database = {
           quote_wallet_id?: string | null
           side: Database["public"]["Enums"]["trade_side"]
           status?: Database["public"]["Enums"]["trade_status"]
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           base_amount?: number
@@ -628,7 +628,7 @@ export type Database = {
           quote_wallet_id?: string | null
           side?: Database["public"]["Enums"]["trade_side"]
           status?: Database["public"]["Enums"]["trade_status"]
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -1146,7 +1146,7 @@ export type Database = {
           to_amount: number
           to_currency: string
           to_wallet_id: string
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string
@@ -1166,7 +1166,7 @@ export type Database = {
           to_amount: number
           to_currency: string
           to_wallet_id: string
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string
@@ -1186,7 +1186,7 @@ export type Database = {
           to_amount?: number
           to_currency?: string
           to_wallet_id?: string
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -2700,7 +2700,7 @@ export type Database = {
           recipient_country: string
           recipient_name: string
           recipient_phone: string | null
-          sender_id: string
+          sender_id: string | null
           sender_wallet_id: string
           source_amount: number
           source_currency: string
@@ -2723,7 +2723,7 @@ export type Database = {
           recipient_country: string
           recipient_name: string
           recipient_phone?: string | null
-          sender_id: string
+          sender_id?: string | null
           sender_wallet_id: string
           source_amount: number
           source_currency: string
@@ -2746,7 +2746,7 @@ export type Database = {
           recipient_country?: string
           recipient_name?: string
           recipient_phone?: string | null
-          sender_id?: string
+          sender_id?: string | null
           sender_wallet_id?: string
           source_amount?: number
           source_currency?: string
