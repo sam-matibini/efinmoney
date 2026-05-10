@@ -137,7 +137,7 @@ const SendPage = () => {
         recipient_phone: recipientPhone,
         recipient_country: targetCountry.code,
         transfer_type: 'mobile_money',
-        payout_method: targetCountry.payout,
+        payout_method: effectivePayoutMethod,
         source_currency: sourceCurrency,
         target_currency: targetCountry.code,
         source_amount: parsedAmount,
@@ -163,7 +163,7 @@ const SendPage = () => {
             name: recipientName,
             phone: recipientPhone,
             country_code: targetCountry.code,
-            payout_method: targetCountry.payout,
+            payout_method: effectivePayoutMethod,
             currency_code: targetCountry.code,
           });
           if (isNew && !pickedBeneficiaryId) {
@@ -826,7 +826,7 @@ const SendPage = () => {
           name: recipientName,
           phone: recipientPhone,
           country_code: targetCountry.code,
-          payout_method: targetCountry.payout,
+          payout_method: effectivePayoutMethod,
           network: null,
           bank_name: null,
           bank_account: null,
