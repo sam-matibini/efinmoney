@@ -9,8 +9,9 @@ import { useKyc } from "@/hooks/useKyc";
 import OnboardingShell from "@/components/kyc/OnboardingShell";
 import DocumentUploader from "@/components/kyc/DocumentUploader";
 import SelfieCaptureModal from "@/components/kyc/SelfieCaptureModal";
+import PersonaVerification from "@/components/kyc/PersonaVerification";
 import { ISO_COUNTRIES } from "@/lib/isoCountries";
-import { ArrowRight, Camera, IdCard, FileText, BookUser, CheckCircle2, Info } from "lucide-react";
+import { ArrowRight, Camera, IdCard, FileText, BookUser, CheckCircle2, Info, ShieldCheck, FlaskConical } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -29,11 +30,13 @@ const Identity = () => {
 
   const [country, setCountry] = useState<string>("");
   const [docType, setDocType] = useState<IdType | "">("");
+  const [manualMode, setManualMode] = useState(false);
   const [frontPath, setFrontPath] = useState<string | null>(null);
   const [backPath, setBackPath] = useState<string | null>(null);
   const [selfiePath, setSelfiePath] = useState<string | null>(null);
   const [selfieOpen, setSelfieOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [personaSubmitted, setPersonaSubmitted] = useState(false);
 
   // Hydrate from existing KYC record
   useEffect(() => {
@@ -50,16 +53,14 @@ const Identity = () => {
       }
     }
     if (kyc.selfie_url) setSelfiePath(kyc.selfie_url);
+    if (kyc.persona_inquiry_id) setPersonaSubmitted(true);
   }, [kyc]);
 
   const requiresBack = docType === "drivers_license" || docType === "national_id";
 
   const persist = async (patch: Record<string, unknown>) => {
     if (!user) return;
-    await supabase
-      .from("kyc_verifications")
-      .update(patch)
-      .eq("user_id", user.id);
+    await supabase.from("kyc_verifications").update(patch).eq("user_id", user.id);
   };
 
   const uploadTo = async (folder: "identity", file: File | Blob, name: string) => {
@@ -97,7 +98,7 @@ const Identity = () => {
     await persist({ selfie_url: path });
   };
 
-  const canContinue = useMemo(() => {
+  const canContinueManual = useMemo(() => {
     if (!country || !docType || !frontPath || !selfiePath) return false;
     if (requiresBack && !backPath) return false;
     return true;
@@ -111,17 +112,53 @@ const Identity = () => {
     navigate("/onboarding/address");
   };
 
+  const onPersonaComplete = async () => {
+    setPersonaSubmitted(true);
+    await persist({ current_step: "address", verification_status: "in_progress" });
+    await refetch();
+    navigate("/onboarding/address");
+  };
+
+  const isSandbox = true; // PERSONA_ENVIRONMENT lives server-side; treat preview as sandbox
+
   return (
-    <OnboardingShell step={1} title="Verify your identity" subtitle="Upload a government-issued ID and take a quick selfie.">
+    <OnboardingShell step={1} title="Verify your identity" subtitle="We'll guide you through a quick automated check.">
+      {isSandbox && (
+        <div className="flex items-center gap-2 rounded-xl border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
+          <FlaskConical className="w-3.5 h-3.5" />
+          <span>
+            Test Mode: use Persona's{" "}
+            <a
+              href="https://docs.withpersona.com/docs/sandbox-data"
+              target="_blank"
+              rel="noreferrer"
+              className="underline"
+            >
+              sandbox test data
+            </a>
+            . Real IDs not required.
+          </span>
+        </div>
+      )}
+
       <Card className="p-5 space-y-4">
         <div className="space-y-2">
           <label className="text-sm font-medium text-foreground">Issuing country</label>
-          <Select value={country} onValueChange={async (v) => { setCountry(v); await persist({ id_document_country: v }); }}>
-            <SelectTrigger><SelectValue placeholder="Select country" /></SelectTrigger>
+          <Select
+            value={country}
+            onValueChange={async (v) => {
+              setCountry(v);
+              await persist({ id_document_country: v });
+            }}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select country" />
+            </SelectTrigger>
             <SelectContent className="max-h-72">
               {ISO_COUNTRIES.map((c) => (
                 <SelectItem key={c.code} value={c.code}>
-                  <span className="mr-2">{c.flag}</span>{c.name}
+                  <span className="mr-2">{c.flag}</span>
+                  {c.name}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -156,55 +193,101 @@ const Identity = () => {
         </div>
       </Card>
 
-      {country && docType && (
-        <Card className="p-5 space-y-4">
-          <DocumentUploader
-            label="Front of document"
-            uploadedPath={frontPath}
-            onUpload={handleFront}
-            onRemove={() => { setFrontPath(null); persist({ id_document_url: JSON.stringify({ front: null, back: backPath }) }); }}
-          />
-          {requiresBack && (
-            <DocumentUploader
-              label="Back of document"
-              uploadedPath={backPath}
-              onUpload={handleBack}
-              onRemove={() => { setBackPath(null); persist({ id_document_url: JSON.stringify({ front: frontPath, back: null }) }); }}
+      {!manualMode ? (
+        <Card className="p-6 space-y-4 text-center">
+          <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+            <ShieldCheck className="w-7 h-7 text-primary" />
+          </div>
+          <div className="space-y-1">
+            <h3 className="font-semibold text-foreground">Automated ID verification</h3>
+            <p className="text-sm text-muted-foreground">
+              We'll verify your ID using bank-grade technology. This takes about 2 minutes.
+            </p>
+          </div>
+          {user && (
+            <PersonaVerification
+              userId={user.id}
+              className="w-full"
+              label={personaSubmitted ? "Restart verification" : "Start ID Verification with Persona"}
+              onComplete={onPersonaComplete}
+              onError={() => {
+                toast.error("Automated verification is temporarily unavailable.");
+              }}
             />
           )}
-          <div className="flex items-start gap-2 text-xs text-muted-foreground">
-            <Info className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-            <p>Make sure the document is clear, well-lit, and all corners are visible.</p>
-          </div>
+          <button
+            type="button"
+            className="text-xs text-muted-foreground underline hover:text-foreground"
+            onClick={() => setManualMode(true)}
+          >
+            Continue with manual upload instead
+          </button>
         </Card>
-      )}
-
-      {country && docType && frontPath && (!requiresBack || backPath) && (
-        <Card className="p-5">
-          <h3 className="font-semibold text-foreground mb-1">Selfie verification</h3>
-          <p className="text-sm text-muted-foreground mb-4">
-            Look at the camera and follow the instructions
-          </p>
-          {selfiePath ? (
-            <div className="flex items-center gap-3 p-3 rounded-xl bg-primary/5">
-              <CheckCircle2 className="w-5 h-5 text-green-500" />
-              <span className="text-sm text-foreground flex-1">Selfie captured</span>
-              <Button variant="outline" size="sm" onClick={() => setSelfieOpen(true)}>
-                Retake
-              </Button>
-            </div>
-          ) : (
-            <Button variant="outline" className="w-full" onClick={() => setSelfieOpen(true)}>
-              <Camera className="w-4 h-4 mr-2" /> Open camera
-            </Button>
+      ) : (
+        <>
+          {country && docType && (
+            <Card className="p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-foreground text-sm">Manual document upload</h3>
+                <button
+                  type="button"
+                  className="text-xs text-primary underline"
+                  onClick={() => setManualMode(false)}
+                >
+                  Use automated check
+                </button>
+              </div>
+              <DocumentUploader
+                label="Front of document"
+                uploadedPath={frontPath}
+                onUpload={handleFront}
+                onRemove={() => {
+                  setFrontPath(null);
+                  persist({ id_document_url: JSON.stringify({ front: null, back: backPath }) });
+                }}
+              />
+              {requiresBack && (
+                <DocumentUploader
+                  label="Back of document"
+                  uploadedPath={backPath}
+                  onUpload={handleBack}
+                  onRemove={() => {
+                    setBackPath(null);
+                    persist({ id_document_url: JSON.stringify({ front: frontPath, back: null }) });
+                  }}
+                />
+              )}
+              <div className="flex items-start gap-2 text-xs text-muted-foreground">
+                <Info className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                <p>Make sure the document is clear, well-lit, and all corners are visible.</p>
+              </div>
+            </Card>
           )}
-        </Card>
-      )}
 
-      <Button size="lg" className="w-full" disabled={!canContinue || submitting} onClick={onContinue}>
-        {submitting ? "Saving..." : "Continue"}
-        <ArrowRight className="w-4 h-4 ml-2" />
-      </Button>
+          {country && docType && frontPath && (!requiresBack || backPath) && (
+            <Card className="p-5">
+              <h3 className="font-semibold text-foreground mb-1">Selfie verification</h3>
+              <p className="text-sm text-muted-foreground mb-4">Look at the camera and follow the instructions</p>
+              {selfiePath ? (
+                <div className="flex items-center gap-3 p-3 rounded-xl bg-primary/5">
+                  <CheckCircle2 className="w-5 h-5 text-green-500" />
+                  <span className="text-sm text-foreground flex-1">Selfie captured</span>
+                  <Button variant="outline" size="sm" onClick={() => setSelfieOpen(true)}>Retake</Button>
+                </div>
+              ) : (
+                <Button variant="outline" className="w-full" onClick={() => setSelfieOpen(true)}>
+                  <Camera className="w-4 h-4 mr-2" /> Open camera
+                </Button>
+              )}
+            </Card>
+          )}
+
+          <Button size="lg" className="w-full" disabled={!canContinueManual || submitting} onClick={onContinue}>
+            {submitting ? "Saving..." : "Continue"}
+            <ArrowRight className="w-4 h-4 ml-2" />
+          </Button>
+        </>
+      )}
 
       <SelfieCaptureModal open={selfieOpen} onOpenChange={setSelfieOpen} onCapture={handleSelfie} />
     </OnboardingShell>
