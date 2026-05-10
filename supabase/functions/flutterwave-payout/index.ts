@@ -216,17 +216,20 @@ Deno.serve(async (req) => {
 
     if (!res.ok || result.status !== "success") {
       const reason = result?.message || `HTTP ${res.status}`;
+      const rev = await reverseTransferLedger(supabase, transfer_id);
       await supabase.from("transfers").update({
         status: "failed",
         failure_reason: reason,
       }).eq("id", transfer_id);
       await supabase.from("notifications").insert({
         user_id: user.id,
-        title: "Transfer failed",
-        message: reason,
+        title: "Transfer failed — refunded",
+        message: rev.reversed
+          ? `Your transfer to ${recipient_name} failed (${reason}) and has been refunded to your wallet.`
+          : reason,
         type: "error",
       });
-      return new Response(JSON.stringify({ success: false, error: reason }), {
+      return new Response(JSON.stringify({ success: false, error: reason, refunded: rev.reversed }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
