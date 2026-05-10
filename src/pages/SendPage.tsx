@@ -827,7 +827,7 @@ const SendPage = () => {
           phone: recipientPhone,
           country_code: targetCountry.code,
           payout_method: effectivePayoutMethod,
-          network: null,
+          network: activeNetwork?.id || null,
           bank_name: null,
           bank_account: null,
           currency_code: targetCountry.code,
