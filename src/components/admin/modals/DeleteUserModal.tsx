@@ -50,9 +50,9 @@ const DeleteUserModal = ({ isOpen, onClose, user }: DeleteUserModalProps) => {
       toast.success('User deleted successfully');
       onClose();
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error('Error deleting user:', error);
-      toast.error('Failed to delete user. They may have associated data.');
+      toast.error(error?.message || 'Failed to delete user.');
     },
   });
 
