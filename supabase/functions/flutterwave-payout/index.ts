@@ -40,6 +40,61 @@ function normalizePhone(phone: string): string {
   return phone.replace(/\D/g, "");
 }
 
+// Posts a reversal journal that mirrors every original ledger entry for the
+// given transfer, restoring the sender's wallet balance and clearing the
+// payable. Idempotent — skips if a reversal journal already exists.
+async function reverseTransferLedger(
+  supabase: ReturnType<typeof createClient>,
+  transferId: string,
+): Promise<{ reversed: boolean; reason?: string }> {
+  // Check if reversal already posted (idempotency)
+  const { data: existingReversal } = await supabase
+    .from("ledger_entries")
+    .select("id")
+    .eq("reference_type", "transfer_reversal")
+    .eq("reference_id", transferId)
+    .limit(1);
+  if (existingReversal && existingReversal.length > 0) {
+    return { reversed: false, reason: "already_reversed" };
+  }
+
+  // Load original ledger entries
+  const { data: originals, error } = await supabase
+    .from("ledger_entries")
+    .select("account_id, wallet_id, currency_code, debit_amount, credit_amount, description")
+    .eq("reference_type", "transfer")
+    .eq("reference_id", transferId);
+  if (error) {
+    console.error("reverseTransferLedger: failed to load originals", error);
+    return { reversed: false, reason: "load_failed" };
+  }
+  if (!originals || originals.length === 0) {
+    return { reversed: false, reason: "no_entries" };
+  }
+
+  const journalId = crypto.randomUUID();
+  const reversalRows = originals.map((o) => ({
+    journal_id: journalId,
+    account_id: o.account_id,
+    wallet_id: o.wallet_id,
+    currency_code: o.currency_code,
+    // Mirror: debit becomes credit and vice versa
+    debit_amount: o.credit_amount,
+    credit_amount: o.debit_amount,
+    description: `REVERSAL: ${o.description ?? ""}`.slice(0, 500),
+    reference_type: "transfer_reversal",
+    reference_id: transferId,
+  }));
+
+  const { error: insErr } = await supabase.from("ledger_entries").insert(reversalRows);
+  if (insErr) {
+    console.error("reverseTransferLedger: insert failed", insErr);
+    return { reversed: false, reason: insErr.message };
+  }
+  console.log(`Reversed ${reversalRows.length} ledger entries for transfer ${transferId}`);
+  return { reversed: true };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
