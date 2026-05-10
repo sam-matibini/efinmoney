@@ -1,5 +1,6 @@
 import { Navigate, useLocation } from "react-router-dom";
 import { useKyc } from "@/hooks/useKyc";
+import { useUserRoles } from "@/hooks/useUserRoles";
 import { ReactNode } from "react";
 
 const Spinner = () => (
@@ -12,12 +13,18 @@ const Spinner = () => (
  * Gates protected app routes behind successful KYC verification.
  * Allows access only when verification_status === 'approved'
  * AND user_risk_tiers.current_tier is tier_2 or higher.
+ * Admins, finance, and compliance staff bypass KYC entirely.
  */
 const KYCGuard = ({ children }: { children: ReactNode }) => {
-  const { kyc, tier, isLoading, isVerified } = useKyc();
+  const { kyc, isLoading, isVerified } = useKyc();
+  const { roles, isLoading: rolesLoading } = useUserRoles();
   const location = useLocation();
 
-  if (isLoading) return <Spinner />;
+  if (isLoading || rolesLoading) return <Spinner />;
+
+  // Staff roles bypass KYC entirely
+  const isStaff = roles?.some((r) => ["admin", "finance", "compliance", "operations"].includes(r));
+  if (isStaff) return <>{children}</>;
 
   // No KYC record yet — start fresh
   if (!kyc) return <Navigate to="/onboarding/welcome" replace />;
