@@ -13,82 +13,44 @@ Deno.serve(async (req) => {
 
   try {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-    let SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    if (!SERVICE_KEY) SERVICE_KEY = Deno.env.get("SUPABASE_SECRET_KEYS")!;
-    if (!SERVICE_KEY) SERVICE_KEY = Deno.env.get("SB_SERVICE_ROLE_KEY")!;
-    const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
-
-    console.log("SK len:", SERVICE_KEY?.length || 0, "AK len:", ANON_KEY?.length || 0);
+    const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
     const body = await req.json();
-    const email = body.email;
-    const userIdFromBody = body.user_id;
-    if (!email && !userIdFromBody) {
-      return new Response(JSON.stringify({ error: "Email or user_id required" }), {
+    const userId = body.user_id;
+    if (!userId) {
+      return new Response(JSON.stringify({ error: "user_id required" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Find the user by email or user_id
-    let userId = body.user_id;
-    if (!userId && email) {
-      const { data: profile } = await admin
-        .from("profiles")
-        .select("user_id")
-        .eq("email", email)
-        .maybeSingle();
-
-      if (profile) {
-        userId = profile.user_id;
-      }
-    }
-
-    if (!userId) {
-      return new Response(JSON.stringify({ error: "User not found" }), {
-        status: 404,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Delete related data (skip transfers/ledger for audit integrity)
+    // Delete public data first
     await admin.from("user_roles").delete().eq("user_id", userId);
     await admin.from("notifications").delete().eq("user_id", userId);
     await admin.from("beneficiaries").delete().eq("user_id", userId);
     await admin.from("cards").delete().eq("user_id", userId);
-    // Wallets and transfers are kept for financial audit; delete profile and auth user
     await admin.from("profiles").delete().eq("user_id", userId);
 
-    // Delete auth user
-    const deleteRes = await fetch(
-      `${SUPABASE_URL}/auth/v1/admin/users/${userId}`,
-      {
-        method: "DELETE",
-        headers: {
-          apikey: Deno.env.get("SUPABASE_ANON_KEY")!,
-          Authorization: `Bearer ${SERVICE_KEY}`,
-        },
+    // Delete auth user with retry
+    let lastError = null;
+    for (let i = 0; i < 3; i++) {
+      const { error } = await admin.auth.admin.deleteUser(userId);
+      if (!error) {
+        return new Response(
+          JSON.stringify({ success: true, user_id: userId }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       }
-    );
-    if (!deleteRes.ok) {
-      const errBody = await deleteRes.text();
-      return new Response(
-        JSON.stringify({ error: `Auth delete failed: ${deleteRes.status} - ${errBody}` }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
+      lastError = error;
+      console.log(`Delete attempt ${i + 1} failed:`, error.message);
+      await new Promise((r) => setTimeout(r, 1000));
     }
 
     return new Response(
-      JSON.stringify({ success: true, user_id: userId }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      JSON.stringify({ error: lastError?.message || "Delete failed after retries" }),
+      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {
     return new Response(JSON.stringify({ error: String(e) }), {
