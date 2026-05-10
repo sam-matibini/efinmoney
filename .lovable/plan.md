@@ -1,34 +1,58 @@
 ## Goal
-Move Stripe integration from test (`sk_test_` / `pk_test_`) to live (`sk_live_` / `pk_live_`) production keys.
 
-## Steps
+When a cross-border transfer fails at the Flutterwave payout step (e.g. IP whitelisting error, network down, invalid number), automatically post a **reversal journal entry** that restores the full debited amount (principal + fee) to the sender's wallet, instead of leaving the funds stranded as a "failed" transfer.
 
-### 1. Update Stripe secrets to live keys
-Use the secrets tool to update both:
-- `STRIPE_SECRET_KEY` → your `sk_live_...` value
-- `STRIPE_PUBLISHABLE_KEY` → your `pk_live_...` value
+For the existing failed transfer (`9ad521b9…`, Fred Yumba / ZMW), we'll also post a one-time backfill reversal so the C$7.99 is returned now.
 
-You'll paste the values into a secure form — they're never shown in chat or stored in code. The frontend `src/lib/stripe.ts` and edge functions (`stripe-payment-intent`, `intra-ca-transfer-create`) already read these from the environment, so no client code changes are needed for the swap itself.
+## What Changes
 
-### 2. Remove the Stripe test-mode fallback in `intra-ca-transfer-create`
-Currently `supabase/functions/intra-ca-transfer-create/index.ts` detects `sk_test_` and substitutes Stripe's documented test bank numbers (institution `001`, transit `11000`, account `000123456789`) instead of the real Plaid-returned EFT numbers. In live mode this branch will never trigger, but it's dead code that's risky to leave around. I'll remove the `isTestMode` block so real Plaid account/institution/transit numbers are always sent to Stripe.
+### 1. New shared reversal helper inside `flutterwave-payout/index.ts`
 
-### 3. Pre-flight checks before going live
-Before/after switching, please verify in your Stripe Dashboard (live mode):
-- **ACSS Debit (PAD)** is activated on your account — required for `/transfers/canada` Plaid + PAD top-ups. This often requires an additional Stripe activation step beyond standard card payments.
-- **Card payments (CAD + USD)** are enabled — required for the deposit/Add Funds flow.
-- **Webhook endpoints** (if any are configured in test mode) are recreated against the live mode dashboard. Note: the current code uses synchronous `paymentIntents.retrieve` for confirmation rather than webhooks, so this may not apply, but worth confirming.
-- Your Stripe account is **fully activated** (business details, bank account for payouts, identity verification all complete).
+Add a `reverseTransferLedger(transfer_id)` function that:
+- Loads all `ledger_entries` for `reference_type='transfer'` and `reference_id=transfer_id`.
+- If a reversal journal already exists (description starts with `REVERSAL:`), skip — idempotent.
+- Creates a new `journal_id` and posts the **mirror** of every original line:
+  - Original debit → reversal credit (same account, wallet, currency, amount)
+  - Original credit → reversal debit
+- Description: `REVERSAL: <original description>`
+- `reference_type='transfer_reversal'`, `reference_id=transfer_id`.
 
-### 4. Smoke test in production
-After the keys are swapped, test with a small real amount:
-1. Deposit a small amount via card on the dashboard.
-2. Run a small Plaid + PAD top-up on `/transfers/canada`.
-3. Confirm ledger entries post correctly and the wallet balance updates.
+Net effect for this case:
+```
+Original                                  Reversal
+DR  CAD wallet liability   7.99   →   CR  CAD wallet liability   7.99
+CR  Transfer Fees revenue  2.99   →   DR  Transfer Fees revenue  2.99
+CR  ZMW Mobile Money Pay   27.77  →   DR  ZMW Mobile Money Pay   27.77
+```
+Wallet balance is restored, fee revenue is reversed, and the ZMW payable is cleared. Books stay balanced.
 
-## Files affected
-- `supabase/functions/intra-ca-transfer-create/index.ts` — remove ~6 lines of `isTestMode` test-data substitution.
-- Secrets: `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY` (updated via secure form, not committed to code).
+### 2. Call the reversal on every failure branch
 
-## Not changing
-- `src/lib/stripe.ts`, `supabase/functions/stripe-payment-intent/index.ts`, and Stripe API version pinning all stay the same — they're already production-ready and key-agnostic.
+Currently three places in `flutterwave-payout/index.ts` mark the transfer `failed` without refunding:
+- Unsupported network (line ~114)
+- Flutterwave API non-OK response (line ~158) ← this is the IP-whitelist case
+- Catch-all `catch` block (line ~196)
+
+Each will call `reverseTransferLedger(transfer_id)` **before** updating notifications, and the user-facing notification will read:
+> *"Your CAD 7.99 transfer to Fred Yumba failed and has been refunded to your CAD wallet."*
+
+### 3. Same reversal hook in `flutterwave-webhook/index.ts`
+
+If Flutterwave later sends a `transfer.failed` webhook (async failure after initial accept), reverse the ledger there too. Idempotency check prevents double-refund if both paths fire.
+
+### 4. One-time backfill for the existing failed transfer
+
+A small SQL insert posts the reversal journal for transfer `9ad521b9-413f-4a79-98f1-1a16c07f2afd` so Sam's CAD wallet immediately gets the C$7.99 back, plus a notification. This will be presented as a data-change for approval.
+
+## What Does NOT Change
+
+- The `transfers` row keeps `status='failed'` and the original `failure_reason` for audit.
+- No Stripe refund is needed — the funds were already in the digital wallet (no card was charged for this specific transfer).
+- No schema changes, no new tables.
+- UI doesn't change; the wallet balance refresh and notification toast already react to the new ledger entry + notification row via existing realtime hooks.
+
+## Verification
+
+1. Deploy `flutterwave-payout` + `flutterwave-webhook`.
+2. Run the backfill migration → confirm Sam's CAD wallet balance increases by 7.99 and a "refunded" notification appears.
+3. Trigger another small ZMW transfer (still failing on IP whitelist) → confirm ledger auto-reverses and balance returns within ~1s.

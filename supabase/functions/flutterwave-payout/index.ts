@@ -40,6 +40,61 @@ function normalizePhone(phone: string): string {
   return phone.replace(/\D/g, "");
 }
 
+// Posts a reversal journal that mirrors every original ledger entry for the
+// given transfer, restoring the sender's wallet balance and clearing the
+// payable. Idempotent — skips if a reversal journal already exists.
+async function reverseTransferLedger(
+  supabase: ReturnType<typeof createClient>,
+  transferId: string,
+): Promise<{ reversed: boolean; reason?: string }> {
+  // Check if reversal already posted (idempotency)
+  const { data: existingReversal } = await supabase
+    .from("ledger_entries")
+    .select("id")
+    .eq("reference_type", "transfer_reversal")
+    .eq("reference_id", transferId)
+    .limit(1);
+  if (existingReversal && existingReversal.length > 0) {
+    return { reversed: false, reason: "already_reversed" };
+  }
+
+  // Load original ledger entries
+  const { data: originals, error } = await supabase
+    .from("ledger_entries")
+    .select("account_id, wallet_id, currency_code, debit_amount, credit_amount, description")
+    .eq("reference_type", "transfer")
+    .eq("reference_id", transferId);
+  if (error) {
+    console.error("reverseTransferLedger: failed to load originals", error);
+    return { reversed: false, reason: "load_failed" };
+  }
+  if (!originals || originals.length === 0) {
+    return { reversed: false, reason: "no_entries" };
+  }
+
+  const journalId = crypto.randomUUID();
+  const reversalRows = originals.map((o) => ({
+    journal_id: journalId,
+    account_id: o.account_id,
+    wallet_id: o.wallet_id,
+    currency_code: o.currency_code,
+    // Mirror: debit becomes credit and vice versa
+    debit_amount: o.credit_amount,
+    credit_amount: o.debit_amount,
+    description: `REVERSAL: ${o.description ?? ""}`.slice(0, 500),
+    reference_type: "transfer_reversal",
+    reference_id: transferId,
+  }));
+
+  const { error: insErr } = await supabase.from("ledger_entries").insert(reversalRows);
+  if (insErr) {
+    console.error("reverseTransferLedger: insert failed", insErr);
+    return { reversed: false, reason: insErr.message };
+  }
+  console.log(`Reversed ${reversalRows.length} ledger entries for transfer ${transferId}`);
+  return { reversed: true };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -111,11 +166,17 @@ Deno.serve(async (req) => {
     const accountBank = NETWORK_MAP[networkKey];
     if (!accountBank && currency !== "NGN") {
       const reason = `Unsupported network ${network} for ${currency}`;
+      const rev = await reverseTransferLedger(supabase, transfer_id);
       await supabase.from("transfers").update({ status: "failed", failure_reason: reason }).eq("id", transfer_id);
       await supabase.from("notifications").insert({
-        user_id: user.id, title: "Transfer failed", message: reason, type: "error",
+        user_id: user.id,
+        title: "Transfer failed — refunded",
+        message: rev.reversed
+          ? `${reason}. Funds have been returned to your wallet.`
+          : reason,
+        type: "error",
       });
-      return new Response(JSON.stringify({ success: false, error: reason }), {
+      return new Response(JSON.stringify({ success: false, error: reason, refunded: rev.reversed }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -155,17 +216,20 @@ Deno.serve(async (req) => {
 
     if (!res.ok || result.status !== "success") {
       const reason = result?.message || `HTTP ${res.status}`;
+      const rev = await reverseTransferLedger(supabase, transfer_id);
       await supabase.from("transfers").update({
         status: "failed",
         failure_reason: reason,
       }).eq("id", transfer_id);
       await supabase.from("notifications").insert({
         user_id: user.id,
-        title: "Transfer failed",
-        message: reason,
+        title: "Transfer failed — refunded",
+        message: rev.reversed
+          ? `Your transfer to ${recipient_name} failed (${reason}) and has been refunded to your wallet.`
+          : reason,
         type: "error",
       });
-      return new Response(JSON.stringify({ success: false, error: reason }), {
+      return new Response(JSON.stringify({ success: false, error: reason, refunded: rev.reversed }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -193,6 +257,7 @@ Deno.serve(async (req) => {
     const msg = err instanceof Error ? err.message : "Unknown error";
     if (currentTransferId) {
       try {
+        const rev = await reverseTransferLedger(supabase, currentTransferId);
         await supabase.from("transfers").update({
           status: "failed",
           failure_reason: msg.slice(0, 500),
@@ -200,8 +265,8 @@ Deno.serve(async (req) => {
         if (currentUserId) {
           await supabase.from("notifications").insert({
             user_id: currentUserId,
-            title: "Transfer failed",
-            message: msg.slice(0, 300),
+            title: "Transfer failed — refunded",
+            message: (rev.reversed ? "Refunded to your wallet. " : "") + msg.slice(0, 250),
             type: "error",
           });
         }

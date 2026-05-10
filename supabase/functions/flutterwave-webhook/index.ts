@@ -5,6 +5,45 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "verif-hash, content-type",
 };
 
+async function reverseTransferLedger(
+  supabase: ReturnType<typeof createClient>,
+  transferId: string,
+): Promise<boolean> {
+  const { data: existing } = await supabase
+    .from("ledger_entries")
+    .select("id")
+    .eq("reference_type", "transfer_reversal")
+    .eq("reference_id", transferId)
+    .limit(1);
+  if (existing && existing.length > 0) return false;
+
+  const { data: originals } = await supabase
+    .from("ledger_entries")
+    .select("account_id, wallet_id, currency_code, debit_amount, credit_amount, description")
+    .eq("reference_type", "transfer")
+    .eq("reference_id", transferId);
+  if (!originals || originals.length === 0) return false;
+
+  const journalId = crypto.randomUUID();
+  const rows = originals.map((o) => ({
+    journal_id: journalId,
+    account_id: o.account_id,
+    wallet_id: o.wallet_id,
+    currency_code: o.currency_code,
+    debit_amount: o.credit_amount,
+    credit_amount: o.debit_amount,
+    description: `REVERSAL: ${o.description ?? ""}`.slice(0, 500),
+    reference_type: "transfer_reversal",
+    reference_id: transferId,
+  }));
+  const { error } = await supabase.from("ledger_entries").insert(rows);
+  if (error) {
+    console.error("webhook reverseTransferLedger insert failed", error);
+    return false;
+  }
+  return true;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -72,6 +111,14 @@ Deno.serve(async (req) => {
     }
 
     if (newStatus) {
+      let refunded = false;
+      if (newStatus === "failed") {
+        refunded = await reverseTransferLedger(supabase, transfer.id);
+        if (refunded) {
+          message = `Your transfer to ${transfer.recipient_name} failed and has been refunded to your wallet.`;
+          title = "Transfer failed — refunded";
+        }
+      }
       await supabase.from("transfers").update({
         status: newStatus,
         provider_reference: flwId || transfer.provider_reference,
