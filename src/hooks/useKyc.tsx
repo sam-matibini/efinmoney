@@ -29,6 +29,10 @@ export interface KycRecord {
   selfie_url: string | null;
   liveness_check_status: "pending" | "approved" | "rejected";
   submitted_at: string | null;
+  persona_inquiry_id: string | null;
+  persona_inquiry_status: string | null;
+  persona_decision: "approved" | "declined" | "needs_review" | null;
+  persona_decision_reason: string | null;
 }
 
 export interface RiskTier {
