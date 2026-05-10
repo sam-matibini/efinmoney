@@ -27,10 +27,9 @@ Deno.serve(async (req) => {
       { global: { headers: { Authorization: authHeader } } },
     );
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data: claimsRes, error: claimsErr } = await supabase.auth.getClaims(token);
-    if (claimsErr || !claimsRes?.claims) return json({ error: "Unauthorized" }, 401);
-    const userId = claimsRes.claims.sub as string;
+    const { data: userRes, error: userErr } = await supabase.auth.getUser();
+    if (userErr || !userRes?.user) return json({ error: "Unauthorized" }, 401);
+    const userId = userRes.user.id;
 
     const body = await req.json().catch(() => ({}));
     if (body?.userId && body.userId !== userId) {
