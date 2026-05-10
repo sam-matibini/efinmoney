@@ -663,7 +663,7 @@ const SendPage = () => {
                                         className="transition-shadow focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:shadow-[0_0_0_4px_hsl(var(--primary)/0.12)]"
                                       />
                                       <p className="text-sm text-muted-foreground">
-                                        Funds will be sent via {targetCountry.method}
+                                        Funds will be sent via {effectiveMethodLabel}
                                       </p>
                                     </motion.div>
 
