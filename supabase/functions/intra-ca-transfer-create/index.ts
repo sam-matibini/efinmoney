@@ -59,6 +59,10 @@ Deno.serve(async (req) => {
       params.append("payment_method_data[billing_details][email]", user.email || "");
       params.append("payment_method_options[acss_debit][mandate_options][payment_schedule]", "sporadic");
       params.append("payment_method_options[acss_debit][mandate_options][transaction_type]", "personal");
+      // Mandate acceptance (required for ACSS Debit / PAD)
+      params.append("mandate_data[customer_acceptance][type]", "online");
+      params.append("mandate_data[customer_acceptance][online][ip_address]", req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "0.0.0.0");
+      params.append("mandate_data[customer_acceptance][online][user_agent]", req.headers.get("user-agent") || "eFinMoney");
       params.append("confirm", "true");
       params.append("description", `eFinMoney intra-CA transfer ${transfer.reference}`);
       params.append("metadata[transfer_id]", transfer.id);
