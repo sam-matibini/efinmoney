@@ -40,6 +40,11 @@ const Approved = () => {
       });
   }, [user]);
 
+  useEffect(() => {
+    const t = setTimeout(() => navigate("/dashboard", { replace: true }), 2500);
+    return () => clearTimeout(t);
+  }, [navigate]);
+
   const copy = async () => {
     if (!accountNumber) return;
     await navigator.clipboard.writeText(accountNumber);

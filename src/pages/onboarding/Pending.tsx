@@ -7,6 +7,7 @@ import OnboardingShell from "@/components/kyc/OnboardingShell";
 import { useAuth } from "@/hooks/useAuth";
 import { useKyc } from "@/hooks/useKyc";
 import { Clock, CheckCircle2, Mail } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 const Pending = () => {
   const navigate = useNavigate();
@@ -14,13 +15,30 @@ const Pending = () => {
   const { kyc, refetch } = useKyc();
 
   useEffect(() => {
-    const t = setInterval(refetch, 15000);
+    // Fast polling fallback
+    const t = setInterval(refetch, 3000);
     return () => clearInterval(t);
   }, [refetch]);
 
+  // Realtime subscription: react instantly when admin approves/rejects
   useEffect(() => {
-    if (kyc?.verification_status === "approved") navigate("/onboarding/approved");
-    if (kyc?.verification_status === "rejected") navigate("/onboarding/rejected");
+    if (!user) return;
+    const channel = supabase
+      .channel(`kyc-status-${user.id}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "kyc_verifications", filter: `user_id=eq.${user.id}` },
+        () => refetch()
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, refetch]);
+
+  useEffect(() => {
+    if (kyc?.verification_status === "approved") navigate("/onboarding/approved", { replace: true });
+    if (kyc?.verification_status === "rejected") navigate("/onboarding/rejected", { replace: true });
   }, [kyc, navigate]);
 
   const steps = [
