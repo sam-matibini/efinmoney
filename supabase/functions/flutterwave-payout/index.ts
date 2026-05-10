@@ -41,6 +41,13 @@ function normalizePhone(phone: string): string {
   return phone.replace(/\D/g, "");
 }
 
+function isTemporaryProviderSetupError(message: string): boolean {
+  const normalized = message.toLowerCase();
+  return normalized.includes("ip whitelisting")
+    || normalized.includes("whitelist")
+    || normalized.includes("access this service");
+}
+
 // Posts a reversal journal that mirrors every original ledger entry for the
 // given transfer, restoring the sender's wallet balance and clearing the
 // payable. Idempotent — skips if a reversal journal already exists.
@@ -217,6 +224,31 @@ Deno.serve(async (req) => {
 
     if (!res.ok || result.status !== "success") {
       const reason = result?.message || `HTTP ${res.status}`;
+
+      if (isTemporaryProviderSetupError(reason)) {
+        await supabase.from("transfers").update({
+          status: "processing",
+          provider_reference: `PENDING-${reference}`,
+          failure_reason: null,
+        }).eq("id", transfer_id);
+
+        await supabase.from("notifications").insert({
+          user_id: user.id,
+          title: "Transfer queued",
+          message: `Your ${currency} ${amount} transfer to ${recipient_name} is queued while the payout partner completes Zambia setup.`,
+          type: "info",
+        });
+
+        return new Response(JSON.stringify({
+          success: true,
+          queued: true,
+          reference,
+          provider_message: reason,
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       const rev = await reverseTransferLedger(supabase, transfer_id);
       await supabase.from("transfers").update({
         status: "failed",
