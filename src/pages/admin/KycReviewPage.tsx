@@ -383,6 +383,73 @@ const KycReviewPage = () => {
             </div>
 
             {/* Internal notes */}
+            {/* Persona Verification Results */}
+            {(kyc.persona_inquiry_id || kyc.persona_decision) && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <ShieldAlert className="w-4 h-4" /> Persona verification results
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3 text-sm">
+                  <div className="flex flex-wrap gap-4">
+                    <div>
+                      <div className="text-xs text-muted-foreground">Decision</div>
+                      <div className={
+                        kyc.persona_decision === "approved" ? "text-green-600 dark:text-green-400 font-medium capitalize" :
+                        kyc.persona_decision === "declined" ? "text-red-600 dark:text-red-400 font-medium capitalize" :
+                        kyc.persona_decision === "needs_review" ? "text-amber-600 dark:text-amber-400 font-medium capitalize" :
+                        "text-muted-foreground capitalize"
+                      }>
+                        {kyc.persona_decision?.replace("_", " ") || "Pending"}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground">Inquiry status</div>
+                      <div className="capitalize">{kyc.persona_inquiry_status || "—"}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground">Inquiry ID</div>
+                      <div className="font-mono text-xs">{kyc.persona_inquiry_id || "—"}</div>
+                    </div>
+                  </div>
+                  {kyc.persona_decision_reason && (
+                    <div>
+                      <div className="text-xs text-muted-foreground">Decline reason</div>
+                      <div className="text-red-600 dark:text-red-400">{kyc.persona_decision_reason}</div>
+                    </div>
+                  )}
+                  {kyc.persona_verification_data && (() => {
+                    const fields = (kyc.persona_verification_data as any)?.data?.attributes?.payload?.data?.attributes?.fields;
+                    if (!fields) return null;
+                    const get = (k: string) => fields?.[k]?.value;
+                    return (
+                      <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t">
+                        <div className="text-muted-foreground">Name</div>
+                        <div>{[get("nameFirst"), get("nameLast")].filter(Boolean).join(" ") || "—"}</div>
+                        <div className="text-muted-foreground">Date of birth</div>
+                        <div>{get("birthdate") || "—"}</div>
+                        <div className="text-muted-foreground">Document #</div>
+                        <div>{get("identificationNumber") || "—"}</div>
+                        <div className="text-muted-foreground">Expires</div>
+                        <div>{get("expirationDate") || "—"}</div>
+                      </div>
+                    );
+                  })()}
+                  {kyc.persona_inquiry_id && (
+                    <a
+                      href={`https://app.withpersona.com/dashboard/inquiries/${kyc.persona_inquiry_id}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-block text-xs text-primary underline pt-1"
+                    >
+                      View in Persona dashboard ↗
+                    </a>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
             <Card>
               <CardHeader><CardTitle className="text-base">Internal notes</CardTitle></CardHeader>
               <CardContent>

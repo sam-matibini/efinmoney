@@ -1486,7 +1486,12 @@ export type Database = {
           id_verification_status: Database["public"]["Enums"]["kyc_doc_review_status"]
           internal_notes: string | null
           liveness_check_status: Database["public"]["Enums"]["kyc_doc_review_status"]
+          persona_decision: string | null
+          persona_decision_reason: string | null
           persona_inquiry_id: string | null
+          persona_inquiry_status: string | null
+          persona_session_token: string | null
+          persona_verification_data: Json | null
           reviewed_at: string | null
           reviewed_by: string | null
           selfie_url: string | null
@@ -1516,7 +1521,12 @@ export type Database = {
           id_verification_status?: Database["public"]["Enums"]["kyc_doc_review_status"]
           internal_notes?: string | null
           liveness_check_status?: Database["public"]["Enums"]["kyc_doc_review_status"]
+          persona_decision?: string | null
+          persona_decision_reason?: string | null
           persona_inquiry_id?: string | null
+          persona_inquiry_status?: string | null
+          persona_session_token?: string | null
+          persona_verification_data?: Json | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           selfie_url?: string | null
@@ -1546,7 +1556,12 @@ export type Database = {
           id_verification_status?: Database["public"]["Enums"]["kyc_doc_review_status"]
           internal_notes?: string | null
           liveness_check_status?: Database["public"]["Enums"]["kyc_doc_review_status"]
+          persona_decision?: string | null
+          persona_decision_reason?: string | null
           persona_inquiry_id?: string | null
+          persona_inquiry_status?: string | null
+          persona_session_token?: string | null
+          persona_verification_data?: Json | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           selfie_url?: string | null
@@ -1861,6 +1876,36 @@ export type Database = {
           metric_value?: number
           period_end?: string
           period_start?: string
+        }
+        Relationships: []
+      }
+      persona_webhook_logs: {
+        Row: {
+          error: string | null
+          event_type: string | null
+          id: string
+          inquiry_id: string | null
+          payload: Json | null
+          processed: boolean
+          received_at: string
+        }
+        Insert: {
+          error?: string | null
+          event_type?: string | null
+          id?: string
+          inquiry_id?: string | null
+          payload?: Json | null
+          processed?: boolean
+          received_at?: string
+        }
+        Update: {
+          error?: string | null
+          event_type?: string | null
+          id?: string
+          inquiry_id?: string | null
+          payload?: Json | null
+          processed?: boolean
+          received_at?: string
         }
         Relationships: []
       }
