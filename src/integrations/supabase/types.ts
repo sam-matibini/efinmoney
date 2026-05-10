@@ -14,9 +14,37 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_notifications: {
+        Row: {
+          admin_id: string
+          created_at: string
+          id: string
+          is_read: boolean
+          payload: Json
+          type: string
+        }
+        Insert: {
+          admin_id: string
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          payload?: Json
+          type: string
+        }
+        Update: {
+          admin_id?: string
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          payload?: Json
+          type?: string
+        }
+        Relationships: []
+      }
       admin_users: {
         Row: {
           created_at: string
+          full_name: string | null
           id: string
           permissions: Json
           role: Database["public"]["Enums"]["admin_user_role"]
@@ -24,6 +52,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          full_name?: string | null
           id: string
           permissions?: Json
           role?: Database["public"]["Enums"]["admin_user_role"]
@@ -31,6 +60,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          full_name?: string | null
           id?: string
           permissions?: Json
           role?: Database["public"]["Enums"]["admin_user_role"]
@@ -1444,6 +1474,8 @@ export type Database = {
           address_verification_status: Database["public"]["Enums"]["kyc_doc_review_status"]
           created_at: string
           current_step: Database["public"]["Enums"]["kyc_current_step"]
+          escalated: boolean
+          escalated_at: string | null
           id: string
           id_document_country: string | null
           id_document_type:
@@ -1452,6 +1484,7 @@ export type Database = {
           id_document_url: string | null
           id_rejection_reason: string | null
           id_verification_status: Database["public"]["Enums"]["kyc_doc_review_status"]
+          internal_notes: string | null
           liveness_check_status: Database["public"]["Enums"]["kyc_doc_review_status"]
           persona_inquiry_id: string | null
           reviewed_at: string | null
@@ -1471,6 +1504,8 @@ export type Database = {
           address_verification_status?: Database["public"]["Enums"]["kyc_doc_review_status"]
           created_at?: string
           current_step?: Database["public"]["Enums"]["kyc_current_step"]
+          escalated?: boolean
+          escalated_at?: string | null
           id?: string
           id_document_country?: string | null
           id_document_type?:
@@ -1479,6 +1514,7 @@ export type Database = {
           id_document_url?: string | null
           id_rejection_reason?: string | null
           id_verification_status?: Database["public"]["Enums"]["kyc_doc_review_status"]
+          internal_notes?: string | null
           liveness_check_status?: Database["public"]["Enums"]["kyc_doc_review_status"]
           persona_inquiry_id?: string | null
           reviewed_at?: string | null
@@ -1498,6 +1534,8 @@ export type Database = {
           address_verification_status?: Database["public"]["Enums"]["kyc_doc_review_status"]
           created_at?: string
           current_step?: Database["public"]["Enums"]["kyc_current_step"]
+          escalated?: boolean
+          escalated_at?: string | null
           id?: string
           id_document_country?: string | null
           id_document_type?:
@@ -1506,6 +1544,7 @@ export type Database = {
           id_document_url?: string | null
           id_rejection_reason?: string | null
           id_verification_status?: Database["public"]["Enums"]["kyc_doc_review_status"]
+          internal_notes?: string | null
           liveness_check_status?: Database["public"]["Enums"]["kyc_doc_review_status"]
           persona_inquiry_id?: string | null
           reviewed_at?: string | null
