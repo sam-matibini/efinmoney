@@ -89,6 +89,19 @@ const SendPage = () => {
     : (selectedExternalSource?.currency_code === 'CAD' ? 'C$' : '$');
   const targetSymbol = targetCountry.symbol || targetCountry.code;
 
+  // Network picker (for countries that expose multiple mobile money networks, e.g. Zambia)
+  const availableNetworks = targetCountry.networks;
+  const activeNetwork = availableNetworks
+    ? (availableNetworks.find(n => n.id === selectedNetworkId) || availableNetworks[0])
+    : null;
+  const effectivePayoutMethod = activeNetwork?.payout || targetCountry.payout;
+  const effectiveMethodLabel = activeNetwork?.label || targetCountry.method;
+
+  // Reset network selection when the destination country changes
+  useEffect(() => {
+    setSelectedNetworkId(null);
+  }, [targetCountryId]);
+
   const fxRate = fxRates?.find(
     r => r.from_currency === sourceCurrency && r.to_currency === targetCountry.code
   );
