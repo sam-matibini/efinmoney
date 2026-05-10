@@ -106,6 +106,12 @@ const PublicRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+const KycProtectedRoute = ({ children }: { children: React.ReactNode }) => (
+  <ProtectedRoute>
+    <KYCGuard>{children}</KYCGuard>
+  </ProtectedRoute>
+);
+
 const RootRoute = () => {
   const { user, loading } = useAuth();
   if (loading) {
@@ -115,7 +121,8 @@ const RootRoute = () => {
       </div>
     );
   }
-  return user ? <Index /> : <Landing />;
+  if (!user) return <Landing />;
+  return <KYCGuard><Index /></KYCGuard>;
 };
 
 const AppRoutes = () => {
@@ -125,11 +132,11 @@ const AppRoutes = () => {
       <PageTransition key={location.pathname}>
         <Routes location={location}>
           <Route path="/" element={<RootRoute />} />
-          <Route path="/dashboard" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-          <Route path="/wallets" element={<ProtectedRoute><WalletsPage /></ProtectedRoute>} />
-          <Route path="/send" element={<ProtectedRoute><SendPage /></ProtectedRoute>} />
-          <Route path="/exchange" element={<ProtectedRoute><ExchangePage /></ProtectedRoute>} />
-          <Route path="/cards" element={<ProtectedRoute><CardsPage /></ProtectedRoute>} />
+          <Route path="/dashboard" element={<KycProtectedRoute><Index /></KycProtectedRoute>} />
+          <Route path="/wallets" element={<KycProtectedRoute><WalletsPage /></KycProtectedRoute>} />
+          <Route path="/send" element={<KycProtectedRoute><SendPage /></KycProtectedRoute>} />
+          <Route path="/exchange" element={<KycProtectedRoute><ExchangePage /></KycProtectedRoute>} />
+          <Route path="/cards" element={<KycProtectedRoute><CardsPage /></KycProtectedRoute>} />
           <Route path="/finance" element={<RoleProtectedRoute allowedRoles={['admin', 'finance']}><FinanceDashboard /></RoleProtectedRoute>} />
           <Route path="/admin" element={<RoleProtectedRoute allowedRoles={['admin']}><AdminDashboard /></RoleProtectedRoute>} />
           <Route path="/settings" element={<RoleProtectedRoute allowedRoles={['admin']}><SettingsDashboard /></RoleProtectedRoute>} />
@@ -139,11 +146,18 @@ const AppRoutes = () => {
           <Route path="/profile" element={<ProtectedRoute><ProfileSettingsPage /></ProtectedRoute>} />
           <Route path="/kyc" element={<ProtectedRoute><KYCPage /></ProtectedRoute>} />
           <Route path="/security" element={<ProtectedRoute><SecurityPage /></ProtectedRoute>} />
-          <Route path="/transfers" element={<ProtectedRoute><TransfersListPage /></ProtectedRoute>} />
-          <Route path="/transfers/:id" element={<ProtectedRoute><TransferTrackingPage /></ProtectedRoute>} />
-          <Route path="/contacts" element={<ProtectedRoute><ContactsPage /></ProtectedRoute>} />
-          <Route path="/transfers/canada" element={<ProtectedRoute><CanadaTransferPage /></ProtectedRoute>} />
+          <Route path="/transfers" element={<KycProtectedRoute><TransfersListPage /></KycProtectedRoute>} />
+          <Route path="/transfers/:id" element={<KycProtectedRoute><TransferTrackingPage /></KycProtectedRoute>} />
+          <Route path="/contacts" element={<KycProtectedRoute><ContactsPage /></KycProtectedRoute>} />
+          <Route path="/transfers/canada" element={<KycProtectedRoute><CanadaTransferPage /></KycProtectedRoute>} />
           <Route path="/deposit/complete" element={<DepositComplete />} />
+          <Route path="/onboarding/welcome" element={<ProtectedRoute><Welcome /></ProtectedRoute>} />
+          <Route path="/onboarding/identity" element={<ProtectedRoute><OnboardingIdentity /></ProtectedRoute>} />
+          <Route path="/onboarding/address" element={<ProtectedRoute><OnboardingAddress /></ProtectedRoute>} />
+          <Route path="/onboarding/review" element={<ProtectedRoute><OnboardingReview /></ProtectedRoute>} />
+          <Route path="/onboarding/pending" element={<ProtectedRoute><OnboardingPending /></ProtectedRoute>} />
+          <Route path="/onboarding/approved" element={<ProtectedRoute><OnboardingApproved /></ProtectedRoute>} />
+          <Route path="/onboarding/rejected" element={<ProtectedRoute><OnboardingRejected /></ProtectedRoute>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </PageTransition>
