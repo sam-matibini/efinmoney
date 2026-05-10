@@ -51,10 +51,20 @@ Deno.serve(async (req) => {
     await admin.from("profiles").delete().eq("user_id", userId);
 
     // Delete auth user
-    const { error: deleteErr } = await admin.auth.admin.deleteUser(userId);
-    if (deleteErr) {
+    const deleteRes = await fetch(
+      `${SUPABASE_URL}/auth/v1/admin/users/${userId}`,
+      {
+        method: "DELETE",
+        headers: {
+          apikey: Deno.env.get("SUPABASE_ANON_KEY")!,
+          Authorization: `Bearer ${SERVICE_KEY}`,
+        },
+      }
+    );
+    if (!deleteRes.ok) {
+      const errBody = await deleteRes.text();
       return new Response(
-        JSON.stringify({ error: deleteErr.message }),
+        JSON.stringify({ error: `Auth delete failed: ${deleteRes.status} - ${errBody}` }),
         {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
