@@ -1,58 +1,66 @@
 ## Goal
 
-When a cross-border transfer fails at the Flutterwave payout step (e.g. IP whitelisting error, network down, invalid number), automatically post a **reversal journal entry** that restores the full debited amount (principal + fee) to the sender's wallet, instead of leaving the funds stranded as a "failed" transfer.
+Allow Zambia (ZMW) recipients to receive funds on **MTN**, **Airtel**, or **Zamtel** mobile money. Currently the SendPage forces every Zambian payout to MTN because `countries.ts` exposes a single `payout: "mtn_mobile"` per country and there is no UI selector.
 
-For the existing failed transfer (`9ad521b9…`, Fred Yumba / ZMW), we'll also post a one-time backfill reversal so the C$7.99 is returned now.
+## Changes
 
-## What Changes
+### 1. Country config — multi-network for Zambia (`src/lib/countries.ts`)
 
-### 1. New shared reversal helper inside `flutterwave-payout/index.ts`
+Extend the country object with an optional `networks` array. For Zambia:
 
-Add a `reverseTransferLedger(transfer_id)` function that:
-- Loads all `ledger_entries` for `reference_type='transfer'` and `reference_id=transfer_id`.
-- If a reversal journal already exists (description starts with `REVERSAL:`), skip — idempotent.
-- Creates a new `journal_id` and posts the **mirror** of every original line:
-  - Original debit → reversal credit (same account, wallet, currency, amount)
-  - Original credit → reversal debit
-- Description: `REVERSAL: <original description>`
-- `reference_type='transfer_reversal'`, `reference_id=transfer_id`.
-
-Net effect for this case:
+```ts
+networks: [
+  { id: "mtn",    label: "MTN Mobile Money",    payout: "mtn_mobile" },
+  { id: "airtel", label: "Airtel Money",        payout: "airtel_money" },
+  { id: "zamtel", label: "Zamtel Kwacha",       payout: "zamtel_money" },
+]
 ```
-Original                                  Reversal
-DR  CAD wallet liability   7.99   →   CR  CAD wallet liability   7.99
-CR  Transfer Fees revenue  2.99   →   DR  Transfer Fees revenue  2.99
-CR  ZMW Mobile Money Pay   27.77  →   DR  ZMW Mobile Money Pay   27.77
+
+Other countries keep their single-method behaviour (the new field is optional).
+
+### 2. SendPage — network picker (`src/pages/SendPage.tsx`)
+
+In step 2 of the send flow (above the "Mobile Money Number" field), when `targetCountry.networks` exists, render a small 3-button radio group: **MTN / Airtel / Zamtel** (with brand-colored chips). Default to the first option.
+
+The selected network drives:
+- `payout_method` saved on the transfer (replaces the static `targetCountry.payout`)
+- The "Funds will be sent via …" hint text
+- The pre-fill in the AddBeneficiaryModal save-contact dialog
+
+For non-Zambia countries the picker is hidden and behaviour is unchanged.
+
+### 3. Network mapping — add Zamtel (`supabase/functions/execute-transfer/index.ts`)
+
+Extend `networkMap` so the new payout method resolves to the Flutterwave network identifier:
+
+```ts
+zamtel_money: "zamtel",
+zamtel: "zamtel",
 ```
-Wallet balance is restored, fee revenue is reversed, and the ZMW payable is cleared. Books stay balanced.
 
-### 2. Call the reversal on every failure branch
+### 4. Flutterwave bank code — add Zamtel (`supabase/functions/flutterwave-payout/index.ts`)
 
-Currently three places in `flutterwave-payout/index.ts` mark the transfer `failed` without refunding:
-- Unsupported network (line ~114)
-- Flutterwave API non-OK response (line ~158) ← this is the IP-whitelist case
-- Catch-all `catch` block (line ~196)
+Extend `NETWORK_MAP`:
 
-Each will call `reverseTransferLedger(transfer_id)` **before** updating notifications, and the user-facing notification will read:
-> *"Your CAD 7.99 transfer to Fred Yumba failed and has been refunded to your CAD wallet."*
+```ts
+"ZMW:zamtel": "ZAMTEL",
+```
 
-### 3. Same reversal hook in `flutterwave-webhook/index.ts`
+(MTN and Airtel for ZMW are already wired.)
 
-If Flutterwave later sends a `transfer.failed` webhook (async failure after initial accept), reverse the ledger there too. Idempotency check prevents double-refund if both paths fire.
+### 5. Beneficiaries (existing) — no schema change
 
-### 4. One-time backfill for the existing failed transfer
+`beneficiaries.network` already exists and accepts free text. Saved Zambia contacts will now persist with their chosen network so subsequent sends auto-pick the right one. The picker on SendPage will respect a beneficiary's saved network if present.
 
-A small SQL insert posts the reversal journal for transfer `9ad521b9-413f-4a79-98f1-1a16c07f2afd` so Sam's CAD wallet immediately gets the C$7.99 back, plus a notification. This will be presented as a data-change for approval.
+## Out of Scope
 
-## What Does NOT Change
-
-- The `transfers` row keeps `status='failed'` and the original `failure_reason` for audit.
-- No Stripe refund is needed — the funds were already in the digital wallet (no card was charged for this specific transfer).
-- No schema changes, no new tables.
-- UI doesn't change; the wallet balance refresh and notification toast already react to the new ledger entry + notification row via existing realtime hooks.
+- No DB migration (network field already exists on beneficiaries).
+- No changes to FX rate logic — ZMW rate is unchanged across networks.
+- No new edge function. Auto-refund on failure (already shipped) covers Zamtel too.
 
 ## Verification
 
-1. Deploy `flutterwave-payout` + `flutterwave-webhook`.
-2. Run the backfill migration → confirm Sam's CAD wallet balance increases by 7.99 and a "refunded" notification appears.
-3. Trigger another small ZMW transfer (still failing on IP whitelist) → confirm ledger auto-reverses and balance returns within ~1s.
+1. `/send` → pick Zambia → step 2 shows MTN | Airtel | Zamtel chips.
+2. Choose Zamtel, enter a Zambian number, send a small test amount.
+3. Check `transfers.payout_method = 'zamtel_money'` and the `flutterwave-payout` request log shows `account_bank: "ZAMTEL"`.
+4. Existing MTN/Airtel sends keep working unchanged.

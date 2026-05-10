@@ -62,6 +62,7 @@ const SendPage = () => {
   const [savePromptOpen, setSavePromptOpen] = useState(false);   // Yes/No confirm
   const [saveModalOpen, setSaveModalOpen] = useState(false);     // pre-filled Add modal
   const [pickedBeneficiaryId, setPickedBeneficiaryId] = useState<string | null>(null);
+  const [selectedNetworkId, setSelectedNetworkId] = useState<string | null>(null);
 
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -87,6 +88,19 @@ const SendPage = () => {
     ? (selectedWallet?.symbol || '$')
     : (selectedExternalSource?.currency_code === 'CAD' ? 'C$' : '$');
   const targetSymbol = targetCountry.symbol || targetCountry.code;
+
+  // Network picker (for countries that expose multiple mobile money networks, e.g. Zambia)
+  const availableNetworks = targetCountry.networks;
+  const activeNetwork = availableNetworks
+    ? (availableNetworks.find(n => n.id === selectedNetworkId) || availableNetworks[0])
+    : null;
+  const effectivePayoutMethod = activeNetwork?.payout || targetCountry.payout;
+  const effectiveMethodLabel = activeNetwork?.label || targetCountry.method;
+
+  // Reset network selection when the destination country changes
+  useEffect(() => {
+    setSelectedNetworkId(null);
+  }, [targetCountryId]);
 
   const fxRate = fxRates?.find(
     r => r.from_currency === sourceCurrency && r.to_currency === targetCountry.code
@@ -123,7 +137,7 @@ const SendPage = () => {
         recipient_phone: recipientPhone,
         recipient_country: targetCountry.code,
         transfer_type: 'mobile_money',
-        payout_method: targetCountry.payout,
+        payout_method: effectivePayoutMethod,
         source_currency: sourceCurrency,
         target_currency: targetCountry.code,
         source_amount: parsedAmount,
@@ -149,7 +163,7 @@ const SendPage = () => {
             name: recipientName,
             phone: recipientPhone,
             country_code: targetCountry.code,
-            payout_method: targetCountry.payout,
+            payout_method: effectivePayoutMethod,
             currency_code: targetCountry.code,
           });
           if (isNew && !pickedBeneficiaryId) {
@@ -173,6 +187,10 @@ const SendPage = () => {
       if (c) setTargetCountryId(c.id);
     }
     setPickedBeneficiaryId(b.id);
+    // Restore saved network choice (after country reset effect runs)
+    setTimeout(() => {
+      if (b.network) setSelectedNetworkId(b.network);
+    }, 0);
   };
 
   useEffect(() => {
@@ -640,6 +658,30 @@ const SendPage = () => {
                                         className="transition-shadow focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:shadow-[0_0_0_4px_hsl(var(--primary)/0.12)]"
                                       />
                                     </motion.div>
+                                    {availableNetworks && availableNetworks.length > 1 && (
+                                      <motion.div custom={1.5} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
+                                        <Label>Mobile Money Network</Label>
+                                        <div className="grid grid-cols-3 gap-2">
+                                          {availableNetworks.map((n) => {
+                                            const active = (activeNetwork?.id === n.id);
+                                            return (
+                                              <button
+                                                key={n.id}
+                                                type="button"
+                                                onClick={() => setSelectedNetworkId(n.id)}
+                                                className={`rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
+                                                  active
+                                                    ? "border-primary bg-primary/10 text-primary"
+                                                    : "border-border bg-card hover:bg-muted text-foreground"
+                                                }`}
+                                              >
+                                                {n.label}
+                                              </button>
+                                            );
+                                          })}
+                                        </div>
+                                      </motion.div>
+                                    )}
                                     <motion.div custom={2} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
                                       <Label>Mobile Money Number</Label>
                                       <Input
@@ -649,7 +691,7 @@ const SendPage = () => {
                                         className="transition-shadow focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:shadow-[0_0_0_4px_hsl(var(--primary)/0.12)]"
                                       />
                                       <p className="text-sm text-muted-foreground">
-                                        Funds will be sent via {targetCountry.method}
+                                        Funds will be sent via {effectiveMethodLabel}
                                       </p>
                                     </motion.div>
 
@@ -812,8 +854,8 @@ const SendPage = () => {
           name: recipientName,
           phone: recipientPhone,
           country_code: targetCountry.code,
-          payout_method: targetCountry.payout,
-          network: null,
+          payout_method: effectivePayoutMethod,
+          network: activeNetwork?.id || null,
           bank_name: null,
           bank_account: null,
           currency_code: targetCountry.code,

@@ -172,6 +172,8 @@ Deno.serve(async (req) => {
         airtel: "airtel",
         vodafone: "vodafone",
         tigo: "tigo",
+        zamtel_money: "zamtel",
+        zamtel: "zamtel",
         lumicash: "mtn",
       };
       const network = networkMap[transfer.payout_method] || "mpesa";

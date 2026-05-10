@@ -28,6 +28,7 @@ const NETWORK_MAP: Record<string, string> = {
   "GHS:vodafone": "VOD",
   "ZMW:mtn": "MTN",
   "ZMW:airtel": "AIRTEL",
+  "ZMW:zamtel": "ZAMTEL",
   "RWF:mtn": "MTN",
   "RWF:airtel": "AIRTEL",
 };
