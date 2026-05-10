@@ -18,8 +18,10 @@ const Welcome = () => {
     setBusy(true);
     const { error } = await supabase
       .from("kyc_verifications")
-      .update({ verification_status: "in_progress", current_step: "identity" })
-      .eq("user_id", user.id);
+      .upsert(
+        { user_id: user.id, verification_status: "in_progress", current_step: "identity" },
+        { onConflict: "user_id" }
+      );
     setBusy(false);
     if (error) {
       toast.error("Could not start verification. Please try again.");
