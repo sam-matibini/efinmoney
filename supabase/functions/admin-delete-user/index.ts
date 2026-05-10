@@ -14,9 +14,8 @@ Deno.serve(async (req) => {
   try {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     let SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    if (!SERVICE_KEY) SERVICE_KEY = Deno.env.get("SUPABASE_SECRET_KEYS")!;
     if (!SERVICE_KEY) SERVICE_KEY = Deno.env.get("SB_SERVICE_ROLE_KEY")!;
-    if (!SERVICE_KEY) SERVICE_KEY = Deno.env.get("SERVICE_ROLE_KEY")!;
-    if (!SERVICE_KEY) SERVICE_KEY = Deno.env.get("SUPABASE_SECRET_KEY")!;
     const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 
     console.log("SK len:", SERVICE_KEY?.length || 0, "AK len:", ANON_KEY?.length || 0);
