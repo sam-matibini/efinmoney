@@ -26,21 +26,26 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Find the user
-    const { data: profile } = await admin
-      .from("profiles")
-      .select("user_id")
-      .eq("email", email)
-      .maybeSingle();
+    // Find the user by email or user_id
+    let userId = body.user_id;
+    if (!userId && email) {
+      const { data: profile } = await admin
+        .from("profiles")
+        .select("user_id")
+        .eq("email", email)
+        .maybeSingle();
 
-    if (!profile) {
+      if (profile) {
+        userId = profile.user_id;
+      }
+    }
+
+    if (!userId) {
       return new Response(JSON.stringify({ error: "User not found" }), {
         status: 404,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-
-    const userId = profile.user_id;
 
     // Delete related data (skip transfers/ledger for audit integrity)
     await admin.from("user_roles").delete().eq("user_id", userId);
