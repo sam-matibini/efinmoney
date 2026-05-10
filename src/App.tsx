@@ -145,7 +145,17 @@ const AppRoutes = () => {
           <Route path="/exchange" element={<KycProtectedRoute><ExchangePage /></KycProtectedRoute>} />
           <Route path="/cards" element={<KycProtectedRoute><CardsPage /></KycProtectedRoute>} />
           <Route path="/finance" element={<RoleProtectedRoute allowedRoles={['admin', 'finance']}><FinanceDashboard /></RoleProtectedRoute>} />
-          <Route path="/admin" element={<RoleProtectedRoute allowedRoles={['admin']}><AdminDashboard /></RoleProtectedRoute>} />
+          <Route path="/admin/legacy" element={<RoleProtectedRoute allowedRoles={['admin']}><AdminDashboard /></RoleProtectedRoute>} />
+          <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
+          <Route path="/admin/login" element={<AdminAuthProvider><AdminLogin /></AdminAuthProvider>} />
+          <Route path="/admin/dashboard" element={<AdminAuthProvider><AdminGuard><AdminDashboardPage /></AdminGuard></AdminAuthProvider>} />
+          <Route path="/admin/kyc" element={<AdminAuthProvider><AdminGuard><KycQueuePage /></AdminGuard></AdminAuthProvider>} />
+          <Route path="/admin/kyc/:id" element={<AdminAuthProvider><AdminGuard><KycReviewPage /></AdminGuard></AdminAuthProvider>} />
+          <Route path="/admin/users" element={<AdminAuthProvider><AdminGuard><AdminPlaceholderPage title="Users" description="User management — coming in Phase 2" /></AdminGuard></AdminAuthProvider>} />
+          <Route path="/admin/users/:id" element={<AdminAuthProvider><AdminGuard><AdminPlaceholderPage title="User detail" description="Coming in Phase 2" /></AdminGuard></AdminAuthProvider>} />
+          <Route path="/admin/risk-tiers" element={<AdminAuthProvider><AdminGuard><AdminPlaceholderPage title="Risk Tiers" description="Tier configuration — coming in Phase 2" /></AdminGuard></AdminAuthProvider>} />
+          <Route path="/admin/audit-log" element={<AdminAuthProvider><AdminGuard><AdminPlaceholderPage title="Audit Log" description="Complete audit trail — coming in Phase 2" /></AdminGuard></AdminAuthProvider>} />
+          <Route path="/admin/settings" element={<AdminAuthProvider><AdminGuard><AdminPlaceholderPage title="Settings" description="Admin settings — coming in Phase 2" /></AdminGuard></AdminAuthProvider>} />
           <Route path="/settings" element={<RoleProtectedRoute allowedRoles={['admin']}><SettingsDashboard /></RoleProtectedRoute>} />
           <Route path="/operations" element={<RoleProtectedRoute allowedRoles={['admin', 'compliance', 'finance']}><OperationsDashboard /></RoleProtectedRoute>} />
           <Route path="/auth" element={<PublicRoute><Auth /></PublicRoute>} />
