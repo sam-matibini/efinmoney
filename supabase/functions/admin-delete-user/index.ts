@@ -18,8 +18,12 @@ Deno.serve(async (req) => {
     if (!SERVICE_KEY) SERVICE_KEY = Deno.env.get("SERVICE_ROLE_KEY")!;
     const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-    console.log("SERVICE_KEY found:", SERVICE_KEY ? "yes" : "no", "len:", SERVICE_KEY?.length || 0);
-    console.log("ANON_KEY found:", ANON_KEY ? "yes" : "no", "len:", ANON_KEY?.length || 0);
+    for (const name of Deno.env.names()) {
+      if (name.toLowerCase().includes("service") || name.toLowerCase().includes("role")) {
+        const val = Deno.env.get(name);
+        console.log("ENV", name, "present:", !!val, "len:", val?.length || 0);
+      }
+    }
 
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
