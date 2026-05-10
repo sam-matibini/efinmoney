@@ -165,7 +165,6 @@ const SendPage = () => {
             country_code: targetCountry.code,
             payout_method: effectivePayoutMethod,
             currency_code: targetCountry.code,
-            network: activeNetwork?.id || null,
           });
           if (isNew && !pickedBeneficiaryId) {
             setSavePromptOpen(true);
