@@ -35,7 +35,11 @@ export const COUNTRIES: CountryInfo[] = [
   { id: "Ghana", country: "Ghana", code: "GHS", flag: "🇬🇭", method: "MTN Mobile", payout: "mtn_mobile", region: "Africa", symbol: "GH₵" },
   { id: "Uganda", country: "Uganda", code: "UGX", flag: "🇺🇬", method: "Mobile Money", payout: "airtel_money", region: "Africa", symbol: "USh" },
   { id: "Tanzania", country: "Tanzania", code: "TZS", flag: "🇹🇿", method: "M-Pesa", payout: "mpesa", region: "Africa", symbol: "TSh" },
-  { id: "Zambia", country: "Zambia", code: "ZMW", flag: "🇿🇲", method: "MTN Mobile", payout: "mtn_mobile", region: "Africa", symbol: "ZK" },
+  { id: "Zambia", country: "Zambia", code: "ZMW", flag: "🇿🇲", method: "Mobile Money", payout: "mtn_mobile", region: "Africa", symbol: "ZK", networks: [
+    { id: "mtn", label: "MTN Mobile Money", payout: "mtn_mobile" },
+    { id: "airtel", label: "Airtel Money", payout: "airtel_money" },
+    { id: "zamtel", label: "Zamtel Kwacha", payout: "zamtel_money" },
+  ] },
   { id: "Rwanda", country: "Rwanda", code: "RWF", flag: "🇷🇼", method: "Mobile Money", payout: "mtn_mobile", region: "Africa", symbol: "RF" },
   { id: "Ethiopia", country: "Ethiopia", code: "ETB", flag: "🇪🇹", method: "Bank Transfer", payout: "bank", region: "Africa" },
   { id: "Senegal", country: "Senegal", code: "XOF", flag: "🇸🇳", method: "Wave/Orange", payout: "mobile_money", region: "Africa" },
