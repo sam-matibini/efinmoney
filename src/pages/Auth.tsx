@@ -29,8 +29,8 @@ const Auth = () => {
         const { error } = await signUp(email, password, fullName);
         if (error) toast.error(error.message);
         else {
-          toast.success("Account created! Welcome to eFinMoney.");
-          navigate("/");
+          toast.success("Sign up successful! Let's verify your identity.");
+          navigate("/onboarding/welcome");
         }
       } else {
         const { error } = await signIn(email, password);
