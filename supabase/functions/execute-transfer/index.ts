@@ -64,6 +64,18 @@ Deno.serve(async (req) => {
       });
     }
 
+    if (!Number(transfer.target_amount) || Number(transfer.target_amount) <= 0) {
+      await supabase.from("transfers").update({
+        status: "failed",
+        failure_reason: "Amount too small after fees — recipient would receive 0",
+      }).eq("id", transfer_id);
+      return new Response(JSON.stringify({
+        error: "Amount too small: after fees the recipient would receive 0. Please increase the send amount.",
+      }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // Idempotency: skip if already has a journal posted
     const { data: existing } = await supabase
       .from("ledger_entries")
