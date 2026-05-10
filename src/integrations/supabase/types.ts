@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_users: {
+        Row: {
+          created_at: string
+          id: string
+          permissions: Json
+          role: Database["public"]["Enums"]["admin_user_role"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id: string
+          permissions?: Json
+          role?: Database["public"]["Enums"]["admin_user_role"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          permissions?: Json
+          role?: Database["public"]["Enums"]["admin_user_role"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       audit_logs: {
         Row: {
           action: string
@@ -1362,6 +1386,138 @@ export type Database = {
           },
         ]
       }
+      kyc_audit_log: {
+        Row: {
+          action: string
+          admin_id: string | null
+          created_at: string
+          id: string
+          kyc_verification_id: string
+          new_status: string | null
+          notes: string | null
+          previous_status: string | null
+        }
+        Insert: {
+          action: string
+          admin_id?: string | null
+          created_at?: string
+          id?: string
+          kyc_verification_id: string
+          new_status?: string | null
+          notes?: string | null
+          previous_status?: string | null
+        }
+        Update: {
+          action?: string
+          admin_id?: string | null
+          created_at?: string
+          id?: string
+          kyc_verification_id?: string
+          new_status?: string | null
+          notes?: string | null
+          previous_status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kyc_audit_log_admin_id_fkey"
+            columns: ["admin_id"]
+            isOneToOne: false
+            referencedRelation: "admin_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kyc_audit_log_kyc_verification_id_fkey"
+            columns: ["kyc_verification_id"]
+            isOneToOne: false
+            referencedRelation: "kyc_verifications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      kyc_verifications: {
+        Row: {
+          address_document_type:
+            | Database["public"]["Enums"]["kyc_address_doc_type"]
+            | null
+          address_document_url: string | null
+          address_rejection_reason: string | null
+          address_verification_status: Database["public"]["Enums"]["kyc_doc_review_status"]
+          created_at: string
+          current_step: Database["public"]["Enums"]["kyc_current_step"]
+          id: string
+          id_document_country: string | null
+          id_document_type:
+            | Database["public"]["Enums"]["kyc_id_doc_type"]
+            | null
+          id_document_url: string | null
+          id_rejection_reason: string | null
+          id_verification_status: Database["public"]["Enums"]["kyc_doc_review_status"]
+          liveness_check_status: Database["public"]["Enums"]["kyc_doc_review_status"]
+          persona_inquiry_id: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          selfie_url: string | null
+          submitted_at: string | null
+          updated_at: string
+          user_id: string
+          verification_status: Database["public"]["Enums"]["kyc_verification_status"]
+        }
+        Insert: {
+          address_document_type?:
+            | Database["public"]["Enums"]["kyc_address_doc_type"]
+            | null
+          address_document_url?: string | null
+          address_rejection_reason?: string | null
+          address_verification_status?: Database["public"]["Enums"]["kyc_doc_review_status"]
+          created_at?: string
+          current_step?: Database["public"]["Enums"]["kyc_current_step"]
+          id?: string
+          id_document_country?: string | null
+          id_document_type?:
+            | Database["public"]["Enums"]["kyc_id_doc_type"]
+            | null
+          id_document_url?: string | null
+          id_rejection_reason?: string | null
+          id_verification_status?: Database["public"]["Enums"]["kyc_doc_review_status"]
+          liveness_check_status?: Database["public"]["Enums"]["kyc_doc_review_status"]
+          persona_inquiry_id?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          selfie_url?: string | null
+          submitted_at?: string | null
+          updated_at?: string
+          user_id: string
+          verification_status?: Database["public"]["Enums"]["kyc_verification_status"]
+        }
+        Update: {
+          address_document_type?:
+            | Database["public"]["Enums"]["kyc_address_doc_type"]
+            | null
+          address_document_url?: string | null
+          address_rejection_reason?: string | null
+          address_verification_status?: Database["public"]["Enums"]["kyc_doc_review_status"]
+          created_at?: string
+          current_step?: Database["public"]["Enums"]["kyc_current_step"]
+          id?: string
+          id_document_country?: string | null
+          id_document_type?:
+            | Database["public"]["Enums"]["kyc_id_doc_type"]
+            | null
+          id_document_url?: string | null
+          id_rejection_reason?: string | null
+          id_verification_status?: Database["public"]["Enums"]["kyc_doc_review_status"]
+          liveness_check_status?: Database["public"]["Enums"]["kyc_doc_review_status"]
+          persona_inquiry_id?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          selfie_url?: string | null
+          submitted_at?: string | null
+          updated_at?: string
+          user_id?: string
+          verification_status?: Database["public"]["Enums"]["kyc_verification_status"]
+        }
+        Relationships: []
+      }
       ledger_accounts: {
         Row: {
           account_type: Database["public"]["Enums"]["account_type"]
@@ -1790,6 +1946,8 @@ export type Database = {
       }
       profiles: {
         Row: {
+          account_number: string | null
+          account_status: Database["public"]["Enums"]["account_status_enum"]
           avatar_url: string | null
           country_code: string | null
           created_at: string
@@ -1797,6 +1955,7 @@ export type Database = {
           email: string | null
           full_name: string | null
           id: string
+          kyc_completed_at: string | null
           kyc_status: Database["public"]["Enums"]["kyc_status"]
           kyc_tier: Database["public"]["Enums"]["kyc_tier"]
           phone_number: string | null
@@ -1805,6 +1964,8 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          account_number?: string | null
+          account_status?: Database["public"]["Enums"]["account_status_enum"]
           avatar_url?: string | null
           country_code?: string | null
           created_at?: string
@@ -1812,6 +1973,7 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id?: string
+          kyc_completed_at?: string | null
           kyc_status?: Database["public"]["Enums"]["kyc_status"]
           kyc_tier?: Database["public"]["Enums"]["kyc_tier"]
           phone_number?: string | null
@@ -1820,6 +1982,8 @@ export type Database = {
           user_id: string
         }
         Update: {
+          account_number?: string | null
+          account_status?: Database["public"]["Enums"]["account_status_enum"]
           avatar_url?: string | null
           country_code?: string | null
           created_at?: string
@@ -1827,6 +1991,7 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id?: string
+          kyc_completed_at?: string | null
           kyc_status?: Database["public"]["Enums"]["kyc_status"]
           kyc_tier?: Database["public"]["Enums"]["kyc_tier"]
           phone_number?: string | null
@@ -2780,6 +2945,45 @@ export type Database = {
           },
         ]
       }
+      user_risk_tiers: {
+        Row: {
+          created_at: string
+          current_tier: Database["public"]["Enums"]["user_risk_tier"]
+          daily_transaction_limit: number
+          features_enabled: Json
+          id: string
+          monthly_transaction_limit: number
+          single_transaction_limit: number
+          updated_at: string
+          upgraded_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          current_tier?: Database["public"]["Enums"]["user_risk_tier"]
+          daily_transaction_limit?: number
+          features_enabled?: Json
+          id?: string
+          monthly_transaction_limit?: number
+          single_transaction_limit?: number
+          updated_at?: string
+          upgraded_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          current_tier?: Database["public"]["Enums"]["user_risk_tier"]
+          daily_transaction_limit?: number
+          features_enabled?: Json
+          id?: string
+          monthly_transaction_limit?: number
+          single_transaction_limit?: number
+          updated_at?: string
+          upgraded_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -3017,6 +3221,7 @@ export type Database = {
         }
         Returns: string
       }
+      generate_account_number: { Args: never; Returns: string }
       get_user_wallet_balances: {
         Args: { p_user_id: string }
         Returns: {
@@ -3046,6 +3251,8 @@ export type Database = {
         Args: { p_data: Json; p_to: string; p_type: string }
         Returns: undefined
       }
+      is_admin_user: { Args: { _uid: string }; Returns: boolean }
+      is_kyc_reviewer: { Args: { _uid: string }; Returns: boolean }
       run_compliance_checks: {
         Args: { p_transfer_id: string }
         Returns: number
@@ -3056,7 +3263,17 @@ export type Database = {
       }
     }
     Enums: {
+      account_status_enum:
+        | "pending_verification"
+        | "active"
+        | "suspended"
+        | "closed"
       account_type: "asset" | "liability" | "income" | "expense" | "equity"
+      admin_user_role:
+        | "super_admin"
+        | "compliance_officer"
+        | "support_agent"
+        | "viewer"
       alert_severity: "low" | "medium" | "high" | "critical"
       alert_status:
         | "open"
@@ -3073,8 +3290,23 @@ export type Database = {
         | "partial"
         | "overdue"
         | "cancelled"
+      kyc_address_doc_type:
+        | "utility_bill"
+        | "bank_statement"
+        | "tax_document"
+        | "lease_agreement"
+      kyc_current_step: "identity" | "address" | "liveness" | "completed"
+      kyc_doc_review_status: "pending" | "approved" | "rejected"
+      kyc_id_doc_type: "passport" | "drivers_license" | "national_id"
       kyc_status: "pending" | "submitted" | "verified" | "rejected" | "expired"
       kyc_tier: "tier_0" | "tier_1" | "tier_2" | "tier_3"
+      kyc_verification_status:
+        | "not_started"
+        | "in_progress"
+        | "pending_review"
+        | "approved"
+        | "rejected"
+        | "expired"
       reconciliation_status:
         | "pending"
         | "matched"
@@ -3106,6 +3338,7 @@ export type Database = {
         | "crypto"
         | "bill_payment"
         | "domestic_canada"
+      user_risk_tier: "tier_1" | "tier_2" | "tier_3" | "tier_4"
       wallet_status: "active" | "frozen" | "suspended" | "closed"
     }
     CompositeTypes: {
@@ -3234,7 +3467,19 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      account_status_enum: [
+        "pending_verification",
+        "active",
+        "suspended",
+        "closed",
+      ],
       account_type: ["asset", "liability", "income", "expense", "equity"],
+      admin_user_role: [
+        "super_admin",
+        "compliance_officer",
+        "support_agent",
+        "viewer",
+      ],
       alert_severity: ["low", "medium", "high", "critical"],
       alert_status: [
         "open",
@@ -3253,8 +3498,25 @@ export const Constants = {
         "overdue",
         "cancelled",
       ],
+      kyc_address_doc_type: [
+        "utility_bill",
+        "bank_statement",
+        "tax_document",
+        "lease_agreement",
+      ],
+      kyc_current_step: ["identity", "address", "liveness", "completed"],
+      kyc_doc_review_status: ["pending", "approved", "rejected"],
+      kyc_id_doc_type: ["passport", "drivers_license", "national_id"],
       kyc_status: ["pending", "submitted", "verified", "rejected", "expired"],
       kyc_tier: ["tier_0", "tier_1", "tier_2", "tier_3"],
+      kyc_verification_status: [
+        "not_started",
+        "in_progress",
+        "pending_review",
+        "approved",
+        "rejected",
+        "expired",
+      ],
       reconciliation_status: [
         "pending",
         "matched",
@@ -3290,6 +3552,7 @@ export const Constants = {
         "bill_payment",
         "domestic_canada",
       ],
+      user_risk_tier: ["tier_1", "tier_2", "tier_3", "tier_4"],
       wallet_status: ["active", "frozen", "suspended", "closed"],
     },
   },
