@@ -166,11 +166,17 @@ Deno.serve(async (req) => {
     const accountBank = NETWORK_MAP[networkKey];
     if (!accountBank && currency !== "NGN") {
       const reason = `Unsupported network ${network} for ${currency}`;
+      const rev = await reverseTransferLedger(supabase, transfer_id);
       await supabase.from("transfers").update({ status: "failed", failure_reason: reason }).eq("id", transfer_id);
       await supabase.from("notifications").insert({
-        user_id: user.id, title: "Transfer failed", message: reason, type: "error",
+        user_id: user.id,
+        title: "Transfer failed — refunded",
+        message: rev.reversed
+          ? `${reason}. Funds have been returned to your wallet.`
+          : reason,
+        type: "error",
       });
-      return new Response(JSON.stringify({ success: false, error: reason }), {
+      return new Response(JSON.stringify({ success: false, error: reason, refunded: rev.reversed }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
