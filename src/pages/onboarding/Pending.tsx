@@ -7,6 +7,7 @@ import OnboardingShell from "@/components/kyc/OnboardingShell";
 import { useAuth } from "@/hooks/useAuth";
 import { useKyc } from "@/hooks/useKyc";
 import { Clock, CheckCircle2, Mail } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 const Pending = () => {
   const navigate = useNavigate();
