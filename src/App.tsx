@@ -37,6 +37,13 @@ import OnboardingReview from "./pages/onboarding/Review";
 import OnboardingPending from "./pages/onboarding/Pending";
 import OnboardingApproved from "./pages/onboarding/Approved";
 import OnboardingRejected from "./pages/onboarding/Rejected";
+import { AdminAuthProvider } from "@/contexts/AdminAuthContext";
+import AdminGuard from "@/components/admin-portal/AdminGuard";
+import AdminLogin from "./pages/admin/AdminLogin";
+import AdminDashboardPage from "./pages/admin/AdminDashboardPage";
+import KycQueuePage from "./pages/admin/KycQueuePage";
+import KycReviewPage from "./pages/admin/KycReviewPage";
+import AdminPlaceholderPage from "./pages/admin/AdminPlaceholderPage";
 
 const queryClient = new QueryClient();
 
