@@ -62,6 +62,7 @@ const SendPage = () => {
   const [savePromptOpen, setSavePromptOpen] = useState(false);   // Yes/No confirm
   const [saveModalOpen, setSaveModalOpen] = useState(false);     // pre-filled Add modal
   const [pickedBeneficiaryId, setPickedBeneficiaryId] = useState<string | null>(null);
+  const [selectedNetworkId, setSelectedNetworkId] = useState<string | null>(null);
 
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
