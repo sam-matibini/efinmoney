@@ -257,6 +257,7 @@ Deno.serve(async (req) => {
     const msg = err instanceof Error ? err.message : "Unknown error";
     if (currentTransferId) {
       try {
+        const rev = await reverseTransferLedger(supabase, currentTransferId);
         await supabase.from("transfers").update({
           status: "failed",
           failure_reason: msg.slice(0, 500),
@@ -264,8 +265,8 @@ Deno.serve(async (req) => {
         if (currentUserId) {
           await supabase.from("notifications").insert({
             user_id: currentUserId,
-            title: "Transfer failed",
-            message: msg.slice(0, 300),
+            title: "Transfer failed — refunded",
+            message: (rev.reversed ? "Refunded to your wallet. " : "") + msg.slice(0, 250),
             type: "error",
           });
         }
