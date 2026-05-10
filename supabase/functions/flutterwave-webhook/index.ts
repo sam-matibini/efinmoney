@@ -111,6 +111,14 @@ Deno.serve(async (req) => {
     }
 
     if (newStatus) {
+      let refunded = false;
+      if (newStatus === "failed") {
+        refunded = await reverseTransferLedger(supabase, transfer.id);
+        if (refunded) {
+          message = `Your transfer to ${transfer.recipient_name} failed and has been refunded to your wallet.`;
+          title = "Transfer failed — refunded";
+        }
+      }
       await supabase.from("transfers").update({
         status: newStatus,
         provider_reference: flwId || transfer.provider_reference,
