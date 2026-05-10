@@ -19,8 +19,9 @@ Deno.serve(async (req) => {
 
     const body = await req.json();
     const email = body.email;
-    if (!email) {
-      return new Response(JSON.stringify({ error: "Email required" }), {
+    const userIdFromBody = body.user_id;
+    if (!email && !userIdFromBody) {
+      return new Response(JSON.stringify({ error: "Email or user_id required" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
