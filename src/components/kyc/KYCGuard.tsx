@@ -23,7 +23,7 @@ const KYCGuard = ({ children }: { children: ReactNode }) => {
   if (isLoading || rolesLoading) return <Spinner />;
 
   // Staff roles bypass KYC entirely
-  const isStaff = roles?.some((r) => ["admin", "finance", "compliance", "operations"].includes(r));
+  const isStaff = roles?.some((r) => ["admin", "finance", "compliance"].includes(r));
   if (isStaff) return <>{children}</>;
 
   // No KYC record yet — start fresh
