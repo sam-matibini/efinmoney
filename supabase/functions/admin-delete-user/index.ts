@@ -13,12 +13,13 @@ Deno.serve(async (req) => {
 
   try {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-    const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    let SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    if (!SERVICE_KEY) SERVICE_KEY = Deno.env.get("SB_SERVICE_ROLE_KEY")!;
+    if (!SERVICE_KEY) SERVICE_KEY = Deno.env.get("SERVICE_ROLE_KEY")!;
     const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-    // Debug: log key presence without exposing full value
-    console.log("SERVICE_KEY present:", !!SERVICE_KEY, "length:", SERVICE_KEY?.length);
-    console.log("ANON_KEY present:", !!ANON_KEY, "length:", ANON_KEY?.length);
+    console.log("SERVICE_KEY found:", SERVICE_KEY ? "yes" : "no", "len:", SERVICE_KEY?.length || 0);
+    console.log("ANON_KEY found:", ANON_KEY ? "yes" : "no", "len:", ANON_KEY?.length || 0);
 
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
