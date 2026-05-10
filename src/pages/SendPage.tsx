@@ -654,6 +654,30 @@ const SendPage = () => {
                                         className="transition-shadow focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:shadow-[0_0_0_4px_hsl(var(--primary)/0.12)]"
                                       />
                                     </motion.div>
+                                    {availableNetworks && availableNetworks.length > 1 && (
+                                      <motion.div custom={1.5} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
+                                        <Label>Mobile Money Network</Label>
+                                        <div className="grid grid-cols-3 gap-2">
+                                          {availableNetworks.map((n) => {
+                                            const active = (activeNetwork?.id === n.id);
+                                            return (
+                                              <button
+                                                key={n.id}
+                                                type="button"
+                                                onClick={() => setSelectedNetworkId(n.id)}
+                                                className={`rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
+                                                  active
+                                                    ? "border-primary bg-primary/10 text-primary"
+                                                    : "border-border bg-card hover:bg-muted text-foreground"
+                                                }`}
+                                              >
+                                                {n.label}
+                                              </button>
+                                            );
+                                          })}
+                                        </div>
+                                      </motion.div>
+                                    )}
                                     <motion.div custom={2} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
                                       <Label>Mobile Money Number</Label>
                                       <Input
