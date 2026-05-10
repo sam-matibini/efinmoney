@@ -10,6 +10,12 @@ export type CountryRegion =
   | "Asia / Middle East"
   | "South America / Oceania";
 
+export interface NetworkOption {
+  id: string;        // e.g. "mtn", "airtel", "zamtel"
+  label: string;     // display label
+  payout: string;    // payout_method token saved on transfers/beneficiaries
+}
+
 export interface CountryInfo {
   id: string;          // unique
   country: string;     // display name
@@ -19,6 +25,7 @@ export interface CountryInfo {
   payout: string;
   region: Exclude<CountryRegion, "Popular">;
   symbol?: string;
+  networks?: NetworkOption[]; // when set, user can pick a mobile-money network
 }
 
 export const COUNTRIES: CountryInfo[] = [
