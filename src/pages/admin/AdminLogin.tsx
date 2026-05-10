@@ -40,7 +40,7 @@ const AdminLogin = () => {
             <ShieldCheck className="w-6 h-6 text-primary-foreground" />
           </div>
           <CardTitle className="font-display">eFin Money Admin</CardTitle>
-          <CardDescription>Restricted access — administrators only</CardDescription>
+          <CardDescription>Sign in to access the admin portal</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
