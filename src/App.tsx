@@ -29,6 +29,14 @@ import TransferTrackingPage from "./pages/TransferTrackingPage";
 import TransfersListPage from "./pages/TransfersListPage";
 import ContactsPage from "./pages/ContactsPage";
 import CanadaTransferPage from "./pages/CanadaTransferPage";
+import KYCGuard from "@/components/kyc/KYCGuard";
+import Welcome from "./pages/onboarding/Welcome";
+import OnboardingIdentity from "./pages/onboarding/Identity";
+import OnboardingAddress from "./pages/onboarding/Address";
+import OnboardingReview from "./pages/onboarding/Review";
+import OnboardingPending from "./pages/onboarding/Pending";
+import OnboardingApproved from "./pages/onboarding/Approved";
+import OnboardingRejected from "./pages/onboarding/Rejected";
 
 const queryClient = new QueryClient();
 
