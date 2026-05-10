@@ -29,8 +29,35 @@ const Pending = () => {
     { label: "Account activation" },
   ];
 
+  const personaBanner = (() => {
+    if (!kyc) return null;
+    if (kyc.persona_decision === "approved") {
+      return { tone: "success" as const, text: "Auto-verified by Persona ✓ Awaiting final review" };
+    }
+    if (kyc.persona_decision === "declined") {
+      return { tone: "error" as const, text: kyc.persona_decision_reason || "Automated verification was declined." };
+    }
+    if (kyc.persona_decision === "needs_review") {
+      return { tone: "warn" as const, text: "Manual review in progress" };
+    }
+    return null;
+  })();
+
   return (
     <OnboardingShell title="We're reviewing your documents" subtitle="This usually takes less than 24 hours. We'll email you when it's done.">
+      {personaBanner && (
+        <Card
+          className={
+            personaBanner.tone === "success"
+              ? "p-4 border-green-500/30 bg-green-500/5 text-sm"
+              : personaBanner.tone === "error"
+              ? "p-4 border-red-500/30 bg-red-500/5 text-sm"
+              : "p-4 border-amber-500/30 bg-amber-500/5 text-sm"
+          }
+        >
+          {personaBanner.text}
+        </Card>
+      )}
       <Card className="p-8 flex flex-col items-center text-center">
         <motion.div
           animate={{ scale: [1, 1.06, 1] }}
