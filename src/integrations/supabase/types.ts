@@ -1948,7 +1948,9 @@ export type Database = {
         Row: {
           account_number: string | null
           account_status: Database["public"]["Enums"]["account_status_enum"]
+          address_country: string | null
           avatar_url: string | null
+          city: string | null
           country_code: string | null
           created_at: string
           default_currency: string | null
@@ -1959,14 +1961,19 @@ export type Database = {
           kyc_status: Database["public"]["Enums"]["kyc_status"]
           kyc_tier: Database["public"]["Enums"]["kyc_tier"]
           phone_number: string | null
+          postal_code: string | null
           risk_score: number | null
+          state_province: string | null
+          street_address: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
           account_number?: string | null
           account_status?: Database["public"]["Enums"]["account_status_enum"]
+          address_country?: string | null
           avatar_url?: string | null
+          city?: string | null
           country_code?: string | null
           created_at?: string
           default_currency?: string | null
@@ -1977,14 +1984,19 @@ export type Database = {
           kyc_status?: Database["public"]["Enums"]["kyc_status"]
           kyc_tier?: Database["public"]["Enums"]["kyc_tier"]
           phone_number?: string | null
+          postal_code?: string | null
           risk_score?: number | null
+          state_province?: string | null
+          street_address?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
           account_number?: string | null
           account_status?: Database["public"]["Enums"]["account_status_enum"]
+          address_country?: string | null
           avatar_url?: string | null
+          city?: string | null
           country_code?: string | null
           created_at?: string
           default_currency?: string | null
@@ -1995,7 +2007,10 @@ export type Database = {
           kyc_status?: Database["public"]["Enums"]["kyc_status"]
           kyc_tier?: Database["public"]["Enums"]["kyc_tier"]
           phone_number?: string | null
+          postal_code?: string | null
           risk_score?: number | null
+          state_province?: string | null
+          street_address?: string | null
           updated_at?: string
           user_id?: string
         }
