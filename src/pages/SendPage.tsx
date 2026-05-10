@@ -187,6 +187,10 @@ const SendPage = () => {
       if (c) setTargetCountryId(c.id);
     }
     setPickedBeneficiaryId(b.id);
+    // Restore saved network choice (after country reset effect runs)
+    setTimeout(() => {
+      if (b.network) setSelectedNetworkId(b.network);
+    }, 0);
   };
 
   useEffect(() => {
