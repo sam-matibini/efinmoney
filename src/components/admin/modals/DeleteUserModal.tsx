@@ -35,21 +35,12 @@ const DeleteUserModal = ({ isOpen, onClose, user }: DeleteUserModalProps) => {
     mutationFn: async () => {
       if (!user) throw new Error('No user selected');
 
-      // Delete user roles first (due to foreign key constraints)
-      const { error: rolesError } = await supabase
-        .from('user_roles')
-        .delete()
-        .eq('user_id', user.user_id);
+      const { data, error } = await supabase.functions.invoke('admin-delete-user', {
+        body: { user_id: user.user_id },
+      });
 
-      if (rolesError) throw rolesError;
-
-      // Delete the profile
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .delete()
-        .eq('id', user.id);
-
-      if (profileError) throw profileError;
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
 
       return user;
     },
