@@ -39,13 +39,6 @@ const TopUpPage = () => {
     }
     setVerifyState({ status: "verifying", message: "Verifying your payment..." });
     (async () => {
-      const { data, error } = await supabase.functions.invoke("flw-verify-payment", {
-        method: "GET",
-        body: undefined,
-        headers: {},
-        // invoke does not handle GET query: use raw fetch fallback
-      } as { method: string });
-      // fallback: use fetch with auth
       const session = (await supabase.auth.getSession()).data.session;
       const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/flw-verify-payment?transaction_id=${tx}&tx_ref=${ref || ""}`;
       try {
@@ -60,7 +53,6 @@ const TopUpPage = () => {
       } catch (e) {
         setVerifyState({ status: "failed", message: e instanceof Error ? e.message : "Verification error" });
       }
-      void data; void error;
     })();
   }, [params]);
 

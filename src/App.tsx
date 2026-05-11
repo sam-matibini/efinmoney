@@ -29,6 +29,9 @@ import TransferTrackingPage from "./pages/TransferTrackingPage";
 import TransfersListPage from "./pages/TransfersListPage";
 import ContactsPage from "./pages/ContactsPage";
 import CanadaTransferPage from "./pages/CanadaTransferPage";
+import ReceivePage from "./pages/ReceivePage";
+import TopUpPage from "./pages/TopUpPage";
+import PayBillsPage from "./pages/PayBillsPage";
 import KYCGuard from "@/components/kyc/KYCGuard";
 import Welcome from "./pages/onboarding/Welcome";
 import OnboardingIdentity from "./pages/onboarding/Identity";
@@ -167,6 +170,9 @@ const AppRoutes = () => {
           <Route path="/transfers/:id" element={<KycProtectedRoute><TransferTrackingPage /></KycProtectedRoute>} />
           <Route path="/contacts" element={<KycProtectedRoute><ContactsPage /></KycProtectedRoute>} />
           <Route path="/transfers/canada" element={<KycProtectedRoute><CanadaTransferPage /></KycProtectedRoute>} />
+          <Route path="/wallet/receive" element={<KycProtectedRoute><ReceivePage /></KycProtectedRoute>} />
+          <Route path="/wallet/topup" element={<KycProtectedRoute><TopUpPage /></KycProtectedRoute>} />
+          <Route path="/pay-bills" element={<KycProtectedRoute><PayBillsPage /></KycProtectedRoute>} />
           <Route path="/deposit/complete" element={<DepositComplete />} />
           <Route path="/onboarding/welcome" element={<ProtectedRoute><Welcome /></ProtectedRoute>} />
           <Route path="/onboarding/identity" element={<ProtectedRoute><OnboardingIdentity /></ProtectedRoute>} />
