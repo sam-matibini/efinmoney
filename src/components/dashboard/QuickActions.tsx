@@ -14,11 +14,12 @@ type Item =
 
 const items: Item[] = [
   { kind: "modal", Modal: SendMoneyModal, icon: Send, label: "Send", color: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" },
+  { kind: "link", to: "/wallet/topup", icon: Download, label: "Add Money", color: "bg-blue-500/15 text-blue-600 dark:text-blue-400" },
+  { kind: "link", to: "/wallet/receive", icon: Smartphone, label: "Receive", color: "bg-cyan-500/15 text-cyan-600 dark:text-cyan-400" },
+  { kind: "link", to: "/pay-bills", icon: CreditCard, label: "Pay Bills", color: "bg-red-500/15 text-red-600 dark:text-red-400" },
   { kind: "link", to: "/send?mode=canada", icon: MapPin, label: "Domestic", color: "bg-rose-500/15 text-rose-600 dark:text-rose-400" },
-  { kind: "modal", Modal: DepositModal, icon: Download, label: "Deposit", color: "bg-blue-500/15 text-blue-600 dark:text-blue-400" },
   { kind: "modal", Modal: ExchangeModal, icon: RefreshCw, label: "Exchange", color: "bg-purple-500/15 text-purple-600 dark:text-purple-400" },
   { kind: "modal", Modal: MobileMoneyModal, icon: Smartphone, label: "Mobile", color: "bg-orange-500/15 text-orange-600 dark:text-orange-400" },
-  { kind: "modal", Modal: PayBillsModal, icon: CreditCard, label: "Pay Bills", color: "bg-red-500/15 text-red-600 dark:text-red-400" },
   { kind: "modal", Modal: SavingsModal, icon: PiggyBank, label: "Savings", color: "bg-teal-500/15 text-teal-600 dark:text-teal-400" },
 ];
 
