@@ -328,6 +328,80 @@ export type Database = {
         }
         Relationships: []
       }
+      bill_payments: {
+        Row: {
+          amount: number
+          biller_code: string
+          biller_name: string | null
+          category: string
+          created_at: string
+          currency: string
+          customer_identifier: string
+          failure_reason: string | null
+          fee: number
+          flw_reference: string | null
+          flw_response: Json | null
+          id: string
+          reference: string
+          status: string
+          token: string | null
+          units: string | null
+          updated_at: string
+          user_id: string
+          wallet_id: string | null
+        }
+        Insert: {
+          amount: number
+          biller_code: string
+          biller_name?: string | null
+          category: string
+          created_at?: string
+          currency: string
+          customer_identifier: string
+          failure_reason?: string | null
+          fee?: number
+          flw_reference?: string | null
+          flw_response?: Json | null
+          id?: string
+          reference: string
+          status?: string
+          token?: string | null
+          units?: string | null
+          updated_at?: string
+          user_id: string
+          wallet_id?: string | null
+        }
+        Update: {
+          amount?: number
+          biller_code?: string
+          biller_name?: string | null
+          category?: string
+          created_at?: string
+          currency?: string
+          customer_identifier?: string
+          failure_reason?: string | null
+          fee?: number
+          flw_reference?: string | null
+          flw_response?: Json | null
+          id?: string
+          reference?: string
+          status?: string
+          token?: string | null
+          units?: string | null
+          updated_at?: string
+          user_id?: string
+          wallet_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bill_payments_wallet_id_fkey"
+            columns: ["wallet_id"]
+            isOneToOne: false
+            referencedRelation: "wallets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cards: {
         Row: {
           card_network: string
@@ -1126,6 +1200,75 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      flw_banks_cache: {
+        Row: {
+          banks: Json
+          country: string
+          fetched_at: string
+        }
+        Insert: {
+          banks: Json
+          country: string
+          fetched_at?: string
+        }
+        Update: {
+          banks?: Json
+          country?: string
+          fetched_at?: string
+        }
+        Relationships: []
+      }
+      flw_billers_cache: {
+        Row: {
+          billers: Json
+          category: string | null
+          country: string
+          fetched_at: string
+          id: string
+        }
+        Insert: {
+          billers: Json
+          category?: string | null
+          country: string
+          fetched_at?: string
+          id?: string
+        }
+        Update: {
+          billers?: Json
+          category?: string | null
+          country?: string
+          fetched_at?: string
+          id?: string
+        }
+        Relationships: []
+      }
+      flw_webhook_logs: {
+        Row: {
+          error: string | null
+          event: string | null
+          id: string
+          payload: Json | null
+          processed: boolean
+          received_at: string
+        }
+        Insert: {
+          error?: string | null
+          event?: string | null
+          id?: string
+          payload?: Json | null
+          processed?: boolean
+          received_at?: string
+        }
+        Update: {
+          error?: string | null
+          event?: string | null
+          id?: string
+          payload?: Json | null
+          processed?: boolean
+          received_at?: string
+        }
+        Relationships: []
       }
       fx_rates: {
         Row: {
@@ -3155,6 +3298,65 @@ export type Database = {
         }
         Relationships: []
       }
+      virtual_accounts: {
+        Row: {
+          account_name: string
+          account_number: string
+          bank_name: string
+          created_at: string
+          currency_code: string
+          expires_at: string | null
+          flw_order_ref: string | null
+          flw_response: Json | null
+          id: string
+          is_permanent: boolean
+          status: Database["public"]["Enums"]["virtual_account_status"]
+          updated_at: string
+          user_id: string
+          wallet_id: string | null
+        }
+        Insert: {
+          account_name: string
+          account_number: string
+          bank_name: string
+          created_at?: string
+          currency_code: string
+          expires_at?: string | null
+          flw_order_ref?: string | null
+          flw_response?: Json | null
+          id?: string
+          is_permanent?: boolean
+          status?: Database["public"]["Enums"]["virtual_account_status"]
+          updated_at?: string
+          user_id: string
+          wallet_id?: string | null
+        }
+        Update: {
+          account_name?: string
+          account_number?: string
+          bank_name?: string
+          created_at?: string
+          currency_code?: string
+          expires_at?: string | null
+          flw_order_ref?: string | null
+          flw_response?: Json | null
+          id?: string
+          is_permanent?: boolean
+          status?: Database["public"]["Enums"]["virtual_account_status"]
+          updated_at?: string
+          user_id?: string
+          wallet_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "virtual_accounts_wallet_id_fkey"
+            columns: ["wallet_id"]
+            isOneToOne: false
+            referencedRelation: "wallets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       wallet_operations: {
         Row: {
           approval_required: boolean
@@ -3438,6 +3640,7 @@ export type Database = {
         | "bill_payment"
         | "domestic_canada"
       user_risk_tier: "tier_1" | "tier_2" | "tier_3" | "tier_4"
+      virtual_account_status: "active" | "inactive" | "expired"
       wallet_status: "active" | "frozen" | "suspended" | "closed"
     }
     CompositeTypes: {
@@ -3652,6 +3855,7 @@ export const Constants = {
         "domestic_canada",
       ],
       user_risk_tier: ["tier_1", "tier_2", "tier_3", "tier_4"],
+      virtual_account_status: ["active", "inactive", "expired"],
       wallet_status: ["active", "frozen", "suspended", "closed"],
     },
   },
