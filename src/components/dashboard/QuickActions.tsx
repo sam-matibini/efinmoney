@@ -3,9 +3,7 @@ import { Link } from "react-router-dom";
 import { Send, Download, RefreshCw, Smartphone, CreditCard, PiggyBank, MapPin } from "lucide-react";
 import SendMoneyModal from "@/components/modals/SendMoneyModal";
 import ExchangeModal from "@/components/modals/ExchangeModal";
-import DepositModal from "@/components/modals/DepositModal";
 import MobileMoneyModal from "@/components/modals/MobileMoneyModal";
-import PayBillsModal from "@/components/modals/PayBillsModal";
 import SavingsModal from "@/components/modals/SavingsModal";
 
 type Item =
