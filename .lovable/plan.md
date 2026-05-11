@@ -1,92 +1,95 @@
-# Admin CRM Portal Build Plan
+# Flutterwave Integration Plan
 
-A full admin portal under `/admin/*` for managing KYC, users, risk tiers, and platform oversight. Sidebar + topbar layout, gated by `admin_users` table membership and roles.
+## Important context first
 
-## Scope confirmation
+Your project **already has** much of what this prompt asks to "create from scratch". Building it as specified would duplicate tables, break the existing ledger, and conflict with current flows. Here is what already exists vs. what's actually new.
 
-Before I start I want to confirm scope, because this is a very large build (8 pages, role guard, realtime, 3 edge functions, audit flows). I'd like to ship it in **two phases** to keep quality high:
+### Already in the project (do NOT recreate)
+- `wallets` table (multi-currency, `is_default`, status, RLS) + `get_user_wallet_balances` RPC
+- **Double-entry `ledger_entries` + `ledger_accounts`** — this is the source of truth for balances. Balances are derived, never stored on the wallet row. The proposed `wallets.balance` column would break this.
+- `transfers` table with provider_reference, status enum, fee, FX fields
+- `beneficiaries` (`contacts`) table + `/contacts` page + picker
+- `flutterwave-webhook` edge function (signature verify, ledger reversal on failure)
+- `flutterwave-payout` edge function (bank/mobile money payout)
+- `notifications`, KYC tier enforcement (`user_risk_tiers`), compliance triggers, receipt generation
+- Pages: `/send` (CanadaSendFlow), `/wallets`, `/transfers`, `/transfers/:id`, `/contacts`
+- Secrets already configured: `FLW_SECRET_KEY`, `FLW_PUBLIC_KEY`, `FLW_ENCRYPTION_KEY`
 
-**Phase 1 (this turn):**
-- `/admin/login` + `AdminGuard` + `AdminAuthContext` (role + 30-min idle logout)
-- Sidebar + topbar `AdminLayout`
-- `/admin/dashboard` (KPIs, tier chart, recent activity, urgent reviews)
-- `/admin/kyc` queue (filters, search, pagination, realtime)
-- `/admin/kyc/[id]` review page (documents with signed URLs, approve/reject/request-info/escalate, internal notes, audit trail)
-- Edge functions: `approve-kyc`, `reject-kyc`, `notify-user` (placeholder)
-- DB additions needed below
+### Genuinely new work
+- Virtual account numbers (NUBAN) for receiving — no table exists
+- Bill payments (airtime/data/electricity) — no table or function exists
+- Bank list + NUBAN account-name resolve helpers
+- Card/bank/USSD top-up via Flutterwave Standard checkout
+- Africa-specific send flow UI (current `/send` is Canada-focused)
+- Webhook logs table for debugging
+- Admin views for transactions/wallets/virtual accounts
 
-**Phase 2 (next turn, after you approve Phase 1):**
-- `/admin/users`, `/admin/users/[id]`
-- `/admin/risk-tiers`
-- `/admin/audit-log` (with CSV export)
-- `/admin/settings` (notifications, integrations placeholder, admin user invites)
+## Proposed approach
 
-If you'd rather have everything in one shot, say so and I'll do it — but expect it to be larger and slower to verify. Otherwise I'll proceed with Phase 1.
+### A. Schema additions (additive, no breaking changes)
 
-## Database additions (Phase 1)
+```sql
+-- Virtual accounts (new)
+virtual_accounts(id, user_id, wallet_id, currency_code, account_number UNIQUE,
+                 bank_name, account_name, flw_order_ref, flw_response jsonb,
+                 is_permanent, expires_at, status)
 
-A small migration is required to support the review workflow without breaking existing tables:
+-- Bill payments (new)
+bill_payments(id, user_id, transfer_id NULL, category, biller_code, biller_name,
+              customer_identifier, amount, currency, token, units, status,
+              flw_response jsonb)
 
-- Add to `kyc_verifications` (nullable, additive only):
-  - `internal_notes text`
-  - `escalated boolean default false`
-  - `escalated_at timestamptz`
-- Add to `admin_users`: ensure `full_name text` exists (used in audit trail display); skip if already there.
-- New table `admin_notifications` (per-admin notification feed for new submissions): `id, admin_id, type, payload jsonb, is_read, created_at`. RLS: admin can read their own.
-- RLS updates on `kyc_verifications`:
-  - Allow `is_kyc_reviewer(auth.uid())` SELECT/UPDATE on all rows (for review).
-  - Keep existing user policies intact.
-- RLS on `kyc_audit_log`: admins can SELECT all; INSERT allowed only when `auth.uid()` is reviewer; user can read their own (kept).
-- Enable realtime on `kyc_verifications` (`ALTER PUBLICATION supabase_realtime ADD TABLE`).
+-- Webhook logs (new)
+flw_webhook_logs(id, event, payload jsonb, processed bool, error text, received_at)
 
-No existing tables, columns, or policies will be removed or repurposed.
-
-## Edge functions (Phase 1)
-
-All under `supabase/functions/`, deployed automatically. Each validates JWT, checks `admin_users` membership + role, writes audit log, returns JSON.
-
-- `approve-kyc` — body: `{ verification_id, scope: 'id_only' | 'id_and_address' }`. Updates the verification record; existing trigger handles tier upgrade + account number.
-- `reject-kyc` — body: `{ verification_id, reason_code, custom_reason?, scope: 'id'|'address'|'both' }`. Updates rejection fields, sets status to `rejected`, audit logs.
-- `notify-user` — placeholder; writes a row into `notifications` table for now (no actual email).
-
-## Frontend architecture
-
-- `src/contexts/AdminAuthContext.tsx` — wraps Supabase auth, fetches `admin_users` row, exposes `{ admin, role, signOut, hasPermission(action) }`. Tracks last activity; auto sign-out after 30 min idle.
-- `src/components/admin-portal/AdminGuard.tsx` — redirects to `/admin/login` if not in `admin_users`; shows "Insufficient permissions" toast for forbidden actions.
-- `src/components/admin-portal/AdminLayout.tsx` — sidebar (collapsible) + topbar (search, notifications bell with realtime badge, profile dropdown, theme toggle).
-- `src/pages/admin/Login.tsx`, `Dashboard.tsx`, `KycQueue.tsx`, `KycReview.tsx`.
-- Role permission helper `canApprove`, `canReject`, `canEditTiers`, etc., centralised.
-
-### Routing
-Add to `src/App.tsx`:
+-- Cache (new)
+flw_banks_cache(country, banks jsonb, fetched_at)
+flw_billers_cache(country, category, billers jsonb, fetched_at)
 ```
-/admin/login                 → public (AdminLogin)
-/admin                       → redirect to /admin/dashboard
-/admin/dashboard             → AdminGuard + Dashboard
-/admin/kyc                   → AdminGuard + KycQueue
-/admin/kyc/:id               → AdminGuard + KycReview
-```
-Existing `/admin` route (current `AdminDashboard`) will be **moved** to `/admin/legacy` so the existing tabs page is preserved but the new portal owns `/admin`. (Confirm if you'd rather keep the old one removed; this seems safest.)
 
-## Design
+RLS: users see only their own rows; admins see everything via `is_admin_user()`.
 
-- Linear/Mercury feel: dense tables, sticky header, hover rows, thin dividers, semantic tokens from `index.css`.
-- Status badges (pending=amber, approved=green, rejected=red, in_progress=blue, not_started=gray) and tier badges (1=gray, 2=blue, 3=purple, 4=amber) defined as small reusable components.
-- Skeleton loaders, empty states with icons, sonner toasts for action feedback.
-- Sidebar uses shadcn `Sidebar` primitives.
+**Will NOT add:** new `wallets`, `transactions`, `beneficiaries` tables — they already exist and are wired into the ledger. New deposits/payouts will write `ledger_entries` (the existing pattern), not a parallel `transactions` table.
 
-## Realtime
+### B. Edge functions (new only; reuse existing where possible)
 
-Subscribe in `AdminLayout` to `kyc_verifications` postgres_changes:
-- On INSERT or UPDATE where `verification_status = 'pending_review'`: increment notification badge, push toast, invalidate React Query cache for queue.
-- On any UPDATE: invalidate per-row queries so detail/list refresh without manual reload.
+| Function | Status |
+|---|---|
+| `flw-create-virtual-account` | NEW |
+| `flw-initialize-payment` (card/USSD/bank top-up) | NEW |
+| `flw-verify-payment` | NEW |
+| `flw-get-banks` | NEW (cached) |
+| `flw-resolve-account` | NEW |
+| `flw-get-billers` | NEW (cached) |
+| `flw-bill-payment` | NEW |
+| `flutterwave-webhook` | EXTEND existing — add `charge.completed` for top-ups & virtual-account credits, and `flw_webhook_logs` writes |
+| Bank/mobile-money payout | REUSE existing `flutterwave-payout` |
+| P2P internal transfer | REUSE existing `intra-ca-transfer-create` pattern (rename/generalize) |
 
-## Out of scope for Phase 1
-- 2FA prompt UI, IP whitelist UI → Phase 2 (settings page).
-- Tier override, audit-log CSV export, admin invites → Phase 2.
-- Real email sending (Resend) — placeholder only as you specified.
-- Persona OCR field extraction — placeholder fields.
+All functions: JWT validation via `getClaims()`, Zod input validation, rate-limited via existing `check_rate_limit`, ledger-based credit/debit (no balance column writes).
 
-## Confirm to proceed
+### C. Frontend
 
-Reply "go" to start Phase 1, or tell me to do everything in one shot / change the split.
+- **New page `/wallet/receive`** — list virtual accounts per currency, copy/share
+- **New page `/wallet/topup`** — currency + amount + method → hosted Flutterwave page → verify on return
+- **New page `/pay-bills`** — category grid, biller picker, customer ID, pay
+- **New Africa send flow** added as a tab/mode in existing `/send` (keep CanadaSendFlow intact)
+- **Extend Dashboard** — add "Add Money", "Pay Bill" quick actions; virtual-account preview card if any exist
+- **Admin** — new `/admin/virtual-accounts` and `/admin/bill-payments` pages; transactions/wallets admin views already exist in finance dashboard
+
+Real-time: subscribe to `ledger_entries` for the user's wallet IDs (balances refresh automatically since they're derived).
+
+### D. Secrets
+
+Already present: `FLW_SECRET_KEY`, `FLW_PUBLIC_KEY`, `FLW_ENCRYPTION_KEY`.
+Will request only if missing: `FLW_WEBHOOK_HASH` (already referenced in current webhook code — may already exist as build secret).
+
+No new `FLW_TEST_*` variants — your code uses one set of keys and Flutterwave's test/live mode is determined by the key itself.
+
+## What I need you to confirm before I build
+
+1. **Do not duplicate the wallets/transactions/beneficiaries tables** — agree to reuse existing `wallets` + `ledger_entries` + `contacts`? (Strongly recommended; otherwise the double-entry ledger and all existing pages break.)
+2. **Phase 1 scope** — start with: virtual accounts + receive page + top-up + webhook extension + bank list/resolve helpers. Phase 2: bill payments + Africa send UI + admin pages. OK to phase, or build everything in one pass?
+3. **Africa send flow** — add as a new tab inside existing `/send` page, or replace the Canada flow? (I recommend adding as a tab.)
+
+Reply with answers (or "go ahead, all in one pass, reuse existing tables, add as tab") and I'll implement.
