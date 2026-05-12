@@ -114,7 +114,76 @@ const SendPage = () => {
   // Reset network selection when the destination country changes
   useEffect(() => {
     setSelectedNetworkId(null);
+    setNgnBankCode("");
+    setNgnAccountNumber("");
+    setNgnResolvedName(null);
+    setNgnResolveError(null);
   }, [targetCountryId]);
+
+  const isNGNBank = targetCountry.code === "NGN";
+
+  // Fetch Nigerian banks list when NGN destination is selected
+  useEffect(() => {
+    if (!isNGNBank || ngnBanks.length > 0) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke("flw-get-banks", {
+          body: null,
+          method: "GET" as any,
+        });
+        // supabase-js doesn't support GET query params via invoke, so call directly
+        const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/flw-get-banks?country=NG`;
+        const { data: { session } } = await supabase.auth.getSession();
+        const res = await fetch(url, {
+          headers: {
+            Authorization: `Bearer ${session?.access_token || ""}`,
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+        });
+        const json = await res.json();
+        if (cancelled) return;
+        const list = Array.isArray(json?.banks)
+          ? json.banks.map((b: any) => ({ code: String(b.code || b.bank_code), name: String(b.name || b.bank_name) })).filter((b: any) => b.code && b.name)
+          : [];
+        setNgnBanks(list);
+      } catch (e) {
+        console.error("Failed to load NG banks", e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isNGNBank, ngnBanks.length]);
+
+  // Resolve account name when NGN bank + 10-digit account number are set
+  useEffect(() => {
+    if (!isNGNBank) return;
+    setNgnResolvedName(null);
+    setNgnResolveError(null);
+    if (!ngnBankCode || ngnAccountNumber.replace(/\D/g, "").length !== 10) return;
+    let cancelled = false;
+    setNgnResolving(true);
+    (async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke("flw-resolve-account", {
+          body: { bankCode: ngnBankCode, accountNumber: ngnAccountNumber.replace(/\D/g, "") },
+        });
+        if (cancelled) return;
+        if (error || !(data as any)?.resolved) {
+          setNgnResolveError((data as any)?.error || "Could not verify account");
+        } else {
+          const name = (data as any).account_name as string;
+          setNgnResolvedName(name);
+          setRecipientName(name);
+        }
+      } catch (e: any) {
+        if (!cancelled) setNgnResolveError(e?.message || "Could not verify account");
+      } finally {
+        if (!cancelled) setNgnResolving(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isNGNBank, ngnBankCode, ngnAccountNumber]);
+
 
   const fxRate = fxRates?.find(
     r => r.from_currency === sourceCurrency && r.to_currency === targetCountry.code
