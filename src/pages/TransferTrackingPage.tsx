@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { CheckCircle2, Loader2, Circle, Share2, ArrowLeft, AlertCircle, Download } from "lucide-react";
+import { CheckCircle2, Loader2, Circle, Share2, ArrowLeft, AlertCircle, Download, XCircle } from "lucide-react";
 import { downloadTransferReceipt } from "@/lib/receipt";
 import Header from "@/components/layout/Header";
 import MobileNav from "@/components/layout/MobileNav";
@@ -9,9 +9,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import type { Transfer } from "@/hooks/useTransfers";
+import { useCancelTransfer, type Transfer } from "@/hooks/useTransfers";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
 
@@ -90,6 +94,18 @@ const TransferTrackingPage = () => {
   const [transfer, setTransfer] = useState<Transfer | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const cancelTransfer = useCancelTransfer();
+  const canCancel = transfer && ["initiated", "funded", "processing"].includes(transfer.status);
+
+  const handleCancel = async () => {
+    if (!transfer) return;
+    try {
+      await cancelTransfer.mutateAsync(transfer.id);
+      toast.success("Transfer cancelled — funds returned to your wallet");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to cancel transfer");
+    }
+  };
 
   useEffect(() => {
     if (!id || !user) return;
@@ -181,6 +197,28 @@ const TransferTrackingPage = () => {
                   <Button variant="outline" size="sm" onClick={handleShare} className="gap-2">
                     <Share2 className="w-4 h-4" /> Share
                   </Button>
+                  {canCancel && (
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="destructive" size="sm" className="gap-2" disabled={cancelTransfer.isPending}>
+                          {cancelTransfer.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
+                          Cancel
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Cancel this transfer?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            The full amount, including fees, will be refunded to your wallet immediately. This cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Keep transfer</AlertDialogCancel>
+                          <AlertDialogAction onClick={handleCancel}>Yes, cancel & refund</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  )}
                 </div>
               </CardHeader>
             </Card>

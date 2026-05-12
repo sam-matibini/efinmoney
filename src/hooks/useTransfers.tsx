@@ -73,6 +73,25 @@ export const useTransfers = (limit = 10) => {
   });
 };
 
+export const useCancelTransfer = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (transfer_id: string) => {
+      const { data, error } = await supabase.functions.invoke('cancel-transfer', {
+        body: { transfer_id },
+      });
+      if (error) throw new Error(error.message || 'Failed to cancel transfer');
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: (_d, transfer_id) => {
+      track('transfer_cancelled', { transfer_id });
+      queryClient.invalidateQueries({ queryKey: ['transfers'] });
+      queryClient.invalidateQueries({ queryKey: ['wallets'] });
+    },
+  });
+};
+
 export const useCreateTransfer = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
