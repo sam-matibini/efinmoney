@@ -67,10 +67,21 @@ Deno.serve(async (req) => {
     if (!user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     const body: PayoutRequest = await req.json();
-    const { transfer_id, phone_number, amount, currency, network, recipient_name } = body;
+    const { transfer_id, phone_number, account_number, bank_code, amount, currency, network, recipient_name } = body;
     currentTransferId = transfer_id; currentUserId = user.id;
-    if (!transfer_id || !phone_number || !amount || amount <= 0 || !currency || !network) {
+    if (!transfer_id || !amount || amount <= 0 || !currency || !network) {
       return new Response(JSON.stringify({ error: "Invalid payload" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    if (currency === "NGN") {
+      if (!account_number || !bank_code) {
+        const reason = "Nigerian payout requires bank_code and 10-digit NUBAN account_number";
+        const rev = await reverseTransferLedger(supabase, transfer_id);
+        await supabase.from("transfers").update({ status: "failed", failure_reason: reason }).eq("id", transfer_id);
+        await supabase.from("notifications").insert({ user_id: user.id, title: "Transfer failed — refunded", message: rev.reversed ? `${reason}. Funds returned to your wallet.` : reason, type: "error" });
+        return new Response(JSON.stringify({ success: false, error: reason, refunded: rev.reversed }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+    } else if (!phone_number) {
+      return new Response(JSON.stringify({ error: "phone_number required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const { data: transfer, error: tErr } = await supabase.from("transfers").select("*").eq("id", transfer_id).eq("sender_id", user.id).single();
@@ -92,7 +103,7 @@ Deno.serve(async (req) => {
     // Build V4 transfer payload
     let payload: Record<string, unknown>;
     if (currency === "NGN") {
-      // Bank transfer (NGN) — caller needs to pass bank_code & account_number; for now treat phone as account
+      // Bank transfer (NGN) — uses real bank_code + 10-digit NUBAN from the transfer
       payload = {
         type: "bank_account",
         currency,
@@ -102,8 +113,8 @@ Deno.serve(async (req) => {
         callback_url: callbackUrl,
         beneficiary: {
           name: recipient_name,
-          account_number: normalizePhone(phone_number),
-          bank_code: "044", // placeholder; SendPage NGN flow needs to provide bank
+          account_number: String(account_number).replace(/\D/g, ""),
+          bank_code: String(bank_code),
           country: "NG",
         },
         meta: { transfer_id, network },
