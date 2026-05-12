@@ -266,6 +266,16 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
             <Label htmlFor="mm-amount">Amount ({wallet?.currency_code || ""})</Label>
             <Input id="mm-amount" type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} />
           </div>
+          {parsedAmount > 0 && fxRate !== null && walletCurrency !== chargeCurrency && (
+            <div className="rounded-lg border border-border bg-muted/30 p-3 text-xs space-y-1">
+              <div className="flex justify-between"><span className="text-muted-foreground">You pay</span><span className="font-medium">{walletCurrency} {parsedAmount.toLocaleString()}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Recipient gets</span><span className="font-medium">{chargeCurrency} {chargeAmount.toLocaleString()}</span></div>
+              <div className="flex justify-between text-muted-foreground"><span>Rate</span><span>1 {walletCurrency} = {fxRate.toFixed(4)} {chargeCurrency}</span></div>
+            </div>
+          )}
+          {parsedAmount > 0 && fxRate === null && walletCurrency !== chargeCurrency && (
+            <p className="text-xs text-destructive">No FX rate available for {walletCurrency} → {chargeCurrency}.</p>
+          )}
           <Button className="w-full" onClick={handlePay} disabled={createTransfer.isPending || isLoading}>
             {createTransfer.isPending || isLoading ? (
               <><LoaderCircle className="mr-2 h-4 w-4 animate-spin" />Preparing…</>
