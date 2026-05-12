@@ -94,6 +94,18 @@ const TransferTrackingPage = () => {
   const [transfer, setTransfer] = useState<Transfer | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const cancelTransfer = useCancelTransfer();
+  const canCancel = transfer && ["initiated", "funded", "processing"].includes(transfer.status);
+
+  const handleCancel = async () => {
+    if (!transfer) return;
+    try {
+      await cancelTransfer.mutateAsync(transfer.id);
+      toast.success("Transfer cancelled — funds returned to your wallet");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to cancel transfer");
+    }
+  };
 
   useEffect(() => {
     if (!id || !user) return;
