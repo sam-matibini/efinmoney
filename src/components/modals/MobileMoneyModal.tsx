@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import { LoaderCircle, Smartphone } from "lucide-react";
 import { useFlutterwave, closePaymentModal } from "flutterwave-react-v3";
@@ -12,6 +12,12 @@ import { useCreateTransfer } from "@/hooks/useTransfers";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import {
+  MOBILE_MONEY_CURRENCY,
+  fetchFxRate,
+  friendlyFlwError,
+  validateMinAmount,
+} from "@/lib/flutterwave";
 
 const getErrorMessage = (error: unknown, fallback: string) => {
   if (error instanceof Error && error.message) return error.message;
@@ -46,6 +52,7 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
   const [amount, setAmount] = useState("");
   const [walletId, setWalletId] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
+  const [fxRate, setFxRate] = useState<number | null>(null);
 
   const { data: wallets } = useWallets();
   const { user } = useAuth();
@@ -57,6 +64,10 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
     import.meta.env.VITE_FLW_PUBLIC_KEY?.trim() ||
     "FLWPUBK_TEST-b6b1a9a088a3bae587f81e8faccffb26-X";
 
+  // Mobile money MUST charge in destination's local currency
+  const chargeCurrency = MOBILE_MONEY_CURRENCY[net.country] || net.currency;
+  const walletCurrency = wallet?.currency_code || "USD";
+
   const txRef = useMemo(
     () => (user ? `mm-${user.id.slice(0, 8)}-${Date.now()}` : ""),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -65,12 +76,25 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
 
   const parsedAmount = parseFloat(amount) || 0;
 
+  // FX: amount entered is in wallet currency. Charge amount = amount * rate(wallet→charge).
+  useEffect(() => {
+    let cancelled = false;
+    if (!wallet) { setFxRate(null); return; }
+    if (walletCurrency === chargeCurrency) { setFxRate(1); return; }
+    fetchFxRate(walletCurrency, chargeCurrency).then((r) => {
+      if (!cancelled) setFxRate(r);
+    });
+    return () => { cancelled = true; };
+  }, [walletCurrency, chargeCurrency, wallet]);
+
+  const chargeAmount = fxRate ? Math.round(parsedAmount * fxRate * 100) / 100 : 0;
+
   const handleFlutterPayment = useFlutterwave({
     public_key: flutterwavePublicKey,
     tx_ref: txRef,
-    amount: parsedAmount,
-    currency: wallet?.currency_code || "USD",
-    payment_options: "mobilemoney,card",
+    amount: chargeAmount,
+    currency: chargeCurrency,
+    payment_options: "mobilemoneyfranco,mobilemoneyghana,mobilemoneykenya,mobilemoneyrwanda,mobilemoneytanzania,mobilemoneyuganda,mobilemoneyzambia,mobilemoney",
     customer: {
       email: user?.email || `${user?.id || "guest"}@efin.money`,
       phone_number: phone.trim(),
@@ -81,7 +105,7 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
       description: `Mobile money to ${recipientName.trim() || "recipient"}`,
       logo: typeof window !== "undefined" ? `${window.location.origin}/favicon.ico` : "",
     },
-    meta: { network, wallet_id: wallet?.wallet_id || "" },
+    meta: { network, wallet_id: wallet?.wallet_id || "", wallet_currency: walletCurrency, charge_currency: chargeCurrency },
   });
 
   const resetForm = () => {
@@ -101,6 +125,10 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
       return toast.error(`Insufficient wallet balance. Available: ${wallet.symbol}${Number(wallet.balance).toLocaleString()}`);
     if (!user) return toast.error("Please sign in to continue");
     if (!flutterwavePublicKey) return toast.error("Flutterwave public key is missing");
+    if (fxRate === null)
+      return toast.error(`No exchange rate available for ${walletCurrency} → ${chargeCurrency}. Please try a different wallet.`);
+    const minErr = validateMinAmount(chargeCurrency, chargeAmount);
+    if (minErr) return toast.error(minErr);
 
     setIsLoading(true);
     let transferId: string | null = null;
@@ -112,11 +140,11 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
         recipient_country: net.country,
         transfer_type: "mobile_money",
         payout_method: network,
-        source_currency: wallet.currency_code,
-        target_currency: wallet.currency_code,
+        source_currency: walletCurrency,
+        target_currency: chargeCurrency,
         source_amount: result.data.amount,
-        target_amount: result.data.amount,
-        exchange_rate: 1,
+        target_amount: chargeAmount,
+        exchange_rate: fxRate,
         fee_amount: 0,
       });
       transferId = transfer.id;
@@ -126,7 +154,8 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
     }
 
     const tId = transferId!;
-    handleFlutterPayment({
+    try {
+      handleFlutterPayment({
       callback: async (response) => {
         try {
           const status = String(response.status || "").toLowerCase();
@@ -179,7 +208,11 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
         }
         setIsLoading(false);
       },
-    });
+      });
+    } catch (e) {
+      setIsLoading(false);
+      toast.error(friendlyFlwError(e, chargeCurrency));
+    }
   };
 
   const handleOpenChange = (next: boolean) => {
@@ -233,6 +266,16 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
             <Label htmlFor="mm-amount">Amount ({wallet?.currency_code || ""})</Label>
             <Input id="mm-amount" type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} />
           </div>
+          {parsedAmount > 0 && fxRate !== null && walletCurrency !== chargeCurrency && (
+            <div className="rounded-lg border border-border bg-muted/30 p-3 text-xs space-y-1">
+              <div className="flex justify-between"><span className="text-muted-foreground">You pay</span><span className="font-medium">{walletCurrency} {parsedAmount.toLocaleString()}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Recipient gets</span><span className="font-medium">{chargeCurrency} {chargeAmount.toLocaleString()}</span></div>
+              <div className="flex justify-between text-muted-foreground"><span>Rate</span><span>1 {walletCurrency} = {fxRate.toFixed(4)} {chargeCurrency}</span></div>
+            </div>
+          )}
+          {parsedAmount > 0 && fxRate === null && walletCurrency !== chargeCurrency && (
+            <p className="text-xs text-destructive">No FX rate available for {walletCurrency} → {chargeCurrency}.</p>
+          )}
           <Button className="w-full" onClick={handlePay} disabled={createTransfer.isPending || isLoading}>
             {createTransfer.isPending || isLoading ? (
               <><LoaderCircle className="mr-2 h-4 w-4 animate-spin" />Preparing…</>

@@ -11,9 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { CheckCircle2, XCircle } from "lucide-react";
+import { ALLOWED_TOPUP_CURRENCIES, validateMinAmount, friendlyFlwError, minAmount, type FlwMethod } from "@/lib/flutterwave";
 
-const CURRENCIES = ["NGN", "KES", "GHS", "ZAR", "UGX", "TZS", "ZMW", "RWF", "USD"];
-const METHODS: { value: string; label: string }[] = [
+const METHODS: { value: FlwMethod; label: string }[] = [
   { value: "card", label: "Card" },
   { value: "banktransfer", label: "Bank Transfer" },
   { value: "ussd", label: "USSD" },
@@ -23,10 +23,16 @@ const METHODS: { value: string; label: string }[] = [
 const TopUpPage = () => {
   const [params] = useSearchParams();
   const [amount, setAmount] = useState("");
-  const [currency, setCurrency] = useState("NGN");
-  const [method, setMethod] = useState("card");
+  const [method, setMethod] = useState<FlwMethod>("card");
+  const [currency, setCurrency] = useState<string>(ALLOWED_TOPUP_CURRENCIES.card[0]);
   const [loading, setLoading] = useState(false);
   const [verifyState, setVerifyState] = useState<{ status: "verifying" | "success" | "failed"; message: string } | null>(null);
+
+  // Keep currency valid for the chosen method
+  useEffect(() => {
+    const allowed = ALLOWED_TOPUP_CURRENCIES[method];
+    if (!allowed.includes(currency)) setCurrency(allowed[0]);
+  }, [method, currency]);
 
   useEffect(() => {
     const tx = params.get("transaction_id");
@@ -59,6 +65,12 @@ const TopUpPage = () => {
   const handleTopUp = async () => {
     const amt = Number(amount);
     if (!Number.isFinite(amt) || amt <= 0) { toast.error("Enter a valid amount"); return; }
+    if (!ALLOWED_TOPUP_CURRENCIES[method].includes(currency)) {
+      toast.error(`${currency} is not supported for ${method}. Please choose a different currency.`);
+      return;
+    }
+    const minErr = validateMinAmount(currency, amt);
+    if (minErr) { toast.error(minErr); return; }
     setLoading(true);
     try {
       const redirectUrl = `${window.location.origin}/wallet/topup`;
@@ -70,7 +82,7 @@ const TopUpPage = () => {
       if ((data as { error?: string })?.error || !link) throw new Error((data as { error?: string })?.error || "No payment link");
       window.location.href = link;
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not start top-up");
+      toast.error(friendlyFlwError(e, currency));
     } finally {
       setLoading(false);
     }
@@ -101,22 +113,25 @@ const TopUpPage = () => {
             <CardHeader><CardTitle>Top up wallet</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <div>
+                <Label>Payment method</Label>
+                <Select value={method} onValueChange={(v) => setMethod(v as FlwMethod)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{METHODS.map((m) => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div>
                 <Label>Currency</Label>
                 <Select value={currency} onValueChange={setCurrency}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{CURRENCIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                  <SelectContent>
+                    {ALLOWED_TOPUP_CURRENCIES[method].map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground mt-1">Minimum: {minAmount(currency)} {currency}</p>
               </div>
               <div>
                 <Label>Amount</Label>
                 <Input type="number" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" />
-              </div>
-              <div>
-                <Label>Payment method</Label>
-                <Select value={method} onValueChange={setMethod}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{METHODS.map((m) => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent>
-                </Select>
               </div>
               <Button className="w-full" onClick={handleTopUp} disabled={loading}>
                 {loading ? "Redirecting..." : "Continue to payment"}
