@@ -79,7 +79,9 @@ const CanadaSendFlow = () => {
 
       // Best-effort: post ledger via execute-transfer (it will skip payout for unmapped corridor)
       try {
-        await supabase.functions.invoke("execute-transfer", { body: { transfer_id: transfer.id } });
+        const { data: execData } = await supabase.functions.invoke("execute-transfer", { body: { transfer_id: transfer.id } });
+        const sec = execData?.payout?.security;
+        if (sec?.question && sec?.answer) setSecurity({ question: sec.question, answer: sec.answer });
       } catch { /* non-fatal — record is created */ }
 
       setLastTransferId(transfer.id);
