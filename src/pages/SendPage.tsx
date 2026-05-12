@@ -299,7 +299,15 @@ const SendPage = () => {
         goToStep(4);
         toast.success(payout?.queued ? 'Transfer queued — awaiting payout partner' : 'Transfer sent successfully!');
       } catch (e: any) {
-        toast.error(e?.message || 'Transfer failed. Please try again.');
+        const raw = String(e?.message || '');
+        const isUpstream =
+          /\b50[234]\b/.test(raw) ||
+          /timeout|timed out|gateway|unavailable|OriginTimeout|Azure Front Door/i.test(raw);
+        if (isUpstream) {
+          toast.error("Our payout partner is temporarily unavailable. Your wallet was not charged — please try again in a few minutes.", { duration: 8000 });
+        } else {
+          toast.error(raw || 'Transfer failed. Please try again.');
+        }
       } finally {
         setConfirming(false);
       }
