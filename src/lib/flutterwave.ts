@@ -114,3 +114,31 @@ export const friendlyFlwError = (error: unknown, currency?: string): string => {
   }
   return raw || "Payment failed";
 };
+
+let flutterwavePublicKeyPromise: Promise<string | null> | null = null;
+
+export const getFlutterwavePublicKey = async (): Promise<string | null> => {
+  if (!flutterwavePublicKeyPromise) {
+    flutterwavePublicKeyPromise = (async () => {
+      try {
+        const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/flw-public-config?action=public_key`;
+        const { data: { session } } = await supabase.auth.getSession();
+        const res = await fetch(url, {
+          headers: {
+            Authorization: `Bearer ${session?.access_token ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+        });
+        if (!res.ok) return null;
+        const json = await res.json();
+        return typeof json?.publicKey === "string" && json.publicKey.trim()
+          ? json.publicKey.trim()
+          : null;
+      } catch {
+        return null;
+      }
+    })();
+  }
+
+  return flutterwavePublicKeyPromise;
+};
