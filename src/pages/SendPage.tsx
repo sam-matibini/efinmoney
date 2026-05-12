@@ -1044,6 +1044,25 @@ const SendPage = () => {
         </AlertDialogContent>
       </AlertDialog>
 
+      <AlertDialog open={cancelOpen} onOpenChange={setCancelOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure you want to cancel this transfer?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {lastTransferId
+                ? "The transfer will be marked as cancelled and you'll be returned to the dashboard."
+                : "You'll be returned to the dashboard. Your recipient details will be cleared."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>No, keep going</AlertDialogCancel>
+            <AlertDialogAction onClick={handleCancelTransfer} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Yes, cancel
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <AddBeneficiaryModal
         open={saveModalOpen}
         onOpenChange={setSaveModalOpen}
