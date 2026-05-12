@@ -68,7 +68,7 @@ const SendPage = () => {
   const [cancelOpen, setCancelOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [usdRate, setUsdRate] = useState<number | null>(null);
-  const [flwPublicKey, setFlwPublicKey] = useState("");
+  // V4: no public key needed
   const navigate = useNavigate();
 
   const { user } = useAuth();
