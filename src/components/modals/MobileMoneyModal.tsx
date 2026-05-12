@@ -16,6 +16,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { MOBILE_MONEY_CURRENCY, fetchFxRate, friendlyFlwError, initializeFlwPayment, validateMinAmount } from "@/lib/flutterwave";
 import { MM_COUNTRIES, POPULAR_MM_CODES, findCountry } from "@/lib/mobileMoneyNetworks";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useBeneficiaries, useCreateBeneficiary, initialsOf, type Beneficiary } from "@/hooks/useBeneficiaries";
+import ContactsPickerModal from "@/components/modals/ContactsPickerModal";
+import { Users, UserPlus } from "lucide-react";
 
 const getErrorMessage = (error: unknown, fallback: string) => {
   if (error instanceof Error && error.message) return error.message;
@@ -53,10 +57,15 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
   const [walletId, setWalletId] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
   const [fxRate, setFxRate] = useState<number | null>(null);
+  const [contactsOpen, setContactsOpen] = useState(false);
+  const [saveContact, setSaveContact] = useState(true);
+  const [pickedBeneficiaryId, setPickedBeneficiaryId] = useState<string | null>(null);
 
   const { data: wallets } = useWallets();
+  const { data: contacts } = useBeneficiaries();
   const { user } = useAuth();
   const createTransfer = useCreateTransfer();
+  const createBeneficiary = useCreateBeneficiary();
 
   const country = findCountry(countryCode) || MM_COUNTRIES[0];
   const network = country.networks.find((n) => n.value === networkValue) || country.networks[0];
@@ -108,6 +117,21 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
     setRecipientName("");
     setAmount("");
     setWalletId("");
+    setPickedBeneficiaryId(null);
+  };
+
+  const handlePickContact = (b: Beneficiary) => {
+    setPickedBeneficiaryId(b.id);
+    setRecipientName(b.name);
+    if (b.country_code && findCountry(b.country_code)) {
+      setCountryCode(b.country_code);
+      const c = findCountry(b.country_code)!;
+      // Try to match network
+      const matched = c.networks.find((n) => n.value === (b.network || b.payout_method));
+      setNetworkValue(matched?.value || c.networks[0].value);
+    }
+    if (b.phone) setPhone(b.phone);
+    setSaveContact(false);
   };
 
   const handlePay = async () => {
@@ -173,8 +197,32 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
       } else {
         toast.success("Check your phone for a USSD prompt to authorize the payment.");
       }
+
+      // Quick-add to contacts if requested and not already a saved contact
+      if (saveContact && !pickedBeneficiaryId) {
+        try {
+          const exists = (contacts || []).some(
+            (c) => (c.phone || "").trim() === phone.trim() ||
+                   c.name.trim().toLowerCase() === recipientName.trim().toLowerCase()
+          );
+          if (!exists) {
+            await createBeneficiary.mutateAsync({
+              name: recipientName.trim(),
+              phone: phone.trim(),
+              country_code: country.code,
+              payout_method: "mobile_money",
+              network: network.value,
+              currency_code: chargeCurrency,
+              avatar_initials: initialsOf(recipientName.trim()),
+            });
+            toast.success("Saved to your contacts");
+          }
+        } catch (e) { /* non-fatal */ }
+      }
+
       setOpen(false);
       resetForm();
+
     } catch (e) {
       // Mark transfer as failed
       try {
@@ -298,9 +346,31 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
           </div>
 
           <div>
-            <Label htmlFor="mm-name">Recipient name</Label>
-            <Input id="mm-name" value={recipientName} onChange={(e) => setRecipientName(e.target.value)} maxLength={100} />
+            <div className="flex items-center justify-between mb-1.5">
+              <Label htmlFor="mm-name">Recipient name</Label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs gap-1"
+                onClick={() => setContactsOpen(true)}
+              >
+                <Users className="w-3.5 h-3.5" />
+                {(contacts || []).length > 0 ? `Choose contact (${(contacts || []).length})` : "Choose contact"}
+              </Button>
+            </div>
+            <Input
+              id="mm-name"
+              value={recipientName}
+              onChange={(e) => { setRecipientName(e.target.value); setPickedBeneficiaryId(null); }}
+              maxLength={100}
+              placeholder="e.g. Amina Mwangi"
+            />
+            {pickedBeneficiaryId && (
+              <p className="text-xs text-muted-foreground mt-1">From your saved contacts</p>
+            )}
           </div>
+
           <div>
             <Label htmlFor="mm-phone">Phone number</Label>
             <Input
@@ -339,6 +409,18 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
           {parsedAmount > 0 && fxRate === null && walletCurrency !== chargeCurrency && (
             <p className="text-xs text-destructive">No FX rate available for {walletCurrency} → {chargeCurrency}.</p>
           )}
+          {!pickedBeneficiaryId && recipientName.trim() && phone.trim() && (
+            <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+              <Checkbox
+                checked={saveContact}
+                onCheckedChange={(v) => setSaveContact(v === true)}
+              />
+              <span className="flex items-center gap-1.5">
+                <UserPlus className="w-4 h-4 text-muted-foreground" />
+                Save {recipientName.trim()} to my contacts
+              </span>
+            </label>
+          )}
           <Button className="w-full" onClick={handlePay} disabled={createTransfer.isPending || isLoading}>
             {createTransfer.isPending || isLoading ? (
               <><LoaderCircle className="mr-2 h-4 w-4 animate-spin" />Preparing…</>
@@ -347,6 +429,11 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
             )}
           </Button>
         </div>
+        <ContactsPickerModal
+          open={contactsOpen}
+          onOpenChange={setContactsOpen}
+          onSelect={handlePickContact}
+        />
       </DialogContent>
     </Dialog>
   );
