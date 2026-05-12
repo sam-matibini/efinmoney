@@ -306,6 +306,21 @@ const CanadaSendFlow = () => {
                 Funds will arrive in the recipient's bank account within 1–3 business days.
               </p>
             )}
+            {security && method === "interac" && (
+              <div className="max-w-md mx-auto mb-6 p-4 rounded-xl border border-border bg-muted/40 text-left">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2">Security details — share with recipient</p>
+                <p className="text-sm"><span className="text-muted-foreground">Question:</span> <strong>{security.question}</strong></p>
+                <p className="text-sm mt-1"><span className="text-muted-foreground">Answer:</span> <strong className="font-mono">{security.answer}</strong></p>
+                <button
+                  type="button"
+                  className="mt-3 text-xs text-primary hover:underline"
+                  onClick={() => {
+                    navigator.clipboard.writeText(`Q: ${security.question}\nA: ${security.answer}`);
+                    toast.success("Copied to clipboard");
+                  }}
+                >Copy Q&amp;A</button>
+              </div>
+            )}
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               {lastTransferId && (
                 <Button asChild>
