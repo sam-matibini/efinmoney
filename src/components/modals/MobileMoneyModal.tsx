@@ -125,6 +125,10 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
       return toast.error(`Insufficient wallet balance. Available: ${wallet.symbol}${Number(wallet.balance).toLocaleString()}`);
     if (!user) return toast.error("Please sign in to continue");
     if (!flutterwavePublicKey) return toast.error("Flutterwave public key is missing");
+    if (fxRate === null)
+      return toast.error(`No exchange rate available for ${walletCurrency} → ${chargeCurrency}. Please try a different wallet.`);
+    const minErr = validateMinAmount(chargeCurrency, chargeAmount);
+    if (minErr) return toast.error(minErr);
 
     setIsLoading(true);
     let transferId: string | null = null;
@@ -136,11 +140,11 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
         recipient_country: net.country,
         transfer_type: "mobile_money",
         payout_method: network,
-        source_currency: wallet.currency_code,
-        target_currency: wallet.currency_code,
+        source_currency: walletCurrency,
+        target_currency: chargeCurrency,
         source_amount: result.data.amount,
-        target_amount: result.data.amount,
-        exchange_rate: 1,
+        target_amount: chargeAmount,
+        exchange_rate: fxRate,
         fee_amount: 0,
       });
       transferId = transfer.id;
@@ -150,7 +154,8 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
     }
 
     const tId = transferId!;
-    handleFlutterPayment({
+    try {
+      handleFlutterPayment({
       callback: async (response) => {
         try {
           const status = String(response.status || "").toLowerCase();
