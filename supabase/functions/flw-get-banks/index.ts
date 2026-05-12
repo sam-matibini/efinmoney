@@ -25,10 +25,46 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ banks: cached.banks, cached: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const { ok, json } = await flwFetch(`/banks?country=${country}`, { method: "GET" });
-    if (!ok || !isFlwSuccess(json)) return new Response(JSON.stringify({ error: json?.message || "Failed to fetch banks" }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    await admin.from("flw_banks_cache").upsert({ country, banks: json.data, fetched_at: new Date().toISOString() });
-    return new Response(JSON.stringify({ banks: json.data, cached: false }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    // Try V4 first with a short timeout
+    let banks: any = null;
+    try {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 8000);
+      const { ok, json } = await flwFetch(`/banks?country=${country}`, { method: "GET", signal: ctrl.signal });
+      clearTimeout(t);
+      if (ok && isFlwSuccess(json)) banks = json.data;
+    } catch (e) { console.warn("V4 banks failed", e); }
+
+    // Fallback: V3 banks endpoint (legacy, uses FLW_SECRET_KEY)
+    if (!banks) {
+      try {
+        const secret = Deno.env.get("FLW_SECRET_KEY");
+        if (secret) {
+          const ctrl = new AbortController();
+          const t = setTimeout(() => ctrl.abort(), 8000);
+          const r = await fetch(`https://api.flutterwave.com/v3/banks/${country}`, {
+            headers: { Authorization: `Bearer ${secret}` },
+            signal: ctrl.signal,
+          });
+          clearTimeout(t);
+          const j = await r.json().catch(() => ({}));
+          if (r.ok && j?.status === "success" && Array.isArray(j.data)) banks = j.data;
+          else console.warn("V3 banks failed", r.status, j);
+        }
+      } catch (e) { console.warn("V3 banks fetch error", e); }
+    }
+
+    // Last resort: serve stale cache if present
+    if (!banks && cached?.banks) {
+      return new Response(JSON.stringify({ banks: cached.banks, cached: true, stale: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    if (!banks) {
+      return new Response(JSON.stringify({ error: "Bank service is temporarily unavailable. Please try again shortly." }), { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    await admin.from("flw_banks_cache").upsert({ country, banks, fetched_at: new Date().toISOString() });
+    return new Response(JSON.stringify({ banks, cached: false }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (err) {
     return new Response(JSON.stringify({ error: err instanceof Error ? err.message : "Unknown" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
