@@ -107,22 +107,25 @@ const TopUpPage = () => {
             <CardHeader><CardTitle>Top up wallet</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <div>
+                <Label>Payment method</Label>
+                <Select value={method} onValueChange={(v) => setMethod(v as FlwMethod)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{METHODS.map((m) => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div>
                 <Label>Currency</Label>
                 <Select value={currency} onValueChange={setCurrency}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{CURRENCIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                  <SelectContent>
+                    {ALLOWED_TOPUP_CURRENCIES[method].map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground mt-1">Minimum: {minAmount(currency)} {currency}</p>
               </div>
               <div>
                 <Label>Amount</Label>
                 <Input type="number" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" />
-              </div>
-              <div>
-                <Label>Payment method</Label>
-                <Select value={method} onValueChange={setMethod}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{METHODS.map((m) => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent>
-                </Select>
               </div>
               <Button className="w-full" onClick={handleTopUp} disabled={loading}>
                 {loading ? "Redirecting..." : "Continue to payment"}
