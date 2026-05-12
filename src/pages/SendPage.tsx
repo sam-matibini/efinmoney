@@ -879,18 +879,64 @@ const SendPage = () => {
                                         </div>
                                       </motion.div>
                                     )}
-                                    <motion.div custom={2} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
-                                      <Label>Mobile Money Number</Label>
-                                      <Input
-                                        placeholder="+254..."
-                                        value={recipientPhone}
-                                        onChange={(e) => setRecipientPhone(e.target.value)}
-                                        className="transition-shadow focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:shadow-[0_0_0_4px_hsl(var(--primary)/0.12)]"
-                                      />
-                                      <p className="text-sm text-muted-foreground">
-                                        Funds will be sent via {effectiveMethodLabel}
-                                      </p>
-                                    </motion.div>
+                                    {isNGNBank ? (
+                                      <>
+                                        <motion.div custom={2} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
+                                          <Label>Recipient Bank</Label>
+                                          <Select value={ngnBankCode} onValueChange={setNgnBankCode}>
+                                            <SelectTrigger>
+                                              <SelectValue placeholder={ngnBanks.length ? "Select Nigerian bank" : "Loading banks..."} />
+                                            </SelectTrigger>
+                                            <SelectContent className="max-h-[300px]">
+                                              {ngnBanks.map((b) => (
+                                                <SelectItem key={b.code} value={b.code}>{b.name}</SelectItem>
+                                              ))}
+                                            </SelectContent>
+                                          </Select>
+                                        </motion.div>
+                                        <motion.div custom={2.5} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
+                                          <Label>NUBAN Account Number</Label>
+                                          <Input
+                                            inputMode="numeric"
+                                            maxLength={10}
+                                            placeholder="10-digit account number"
+                                            value={ngnAccountNumber}
+                                            onChange={(e) => setNgnAccountNumber(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                                            className="transition-shadow focus-visible:ring-2 focus-visible:ring-primary/40"
+                                          />
+                                          {ngnResolving && (
+                                            <p className="text-sm text-muted-foreground inline-flex items-center gap-2">
+                                              <span className="h-3 w-3 rounded-full border-2 border-primary/40 border-t-primary animate-spin" />
+                                              Verifying account…
+                                            </p>
+                                          )}
+                                          {ngnResolvedName && !ngnResolving && (
+                                            <p className="text-sm text-emerald-600 dark:text-emerald-400 inline-flex items-center gap-1">
+                                              <CheckCircle className="w-3.5 h-3.5" /> {ngnResolvedName}
+                                            </p>
+                                          )}
+                                          {ngnResolveError && !ngnResolving && (
+                                            <p className="text-sm text-destructive inline-flex items-center gap-1">
+                                              <AlertCircle className="w-3.5 h-3.5" /> {ngnResolveError}
+                                            </p>
+                                          )}
+                                          <p className="text-xs text-muted-foreground">Funds will be deposited directly to the bank account above.</p>
+                                        </motion.div>
+                                      </>
+                                    ) : (
+                                      <motion.div custom={2} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
+                                        <Label>Mobile Money Number</Label>
+                                        <Input
+                                          placeholder="+254..."
+                                          value={recipientPhone}
+                                          onChange={(e) => setRecipientPhone(e.target.value)}
+                                          className="transition-shadow focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:shadow-[0_0_0_4px_hsl(var(--primary)/0.12)]"
+                                        />
+                                        <p className="text-sm text-muted-foreground">
+                                          Funds will be sent via {effectiveMethodLabel}
+                                        </p>
+                                      </motion.div>
+                                    )}
 
                                     <motion.div custom={3} variants={fieldVariants} initial="hidden" animate="show" className="flex gap-3">
                                       <Button variant="outline" className="flex-1" onClick={() => goToStep(1)}>Back</Button>
