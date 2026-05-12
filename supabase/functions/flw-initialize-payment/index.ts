@@ -26,10 +26,6 @@ const NETWORK_MAP: Record<string, string> = {
   "ZMW:zamtel": "ZAMTEL",
   "RWF:mtn": "MTN",
   "RWF:airtel": "AIRTEL",
-  "NGN:mtn": "MTN",
-  "NGN:airtel": "AIRTEL",
-  "NGN:9mobile": "9MOBILE",
-  "NGN:glo": "GLO",
 };
 
 function jr(status: number, body: unknown) {
@@ -78,6 +74,9 @@ Deno.serve(async (req) => {
 
     // ── Mobile Money: V4 direct charge (no encryption needed) ───────────
     if (paymentMethod === "mobilemoney") {
+      if (currency === "NGN") {
+        return jr(400, { error: "Nigeria does not support mobile money on Flutterwave. Please use bank transfer, USSD, or card instead." });
+      }
       if (!phone) return jr(400, { error: "Phone number required for mobile money" });
       const networkCode = NETWORK_MAP[`${currency}:${network}`];
       if (!networkCode) return jr(400, { error: `Unsupported mobile money network ${network} for ${currency}` });
