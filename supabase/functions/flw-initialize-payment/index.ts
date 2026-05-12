@@ -220,8 +220,20 @@ Deno.serve(async (req) => {
         : ["card", "bank_transfer", "ussd"],
       meta: { user_id: userId, type: "wallet_topup", currency },
     };
-    const { ok, json } = await flwFetch("/orchestration", { method: "POST", body: JSON.stringify(orchestrationPayload) });
-    if (!ok || !isFlwSuccess(json)) return jr(502, { error: json?.message || json?.error || "Failed to initialize payment", details: json });
+    const { ok, status, json } = await flwFetch("/orchestration", { method: "POST", body: JSON.stringify(orchestrationPayload) });
+    if (!ok || !isFlwSuccess(json)) {
+      if (isGatewayJson(json, status)) {
+        console.warn("V4 orchestration gateway error, falling back to V3 hosted payment ...");
+        const v3 = await v3HostedPayment({ currency, amount, reference, redirectUrl, email: customer.email, name: customer.name, phone: customer.phone_number, paymentMethod, userId });
+        if (v3.ok) {
+          return new Response(JSON.stringify({
+            success: true, payment_link: v3.json?.data?.link, reference, tx_ref: reference, via: "v3_fallback",
+          }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+        return jr(502, { error: "Our payout partner is temporarily unavailable. Please try again in a few minutes.", transient: true });
+      }
+      return jr(502, { error: json?.message || json?.error || "Failed to initialize payment", details: json });
+    }
 
     return new Response(JSON.stringify({
       success: true,
