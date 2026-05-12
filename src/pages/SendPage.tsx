@@ -164,12 +164,18 @@ const SendPage = () => {
           body: { bankCode: ngnBankCode, accountNumber: ngnAccountNumber.replace(/\D/g, "") },
         });
         if (cancelled) return;
-        if (error || !(data as any)?.resolved) {
-          setNgnResolveError((data as any)?.error || "Could not verify account");
-        } else {
+        if (error) {
+          setNgnResolveError("Could not verify account");
+        } else if ((data as any)?.resolved) {
           const name = (data as any).account_name as string;
           setNgnResolvedName(name);
           setRecipientName(name);
+        } else if ((data as any)?.unverified) {
+          // Flutterwave verification temporarily unavailable — allow continue using typed name
+          setNgnResolveError((data as any)?.error || "Name verification unavailable. Double-check the account number.");
+          setNgnResolvedName(recipientName?.trim() ? recipientName.trim() : "Unverified recipient");
+        } else {
+          setNgnResolveError((data as any)?.error || "Could not verify account");
         }
       } catch (e: any) {
         if (!cancelled) setNgnResolveError(e?.message || "Could not verify account");
