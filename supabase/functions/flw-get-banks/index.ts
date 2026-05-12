@@ -1,4 +1,6 @@
+// V4 banks list — GET /banks?country=NG
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { flwFetch, isFlwSuccess } from "../_shared/flw-v4.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -23,14 +25,8 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ banks: cached.banks, cached: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const FLW_KEY = Deno.env.get("FLW_SECRET_KEY");
-    if (!FLW_KEY) return new Response(JSON.stringify({ error: "Flutterwave not configured" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-
-    const res = await fetch(`https://api.flutterwave.com/v3/banks/${country}`, { headers: { Authorization: `Bearer ${FLW_KEY}` } });
-    const json = await res.json();
-    if (!res.ok || json?.status !== "success") {
-      return new Response(JSON.stringify({ error: json?.message || "Failed to fetch banks" }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
+    const { ok, json } = await flwFetch(`/banks?country=${country}`, { method: "GET" });
+    if (!ok || !isFlwSuccess(json)) return new Response(JSON.stringify({ error: json?.message || "Failed to fetch banks" }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     await admin.from("flw_banks_cache").upsert({ country, banks: json.data, fetched_at: new Date().toISOString() });
     return new Response(JSON.stringify({ banks: json.data, cached: false }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (err) {
