@@ -542,7 +542,7 @@ const SendPage = () => {
                                           <SelectContent>
                                             {wallets?.map((w) => (
                                               <SelectItem key={w.wallet_id} value={w.wallet_id}>
-                                                {w.flag_emoji} {w.currency_code} - {w.symbol}{Number(w.balance).toFixed(2)}
+                                                {w.flag_emoji} {w.currency_code} — {w.symbol}{Number(w.balance).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                               </SelectItem>
                                             ))}
                                           </SelectContent>
