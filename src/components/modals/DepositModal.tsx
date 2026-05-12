@@ -114,6 +114,10 @@ const DepositModal = ({ children }: DepositModalProps) => {
                 onSuccess={() => { /* form shows its own success state */ }}
               />
             </TabsContent>
+
+            <TabsContent value="flw" className="mt-4">
+              <FlutterwaveDepositForm walletCurrency={selectedWallet?.currency_code ?? "USD"} />
+            </TabsContent>
           </Tabs>
         )}
         </div>
