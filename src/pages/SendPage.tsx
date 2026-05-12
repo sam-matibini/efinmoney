@@ -132,56 +132,179 @@ const SendPage = () => {
     setStep(next);
   };
 
-  const handleSubmit = async () => {
-    if (fundingSource === 'wallet' && !selectedWallet) return;
+  const flwPublicKey =
+    import.meta.env.VITE_FLW_PUBLIC_KEY?.trim() ||
+    "FLWPUBK_TEST-b6b1a9a088a3bae587f81e8faccffb26-X";
 
-    try {
-      const transfer = await createTransfer.mutateAsync({
-        sender_wallet_id: fundingSource === 'wallet' ? selectedWallet!.wallet_id : wallets?.[0]?.wallet_id || '',
-        recipient_name: recipientName,
-        recipient_phone: recipientPhone,
-        recipient_country: targetCountry.code,
-        transfer_type: 'mobile_money',
-        payout_method: effectivePayoutMethod,
-        source_currency: sourceCurrency,
-        target_currency: targetCountry.code,
-        source_amount: parsedAmount,
-        target_amount: receivedAmount,
-        exchange_rate: effectiveRate,
-        fee_amount: fee,
-      });
+  // For card payments we always charge in USD (or NGN for NGN wallets).
+  const cardCurrency = cardChargeCurrency(sourceCurrency);
 
-      const { supabase } = await import('@/integrations/supabase/client');
-      const { data, error } = await supabase.functions.invoke('execute-transfer', {
-        body: { transfer_id: transfer.id },
-      });
-      if (error || (data as any)?.error) {
-        throw new Error((data as any)?.error || error?.message || 'Payout failed');
-      }
+  // Convert amount (in source currency) → USD when needed.
+  useEffect(() => {
+    let cancelled = false;
+    if (fundingSource !== 'card') { setUsdRate(1); return; }
+    if (sourceCurrency === cardCurrency) { setUsdRate(1); return; }
+    fetchFxRate(sourceCurrency, cardCurrency).then((r) => {
+      if (!cancelled) setUsdRate(r);
+    });
+    return () => { cancelled = true; };
+  }, [fundingSource, sourceCurrency, cardCurrency]);
 
-      setLastTransferId(transfer.id);
+  const cardChargeAmount = useMemo(
+    () => (usdRate ? Math.round(parsedAmount * usdRate * 100) / 100 : 0),
+    [parsedAmount, usdRate]
+  );
 
-      if (user) {
-        try {
-          const { isNew } = await recordTransferRecipient({
-            user_id: user.id,
-            name: recipientName,
-            phone: recipientPhone,
-            country_code: targetCountry.code,
-            payout_method: effectivePayoutMethod,
-            currency_code: targetCountry.code,
-          });
-          if (isNew && !pickedBeneficiaryId) {
-            setSavePromptOpen(true);
-          }
-        } catch { /* non-fatal */ }
-      }
+  const txRef = useMemo(
+    () => (user ? `send-${user.id.slice(0, 8)}-${Date.now()}` : ""),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [step]
+  );
 
-      goToStep(3);
-      toast.success('Transfer sent successfully!');
-    } catch (error: any) {
-      toast.error(error?.message || 'Transfer failed. Please try again.');
+  const flutterwavePay = useFlutterwave({
+    public_key: flwPublicKey,
+    tx_ref: txRef,
+    amount: cardChargeAmount,
+    currency: cardCurrency,
+    payment_options: "card",
+    customer: {
+      email: user?.email || `${user?.id || "guest"}@efin.money`,
+      phone_number: recipientPhone || "",
+      name: recipientName || "eFinMoney user",
+    },
+    customizations: {
+      title: "eFinMoney",
+      description: `Card payment to ${recipientName || "recipient"}`,
+      logo: typeof window !== "undefined" ? `${window.location.origin}/favicon.ico` : "",
+    },
+    meta: { type: "send", recipient_country: targetCountry.code },
+  });
+
+  // Create transfer row + maybe save beneficiary. Returns id.
+  const createTransferRecord = async () => {
+    const transfer = await createTransfer.mutateAsync({
+      sender_wallet_id: fundingSource === 'wallet' ? selectedWallet!.wallet_id : wallets?.[0]?.wallet_id || '',
+      recipient_name: recipientName,
+      recipient_phone: recipientPhone,
+      recipient_country: targetCountry.code,
+      transfer_type: 'mobile_money',
+      payout_method: effectivePayoutMethod,
+      source_currency: sourceCurrency,
+      target_currency: targetCountry.code,
+      source_amount: parsedAmount,
+      target_amount: receivedAmount,
+      exchange_rate: effectiveRate,
+      fee_amount: fee,
+    });
+    setLastTransferId(transfer.id);
+    if (user) {
+      try {
+        const { isNew } = await recordTransferRecipient({
+          user_id: user.id,
+          name: recipientName,
+          phone: recipientPhone,
+          country_code: targetCountry.code,
+          payout_method: effectivePayoutMethod,
+          currency_code: targetCountry.code,
+        });
+        if (isNew && !pickedBeneficiaryId) setSavePromptOpen(true);
+      } catch { /* non-fatal */ }
     }
+    return transfer.id;
+  };
+
+  const handleConfirm = async () => {
+    if (confirming) return;
+    setConfirming(true);
+
+    // ── Wallet: create + execute payout immediately ──────────────────────
+    if (fundingSource === 'wallet') {
+      if (!selectedWallet) { setConfirming(false); return; }
+      try {
+        const tid = await createTransferRecord();
+        const { data, error } = await supabase.functions.invoke('execute-transfer', { body: { transfer_id: tid } });
+        if (error || (data as any)?.error) throw new Error((data as any)?.error || error?.message || 'Payout failed');
+        goToStep(4);
+        toast.success('Transfer sent successfully!');
+      } catch (e: any) {
+        toast.error(e?.message || 'Transfer failed. Please try again.');
+      } finally {
+        setConfirming(false);
+      }
+      return;
+    }
+
+    // ── Bank: queue as pending; debit takes 1-2 business days ────────────
+    if (fundingSource === 'bank') {
+      try {
+        const tid = await createTransferRecord();
+        await supabase.from('transfers').update({ status: 'processing' }).eq('id', tid);
+        toast.success('Bank transfer initiated — funds will be debited within 1-2 business days');
+        goToStep(4);
+      } catch (e: any) {
+        toast.error(e?.message || 'Could not initiate bank transfer');
+      } finally {
+        setConfirming(false);
+      }
+      return;
+    }
+
+    // ── Card: create transfer then open Flutterwave checkout (USD) ───────
+    if (!flwPublicKey) { toast.error('Flutterwave public key missing'); setConfirming(false); return; }
+    if (usdRate === null || cardChargeAmount <= 0) {
+      toast.error(`No FX rate available for ${sourceCurrency} → ${cardCurrency}`);
+      setConfirming(false);
+      return;
+    }
+    let tid: string;
+    try {
+      tid = await createTransferRecord();
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to create transfer');
+      setConfirming(false);
+      return;
+    }
+    try {
+      flutterwavePay({
+        callback: async (response) => {
+          try {
+            const status = String(response.status || '').toLowerCase();
+            const ok = ['successful', 'completed', 'success'].includes(status);
+            await supabase.from('transfers').update(
+              ok
+                ? { status: 'processing', provider_reference: response.flw_ref || String(response.transaction_id || txRef), failure_reason: null }
+                : { status: 'failed', provider_reference: response.flw_ref || null, failure_reason: response.status || 'Card payment failed' }
+            ).eq('id', tid);
+            if (ok) { toast.success('Payment received — transfer is processing'); goToStep(4); }
+            else { toast.error(response.status || 'Card payment failed'); }
+          } finally {
+            closePaymentModal();
+            setConfirming(false);
+          }
+        },
+        onClose: async () => {
+          try {
+            await supabase.from('transfers')
+              .update({ status: 'failed', failure_reason: 'User closed card payment without paying' })
+              .eq('id', tid).eq('status', 'initiated');
+          } catch { /* ignore */ }
+          toast.error('Card payment cancelled');
+          setConfirming(false);
+        },
+      });
+    } catch (e) {
+      toast.error(friendlyFlwError(e, cardCurrency));
+      setConfirming(false);
+    }
+  };
+
+  const handleCancelTransfer = async () => {
+    if (lastTransferId) {
+      try { await supabase.from('transfers').update({ status: 'cancelled', failure_reason: 'Cancelled by user' }).eq('id', lastTransferId); } catch { /* ignore */ }
+    }
+    setCancelOpen(false);
+    setLastTransferId(null);
+    navigate('/');
   };
 
   const applyBeneficiary = (b: Beneficiary) => {
