@@ -98,6 +98,7 @@ const CanadaSendFlow = () => {
     setRecipientName(""); setRecipientEmail(""); setMessage("");
     setInstitutionNumber(""); setTransitNumber(""); setAccountNumber(""); setBankName("");
     setLastTransferId(null);
+    setSecurity(null);
   };
 
   return (
