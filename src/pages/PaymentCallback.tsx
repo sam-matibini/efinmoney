@@ -100,13 +100,6 @@ const PaymentCallback = () => {
   const verify = async () => {
     pollsRef.current += 1;
     try {
-      const { data, error } = await supabase.functions.invoke("flw-verify-payment", {
-        method: "GET" as any,
-        body: undefined,
-        headers: undefined,
-      } as any).catch(() => ({ data: null, error: { message: "invoke-failed" } as any }));
-
-      // Some clients don't pass query params via invoke — call directly
       const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/flw-verify-payment?charge_id=${encodeURIComponent(chargeId!)}`;
       const session = (await supabase.auth.getSession()).data.session;
       const resp = await fetch(url, {
