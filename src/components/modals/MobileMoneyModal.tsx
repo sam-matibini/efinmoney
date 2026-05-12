@@ -16,6 +16,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { MOBILE_MONEY_CURRENCY, fetchFxRate, friendlyFlwError, initializeFlwPayment, validateMinAmount } from "@/lib/flutterwave";
 import { MM_COUNTRIES, POPULAR_MM_CODES, findCountry } from "@/lib/mobileMoneyNetworks";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useBeneficiaries, useCreateBeneficiary, initialsOf, type Beneficiary } from "@/hooks/useBeneficiaries";
+import ContactsPickerModal from "@/components/modals/ContactsPickerModal";
+import { Users, UserPlus } from "lucide-react";
 
 const getErrorMessage = (error: unknown, fallback: string) => {
   if (error instanceof Error && error.message) return error.message;
