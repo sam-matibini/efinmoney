@@ -197,6 +197,28 @@ const TransferTrackingPage = () => {
                   <Button variant="outline" size="sm" onClick={handleShare} className="gap-2">
                     <Share2 className="w-4 h-4" /> Share
                   </Button>
+                  {canCancel && (
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="destructive" size="sm" className="gap-2" disabled={cancelTransfer.isPending}>
+                          {cancelTransfer.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
+                          Cancel
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Cancel this transfer?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            The full amount, including fees, will be refunded to your wallet immediately. This cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Keep transfer</AlertDialogCancel>
+                          <AlertDialogAction onClick={handleCancel}>Yes, cancel & refund</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  )}
                 </div>
               </CardHeader>
             </Card>
