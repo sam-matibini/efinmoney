@@ -68,6 +68,13 @@ const SendPage = () => {
   const [cancelOpen, setCancelOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [usdRate, setUsdRate] = useState<number | null>(null);
+  // NGN bank payout state
+  const [ngnBanks, setNgnBanks] = useState<Array<{ code: string; name: string }>>([]);
+  const [ngnBankCode, setNgnBankCode] = useState<string>("");
+  const [ngnAccountNumber, setNgnAccountNumber] = useState<string>("");
+  const [ngnResolving, setNgnResolving] = useState(false);
+  const [ngnResolvedName, setNgnResolvedName] = useState<string | null>(null);
+  const [ngnResolveError, setNgnResolveError] = useState<string | null>(null);
   // V4: no public key needed
   const navigate = useNavigate();
 
