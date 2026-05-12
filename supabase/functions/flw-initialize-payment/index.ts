@@ -32,6 +32,14 @@ function jr(status: number, body: unknown) {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 }
 
+function ok(body: unknown) {
+  return jr(200, body);
+}
+
+function softFail(error: string, extra: Record<string, unknown> = {}) {
+  return ok({ success: false, error, ...extra });
+}
+
 function isGatewayJson(json: any, status: number): boolean {
   if ([0, 408, 502, 503, 504].includes(status)) return true;
   const raw = typeof json?.raw === "string" ? json.raw : "";
@@ -182,29 +190,42 @@ Deno.serve(async (req) => {
           const v3 = await v3MobileMoneyCharge({ currency, amount, reference, redirectUrl, phone, network, email: customer.email, name: customer.name, userId });
           if (v3.ok) {
             const d = v3.json?.data || {};
-            return new Response(JSON.stringify({
+            return ok({
               success: true, charge_id: d.id, reference,
               next_action: d.processor_response || d.auth_url || d.redirect_url || null,
               status: d.status,
               payment_link: d.auth_url || d.redirect_url || null,
               via: "v3_fallback",
-            }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+            });
           }
-          return jr(502, { error: "Our payout partner is temporarily unavailable. Please try again in a few minutes.", transient: true });
+          return softFail(
+            /invalid authorization key/i.test(String(v3.json?.message || v3.json?.error || ""))
+              ? "Payment fallback is currently unavailable. Please contact support if this persists."
+              : "Our payout partner is temporarily unavailable. Please try again in a few minutes.",
+            {
+              transient: true,
+              fallback: true,
+              provider_status: v3.status || status,
+            },
+          );
         }
-        return jr(502, { error: json?.message || json?.error || "Mobile money charge failed", details: json });
+        return softFail(json?.message || json?.error || "Mobile money charge failed", {
+          transient: false,
+          provider_status: status,
+          details: json,
+        });
       }
 
       // V4 returns next_action: USSD code, OTP prompt, or a redirect
       const data = json.data || {};
-      return new Response(JSON.stringify({
+      return ok({
         success: true,
         charge_id: data.id,
         reference,
         next_action: data.next_action || data.processor_response || null,
         status: data.status,
         payment_link: data.next_action?.redirect_url || null,
-      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      });
     }
 
     // ── Card / USSD / Bank-transfer: hosted orchestration link ──────────
@@ -226,23 +247,40 @@ Deno.serve(async (req) => {
         console.warn("V4 orchestration gateway error, falling back to V3 hosted payment ...");
         const v3 = await v3HostedPayment({ currency, amount, reference, redirectUrl, email: customer.email, name: customer.name, phone: customer.phone_number, paymentMethod, userId });
         if (v3.ok) {
-          return new Response(JSON.stringify({
+          return ok({
             success: true, payment_link: v3.json?.data?.link, reference, tx_ref: reference, via: "v3_fallback",
-          }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+          });
         }
-        return jr(502, { error: "Our payout partner is temporarily unavailable. Please try again in a few minutes.", transient: true });
+        return softFail(
+          /invalid authorization key/i.test(String(v3.json?.message || v3.json?.error || ""))
+            ? "Payment fallback is currently unavailable. Please contact support if this persists."
+            : "Our payout partner is temporarily unavailable. Please try again in a few minutes.",
+          {
+            transient: true,
+            fallback: true,
+            provider_status: v3.status || status,
+          },
+        );
       }
-      return jr(502, { error: json?.message || json?.error || "Failed to initialize payment", details: json });
+      return softFail(json?.message || json?.error || "Failed to initialize payment", {
+        transient: false,
+        provider_status: status,
+        details: json,
+      });
     }
 
-    return new Response(JSON.stringify({
+    return ok({
       success: true,
       payment_link: json.data?.link || json.data?.checkout_url,
       reference,
       tx_ref: reference,
-    }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    });
   } catch (err) {
     console.error("flw-initialize-payment V4 error", err);
-    return jr(500, { error: err instanceof Error ? err.message : "Unknown error" });
+    return softFail(err instanceof Error ? err.message : "Unknown error", {
+      transient: true,
+      fallback: true,
+      code: "SERVICE_FAILED",
+    });
   }
 });

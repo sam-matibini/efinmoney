@@ -120,11 +120,15 @@ export const friendlyFlwError = (error: unknown, currency?: string): string => {
 // transfer) or a `next_action` (mobile-money USSD prompt).
 export interface FlwInitResult {
   success: boolean;
+  error?: string;
   payment_link?: string | null;
   reference: string;
   charge_id?: string;
   next_action?: any;
   status?: string;
+  transient?: boolean;
+  fallback?: boolean;
+  provider_status?: number;
 }
 
 export const initializeFlwPayment = async (params: {
