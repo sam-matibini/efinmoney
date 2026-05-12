@@ -1,6 +1,7 @@
 // V4 banks list — GET /banks?country=NG
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { flwFetch, isFlwSuccess } from "../_shared/flw-v4.ts";
+import { NG_BANKS_FALLBACK } from "../_shared/ng-banks-fallback.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
