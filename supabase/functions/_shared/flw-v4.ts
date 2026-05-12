@@ -49,22 +49,57 @@ export interface FlwFetchOptions extends RequestInit {
   traceId?: string;
 }
 
+const TRANSIENT_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
+const RETRY_DELAYS_MS = [500, 1500, 3000];
+
 export async function flwFetch(path: string, opts: FlwFetchOptions = {}): Promise<{ ok: boolean; status: number; json: any }> {
   const token = await getFlwAccessToken();
   const headers = new Headers(opts.headers || {});
   headers.set("Authorization", `Bearer ${token}`);
   headers.set("X-Trace-Id", opts.traceId || crypto.randomUUID());
+  // Stable idempotency key reused across retries so FLW dedupes if a prior attempt secretly succeeded.
+  const idemKey = opts.idempotencyKey || crypto.randomUUID();
   if (opts.method && opts.method !== "GET") {
-    headers.set("X-Idempotency-Key", opts.idempotencyKey || crypto.randomUUID());
+    headers.set("X-Idempotency-Key", idemKey);
     if (!headers.has("Content-Type")) headers.set("Content-Type", "application/json");
   }
   const url = path.startsWith("http") ? path : `${FLW_BASE}${path}`;
-  const res = await fetch(url, { ...opts, headers });
-  const text = await res.text();
-  let json: any = {};
-  try { json = text ? JSON.parse(text) : {}; } catch { json = { raw: text }; }
-  if (!res.ok) console.warn(`FLW V4 ${opts.method || "GET"} ${path} -> ${res.status}`, json);
-  return { ok: res.ok, status: res.status, json };
+
+  let lastStatus = 0;
+  let lastJson: any = {};
+  let lastErr: unknown = null;
+
+  for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
+    try {
+      const res = await fetch(url, { ...opts, headers });
+      const text = await res.text();
+      let json: any = {};
+      try { json = text ? JSON.parse(text) : {}; } catch { json = { raw: text }; }
+      lastStatus = res.status;
+      lastJson = json;
+
+      if (res.ok) return { ok: true, status: res.status, json };
+
+      const transient = TRANSIENT_STATUSES.has(res.status) ||
+        (typeof json?.raw === "string" && /OriginTimeout|Service unavailable|Gateway Timeout/i.test(json.raw));
+
+      if (!transient || attempt === RETRY_DELAYS_MS.length) {
+        console.warn(`FLW V4 ${opts.method || "GET"} ${path} -> ${res.status}`, json);
+        return { ok: false, status: res.status, json };
+      }
+      console.warn(`FLW V4 ${opts.method || "GET"} ${path} -> ${res.status} (transient, retry ${attempt + 1}/${RETRY_DELAYS_MS.length})`);
+    } catch (err) {
+      lastErr = err;
+      if (attempt === RETRY_DELAYS_MS.length) {
+        console.error(`FLW V4 ${opts.method || "GET"} ${path} network error after retries`, err);
+        return { ok: false, status: 0, json: { error: err instanceof Error ? err.message : "network error" } };
+      }
+      console.warn(`FLW V4 ${opts.method || "GET"} ${path} network error (retry ${attempt + 1}/${RETRY_DELAYS_MS.length})`, err);
+    }
+    await new Promise((r) => setTimeout(r, RETRY_DELAYS_MS[attempt]));
+  }
+  // Unreachable, but keep TS happy
+  return { ok: false, status: lastStatus, json: lastJson || { error: String(lastErr) } };
 }
 
 /** V4 success envelope: { status: "success", data: {...} } */
