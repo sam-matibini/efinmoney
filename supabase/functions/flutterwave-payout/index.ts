@@ -137,7 +137,7 @@ Deno.serve(async (req) => {
         callback_url: callbackUrl,
         beneficiary: {
           name: recipient_name,
-          phone_number: normalizePhone(phone_number),
+          phone_number: normalizePhone(phone_number || ""),
           country: currency === "KES" ? "KE" : currency === "UGX" ? "UG" : currency === "GHS" ? "GH" : currency === "TZS" ? "TZ" : currency === "ZMW" ? "ZM" : currency === "RWF" ? "RW" : "",
           mobile_money: { network: networkCode },
         },
