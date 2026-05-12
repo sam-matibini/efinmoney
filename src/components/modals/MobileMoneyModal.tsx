@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import { Check, ChevronsUpDown, LoaderCircle, Smartphone } from "lucide-react";
-import { useFlutterwave, closePaymentModal } from "flutterwave-react-v3";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,7 +14,7 @@ import { useCreateTransfer } from "@/hooks/useTransfers";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { MOBILE_MONEY_CURRENCY, fetchFxRate, friendlyFlwError, getFlutterwavePublicKey, validateMinAmount } from "@/lib/flutterwave";
+import { MOBILE_MONEY_CURRENCY, fetchFxRate, friendlyFlwError, initializeFlwPayment, validateMinAmount } from "@/lib/flutterwave";
 import { MM_COUNTRIES, POPULAR_MM_CODES, findCountry } from "@/lib/mobileMoneyNetworks";
 
 const getErrorMessage = (error: unknown, fallback: string) => {
