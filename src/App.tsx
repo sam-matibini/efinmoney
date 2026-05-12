@@ -175,6 +175,7 @@ const AppRoutes = () => {
           <Route path="/wallet/topup" element={<KycProtectedRoute><TopUpPage /></KycProtectedRoute>} />
           <Route path="/pay-bills" element={<KycProtectedRoute><PayBillsPage /></KycProtectedRoute>} />
           <Route path="/deposit/complete" element={<DepositComplete />} />
+          <Route path="/payment-callback" element={<PaymentCallback />} />
           <Route path="/onboarding/welcome" element={<ProtectedRoute><Welcome /></ProtectedRoute>} />
           <Route path="/onboarding/identity" element={<ProtectedRoute><OnboardingIdentity /></ProtectedRoute>} />
           <Route path="/onboarding/address" element={<ProtectedRoute><OnboardingAddress /></ProtectedRoute>} />
