@@ -345,9 +345,7 @@ const SendPage = () => {
     setPickedBeneficiaryId(null);
   };
 
-  const isStep1Valid = parsedAmount > 0 && parsedAmount > fee && receivedAmount > 0 && rateAvailable && !noLinkedSource && !insufficientFunds && (
-    fundingSource !== 'card'
-  );
+  const isStep1Valid = parsedAmount > 0 && parsedAmount > fee && receivedAmount > 0 && rateAvailable && !noLinkedSource && !insufficientFunds;
   const isStep2Valid = recipientName.length > 2 && recipientPhone.length > 8 && !!effectivePayoutMethod && receivedAmount > 0;
 
   const activeTab = searchParams.get('mode') === 'canada' ? 'canada' : 'international';
