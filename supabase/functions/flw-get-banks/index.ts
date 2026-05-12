@@ -61,6 +61,9 @@ Deno.serve(async (req) => {
     }
 
     if (!banks) {
+      if (country === "NG") {
+        return new Response(JSON.stringify({ banks: NG_BANKS_FALLBACK, cached: false, fallback: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
       return new Response(JSON.stringify({ error: "Bank service is temporarily unavailable. Please try again shortly." }), { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
