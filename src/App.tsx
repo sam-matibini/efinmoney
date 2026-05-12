@@ -25,6 +25,7 @@ import ProfileSettingsPage from "./pages/ProfileSettingsPage";
 import KYCPage from "./pages/KYCPage";
 import SecurityPage from "./pages/SecurityPage";
 import DepositComplete from "./pages/DepositComplete";
+import PaymentCallback from "./pages/PaymentCallback";
 import TransferTrackingPage from "./pages/TransferTrackingPage";
 import TransfersListPage from "./pages/TransfersListPage";
 import ContactsPage from "./pages/ContactsPage";
@@ -174,6 +175,7 @@ const AppRoutes = () => {
           <Route path="/wallet/topup" element={<KycProtectedRoute><TopUpPage /></KycProtectedRoute>} />
           <Route path="/pay-bills" element={<KycProtectedRoute><PayBillsPage /></KycProtectedRoute>} />
           <Route path="/deposit/complete" element={<DepositComplete />} />
+          <Route path="/payment-callback" element={<PaymentCallback />} />
           <Route path="/onboarding/welcome" element={<ProtectedRoute><Welcome /></ProtectedRoute>} />
           <Route path="/onboarding/identity" element={<ProtectedRoute><OnboardingIdentity /></ProtectedRoute>} />
           <Route path="/onboarding/address" element={<ProtectedRoute><OnboardingAddress /></ProtectedRoute>} />

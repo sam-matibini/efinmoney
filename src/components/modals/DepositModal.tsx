@@ -1,14 +1,16 @@
 import { useState } from "react";
-import { Copy, Check, Building2, Landmark, CreditCard } from "lucide-react";
+import { Copy, Check, Building2, Landmark, CreditCard, Globe, Loader2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useWallets } from "@/hooks/useWallets";
 import { useAuth } from "@/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import CardPaymentForm from "./CardPaymentForm";
+import { initializeFlwPayment, cardChargeCurrency, friendlyFlwError, validateMinAmount } from "@/lib/flutterwave";
 
 interface DepositModalProps { children: React.ReactNode; }
 
@@ -61,9 +63,10 @@ const DepositModal = ({ children }: DepositModalProps) => {
           <p className="text-sm text-muted-foreground">No wallets available. Create one first.</p>
         ) : (
           <Tabs defaultValue="bank" className="w-full">
-            <TabsList className="grid grid-cols-2 w-full">
-              <TabsTrigger value="bank"><Landmark className="w-4 h-4 mr-1.5" /> Bank Transfer</TabsTrigger>
-              <TabsTrigger value="card"><CreditCard className="w-4 h-4 mr-1.5" /> Pay by Card</TabsTrigger>
+            <TabsList className="grid grid-cols-3 w-full">
+              <TabsTrigger value="bank"><Landmark className="w-4 h-4 mr-1.5" /> Bank</TabsTrigger>
+              <TabsTrigger value="card"><CreditCard className="w-4 h-4 mr-1.5" /> Card</TabsTrigger>
+              <TabsTrigger value="flw"><Globe className="w-4 h-4 mr-1.5" /> Intl.</TabsTrigger>
             </TabsList>
 
             <TabsContent value="bank" className="space-y-4 mt-4">
@@ -111,11 +114,68 @@ const DepositModal = ({ children }: DepositModalProps) => {
                 onSuccess={() => { /* form shows its own success state */ }}
               />
             </TabsContent>
+
+            <TabsContent value="flw" className="mt-4">
+              <FlutterwaveDepositForm walletCurrency={selectedWallet?.currency_code ?? "USD"} />
+            </TabsContent>
           </Tabs>
         )}
         </div>
       </DialogContent>
     </Dialog>
+  );
+};
+
+const FlutterwaveDepositForm = ({ walletCurrency }: { walletCurrency: string }) => {
+  const currency = cardChargeCurrency(walletCurrency);
+  const [amount, setAmount] = useState("");
+  const [loading, setLoading] = useState(false);
+  const amountNum = parseFloat(amount) || 0;
+
+  const handlePay = async () => {
+    const err = validateMinAmount(currency, amountNum);
+    if (err) { toast.error(err); return; }
+    setLoading(true);
+    try {
+      const redirectUrl = `${window.location.origin}/payment-callback?type=deposit`;
+      const result = await initializeFlwPayment({
+        amount: amountNum,
+        currency,
+        paymentMethod: "card",
+        redirectUrl,
+      });
+      if (!result.payment_link) throw new Error("No payment link returned");
+      window.location.href = result.payment_link;
+    } catch (e) {
+      toast.error(friendlyFlwError(e, currency));
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="p-3 rounded-lg bg-accent/10 border border-accent/20">
+        <p className="text-xs text-foreground">
+          Pay with international card via Flutterwave's secure hosted page. Charged in {currency}.
+        </p>
+      </div>
+      <div className="space-y-2">
+        <Label className="text-xs">Amount ({currency})</Label>
+        <Input
+          type="number"
+          inputMode="decimal"
+          step="0.01"
+          min="1"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          placeholder="0.00"
+          className="h-12 text-lg"
+        />
+      </div>
+      <Button onClick={handlePay} disabled={loading || amountNum <= 0} size="lg" className="w-full">
+        {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Redirecting…</> : `Continue to Flutterwave`}
+      </Button>
+    </div>
   );
 };
 
