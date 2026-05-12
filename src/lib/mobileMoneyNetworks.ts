@@ -39,8 +39,9 @@ export const MM_COUNTRIES: MMCountry[] = [
     { value: "AIRTEL", label: "Airtel" },
   ]},
   { code: "ZM", name: "Zambia", flag: "🇿🇲", currency: "ZMW", dialCode: "+260", networks: [
-    { value: "MTN",    label: "MTN" },
-    { value: "AIRTEL", label: "Airtel" },
+    { value: "MTN",    label: "MTN MoMo" },
+    { value: "AIRTEL", label: "Airtel Money" },
+    { value: "ZAMTEL", label: "Zamtel Kwacha" },
   ]},
   { code: "CM", name: "Cameroon", flag: "🇨🇲", currency: "XAF", dialCode: "+237", networks: [
     { value: "MTN",    label: "MTN" },
