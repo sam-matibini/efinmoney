@@ -117,6 +117,21 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
     setRecipientName("");
     setAmount("");
     setWalletId("");
+    setPickedBeneficiaryId(null);
+  };
+
+  const handlePickContact = (b: Beneficiary) => {
+    setPickedBeneficiaryId(b.id);
+    setRecipientName(b.name);
+    if (b.country_code && findCountry(b.country_code)) {
+      setCountryCode(b.country_code);
+      const c = findCountry(b.country_code)!;
+      // Try to match network
+      const matched = c.networks.find((n) => n.value === (b.network || b.payout_method));
+      setNetworkValue(matched?.value || c.networks[0].value);
+    }
+    if (b.phone) setPhone(b.phone);
+    setSaveContact(false);
   };
 
   const handlePay = async () => {
