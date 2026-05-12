@@ -64,6 +64,10 @@ const SendPage = () => {
   const [saveModalOpen, setSaveModalOpen] = useState(false);     // pre-filled Add modal
   const [pickedBeneficiaryId, setPickedBeneficiaryId] = useState<string | null>(null);
   const [selectedNetworkId, setSelectedNetworkId] = useState<string | null>(null);
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [usdRate, setUsdRate] = useState<number | null>(null);
+  const navigate = useNavigate();
 
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
