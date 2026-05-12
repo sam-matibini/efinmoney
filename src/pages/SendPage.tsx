@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence, type Variants } from "framer-motion";
 import { useSearchParams, useNavigate, Link } from "react-router-dom";
-import { useFlutterwave, closePaymentModal } from "flutterwave-react-v3";
+// Flutterwave V3 SDK removed — V4 uses hosted payment links via the
+// flw-initialize-payment edge function.
 import ContactsPickerModal from "@/components/modals/ContactsPickerModal";
 import AddBeneficiaryModal from "@/components/modals/AddBeneficiaryModal";
 import { useBeneficiaries, recordTransferRecipient, type Beneficiary } from "@/hooks/useBeneficiaries";
@@ -21,7 +22,7 @@ import { useCreateTransfer } from "@/hooks/useTransfers";
 import { useFundingSources } from "@/hooks/useFundingSources";
 import { usePricingConfig } from "@/hooks/usePricingConfig";
 import { supabase } from "@/integrations/supabase/client";
-import { friendlyFlwError, fetchFxRate, cardChargeCurrency, getFlutterwavePublicKey } from "@/lib/flutterwave";
+import { friendlyFlwError, fetchFxRate, cardChargeCurrency, initializeFlwPayment } from "@/lib/flutterwave";
 import { toast } from "sonner";
 import { ArrowRight, CheckCircle, Users, Clock, Shield, Wallet, Landmark, CreditCard, AlertCircle, X } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -67,7 +68,7 @@ const SendPage = () => {
   const [cancelOpen, setCancelOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [usdRate, setUsdRate] = useState<number | null>(null);
-  const [flwPublicKey, setFlwPublicKey] = useState("");
+  // V4: no public key needed
   const navigate = useNavigate();
 
   const { user } = useAuth();
@@ -136,15 +137,7 @@ const SendPage = () => {
   // For card payments we always charge in USD (or NGN for NGN wallets).
   const cardCurrency = cardChargeCurrency(sourceCurrency);
 
-  useEffect(() => {
-    let cancelled = false;
-    getFlutterwavePublicKey().then((key) => {
-      if (!cancelled && key) setFlwPublicKey(key);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  // V4: no public-key bootstrap. Card payments use a hosted link via flw-initialize-payment.
 
   // Convert amount (in source currency) → USD when needed.
   useEffect(() => {
@@ -167,25 +160,6 @@ const SendPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [step]
   );
-
-  const flutterwavePay = useFlutterwave({
-    public_key: flwPublicKey,
-    tx_ref: txRef,
-    amount: cardChargeAmount,
-    currency: cardCurrency,
-    payment_options: "card",
-    customer: {
-      email: user?.email || `${user?.id || "guest"}@efin.money`,
-      phone_number: recipientPhone || "",
-      name: recipientName || "eFinMoney user",
-    },
-    customizations: {
-      title: "eFinMoney",
-      description: `Card payment to ${recipientName || "recipient"}`,
-      logo: typeof window !== "undefined" ? `${window.location.origin}/favicon.ico` : "",
-    },
-    meta: { type: "send", recipient_country: targetCountry.code },
-  });
 
   // Create transfer row + maybe save beneficiary. Returns id.
   const createTransferRecord = async () => {
@@ -256,8 +230,7 @@ const SendPage = () => {
       return;
     }
 
-    // ── Card: create transfer then open Flutterwave checkout (USD) ───────
-    if (!flwPublicKey) { toast.error('Flutterwave public key missing'); setConfirming(false); return; }
+    // ── Card: V4 hosted payment link — redirect user to Flutterwave checkout ──
     if (usdRate === null || cardChargeAmount <= 0) {
       toast.error(`No FX rate available for ${sourceCurrency} → ${cardCurrency}`);
       setConfirming(false);
@@ -272,34 +245,24 @@ const SendPage = () => {
       return;
     }
     try {
-      flutterwavePay({
-        callback: async (response) => {
-          try {
-            const status = String(response.status || '').toLowerCase();
-            const ok = ['successful', 'completed', 'success'].includes(status);
-            await supabase.from('transfers').update(
-              ok
-                ? { status: 'processing', provider_reference: response.flw_ref || String(response.transaction_id || txRef), failure_reason: null }
-                : { status: 'failed', provider_reference: response.flw_ref || null, failure_reason: response.status || 'Card payment failed' }
-            ).eq('id', tid);
-            if (ok) { toast.success('Payment received — transfer is processing'); goToStep(4); }
-            else { toast.error(response.status || 'Card payment failed'); }
-          } finally {
-            closePaymentModal();
-            setConfirming(false);
-          }
-        },
-        onClose: async () => {
-          try {
-            await supabase.from('transfers')
-              .update({ status: 'failed', failure_reason: 'User closed card payment without paying' })
-              .eq('id', tid).eq('status', 'initiated');
-          } catch { /* ignore */ }
-          toast.error('Card payment cancelled');
-          setConfirming(false);
-        },
+      const callbackUrl = `${window.location.origin}/payment-callback?transfer_id=${tid}`;
+      const result = await initializeFlwPayment({
+        amount: cardChargeAmount,
+        currency: cardCurrency,
+        paymentMethod: 'card',
+        redirectUrl: callbackUrl,
       });
+      if (!result.payment_link) throw new Error('No payment link returned');
+      // Persist the in-progress transfer id so /payment-callback can verify
+      try { sessionStorage.setItem('pending_transfer_id', tid); } catch { /* ignore */ }
+      toast.success('Redirecting to Flutterwave…');
+      window.location.href = result.payment_link;
     } catch (e) {
+      try {
+        await supabase.from('transfers')
+          .update({ status: 'failed', failure_reason: friendlyFlwError(e, cardCurrency) })
+          .eq('id', tid);
+      } catch { /* ignore */ }
       toast.error(friendlyFlwError(e, cardCurrency));
       setConfirming(false);
     }

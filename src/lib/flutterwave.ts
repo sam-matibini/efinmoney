@@ -115,30 +115,29 @@ export const friendlyFlwError = (error: unknown, currency?: string): string => {
   return raw || "Payment failed";
 };
 
-let flutterwavePublicKeyPromise: Promise<string | null> | null = null;
+// V4: No public key. All payments are initiated via the `flw-initialize-payment`
+// edge function which returns either a hosted `payment_link` (cards/USSD/bank
+// transfer) or a `next_action` (mobile-money USSD prompt).
+export interface FlwInitResult {
+  success: boolean;
+  payment_link?: string | null;
+  reference: string;
+  charge_id?: string;
+  next_action?: any;
+  status?: string;
+}
 
-export const getFlutterwavePublicKey = async (): Promise<string | null> => {
-  if (!flutterwavePublicKeyPromise) {
-    flutterwavePublicKeyPromise = (async () => {
-      try {
-        const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/flw-public-config?action=public_key`;
-        const { data: { session } } = await supabase.auth.getSession();
-        const res = await fetch(url, {
-          headers: {
-            Authorization: `Bearer ${session?.access_token ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-          },
-        });
-        if (!res.ok) return null;
-        const json = await res.json();
-        return typeof json?.publicKey === "string" && json.publicKey.trim()
-          ? json.publicKey.trim()
-          : null;
-      } catch {
-        return null;
-      }
-    })();
-  }
-
-  return flutterwavePublicKeyPromise;
+export const initializeFlwPayment = async (params: {
+  amount: number;
+  currency: string;
+  paymentMethod: "card" | "mobilemoney" | "banktransfer" | "ussd";
+  redirectUrl: string;
+  phone?: string;
+  network?: string;
+  country?: string;
+}): Promise<FlwInitResult> => {
+  const { data, error } = await supabase.functions.invoke("flw-initialize-payment", { body: params });
+  if (error) throw new Error(error.message || "Failed to initialize payment");
+  if (!data?.success) throw new Error(data?.error || "Failed to initialize payment");
+  return data as FlwInitResult;
 };

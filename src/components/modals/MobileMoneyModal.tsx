@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import { Check, ChevronsUpDown, LoaderCircle, Smartphone } from "lucide-react";
-import { useFlutterwave, closePaymentModal } from "flutterwave-react-v3";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,7 +14,7 @@ import { useCreateTransfer } from "@/hooks/useTransfers";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { MOBILE_MONEY_CURRENCY, fetchFxRate, friendlyFlwError, getFlutterwavePublicKey, validateMinAmount } from "@/lib/flutterwave";
+import { MOBILE_MONEY_CURRENCY, fetchFxRate, friendlyFlwError, initializeFlwPayment, validateMinAmount } from "@/lib/flutterwave";
 import { MM_COUNTRIES, POPULAR_MM_CODES, findCountry } from "@/lib/mobileMoneyNetworks";
 
 const getErrorMessage = (error: unknown, fallback: string) => {
@@ -54,7 +53,6 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
   const [walletId, setWalletId] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
   const [fxRate, setFxRate] = useState<number | null>(null);
-  const [flutterwavePublicKey, setFlutterwavePublicKey] = useState<string>("");
 
   const { data: wallets } = useWallets();
   const { user } = useAuth();
@@ -66,16 +64,6 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
 
   const chargeCurrency = MOBILE_MONEY_CURRENCY[country.code] || country.currency;
   const walletCurrency = wallet?.currency_code || "USD";
-
-  useEffect(() => {
-    let cancelled = false;
-    getFlutterwavePublicKey().then((key) => {
-      if (!cancelled && key) setFlutterwavePublicKey(key);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   // Reset network when country changes (if current isn't valid)
   useEffect(() => {
@@ -115,32 +103,6 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
 
   const chargeAmount = fxRate ? Math.round(parsedAmount * fxRate * 100) / 100 : 0;
 
-  const handleFlutterPayment = useFlutterwave({
-    public_key: flutterwavePublicKey,
-    tx_ref: txRef,
-    amount: chargeAmount,
-    currency: chargeCurrency,
-    payment_options:
-      "mobilemoneyfranco,mobilemoneyghana,mobilemoneykenya,mobilemoneyrwanda,mobilemoneytanzania,mobilemoneyuganda,mobilemoneyzambia,mobilemoney",
-    customer: {
-      email: user?.email || `${user?.id || "guest"}@efin.money`,
-      phone_number: phone.trim(),
-      name: recipientName.trim() || "eFinMoney user",
-    },
-    customizations: {
-      title: "eFinMoney",
-      description: `Mobile money to ${recipientName.trim() || "recipient"}`,
-      logo: typeof window !== "undefined" ? `${window.location.origin}/favicon.ico` : "",
-    },
-    meta: {
-      country: country.code,
-      network: network.value,
-      wallet_id: wallet?.wallet_id || "",
-      wallet_currency: walletCurrency,
-      charge_currency: chargeCurrency,
-    },
-  });
-
   const resetForm = () => {
     setPhone("");
     setRecipientName("");
@@ -157,7 +119,6 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
     if (Number(wallet.balance) < result.data.amount)
       return toast.error(`Insufficient wallet balance. Available: ${wallet.symbol}${Number(wallet.balance).toLocaleString()}`);
     if (!user) return toast.error("Please sign in to continue");
-    if (!flutterwavePublicKey) return toast.error("Flutterwave public key is missing");
     if (fxRate === null)
       return toast.error(`No exchange rate available for ${walletCurrency} → ${chargeCurrency}. Please try a different wallet.`);
     const minErr = validateMinAmount(chargeCurrency, chargeAmount);
@@ -188,63 +149,42 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
 
     const tId = transferId!;
     try {
-      handleFlutterPayment({
-        callback: async (response) => {
-          try {
-            const status = String(response.status || "").toLowerCase();
-            const success = ["successful", "completed", "success"].includes(status);
-            const updatePayload = success
-              ? {
-                  status: "completed" as const,
-                  provider_reference: response.flw_ref || String(response.transaction_id || txRef),
-                  failure_reason: null,
-                  completed_at: new Date().toISOString(),
-                }
-              : {
-                  status: "failed" as const,
-                  provider_reference: response.flw_ref || null,
-                  failure_reason: response.status || "Checkout failed",
-                };
-            await supabase.from("transfers").update(updatePayload).eq("id", tId).eq("sender_id", user.id);
-            await supabase.from("notifications").insert({
-              user_id: user.id,
-              title: success ? "Transfer completed" : "Transfer failed",
-              message: success
-                ? `Your ${wallet.currency_code} ${parsedAmount} transfer to ${recipientName.trim()} is complete.`
-                : response.status || "Flutterwave could not complete this transfer.",
-              type: success ? "transfer" : "error",
-            });
-            if (success) {
-              toast.success("Transfer completed");
-              setOpen(false);
-              resetForm();
-            } else {
-              toast.error(response.status || "Transfer was not completed");
-            }
-          } catch (err) {
-            toast.error(getErrorMessage(err, "Unable to update transfer"));
-          } finally {
-            closePaymentModal();
-            setIsLoading(false);
-          }
-        },
-        onClose: async () => {
-          try {
-            await supabase
-              .from("transfers")
-              .update({ status: "failed", failure_reason: "User closed payment without paying" })
-              .eq("id", tId)
-              .eq("sender_id", user.id)
-              .eq("status", "initiated");
-          } catch {
-            // ignore
-          }
-          setIsLoading(false);
-        },
+      // V4: direct mobile money charge — Flutterwave sends a USSD prompt to the
+      // payer's phone. The webhook finalizes the charge; we mark it as processing.
+      const result2 = await initializeFlwPayment({
+        amount: chargeAmount,
+        currency: chargeCurrency,
+        paymentMethod: "mobilemoney",
+        phone: phone.trim(),
+        network: network.value,
+        country: country.code,
+        redirectUrl: typeof window !== "undefined" ? window.location.origin + "/payment-callback" : "",
       });
+
+      await supabase.from("transfers").update({
+        status: "processing",
+        provider_reference: result2.charge_id ? String(result2.charge_id) : result2.reference,
+      }).eq("id", tId).eq("sender_id", user.id);
+
+      // If Flutterwave returned a redirect (some markets need OTP UI), open it.
+      if (result2.payment_link) {
+        window.open(result2.payment_link, "_blank", "noopener,noreferrer");
+        toast.success("Complete the payment in the new tab.");
+      } else {
+        toast.success("Check your phone for a USSD prompt to authorize the payment.");
+      }
+      setOpen(false);
+      resetForm();
     } catch (e) {
-      setIsLoading(false);
+      // Mark transfer as failed
+      try {
+        await supabase.from("transfers")
+          .update({ status: "failed", failure_reason: getErrorMessage(e, "Mobile money charge failed") })
+          .eq("id", tId).eq("sender_id", user.id);
+      } catch { /* ignore */ }
       toast.error(friendlyFlwError(e, chargeCurrency));
+    } finally {
+      setIsLoading(false);
     }
   };
 
