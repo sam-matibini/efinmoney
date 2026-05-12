@@ -587,20 +587,16 @@ const SendPage = () => {
                                     {fundingSource === 'card' && (
                                       <motion.div custom={1} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
                                         <Label>Pay with Card</Label>
-                                        <div className="p-3 rounded-lg border border-border bg-muted/40 space-y-3">
+                                        <div className="p-3 rounded-lg border border-border bg-muted/40 space-y-2">
                                           <p className="text-xs text-muted-foreground">
-                                            Securely charge your card. Funds are added to your {wallets?.[0]?.currency_code || 'wallet'} wallet, then the transfer continues.
+                                            You'll be redirected to a secure card checkout (powered by Flutterwave) on the review step. Card payments are charged in {cardCurrency}.
                                           </p>
-                                          <CardPaymentForm
-                                            defaultWalletId={wallets?.[0]?.wallet_id}
-                                            defaultAmount={parsedAmount > 0 ? parsedAmount : undefined}
-                                            ctaLabel={parsedAmount > 0 ? `Pay ${sourceSymbol}${parsedAmount.toFixed(2)} & Continue` : 'Enter an amount above'}
-                                            onSuccess={() => {
-                                              toast.success('Card charged. Continue to recipient details.');
-                                              setFundingSource('wallet');
-                                              goToStep(2);
-                                            }}
-                                          />
+                                          {parsedAmount > 0 && usdRate !== null && sourceCurrency !== cardCurrency && (
+                                            <p className="text-xs text-muted-foreground">
+                                              Estimated charge: <span className="font-medium">{cardCurrency} {cardChargeAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                              {' '}(rate: 1 {sourceCurrency} = {usdRate.toFixed(4)} {cardCurrency})
+                                            </p>
+                                          )}
                                           {cardFee > 0 && (
                                             <p className="text-xs text-muted-foreground">+{sourceSymbol}{cardFee.toFixed(2)} card processing fee applies</p>
                                           )}
