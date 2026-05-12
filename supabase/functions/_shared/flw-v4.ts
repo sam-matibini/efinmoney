@@ -73,9 +73,10 @@ export async function flwFetch(path: string, opts: FlwFetchOptions = {}): Promis
   let lastErr: unknown = null;
 
   for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
+    let timeout: ReturnType<typeof setTimeout> | undefined;
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort("FLW request timeout"), timeoutMs);
+      timeout = setTimeout(() => controller.abort("FLW request timeout"), timeoutMs);
       const res = await fetch(url, { ...opts, headers, signal: controller.signal });
       clearTimeout(timeout);
       const text = await res.text();
@@ -95,6 +96,7 @@ export async function flwFetch(path: string, opts: FlwFetchOptions = {}): Promis
       }
       console.warn(`FLW V4 ${opts.method || "GET"} ${path} -> ${res.status} (transient, retry ${attempt + 1}/${RETRY_DELAYS_MS.length})`);
     } catch (err) {
+      if (timeout) clearTimeout(timeout);
       lastErr = err;
       const timedOut = err instanceof DOMException && err.name === "AbortError";
       if (attempt === RETRY_DELAYS_MS.length) {
