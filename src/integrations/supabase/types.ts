@@ -3101,7 +3101,10 @@ export type Database = {
           failure_reason: string | null
           fee_amount: number
           id: string
+          interac_security_answer: string | null
+          interac_security_question: string | null
           payout_method: string | null
+          paysafe_payment_id: string | null
           provider_reference: string | null
           recipient_account: string | null
           recipient_bank_code: string | null
@@ -3126,7 +3129,10 @@ export type Database = {
           failure_reason?: string | null
           fee_amount?: number
           id?: string
+          interac_security_answer?: string | null
+          interac_security_question?: string | null
           payout_method?: string | null
+          paysafe_payment_id?: string | null
           provider_reference?: string | null
           recipient_account?: string | null
           recipient_bank_code?: string | null
@@ -3151,7 +3157,10 @@ export type Database = {
           failure_reason?: string | null
           fee_amount?: number
           id?: string
+          interac_security_answer?: string | null
+          interac_security_question?: string | null
           payout_method?: string | null
+          paysafe_payment_id?: string | null
           provider_reference?: string | null
           recipient_account?: string | null
           recipient_bank_code?: string | null
