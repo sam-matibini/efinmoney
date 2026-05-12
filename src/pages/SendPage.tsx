@@ -128,11 +128,7 @@ const SendPage = () => {
     let cancelled = false;
     (async () => {
       try {
-        const { data, error } = await supabase.functions.invoke("flw-get-banks", {
-          body: null,
-          method: "GET" as any,
-        });
-        // supabase-js doesn't support GET query params via invoke, so call directly
+        // supabase-js .invoke() doesn't support GET query params, so call directly
         const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/flw-get-banks?country=NG`;
         const { data: { session } } = await supabase.auth.getSession();
         const res = await fetch(url, {
