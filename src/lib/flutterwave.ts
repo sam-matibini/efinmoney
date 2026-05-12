@@ -7,13 +7,22 @@ export type FlwMethod = "card" | "mobilemoney" | "banktransfer" | "ussd";
 
 // Mobile money: always charge in destination's local currency
 export const MOBILE_MONEY_CURRENCY: Record<string, string> = {
-  KE: "KES",
-  UG: "UGX",
-  GH: "GHS",
-  TZ: "TZS",
-  ZM: "ZMW",
-  RW: "RWF",
   NG: "NGN",
+  KE: "KES",
+  GH: "GHS",
+  UG: "UGX",
+  TZ: "TZS",
+  RW: "RWF",
+  ZM: "ZMW",
+  CM: "XAF",
+  SN: "XOF",
+  CI: "XOF",
+  BF: "XOF",
+  ML: "XOF",
+  SL: "SLE",
+  LR: "LRD",
+  MW: "MWK",
+  BI: "BIF",
 };
 
 // Bank transfer: destination local currency
@@ -51,6 +60,12 @@ export const MIN_AMOUNTS: Record<string, number> = {
   TZS: 1000,
   ZMW: 5,
   RWF: 500,
+  XAF: 500,
+  XOF: 500,
+  SLE: 1000,
+  LRD: 500,
+  MWK: 500,
+  BIF: 500,
   CAD: 1,
   GBP: 1,
   EUR: 1,
