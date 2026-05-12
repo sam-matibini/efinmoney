@@ -15,7 +15,7 @@ import { useCreateTransfer } from "@/hooks/useTransfers";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { MOBILE_MONEY_CURRENCY, fetchFxRate, friendlyFlwError, validateMinAmount } from "@/lib/flutterwave";
+import { MOBILE_MONEY_CURRENCY, fetchFxRate, friendlyFlwError, getFlutterwavePublicKey, validateMinAmount } from "@/lib/flutterwave";
 import { MM_COUNTRIES, POPULAR_MM_CODES, findCountry } from "@/lib/mobileMoneyNetworks";
 
 const getErrorMessage = (error: unknown, fallback: string) => {
@@ -54,6 +54,7 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
   const [walletId, setWalletId] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
   const [fxRate, setFxRate] = useState<number | null>(null);
+  const [flutterwavePublicKey, setFlutterwavePublicKey] = useState<string>("");
 
   const { data: wallets } = useWallets();
   const { user } = useAuth();
@@ -63,12 +64,18 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
   const network = country.networks.find((n) => n.value === networkValue) || country.networks[0];
   const wallet = wallets?.find((w) => w.wallet_id === walletId) || wallets?.[0];
 
-  const flutterwavePublicKey =
-    import.meta.env.VITE_FLW_PUBLIC_KEY?.trim() ||
-    "FLWPUBK_TEST-b6b1a9a088a3bae587f81e8faccffb26-X";
-
   const chargeCurrency = MOBILE_MONEY_CURRENCY[country.code] || country.currency;
   const walletCurrency = wallet?.currency_code || "USD";
+
+  useEffect(() => {
+    let cancelled = false;
+    getFlutterwavePublicKey().then((key) => {
+      if (!cancelled && key) setFlutterwavePublicKey(key);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Reset network when country changes (if current isn't valid)
   useEffect(() => {
