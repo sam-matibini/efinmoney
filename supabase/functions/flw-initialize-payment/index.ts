@@ -26,10 +26,6 @@ const NETWORK_MAP: Record<string, string> = {
   "ZMW:zamtel": "ZAMTEL",
   "RWF:mtn": "MTN",
   "RWF:airtel": "AIRTEL",
-  "NGN:mtn": "MTN",
-  "NGN:airtel": "AIRTEL",
-  "NGN:9mobile": "9MOBILE",
-  "NGN:glo": "GLO",
 };
 
 function jr(status: number, body: unknown) {
