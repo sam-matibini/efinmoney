@@ -52,6 +52,7 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
   const [amount, setAmount] = useState("");
   const [walletId, setWalletId] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
+  const [fxRate, setFxRate] = useState<number | null>(null);
 
   const { data: wallets } = useWallets();
   const { user } = useAuth();
@@ -63,6 +64,10 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
     import.meta.env.VITE_FLW_PUBLIC_KEY?.trim() ||
     "FLWPUBK_TEST-b6b1a9a088a3bae587f81e8faccffb26-X";
 
+  // Mobile money MUST charge in destination's local currency
+  const chargeCurrency = MOBILE_MONEY_CURRENCY[net.country] || net.currency;
+  const walletCurrency = wallet?.currency_code || "USD";
+
   const txRef = useMemo(
     () => (user ? `mm-${user.id.slice(0, 8)}-${Date.now()}` : ""),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -71,12 +76,25 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
 
   const parsedAmount = parseFloat(amount) || 0;
 
+  // FX: amount entered is in wallet currency. Charge amount = amount * rate(wallet→charge).
+  useEffect(() => {
+    let cancelled = false;
+    if (!wallet) { setFxRate(null); return; }
+    if (walletCurrency === chargeCurrency) { setFxRate(1); return; }
+    fetchFxRate(walletCurrency, chargeCurrency).then((r) => {
+      if (!cancelled) setFxRate(r);
+    });
+    return () => { cancelled = true; };
+  }, [walletCurrency, chargeCurrency, wallet]);
+
+  const chargeAmount = fxRate ? Math.round(parsedAmount * fxRate * 100) / 100 : 0;
+
   const handleFlutterPayment = useFlutterwave({
     public_key: flutterwavePublicKey,
     tx_ref: txRef,
-    amount: parsedAmount,
-    currency: wallet?.currency_code || "USD",
-    payment_options: "mobilemoney,card",
+    amount: chargeAmount,
+    currency: chargeCurrency,
+    payment_options: "mobilemoneyfranco,mobilemoneyghana,mobilemoneykenya,mobilemoneyrwanda,mobilemoneytanzania,mobilemoneyuganda,mobilemoneyzambia,mobilemoney",
     customer: {
       email: user?.email || `${user?.id || "guest"}@efin.money`,
       phone_number: phone.trim(),
@@ -87,7 +105,7 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
       description: `Mobile money to ${recipientName.trim() || "recipient"}`,
       logo: typeof window !== "undefined" ? `${window.location.origin}/favicon.ico` : "",
     },
-    meta: { network, wallet_id: wallet?.wallet_id || "" },
+    meta: { network, wallet_id: wallet?.wallet_id || "", wallet_currency: walletCurrency, charge_currency: chargeCurrency },
   });
 
   const resetForm = () => {
