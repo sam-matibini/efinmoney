@@ -34,6 +34,7 @@ const CanadaSendFlow = () => {
   const [bankName, setBankName] = useState("");
 
   const [lastTransferId, setLastTransferId] = useState<string | null>(null);
+  const [security, setSecurity] = useState<{ question: string; answer: string } | null>(null);
 
   const { data: wallets } = useWallets();
   const createTransfer = useCreateTransfer();
