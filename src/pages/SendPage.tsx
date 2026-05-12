@@ -697,29 +697,34 @@ const SendPage = () => {
                                       </AnimatePresence>
                                     </motion.div>
 
-                                    {fundingSource !== 'card' && (
-                                      <motion.div custom={6} variants={fieldVariants} initial="hidden" animate="show">
-                                        <motion.div
-                                          whileTap={{ scale: 0.97 }}
-                                          animate={isStep1Valid ? { boxShadow: [
-                                            "0 0 0 0 hsl(var(--primary) / 0)",
-                                            "0 0 0 6px hsl(var(--primary) / 0.15)",
-                                            "0 0 0 0 hsl(var(--primary) / 0)",
-                                          ] } : { boxShadow: "0 0 0 0 hsl(var(--primary) / 0)" }}
-                                          transition={isStep1Valid ? { duration: 1.8, repeat: Infinity, ease: "easeInOut" } : { duration: 0.2 }}
-                                          className="rounded-md"
+                                    <motion.div custom={6} variants={fieldVariants} initial="hidden" animate="show" className="space-y-3">
+                                      <motion.div
+                                        whileTap={{ scale: 0.97 }}
+                                        animate={isStep1Valid ? { boxShadow: [
+                                          "0 0 0 0 hsl(var(--primary) / 0)",
+                                          "0 0 0 6px hsl(var(--primary) / 0.15)",
+                                          "0 0 0 0 hsl(var(--primary) / 0)",
+                                        ] } : { boxShadow: "0 0 0 0 hsl(var(--primary) / 0)" }}
+                                        transition={isStep1Valid ? { duration: 1.8, repeat: Infinity, ease: "easeInOut" } : { duration: 0.2 }}
+                                        className="rounded-md"
+                                      >
+                                        <Button
+                                          className="w-full"
+                                          size="lg"
+                                          onClick={() => goToStep(2)}
+                                          disabled={!isStep1Valid}
                                         >
-                                          <Button
-                                            className="w-full"
-                                            size="lg"
-                                            onClick={() => goToStep(2)}
-                                            disabled={!isStep1Valid}
-                                          >
-                                            Continue
-                                          </Button>
-                                        </motion.div>
+                                          Continue
+                                        </Button>
                                       </motion.div>
-                                    )}
+                                      <button
+                                        type="button"
+                                        onClick={() => navigate('/')}
+                                        className="block mx-auto text-sm text-muted-foreground hover:text-foreground transition-colors underline-offset-4 hover:underline"
+                                      >
+                                        Cancel
+                                      </button>
+                                    </motion.div>
                                   </CardContent>
                                 </Card>
                               </motion.div>
