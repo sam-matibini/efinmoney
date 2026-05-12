@@ -35,6 +35,71 @@ function isTemporaryProviderSetupError(message: string): boolean {
   return m.includes("ip whitelisting") || m.includes("whitelist") || m.includes("access this service");
 }
 
+// V3 fallback — used when V4 host (Azure Front Door) returns gateway errors.
+// V3 is hosted on a different stack (api.flutterwave.com) and stays up during V4 outages.
+const V3_MM_BANK: Record<string, string> = {
+  // Mobile-money "account_bank" codes per Flutterwave V3 docs
+  "KES:mpesa": "MPS",
+  "GHS:mtn": "MTN", "GHS:vodafone": "VOD", "GHS:airtel": "ATL",
+  "UGX:mtn": "MTN", "UGX:airtel": "ATL",
+  "TZS:airtel": "ATL", "TZS:vodafone": "VOD", "TZS:tigo": "TIGO",
+  "ZMW:mtn": "MTN", "ZMW:airtel": "ATL", "ZMW:zamtel": "ZAMTEL",
+  "RWF:mtn": "MTN", "RWF:airtel": "ATL",
+};
+
+async function tryV3Payout(opts: {
+  currency: string; amount: number; reference: string; recipient_name: string;
+  network: string; phone_number?: string; account_number?: string; bank_code?: string;
+  callback_url: string; transfer_id: string;
+}): Promise<{ ok: boolean; status: number; json: any }> {
+  const secret = (Deno.env.get("FLW_SECRET_KEY") || "").trim();
+  if (!secret) return { ok: false, status: 0, json: { message: "V3 fallback unavailable (FLW_SECRET_KEY not set)" } };
+
+  let body: Record<string, unknown>;
+  if (opts.currency === "NGN") {
+    body = {
+      account_bank: String(opts.bank_code),
+      account_number: String(opts.account_number).replace(/\D/g, ""),
+      amount: Math.round(opts.amount * 100) / 100,
+      narration: `Transfer to ${opts.recipient_name}`,
+      currency: opts.currency,
+      reference: opts.reference,
+      callback_url: opts.callback_url,
+      debit_currency: opts.currency,
+      beneficiary_name: opts.recipient_name,
+      meta: [{ transfer_id: opts.transfer_id, network: opts.network }],
+    };
+  } else {
+    const bank = V3_MM_BANK[`${opts.currency}:${opts.network.toLowerCase()}`];
+    if (!bank) return { ok: false, status: 0, json: { message: `V3 has no bank code for ${opts.currency}:${opts.network}` } };
+    body = {
+      account_bank: bank,
+      account_number: normalizePhone(opts.phone_number || ""),
+      amount: Math.round(opts.amount * 100) / 100,
+      narration: `Transfer to ${opts.recipient_name}`,
+      currency: opts.currency,
+      reference: opts.reference,
+      callback_url: opts.callback_url,
+      debit_currency: opts.currency,
+      beneficiary_name: opts.recipient_name,
+      meta: [{ transfer_id: opts.transfer_id, network: opts.network }],
+    };
+  }
+
+  console.log("FLW V3 fallback payload:", JSON.stringify(body));
+  const res = await fetch("https://api.flutterwave.com/v3/transfers", {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${secret}`, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const text = await res.text();
+  let json: any = {};
+  try { json = text ? JSON.parse(text) : {}; } catch { json = { raw: text }; }
+  console.log("FLW V3 fallback response:", res.status, JSON.stringify(json));
+  const success = res.ok && (json?.status === "success");
+  return { ok: success, status: res.status, json };
+}
+
 async function reverseTransferLedger(supabase: ReturnType<typeof createClient>, transferId: string) {
   const { data: existing } = await supabase.from("ledger_entries").select("id").eq("reference_type", "transfer_reversal").eq("reference_id", transferId).limit(1);
   if (existing && existing.length > 0) return { reversed: false, reason: "already_reversed" };
