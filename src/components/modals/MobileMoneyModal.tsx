@@ -409,6 +409,18 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
           {parsedAmount > 0 && fxRate === null && walletCurrency !== chargeCurrency && (
             <p className="text-xs text-destructive">No FX rate available for {walletCurrency} → {chargeCurrency}.</p>
           )}
+          {!pickedBeneficiaryId && recipientName.trim() && phone.trim() && (
+            <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+              <Checkbox
+                checked={saveContact}
+                onCheckedChange={(v) => setSaveContact(v === true)}
+              />
+              <span className="flex items-center gap-1.5">
+                <UserPlus className="w-4 h-4 text-muted-foreground" />
+                Save {recipientName.trim()} to my contacts
+              </span>
+            </label>
+          )}
           <Button className="w-full" onClick={handlePay} disabled={createTransfer.isPending || isLoading}>
             {createTransfer.isPending || isLoading ? (
               <><LoaderCircle className="mr-2 h-4 w-4 animate-spin" />Preparing…</>
@@ -417,6 +429,11 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
             )}
           </Button>
         </div>
+        <ContactsPickerModal
+          open={contactsOpen}
+          onOpenChange={setContactsOpen}
+          onSelect={handlePickContact}
+        />
       </DialogContent>
     </Dialog>
   );
