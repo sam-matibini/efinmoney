@@ -197,8 +197,32 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
       } else {
         toast.success("Check your phone for a USSD prompt to authorize the payment.");
       }
+
+      // Quick-add to contacts if requested and not already a saved contact
+      if (saveContact && !pickedBeneficiaryId) {
+        try {
+          const exists = (contacts || []).some(
+            (c) => (c.phone || "").trim() === phone.trim() ||
+                   c.name.trim().toLowerCase() === recipientName.trim().toLowerCase()
+          );
+          if (!exists) {
+            await createBeneficiary.mutateAsync({
+              name: recipientName.trim(),
+              phone: phone.trim(),
+              country_code: country.code,
+              payout_method: "mobile_money",
+              network: network.value,
+              currency_code: chargeCurrency,
+              avatar_initials: initialsOf(recipientName.trim()),
+            });
+            toast.success("Saved to your contacts");
+          }
+        } catch (e) { /* non-fatal */ }
+      }
+
       setOpen(false);
       resetForm();
+
     } catch (e) {
       // Mark transfer as failed
       try {
