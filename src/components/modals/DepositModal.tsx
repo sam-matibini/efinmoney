@@ -63,9 +63,10 @@ const DepositModal = ({ children }: DepositModalProps) => {
           <p className="text-sm text-muted-foreground">No wallets available. Create one first.</p>
         ) : (
           <Tabs defaultValue="bank" className="w-full">
-            <TabsList className="grid grid-cols-2 w-full">
-              <TabsTrigger value="bank"><Landmark className="w-4 h-4 mr-1.5" /> Bank Transfer</TabsTrigger>
-              <TabsTrigger value="card"><CreditCard className="w-4 h-4 mr-1.5" /> Pay by Card</TabsTrigger>
+            <TabsList className="grid grid-cols-3 w-full">
+              <TabsTrigger value="bank"><Landmark className="w-4 h-4 mr-1.5" /> Bank</TabsTrigger>
+              <TabsTrigger value="card"><CreditCard className="w-4 h-4 mr-1.5" /> Card</TabsTrigger>
+              <TabsTrigger value="flw"><Globe className="w-4 h-4 mr-1.5" /> Intl.</TabsTrigger>
             </TabsList>
 
             <TabsContent value="bank" className="space-y-4 mt-4">
