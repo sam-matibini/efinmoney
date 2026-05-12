@@ -15,12 +15,7 @@ export interface MMCountry {
 }
 
 export const MM_COUNTRIES: MMCountry[] = [
-  { code: "NG", name: "Nigeria", flag: "🇳🇬", currency: "NGN", dialCode: "+234", networks: [
-    { value: "MTN",      label: "MTN" },
-    { value: "AIRTEL",   label: "Airtel" },
-    { value: "GLO",      label: "Glo" },
-    { value: "9MOBILE",  label: "9mobile" },
-  ]},
+  // Nigeria intentionally omitted: Flutterwave does not support mobile money for NGN.
   { code: "KE", name: "Kenya", flag: "🇰🇪", currency: "KES", dialCode: "+254", networks: [
     { value: "MPS", label: "M-Pesa (Safaricom)" },
   ]},
