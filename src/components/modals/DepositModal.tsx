@@ -1,14 +1,16 @@
 import { useState } from "react";
-import { Copy, Check, Building2, Landmark, CreditCard } from "lucide-react";
+import { Copy, Check, Building2, Landmark, CreditCard, Globe, Loader2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useWallets } from "@/hooks/useWallets";
 import { useAuth } from "@/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import CardPaymentForm from "./CardPaymentForm";
+import { initializeFlwPayment, cardChargeCurrency, friendlyFlwError, validateMinAmount } from "@/lib/flutterwave";
 
 interface DepositModalProps { children: React.ReactNode; }
 
