@@ -30,6 +30,23 @@ Deno.serve(async (req) => {
     if (!Number.isFinite(amount) || amount <= 0) return new Response(JSON.stringify({ error: "Invalid amount" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     if (!redirectUrl) return new Response(JSON.stringify({ error: "redirectUrl required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
+    // Enforce Flutterwave currency rules per payment method
+    const ALLOWED: Record<string, string[]> = {
+      card: ["USD", "NGN"],
+      mobilemoney: ["KES", "UGX", "GHS", "TZS", "ZMW", "RWF", "NGN"],
+      banktransfer: ["NGN", "GHS", "KES", "CAD", "GBP", "USD"],
+      ussd: ["NGN"],
+    };
+    const allowed = ALLOWED[paymentMethod];
+    if (allowed && !allowed.includes(currency)) {
+      return new Response(JSON.stringify({ error: `${currency} is not supported for ${paymentMethod}. Allowed: ${allowed.join(", ")}` }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    const MIN: Record<string, number> = { NGN: 100, KES: 10, GHS: 1, USD: 1, UGX: 500, TZS: 1000, ZMW: 5, RWF: 500, CAD: 1, GBP: 1, EUR: 1, ZAR: 10 };
+    const min = MIN[currency] ?? 1;
+    if (amount < min) {
+      return new Response(JSON.stringify({ error: `Minimum amount is ${min} ${currency}` }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     const { data: rl } = await supabase.rpc("check_rate_limit", { p_key: `flw_topup:${userId}`, p_max_requests: 10, p_window_seconds: 60 });
     if (rl === false) return new Response(JSON.stringify({ error: "Too many requests" }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
