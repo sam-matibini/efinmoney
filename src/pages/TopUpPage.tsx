@@ -65,6 +65,12 @@ const TopUpPage = () => {
   const handleTopUp = async () => {
     const amt = Number(amount);
     if (!Number.isFinite(amt) || amt <= 0) { toast.error("Enter a valid amount"); return; }
+    if (!ALLOWED_TOPUP_CURRENCIES[method].includes(currency)) {
+      toast.error(`${currency} is not supported for ${method}. Please choose a different currency.`);
+      return;
+    }
+    const minErr = validateMinAmount(currency, amt);
+    if (minErr) { toast.error(minErr); return; }
     setLoading(true);
     try {
       const redirectUrl = `${window.location.origin}/wallet/topup`;
@@ -76,7 +82,7 @@ const TopUpPage = () => {
       if ((data as { error?: string })?.error || !link) throw new Error((data as { error?: string })?.error || "No payment link");
       window.location.href = link;
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not start top-up");
+      toast.error(friendlyFlwError(e, currency));
     } finally {
       setLoading(false);
     }
