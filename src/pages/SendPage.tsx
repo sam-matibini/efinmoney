@@ -22,7 +22,7 @@ import { useCreateTransfer } from "@/hooks/useTransfers";
 import { useFundingSources } from "@/hooks/useFundingSources";
 import { usePricingConfig } from "@/hooks/usePricingConfig";
 import { supabase } from "@/integrations/supabase/client";
-import { friendlyFlwError, fetchFxRate, cardChargeCurrency, getFlutterwavePublicKey } from "@/lib/flutterwave";
+import { friendlyFlwError, fetchFxRate, cardChargeCurrency, initializeFlwPayment } from "@/lib/flutterwave";
 import { toast } from "sonner";
 import { ArrowRight, CheckCircle, Users, Clock, Shield, Wallet, Landmark, CreditCard, AlertCircle, X } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
