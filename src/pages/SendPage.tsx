@@ -300,7 +300,7 @@ const SendPage = () => {
 
   const handleCancelTransfer = async () => {
     if (lastTransferId) {
-      try { await supabase.from('transfers').update({ status: 'cancelled', failure_reason: 'Cancelled by user' }).eq('id', lastTransferId); } catch { /* ignore */ }
+      try { await supabase.from('transfers').update({ status: 'failed', failure_reason: 'Cancelled by user' }).eq('id', lastTransferId); } catch { /* ignore */ }
     }
     setCancelOpen(false);
     setLastTransferId(null);
