@@ -47,14 +47,17 @@ export interface FlwFetchOptions extends RequestInit {
   idempotencyKey?: string;
   /** Trace ID for correlating logs. Auto-generated if not provided. */
   traceId?: string;
+  /** Per-request timeout in milliseconds. */
+  timeoutMs?: number;
 }
 
 const TRANSIENT_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
-const RETRY_DELAYS_MS = [500, 1500, 3000];
+const RETRY_DELAYS_MS = [400, 1200];
 
 export async function flwFetch(path: string, opts: FlwFetchOptions = {}): Promise<{ ok: boolean; status: number; json: any }> {
   const token = await getFlwAccessToken();
   const headers = new Headers(opts.headers || {});
+  const timeoutMs = Math.max(1_000, Number(opts.timeoutMs) || 8_000);
   headers.set("Authorization", `Bearer ${token}`);
   headers.set("X-Trace-Id", opts.traceId || crypto.randomUUID());
   // Stable idempotency key reused across retries so FLW dedupes if a prior attempt secretly succeeded.
@@ -71,7 +74,10 @@ export async function flwFetch(path: string, opts: FlwFetchOptions = {}): Promis
 
   for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
     try {
-      const res = await fetch(url, { ...opts, headers });
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort("FLW request timeout"), timeoutMs);
+      const res = await fetch(url, { ...opts, headers, signal: controller.signal });
+      clearTimeout(timeout);
       const text = await res.text();
       let json: any = {};
       try { json = text ? JSON.parse(text) : {}; } catch { json = { raw: text }; }
@@ -90,9 +96,14 @@ export async function flwFetch(path: string, opts: FlwFetchOptions = {}): Promis
       console.warn(`FLW V4 ${opts.method || "GET"} ${path} -> ${res.status} (transient, retry ${attempt + 1}/${RETRY_DELAYS_MS.length})`);
     } catch (err) {
       lastErr = err;
+      const timedOut = err instanceof DOMException && err.name === "AbortError";
       if (attempt === RETRY_DELAYS_MS.length) {
         console.error(`FLW V4 ${opts.method || "GET"} ${path} network error after retries`, err);
-        return { ok: false, status: 0, json: { error: err instanceof Error ? err.message : "network error" } };
+        return {
+          ok: false,
+          status: timedOut ? 504 : 0,
+          json: { error: timedOut ? "Gateway Timeout" : err instanceof Error ? err.message : "network error" },
+        };
       }
       console.warn(`FLW V4 ${opts.method || "GET"} ${path} network error (retry ${attempt + 1}/${RETRY_DELAYS_MS.length})`, err);
     }
