@@ -346,9 +346,31 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
           </div>
 
           <div>
-            <Label htmlFor="mm-name">Recipient name</Label>
-            <Input id="mm-name" value={recipientName} onChange={(e) => setRecipientName(e.target.value)} maxLength={100} />
+            <div className="flex items-center justify-between mb-1.5">
+              <Label htmlFor="mm-name">Recipient name</Label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs gap-1"
+                onClick={() => setContactsOpen(true)}
+              >
+                <Users className="w-3.5 h-3.5" />
+                {(contacts || []).length > 0 ? `Choose contact (${(contacts || []).length})` : "Choose contact"}
+              </Button>
+            </div>
+            <Input
+              id="mm-name"
+              value={recipientName}
+              onChange={(e) => { setRecipientName(e.target.value); setPickedBeneficiaryId(null); }}
+              maxLength={100}
+              placeholder="e.g. Amina Mwangi"
+            />
+            {pickedBeneficiaryId && (
+              <p className="text-xs text-muted-foreground mt-1">From your saved contacts</p>
+            )}
           </div>
+
           <div>
             <Label htmlFor="mm-phone">Phone number</Label>
             <Input
