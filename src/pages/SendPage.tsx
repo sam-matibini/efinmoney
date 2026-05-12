@@ -21,7 +21,7 @@ import { useCreateTransfer } from "@/hooks/useTransfers";
 import { useFundingSources } from "@/hooks/useFundingSources";
 import { usePricingConfig } from "@/hooks/usePricingConfig";
 import { supabase } from "@/integrations/supabase/client";
-import { friendlyFlwError, fetchFxRate, cardChargeCurrency } from "@/lib/flutterwave";
+import { friendlyFlwError, fetchFxRate, cardChargeCurrency, getFlutterwavePublicKey } from "@/lib/flutterwave";
 import { toast } from "sonner";
 import { ArrowRight, CheckCircle, Users, Clock, Shield, Wallet, Landmark, CreditCard, AlertCircle, X } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -67,6 +67,7 @@ const SendPage = () => {
   const [cancelOpen, setCancelOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [usdRate, setUsdRate] = useState<number | null>(null);
+  const [flwPublicKey, setFlwPublicKey] = useState("");
   const navigate = useNavigate();
 
   const { user } = useAuth();
@@ -132,12 +133,18 @@ const SendPage = () => {
     setStep(next);
   };
 
-  const flwPublicKey =
-    import.meta.env.VITE_FLW_PUBLIC_KEY?.trim() ||
-    "FLWPUBK_TEST-b6b1a9a088a3bae587f81e8faccffb26-X";
-
   // For card payments we always charge in USD (or NGN for NGN wallets).
   const cardCurrency = cardChargeCurrency(sourceCurrency);
+
+  useEffect(() => {
+    let cancelled = false;
+    getFlutterwavePublicKey().then((key) => {
+      if (!cancelled && key) setFlwPublicKey(key);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Convert amount (in source currency) → USD when needed.
   useEffect(() => {
