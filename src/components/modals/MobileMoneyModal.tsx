@@ -53,7 +53,6 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
   const [walletId, setWalletId] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
   const [fxRate, setFxRate] = useState<number | null>(null);
-  const [flutterwavePublicKey, setFlutterwavePublicKey] = useState<string>("");
 
   const { data: wallets } = useWallets();
   const { user } = useAuth();
@@ -65,16 +64,6 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
 
   const chargeCurrency = MOBILE_MONEY_CURRENCY[country.code] || country.currency;
   const walletCurrency = wallet?.currency_code || "USD";
-
-  useEffect(() => {
-    let cancelled = false;
-    getFlutterwavePublicKey().then((key) => {
-      if (!cancelled && key) setFlutterwavePublicKey(key);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   // Reset network when country changes (if current isn't valid)
   useEffect(() => {
