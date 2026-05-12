@@ -25,6 +25,7 @@ import ProfileSettingsPage from "./pages/ProfileSettingsPage";
 import KYCPage from "./pages/KYCPage";
 import SecurityPage from "./pages/SecurityPage";
 import DepositComplete from "./pages/DepositComplete";
+import PaymentCallback from "./pages/PaymentCallback";
 import TransferTrackingPage from "./pages/TransferTrackingPage";
 import TransfersListPage from "./pages/TransfersListPage";
 import ContactsPage from "./pages/ContactsPage";
