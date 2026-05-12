@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { CheckCircle2, Loader2, Circle, Share2, ArrowLeft, AlertCircle, Download } from "lucide-react";
+import { CheckCircle2, Loader2, Circle, Share2, ArrowLeft, AlertCircle, Download, XCircle } from "lucide-react";
 import { downloadTransferReceipt } from "@/lib/receipt";
 import Header from "@/components/layout/Header";
 import MobileNav from "@/components/layout/MobileNav";
@@ -9,9 +9,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import type { Transfer } from "@/hooks/useTransfers";
+import { useCancelTransfer, type Transfer } from "@/hooks/useTransfers";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
 
