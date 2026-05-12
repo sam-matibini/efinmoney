@@ -11,9 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { CheckCircle2, XCircle } from "lucide-react";
+import { ALLOWED_TOPUP_CURRENCIES, validateMinAmount, friendlyFlwError, minAmount, type FlwMethod } from "@/lib/flutterwave";
 
-const CURRENCIES = ["NGN", "KES", "GHS", "ZAR", "UGX", "TZS", "ZMW", "RWF", "USD"];
-const METHODS: { value: string; label: string }[] = [
+const METHODS: { value: FlwMethod; label: string }[] = [
   { value: "card", label: "Card" },
   { value: "banktransfer", label: "Bank Transfer" },
   { value: "ussd", label: "USSD" },
