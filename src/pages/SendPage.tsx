@@ -842,13 +842,8 @@ const SendPage = () => {
                                         transition={isStep2Valid && !createTransfer.isPending ? { duration: 1.8, repeat: Infinity, ease: "easeInOut" } : { duration: 0.2 }}
                                         className="flex-1 rounded-md"
                                       >
-                                        <Button className="w-full" onClick={handleSubmit} disabled={!isStep2Valid || createTransfer.isPending}>
-                                          {createTransfer.isPending ? (
-                                            <span className="inline-flex items-center gap-2">
-                                              <span className="h-4 w-4 rounded-full border-2 border-primary-foreground/40 border-t-primary-foreground animate-spin" />
-                                              Processing...
-                                            </span>
-                                          ) : 'Send Money'}
+                                        <Button className="w-full" onClick={() => goToStep(3)} disabled={!isStep2Valid}>
+                                          Continue
                                         </Button>
                                       </motion.div>
                                     </motion.div>
