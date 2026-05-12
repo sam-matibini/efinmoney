@@ -57,10 +57,15 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
   const [walletId, setWalletId] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
   const [fxRate, setFxRate] = useState<number | null>(null);
+  const [contactsOpen, setContactsOpen] = useState(false);
+  const [saveContact, setSaveContact] = useState(true);
+  const [pickedBeneficiaryId, setPickedBeneficiaryId] = useState<string | null>(null);
 
   const { data: wallets } = useWallets();
+  const { data: contacts } = useBeneficiaries();
   const { user } = useAuth();
   const createTransfer = useCreateTransfer();
+  const createBeneficiary = useCreateBeneficiary();
 
   const country = findCountry(countryCode) || MM_COUNTRIES[0];
   const network = country.networks.find((n) => n.value === networkValue) || country.networks[0];
