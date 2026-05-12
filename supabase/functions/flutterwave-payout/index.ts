@@ -10,7 +10,9 @@ const corsHeaders = {
 
 interface PayoutRequest {
   transfer_id: string;
-  phone_number: string;
+  phone_number?: string;
+  account_number?: string;
+  bank_code?: string;
   amount: number;
   currency: string;
   network: string;
