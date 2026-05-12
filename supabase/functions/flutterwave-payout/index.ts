@@ -150,16 +150,20 @@ Deno.serve(async (req) => {
     console.log("FLW V4 response:", status, JSON.stringify(json));
 
     if (!ok || !isFlwSuccess(json)) {
-      const reason = json?.message || json?.error || `HTTP ${status}`;
-      if (isTemporaryProviderSetupError(reason)) {
+      const rawReason = json?.message || json?.error || (typeof json?.raw === "string" && /OriginTimeout|Gateway Timeout|Service unavailable/i.test(json.raw) ? "Gateway timeout from payout partner" : `HTTP ${status}`);
+      const isGateway = [0, 408, 502, 503, 504].includes(status) || /OriginTimeout|Gateway Timeout|Service unavailable/i.test(String(rawReason));
+      const reason = isGateway
+        ? "Our payout partner is temporarily unavailable. Please try again in a few minutes."
+        : rawReason;
+      if (isTemporaryProviderSetupError(rawReason)) {
         await supabase.from("transfers").update({ status: "processing", provider_reference: `PENDING-${reference}`, failure_reason: null }).eq("id", transfer_id);
         await supabase.from("notifications").insert({ user_id: user.id, title: "Transfer queued", message: `Your ${currency} ${amount} transfer to ${recipient_name} is queued while the payout partner completes setup.`, type: "info" });
-        return new Response(JSON.stringify({ success: true, queued: true, reference, provider_message: reason }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return new Response(JSON.stringify({ success: true, queued: true, reference, provider_message: rawReason }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
       const rev = await reverseTransferLedger(supabase, transfer_id);
       await supabase.from("transfers").update({ status: "failed", failure_reason: reason }).eq("id", transfer_id);
-      await supabase.from("notifications").insert({ user_id: user.id, title: "Transfer failed — refunded", message: rev.reversed ? `Your transfer to ${recipient_name} failed (${reason}) and has been refunded to your wallet.` : reason, type: "error" });
-      return new Response(JSON.stringify({ success: false, error: reason, refunded: rev.reversed }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      await supabase.from("notifications").insert({ user_id: user.id, title: "Transfer failed — refunded", message: rev.reversed ? `Your transfer to ${recipient_name} could not be sent — ${reason} Your wallet has been refunded.` : reason, type: "error" });
+      return new Response(JSON.stringify({ success: false, error: reason, refunded: rev.reversed, transient: isGateway }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     await supabase.from("transfers").update({ status: "processing", provider_reference: String(json.data?.id || json.data?.reference || reference) }).eq("id", transfer_id);
