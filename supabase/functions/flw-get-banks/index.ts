@@ -1,6 +1,7 @@
 // V4 banks list — GET /banks?country=NG
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { flwFetch, isFlwSuccess } from "../_shared/flw-v4.ts";
+import { NG_BANKS_FALLBACK } from "../_shared/ng-banks-fallback.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -60,6 +61,9 @@ Deno.serve(async (req) => {
     }
 
     if (!banks) {
+      if (country === "NG") {
+        return new Response(JSON.stringify({ banks: NG_BANKS_FALLBACK, cached: false, fallback: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
       return new Response(JSON.stringify({ error: "Bank service is temporarily unavailable. Please try again shortly." }), { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
