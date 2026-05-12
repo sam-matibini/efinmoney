@@ -239,13 +239,18 @@ const SendPage = () => {
 
   // Create transfer row + maybe save beneficiary. Returns id.
   const createTransferRecord = async () => {
+    const ngnAcct = isNGNBank ? ngnAccountNumber.replace(/\D/g, "") : "";
+    const ngnBank = isNGNBank ? (ngnBanks.find((b) => b.code === ngnBankCode)?.name || null) : null;
     const transfer = await createTransfer.mutateAsync({
       sender_wallet_id: fundingSource === 'wallet' ? selectedWallet!.wallet_id : wallets?.[0]?.wallet_id || '',
       recipient_name: recipientName,
-      recipient_phone: recipientPhone,
+      recipient_phone: isNGNBank ? undefined : recipientPhone,
+      recipient_account: isNGNBank ? ngnAcct : undefined,
+      recipient_bank_code: isNGNBank ? ngnBankCode : undefined,
+      recipient_bank_name: isNGNBank ? (ngnBank || undefined) : undefined,
       recipient_country: targetCountry.code,
-      transfer_type: 'mobile_money',
-      payout_method: effectivePayoutMethod,
+      transfer_type: isNGNBank ? 'bank' : 'mobile_money',
+      payout_method: isNGNBank ? 'bank' : effectivePayoutMethod,
       source_currency: sourceCurrency,
       target_currency: targetCountry.code,
       source_amount: parsedAmount,
@@ -259,16 +264,19 @@ const SendPage = () => {
         const { isNew } = await recordTransferRecipient({
           user_id: user.id,
           name: recipientName,
-          phone: recipientPhone,
+          phone: isNGNBank ? "" : recipientPhone,
           country_code: targetCountry.code,
-          payout_method: effectivePayoutMethod,
+          payout_method: isNGNBank ? 'bank' : effectivePayoutMethod,
           currency_code: targetCountry.code,
-        });
+          bank_name: isNGNBank ? ngnBank : null,
+          bank_account: isNGNBank ? ngnAcct : null,
+        } as any);
         if (isNew && !pickedBeneficiaryId) setSavePromptOpen(true);
       } catch { /* non-fatal */ }
     }
     return transfer.id;
   };
+
 
   const handleConfirm = async () => {
     if (confirming) return;
