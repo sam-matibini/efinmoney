@@ -208,7 +208,11 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
         }
         setIsLoading(false);
       },
-    });
+      });
+    } catch (e) {
+      setIsLoading(false);
+      toast.error(friendlyFlwError(e, chargeCurrency));
+    }
   };
 
   const handleOpenChange = (next: boolean) => {
