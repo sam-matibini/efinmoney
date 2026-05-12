@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence, type Variants } from "framer-motion";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate, Link } from "react-router-dom";
+import { useFlutterwave, closePaymentModal } from "flutterwave-react-v3";
 import ContactsPickerModal from "@/components/modals/ContactsPickerModal";
 import AddBeneficiaryModal from "@/components/modals/AddBeneficiaryModal";
 import { useBeneficiaries, recordTransferRecipient, type Beneficiary } from "@/hooks/useBeneficiaries";
@@ -19,10 +20,10 @@ import { useFxRates } from "@/hooks/useFxRates";
 import { useCreateTransfer } from "@/hooks/useTransfers";
 import { useFundingSources } from "@/hooks/useFundingSources";
 import { usePricingConfig } from "@/hooks/usePricingConfig";
+import { supabase } from "@/integrations/supabase/client";
+import { friendlyFlwError, fetchFxRate, cardChargeCurrency } from "@/lib/flutterwave";
 import { toast } from "sonner";
 import { ArrowRight, CheckCircle, Users, Clock, Shield, Wallet, Landmark, CreditCard, AlertCircle, X } from "lucide-react";
-import CardPaymentForm from "@/components/modals/CardPaymentForm";
-import { Link } from "react-router-dom";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import CanadaSendFlow from "@/components/send/CanadaSendFlow";
 import AnimatedNumber from "@/components/ui/AnimatedNumber";
@@ -63,6 +64,10 @@ const SendPage = () => {
   const [saveModalOpen, setSaveModalOpen] = useState(false);     // pre-filled Add modal
   const [pickedBeneficiaryId, setPickedBeneficiaryId] = useState<string | null>(null);
   const [selectedNetworkId, setSelectedNetworkId] = useState<string | null>(null);
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [usdRate, setUsdRate] = useState<number | null>(null);
+  const navigate = useNavigate();
 
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -127,56 +132,179 @@ const SendPage = () => {
     setStep(next);
   };
 
-  const handleSubmit = async () => {
-    if (fundingSource === 'wallet' && !selectedWallet) return;
+  const flwPublicKey =
+    import.meta.env.VITE_FLW_PUBLIC_KEY?.trim() ||
+    "FLWPUBK_TEST-b6b1a9a088a3bae587f81e8faccffb26-X";
 
-    try {
-      const transfer = await createTransfer.mutateAsync({
-        sender_wallet_id: fundingSource === 'wallet' ? selectedWallet!.wallet_id : wallets?.[0]?.wallet_id || '',
-        recipient_name: recipientName,
-        recipient_phone: recipientPhone,
-        recipient_country: targetCountry.code,
-        transfer_type: 'mobile_money',
-        payout_method: effectivePayoutMethod,
-        source_currency: sourceCurrency,
-        target_currency: targetCountry.code,
-        source_amount: parsedAmount,
-        target_amount: receivedAmount,
-        exchange_rate: effectiveRate,
-        fee_amount: fee,
-      });
+  // For card payments we always charge in USD (or NGN for NGN wallets).
+  const cardCurrency = cardChargeCurrency(sourceCurrency);
 
-      const { supabase } = await import('@/integrations/supabase/client');
-      const { data, error } = await supabase.functions.invoke('execute-transfer', {
-        body: { transfer_id: transfer.id },
-      });
-      if (error || (data as any)?.error) {
-        throw new Error((data as any)?.error || error?.message || 'Payout failed');
-      }
+  // Convert amount (in source currency) → USD when needed.
+  useEffect(() => {
+    let cancelled = false;
+    if (fundingSource !== 'card') { setUsdRate(1); return; }
+    if (sourceCurrency === cardCurrency) { setUsdRate(1); return; }
+    fetchFxRate(sourceCurrency, cardCurrency).then((r) => {
+      if (!cancelled) setUsdRate(r);
+    });
+    return () => { cancelled = true; };
+  }, [fundingSource, sourceCurrency, cardCurrency]);
 
-      setLastTransferId(transfer.id);
+  const cardChargeAmount = useMemo(
+    () => (usdRate ? Math.round(parsedAmount * usdRate * 100) / 100 : 0),
+    [parsedAmount, usdRate]
+  );
 
-      if (user) {
-        try {
-          const { isNew } = await recordTransferRecipient({
-            user_id: user.id,
-            name: recipientName,
-            phone: recipientPhone,
-            country_code: targetCountry.code,
-            payout_method: effectivePayoutMethod,
-            currency_code: targetCountry.code,
-          });
-          if (isNew && !pickedBeneficiaryId) {
-            setSavePromptOpen(true);
-          }
-        } catch { /* non-fatal */ }
-      }
+  const txRef = useMemo(
+    () => (user ? `send-${user.id.slice(0, 8)}-${Date.now()}` : ""),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [step]
+  );
 
-      goToStep(3);
-      toast.success('Transfer sent successfully!');
-    } catch (error: any) {
-      toast.error(error?.message || 'Transfer failed. Please try again.');
+  const flutterwavePay = useFlutterwave({
+    public_key: flwPublicKey,
+    tx_ref: txRef,
+    amount: cardChargeAmount,
+    currency: cardCurrency,
+    payment_options: "card",
+    customer: {
+      email: user?.email || `${user?.id || "guest"}@efin.money`,
+      phone_number: recipientPhone || "",
+      name: recipientName || "eFinMoney user",
+    },
+    customizations: {
+      title: "eFinMoney",
+      description: `Card payment to ${recipientName || "recipient"}`,
+      logo: typeof window !== "undefined" ? `${window.location.origin}/favicon.ico` : "",
+    },
+    meta: { type: "send", recipient_country: targetCountry.code },
+  });
+
+  // Create transfer row + maybe save beneficiary. Returns id.
+  const createTransferRecord = async () => {
+    const transfer = await createTransfer.mutateAsync({
+      sender_wallet_id: fundingSource === 'wallet' ? selectedWallet!.wallet_id : wallets?.[0]?.wallet_id || '',
+      recipient_name: recipientName,
+      recipient_phone: recipientPhone,
+      recipient_country: targetCountry.code,
+      transfer_type: 'mobile_money',
+      payout_method: effectivePayoutMethod,
+      source_currency: sourceCurrency,
+      target_currency: targetCountry.code,
+      source_amount: parsedAmount,
+      target_amount: receivedAmount,
+      exchange_rate: effectiveRate,
+      fee_amount: fee,
+    });
+    setLastTransferId(transfer.id);
+    if (user) {
+      try {
+        const { isNew } = await recordTransferRecipient({
+          user_id: user.id,
+          name: recipientName,
+          phone: recipientPhone,
+          country_code: targetCountry.code,
+          payout_method: effectivePayoutMethod,
+          currency_code: targetCountry.code,
+        });
+        if (isNew && !pickedBeneficiaryId) setSavePromptOpen(true);
+      } catch { /* non-fatal */ }
     }
+    return transfer.id;
+  };
+
+  const handleConfirm = async () => {
+    if (confirming) return;
+    setConfirming(true);
+
+    // ── Wallet: create + execute payout immediately ──────────────────────
+    if (fundingSource === 'wallet') {
+      if (!selectedWallet) { setConfirming(false); return; }
+      try {
+        const tid = await createTransferRecord();
+        const { data, error } = await supabase.functions.invoke('execute-transfer', { body: { transfer_id: tid } });
+        if (error || (data as any)?.error) throw new Error((data as any)?.error || error?.message || 'Payout failed');
+        goToStep(4);
+        toast.success('Transfer sent successfully!');
+      } catch (e: any) {
+        toast.error(e?.message || 'Transfer failed. Please try again.');
+      } finally {
+        setConfirming(false);
+      }
+      return;
+    }
+
+    // ── Bank: queue as pending; debit takes 1-2 business days ────────────
+    if (fundingSource === 'bank') {
+      try {
+        const tid = await createTransferRecord();
+        await supabase.from('transfers').update({ status: 'processing' }).eq('id', tid);
+        toast.success('Bank transfer initiated — funds will be debited within 1-2 business days');
+        goToStep(4);
+      } catch (e: any) {
+        toast.error(e?.message || 'Could not initiate bank transfer');
+      } finally {
+        setConfirming(false);
+      }
+      return;
+    }
+
+    // ── Card: create transfer then open Flutterwave checkout (USD) ───────
+    if (!flwPublicKey) { toast.error('Flutterwave public key missing'); setConfirming(false); return; }
+    if (usdRate === null || cardChargeAmount <= 0) {
+      toast.error(`No FX rate available for ${sourceCurrency} → ${cardCurrency}`);
+      setConfirming(false);
+      return;
+    }
+    let tid: string;
+    try {
+      tid = await createTransferRecord();
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to create transfer');
+      setConfirming(false);
+      return;
+    }
+    try {
+      flutterwavePay({
+        callback: async (response) => {
+          try {
+            const status = String(response.status || '').toLowerCase();
+            const ok = ['successful', 'completed', 'success'].includes(status);
+            await supabase.from('transfers').update(
+              ok
+                ? { status: 'processing', provider_reference: response.flw_ref || String(response.transaction_id || txRef), failure_reason: null }
+                : { status: 'failed', provider_reference: response.flw_ref || null, failure_reason: response.status || 'Card payment failed' }
+            ).eq('id', tid);
+            if (ok) { toast.success('Payment received — transfer is processing'); goToStep(4); }
+            else { toast.error(response.status || 'Card payment failed'); }
+          } finally {
+            closePaymentModal();
+            setConfirming(false);
+          }
+        },
+        onClose: async () => {
+          try {
+            await supabase.from('transfers')
+              .update({ status: 'failed', failure_reason: 'User closed card payment without paying' })
+              .eq('id', tid).eq('status', 'initiated');
+          } catch { /* ignore */ }
+          toast.error('Card payment cancelled');
+          setConfirming(false);
+        },
+      });
+    } catch (e) {
+      toast.error(friendlyFlwError(e, cardCurrency));
+      setConfirming(false);
+    }
+  };
+
+  const handleCancelTransfer = async () => {
+    if (lastTransferId) {
+      try { await supabase.from('transfers').update({ status: 'failed', failure_reason: 'Cancelled by user' }).eq('id', lastTransferId); } catch { /* ignore */ }
+    }
+    setCancelOpen(false);
+    setLastTransferId(null);
+    navigate('/');
   };
 
   const applyBeneficiary = (b: Beneficiary) => {
@@ -217,9 +345,7 @@ const SendPage = () => {
     setPickedBeneficiaryId(null);
   };
 
-  const isStep1Valid = parsedAmount > 0 && parsedAmount > fee && receivedAmount > 0 && rateAvailable && !noLinkedSource && !insufficientFunds && (
-    fundingSource !== 'card'
-  );
+  const isStep1Valid = parsedAmount > 0 && parsedAmount > fee && receivedAmount > 0 && rateAvailable && !noLinkedSource && !insufficientFunds;
   const isStep2Valid = recipientName.length > 2 && recipientPhone.length > 8 && !!effectivePayoutMethod && receivedAmount > 0;
 
   const activeTab = searchParams.get('mode') === 'canada' ? 'canada' : 'international';
@@ -416,7 +542,7 @@ const SendPage = () => {
                                           <SelectContent>
                                             {wallets?.map((w) => (
                                               <SelectItem key={w.wallet_id} value={w.wallet_id}>
-                                                {w.flag_emoji} {w.currency_code} - {w.symbol}{Number(w.balance).toFixed(2)}
+                                                {w.flag_emoji} {w.currency_code} — {w.symbol}{Number(w.balance).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                               </SelectItem>
                                             ))}
                                           </SelectContent>
@@ -461,20 +587,16 @@ const SendPage = () => {
                                     {fundingSource === 'card' && (
                                       <motion.div custom={1} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
                                         <Label>Pay with Card</Label>
-                                        <div className="p-3 rounded-lg border border-border bg-muted/40 space-y-3">
+                                        <div className="p-3 rounded-lg border border-border bg-muted/40 space-y-2">
                                           <p className="text-xs text-muted-foreground">
-                                            Securely charge your card. Funds are added to your {wallets?.[0]?.currency_code || 'wallet'} wallet, then the transfer continues.
+                                            You'll be redirected to a secure card checkout (powered by Flutterwave) on the review step. Card payments are charged in {cardCurrency}.
                                           </p>
-                                          <CardPaymentForm
-                                            defaultWalletId={wallets?.[0]?.wallet_id}
-                                            defaultAmount={parsedAmount > 0 ? parsedAmount : undefined}
-                                            ctaLabel={parsedAmount > 0 ? `Pay ${sourceSymbol}${parsedAmount.toFixed(2)} & Continue` : 'Enter an amount above'}
-                                            onSuccess={() => {
-                                              toast.success('Card charged. Continue to recipient details.');
-                                              setFundingSource('wallet');
-                                              goToStep(2);
-                                            }}
-                                          />
+                                          {parsedAmount > 0 && usdRate !== null && sourceCurrency !== cardCurrency && (
+                                            <p className="text-xs text-muted-foreground">
+                                              Estimated charge: <span className="font-medium">{cardCurrency} {cardChargeAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                              {' '}(rate: 1 {sourceCurrency} = {usdRate.toFixed(4)} {cardCurrency})
+                                            </p>
+                                          )}
                                           {cardFee > 0 && (
                                             <p className="text-xs text-muted-foreground">+{sourceSymbol}{cardFee.toFixed(2)} card processing fee applies</p>
                                           )}
@@ -575,29 +697,34 @@ const SendPage = () => {
                                       </AnimatePresence>
                                     </motion.div>
 
-                                    {fundingSource !== 'card' && (
-                                      <motion.div custom={6} variants={fieldVariants} initial="hidden" animate="show">
-                                        <motion.div
-                                          whileTap={{ scale: 0.97 }}
-                                          animate={isStep1Valid ? { boxShadow: [
-                                            "0 0 0 0 hsl(var(--primary) / 0)",
-                                            "0 0 0 6px hsl(var(--primary) / 0.15)",
-                                            "0 0 0 0 hsl(var(--primary) / 0)",
-                                          ] } : { boxShadow: "0 0 0 0 hsl(var(--primary) / 0)" }}
-                                          transition={isStep1Valid ? { duration: 1.8, repeat: Infinity, ease: "easeInOut" } : { duration: 0.2 }}
-                                          className="rounded-md"
+                                    <motion.div custom={6} variants={fieldVariants} initial="hidden" animate="show" className="space-y-3">
+                                      <motion.div
+                                        whileTap={{ scale: 0.97 }}
+                                        animate={isStep1Valid ? { boxShadow: [
+                                          "0 0 0 0 hsl(var(--primary) / 0)",
+                                          "0 0 0 6px hsl(var(--primary) / 0.15)",
+                                          "0 0 0 0 hsl(var(--primary) / 0)",
+                                        ] } : { boxShadow: "0 0 0 0 hsl(var(--primary) / 0)" }}
+                                        transition={isStep1Valid ? { duration: 1.8, repeat: Infinity, ease: "easeInOut" } : { duration: 0.2 }}
+                                        className="rounded-md"
+                                      >
+                                        <Button
+                                          className="w-full"
+                                          size="lg"
+                                          onClick={() => goToStep(2)}
+                                          disabled={!isStep1Valid}
                                         >
-                                          <Button
-                                            className="w-full"
-                                            size="lg"
-                                            onClick={() => goToStep(2)}
-                                            disabled={!isStep1Valid}
-                                          >
-                                            Continue
-                                          </Button>
-                                        </motion.div>
+                                          Continue
+                                        </Button>
                                       </motion.div>
-                                    )}
+                                      <button
+                                        type="button"
+                                        onClick={() => navigate('/')}
+                                        className="block mx-auto text-sm text-muted-foreground hover:text-foreground transition-colors underline-offset-4 hover:underline"
+                                      >
+                                        Cancel
+                                      </button>
+                                    </motion.div>
                                   </CardContent>
                                 </Card>
                               </motion.div>
@@ -614,8 +741,16 @@ const SendPage = () => {
                                 transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
                               >
                                 <Card>
-                                  <CardHeader>
+                                  <CardHeader className="flex-row items-center justify-between space-y-0">
                                     <CardTitle>Recipient Details</CardTitle>
+                                    <button
+                                      type="button"
+                                      onClick={() => navigate('/')}
+                                      aria-label="Close and return to dashboard"
+                                      className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                                    >
+                                      <X className="w-5 h-5" />
+                                    </button>
                                   </CardHeader>
                                   <CardContent className="space-y-6">
                                     <motion.div custom={0} variants={fieldVariants} initial="hidden" animate="show">
@@ -707,13 +842,8 @@ const SendPage = () => {
                                         transition={isStep2Valid && !createTransfer.isPending ? { duration: 1.8, repeat: Infinity, ease: "easeInOut" } : { duration: 0.2 }}
                                         className="flex-1 rounded-md"
                                       >
-                                        <Button className="w-full" onClick={handleSubmit} disabled={!isStep2Valid || createTransfer.isPending}>
-                                          {createTransfer.isPending ? (
-                                            <span className="inline-flex items-center gap-2">
-                                              <span className="h-4 w-4 rounded-full border-2 border-primary-foreground/40 border-t-primary-foreground animate-spin" />
-                                              Processing...
-                                            </span>
-                                          ) : 'Send Money'}
+                                        <Button className="w-full" onClick={() => goToStep(3)} disabled={!isStep2Valid}>
+                                          Continue
                                         </Button>
                                       </motion.div>
                                     </motion.div>
@@ -724,7 +854,76 @@ const SendPage = () => {
 
                             {step === 3 && (
                               <motion.div
-                                key="step3"
+                                key="step3-review"
+                                custom={direction}
+                                variants={stepVariants}
+                                initial="enter"
+                                animate="center"
+                                exit="exit"
+                                transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                              >
+                                <Card>
+                                  <CardHeader className="flex-row items-center justify-between space-y-0">
+                                    <CardTitle>Review &amp; Confirm</CardTitle>
+                                    <button
+                                      type="button"
+                                      onClick={() => setCancelOpen(true)}
+                                      aria-label="Cancel transfer"
+                                      className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                                    >
+                                      <X className="w-5 h-5" />
+                                    </button>
+                                  </CardHeader>
+                                  <CardContent className="space-y-5">
+                                    <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-2 text-sm">
+                                      <div className="flex justify-between"><span className="text-muted-foreground">Recipient</span><span className="font-medium">{recipientName}</span></div>
+                                      <div className="flex justify-between"><span className="text-muted-foreground">Phone</span><span className="font-medium">{recipientPhone}</span></div>
+                                      <div className="flex justify-between"><span className="text-muted-foreground">Destination</span><span className="font-medium">{targetCountry.flag} {targetCountry.country}</span></div>
+                                      <div className="flex justify-between"><span className="text-muted-foreground">Method</span><span className="font-medium">{effectiveMethodLabel}</span></div>
+                                      <div className="flex justify-between"><span className="text-muted-foreground">Funding</span><span className="font-medium capitalize">{fundingSource}</span></div>
+                                    </div>
+                                    <div className="rounded-xl border border-border bg-card p-4 space-y-2 text-sm">
+                                      <div className="flex justify-between"><span className="text-muted-foreground">You send</span><span className="font-medium">{sourceSymbol}{parsedAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {sourceCurrency}</span></div>
+                                      <div className="flex justify-between"><span className="text-muted-foreground">Fee</span><span className="font-medium">{sourceSymbol}{fee.toFixed(2)}</span></div>
+                                      <div className="flex justify-between"><span className="text-muted-foreground">Rate</span><span className="font-medium">1 {sourceCurrency} = {effectiveRate.toFixed(4)} {targetCountry.code}</span></div>
+                                      <div className="flex justify-between text-base pt-2 border-t border-border"><span>They receive</span><span className="font-bold">{targetSymbol} {receivedAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+                                      {fundingSource === 'card' && usdRate !== null && sourceCurrency !== cardCurrency && (
+                                        <div className="flex justify-between text-xs text-muted-foreground pt-2 border-t border-border"><span>Card charge</span><span>{cardCurrency} {cardChargeAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+                                      )}
+                                    </div>
+                                    {fundingSource === 'bank' && (
+                                      <p className="text-xs text-muted-foreground text-center">Bank transfer — funds will be debited within 1-2 business days.</p>
+                                    )}
+                                    {fundingSource === 'card' && (
+                                      <p className="text-xs text-muted-foreground text-center">You'll be redirected to a secure card checkout in {cardCurrency}.</p>
+                                    )}
+                                    <div className="flex gap-3">
+                                      <Button variant="outline" className="flex-1" onClick={() => goToStep(2)} disabled={confirming}>Back</Button>
+                                      <Button className="flex-1" onClick={handleConfirm} disabled={confirming}>
+                                        {confirming ? (
+                                          <span className="inline-flex items-center gap-2">
+                                            <span className="h-4 w-4 rounded-full border-2 border-primary-foreground/40 border-t-primary-foreground animate-spin" />
+                                            Processing...
+                                          </span>
+                                        ) : fundingSource === 'card' ? 'Pay with Card' : 'Confirm Transfer'}
+                                      </Button>
+                                    </div>
+                                    <Button
+                                      variant="outline"
+                                      className="w-full border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                      onClick={() => setCancelOpen(true)}
+                                      disabled={confirming}
+                                    >
+                                      Cancel Transfer
+                                    </Button>
+                                  </CardContent>
+                                </Card>
+                              </motion.div>
+                            )}
+
+                            {step === 4 && (
+                              <motion.div
+                                key="step4"
                                 custom={direction}
                                 variants={stepVariants}
                                 initial="enter"
@@ -840,6 +1039,25 @@ const SendPage = () => {
             <AlertDialogCancel>No, thanks</AlertDialogCancel>
             <AlertDialogAction onClick={() => { setSavePromptOpen(false); setSaveModalOpen(true); }}>
               Yes, save contact
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={cancelOpen} onOpenChange={setCancelOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure you want to cancel this transfer?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {lastTransferId
+                ? "The transfer will be marked as cancelled and you'll be returned to the dashboard."
+                : "You'll be returned to the dashboard. Your recipient details will be cleared."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>No, keep going</AlertDialogCancel>
+            <AlertDialogAction onClick={handleCancelTransfer} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Yes, cancel
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
