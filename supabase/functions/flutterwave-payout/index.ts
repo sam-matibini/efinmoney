@@ -1,4 +1,7 @@
+// V4 Payout / Transfer — POST /transfers
+// Used by Send Money flow to disburse funds via mobile money or bank transfer.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { flwFetch, isFlwSuccess } from "../_shared/flw-v4.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -9,304 +12,156 @@ interface PayoutRequest {
   transfer_id: string;
   phone_number: string;
   amount: number;
-  currency: string; // KES, UGX, TZS, GHS, ZMW, RWF, NGN
-  network: string;  // mpesa, mtn, airtel, vodafone, tigo
+  currency: string;
+  network: string;
   recipient_name: string;
 }
 
-// Map (currency, network) -> Flutterwave account_bank code
-// See: https://developer.flutterwave.com/docs/mobile-money
-const NETWORK_MAP: Record<string, string> = {
-  "KES:mpesa": "MPS",
-  "UGX:mtn": "MTN",
-  "UGX:airtel": "ATL",
-  "TZS:airtel": "AIRTEL",
-  "TZS:vodafone": "VODAFONE",
-  "TZS:tigo": "TIGO",
-  "GHS:mtn": "MTN",
-  "GHS:airtel": "ATL",
-  "GHS:vodafone": "VOD",
-  "ZMW:mtn": "MTN",
-  "ZMW:airtel": "AIRTEL",
-  "ZMW:zamtel": "ZAMTEL",
-  "RWF:mtn": "MTN",
-  "RWF:airtel": "AIRTEL",
+const MM_NETWORK_MAP: Record<string, string> = {
+  "KES:mpesa": "MPESA",
+  "UGX:mtn": "MTN", "UGX:airtel": "AIRTEL",
+  "GHS:mtn": "MTN", "GHS:airtel": "AIRTEL", "GHS:vodafone": "VODAFONE",
+  "TZS:airtel": "AIRTEL", "TZS:vodafone": "VODAFONE", "TZS:tigo": "TIGO",
+  "ZMW:mtn": "MTN", "ZMW:airtel": "AIRTEL", "ZMW:zamtel": "ZAMTEL",
+  "RWF:mtn": "MTN", "RWF:airtel": "AIRTEL",
 };
 
-function fxBeneficiaryType(currency: string): string {
-  return currency === "NGN" ? "bank" : "mobilemoney";
-}
-
-function normalizePhone(phone: string): string {
-  return phone.replace(/\D/g, "");
-}
+function normalizePhone(phone: string): string { return phone.replace(/\D/g, ""); }
 
 function isTemporaryProviderSetupError(message: string): boolean {
-  const normalized = message.toLowerCase();
-  return normalized.includes("ip whitelisting")
-    || normalized.includes("whitelist")
-    || normalized.includes("access this service");
+  const m = message.toLowerCase();
+  return m.includes("ip whitelisting") || m.includes("whitelist") || m.includes("access this service");
 }
 
-// Posts a reversal journal that mirrors every original ledger entry for the
-// given transfer, restoring the sender's wallet balance and clearing the
-// payable. Idempotent — skips if a reversal journal already exists.
-async function reverseTransferLedger(
-  supabase: ReturnType<typeof createClient>,
-  transferId: string,
-): Promise<{ reversed: boolean; reason?: string }> {
-  // Check if reversal already posted (idempotency)
-  const { data: existingReversal } = await supabase
-    .from("ledger_entries")
-    .select("id")
-    .eq("reference_type", "transfer_reversal")
-    .eq("reference_id", transferId)
-    .limit(1);
-  if (existingReversal && existingReversal.length > 0) {
-    return { reversed: false, reason: "already_reversed" };
-  }
-
-  // Load original ledger entries
-  const { data: originals, error } = await supabase
-    .from("ledger_entries")
+async function reverseTransferLedger(supabase: ReturnType<typeof createClient>, transferId: string) {
+  const { data: existing } = await supabase.from("ledger_entries").select("id").eq("reference_type", "transfer_reversal").eq("reference_id", transferId).limit(1);
+  if (existing && existing.length > 0) return { reversed: false, reason: "already_reversed" };
+  const { data: originals, error } = await supabase.from("ledger_entries")
     .select("account_id, wallet_id, currency_code, debit_amount, credit_amount, description")
-    .eq("reference_type", "transfer")
-    .eq("reference_id", transferId);
-  if (error) {
-    console.error("reverseTransferLedger: failed to load originals", error);
-    return { reversed: false, reason: "load_failed" };
-  }
-  if (!originals || originals.length === 0) {
-    return { reversed: false, reason: "no_entries" };
-  }
-
-  const journalId = crypto.randomUUID();
-  const reversalRows = originals.map((o) => ({
-    journal_id: journalId,
-    account_id: o.account_id,
-    wallet_id: o.wallet_id,
-    currency_code: o.currency_code,
-    // Mirror: debit becomes credit and vice versa
-    debit_amount: o.credit_amount,
-    credit_amount: o.debit_amount,
+    .eq("reference_type", "transfer").eq("reference_id", transferId);
+  if (error || !originals?.length) return { reversed: false, reason: "no_entries" };
+  const j = crypto.randomUUID();
+  const rows = originals.map((o) => ({
+    journal_id: j, account_id: o.account_id, wallet_id: o.wallet_id, currency_code: o.currency_code,
+    debit_amount: o.credit_amount, credit_amount: o.debit_amount,
     description: `REVERSAL: ${o.description ?? ""}`.slice(0, 500),
-    reference_type: "transfer_reversal",
-    reference_id: transferId,
+    reference_type: "transfer_reversal", reference_id: transferId,
   }));
-
-  const { error: insErr } = await supabase.from("ledger_entries").insert(reversalRows);
-  if (insErr) {
-    console.error("reverseTransferLedger: insert failed", insErr);
-    return { reversed: false, reason: insErr.message };
-  }
-  console.log(`Reversed ${reversalRows.length} ledger entries for transfer ${transferId}`);
+  const { error: insErr } = await supabase.from("ledger_entries").insert(rows);
+  if (insErr) return { reversed: false, reason: insErr.message };
   return { reversed: true };
 }
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
-
-  const supabase = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-  );
-
+  const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   let currentTransferId: string | null = null;
   let currentUserId: string | null = null;
 
   try {
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Missing authorization" }), {
-        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    if (!authHeader) return new Response(JSON.stringify({ error: "Missing authorization" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     const { data: { user } } = await supabase.auth.getUser(authHeader.replace("Bearer ", ""));
-    if (!user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    if (!user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     const body: PayoutRequest = await req.json();
     const { transfer_id, phone_number, amount, currency, network, recipient_name } = body;
-    currentTransferId = transfer_id;
-    currentUserId = user.id;
-
+    currentTransferId = transfer_id; currentUserId = user.id;
     if (!transfer_id || !phone_number || !amount || amount <= 0 || !currency || !network) {
-      return new Response(JSON.stringify({ error: "Invalid payload" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(JSON.stringify({ error: "Invalid payload" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Verify ownership
-    const { data: transfer, error: tErr } = await supabase
-      .from("transfers")
-      .select("*")
-      .eq("id", transfer_id)
-      .eq("sender_id", user.id)
-      .single();
-    if (tErr || !transfer) {
-      return new Response(JSON.stringify({ error: "Transfer not found" }), {
-        status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    const { data: transfer, error: tErr } = await supabase.from("transfers").select("*").eq("id", transfer_id).eq("sender_id", user.id).single();
+    if (tErr || !transfer) return new Response(JSON.stringify({ error: "Transfer not found" }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-    const flwSecret = (Deno.env.get("FLW_SECRET_KEY") || "").trim();
-    if (!flwSecret) {
+    const clientId = (Deno.env.get("FLW_CLIENT_ID") || "").trim();
+    const clientSecret = (Deno.env.get("FLW_CLIENT_SECRET") || "").trim();
+    if (!clientId || !clientSecret) {
       // Stub mode if not configured
-      await supabase.from("transfers").update({
-        status: "processing",
-        provider_reference: `STUB-${transfer_id.slice(0, 8)}`,
-      }).eq("id", transfer_id);
-      await supabase.from("notifications").insert({
-        user_id: user.id,
-        title: "Transfer queued",
-        message: `Your ${currency} ${amount} transfer to ${recipient_name} is queued (Flutterwave not yet configured).`,
-        type: "info",
-      });
-      return new Response(JSON.stringify({ success: true, stub: true }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const networkKey = `${currency}:${network.toLowerCase()}`;
-    const accountBank = NETWORK_MAP[networkKey];
-    if (!accountBank && currency !== "NGN") {
-      const reason = `Unsupported network ${network} for ${currency}`;
-      const rev = await reverseTransferLedger(supabase, transfer_id);
-      await supabase.from("transfers").update({ status: "failed", failure_reason: reason }).eq("id", transfer_id);
-      await supabase.from("notifications").insert({
-        user_id: user.id,
-        title: "Transfer failed — refunded",
-        message: rev.reversed
-          ? `${reason}. Funds have been returned to your wallet.`
-          : reason,
-        type: "error",
-      });
-      return new Response(JSON.stringify({ success: false, error: reason, refunded: rev.reversed }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      await supabase.from("transfers").update({ status: "processing", provider_reference: `STUB-${transfer_id.slice(0, 8)}` }).eq("id", transfer_id);
+      await supabase.from("notifications").insert({ user_id: user.id, title: "Transfer queued", message: `Your ${currency} ${amount} transfer to ${recipient_name} is queued (Flutterwave not yet configured).`, type: "info" });
+      return new Response(JSON.stringify({ success: true, stub: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const reference = `EFM-${transfer_id.slice(0, 8)}-${Date.now()}`;
     const projectRef = Deno.env.get("SUPABASE_URL")?.match(/https:\/\/([^.]+)/)?.[1];
     const callbackUrl = `https://${projectRef}.functions.supabase.co/flutterwave-webhook`;
 
-    const payload: Record<string, unknown> = {
-      account_bank: accountBank || "MPS",
-      account_number: normalizePhone(phone_number),
-      amount: Math.round(amount * 100) / 100,
-      narration: `Transfer to ${recipient_name}`,
-      currency,
-      reference,
-      callback_url: callbackUrl,
-      debit_currency: currency,
-      beneficiary_name: recipient_name,
-      meta: [
-        { transfer_id, network, beneficiary_type: fxBeneficiaryType(currency) },
-      ],
-    };
-
-    console.log("Flutterwave transfer request:", JSON.stringify(payload));
-
-    const res = await fetch("https://api.flutterwave.com/v3/transfers", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${flwSecret}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
-
-    const result = await res.json();
-    console.log("Flutterwave response:", res.status, JSON.stringify(result));
-
-    if (!res.ok || result.status !== "success") {
-      const reason = result?.message || `HTTP ${res.status}`;
-
-      if (isTemporaryProviderSetupError(reason)) {
-        await supabase.from("transfers").update({
-          status: "processing",
-          provider_reference: `PENDING-${reference}`,
-          failure_reason: null,
-        }).eq("id", transfer_id);
-
-        await supabase.from("notifications").insert({
-          user_id: user.id,
-          title: "Transfer queued",
-          message: `Your ${currency} ${amount} transfer to ${recipient_name} is queued while the payout partner completes Zambia setup.`,
-          type: "info",
-        });
-
-        return new Response(JSON.stringify({
-          success: true,
-          queued: true,
-          reference,
-          provider_message: reason,
-        }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+    // Build V4 transfer payload
+    let payload: Record<string, unknown>;
+    if (currency === "NGN") {
+      // Bank transfer (NGN) — caller needs to pass bank_code & account_number; for now treat phone as account
+      payload = {
+        type: "bank_account",
+        currency,
+        amount: Math.round(amount * 100) / 100,
+        reference,
+        narration: `Transfer to ${recipient_name}`,
+        callback_url: callbackUrl,
+        beneficiary: {
+          name: recipient_name,
+          account_number: normalizePhone(phone_number),
+          bank_code: "044", // placeholder; SendPage NGN flow needs to provide bank
+          country: "NG",
+        },
+        meta: { transfer_id, network },
+      };
+    } else {
+      const networkCode = MM_NETWORK_MAP[`${currency}:${network.toLowerCase()}`];
+      if (!networkCode) {
+        const reason = `Unsupported network ${network} for ${currency}`;
+        const rev = await reverseTransferLedger(supabase, transfer_id);
+        await supabase.from("transfers").update({ status: "failed", failure_reason: reason }).eq("id", transfer_id);
+        await supabase.from("notifications").insert({ user_id: user.id, title: "Transfer failed — refunded", message: rev.reversed ? `${reason}. Funds returned to your wallet.` : reason, type: "error" });
+        return new Response(JSON.stringify({ success: false, error: reason, refunded: rev.reversed }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
-
-      const rev = await reverseTransferLedger(supabase, transfer_id);
-      await supabase.from("transfers").update({
-        status: "failed",
-        failure_reason: reason,
-      }).eq("id", transfer_id);
-      await supabase.from("notifications").insert({
-        user_id: user.id,
-        title: "Transfer failed — refunded",
-        message: rev.reversed
-          ? `Your transfer to ${recipient_name} failed (${reason}) and has been refunded to your wallet.`
-          : reason,
-        type: "error",
-      });
-      return new Response(JSON.stringify({ success: false, error: reason, refunded: rev.reversed }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      payload = {
+        type: "mobile_money",
+        currency,
+        amount: Math.round(amount * 100) / 100,
+        reference,
+        narration: `Transfer to ${recipient_name}`,
+        callback_url: callbackUrl,
+        beneficiary: {
+          name: recipient_name,
+          phone_number: normalizePhone(phone_number),
+          country: currency === "KES" ? "KE" : currency === "UGX" ? "UG" : currency === "GHS" ? "GH" : currency === "TZS" ? "TZ" : currency === "ZMW" ? "ZM" : currency === "RWF" ? "RW" : "",
+          mobile_money: { network: networkCode },
+        },
+        meta: { transfer_id, network },
+      };
     }
 
-    await supabase.from("transfers").update({
-      status: "processing",
-      provider_reference: String(result.data?.id || result.data?.reference || reference),
-    }).eq("id", transfer_id);
+    console.log("FLW V4 transfer payload:", JSON.stringify(payload));
+    const { ok, status, json } = await flwFetch("/transfers", { method: "POST", body: JSON.stringify(payload), idempotencyKey: reference });
+    console.log("FLW V4 response:", status, JSON.stringify(json));
 
-    await supabase.from("notifications").insert({
-      user_id: user.id,
-      title: "Transfer initiated",
-      message: `Your ${currency} ${amount} transfer to ${recipient_name} is being processed.`,
-      type: "transfer",
-    });
+    if (!ok || !isFlwSuccess(json)) {
+      const reason = json?.message || json?.error || `HTTP ${status}`;
+      if (isTemporaryProviderSetupError(reason)) {
+        await supabase.from("transfers").update({ status: "processing", provider_reference: `PENDING-${reference}`, failure_reason: null }).eq("id", transfer_id);
+        await supabase.from("notifications").insert({ user_id: user.id, title: "Transfer queued", message: `Your ${currency} ${amount} transfer to ${recipient_name} is queued while the payout partner completes setup.`, type: "info" });
+        return new Response(JSON.stringify({ success: true, queued: true, reference, provider_message: reason }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      const rev = await reverseTransferLedger(supabase, transfer_id);
+      await supabase.from("transfers").update({ status: "failed", failure_reason: reason }).eq("id", transfer_id);
+      await supabase.from("notifications").insert({ user_id: user.id, title: "Transfer failed — refunded", message: rev.reversed ? `Your transfer to ${recipient_name} failed (${reason}) and has been refunded to your wallet.` : reason, type: "error" });
+      return new Response(JSON.stringify({ success: false, error: reason, refunded: rev.reversed }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
-    return new Response(JSON.stringify({
-      success: true,
-      reference,
-      flw_id: result.data?.id,
-      response: result,
-    }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    await supabase.from("transfers").update({ status: "processing", provider_reference: String(json.data?.id || json.data?.reference || reference) }).eq("id", transfer_id);
+    await supabase.from("notifications").insert({ user_id: user.id, title: "Transfer initiated", message: `Your ${currency} ${amount} transfer to ${recipient_name} is being processed.`, type: "info" });
+    return new Response(JSON.stringify({ success: true, reference, flw_id: json.data?.id }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (err) {
-    console.error("flutterwave-payout error:", err);
     const msg = err instanceof Error ? err.message : "Unknown error";
+    console.error("flutterwave-payout V4 error", msg);
     if (currentTransferId) {
       try {
         const rev = await reverseTransferLedger(supabase, currentTransferId);
-        await supabase.from("transfers").update({
-          status: "failed",
-          failure_reason: msg.slice(0, 500),
-        }).eq("id", currentTransferId);
-        if (currentUserId) {
-          await supabase.from("notifications").insert({
-            user_id: currentUserId,
-            title: "Transfer failed — refunded",
-            message: (rev.reversed ? "Refunded to your wallet. " : "") + msg.slice(0, 250),
-            type: "error",
-          });
-        }
-      } catch (_) { /* ignore */ }
+        await supabase.from("transfers").update({ status: "failed", failure_reason: msg.slice(0, 500) }).eq("id", currentTransferId);
+        if (currentUserId) await supabase.from("notifications").insert({ user_id: currentUserId, title: "Transfer failed — refunded", message: (rev.reversed ? "Refunded to your wallet. " : "") + msg.slice(0, 250), type: "error" });
+      } catch { /* ignore */ }
     }
-    return new Response(JSON.stringify({ success: false, error: msg }), {
-      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(JSON.stringify({ success: false, error: msg }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 });
