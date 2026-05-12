@@ -230,8 +230,7 @@ const SendPage = () => {
       return;
     }
 
-    // ── Card: create transfer then open Flutterwave checkout (USD) ───────
-    if (!flwPublicKey) { toast.error('Flutterwave public key missing'); setConfirming(false); return; }
+    // ── Card: V4 hosted payment link — redirect user to Flutterwave checkout ──
     if (usdRate === null || cardChargeAmount <= 0) {
       toast.error(`No FX rate available for ${sourceCurrency} → ${cardCurrency}`);
       setConfirming(false);
@@ -246,34 +245,24 @@ const SendPage = () => {
       return;
     }
     try {
-      flutterwavePay({
-        callback: async (response) => {
-          try {
-            const status = String(response.status || '').toLowerCase();
-            const ok = ['successful', 'completed', 'success'].includes(status);
-            await supabase.from('transfers').update(
-              ok
-                ? { status: 'processing', provider_reference: response.flw_ref || String(response.transaction_id || txRef), failure_reason: null }
-                : { status: 'failed', provider_reference: response.flw_ref || null, failure_reason: response.status || 'Card payment failed' }
-            ).eq('id', tid);
-            if (ok) { toast.success('Payment received — transfer is processing'); goToStep(4); }
-            else { toast.error(response.status || 'Card payment failed'); }
-          } finally {
-            closePaymentModal();
-            setConfirming(false);
-          }
-        },
-        onClose: async () => {
-          try {
-            await supabase.from('transfers')
-              .update({ status: 'failed', failure_reason: 'User closed card payment without paying' })
-              .eq('id', tid).eq('status', 'initiated');
-          } catch { /* ignore */ }
-          toast.error('Card payment cancelled');
-          setConfirming(false);
-        },
+      const callbackUrl = `${window.location.origin}/payment-callback?transfer_id=${tid}`;
+      const result = await initializeFlwPayment({
+        amount: cardChargeAmount,
+        currency: cardCurrency,
+        paymentMethod: 'card',
+        redirectUrl: callbackUrl,
       });
+      if (!result.payment_link) throw new Error('No payment link returned');
+      // Persist the in-progress transfer id so /payment-callback can verify
+      try { sessionStorage.setItem('pending_transfer_id', tid); } catch { /* ignore */ }
+      toast.success('Redirecting to Flutterwave…');
+      window.location.href = result.payment_link;
     } catch (e) {
+      try {
+        await supabase.from('transfers')
+          .update({ status: 'failed', failure_reason: friendlyFlwError(e, cardCurrency) })
+          .eq('id', tid);
+      } catch { /* ignore */ }
       toast.error(friendlyFlwError(e, cardCurrency));
       setConfirming(false);
     }
