@@ -854,7 +854,76 @@ const SendPage = () => {
 
                             {step === 3 && (
                               <motion.div
-                                key="step3"
+                                key="step3-review"
+                                custom={direction}
+                                variants={stepVariants}
+                                initial="enter"
+                                animate="center"
+                                exit="exit"
+                                transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                              >
+                                <Card>
+                                  <CardHeader className="flex-row items-center justify-between space-y-0">
+                                    <CardTitle>Review &amp; Confirm</CardTitle>
+                                    <button
+                                      type="button"
+                                      onClick={() => setCancelOpen(true)}
+                                      aria-label="Cancel transfer"
+                                      className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                                    >
+                                      <X className="w-5 h-5" />
+                                    </button>
+                                  </CardHeader>
+                                  <CardContent className="space-y-5">
+                                    <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-2 text-sm">
+                                      <div className="flex justify-between"><span className="text-muted-foreground">Recipient</span><span className="font-medium">{recipientName}</span></div>
+                                      <div className="flex justify-between"><span className="text-muted-foreground">Phone</span><span className="font-medium">{recipientPhone}</span></div>
+                                      <div className="flex justify-between"><span className="text-muted-foreground">Destination</span><span className="font-medium">{targetCountry.flag} {targetCountry.name}</span></div>
+                                      <div className="flex justify-between"><span className="text-muted-foreground">Method</span><span className="font-medium">{effectiveMethodLabel}</span></div>
+                                      <div className="flex justify-between"><span className="text-muted-foreground">Funding</span><span className="font-medium capitalize">{fundingSource}</span></div>
+                                    </div>
+                                    <div className="rounded-xl border border-border bg-card p-4 space-y-2 text-sm">
+                                      <div className="flex justify-between"><span className="text-muted-foreground">You send</span><span className="font-medium">{sourceSymbol}{parsedAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {sourceCurrency}</span></div>
+                                      <div className="flex justify-between"><span className="text-muted-foreground">Fee</span><span className="font-medium">{sourceSymbol}{fee.toFixed(2)}</span></div>
+                                      <div className="flex justify-between"><span className="text-muted-foreground">Rate</span><span className="font-medium">1 {sourceCurrency} = {effectiveRate.toFixed(4)} {targetCountry.code}</span></div>
+                                      <div className="flex justify-between text-base pt-2 border-t border-border"><span>They receive</span><span className="font-bold">{targetSymbol} {receivedAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+                                      {fundingSource === 'card' && usdRate !== null && sourceCurrency !== cardCurrency && (
+                                        <div className="flex justify-between text-xs text-muted-foreground pt-2 border-t border-border"><span>Card charge</span><span>{cardCurrency} {cardChargeAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+                                      )}
+                                    </div>
+                                    {fundingSource === 'bank' && (
+                                      <p className="text-xs text-muted-foreground text-center">Bank transfer — funds will be debited within 1-2 business days.</p>
+                                    )}
+                                    {fundingSource === 'card' && (
+                                      <p className="text-xs text-muted-foreground text-center">You'll be redirected to a secure card checkout in {cardCurrency}.</p>
+                                    )}
+                                    <div className="flex gap-3">
+                                      <Button variant="outline" className="flex-1" onClick={() => goToStep(2)} disabled={confirming}>Back</Button>
+                                      <Button className="flex-1" onClick={handleConfirm} disabled={confirming}>
+                                        {confirming ? (
+                                          <span className="inline-flex items-center gap-2">
+                                            <span className="h-4 w-4 rounded-full border-2 border-primary-foreground/40 border-t-primary-foreground animate-spin" />
+                                            Processing...
+                                          </span>
+                                        ) : fundingSource === 'card' ? 'Pay with Card' : 'Confirm Transfer'}
+                                      </Button>
+                                    </div>
+                                    <Button
+                                      variant="outline"
+                                      className="w-full border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                      onClick={() => setCancelOpen(true)}
+                                      disabled={confirming}
+                                    >
+                                      Cancel Transfer
+                                    </Button>
+                                  </CardContent>
+                                </Card>
+                              </motion.div>
+                            )}
+
+                            {step === 4 && (
+                              <motion.div
+                                key="step4"
                                 custom={direction}
                                 variants={stepVariants}
                                 initial="enter"
