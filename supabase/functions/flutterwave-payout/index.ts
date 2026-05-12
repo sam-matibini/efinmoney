@@ -217,6 +217,24 @@ Deno.serve(async (req) => {
     if (!ok || !isFlwSuccess(json)) {
       const rawReason = json?.message || json?.error || (typeof json?.raw === "string" && /OriginTimeout|Gateway Timeout|Service unavailable/i.test(json.raw) ? "Gateway timeout from payout partner" : `HTTP ${status}`);
       const isGateway = [0, 408, 502, 503, 504].includes(status) || /OriginTimeout|Gateway Timeout|Service unavailable/i.test(String(rawReason));
+
+      // V3 FALLBACK — try the legacy API on a different host when V4 gateway is down
+      if (isGateway) {
+        console.warn("V4 gateway error, falling back to V3 ...");
+        const v3 = await tryV3Payout({
+          currency, amount, reference, recipient_name, network,
+          phone_number, account_number, bank_code,
+          callback_url: callbackUrl, transfer_id,
+        });
+        if (v3.ok) {
+          const v3Id = String(v3.json?.data?.id || v3.json?.data?.reference || reference);
+          await supabase.from("transfers").update({ status: "processing", provider_reference: v3Id }).eq("id", transfer_id);
+          await supabase.from("notifications").insert({ user_id: user.id, title: "Transfer initiated", message: `Your ${currency} ${amount} transfer to ${recipient_name} is being processed.`, type: "info" });
+          return new Response(JSON.stringify({ success: true, reference, flw_id: v3.json?.data?.id, via: "v3_fallback" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+        console.warn("V3 fallback also failed:", v3.status, v3.json?.message);
+      }
+
       const reason = isGateway
         ? "Our payout partner is temporarily unavailable. Please try again in a few minutes."
         : rawReason;
