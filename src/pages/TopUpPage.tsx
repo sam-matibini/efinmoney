@@ -23,10 +23,16 @@ const METHODS: { value: FlwMethod; label: string }[] = [
 const TopUpPage = () => {
   const [params] = useSearchParams();
   const [amount, setAmount] = useState("");
-  const [currency, setCurrency] = useState("NGN");
-  const [method, setMethod] = useState("card");
+  const [method, setMethod] = useState<FlwMethod>("card");
+  const [currency, setCurrency] = useState<string>(ALLOWED_TOPUP_CURRENCIES.card[0]);
   const [loading, setLoading] = useState(false);
   const [verifyState, setVerifyState] = useState<{ status: "verifying" | "success" | "failed"; message: string } | null>(null);
+
+  // Keep currency valid for the chosen method
+  useEffect(() => {
+    const allowed = ALLOWED_TOPUP_CURRENCIES[method];
+    if (!allowed.includes(currency)) setCurrency(allowed[0]);
+  }, [method, currency]);
 
   useEffect(() => {
     const tx = params.get("transaction_id");
