@@ -32,6 +32,84 @@ function jr(status: number, body: unknown) {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 }
 
+function isGatewayJson(json: any, status: number): boolean {
+  if ([0, 408, 502, 503, 504].includes(status)) return true;
+  const raw = typeof json?.raw === "string" ? json.raw : "";
+  return /OriginTimeout|Gateway Timeout|Service unavailable/i.test(raw);
+}
+
+// ── V3 fallback (api.flutterwave.com) — used when V4 host is gateway-timing-out
+const V3_MM_TYPE: Record<string, string> = {
+  KES: "mpesa",
+  UGX: "mobile_money_uganda",
+  GHS: "mobile_money_ghana",
+  TZS: "mobile_money_tanzania",
+  ZMW: "mobile_money_zambia",
+  RWF: "mobile_money_rwanda",
+};
+
+async function v3MobileMoneyCharge(opts: {
+  currency: string; amount: number; reference: string; redirectUrl: string;
+  phone: string; network: string; email: string; name: string; userId: string;
+}): Promise<{ ok: boolean; status: number; json: any }> {
+  const secret = (Deno.env.get("FLW_SECRET_KEY") || "").trim();
+  if (!secret) return { ok: false, status: 0, json: { message: "V3 fallback unavailable (FLW_SECRET_KEY not set)" } };
+  const type = V3_MM_TYPE[opts.currency];
+  if (!type) return { ok: false, status: 0, json: { message: `V3 has no MM type for ${opts.currency}` } };
+  const body: Record<string, unknown> = {
+    tx_ref: opts.reference,
+    amount: String(opts.amount),
+    currency: opts.currency,
+    email: opts.email,
+    fullname: opts.name || "eFin User",
+    phone_number: opts.phone,
+    redirect_url: opts.redirectUrl,
+    meta: { user_id: opts.userId, type: "wallet_topup", currency: opts.currency, network: opts.network },
+  };
+  if (opts.currency === "GHS") body.network = (opts.network || "MTN").toUpperCase();
+  if (opts.currency === "UGX") body.voucher = "00000";
+  const res = await fetch(`https://api.flutterwave.com/v3/charges?type=${type}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${secret}`, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const text = await res.text();
+  let json: any = {}; try { json = text ? JSON.parse(text) : {}; } catch { json = { raw: text }; }
+  console.log("V3 MM charge response:", res.status, JSON.stringify(json));
+  return { ok: res.ok && json?.status === "success", status: res.status, json };
+}
+
+async function v3HostedPayment(opts: {
+  currency: string; amount: number; reference: string; redirectUrl: string;
+  email: string; name: string; phone: string; paymentMethod: string; userId: string;
+}): Promise<{ ok: boolean; status: number; json: any }> {
+  const secret = (Deno.env.get("FLW_SECRET_KEY") || "").trim();
+  if (!secret) return { ok: false, status: 0, json: { message: "V3 fallback unavailable (FLW_SECRET_KEY not set)" } };
+  const payment_options = opts.paymentMethod === "card" ? "card"
+    : opts.paymentMethod === "ussd" ? "ussd"
+    : opts.paymentMethod === "banktransfer" ? "banktransfer"
+    : "card,banktransfer,ussd";
+  const body = {
+    tx_ref: opts.reference,
+    amount: String(opts.amount),
+    currency: opts.currency,
+    redirect_url: opts.redirectUrl,
+    payment_options,
+    customer: { email: opts.email, name: opts.name, phonenumber: opts.phone },
+    meta: { user_id: opts.userId, type: "wallet_topup", currency: opts.currency },
+    customizations: { title: "eFinMoney top-up" },
+  };
+  const res = await fetch("https://api.flutterwave.com/v3/payments", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${secret}`, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const text = await res.text();
+  let json: any = {}; try { json = text ? JSON.parse(text) : {}; } catch { json = { raw: text }; }
+  console.log("V3 hosted payment response:", res.status, JSON.stringify(json));
+  return { ok: res.ok && json?.status === "success", status: res.status, json };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {
