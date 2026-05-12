@@ -289,8 +289,13 @@ const SendPage = () => {
         const tid = await createTransferRecord();
         const { data, error } = await supabase.functions.invoke('execute-transfer', { body: { transfer_id: tid } });
         if (error || (data as any)?.error) throw new Error((data as any)?.error || error?.message || 'Payout failed');
+        // Gate success: payout sub-call may have failed even if execute-transfer returned 200
+        const payout = (data as any)?.payout;
+        if (payout && payout.success === false) {
+          throw new Error(payout.error || 'Payout failed');
+        }
         goToStep(4);
-        toast.success('Transfer sent successfully!');
+        toast.success(payout?.queued ? 'Transfer queued — awaiting payout partner' : 'Transfer sent successfully!');
       } catch (e: any) {
         toast.error(e?.message || 'Transfer failed. Please try again.');
       } finally {
@@ -298,6 +303,7 @@ const SendPage = () => {
       }
       return;
     }
+
 
     // ── Bank: queue as pending; debit takes 1-2 business days ────────────
     if (fundingSource === 'bank') {
