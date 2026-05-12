@@ -8,3 +8,9 @@ verify_jwt = false
 
 [functions.send-email]
 verify_jwt = false
+
+[functions.paysafe-webhook]
+verify_jwt = false
+
+[functions.paysafe-payout]
+verify_jwt = false

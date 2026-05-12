@@ -34,6 +34,7 @@ const CanadaSendFlow = () => {
   const [bankName, setBankName] = useState("");
 
   const [lastTransferId, setLastTransferId] = useState<string | null>(null);
+  const [security, setSecurity] = useState<{ question: string; answer: string } | null>(null);
 
   const { data: wallets } = useWallets();
   const createTransfer = useCreateTransfer();
@@ -78,7 +79,9 @@ const CanadaSendFlow = () => {
 
       // Best-effort: post ledger via execute-transfer (it will skip payout for unmapped corridor)
       try {
-        await supabase.functions.invoke("execute-transfer", { body: { transfer_id: transfer.id } });
+        const { data: execData } = await supabase.functions.invoke("execute-transfer", { body: { transfer_id: transfer.id } });
+        const sec = execData?.payout?.security;
+        if (sec?.question && sec?.answer) setSecurity({ question: sec.question, answer: sec.answer });
       } catch { /* non-fatal — record is created */ }
 
       setLastTransferId(transfer.id);
@@ -95,6 +98,7 @@ const CanadaSendFlow = () => {
     setRecipientName(""); setRecipientEmail(""); setMessage("");
     setInstitutionNumber(""); setTransitNumber(""); setAccountNumber(""); setBankName("");
     setLastTransferId(null);
+    setSecurity(null);
   };
 
   return (
@@ -301,6 +305,21 @@ const CanadaSendFlow = () => {
               <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
                 Funds will arrive in the recipient's bank account within 1–3 business days.
               </p>
+            )}
+            {security && method === "interac" && (
+              <div className="max-w-md mx-auto mb-6 p-4 rounded-xl border border-border bg-muted/40 text-left">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2">Security details — share with recipient</p>
+                <p className="text-sm"><span className="text-muted-foreground">Question:</span> <strong>{security.question}</strong></p>
+                <p className="text-sm mt-1"><span className="text-muted-foreground">Answer:</span> <strong className="font-mono">{security.answer}</strong></p>
+                <button
+                  type="button"
+                  className="mt-3 text-xs text-primary hover:underline"
+                  onClick={() => {
+                    navigator.clipboard.writeText(`Q: ${security.question}\nA: ${security.answer}`);
+                    toast.success("Copied to clipboard");
+                  }}
+                >Copy Q&amp;A</button>
+              </div>
             )}
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               {lastTransferId && (
