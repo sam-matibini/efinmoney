@@ -175,8 +175,25 @@ Deno.serve(async (req) => {
         },
         meta: { user_id: userId, type: "wallet_topup", currency },
       };
-      const { ok, json } = await flwFetch("/direct-charges", { method: "POST", body: JSON.stringify(payload) });
-      if (!ok || !isFlwSuccess(json)) return jr(502, { error: json?.message || json?.error || "Mobile money charge failed", details: json });
+      const { ok, status, json } = await flwFetch("/direct-charges", { method: "POST", body: JSON.stringify(payload) });
+      if (!ok || !isFlwSuccess(json)) {
+        if (isGatewayJson(json, status)) {
+          console.warn("V4 MM charge gateway error, falling back to V3 ...");
+          const v3 = await v3MobileMoneyCharge({ currency, amount, reference, redirectUrl, phone, network, email: customer.email, name: customer.name, userId });
+          if (v3.ok) {
+            const d = v3.json?.data || {};
+            return new Response(JSON.stringify({
+              success: true, charge_id: d.id, reference,
+              next_action: d.processor_response || d.auth_url || d.redirect_url || null,
+              status: d.status,
+              payment_link: d.auth_url || d.redirect_url || null,
+              via: "v3_fallback",
+            }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+          }
+          return jr(502, { error: "Our payout partner is temporarily unavailable. Please try again in a few minutes.", transient: true });
+        }
+        return jr(502, { error: json?.message || json?.error || "Mobile money charge failed", details: json });
+      }
 
       // V4 returns next_action: USSD code, OTP prompt, or a redirect
       const data = json.data || {};
