@@ -3104,6 +3104,8 @@ export type Database = {
           payout_method: string | null
           provider_reference: string | null
           recipient_account: string | null
+          recipient_bank_code: string | null
+          recipient_bank_name: string | null
           recipient_country: string
           recipient_name: string
           recipient_phone: string | null
@@ -3127,6 +3129,8 @@ export type Database = {
           payout_method?: string | null
           provider_reference?: string | null
           recipient_account?: string | null
+          recipient_bank_code?: string | null
+          recipient_bank_name?: string | null
           recipient_country: string
           recipient_name: string
           recipient_phone?: string | null
@@ -3150,6 +3154,8 @@ export type Database = {
           payout_method?: string | null
           provider_reference?: string | null
           recipient_account?: string | null
+          recipient_bank_code?: string | null
+          recipient_bank_name?: string | null
           recipient_country?: string
           recipient_name?: string
           recipient_phone?: string | null

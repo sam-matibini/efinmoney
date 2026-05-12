@@ -200,7 +200,9 @@ Deno.serve(async (req) => {
           },
           body: JSON.stringify({
             transfer_id,
-            phone_number: transfer.recipient_phone,
+            phone_number: transfer.recipient_phone || "",
+            account_number: (transfer as any).recipient_account || "",
+            bank_code: (transfer as any).recipient_bank_code || "",
             amount: Number(transfer.target_amount),
             currency: transfer.target_currency,
             network,

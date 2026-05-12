@@ -10,6 +10,8 @@ export interface Transfer {
   recipient_name: string;
   recipient_phone: string | null;
   recipient_account: string | null;
+  recipient_bank_code?: string | null;
+  recipient_bank_name?: string | null;
   recipient_country: string;
   transfer_type: 'internal' | 'mobile_money' | 'bank' | 'crypto' | 'bill_payment' | 'domestic_canada';
   payout_method: string | null;
@@ -32,6 +34,8 @@ export interface CreateTransferInput {
   recipient_name: string;
   recipient_phone?: string;
   recipient_account?: string;
+  recipient_bank_code?: string;
+  recipient_bank_name?: string;
   recipient_country: string;
   transfer_type: 'internal' | 'mobile_money' | 'bank' | 'crypto' | 'bill_payment' | 'domestic_canada';
   payout_method?: string;

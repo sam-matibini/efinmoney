@@ -68,6 +68,13 @@ const SendPage = () => {
   const [cancelOpen, setCancelOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [usdRate, setUsdRate] = useState<number | null>(null);
+  // NGN bank payout state
+  const [ngnBanks, setNgnBanks] = useState<Array<{ code: string; name: string }>>([]);
+  const [ngnBankCode, setNgnBankCode] = useState<string>("");
+  const [ngnAccountNumber, setNgnAccountNumber] = useState<string>("");
+  const [ngnResolving, setNgnResolving] = useState(false);
+  const [ngnResolvedName, setNgnResolvedName] = useState<string | null>(null);
+  const [ngnResolveError, setNgnResolveError] = useState<string | null>(null);
   // V4: no public key needed
   const navigate = useNavigate();
 
@@ -107,7 +114,72 @@ const SendPage = () => {
   // Reset network selection when the destination country changes
   useEffect(() => {
     setSelectedNetworkId(null);
+    setNgnBankCode("");
+    setNgnAccountNumber("");
+    setNgnResolvedName(null);
+    setNgnResolveError(null);
   }, [targetCountryId]);
+
+  const isNGNBank = targetCountry.code === "NGN";
+
+  // Fetch Nigerian banks list when NGN destination is selected
+  useEffect(() => {
+    if (!isNGNBank || ngnBanks.length > 0) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        // supabase-js .invoke() doesn't support GET query params, so call directly
+        const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/flw-get-banks?country=NG`;
+        const { data: { session } } = await supabase.auth.getSession();
+        const res = await fetch(url, {
+          headers: {
+            Authorization: `Bearer ${session?.access_token || ""}`,
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+        });
+        const json = await res.json();
+        if (cancelled) return;
+        const list = Array.isArray(json?.banks)
+          ? json.banks.map((b: any) => ({ code: String(b.code || b.bank_code), name: String(b.name || b.bank_name) })).filter((b: any) => b.code && b.name)
+          : [];
+        setNgnBanks(list);
+      } catch (e) {
+        console.error("Failed to load NG banks", e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isNGNBank, ngnBanks.length]);
+
+  // Resolve account name when NGN bank + 10-digit account number are set
+  useEffect(() => {
+    if (!isNGNBank) return;
+    setNgnResolvedName(null);
+    setNgnResolveError(null);
+    if (!ngnBankCode || ngnAccountNumber.replace(/\D/g, "").length !== 10) return;
+    let cancelled = false;
+    setNgnResolving(true);
+    (async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke("flw-resolve-account", {
+          body: { bankCode: ngnBankCode, accountNumber: ngnAccountNumber.replace(/\D/g, "") },
+        });
+        if (cancelled) return;
+        if (error || !(data as any)?.resolved) {
+          setNgnResolveError((data as any)?.error || "Could not verify account");
+        } else {
+          const name = (data as any).account_name as string;
+          setNgnResolvedName(name);
+          setRecipientName(name);
+        }
+      } catch (e: any) {
+        if (!cancelled) setNgnResolveError(e?.message || "Could not verify account");
+      } finally {
+        if (!cancelled) setNgnResolving(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isNGNBank, ngnBankCode, ngnAccountNumber]);
+
 
   const fxRate = fxRates?.find(
     r => r.from_currency === sourceCurrency && r.to_currency === targetCountry.code
@@ -163,13 +235,18 @@ const SendPage = () => {
 
   // Create transfer row + maybe save beneficiary. Returns id.
   const createTransferRecord = async () => {
+    const ngnAcct = isNGNBank ? ngnAccountNumber.replace(/\D/g, "") : "";
+    const ngnBank = isNGNBank ? (ngnBanks.find((b) => b.code === ngnBankCode)?.name || null) : null;
     const transfer = await createTransfer.mutateAsync({
       sender_wallet_id: fundingSource === 'wallet' ? selectedWallet!.wallet_id : wallets?.[0]?.wallet_id || '',
       recipient_name: recipientName,
-      recipient_phone: recipientPhone,
+      recipient_phone: isNGNBank ? undefined : recipientPhone,
+      recipient_account: isNGNBank ? ngnAcct : undefined,
+      recipient_bank_code: isNGNBank ? ngnBankCode : undefined,
+      recipient_bank_name: isNGNBank ? (ngnBank || undefined) : undefined,
       recipient_country: targetCountry.code,
-      transfer_type: 'mobile_money',
-      payout_method: effectivePayoutMethod,
+      transfer_type: isNGNBank ? 'bank' : 'mobile_money',
+      payout_method: isNGNBank ? 'bank' : effectivePayoutMethod,
       source_currency: sourceCurrency,
       target_currency: targetCountry.code,
       source_amount: parsedAmount,
@@ -183,16 +260,19 @@ const SendPage = () => {
         const { isNew } = await recordTransferRecipient({
           user_id: user.id,
           name: recipientName,
-          phone: recipientPhone,
+          phone: isNGNBank ? "" : recipientPhone,
           country_code: targetCountry.code,
-          payout_method: effectivePayoutMethod,
+          payout_method: isNGNBank ? 'bank' : effectivePayoutMethod,
           currency_code: targetCountry.code,
-        });
+          bank_name: isNGNBank ? ngnBank : null,
+          bank_account: isNGNBank ? ngnAcct : null,
+        } as any);
         if (isNew && !pickedBeneficiaryId) setSavePromptOpen(true);
       } catch { /* non-fatal */ }
     }
     return transfer.id;
   };
+
 
   const handleConfirm = async () => {
     if (confirming) return;
@@ -205,8 +285,13 @@ const SendPage = () => {
         const tid = await createTransferRecord();
         const { data, error } = await supabase.functions.invoke('execute-transfer', { body: { transfer_id: tid } });
         if (error || (data as any)?.error) throw new Error((data as any)?.error || error?.message || 'Payout failed');
+        // Gate success: payout sub-call may have failed even if execute-transfer returned 200
+        const payout = (data as any)?.payout;
+        if (payout && payout.success === false) {
+          throw new Error(payout.error || 'Payout failed');
+        }
         goToStep(4);
-        toast.success('Transfer sent successfully!');
+        toast.success(payout?.queued ? 'Transfer queued — awaiting payout partner' : 'Transfer sent successfully!');
       } catch (e: any) {
         toast.error(e?.message || 'Transfer failed. Please try again.');
       } finally {
@@ -214,6 +299,7 @@ const SendPage = () => {
       }
       return;
     }
+
 
     // ── Bank: queue as pending; debit takes 1-2 business days ────────────
     if (fundingSource === 'bank') {
@@ -316,7 +402,9 @@ const SendPage = () => {
   };
 
   const isStep1Valid = parsedAmount > 0 && parsedAmount > fee && receivedAmount > 0 && rateAvailable && !noLinkedSource && !insufficientFunds;
-  const isStep2Valid = recipientName.length > 2 && recipientPhone.length > 8 && !!effectivePayoutMethod && receivedAmount > 0;
+  const isStep2Valid = isNGNBank
+    ? (!!ngnBankCode && ngnAccountNumber.replace(/\D/g, "").length === 10 && !!ngnResolvedName && receivedAmount > 0)
+    : (recipientName.length > 2 && recipientPhone.length > 8 && !!effectivePayoutMethod && receivedAmount > 0);
 
   const activeTab = searchParams.get('mode') === 'canada' ? 'canada' : 'international';
 
@@ -787,18 +875,64 @@ const SendPage = () => {
                                         </div>
                                       </motion.div>
                                     )}
-                                    <motion.div custom={2} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
-                                      <Label>Mobile Money Number</Label>
-                                      <Input
-                                        placeholder="+254..."
-                                        value={recipientPhone}
-                                        onChange={(e) => setRecipientPhone(e.target.value)}
-                                        className="transition-shadow focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:shadow-[0_0_0_4px_hsl(var(--primary)/0.12)]"
-                                      />
-                                      <p className="text-sm text-muted-foreground">
-                                        Funds will be sent via {effectiveMethodLabel}
-                                      </p>
-                                    </motion.div>
+                                    {isNGNBank ? (
+                                      <>
+                                        <motion.div custom={2} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
+                                          <Label>Recipient Bank</Label>
+                                          <Select value={ngnBankCode} onValueChange={setNgnBankCode}>
+                                            <SelectTrigger>
+                                              <SelectValue placeholder={ngnBanks.length ? "Select Nigerian bank" : "Loading banks..."} />
+                                            </SelectTrigger>
+                                            <SelectContent className="max-h-[300px]">
+                                              {ngnBanks.map((b) => (
+                                                <SelectItem key={b.code} value={b.code}>{b.name}</SelectItem>
+                                              ))}
+                                            </SelectContent>
+                                          </Select>
+                                        </motion.div>
+                                        <motion.div custom={2.5} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
+                                          <Label>NUBAN Account Number</Label>
+                                          <Input
+                                            inputMode="numeric"
+                                            maxLength={10}
+                                            placeholder="10-digit account number"
+                                            value={ngnAccountNumber}
+                                            onChange={(e) => setNgnAccountNumber(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                                            className="transition-shadow focus-visible:ring-2 focus-visible:ring-primary/40"
+                                          />
+                                          {ngnResolving && (
+                                            <p className="text-sm text-muted-foreground inline-flex items-center gap-2">
+                                              <span className="h-3 w-3 rounded-full border-2 border-primary/40 border-t-primary animate-spin" />
+                                              Verifying account…
+                                            </p>
+                                          )}
+                                          {ngnResolvedName && !ngnResolving && (
+                                            <p className="text-sm text-emerald-600 dark:text-emerald-400 inline-flex items-center gap-1">
+                                              <CheckCircle className="w-3.5 h-3.5" /> {ngnResolvedName}
+                                            </p>
+                                          )}
+                                          {ngnResolveError && !ngnResolving && (
+                                            <p className="text-sm text-destructive inline-flex items-center gap-1">
+                                              <AlertCircle className="w-3.5 h-3.5" /> {ngnResolveError}
+                                            </p>
+                                          )}
+                                          <p className="text-xs text-muted-foreground">Funds will be deposited directly to the bank account above.</p>
+                                        </motion.div>
+                                      </>
+                                    ) : (
+                                      <motion.div custom={2} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
+                                        <Label>Mobile Money Number</Label>
+                                        <Input
+                                          placeholder="+254..."
+                                          value={recipientPhone}
+                                          onChange={(e) => setRecipientPhone(e.target.value)}
+                                          className="transition-shadow focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:shadow-[0_0_0_4px_hsl(var(--primary)/0.12)]"
+                                        />
+                                        <p className="text-sm text-muted-foreground">
+                                          Funds will be sent via {effectiveMethodLabel}
+                                        </p>
+                                      </motion.div>
+                                    )}
 
                                     <motion.div custom={3} variants={fieldVariants} initial="hidden" animate="show" className="flex gap-3">
                                       <Button variant="outline" className="flex-1" onClick={() => goToStep(1)}>Back</Button>
