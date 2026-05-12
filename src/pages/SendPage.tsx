@@ -878,7 +878,7 @@ const SendPage = () => {
                                     <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-2 text-sm">
                                       <div className="flex justify-between"><span className="text-muted-foreground">Recipient</span><span className="font-medium">{recipientName}</span></div>
                                       <div className="flex justify-between"><span className="text-muted-foreground">Phone</span><span className="font-medium">{recipientPhone}</span></div>
-                                      <div className="flex justify-between"><span className="text-muted-foreground">Destination</span><span className="font-medium">{targetCountry.flag} {targetCountry.name}</span></div>
+                                      <div className="flex justify-between"><span className="text-muted-foreground">Destination</span><span className="font-medium">{targetCountry.flag} {targetCountry.country}</span></div>
                                       <div className="flex justify-between"><span className="text-muted-foreground">Method</span><span className="font-medium">{effectiveMethodLabel}</span></div>
                                       <div className="flex justify-between"><span className="text-muted-foreground">Funding</span><span className="font-medium capitalize">{fundingSource}</span></div>
                                     </div>
