@@ -44,8 +44,8 @@ Deno.serve(async (req) => {
       { global: { headers: { Authorization: authHeader } } }
     );
     const { data: { user } } = await supabase.auth.getUser();
-    if (!claims?.claims) return jr(401, { error: "Unauthorized" });
-    const userId = claims.claims.sub as string;
+    if (!user) return jr(401, { error: "Unauthorized" });
+    const userId = user.id;
 
     const body = await req.json().catch(() => ({}));
     const amount = Number(body?.amount);
