@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import { LoaderCircle, Smartphone } from "lucide-react";
 import { useFlutterwave, closePaymentModal } from "flutterwave-react-v3";
@@ -12,6 +12,12 @@ import { useCreateTransfer } from "@/hooks/useTransfers";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import {
+  MOBILE_MONEY_CURRENCY,
+  fetchFxRate,
+  friendlyFlwError,
+  validateMinAmount,
+} from "@/lib/flutterwave";
 
 const getErrorMessage = (error: unknown, fallback: string) => {
   if (error instanceof Error && error.message) return error.message;
