@@ -137,15 +137,7 @@ const SendPage = () => {
   // For card payments we always charge in USD (or NGN for NGN wallets).
   const cardCurrency = cardChargeCurrency(sourceCurrency);
 
-  useEffect(() => {
-    let cancelled = false;
-    getFlutterwavePublicKey().then((key) => {
-      if (!cancelled && key) setFlwPublicKey(key);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  // V4: no public-key bootstrap. Card payments use a hosted link via flw-initialize-payment.
 
   // Convert amount (in source currency) → USD when needed.
   useEffect(() => {
@@ -168,25 +160,6 @@ const SendPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [step]
   );
-
-  const flutterwavePay = useFlutterwave({
-    public_key: flwPublicKey,
-    tx_ref: txRef,
-    amount: cardChargeAmount,
-    currency: cardCurrency,
-    payment_options: "card",
-    customer: {
-      email: user?.email || `${user?.id || "guest"}@efin.money`,
-      phone_number: recipientPhone || "",
-      name: recipientName || "eFinMoney user",
-    },
-    customizations: {
-      title: "eFinMoney",
-      description: `Card payment to ${recipientName || "recipient"}`,
-      logo: typeof window !== "undefined" ? `${window.location.origin}/favicon.ico` : "",
-    },
-    meta: { type: "send", recipient_country: targetCountry.code },
-  });
 
   // Create transfer row + maybe save beneficiary. Returns id.
   const createTransferRecord = async () => {
