@@ -741,8 +741,16 @@ const SendPage = () => {
                                 transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
                               >
                                 <Card>
-                                  <CardHeader>
+                                  <CardHeader className="flex-row items-center justify-between space-y-0">
                                     <CardTitle>Recipient Details</CardTitle>
+                                    <button
+                                      type="button"
+                                      onClick={() => navigate('/')}
+                                      aria-label="Close and return to dashboard"
+                                      className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                                    >
+                                      <X className="w-5 h-5" />
+                                    </button>
                                   </CardHeader>
                                   <CardContent className="space-y-6">
                                     <motion.div custom={0} variants={fieldVariants} initial="hidden" animate="show">
