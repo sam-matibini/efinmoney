@@ -80,7 +80,7 @@ export const MM_COUNTRIES: MMCountry[] = [
   ]},
 ];
 
-export const POPULAR_MM_CODES = ["NG", "KE", "GH", "UG"];
+export const POPULAR_MM_CODES = ["KE", "GH", "UG", "RW"];
 
 export const findCountry = (code: string) =>
   MM_COUNTRIES.find((c) => c.code === code);
