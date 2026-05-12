@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence, type Variants } from "framer-motion";
 import { useSearchParams, useNavigate, Link } from "react-router-dom";
-import { useFlutterwave, closePaymentModal } from "flutterwave-react-v3";
+// Flutterwave V3 SDK removed — V4 uses hosted payment links via the
+// flw-initialize-payment edge function.
 import ContactsPickerModal from "@/components/modals/ContactsPickerModal";
 import AddBeneficiaryModal from "@/components/modals/AddBeneficiaryModal";
 import { useBeneficiaries, recordTransferRecipient, type Beneficiary } from "@/hooks/useBeneficiaries";
