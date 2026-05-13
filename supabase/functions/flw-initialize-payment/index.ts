@@ -1,8 +1,6 @@
-// V4 Mobile Money / Bank-transfer / USSD direct charge OR hosted Card payment.
-// For mobile money we POST /direct-charges with a phone number — user gets a USSD prompt.
-// For card payments we create an orchestration link (hosted page) — avoids JWE encryption.
+// V3 hosted payment — POST /v3/payments. Always returns a hosted checkout link.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { flwFetch, isFlwSuccess } from "../_shared/flw-v4.ts";
+import { flwV3Fetch } from "../_shared/flw-v3.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -10,113 +8,10 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-// (currency, network) -> Flutterwave V4 mobile_money network code
-const NETWORK_MAP: Record<string, string> = {
-  "KES:mpesa": "MPESA",
-  "UGX:mtn": "MTN",
-  "UGX:airtel": "AIRTEL",
-  "GHS:mtn": "MTN",
-  "GHS:airtel": "AIRTEL",
-  "GHS:vodafone": "VODAFONE",
-  "TZS:airtel": "AIRTEL",
-  "TZS:vodafone": "VODAFONE",
-  "TZS:tigo": "TIGO",
-  "ZMW:mtn": "MTN",
-  "ZMW:airtel": "AIRTEL",
-  "ZMW:zamtel": "ZAMTEL",
-  "RWF:mtn": "MTN",
-  "RWF:airtel": "AIRTEL",
-};
-
 function jr(status: number, body: unknown) {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 }
-
-function ok(body: unknown) {
-  return jr(200, body);
-}
-
-function softFail(error: string, extra: Record<string, unknown> = {}) {
-  return ok({ success: false, error, ...extra });
-}
-
-function isGatewayJson(json: any, status: number): boolean {
-  if ([0, 408, 502, 503, 504].includes(status)) return true;
-  const raw = typeof json?.raw === "string" ? json.raw : "";
-  return /OriginTimeout|Gateway Timeout|Service unavailable/i.test(raw);
-}
-
-// ── V3 fallback (api.flutterwave.com) — used when V4 host is gateway-timing-out
-const V3_MM_TYPE: Record<string, string> = {
-  KES: "mpesa",
-  UGX: "mobile_money_uganda",
-  GHS: "mobile_money_ghana",
-  TZS: "mobile_money_tanzania",
-  ZMW: "mobile_money_zambia",
-  RWF: "mobile_money_rwanda",
-};
-
-async function v3MobileMoneyCharge(opts: {
-  currency: string; amount: number; reference: string; redirectUrl: string;
-  phone: string; network: string; email: string; name: string; userId: string;
-}): Promise<{ ok: boolean; status: number; json: any }> {
-  const secret = (Deno.env.get("FLW_SECRET_KEY") || "").trim();
-  if (!secret) return { ok: false, status: 0, json: { message: "V3 fallback unavailable (FLW_SECRET_KEY not set)" } };
-  const type = V3_MM_TYPE[opts.currency];
-  if (!type) return { ok: false, status: 0, json: { message: `V3 has no MM type for ${opts.currency}` } };
-  const body: Record<string, unknown> = {
-    tx_ref: opts.reference,
-    amount: String(opts.amount),
-    currency: opts.currency,
-    email: opts.email,
-    fullname: opts.name || "eFin User",
-    phone_number: opts.phone,
-    redirect_url: opts.redirectUrl,
-    meta: { user_id: opts.userId, type: "wallet_topup", currency: opts.currency, network: opts.network },
-  };
-  if (opts.currency === "GHS") body.network = (opts.network || "MTN").toUpperCase();
-  if (opts.currency === "UGX") body.voucher = "00000";
-  const res = await fetch(`https://api.flutterwave.com/v3/charges?type=${type}`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${secret}`, "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  const text = await res.text();
-  let json: any = {}; try { json = text ? JSON.parse(text) : {}; } catch { json = { raw: text }; }
-  console.log("V3 MM charge response:", res.status, JSON.stringify(json));
-  return { ok: res.ok && json?.status === "success", status: res.status, json };
-}
-
-async function v3HostedPayment(opts: {
-  currency: string; amount: number; reference: string; redirectUrl: string;
-  email: string; name: string; phone: string; paymentMethod: string; userId: string;
-}): Promise<{ ok: boolean; status: number; json: any }> {
-  const secret = (Deno.env.get("FLW_SECRET_KEY") || "").trim();
-  if (!secret) return { ok: false, status: 0, json: { message: "V3 fallback unavailable (FLW_SECRET_KEY not set)" } };
-  const payment_options = opts.paymentMethod === "card" ? "card"
-    : opts.paymentMethod === "ussd" ? "ussd"
-    : opts.paymentMethod === "banktransfer" ? "banktransfer"
-    : "card,banktransfer,ussd";
-  const body = {
-    tx_ref: opts.reference,
-    amount: String(opts.amount),
-    currency: opts.currency,
-    redirect_url: opts.redirectUrl,
-    payment_options,
-    customer: { email: opts.email, name: opts.name, phonenumber: opts.phone },
-    meta: { user_id: opts.userId, type: "wallet_topup", currency: opts.currency },
-    customizations: { title: "eFinMoney top-up" },
-  };
-  const res = await fetch("https://api.flutterwave.com/v3/payments", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${secret}`, "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  const text = await res.text();
-  let json: any = {}; try { json = text ? JSON.parse(text) : {}; } catch { json = { raw: text }; }
-  console.log("V3 hosted payment response:", res.status, JSON.stringify(json));
-  return { ok: res.ok && json?.status === "success", status: res.status, json };
-}
+const ok = (body: unknown) => jr(200, body);
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -148,38 +43,40 @@ Deno.serve(async (req) => {
     const { data: rl } = await supabase.rpc("check_rate_limit", { p_key: `flw_topup:${userId}`, p_max_requests: 10, p_window_seconds: 60 });
     if (rl === false) return jr(429, { error: "Too many requests" });
 
-    const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-    const { data: profile } = await admin.from("profiles").select("email, first_name, last_name, phone").eq("user_id", userId).maybeSingle();
-
-    const reference = `efm_topup_${userId.slice(0, 8)}_${Date.now()}`;
-    const customer = {
-      email: profile?.email || `${userId}@efin.money`,
-      name: `${profile?.first_name || ""} ${profile?.last_name || ""}`.trim() || (profile?.email ?? "eFin User"),
-      phone_number: phone || profile?.phone || "",
-    };
-
-    // ── ALL methods: hosted orchestration link (no /direct-charges) ──
-    // We never call server-side /transfers or /direct-charges anymore — the
-    // user always completes payment on Flutterwave's hosted page. This avoids
-    // the IP whitelist requirement entirely.
-    const pmTypes: string[] =
-      paymentMethod === "card" ? ["card"]
-      : paymentMethod === "ussd" ? ["ussd"]
-      : paymentMethod === "banktransfer" ? ["bank_transfer"]
-      : paymentMethod === "mobilemoney" ? ["mobilemoney"]
-      : ["card", "bank_transfer", "mobilemoney"];
-
     if (paymentMethod === "mobilemoney" && currency === "NGN") {
       return jr(400, { error: "Nigeria does not support mobile money on Flutterwave. Please use bank transfer, USSD, or card instead." });
     }
 
-    const orchestrationPayload: Record<string, unknown> = {
-      currency,
+    const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const { data: profile } = await admin.from("profiles").select("email, first_name, last_name, phone").eq("user_id", userId).maybeSingle();
+
+    const reference = `efm_topup_${userId.slice(0, 8)}_${Date.now()}`;
+    const customerEmail = profile?.email || `${userId}@efin.money`;
+    const customerName = `${profile?.first_name || ""} ${profile?.last_name || ""}`.trim() || (profile?.email ?? "eFin User");
+    const customerPhone = phone || profile?.phone || "";
+
+    // Map paymentMethod -> V3 payment_options
+    const payment_options =
+      paymentMethod === "card" ? "card"
+      : paymentMethod === "ussd" ? "ussd"
+      : paymentMethod === "banktransfer" ? "banktransfer"
+      : paymentMethod === "mobilemoney"
+        ? (currency === "GHS" ? "mobilemoneyghana"
+          : currency === "UGX" ? "mobilemoneyuganda"
+          : currency === "KES" ? "mpesa"
+          : currency === "TZS" ? "mobilemoneytanzania"
+          : currency === "ZMW" ? "mobilemoneyzambia"
+          : currency === "RWF" ? "mobilemoneyrwanda"
+          : "card,mobilemoneyghana,mobilemoneyuganda,mpesa")
+      : "card,banktransfer,ussd";
+
+    const payload = {
+      tx_ref: reference,
       amount: String(amount),
-      reference,
+      currency,
       redirect_url: redirectUrl,
-      customer,
-      payment_method_types: pmTypes,
+      payment_options,
+      customer: { email: customerEmail, name: customerName, phonenumber: customerPhone },
       meta: {
         user_id: userId,
         type: body?.type || "wallet_topup",
@@ -188,53 +85,28 @@ Deno.serve(async (req) => {
         ...(country ? { country } : {}),
         ...(phone ? { phone } : {}),
       },
+      customizations: { title: "eFinMoney" },
     };
-    console.log("[INIT-PAY] /orchestration payload:", JSON.stringify(orchestrationPayload));
-    const { ok, status, json } = await flwFetch("/orchestration", {
+
+    const { ok: success, status, json } = await flwV3Fetch("/payments", {
       method: "POST",
-      body: JSON.stringify(orchestrationPayload),
+      body: JSON.stringify(payload),
       timeoutMs: 20_000,
     });
-    console.log("[INIT-PAY] /orchestration result:", { ok, status, body: JSON.stringify(json).slice(0, 1500) });
-    if (!ok || !isFlwSuccess(json)) {
-      if (isGatewayJson(json, status)) {
-        console.warn("V4 orchestration gateway error, falling back to V3 hosted payment ...");
-        const v3 = await v3HostedPayment({ currency, amount, reference, redirectUrl, email: customer.email, name: customer.name, phone: customer.phone_number, paymentMethod, userId });
-        if (v3.ok) {
-          return ok({
-            success: true, payment_link: v3.json?.data?.link, reference, tx_ref: reference, via: "v3_fallback",
-          });
-        }
-        return softFail(
-          /invalid authorization key/i.test(String(v3.json?.message || v3.json?.error || ""))
-            ? "Payment fallback is currently unavailable. Please contact support if this persists."
-            : "Our payout partner is temporarily unavailable. Please try again in a few minutes.",
-          {
-            transient: true,
-            fallback: true,
-            provider_status: v3.status || status,
-          },
-        );
-      }
-      return softFail(json?.message || json?.error || "Failed to initialize payment", {
-        transient: false,
-        provider_status: status,
-        details: json,
-      });
+
+    if (!success) {
+      const msg = json?.message || json?.error || `Failed to initialize payment (HTTP ${status})`;
+      return ok({ success: false, error: msg, transient: [0, 408, 502, 503, 504].includes(status), provider_status: status });
     }
 
     return ok({
       success: true,
-      payment_link: json.data?.link || json.data?.checkout_url,
+      payment_link: json?.data?.link,
       reference,
       tx_ref: reference,
     });
   } catch (err) {
-    console.error("flw-initialize-payment V4 error", err);
-    return softFail(err instanceof Error ? err.message : "Unknown error", {
-      transient: true,
-      fallback: true,
-      code: "SERVICE_FAILED",
-    });
+    console.error("flw-initialize-payment V3 error", err);
+    return ok({ success: false, error: err instanceof Error ? err.message : "Unknown error", transient: true });
   }
 });
