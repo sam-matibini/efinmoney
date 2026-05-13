@@ -106,7 +106,7 @@ const CardsPage = () => {
     <div className="min-h-screen bg-background pb-24 md:pb-8">
       <Header />
 
-      <main className="container px-4 py-6">
+      <main className="container relative z-0 px-4 py-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -180,7 +180,7 @@ const CardsPage = () => {
                       label="Card details"
                       onClick={() => toggleFlip(card.id)}
                     />
-                    <DropdownMenu>
+                    <DropdownMenu modal={false}>
                       <DropdownMenuTrigger asChild>
                         <button className="flex flex-col items-center gap-1.5 group">
                           <span className="w-12 h-12 rounded-2xl flex items-center justify-center border bg-card group-hover:bg-accent transition-colors">
