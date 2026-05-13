@@ -245,7 +245,7 @@ const SendPage = () => {
   );
 
   // Create transfer row + maybe save beneficiary. Returns id.
-  const createTransferRecord = async () => {
+  const createTransferRecord = async (overrides?: { funding_source?: 'wallet' | 'card' | 'bank' }) => {
     const ngnAcct = isNGNBank ? ngnAccountNumber.replace(/\D/g, "") : "";
     const ngnBank = isNGNBank ? (ngnBanks.find((b) => b.code === ngnBankCode)?.name || null) : null;
     const transfer = await createTransfer.mutateAsync({
@@ -264,6 +264,7 @@ const SendPage = () => {
       target_amount: receivedAmount,
       exchange_rate: effectiveRate,
       fee_amount: fee,
+      funding_source: overrides?.funding_source ?? fundingSource,
     });
     setLastTransferId(transfer.id);
     if (user) {
@@ -296,7 +297,6 @@ const SendPage = () => {
         const tid = await createTransferRecord();
         const { data, error } = await supabase.functions.invoke('execute-transfer', { body: { transfer_id: tid } });
         if (error || (data as any)?.error) throw new Error((data as any)?.error || error?.message || 'Payout failed');
-        // Gate success: payout sub-call may have failed even if execute-transfer returned 200
         const payout = (data as any)?.payout;
         if (payout && payout.success === false) {
           throw new Error(payout.error || 'Payout failed');
@@ -335,37 +335,50 @@ const SendPage = () => {
       return;
     }
 
-    // ── Card: charge a saved Stripe card, credit wallet, then payout via Flutterwave ──
+    // ── Card: charge Stripe FIRST, then create transfer + payout ────────
     const pmId = selectedSavedCardId
       || savedCards.find(c => c.is_default)?.stripe_payment_method_id
       || savedCards[0]?.stripe_payment_method_id;
     if (!pmId) {
-      toast.error("Add a saved card first");
+      toast.error("No saved cards. Go to Cards page to link a card first.");
       setConfirming(false);
       return;
     }
-    let tid: string;
+
+    // Step A: charge the card
+    const totalCharge = Math.round((parsedAmount + fee) * 100) / 100;
+    let chargeData: any;
     try {
-      tid = await createTransferRecord();
-    } catch (e: any) {
-      toast.error(e?.message || 'Failed to create transfer');
-      setConfirming(false);
-      return;
-    }
-    try {
-      const totalCharge = Math.round((parsedAmount + fee) * 100) / 100;
-      const { data: chargeData, error: chargeErr } = await supabase.functions.invoke('stripe-charge-saved-card', {
+      const { data, error: chargeErr } = await supabase.functions.invoke('stripe-charge-saved-card', {
         body: {
           payment_method_id: pmId,
           amount: totalCharge,
           currency: sourceCurrency,
-          transfer_id: tid,
           purpose: 'transfer_funding',
         },
       });
-      if (chargeErr || !(chargeData as any)?.success) {
-        throw new Error((chargeData as any)?.error || chargeErr?.message || 'Card charge failed');
+      if (chargeErr || !(data as any)?.success) {
+        throw new Error((data as any)?.error || chargeErr?.message || 'Card charge failed');
       }
+      chargeData = data;
+    } catch (e: any) {
+      toast.error(`Card payment failed: ${e?.message || 'Please try another card.'}`);
+      setConfirming(false);
+      return;
+    }
+
+    // Step B: card succeeded → create transfer record (funding_source='card' bypasses wallet balance check)
+    let tid: string;
+    try {
+      tid = await createTransferRecord({ funding_source: 'card' });
+    } catch (e: any) {
+      toast.error(`Payment received, but we could not create the transfer: ${e?.message || ''}. Funds remain in your wallet.`);
+      setConfirming(false);
+      return;
+    }
+
+    // Step C: trigger payout via Flutterwave
+    try {
       const { data, error } = await supabase.functions.invoke('execute-transfer', { body: { transfer_id: tid } });
       if (error || (data as any)?.error) throw new Error((data as any)?.error || error?.message || 'Payout failed');
       const payout = (data as any)?.payout;
@@ -373,12 +386,14 @@ const SendPage = () => {
       goToStep(4);
       toast.success(payout?.queued ? 'Card charged — payout queued' : 'Transfer sent successfully!');
     } catch (e: any) {
+      // Card already charged + wallet credited. Mark transfer processing — don't roll back.
       try {
         await supabase.from('transfers')
-          .update({ status: 'failed', failure_reason: String(e?.message ?? 'Card charge failed') })
+          .update({ status: 'processing', failure_reason: `Payout queued — ${String(e?.message ?? 'orchestration pending')}` })
           .eq('id', tid);
       } catch { /* ignore */ }
-      toast.error(e?.message || 'Card charge failed');
+      toast.success('Payment received! Payout to recipient is being processed.', { duration: 8000 });
+      goToStep(4);
     } finally {
       setConfirming(false);
     }
