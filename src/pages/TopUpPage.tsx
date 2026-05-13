@@ -12,6 +12,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { CheckCircle2, XCircle } from "lucide-react";
 import { ALLOWED_TOPUP_CURRENCIES, validateMinAmount, friendlyFlwError, minAmount, type FlwMethod } from "@/lib/flutterwave";
+import { MM_COUNTRIES } from "@/lib/mobileMoneyNetworks";
+
+const MM_BY_CCY = Object.fromEntries(MM_COUNTRIES.map((c) => [c.currency, c]));
 
 const METHODS: { value: FlwMethod; label: string }[] = [
   { value: "card", label: "Card" },
@@ -27,12 +30,23 @@ const TopUpPage = () => {
   const [currency, setCurrency] = useState<string>(ALLOWED_TOPUP_CURRENCIES.card[0]);
   const [loading, setLoading] = useState(false);
   const [verifyState, setVerifyState] = useState<{ status: "verifying" | "success" | "failed"; message: string } | null>(null);
+  const [network, setNetwork] = useState<string>("");
+  const [phone, setPhone] = useState<string>("");
+
+  const mmCountry = method === "mobilemoney" ? MM_BY_CCY[currency] : undefined;
 
   // Keep currency valid for the chosen method
   useEffect(() => {
     const allowed = ALLOWED_TOPUP_CURRENCIES[method];
     if (!allowed.includes(currency)) setCurrency(allowed[0]);
   }, [method, currency]);
+
+  // Default the network when the mobile-money country changes
+  useEffect(() => {
+    if (mmCountry && !mmCountry.networks.find((n) => n.value === network)) {
+      setNetwork(mmCountry.networks[0]?.value || "");
+    }
+  }, [mmCountry, network]);
 
   useEffect(() => {
     const tx = params.get("transaction_id");
@@ -71,11 +85,24 @@ const TopUpPage = () => {
     }
     const minErr = validateMinAmount(currency, amt);
     if (minErr) { toast.error(minErr); return; }
+    if (method === "mobilemoney") {
+      if (!mmCountry) { toast.error(`${currency} mobile money is not supported.`); return; }
+      if (!network) { toast.error("Select a mobile money network"); return; }
+      const digits = phone.replace(/\D/g, "");
+      if (digits.length < 9) { toast.error("Enter a valid mobile number"); return; }
+    }
     setLoading(true);
     try {
       const redirectUrl = `${window.location.origin}/wallet/topup`;
+      const fullPhone = mmCountry ? `${mmCountry.dialCode}${phone.replace(/\D/g, "").replace(/^0+/, "")}` : phone;
       const { data, error } = await supabase.functions.invoke("flw-initialize-payment", {
-        body: { amount: amt, currency, paymentMethod: method, redirectUrl },
+        body: {
+          amount: amt,
+          currency,
+          paymentMethod: method,
+          redirectUrl,
+          ...(method === "mobilemoney" ? { network, phone: fullPhone, country: mmCountry?.code } : {}),
+        },
       });
       if (error) throw error;
       const link = (data as { payment_link?: string; error?: string })?.payment_link;
@@ -133,6 +160,29 @@ const TopUpPage = () => {
                 <Label>Amount</Label>
                 <Input type="number" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" />
               </div>
+              {method === "mobilemoney" && mmCountry && (
+                <>
+                  <div>
+                    <Label>Network</Label>
+                    <Select value={network} onValueChange={setNetwork}>
+                      <SelectTrigger><SelectValue placeholder="Select network" /></SelectTrigger>
+                      <SelectContent>
+                        {mmCountry.networks.map((n) => (
+                          <SelectItem key={n.value} value={n.value}>{n.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Mobile number</Label>
+                    <div className="flex gap-2">
+                      <div className="flex items-center px-3 rounded-md border bg-muted text-sm">{mmCountry.flag} {mmCountry.dialCode}</div>
+                      <Input inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="7XX XXX XXX" />
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">You'll be prompted on your phone to authorize the payment.</p>
+                  </div>
+                </>
+              )}
               <Button className="w-full" onClick={handleTopUp} disabled={loading}>
                 {loading ? "Redirecting..." : "Continue to payment"}
               </Button>

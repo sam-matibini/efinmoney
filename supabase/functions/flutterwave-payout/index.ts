@@ -144,9 +144,12 @@ Deno.serve(async (req) => {
         ? "Our payout partner is temporarily unavailable. Please try again in a few minutes."
         : rawReason;
       if (isTemporaryProviderSetupError(rawReason)) {
-        await supabase.from("transfers").update({ status: "processing", provider_reference: `PENDING-${reference}`, failure_reason: null }).eq("id", transfer_id);
-        await supabase.from("notifications").insert({ user_id: user.id, title: "Transfer queued", message: `Your ${currency} ${amount} transfer to ${recipient_name} is queued while the payout partner completes setup.`, type: "info" });
-        return new Response(JSON.stringify({ success: true, queued: true, reference, provider_message: rawReason }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        const opsReason = `Provider setup required: enable IP whitelisting on Flutterwave for ${currency} payouts. Funds returned. (raw: ${rawReason})`;
+        const userReason = `${currency} payouts are temporarily unavailable. Your funds have been returned to your wallet — please try again shortly.`;
+        const rev = await reverseTransferLedger(supabase, transfer_id);
+        await supabase.from("transfers").update({ status: "failed", failure_reason: opsReason.slice(0, 500) }).eq("id", transfer_id);
+        await supabase.from("notifications").insert({ user_id: user.id, title: "Transfer failed — refunded", message: rev.reversed ? userReason : userReason.replace("Your funds have been returned to your wallet — please try again shortly.", "Please contact support."), type: "error" });
+        return new Response(JSON.stringify({ success: false, error: userReason, code: "provider_setup_required", refunded: rev.reversed, provider_message: rawReason }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
       const rev = await reverseTransferLedger(supabase, transfer_id);
       await supabase.from("transfers").update({ status: "failed", failure_reason: reason }).eq("id", transfer_id);

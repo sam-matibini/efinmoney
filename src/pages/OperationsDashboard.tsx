@@ -10,6 +10,7 @@ import { OperationsKPIsPanel } from "@/components/operations/OperationsKPIsPanel
 import { RegulatoryReportsPanel } from "@/components/operations/RegulatoryReportsPanel";
 import { CommunicationsPanel } from "@/components/operations/CommunicationsPanel";
 import { MakerCheckerPanel } from "@/components/operations/MakerCheckerPanel";
+import { ProviderStatusPanel } from "@/components/operations/ProviderStatusPanel";
 
 const OperationsDashboard = () => {
   return (
@@ -26,6 +27,9 @@ const OperationsDashboard = () => {
             <h1 className="text-2xl font-display font-bold text-foreground">Operations Dashboard</h1>
             <p className="text-muted-foreground">CRM, transaction monitoring, disputes, compliance & operational controls</p>
           </div>
+
+
+          <ProviderStatusPanel />
 
           <Tabs defaultValue="crm" className="space-y-4">
             <div className="overflow-x-auto pb-2">
