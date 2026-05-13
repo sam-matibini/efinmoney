@@ -189,7 +189,13 @@ Deno.serve(async (req) => {
         ...(phone ? { phone } : {}),
       },
     };
-    const { ok, status, json } = await flwFetch("/orchestration", { method: "POST", body: JSON.stringify(orchestrationPayload) });
+    console.log("[INIT-PAY] /orchestration payload:", JSON.stringify(orchestrationPayload));
+    const { ok, status, json } = await flwFetch("/orchestration", {
+      method: "POST",
+      body: JSON.stringify(orchestrationPayload),
+      timeoutMs: 20_000,
+    });
+    console.log("[INIT-PAY] /orchestration result:", { ok, status, body: JSON.stringify(json).slice(0, 1500) });
     if (!ok || !isFlwSuccess(json)) {
       if (isGatewayJson(json, status)) {
         console.warn("V4 orchestration gateway error, falling back to V3 hosted payment ...");
