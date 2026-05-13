@@ -1,0 +1,1 @@
+TRUNCATE TABLE public.ledger_entries, public.transfers, public.fx_transactions, public.crypto_trades, public.intra_ca_transfers, public.bill_payments, public.tax_transactions, public.transaction_interventions, public.bank_transactions RESTART IDENTITY CASCADE;
