@@ -21,6 +21,15 @@ import { format, formatDistanceToNow } from "date-fns";
 
 const refOf = (id: string) => `EFM-${id.replace(/-/g, "").slice(0, 8).toUpperCase()}`;
 
+const friendlyFailureReason = (reason: string): string => {
+  const r = reason.toLowerCase();
+  if (r.includes("provider setup required") || r.includes("ip whitelist") || r.includes("whitelisting")) {
+    return "This payout corridor is temporarily unavailable. Your funds have been returned to your wallet. Please try again shortly or contact support.";
+  }
+  // Strip any "(raw: ...)" debug suffix from other ops messages
+  return reason.replace(/\s*\(raw:[^)]*\)\s*/gi, "").trim();
+};
+
 const currencySymbol = (code: string) => {
   const map: Record<string, string> = {
     USD: "$", CAD: "C$", EUR: "€", GBP: "£", NGN: "₦",
@@ -274,7 +283,7 @@ const TransferTrackingPage = () => {
                 </ol>
                 {transfer.failure_reason && (
                   <div className="mt-4 p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-sm text-destructive">
-                    {transfer.failure_reason}
+                    {friendlyFailureReason(transfer.failure_reason)}
                   </div>
                 )}
               </CardContent>
