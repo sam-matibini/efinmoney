@@ -180,7 +180,7 @@ const CardsPage = () => {
                       label="Card details"
                       onClick={() => toggleFlip(card.id)}
                     />
-                    <DropdownMenu>
+                    <DropdownMenu modal={false}>
                       <DropdownMenuTrigger asChild>
                         <button className="flex flex-col items-center gap-1.5 group">
                           <span className="w-12 h-12 rounded-2xl flex items-center justify-center border bg-card group-hover:bg-accent transition-colors">
