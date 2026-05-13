@@ -19,8 +19,9 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useCardMutations, type Card as CardRow, type CardType, type CardNetwork } from "@/hooks/useCards";
 import { useWallets } from "@/hooks/useWallets";
-import { Copy, Check, Eye, EyeOff, ShieldCheck } from "lucide-react";
+import { Copy, Check, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
+import SaveCardForm from "@/components/cards/SaveCardForm";
 
 interface AddCardModalProps {
   isOpen: boolean;
@@ -28,23 +29,6 @@ interface AddCardModalProps {
 }
 
 const formatPan = (pan: string) => pan.replace(/(.{4})/g, "$1 ").trim();
-
-const luhnValid = (digits: string) => {
-  if (!/^\d{13,19}$/.test(digits)) return false;
-  let sum = 0;
-  for (let i = 0; i < digits.length; i++) {
-    let d = parseInt(digits[digits.length - 1 - i], 10);
-    if (i % 2 === 1) {
-      d *= 2;
-      if (d > 9) d -= 9;
-    }
-    sum += d;
-  }
-  return sum % 10 === 0;
-};
-
-const detectNetwork = (digits: string): CardNetwork =>
-  digits.startsWith("4") ? "visa" : "mastercard";
 
 const AddCardModal = ({ isOpen, onClose }: AddCardModalProps) => {
   const { createCard } = useCardMutations();
@@ -60,13 +44,6 @@ const AddCardModal = ({ isOpen, onClose }: AddCardModalProps) => {
   const [creditLimit, setCreditLimit] = useState("10000");
   const [walletId, setWalletId] = useState<string>("");
 
-  // Link mode state
-  const [linkName, setLinkName] = useState("");
-  const [linkPan, setLinkPan] = useState("");
-  const [linkExp, setLinkExp] = useState(""); // MM/YY
-  const [linkCvv, setLinkCvv] = useState("");
-  const [linkWalletId, setLinkWalletId] = useState("");
-
   const [createdCard, setCreatedCard] = useState<CardRow | null>(null);
   const [reveal, setReveal] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -81,11 +58,6 @@ const AddCardModal = ({ isOpen, onClose }: AddCardModalProps) => {
     setSpendingLimit("5000");
     setCreditLimit("10000");
     setWalletId("");
-    setLinkName("");
-    setLinkPan("");
-    setLinkExp("");
-    setLinkCvv("");
-    setLinkWalletId("");
     setCreatedCard(null);
     setReveal(false);
     setCopied(false);
@@ -116,36 +88,6 @@ const AddCardModal = ({ isOpen, onClose }: AddCardModalProps) => {
         wallet_id: isCredit ? null : walletId,
       });
       setCreatedCard(card);
-    } catch {
-      /* toast handled */
-    }
-  };
-
-  const handleLink = async () => {
-    if (!linkName.trim()) return toast.error("Cardholder name is required");
-    const digits = linkPan.replace(/\D/g, "");
-    if (!luhnValid(digits)) return toast.error("Invalid card number");
-    const expMatch = linkExp.match(/^(\d{2})\s*\/\s*(\d{2})$/);
-    if (!expMatch) return toast.error("Expiry must be MM/YY");
-    const mm = parseInt(expMatch[1], 10);
-    const yy = parseInt(expMatch[2], 10);
-    if (mm < 1 || mm > 12) return toast.error("Invalid expiry month");
-    if (!/^\d{3,4}$/.test(linkCvv)) return toast.error("Invalid CVV");
-    if (!linkWalletId) return toast.error("Select a wallet to fund");
-
-    try {
-      await createCard.mutateAsync({
-        card_type: "debit",
-        card_network: detectNetwork(digits),
-        cardholder_name: linkName.trim(),
-        wallet_id: linkWalletId,
-        external: {
-          last_four: digits.slice(-4),
-          expiry_month: mm,
-          expiry_year: 2000 + yy,
-        },
-      });
-      handleClose();
     } catch {
       /* toast handled */
     }
@@ -294,82 +236,7 @@ const AddCardModal = ({ isOpen, onClose }: AddCardModalProps) => {
             </TabsContent>
 
             <TabsContent value="link" className="space-y-4 mt-4">
-              <div className="flex items-start gap-2 rounded-md bg-muted/40 p-3 text-xs text-muted-foreground">
-                <ShieldCheck className="w-4 h-4 mt-0.5 shrink-0 text-primary" />
-                <span>
-                  We only store the last 4 digits and expiry. Your full number and CVV are
-                  re-collected via our secure payment processor at top-up time.
-                </span>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Cardholder Name</Label>
-                <Input
-                  placeholder="JOHN DOE"
-                  value={linkName}
-                  onChange={(e) => setLinkName(e.target.value.toUpperCase())}
-                  maxLength={50}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Card Number</Label>
-                <Input
-                  inputMode="numeric"
-                  placeholder="4242 4242 4242 4242"
-                  value={linkPan}
-                  onChange={(e) => {
-                    const d = e.target.value.replace(/\D/g, "").slice(0, 19);
-                    setLinkPan(d.replace(/(.{4})/g, "$1 ").trim());
-                  }}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label>Expiry (MM/YY)</Label>
-                  <Input
-                    placeholder="12/29"
-                    value={linkExp}
-                    onChange={(e) => {
-                      const d = e.target.value.replace(/\D/g, "").slice(0, 4);
-                      setLinkExp(d.length > 2 ? `${d.slice(0, 2)}/${d.slice(2)}` : d);
-                    }}
-                    maxLength={5}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>CVV</Label>
-                  <Input
-                    inputMode="numeric"
-                    placeholder="123"
-                    value={linkCvv}
-                    onChange={(e) => setLinkCvv(e.target.value.replace(/\D/g, "").slice(0, 4))}
-                    maxLength={4}
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Wallet to Fund</Label>
-                <Select value={linkWalletId} onValueChange={setLinkWalletId}>
-                  <SelectTrigger><SelectValue placeholder="Select a wallet" /></SelectTrigger>
-                  <SelectContent>
-                    {wallets?.map((w) => (
-                      <SelectItem key={w.wallet_id} value={w.wallet_id}>
-                        {w.flag_emoji} {w.currency_code} — {w.symbol}{Number(w.balance).toFixed(2)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <DialogFooter>
-                <Button variant="outline" onClick={handleClose}>Cancel</Button>
-                <Button onClick={handleLink} disabled={createCard.isPending}>
-                  {createCard.isPending ? "Linking..." : "Link Card"}
-                </Button>
-              </DialogFooter>
+              <SaveCardForm onSuccess={handleClose} onCancel={handleClose} />
             </TabsContent>
           </Tabs>
         )}

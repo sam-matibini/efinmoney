@@ -20,6 +20,7 @@ import { useWallets } from "@/hooks/useWallets";
 import { useFxRates } from "@/hooks/useFxRates";
 import { useCreateTransfer } from "@/hooks/useTransfers";
 import { useFundingSources } from "@/hooks/useFundingSources";
+import { useSavedCards } from "@/hooks/useSavedCards";
 import { usePricingConfig } from "@/hooks/usePricingConfig";
 import { supabase } from "@/integrations/supabase/client";
 import { friendlyFlwError, fetchFxRate, cardChargeCurrency, initializeFlwPayment } from "@/lib/flutterwave";
@@ -86,8 +87,10 @@ const SendPage = () => {
   const { data: fxRates } = useFxRates();
   const { data: bankSources = [] } = useFundingSources('bank');
   const { data: cardSources = [] } = useFundingSources('card');
+  const { data: savedCards = [] } = useSavedCards();
   const { data: pricing } = usePricingConfig();
   const createTransfer = useCreateTransfer();
+  const [selectedSavedCardId, setSelectedSavedCardId] = useState<string>("");
 
   const selectedWallet = wallets?.find(w => w.wallet_id === selectedWalletId) || wallets?.[0];
   const targetCountry = findCountryById(targetCountryId) || COUNTRIES[0];
@@ -330,9 +333,12 @@ const SendPage = () => {
       return;
     }
 
-    // ── Card: V4 hosted payment link — redirect user to Flutterwave checkout ──
-    if (usdRate === null || cardChargeAmount <= 0) {
-      toast.error(`No FX rate available for ${sourceCurrency} → ${cardCurrency}`);
+    // ── Card: charge a saved Stripe card, credit wallet, then payout via Flutterwave ──
+    const pmId = selectedSavedCardId
+      || savedCards.find(c => c.is_default)?.stripe_payment_method_id
+      || savedCards[0]?.stripe_payment_method_id;
+    if (!pmId) {
+      toast.error("Add a saved card first");
       setConfirming(false);
       return;
     }
@@ -345,25 +351,33 @@ const SendPage = () => {
       return;
     }
     try {
-      const callbackUrl = `${window.location.origin}/payment-callback?transfer_id=${tid}`;
-      const result = await initializeFlwPayment({
-        amount: cardChargeAmount,
-        currency: cardCurrency,
-        paymentMethod: 'card',
-        redirectUrl: callbackUrl,
+      const totalCharge = Math.round((parsedAmount + fee) * 100) / 100;
+      const { data: chargeData, error: chargeErr } = await supabase.functions.invoke('stripe-charge-saved-card', {
+        body: {
+          payment_method_id: pmId,
+          amount: totalCharge,
+          currency: sourceCurrency,
+          transfer_id: tid,
+          purpose: 'transfer_funding',
+        },
       });
-      if (!result.payment_link) throw new Error('No payment link returned');
-      // Persist the in-progress transfer id so /payment-callback can verify
-      try { sessionStorage.setItem('pending_transfer_id', tid); } catch { /* ignore */ }
-      toast.success('Redirecting to Flutterwave…');
-      window.location.href = result.payment_link;
-    } catch (e) {
+      if (chargeErr || !(chargeData as any)?.success) {
+        throw new Error((chargeData as any)?.error || chargeErr?.message || 'Card charge failed');
+      }
+      const { data, error } = await supabase.functions.invoke('execute-transfer', { body: { transfer_id: tid } });
+      if (error || (data as any)?.error) throw new Error((data as any)?.error || error?.message || 'Payout failed');
+      const payout = (data as any)?.payout;
+      if (payout && payout.success === false) throw new Error(payout.error || 'Payout failed');
+      goToStep(4);
+      toast.success(payout?.queued ? 'Card charged — payout queued' : 'Transfer sent successfully!');
+    } catch (e: any) {
       try {
         await supabase.from('transfers')
-          .update({ status: 'failed', failure_reason: friendlyFlwError(e, cardCurrency) })
+          .update({ status: 'failed', failure_reason: String(e?.message ?? 'Card charge failed') })
           .eq('id', tid);
       } catch { /* ignore */ }
-      toast.error(friendlyFlwError(e, cardCurrency));
+      toast.error(e?.message || 'Card charge failed');
+    } finally {
       setConfirming(false);
     }
   };
@@ -661,23 +675,44 @@ const SendPage = () => {
 
                                     {fundingSource === 'card' && (
                                       <motion.div custom={1} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
-                                        <Label>Pay with Card</Label>
-                                        <div className="p-3 rounded-lg border border-border bg-muted/40 space-y-2">
-                                          <p className="text-xs text-muted-foreground">
-                                            You'll be redirected to a secure card checkout (powered by Flutterwave) on the review step. Card payments are charged in {cardCurrency}.
-                                          </p>
-                                          {parsedAmount > 0 && usdRate !== null && sourceCurrency !== cardCurrency && (
-                                            <p className="text-xs text-muted-foreground">
-                                              Estimated charge: <span className="font-medium">{cardCurrency} {cardChargeAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                              {' '}(rate: 1 {sourceCurrency} = {usdRate.toFixed(4)} {cardCurrency})
-                                            </p>
-                                          )}
-                                          {cardFee > 0 && (
-                                            <p className="text-xs text-muted-foreground">+{sourceSymbol}{cardFee.toFixed(2)} card processing fee applies</p>
-                                          )}
-                                        </div>
+                                        <Label>Pay with saved card</Label>
+                                        {savedCards.length === 0 ? (
+                                          <div className="p-3 rounded-lg border border-dashed border-border bg-muted/40 space-y-2">
+                                            <div className="flex items-start gap-2">
+                                              <AlertCircle className="w-4 h-4 mt-0.5 text-muted-foreground shrink-0" />
+                                              <p className="text-sm text-muted-foreground">No saved cards yet. Add one to pay by card.</p>
+                                            </div>
+                                            <Button asChild type="button" variant="secondary" size="sm" className="w-full">
+                                              <Link to="/cards"><CreditCard className="w-4 h-4 mr-2" />Add a card</Link>
+                                            </Button>
+                                          </div>
+                                        ) : (
+                                          <div className="space-y-2">
+                                            {savedCards.map((c) => {
+                                              const id = c.stripe_payment_method_id;
+                                              const checked = (selectedSavedCardId || savedCards.find(x => x.is_default)?.stripe_payment_method_id || savedCards[0].stripe_payment_method_id) === id;
+                                              return (
+                                                <button
+                                                  key={c.id}
+                                                  type="button"
+                                                  onClick={() => setSelectedSavedCardId(id)}
+                                                  className={`w-full text-left flex items-center gap-3 p-3 rounded-lg border transition ${checked ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted/40'}`}
+                                                >
+                                                  <CreditCard className="w-5 h-5 text-muted-foreground" />
+                                                  <div className="flex-1 min-w-0">
+                                                    <p className="text-sm font-medium capitalize">{c.card_brand ?? 'Card'} •••• {c.last_four}</p>
+                                                    <p className="text-xs text-muted-foreground">Exp {String(c.exp_month ?? '').padStart(2, '0')}/{String(c.exp_year ?? '').slice(-2)}</p>
+                                                  </div>
+                                                  {checked && <CheckCircle className="w-4 h-4 text-primary" />}
+                                                </button>
+                                              );
+                                            })}
+                                            <p className="text-xs text-muted-foreground">Card will be charged in {sourceCurrency}.</p>
+                                          </div>
+                                        )}
                                       </motion.div>
                                     )}
+
 
                                     <motion.div custom={2} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
                                       <Label>You Send</Label>

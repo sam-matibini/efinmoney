@@ -2192,6 +2192,7 @@ export type Database = {
           risk_score: number | null
           state_province: string | null
           street_address: string | null
+          stripe_customer_id: string | null
           updated_at: string
           user_id: string
         }
@@ -2215,6 +2216,7 @@ export type Database = {
           risk_score?: number | null
           state_province?: string | null
           street_address?: string | null
+          stripe_customer_id?: string | null
           updated_at?: string
           user_id: string
         }
@@ -2238,6 +2240,7 @@ export type Database = {
           risk_score?: number | null
           state_province?: string | null
           street_address?: string | null
+          stripe_customer_id?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -2653,6 +2656,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      saved_payment_methods: {
+        Row: {
+          card_brand: string | null
+          cardholder_name: string | null
+          created_at: string
+          exp_month: number | null
+          exp_year: number | null
+          id: string
+          is_default: boolean
+          last_four: string | null
+          stripe_customer_id: string
+          stripe_payment_method_id: string
+          user_id: string
+        }
+        Insert: {
+          card_brand?: string | null
+          cardholder_name?: string | null
+          created_at?: string
+          exp_month?: number | null
+          exp_year?: number | null
+          id?: string
+          is_default?: boolean
+          last_four?: string | null
+          stripe_customer_id: string
+          stripe_payment_method_id: string
+          user_id: string
+        }
+        Update: {
+          card_brand?: string | null
+          cardholder_name?: string | null
+          created_at?: string
+          exp_month?: number | null
+          exp_year?: number | null
+          id?: string
+          is_default?: boolean
+          last_four?: string | null
+          stripe_customer_id?: string
+          stripe_payment_method_id?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       savings_goals: {
         Row: {
