@@ -1,6 +1,6 @@
-// V4 bill categories — GET /bill-categories?country=NG
+// V3 bill categories — GET /v3/top-bill-categories  (or /v3/bill-categories)
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { flwFetch, isFlwSuccess } from "../_shared/flw-v4.ts";
+import { flwV3Fetch } from "../_shared/flw-v3.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -30,18 +30,11 @@ Deno.serve(async (req) => {
     }
 
     let billers: any[] = [];
-    try {
-      const { ok, json } = await flwFetch(`/bill-categories?country=${country}`, { method: "GET", timeoutMs: 6000 });
-      if (ok && isFlwSuccess(json)) {
-        billers = json.data || [];
-      } else {
-        console.warn("FLW bill-categories non-ok", json);
-      }
-    } catch (e) {
-      console.warn("FLW bill-categories threw", e);
+    const { ok, json } = await flwV3Fetch(`/top-bill-categories`, { method: "GET", timeoutMs: 10_000 });
+    if (ok && Array.isArray(json?.data)) {
+      billers = json.data.filter((b: any) => !country || (b.country || "").toUpperCase() === country || !b.country);
     }
 
-    // Serve stale cache if available when upstream failed
     if (billers.length === 0 && cached?.billers) {
       return new Response(JSON.stringify({ billers: cached.billers, cached: true, stale: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
