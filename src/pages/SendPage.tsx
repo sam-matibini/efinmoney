@@ -689,12 +689,12 @@ const SendPage = () => {
                                           <div className="space-y-2">
                                             {savedCards.map((c) => {
                                               const id = c.stripe_payment_method_id;
-                                              const checked = (selectedSavedCardId || savedCards.find(x => x.is_default)?.stripe_payment_method_id || savedCards[0].stripe_payment_method_id) === id;
+                                              const checked = (selectedSavedCardId ?? savedCards.find(x => x.is_default)?.stripe_payment_method_id ?? savedCards[0].stripe_payment_method_id) === id;
                                               return (
                                                 <button
                                                   key={c.id}
                                                   type="button"
-                                                  onClick={() => setSelectedSavedCardId(id)}
+                                                  onClick={() => setSelectedSavedCardId(checked ? null : id)}
                                                   className={`w-full text-left flex items-center gap-3 p-3 rounded-lg border transition ${checked ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted/40'}`}
                                                 >
                                                   <CreditCard className="w-5 h-5 text-muted-foreground" />
@@ -706,7 +706,12 @@ const SendPage = () => {
                                                 </button>
                                               );
                                             })}
-                                            <p className="text-xs text-muted-foreground">Card will be charged in {sourceCurrency}.</p>
+                                            <div className="flex items-center justify-between pt-1">
+                                              <p className="text-xs text-muted-foreground">Card will be charged in {sourceCurrency}.</p>
+                                              <Button type="button" variant="ghost" size="sm" className="h-auto py-1 px-2 text-xs" onClick={() => setAddCardOpen(true)}>
+                                                <CreditCard className="w-3.5 h-3.5 mr-1" />Add another
+                                              </Button>
+                                            </div>
                                           </div>
                                         )}
                                       </motion.div>
