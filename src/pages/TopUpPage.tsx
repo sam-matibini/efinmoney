@@ -30,12 +30,23 @@ const TopUpPage = () => {
   const [currency, setCurrency] = useState<string>(ALLOWED_TOPUP_CURRENCIES.card[0]);
   const [loading, setLoading] = useState(false);
   const [verifyState, setVerifyState] = useState<{ status: "verifying" | "success" | "failed"; message: string } | null>(null);
+  const [network, setNetwork] = useState<string>("");
+  const [phone, setPhone] = useState<string>("");
+
+  const mmCountry = method === "mobilemoney" ? MM_BY_CCY[currency] : undefined;
 
   // Keep currency valid for the chosen method
   useEffect(() => {
     const allowed = ALLOWED_TOPUP_CURRENCIES[method];
     if (!allowed.includes(currency)) setCurrency(allowed[0]);
   }, [method, currency]);
+
+  // Default the network when the mobile-money country changes
+  useEffect(() => {
+    if (mmCountry && !mmCountry.networks.find((n) => n.value === network)) {
+      setNetwork(mmCountry.networks[0]?.value || "");
+    }
+  }, [mmCountry, network]);
 
   useEffect(() => {
     const tx = params.get("transaction_id");
