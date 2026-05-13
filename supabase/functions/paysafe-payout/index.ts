@@ -128,7 +128,6 @@ Deno.serve(async (req) => {
         headers: {
           Authorization: authHeader(),
           "Content-Type": "application/json",
-          "Simulator": PAYSAFE_ENV === "test" ? "EXTERNAL" : "INTERNAL",
         },
         body: JSON.stringify(body),
         signal: ctrl.signal,
