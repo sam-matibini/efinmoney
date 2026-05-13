@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import NotificationsPanel from "@/components/header/NotificationsPanel";
 import SearchModal from "@/components/header/SearchModal";
+import { Logo } from "@/components/Logo";
 import ThemeToggle from "@/components/theme/ThemeToggle";
 import { useWallets } from "@/hooks/useWallets";
 
