@@ -380,12 +380,31 @@ const SendPage = () => {
       if (!selectedWallet) { setConfirming(false); return; }
       try {
         const tid = await createTransferRecord();
-        const { data, error } = await supabase.functions.invoke('execute-transfer', { body: { transfer_id: tid } });
-        if (error || (data as any)?.error) throw new Error((data as any)?.error || error?.message || 'Payout failed');
-        const payout = (data as any)?.payout;
-        if (payout && payout.success === false) {
-          throw new Error(payout.error || 'Payout failed');
+        let data: any = null;
+        let invokeErr: any = null;
+        try {
+          const res = await supabase.functions.invoke('execute-transfer', { body: { transfer_id: tid } });
+          data = res.data;
+          invokeErr = res.error;
+        } catch (err) {
+          invokeErr = err;
         }
+        // Recover structured body when Supabase JS throws on non-2xx
+        if (invokeErr && !data && (invokeErr as any)?.context?.response) {
+          try { data = await (invokeErr as any).context.response.json(); } catch { /* ignore */ }
+        }
+        if (data?.success === false || data?.error) {
+          const refunded = data.refunded === true || data?.payout?.refunded === true;
+          const msg = data.error || data?.payout?.error || 'Payout failed';
+          if (refunded) {
+            toast.error(msg, { description: 'Funds have been returned to your wallet.', duration: 10000 });
+          } else {
+            toast.error(msg, { duration: 8000 });
+          }
+          return;
+        }
+        if (invokeErr) throw new Error(invokeErr.message || 'Payout failed');
+        const payout = data?.payout;
         goToStep(4);
         toast.success(payout?.queued ? 'Transfer queued — awaiting payout partner' : 'Transfer sent successfully!');
       } catch (e: any) {
