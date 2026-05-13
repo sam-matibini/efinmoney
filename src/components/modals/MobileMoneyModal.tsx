@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { z } from "zod";
-import { Check, ChevronsUpDown, LoaderCircle, Smartphone } from "lucide-react";
+import { Check, ChevronsUpDown, LoaderCircle, Smartphone, Wallet, CreditCard, Landmark, AlertCircle, ArrowRight } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,8 +19,11 @@ import { MOBILE_MONEY_CURRENCY, fetchFxRate, friendlyFlwError, initializeFlwPaym
 import { MM_COUNTRIES, POPULAR_MM_CODES, findCountry } from "@/lib/mobileMoneyNetworks";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useBeneficiaries, useCreateBeneficiary, initialsOf, type Beneficiary } from "@/hooks/useBeneficiaries";
+import { useSavedCards } from "@/hooks/useSavedCards";
 import ContactsPickerModal from "@/components/modals/ContactsPickerModal";
 import { Users, UserPlus } from "lucide-react";
+
+type FundingSource = 'wallet' | 'card' | 'bank' | 'flutterwave';
 
 const getErrorMessage = (error: unknown, fallback: string) => {
   if (error instanceof Error && error.message) return error.message;
