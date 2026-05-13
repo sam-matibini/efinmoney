@@ -89,12 +89,82 @@ const SendPage = () => {
 
   const { data: wallets } = useWallets();
   const { data: fxRates } = useFxRates();
-  const { data: bankSources = [] } = useFundingSources('bank');
+  const { data: linkedBankSources = [] } = useFundingSources('bank');
   const { data: cardSources = [] } = useFundingSources('card');
   const { data: savedCards = [] } = useSavedCards();
   const { data: pricing } = usePricingConfig();
   const createTransfer = useCreateTransfer();
   const [selectedSavedCardId, setSelectedSavedCardId] = useState<string>("");
+  const qc = useQueryClient();
+
+  // Plaid-linked bank accounts (preferred path for ACH/EFT funding)
+  const { data: plaidAccounts = [] } = useQuery({
+    queryKey: ["plaid_accounts", user?.id],
+    queryFn: async () => {
+      if (!user) return [] as any[];
+      const { data, error } = await supabase
+        .from("plaid_accounts")
+        .select("id,name,mask,subtype, plaid_items(institution_name)")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user,
+  });
+
+  // Normalize Plaid accounts into the same shape as linked_funding_sources for the picker
+  const bankSources = useMemo(() => {
+    const fromPlaid = (plaidAccounts as any[]).map((a) => ({
+      id: a.id,
+      user_id: user?.id || "",
+      source_type: 'bank' as const,
+      display_name: a.name || 'Bank account',
+      institution: a.plaid_items?.institution_name || null,
+      last_four: a.mask || '',
+      currency_code: 'USD',
+      is_active: true,
+      created_at: '',
+    }));
+    return [...fromPlaid, ...linkedBankSources];
+  }, [plaidAccounts, linkedBankSources, user?.id]);
+
+  // Plaid Link: let users connect a bank right from /send if none exists
+  const [plaidLinkToken, setPlaidLinkToken] = useState<string | null>(null);
+  const [plaidLinking, setPlaidLinking] = useState(false);
+  const startPlaidLink = useCallback(async () => {
+    setPlaidLinking(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("plaid-create-link-token");
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      setPlaidLinkToken((data as any).link_token);
+    } catch (e: any) {
+      toast.error(e?.message || "Could not start bank link");
+    } finally {
+      setPlaidLinking(false);
+    }
+  }, []);
+  const onPlaidSuccess = useCallback(async (public_token: string, metadata: any) => {
+    try {
+      const { data, error } = await supabase.functions.invoke("plaid-exchange-token", {
+        body: { public_token, institution: metadata.institution },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      toast.success(`Linked ${metadata.institution?.name || "bank"}`);
+      qc.invalidateQueries({ queryKey: ["plaid_accounts", user?.id] });
+    } catch (e: any) {
+      toast.error(e?.message || "Could not link bank");
+    }
+  }, [qc, user?.id]);
+  const { open: openPlaid, ready: plaidReady } = usePlaidLink({
+    token: plaidLinkToken || "",
+    onSuccess: onPlaidSuccess,
+  });
+  useEffect(() => {
+    if (plaidLinkToken && plaidReady) openPlaid();
+  }, [plaidLinkToken, plaidReady, openPlaid]);
 
   const selectedWallet = wallets?.find(w => w.wallet_id === selectedWalletId) || wallets?.[0];
   const targetCountry = findCountryById(targetCountryId) || COUNTRIES[0];
