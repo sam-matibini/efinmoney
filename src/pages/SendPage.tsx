@@ -774,12 +774,16 @@ const SendPage = () => {
                                             <div className="flex items-start gap-2">
                                               <AlertCircle className="w-4 h-4 mt-0.5 text-muted-foreground shrink-0" />
                                               <p className="text-sm text-muted-foreground">
-                                                No bank accounts linked. You can fund this transfer using your wallet or card instead.
+                                                No bank accounts linked. Connect your bank to fund transfers via ACH/EFT.
                                               </p>
                                             </div>
-                                            <Button type="button" variant="secondary" size="sm" className="w-full" onClick={() => setFundingSource('wallet')}>
+                                            <Button type="button" size="sm" className="w-full" onClick={startPlaidLink} disabled={plaidLinking}>
+                                              <Landmark className="w-4 h-4 mr-2" />
+                                              {plaidLinking ? "Starting…" : "Link bank account"}
+                                            </Button>
+                                            <Button type="button" variant="ghost" size="sm" className="w-full" onClick={() => setFundingSource('wallet')}>
                                               <Wallet className="w-4 h-4 mr-2" />
-                                              Use Wallet Instead
+                                              Use wallet instead
                                             </Button>
                                           </div>
                                         )}
