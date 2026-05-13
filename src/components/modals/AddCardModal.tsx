@@ -19,8 +19,9 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useCardMutations, type Card as CardRow, type CardType, type CardNetwork } from "@/hooks/useCards";
 import { useWallets } from "@/hooks/useWallets";
-import { Copy, Check, Eye, EyeOff, ShieldCheck } from "lucide-react";
+import { Copy, Check, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
+import SaveCardForm from "@/components/cards/SaveCardForm";
 
 interface AddCardModalProps {
   isOpen: boolean;
