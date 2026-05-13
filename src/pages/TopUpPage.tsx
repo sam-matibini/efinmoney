@@ -160,6 +160,29 @@ const TopUpPage = () => {
                 <Label>Amount</Label>
                 <Input type="number" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" />
               </div>
+              {method === "mobilemoney" && mmCountry && (
+                <>
+                  <div>
+                    <Label>Network</Label>
+                    <Select value={network} onValueChange={setNetwork}>
+                      <SelectTrigger><SelectValue placeholder="Select network" /></SelectTrigger>
+                      <SelectContent>
+                        {mmCountry.networks.map((n) => (
+                          <SelectItem key={n.value} value={n.value}>{n.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Mobile number</Label>
+                    <div className="flex gap-2">
+                      <div className="flex items-center px-3 rounded-md border bg-muted text-sm">{mmCountry.flag} {mmCountry.dialCode}</div>
+                      <Input inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="7XX XXX XXX" />
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">You'll be prompted on your phone to authorize the payment.</p>
+                  </div>
+                </>
+              )}
               <Button className="w-full" onClick={handleTopUp} disabled={loading}>
                 {loading ? "Redirecting..." : "Continue to payment"}
               </Button>
