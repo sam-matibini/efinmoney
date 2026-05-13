@@ -28,6 +28,9 @@ const OperationsDashboard = () => {
             <p className="text-muted-foreground">CRM, transaction monitoring, disputes, compliance & operational controls</p>
           </div>
 
+
+          <ProviderStatusPanel />
+
           <Tabs defaultValue="crm" className="space-y-4">
             <div className="overflow-x-auto pb-2">
               <TabsList className="inline-flex w-auto min-w-full lg:min-w-0">
