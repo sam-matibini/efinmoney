@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
@@ -20,7 +21,10 @@ export interface SavedCard {
 
 export const useSavedCards = () => {
   const { user } = useAuth();
-  return useQuery({
+  const qc = useQueryClient();
+  const backfillRan = useRef(false);
+
+  const query = useQuery({
     queryKey: ["saved-cards", user?.id],
     queryFn: async (): Promise<SavedCard[]> => {
       if (!user) return [];
@@ -35,6 +39,23 @@ export const useSavedCards = () => {
     },
     enabled: !!user,
   });
+
+  // Auto-backfill missing currency_code (cards saved before column existed)
+  useEffect(() => {
+    if (!user || backfillRan.current) return;
+    const cards = query.data;
+    if (!cards || cards.length === 0) return;
+    if (!cards.some((c) => !c.currency_code)) return;
+    backfillRan.current = true;
+    supabase.functions.invoke("backfill-card-currency", { body: {} })
+      .then(({ error }) => {
+        if (error) console.warn("backfill-card-currency failed", error);
+        qc.invalidateQueries({ queryKey: ["saved-cards", user.id] });
+      })
+      .catch((e) => console.warn("backfill-card-currency invoke error", e));
+  }, [user, query.data, qc]);
+
+  return query;
 };
 
 export const useDeleteSavedCard = () => {
