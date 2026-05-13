@@ -52,7 +52,7 @@ const fieldVariants: Variants = {
 const SendPage = () => {
   const [step, setStep] = useState(1);
   const [direction, setDirection] = useState(1);
-  const [fundingSource, setFundingSource] = useState<FundingSource>('wallet');
+  const [fundingSource, setFundingSource] = useState<FundingSource>('card');
   const [amount, setAmount] = useState("");
   const [selectedWalletId, setSelectedWalletId] = useState("");
   const [targetCountryId, setTargetCountryId] = useState<string>("Kenya");
