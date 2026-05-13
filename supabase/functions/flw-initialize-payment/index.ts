@@ -158,88 +158,36 @@ Deno.serve(async (req) => {
       phone_number: phone || profile?.phone || "",
     };
 
-    // ── Mobile Money: V4 direct charge (no encryption needed) ───────────
-    if (paymentMethod === "mobilemoney") {
-      if (currency === "NGN") {
-        return jr(400, { error: "Nigeria does not support mobile money on Flutterwave. Please use bank transfer, USSD, or card instead." });
-      }
-      if (!phone) return jr(400, { error: "Phone number required for mobile money" });
-      const networkCode = NETWORK_MAP[`${currency}:${network}`];
-      if (!networkCode) return jr(400, { error: `Unsupported mobile money network ${network} for ${currency}` });
+    // ── ALL methods: hosted orchestration link (no /direct-charges) ──
+    // We never call server-side /transfers or /direct-charges anymore — the
+    // user always completes payment on Flutterwave's hosted page. This avoids
+    // the IP whitelist requirement entirely.
+    const pmTypes: string[] =
+      paymentMethod === "card" ? ["card"]
+      : paymentMethod === "ussd" ? ["ussd"]
+      : paymentMethod === "banktransfer" ? ["bank_transfer"]
+      : paymentMethod === "mobilemoney" ? ["mobilemoney"]
+      : ["card", "bank_transfer", "mobilemoney"];
 
-      const payload = {
-        currency,
-        amount: String(amount),
-        reference,
-        redirect_url: redirectUrl,
-        customer,
-        payment_method: {
-          type: "mobile_money",
-          mobile_money: {
-            country_code: country || currency.slice(0, 2),
-            network: networkCode,
-            phone_number: phone,
-          },
-        },
-        meta: { user_id: userId, type: "wallet_topup", currency },
-      };
-      const { ok, status, json } = await flwFetch("/direct-charges", { method: "POST", body: JSON.stringify(payload) });
-      if (!ok || !isFlwSuccess(json)) {
-        if (isGatewayJson(json, status)) {
-          console.warn("V4 MM charge gateway error, falling back to V3 ...");
-          const v3 = await v3MobileMoneyCharge({ currency, amount, reference, redirectUrl, phone, network, email: customer.email, name: customer.name, userId });
-          if (v3.ok) {
-            const d = v3.json?.data || {};
-            return ok({
-              success: true, charge_id: d.id, reference,
-              next_action: d.processor_response || d.auth_url || d.redirect_url || null,
-              status: d.status,
-              payment_link: d.auth_url || d.redirect_url || null,
-              via: "v3_fallback",
-            });
-          }
-          return softFail(
-            /invalid authorization key/i.test(String(v3.json?.message || v3.json?.error || ""))
-              ? "Payment fallback is currently unavailable. Please contact support if this persists."
-              : "Our payout partner is temporarily unavailable. Please try again in a few minutes.",
-            {
-              transient: true,
-              fallback: true,
-              provider_status: v3.status || status,
-            },
-          );
-        }
-        return softFail(json?.message || json?.error || "Mobile money charge failed", {
-          transient: false,
-          provider_status: status,
-          details: json,
-        });
-      }
-
-      // V4 returns next_action: USSD code, OTP prompt, or a redirect
-      const data = json.data || {};
-      return ok({
-        success: true,
-        charge_id: data.id,
-        reference,
-        next_action: data.next_action || data.processor_response || null,
-        status: data.status,
-        payment_link: data.next_action?.redirect_url || null,
-      });
+    if (paymentMethod === "mobilemoney" && currency === "NGN") {
+      return jr(400, { error: "Nigeria does not support mobile money on Flutterwave. Please use bank transfer, USSD, or card instead." });
     }
 
-    // ── Card / USSD / Bank-transfer: hosted orchestration link ──────────
-    const orchestrationPayload = {
+    const orchestrationPayload: Record<string, unknown> = {
       currency,
       amount: String(amount),
       reference,
       redirect_url: redirectUrl,
       customer,
-      payment_method_types: paymentMethod === "card" ? ["card"]
-        : paymentMethod === "ussd" ? ["ussd"]
-        : paymentMethod === "banktransfer" ? ["bank_transfer"]
-        : ["card", "bank_transfer", "ussd"],
-      meta: { user_id: userId, type: "wallet_topup", currency },
+      payment_method_types: pmTypes,
+      meta: {
+        user_id: userId,
+        type: body?.type || "wallet_topup",
+        currency,
+        ...(network ? { network } : {}),
+        ...(country ? { country } : {}),
+        ...(phone ? { phone } : {}),
+      },
     };
     const { ok, status, json } = await flwFetch("/orchestration", { method: "POST", body: JSON.stringify(orchestrationPayload) });
     if (!ok || !isFlwSuccess(json)) {
