@@ -107,7 +107,7 @@ const SendPage = () => {
       if (!user) return [] as any[];
       const { data, error } = await supabase
         .from("plaid_accounts")
-        .select("id,name,mask,subtype, plaid_items(institution_name)")
+        .select("id,name,mask,subtype,currency_code, plaid_items(institution_name)")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -125,7 +125,7 @@ const SendPage = () => {
       display_name: a.name || 'Bank account',
       institution: a.plaid_items?.institution_name || null,
       last_four: a.mask || '',
-      currency_code: 'USD',
+      currency_code: a.currency_code || 'CAD',
       is_active: true,
       created_at: '',
     }));
