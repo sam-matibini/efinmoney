@@ -64,6 +64,29 @@ Deno.serve(async (req) => {
 
     const isDefault = (count ?? 0) === 0;
 
+    // Derive billing currency from card.country → fallback to profile default_currency → USD
+    const COUNTRY_CCY: Record<string, string> = {
+      US: "USD", CA: "CAD", GB: "GBP", AU: "AUD", NZ: "NZD",
+      IE: "EUR", FR: "EUR", DE: "EUR", ES: "EUR", IT: "EUR", NL: "EUR",
+      BE: "EUR", PT: "EUR", AT: "EUR", FI: "EUR", GR: "EUR", LU: "EUR",
+      CH: "CHF", JP: "JPY", CN: "CNY", HK: "HKD", SG: "SGD",
+      NG: "NGN", KE: "KES", UG: "UGX", TZ: "TZS", RW: "RWF",
+      ZM: "ZMW", GH: "GHS", ZA: "ZAR", CI: "XOF", SN: "XOF",
+      CM: "XAF", EG: "EGP", MA: "MAD", IN: "INR", BR: "BRL",
+      MX: "MXN", AE: "AED", SA: "SAR", TR: "TRY",
+    };
+    let currencyCode: string | null = pm.card.country ? (COUNTRY_CCY[pm.card.country.toUpperCase()] ?? null) : null;
+    if (!currencyCode) {
+      const { data: prof } = await admin
+        .from("profiles")
+        .select("default_currency, country_code")
+        .eq("user_id", userId)
+        .maybeSingle();
+      currencyCode = (prof?.default_currency as string | null)
+        || (prof?.country_code ? (COUNTRY_CCY[String(prof.country_code).toUpperCase()] ?? null) : null)
+        || "USD";
+    }
+
     const { data: row, error: insertErr } = await admin
       .from("saved_payment_methods")
       .upsert(
@@ -77,6 +100,7 @@ Deno.serve(async (req) => {
           exp_year: pm.card.exp_year,
           cardholder_name: pm.billing_details?.name ?? null,
           is_default: isDefault,
+          currency_code: currencyCode,
         },
         { onConflict: "stripe_payment_method_id" },
       )
