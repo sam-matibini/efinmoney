@@ -242,6 +242,16 @@ Deno.serve(async (req) => {
       console.error("Payout trigger error:", e);
     }
 
+    if (payoutResult && payoutResult.success === false) {
+      return new Response(JSON.stringify({
+        success: false,
+        error: payoutResult.error || "Payout failed",
+        code: payoutResult.code,
+        refunded: payoutResult.refunded,
+        payout: payoutResult,
+      }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     return new Response(JSON.stringify({ success: true, payout: payoutResult }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
