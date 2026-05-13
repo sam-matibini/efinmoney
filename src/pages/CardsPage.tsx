@@ -311,7 +311,13 @@ const CardsPage = () => {
               }
             : null
         }
-        onDelete={(id) => deleteCard.mutate(id)}
+        onDelete={(id) => {
+          if (id.startsWith(STRIPE_PREFIX)) {
+            deleteStripeCard.mutate(id.slice(STRIPE_PREFIX.length));
+          } else {
+            deleteCard.mutate(id);
+          }
+        }}
       />
 
       <CardPaymentModal
