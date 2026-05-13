@@ -20,22 +20,35 @@ interface Props {
   ctaLabel?: string;
 }
 
-const CARD_ELEMENT_OPTIONS = {
-  hidePostalCode: true,
-  style: {
-    base: {
-      color: "#ffffff",
-      fontSize: "16px",
-      fontFamily: "Inter, system-ui, sans-serif",
-      "::placeholder": { color: "#6b7280" },
-      iconColor: "#ffffff",
+function getThemeColors() {
+  if (typeof window === "undefined") {
+    return { text: "#0f172a", placeholder: "#94a3b8" };
+  }
+  const styles = getComputedStyle(document.documentElement);
+  const fg = styles.getPropertyValue("--foreground").trim();
+  const muted = styles.getPropertyValue("--muted-foreground").trim();
+  return {
+    text: fg ? `hsl(${fg})` : "#0f172a",
+    placeholder: muted ? `hsl(${muted})` : "#94a3b8",
+  };
+}
+
+function buildCardOptions() {
+  const { text, placeholder } = getThemeColors();
+  return {
+    hidePostalCode: true,
+    style: {
+      base: {
+        color: text,
+        fontSize: "16px",
+        fontFamily: "Inter, system-ui, sans-serif",
+        "::placeholder": { color: placeholder },
+        iconColor: text,
+      },
+      invalid: { color: "#ef4444", iconColor: "#ef4444" },
     },
-    invalid: {
-      color: "#ef4444",
-      iconColor: "#ef4444",
-    },
-  },
-} as const;
+  } as const;
+}
 
 function InnerForm({
   wallets,
@@ -202,7 +215,7 @@ function InnerForm({
           )}
         </div>
         <div className="rounded-lg border border-border bg-muted/30 px-3 py-3.5">
-          <CardElement options={CARD_ELEMENT_OPTIONS} onReady={() => setCardReady(true)} />
+          <CardElement options={buildCardOptions()} onReady={() => setCardReady(true)} />
         </div>
       </div>
 
