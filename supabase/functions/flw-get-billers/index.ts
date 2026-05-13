@@ -29,10 +29,23 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ billers: cached.billers, cached: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const { ok, json } = await flwFetch(`/bill-categories?country=${country}`, { method: "GET" });
-    if (!ok || !isFlwSuccess(json)) return new Response(JSON.stringify({ error: json?.message || "Failed to fetch billers" }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    let billers: any[] = [];
+    try {
+      const { ok, json } = await flwFetch(`/bill-categories?country=${country}`, { method: "GET", timeoutMs: 6000 });
+      if (ok && isFlwSuccess(json)) {
+        billers = json.data || [];
+      } else {
+        console.warn("FLW bill-categories non-ok", json);
+      }
+    } catch (e) {
+      console.warn("FLW bill-categories threw", e);
+    }
 
-    let billers = json.data || [];
+    // Serve stale cache if available when upstream failed
+    if (billers.length === 0 && cached?.billers) {
+      return new Response(JSON.stringify({ billers: cached.billers, cached: true, stale: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     if (category) {
       const cat = category.toLowerCase();
       billers = billers.filter((b: any) => (b.biller_name || b.label_name || b.name || "").toLowerCase().includes(cat));
