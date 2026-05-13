@@ -246,21 +246,18 @@ export default function CardPaymentForm(props: Props) {
     getStripe().then(setStripeReady);
   }, []);
 
-  const elementsOptions = useMemo(
-    () => ({
+  const elementsOptions = useMemo(() => {
+    const { text } = getThemeColors();
+    return {
       appearance: {
-        theme: "night" as const,
+        theme: "stripe" as const,
         variables: {
-          colorPrimary: "hsl(var(--primary))",
-          colorBackground: "hsl(var(--muted) / 0.3)",
-          colorText: "hsl(var(--foreground))",
-          colorDanger: "hsl(var(--destructive))",
+          colorText: text,
           fontFamily: "Inter, system-ui, sans-serif",
         },
       },
-    }),
-    [],
-  );
+    };
+  }, []);
 
   if (!stripeReady) {
     return (
