@@ -694,11 +694,16 @@ const SendPage = () => {
                                           <div className="p-3 rounded-lg border border-dashed border-border bg-muted/40 space-y-2">
                                             <div className="flex items-start gap-2">
                                               <AlertCircle className="w-4 h-4 mt-0.5 text-muted-foreground shrink-0" />
-                                              <p className="text-sm text-muted-foreground">No saved cards yet. Add one to pay by card.</p>
+                                              <p className="text-sm text-muted-foreground">No saved cards. Go to Cards page to link a card first.</p>
                                             </div>
-                                            <Button type="button" variant="secondary" size="sm" className="w-full" onClick={() => setAddCardOpen(true)}>
-                                              <CreditCard className="w-4 h-4 mr-2" />Add a card
-                                            </Button>
+                                            <div className="flex gap-2">
+                                              <Button type="button" variant="secondary" size="sm" className="flex-1" onClick={() => setAddCardOpen(true)}>
+                                                <CreditCard className="w-4 h-4 mr-2" />Add a card
+                                              </Button>
+                                              <Button type="button" variant="outline" size="sm" className="flex-1" onClick={() => navigate('/cards')}>
+                                                Go to Cards <ArrowRight className="w-4 h-4 ml-1" />
+                                              </Button>
+                                            </div>
                                           </div>
                                         ) : (
                                           <div className="space-y-2">
