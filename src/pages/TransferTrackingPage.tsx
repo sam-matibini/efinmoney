@@ -274,7 +274,7 @@ const TransferTrackingPage = () => {
                 </ol>
                 {transfer.failure_reason && (
                   <div className="mt-4 p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-sm text-destructive">
-                    {transfer.failure_reason}
+                    {friendlyFailureReason(transfer.failure_reason)}
                   </div>
                 )}
               </CardContent>
