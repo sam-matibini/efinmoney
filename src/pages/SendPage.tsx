@@ -843,7 +843,11 @@ const SendPage = () => {
                                               );
                                             })}
                                             <div className="flex items-center justify-between pt-1">
-                                              <p className="text-xs text-muted-foreground">Card will be charged in {sourceCurrency}.</p>
+                                              <p className="text-xs text-muted-foreground">
+                                                {activeSavedCard && !activeSavedCard.currency_code
+                                                  ? "Detecting card currency…"
+                                                  : `Card will be charged in ${sourceCurrency}.`}
+                                              </p>
                                               <Button type="button" variant="ghost" size="sm" className="h-auto py-1 px-2 text-xs" onClick={() => setAddCardOpen(true)}>
                                                 <CreditCard className="w-3.5 h-3.5 mr-1" />Add another
                                               </Button>
