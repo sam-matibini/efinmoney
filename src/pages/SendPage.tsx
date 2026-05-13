@@ -357,12 +357,29 @@ const SendPage = () => {
           purpose: 'transfer_funding',
         },
       });
-      if (chargeErr || !(data as any)?.success) {
-        throw new Error((data as any)?.error || chargeErr?.message || 'Card charge failed');
+      // Non-2xx responses populate `error` (FunctionsHttpError) and leave `data` null.
+      // Read the actual JSON body so we can surface Stripe's decline reason.
+      if (chargeErr) {
+        let serverMsg = chargeErr.message || 'Card charge failed';
+        try {
+          const ctx: any = (chargeErr as any).context;
+          if (ctx?.json) serverMsg = ctx.json.error || serverMsg;
+          else if (typeof ctx?.text === 'function') {
+            const body = await ctx.text();
+            try { serverMsg = JSON.parse(body)?.error || serverMsg; } catch { /* ignore */ }
+          } else if (ctx instanceof Response) {
+            const body = await ctx.clone().text();
+            try { serverMsg = JSON.parse(body)?.error || serverMsg; } catch { /* ignore */ }
+          }
+        } catch { /* ignore */ }
+        throw new Error(serverMsg);
+      }
+      if (!(data as any)?.success) {
+        throw new Error((data as any)?.error || 'Card charge failed');
       }
       chargeData = data;
     } catch (e: any) {
-      toast.error(`Card payment failed: ${e?.message || 'Please try another card.'}`);
+      toast.error(`Card payment failed: ${e?.message || 'Please try another card.'}`, { duration: 8000 });
       setConfirming(false);
       return;
     }
