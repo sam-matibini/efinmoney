@@ -249,7 +249,7 @@ Deno.serve(async (req) => {
         code: payoutResult.code,
         refunded: payoutResult.refunded,
         payout: payoutResult,
-      }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     return new Response(JSON.stringify({ success: true, payout: payoutResult }), {
