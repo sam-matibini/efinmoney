@@ -604,25 +604,22 @@ const SendPage = () => {
                                       <Label>Pay From</Label>
                                       <div className="grid grid-cols-3 gap-2">
                                         {([
-                                          { v: 'wallet', icon: Wallet, label: 'Wallet', disabled: true },
-                                          { v: 'bank', icon: Landmark, label: 'Bank', disabled: false },
-                                          { v: 'card', icon: CreditCard, label: 'Card', disabled: false },
-                                        ] as const).map(({ v, icon: Icon, label, disabled }) => (
+                                          { v: 'wallet', icon: Wallet, label: 'Wallet' },
+                                          { v: 'bank', icon: Landmark, label: 'Bank' },
+                                          { v: 'card', icon: CreditCard, label: 'Card' },
+                                        ] as const).map(({ v, icon: Icon, label }) => (
                                           <Button
                                             key={v}
                                             type="button"
                                             variant={fundingSource === v ? 'default' : 'outline'}
-                                            disabled={disabled}
-                                            title={disabled ? 'Wallet funding for international sends is temporarily disabled — use Card or Bank.' : undefined}
-                                            className="flex flex-col items-center gap-1 h-auto py-3 transition-all hover:-translate-y-0.5 disabled:opacity-50"
-                                            onClick={() => { if (!disabled) setFundingSource(v); }}
+                                            className="flex flex-col items-center gap-1 h-auto py-3 transition-all hover:-translate-y-0.5"
+                                            onClick={() => setFundingSource(v)}
                                           >
                                             <Icon className="w-5 h-5" />
                                             <span className="text-xs">{label}</span>
                                           </Button>
                                         ))}
                                       </div>
-                                      <p className="text-[11px] text-muted-foreground">International sends are funded via Card or Bank — wallet sends are temporarily disabled.</p>
                                     </motion.div>
 
                                     {fundingSource === 'wallet' && (
@@ -692,12 +689,12 @@ const SendPage = () => {
                                           <div className="space-y-2">
                                             {savedCards.map((c) => {
                                               const id = c.stripe_payment_method_id;
-                                              const checked = (selectedSavedCardId || savedCards.find(x => x.is_default)?.stripe_payment_method_id || savedCards[0].stripe_payment_method_id) === id;
+                                              const checked = (selectedSavedCardId ?? savedCards.find(x => x.is_default)?.stripe_payment_method_id ?? savedCards[0].stripe_payment_method_id) === id;
                                               return (
                                                 <button
                                                   key={c.id}
                                                   type="button"
-                                                  onClick={() => setSelectedSavedCardId(id)}
+                                                  onClick={() => setSelectedSavedCardId(checked ? null : id)}
                                                   className={`w-full text-left flex items-center gap-3 p-3 rounded-lg border transition ${checked ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted/40'}`}
                                                 >
                                                   <CreditCard className="w-5 h-5 text-muted-foreground" />
@@ -709,7 +706,12 @@ const SendPage = () => {
                                                 </button>
                                               );
                                             })}
-                                            <p className="text-xs text-muted-foreground">Card will be charged in {sourceCurrency}.</p>
+                                            <div className="flex items-center justify-between pt-1">
+                                              <p className="text-xs text-muted-foreground">Card will be charged in {sourceCurrency}.</p>
+                                              <Button type="button" variant="ghost" size="sm" className="h-auto py-1 px-2 text-xs" onClick={() => setAddCardOpen(true)}>
+                                                <CreditCard className="w-3.5 h-3.5 mr-1" />Add another
+                                              </Button>
+                                            </div>
                                           </div>
                                         )}
                                       </motion.div>
