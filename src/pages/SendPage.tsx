@@ -375,11 +375,21 @@ const SendPage = () => {
         throw new Error(serverMsg);
       }
       if (!(data as any)?.success) {
-        throw new Error((data as any)?.error || 'Card charge failed');
+        const code = (data as any)?.code as string | undefined;
+        const friendly: Record<string, string> = {
+          insufficient_funds: "Your card has insufficient funds. Try another card or top up your bank account.",
+          card_declined: "Your bank declined this charge. Contact your bank or try another card.",
+          incorrect_number: "The card number is incorrect. Please re-link the card.",
+          incorrect_cvc: "The card's security code is incorrect.",
+          expired_card: "This card has expired. Please link a new one.",
+          processing_error: "Your bank had a temporary issue. Please try again in a moment.",
+          authentication_required: "Your bank requires extra authentication for this card. Try a different card.",
+        };
+        throw new Error(friendly[code ?? ""] || (data as any)?.error || 'Card charge failed');
       }
       chargeData = data;
     } catch (e: any) {
-      toast.error(`Card payment failed: ${e?.message || 'Please try another card.'}`, { duration: 8000 });
+      toast.error(e?.message || 'Card payment failed. Please try another card.', { duration: 8000 });
       setConfirming(false);
       return;
     }
