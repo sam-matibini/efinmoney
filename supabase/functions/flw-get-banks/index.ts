@@ -1,6 +1,6 @@
-// V4 banks list — GET /banks?country=NG
+// V3 banks list — GET /v3/banks/{country}
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { flwFetch, isFlwSuccess } from "../_shared/flw-v4.ts";
+import { flwV3Fetch } from "../_shared/flw-v3.ts";
 import { NG_BANKS_FALLBACK } from "../_shared/ng-banks-fallback.ts";
 
 const corsHeaders = {
@@ -26,36 +26,10 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ banks: cached.banks, cached: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Try V4 first with a short timeout
     let banks: any = null;
-    try {
-      const ctrl = new AbortController();
-      const t = setTimeout(() => ctrl.abort(), 8000);
-      const { ok, json } = await flwFetch(`/banks?country=${country}`, { method: "GET", signal: ctrl.signal });
-      clearTimeout(t);
-      if (ok && isFlwSuccess(json)) banks = json.data;
-    } catch (e) { console.warn("V4 banks failed", e); }
+    const { ok, json } = await flwV3Fetch(`/banks/${country}`, { method: "GET", timeoutMs: 10_000 });
+    if (ok && Array.isArray(json?.data)) banks = json.data;
 
-    // Fallback: V3 banks endpoint (legacy, uses FLW_SECRET_KEY)
-    if (!banks) {
-      try {
-        const secret = Deno.env.get("FLW_SECRET_KEY");
-        if (secret) {
-          const ctrl = new AbortController();
-          const t = setTimeout(() => ctrl.abort(), 8000);
-          const r = await fetch(`https://api.flutterwave.com/v3/banks/${country}`, {
-            headers: { Authorization: `Bearer ${secret}` },
-            signal: ctrl.signal,
-          });
-          clearTimeout(t);
-          const j = await r.json().catch(() => ({}));
-          if (r.ok && j?.status === "success" && Array.isArray(j.data)) banks = j.data;
-          else console.warn("V3 banks failed", r.status, j);
-        }
-      } catch (e) { console.warn("V3 banks fetch error", e); }
-    }
-
-    // Last resort: serve stale cache if present
     if (!banks && cached?.banks) {
       return new Response(JSON.stringify({ banks: cached.banks, cached: true, stale: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }

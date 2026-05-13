@@ -1,6 +1,6 @@
-// V4 bill payment — POST /bills
+// V3 bill payment — POST /v3/bills
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { flwFetch, isFlwSuccess } from "../_shared/flw-v4.ts";
+import { flwV3Fetch } from "../_shared/flw-v3.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -57,13 +57,13 @@ Deno.serve(async (req) => {
       ]);
     }
 
-    const { ok, json } = await flwFetch("/bills", {
+    const { ok, json } = await flwV3Fetch("/bills", {
       method: "POST",
-      body: JSON.stringify({ country, customer: customerIdentifier, amount, type: billerCode, reference }),
-      idempotencyKey: reference,
+      body: JSON.stringify({ country, customer: customerIdentifier, amount, type: billerCode, reference, recurrence: "ONCE" }),
+      timeoutMs: 20_000,
     });
 
-    const success = ok && isFlwSuccess(json);
+    const success = ok;
     await admin.from("bill_payments").update({
       status: success ? "processing" : "failed",
       flw_reference: json?.data?.reference || null,
