@@ -175,12 +175,22 @@ const SendPage = () => {
   const activeSources = fundingSource === 'bank' ? bankSources : fundingSource === 'card' ? cardSources : [];
   const selectedExternalSource = activeSources.find(s => s.id === selectedSourceId) || activeSources[0];
 
+  // Selected saved card (for card funding source) — drives charge currency
+  const activeSavedCard = savedCards.find(c => c.stripe_payment_method_id === selectedSavedCardId)
+    || savedCards.find(c => c.is_default)
+    || savedCards[0];
+
+  const profileCurrency = profile?.default_currency
+    || countryToCurrency(profile?.country_code)
+    || wallets?.find(w => w.is_default)?.currency_code
+    || null;
+
   const sourceCurrency = fundingSource === 'wallet'
-    ? (selectedWallet?.currency_code || 'USD')
-    : (selectedExternalSource?.currency_code || 'USD');
-  const sourceSymbol = fundingSource === 'wallet'
-    ? (selectedWallet?.symbol || '$')
-    : (selectedExternalSource?.currency_code === 'CAD' ? 'C$' : '$');
+    ? (selectedWallet?.currency_code || profileCurrency || 'USD')
+    : fundingSource === 'card'
+    ? (activeSavedCard?.currency_code || profileCurrency || 'USD')
+    : (selectedExternalSource?.currency_code || profileCurrency || 'USD');
+  const sourceSymbol = currencySymbol(sourceCurrency);
   const targetSymbol = targetCountry.symbol || targetCountry.code;
 
   // Network picker (for countries that expose multiple mobile money networks, e.g. Zambia)
