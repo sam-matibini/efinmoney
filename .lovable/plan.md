@@ -1,42 +1,36 @@
-## Problem
+# Fix: saved card currency defaulting to USD on /send
 
-On `/send`, when the user picks **Card** as the funding source, the "You Send" field always shows `$` and the helper text says "Card will be charged in USD" — regardless of the card's actual issuing country, the bank account's currency, or the user's default wallet. The same applies to **Bank**: the picker normalizes Plaid accounts to a hardcoded `USD`. Only the **Wallet** option correctly reflects the chosen wallet's currency.
+## Root cause
 
-Root cause: `saved_payment_methods` has no currency field, the Plaid normalizer in `SendPage.tsx` hardcodes `currency_code: 'USD'`, and the `sourceSymbol` ternary only knows `CAD → C$` vs `$`.
+`saved_payment_methods.currency_code` is **null** for every existing card (the column was added recently and never backfilled). When the card has no currency, `SendPage` falls back to the profile's `default_currency`, which is `USD` for every user in the DB. Result: a real Canadian Mastercard is shown as USD, the FX rate becomes USD→ZMW instead of CAD→ZMW, and the card-charge currency is wrong.
 
-## Fix
+The new-card path (`stripe-save-card-confirm` + `useSavedCards`) already writes `currency_code` correctly from `pm.card.country`, so this only affects pre-existing cards and any future cards where Stripe doesn't return a country.
 
-### 1. Capture each saved card's billing currency
-- Add `currency_code text` to `public.saved_payment_methods` (nullable).
-- In `stripe-save-card-confirm`: read `pm.card.country` (issuing country, ISO‑2) and map it to a currency via a small ISO country→currency table (CA→CAD, US→USD, GB→GBP, NG→NGN, KE→KES, ZA→ZAR, etc.). Fall back to the user profile's `default_currency`, then `USD`. Persist on insert.
-- Backfill: leave existing rows null (the UI fallback below handles them).
+## Plan
 
-### 2. Use real currencies in the Bank picker
-- In `SendPage.tsx`, stop hardcoding `currency_code: 'USD'` for the Plaid normalization. Use the row's existing `plaid_accounts.currency_code` (already defaults to `CAD` in DB, populated per‑account).
-- Also `select` `currency_code` in the `plaid_accounts` query.
+1. **Add `country_code` column** to `saved_payment_methods` (text, nullable) so we persist Stripe's `card.country` for audit and future re-derivations.
 
-### 3. Drive `sourceCurrency` from the actual selection
-- For **Card**: use the *selected* `savedCards` row's new `currency_code`. Fallback chain: card.currency_code → profile.default_currency → wallet's default currency → `USD`.
-- For **Bank**: use the selected bank source's `currency_code` (now real, per #2).
-- For **Wallet**: unchanged.
-- Track the selected card via `selectedSavedCardId` (already in state) so changing cards updates the displayed currency live.
+2. **New edge function `backfill-card-currency`** (verify_jwt = true):
+   - Input: optional `payment_method_id`. If omitted, processes all of the caller's cards where `currency_code IS NULL`.
+   - For each row, calls `stripe.paymentMethods.retrieve(pm_...)`, reads `card.country` (ISO‑2), maps via the existing `COUNTRY_CCY` table (CA→CAD, US→USD, GB→GBP, NG→NGN, etc.).
+   - Updates `country_code` and `currency_code`. Falls back to profile `default_currency` only when Stripe returns no country.
+   - Returns the updated rows.
 
-### 4. Correct the currency symbol everywhere
-- Replace the inline ternary at line 178‑180 with a tiny `currencySymbol(code)` helper covering the currencies the app supports (CAD→C$, GBP→£, EUR→€, NGN→₦, KES→KSh, ZAR→R, GHS→₵, UGX→USh, TZS→TSh, ZMW→ZK, RWF→FRw, USD→$, fallback → currency code). Use it in the `You Send` input prefix and the helper text ("Card will be charged in {sourceCurrency}").
+3. **Auto-trigger from `useSavedCards`**: after the cards query resolves, if any row has `currency_code IS NULL`, fire-and-forget invoke `backfill-card-currency`, then refetch. One-shot per session via a ref guard so we don't loop.
 
-### 5. Keep downstream behaviour intact
-- `cardChargeCurrency()` (USD/NGN constraint for Flutterwave card capture) and the `usdRate` conversion to `cardChargeAmount` already handle non‑USD source currencies — no change needed.
-- FX lookup `from_currency = sourceCurrency → target` already works because it reads whatever `sourceCurrency` resolves to; ensure rates exist for new pairs (no schema change, just relies on `useFxRates`).
+4. **`SendPage` resilience tweak**: when `fundingSource === 'card'` and `activeSavedCard.currency_code` is null, show a small inline "Detecting card currency…" hint instead of silently using USD, and disable the Continue button until it resolves. Once the backfill runs the value populates and the FX rate / "card will be charged in X" line update automatically.
 
-## Files touched
+5. **No change** to ledger/transfer logic, fee math, or Stripe charge flow — they already consume `sourceCurrency` correctly once it's right.
 
-- `supabase/migrations/<new>.sql` — add `currency_code` to `saved_payment_methods`
-- `supabase/functions/stripe-save-card-confirm/index.ts` — derive + store card currency
-- `src/hooks/useSavedCards.tsx` — add `currency_code` to type
-- `src/pages/SendPage.tsx` — real bank currency, card‑driven `sourceCurrency`, symbol helper, helper‑text update
-- `src/lib/utils.ts` (or new `src/lib/currency.ts`) — `currencySymbol(code)` helper
+## Technical notes
 
-## Out of scope
+- Files touched:
+  - `supabase/migrations/<new>.sql` — `ALTER TABLE saved_payment_methods ADD COLUMN country_code text;`
+  - `supabase/functions/backfill-card-currency/index.ts` — new
+  - `supabase/config.toml` — register the new function (default verify_jwt = true)
+  - `src/hooks/useSavedCards.tsx` — auto-invoke + refetch
+  - `src/pages/SendPage.tsx` — pending-state hint + button gating
 
-- Wallet/bank UIs outside `/send` (MobileMoneyModal already shows wallet currency correctly).
-- Multi‑currency Stripe charging — Stripe still captures in USD/NGN; only the *display* and the *ledger source_currency* reflect the funding source's true currency. The existing `usdRate` conversion handles the difference.
+- Reuses the existing `COUNTRY_CCY` map from `src/lib/currency.ts` (mirrored in the edge function, same as `stripe-save-card-confirm`).
+- Requires `STRIPE_SECRET_KEY` (already configured).
+- For the screenshot's card (Mastercard •1449, BENDICT UKWENYA): once backfilled, Stripe will return `card.country = 'CA'` → `currency_code = 'CAD'`, and Review & Confirm will read "C$ 4.99 CAD" with rate `1 CAD = … ZMW` and "redirected to a secure card checkout in CAD".

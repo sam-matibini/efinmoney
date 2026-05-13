@@ -2661,6 +2661,7 @@ export type Database = {
         Row: {
           card_brand: string | null
           cardholder_name: string | null
+          country_code: string | null
           created_at: string
           currency_code: string | null
           exp_month: number | null
@@ -2675,6 +2676,7 @@ export type Database = {
         Insert: {
           card_brand?: string | null
           cardholder_name?: string | null
+          country_code?: string | null
           created_at?: string
           currency_code?: string | null
           exp_month?: number | null
@@ -2689,6 +2691,7 @@ export type Database = {
         Update: {
           card_brand?: string | null
           cardholder_name?: string | null
+          country_code?: string | null
           created_at?: string
           currency_code?: string | null
           exp_month?: number | null
