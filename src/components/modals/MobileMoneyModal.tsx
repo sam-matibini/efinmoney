@@ -142,6 +142,43 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
     setSaveContact(false);
   };
 
+  const maybeSaveContact = async () => {
+    if (!saveContact || pickedBeneficiaryId) return;
+    try {
+      const exists = (contacts || []).some(
+        (c) => (c.phone || "").trim() === phone.trim() ||
+               c.name.trim().toLowerCase() === recipientName.trim().toLowerCase()
+      );
+      if (!exists) {
+        await createBeneficiary.mutateAsync({
+          name: recipientName.trim(),
+          phone: phone.trim(),
+          country_code: country.code,
+          payout_method: "mobile_money",
+          network: network.value,
+          currency_code: chargeCurrency,
+          avatar_initials: initialsOf(recipientName.trim()),
+        });
+      }
+    } catch { /* non-fatal */ }
+  };
+
+  const buildTransferPayload = (fs: 'wallet' | 'card' | 'bank') => ({
+    sender_wallet_id: wallet!.wallet_id,
+    recipient_name: recipientName.trim(),
+    recipient_phone: phone.trim(),
+    recipient_country: country.code,
+    transfer_type: "mobile_money" as const,
+    payout_method: network.value,
+    source_currency: walletCurrency,
+    target_currency: chargeCurrency,
+    source_amount: parsedAmount,
+    target_amount: chargeAmount,
+    exchange_rate: fxRate!,
+    fee_amount: 0,
+    funding_source: fs,
+  });
+
   const handlePay = async () => {
     const result = schema.safeParse({ phone, amount: parsedAmount, recipientName });
     if (!result.success) return toast.error(result.error.issues[0].message);
@@ -153,75 +190,99 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
     if (minErr) return toast.error(minErr);
 
     setIsLoading(true);
+
+    // ── WALLET: create + execute payout ────────────────────────────────
+    if (fundingSource === 'wallet') {
+      try {
+        const transfer = await createTransfer.mutateAsync(buildTransferPayload('wallet') as any);
+        const { data, error } = await supabase.functions.invoke('execute-transfer', { body: { transfer_id: transfer.id } });
+        if (error || (data as any)?.error) throw new Error((data as any)?.error || error?.message || 'Payout failed');
+        const payout = (data as any)?.payout;
+        if (payout && payout.success === false) throw new Error(payout.error || 'Payout failed');
+        await maybeSaveContact();
+        toast.success(payout?.queued ? 'Transfer queued — awaiting payout partner' : 'Transfer sent!');
+        setOpen(false);
+        resetForm();
+      } catch (e) {
+        toast.error(getErrorMessage(e, 'Transfer failed'));
+      } finally { setIsLoading(false); }
+      return;
+    }
+
+    // ── CARD: charge Stripe → create transfer → payout ─────────────────
+    if (fundingSource === 'card') {
+      const pmId = selectedCardId
+        || savedCards.find(c => c.is_default)?.stripe_payment_method_id
+        || savedCards[0]?.stripe_payment_method_id;
+      if (!pmId) {
+        toast.error('No saved cards. Add a card on the Cards page.');
+        setIsLoading(false);
+        return;
+      }
+      try {
+        const { data: charge, error: chErr } = await supabase.functions.invoke('stripe-charge-saved-card', {
+          body: { payment_method_id: pmId, amount: parsedAmount, currency: walletCurrency, purpose: 'transfer_funding' },
+        });
+        if (chErr || !(charge as any)?.success) {
+          throw new Error((charge as any)?.error || chErr?.message || 'Card charge failed');
+        }
+        const transfer = await createTransfer.mutateAsync(buildTransferPayload('card') as any);
+        const { data, error } = await supabase.functions.invoke('execute-transfer', { body: { transfer_id: transfer.id } });
+        if (error || (data as any)?.error) {
+          await supabase.from('transfers').update({ status: 'processing', failure_reason: 'Payout queued' }).eq('id', transfer.id);
+          await maybeSaveContact();
+          toast.success('Card charged — payout is being processed.');
+        } else {
+          await maybeSaveContact();
+          toast.success('Card charged — transfer sent!');
+        }
+        setOpen(false);
+        resetForm();
+      } catch (e) {
+        toast.error(getErrorMessage(e, 'Card payment failed'));
+      } finally { setIsLoading(false); }
+      return;
+    }
+
+    // ── BANK (ACH/EFT): queue as processing ────────────────────────────
+    if (fundingSource === 'bank') {
+      try {
+        const transfer = await createTransfer.mutateAsync(buildTransferPayload('bank') as any);
+        await supabase.from('transfers').update({ status: 'processing' }).eq('id', transfer.id);
+        await maybeSaveContact();
+        toast.success('Bank transfer initiated — funds will be debited within 1-2 business days');
+        setOpen(false);
+        resetForm();
+      } catch (e) {
+        toast.error(getErrorMessage(e, 'Could not initiate bank transfer'));
+      } finally { setIsLoading(false); }
+      return;
+    }
+
+    // ── FLUTTERWAVE HOSTED CHECKOUT (legacy fallback) ──────────────────
     let transferId: string | null = null;
     try {
-      const transfer = await createTransfer.mutateAsync({
-        sender_wallet_id: wallet.wallet_id,
-        recipient_name: recipientName.trim(),
-        recipient_phone: phone.trim(),
-        recipient_country: country.code,
-        transfer_type: "mobile_money",
-        payout_method: network.value,
-        source_currency: walletCurrency,
-        target_currency: chargeCurrency,
-        source_amount: result.data.amount,
-        target_amount: chargeAmount,
-        exchange_rate: fxRate,
-        fee_amount: 0,
-      });
+      const transfer = await createTransfer.mutateAsync(buildTransferPayload('wallet') as any);
       transferId = transfer.id;
     } catch (e) {
       setIsLoading(false);
       return toast.error(getErrorMessage(e, "Failed to create transfer"));
     }
-
     const tId = transferId!;
     try {
-      // Hosted Flutterwave checkout — user pays on Flutterwave's page directly,
-      // avoiding any IP-whitelisted server-side calls.
       const callbackUrl = typeof window !== "undefined"
         ? `${window.location.origin}/payment-callback?transfer_id=${tId}`
         : "";
       const result2 = await initializeFlwPayment({
-        amount: chargeAmount,
-        currency: chargeCurrency,
-        paymentMethod: "mobilemoney",
-        phone: phone.trim(),
-        network: network.value,
-        country: country.code,
-        redirectUrl: callbackUrl,
+        amount: chargeAmount, currency: chargeCurrency, paymentMethod: "mobilemoney",
+        phone: phone.trim(), network: network.value, country: country.code, redirectUrl: callbackUrl,
       });
-
       await supabase.from("transfers").update({
         status: "processing",
         provider_reference: result2.charge_id ? String(result2.charge_id) : result2.reference,
       }).eq("id", tId).eq("sender_id", user.id);
-
-      // Quick-add to contacts if requested and not already a saved contact
-      if (saveContact && !pickedBeneficiaryId) {
-        try {
-          const exists = (contacts || []).some(
-            (c) => (c.phone || "").trim() === phone.trim() ||
-                   c.name.trim().toLowerCase() === recipientName.trim().toLowerCase()
-          );
-          if (!exists) {
-            await createBeneficiary.mutateAsync({
-              name: recipientName.trim(),
-              phone: phone.trim(),
-              country_code: country.code,
-              payout_method: "mobile_money",
-              network: network.value,
-              currency_code: chargeCurrency,
-              avatar_initials: initialsOf(recipientName.trim()),
-            });
-          }
-        } catch (e) { /* non-fatal */ }
-      }
-
-      if (!result2.payment_link) {
-        throw new Error("No payment link returned");
-      }
-
+      await maybeSaveContact();
+      if (!result2.payment_link) throw new Error("No payment link returned");
       try { sessionStorage.setItem("pending_transfer_id", tId); } catch { /* ignore */ }
       toast.success("Redirecting to Flutterwave…");
       window.location.href = result2.payment_link;
