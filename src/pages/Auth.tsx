@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Eye, EyeOff, ArrowRight, ArrowLeft } from "lucide-react";
-import { Logo } from "@/components/Logo";
+import { Logo, Wordmark } from "@/components/Logo";
 
 const Auth = () => {
   const [isSignUp, setIsSignUp] = useState(false);
@@ -52,7 +52,7 @@ const Auth = () => {
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
             <Logo className="w-9 h-9" />
-            <span className="font-black text-xl tracking-tight">eFinMoney</span>
+            <Wordmark className="font-black text-xl tracking-tight" />
           </Link>
           <Link to="/" className="text-sm font-medium text-neutral-600 hover:text-neutral-900 inline-flex items-center gap-1">
             <ArrowLeft className="w-4 h-4" /> Back to home
