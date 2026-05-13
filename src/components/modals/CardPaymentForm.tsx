@@ -215,7 +215,7 @@ function InnerForm({
           )}
         </div>
         <div className="rounded-lg border border-border bg-muted/30 px-3 py-3.5">
-          <CardElement options={CARD_ELEMENT_OPTIONS} onReady={() => setCardReady(true)} />
+          <CardElement options={buildCardOptions()} onReady={() => setCardReady(true)} />
         </div>
       </div>
 
