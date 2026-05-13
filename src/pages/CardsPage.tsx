@@ -3,17 +3,18 @@ import Header from "@/components/layout/Header";
 import MobileNav from "@/components/layout/MobileNav";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CreditCard, Plus, Lock, Unlock, Settings, Trash2, Snowflake } from "lucide-react";
-import { useState } from "react";
+import { CreditCard, Plus, Lock, Unlock, Settings, Trash2, Snowflake, Send } from "lucide-react";
+import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Skeleton } from "@/components/ui/skeleton";
 import EditCardModal from "@/components/modals/EditCardModal";
 import DeleteCardModal from "@/components/modals/DeleteCardModal";
 import AddCardModal from "@/components/modals/AddCardModal";
 import CardPaymentModal from "@/components/modals/CardPaymentModal";
-import SavedCardsSection from "@/components/cards/SavedCardsSection";
 import FlipCard from "@/components/cards/FlipCard";
 import CardStack from "@/components/cards/CardStack";
 import { useCards, useCardMutations, type Card as CardRow } from "@/hooks/useCards";
+import { useSavedCards, useDeleteSavedCard } from "@/hooks/useSavedCards";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,6 +22,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+
+const STRIPE_PREFIX = "stripe:";
 
 const formatExpires = (iso: string) => {
   const d = new Date(iso);
@@ -51,14 +54,43 @@ const ActionTile = ({ icon, label, onClick, variant = "default" }: ActionTilePro
 );
 
 const CardsPage = () => {
-  const { data: cards, isLoading } = useCards();
+  const navigate = useNavigate();
+  const { data: issuedCards, isLoading } = useCards();
+  const { data: stripeCards } = useSavedCards();
   const { updateCardStatus, updateCard, deleteCard } = useCardMutations();
+  const deleteStripeCard = useDeleteSavedCard();
 
   const [flipped, setFlipped] = useState<Record<string, boolean>>({});
   const [editCard, setEditCard] = useState<CardRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<CardRow | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [fundCard, setFundCard] = useState<CardRow | null>(null);
+
+  const cards = useMemo<CardRow[]>(() => {
+    const issued = issuedCards ?? [];
+    const stripe = (stripeCards ?? []).map<CardRow>((c) => ({
+      id: `${STRIPE_PREFIX}${c.id}`,
+      user_id: c.user_id,
+      card_type: "debit" as any,
+      card_network: ((c.card_brand ?? "visa").toLowerCase() === "mastercard" ? "mastercard" : "visa") as any,
+      last_four: c.last_four ?? "••••",
+      card_number: null,
+      cvv: null,
+      expiry_month: c.exp_month,
+      expiry_year: c.exp_year,
+      cardholder_name: c.cardholder_name ?? "",
+      status: "active",
+      spending_limit: 0,
+      credit_limit: null,
+      funding_source: "external",
+      wallet_id: null,
+      expires_at: c.exp_year && c.exp_month
+        ? new Date(c.exp_year, c.exp_month - 1, 1).toISOString()
+        : new Date().toISOString(),
+      created_at: c.created_at,
+    }));
+    return [...issued, ...stripe];
+  }, [issuedCards, stripeCards]);
 
   const toggleFlip = (id: string) =>
     setFlipped((p) => ({ ...p, [id]: !p[id] }));
