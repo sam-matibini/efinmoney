@@ -138,10 +138,6 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
     const result = schema.safeParse({ phone, amount: parsedAmount, recipientName });
     if (!result.success) return toast.error(result.error.issues[0].message);
     if (!wallet) return toast.error("Select a source wallet");
-    if (Number(wallet.balance) <= 0)
-      return toast.error(`Insufficient ${wallet.currency_code} wallet balance. Please deposit funds first.`);
-    if (Number(wallet.balance) < result.data.amount)
-      return toast.error(`Insufficient wallet balance. Available: ${wallet.symbol}${Number(wallet.balance).toLocaleString()}`);
     if (!user) return toast.error("Please sign in to continue");
     if (fxRate === null)
       return toast.error(`No exchange rate available for ${walletCurrency} → ${chargeCurrency}. Please try a different wallet.`);
@@ -173,8 +169,11 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
 
     const tId = transferId!;
     try {
-      // V4: direct mobile money charge — Flutterwave sends a USSD prompt to the
-      // payer's phone. The webhook finalizes the charge; we mark it as processing.
+      // Hosted Flutterwave checkout — user pays on Flutterwave's page directly,
+      // avoiding any IP-whitelisted server-side calls.
+      const callbackUrl = typeof window !== "undefined"
+        ? `${window.location.origin}/payment-callback?transfer_id=${tId}`
+        : "";
       const result2 = await initializeFlwPayment({
         amount: chargeAmount,
         currency: chargeCurrency,
@@ -182,21 +181,13 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
         phone: phone.trim(),
         network: network.value,
         country: country.code,
-        redirectUrl: typeof window !== "undefined" ? window.location.origin + "/payment-callback" : "",
+        redirectUrl: callbackUrl,
       });
 
       await supabase.from("transfers").update({
         status: "processing",
         provider_reference: result2.charge_id ? String(result2.charge_id) : result2.reference,
       }).eq("id", tId).eq("sender_id", user.id);
-
-      // If Flutterwave returned a redirect (some markets need OTP UI), open it.
-      if (result2.payment_link) {
-        window.open(result2.payment_link, "_blank", "noopener,noreferrer");
-        toast.success("Complete the payment in the new tab.");
-      } else {
-        toast.success("Check your phone for a USSD prompt to authorize the payment.");
-      }
 
       // Quick-add to contacts if requested and not already a saved contact
       if (saveContact && !pickedBeneficiaryId) {
@@ -215,16 +206,18 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
               currency_code: chargeCurrency,
               avatar_initials: initialsOf(recipientName.trim()),
             });
-            toast.success("Saved to your contacts");
           }
         } catch (e) { /* non-fatal */ }
       }
 
-      setOpen(false);
-      resetForm();
+      if (!result2.payment_link) {
+        throw new Error("No payment link returned");
+      }
 
+      try { sessionStorage.setItem("pending_transfer_id", tId); } catch { /* ignore */ }
+      toast.success("Redirecting to Flutterwave…");
+      window.location.href = result2.payment_link;
     } catch (e) {
-      // Mark transfer as failed
       try {
         await supabase.from("transfers")
           .update({ status: "failed", failure_reason: getErrorMessage(e, "Mobile money charge failed") })
