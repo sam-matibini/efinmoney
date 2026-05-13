@@ -50,9 +50,7 @@ const Auth = () => {
       <header className="border-b border-neutral-100">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-xl bg-emerald-500 flex items-center justify-center">
-              <span className="text-white font-black text-lg">e</span>
-            </div>
+            <Logo className="w-9 h-9" />
             <span className="font-black text-xl tracking-tight">eFinMoney</span>
           </Link>
           <Link to="/" className="text-sm font-medium text-neutral-600 hover:text-neutral-900 inline-flex items-center gap-1">
