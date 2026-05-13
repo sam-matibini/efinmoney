@@ -26,15 +26,16 @@ import SaveCardForm from "@/components/cards/SaveCardForm";
 interface AddCardModalProps {
   isOpen: boolean;
   onClose: () => void;
+  defaultMode?: "issue" | "link";
 }
 
 const formatPan = (pan: string) => pan.replace(/(.{4})/g, "$1 ").trim();
 
-const AddCardModal = ({ isOpen, onClose }: AddCardModalProps) => {
+const AddCardModal = ({ isOpen, onClose, defaultMode = "issue" }: AddCardModalProps) => {
   const { createCard } = useCardMutations();
   const { data: wallets } = useWallets();
 
-  const [mode, setMode] = useState<"issue" | "link">("issue");
+  const [mode, setMode] = useState<"issue" | "link">(defaultMode);
 
   // Issue mode state
   const [cardType, setCardType] = useState<CardType>("debit");
@@ -51,7 +52,7 @@ const AddCardModal = ({ isOpen, onClose }: AddCardModalProps) => {
   const isCredit = cardType === "credit";
 
   const reset = () => {
-    setMode("issue");
+    setMode(defaultMode);
     setCardType("debit");
     setCardNetwork("visa");
     setCardholderName("");

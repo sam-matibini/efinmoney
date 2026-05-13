@@ -1243,7 +1243,7 @@ const SendPage = () => {
           updated_at: "",
         } as any}
       />
-      <AddCardModal isOpen={addCardOpen} onClose={() => setAddCardOpen(false)} />
+      <AddCardModal isOpen={addCardOpen} onClose={() => setAddCardOpen(false)} defaultMode="link" />
       <MobileNav />
     </div>
   );
