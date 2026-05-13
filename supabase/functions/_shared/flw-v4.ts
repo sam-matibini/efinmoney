@@ -9,12 +9,19 @@ const FLW_TOKEN_URL = "https://idp.flutterwave.com/realms/flutterwave/protocol/o
 let cachedToken: string | null = null;
 let cachedExpiry = 0; // epoch ms
 
+function maskCred(name: string, val: string) {
+  if (!val) return `${name}=<MISSING>`;
+  return `${name}(len=${val.length}, prefix=${val.slice(0, 4)}…${val.slice(-4)})`;
+}
+
 export async function getFlwAccessToken(): Promise<string> {
   // Return cached token if still valid (renew 60s before expiry)
   if (cachedToken && Date.now() < cachedExpiry - 60_000) return cachedToken;
 
   const clientId = (Deno.env.get("FLW_CLIENT_ID") || "").trim();
   const clientSecret = (Deno.env.get("FLW_CLIENT_SECRET") || "").trim();
+  console.log("[FLW AUTH] Token URL:", FLW_TOKEN_URL);
+  console.log("[FLW AUTH] Creds:", maskCred("FLW_CLIENT_ID", clientId), maskCred("FLW_CLIENT_SECRET", clientSecret));
   if (!clientId || !clientSecret) {
     throw new Error("FLW_CLIENT_ID / FLW_CLIENT_SECRET are not configured");
   }
@@ -25,20 +32,24 @@ export async function getFlwAccessToken(): Promise<string> {
     client_secret: clientSecret,
   });
 
+  const t0 = Date.now();
   const res = await fetch(FLW_TOKEN_URL, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: body.toString(),
   });
-  const json = await res.json().catch(() => ({}));
+  const text = await res.text();
+  let json: any = {};
+  try { json = text ? JSON.parse(text) : {}; } catch { json = { raw: text }; }
+  console.log(`[FLW AUTH] Response status=${res.status} in ${Date.now() - t0}ms body=`, JSON.stringify(json).slice(0, 500));
   if (!res.ok || !json?.access_token) {
-    console.error("FLW V4 auth failed", res.status, json);
+    console.error("[FLW AUTH] FAILED", res.status, json);
     throw new Error(json?.error_description || json?.error || `FLW auth failed (${res.status})`);
   }
   cachedToken = json.access_token as string;
-  // expires_in is seconds; default 600
   const ttlMs = (Number(json.expires_in) || 600) * 1000;
   cachedExpiry = Date.now() + ttlMs;
+  console.log(`[FLW AUTH] OK — token len=${cachedToken.length}, ttl=${ttlMs / 1000}s`);
   return cachedToken;
 }
 
@@ -77,6 +88,8 @@ export async function flwFetch(path: string, opts: FlwFetchOptions = {}): Promis
     try {
       const controller = new AbortController();
       timeout = setTimeout(() => controller.abort("FLW request timeout"), timeoutMs);
+      const t0 = Date.now();
+      console.log(`[FLW REQ] ${opts.method || "GET"} ${url} body=`, typeof opts.body === "string" ? opts.body.slice(0, 1000) : "<none>");
       const res = await fetch(url, { ...opts, headers, signal: controller.signal });
       clearTimeout(timeout);
       const text = await res.text();
@@ -84,6 +97,7 @@ export async function flwFetch(path: string, opts: FlwFetchOptions = {}): Promis
       try { json = text ? JSON.parse(text) : {}; } catch { json = { raw: text }; }
       lastStatus = res.status;
       lastJson = json;
+      console.log(`[FLW RES] ${opts.method || "GET"} ${path} -> ${res.status} in ${Date.now() - t0}ms body=`, JSON.stringify(json).slice(0, 1500));
 
       if (res.ok) return { ok: true, status: res.status, json };
 
@@ -91,23 +105,23 @@ export async function flwFetch(path: string, opts: FlwFetchOptions = {}): Promis
         (typeof json?.raw === "string" && /OriginTimeout|Service unavailable|Gateway Timeout/i.test(json.raw));
 
       if (!transient || attempt === RETRY_DELAYS_MS.length) {
-        console.warn(`FLW V4 ${opts.method || "GET"} ${path} -> ${res.status}`, json);
+        console.warn(`[FLW NON-OK] ${opts.method || "GET"} ${path} -> ${res.status}`, JSON.stringify(json).slice(0, 1500));
         return { ok: false, status: res.status, json };
       }
-      console.warn(`FLW V4 ${opts.method || "GET"} ${path} -> ${res.status} (transient, retry ${attempt + 1}/${RETRY_DELAYS_MS.length})`);
+      console.warn(`[FLW TRANSIENT] ${opts.method || "GET"} ${path} -> ${res.status} (retry ${attempt + 1}/${RETRY_DELAYS_MS.length})`);
     } catch (err) {
       if (timeout) clearTimeout(timeout);
       lastErr = err;
       const timedOut = err instanceof DOMException && err.name === "AbortError";
+      console.warn(`[FLW NETERR] ${opts.method || "GET"} ${path} attempt ${attempt + 1}: ${err instanceof Error ? err.message : String(err)} (timedOut=${timedOut})`);
       if (attempt === RETRY_DELAYS_MS.length) {
-        console.error(`FLW V4 ${opts.method || "GET"} ${path} network error after retries`, err);
+        console.error(`[FLW NETERR FINAL] ${opts.method || "GET"} ${path} after retries`, err);
         return {
           ok: false,
           status: timedOut ? 504 : 0,
           json: { error: timedOut ? "Gateway Timeout" : err instanceof Error ? err.message : "network error" },
         };
       }
-      console.warn(`FLW V4 ${opts.method || "GET"} ${path} network error (retry ${attempt + 1}/${RETRY_DELAYS_MS.length})`, err);
     }
     await new Promise((r) => setTimeout(r, RETRY_DELAYS_MS[attempt]));
   }
