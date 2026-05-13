@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
+import { useEffect } from "react";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { useUserRoles } from "@/hooks/useUserRoles";
 import PageTransition from "@/components/ui/PageTransition";
@@ -138,6 +139,16 @@ const RootRoute = () => {
 
 const AppRoutes = () => {
   const location = useLocation();
+
+  // Workaround for a known Radix UI bug where Dialog/DropdownMenu
+  // sometimes leaves `pointer-events: none` stuck on <body> after closing,
+  // requiring users to double-click the next interactive element.
+  useEffect(() => {
+    if (document.body.style.pointerEvents === "none") {
+      document.body.style.pointerEvents = "";
+    }
+  }, [location.pathname]);
+
   return (
     <AnimatePresence mode="wait">
       <PageTransition key={location.pathname}>
