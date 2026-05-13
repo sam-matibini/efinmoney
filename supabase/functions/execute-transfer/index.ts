@@ -203,7 +203,7 @@ Deno.serve(async (req) => {
               bank_code: transfer.recipient_bank_code,
               amount: Number(transfer.target_amount ?? transfer.source_amount),
               currency: transfer.target_currency ?? transfer.source_currency,
-              network: transfer.payout_method === "bank" ? "bank" : "mpesa",
+              network: resolveNetwork(transfer.payout_method, transfer.target_currency ?? transfer.source_currency),
               recipient_name: transfer.recipient_name,
             }),
           },
