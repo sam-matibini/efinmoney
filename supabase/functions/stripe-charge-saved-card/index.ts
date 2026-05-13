@@ -99,11 +99,13 @@ Deno.serve(async (req) => {
     } catch (err: any) {
       const code = err?.code ?? err?.raw?.code ?? "stripe_error";
       const message = err?.message ?? "Card charge failed";
-      return json({ error: message, code, declined: true }, 402);
+      // Return 200 with error payload so supabase-js doesn't surface a FunctionsHttpError
+      // (which the client treats as a runtime error / blank screen).
+      return json({ success: false, error: message, code, declined: true });
     }
 
     if (intent.status !== "succeeded") {
-      return json({ error: `Payment ${intent.status}`, status: intent.status, payment_intent_id: intent.id }, 402);
+      return json({ success: false, error: `Payment ${intent.status}`, status: intent.status, payment_intent_id: intent.id });
     }
 
     // Idempotency: skip ledger if already posted for this PI
