@@ -20,16 +20,33 @@ interface Props {
   ctaLabel?: string;
 }
 
+function resolveCssColor(value: string, fallback: string) {
+  if (typeof window === "undefined" || !value) return fallback;
+
+  const probe = document.createElement("span");
+  probe.style.color = value;
+  probe.style.position = "absolute";
+  probe.style.pointerEvents = "none";
+  probe.style.opacity = "0";
+  document.body.appendChild(probe);
+
+  const resolved = getComputedStyle(probe).color || fallback;
+  document.body.removeChild(probe);
+  return resolved;
+}
+
 function getThemeColors() {
   if (typeof window === "undefined") {
-    return { text: "#0f172a", placeholder: "#94a3b8" };
+    return { text: "rgb(15, 23, 42)", placeholder: "rgb(148, 163, 184)" };
   }
+
   const styles = getComputedStyle(document.documentElement);
   const fg = styles.getPropertyValue("--foreground").trim();
   const muted = styles.getPropertyValue("--muted-foreground").trim();
+
   return {
-    text: fg ? `hsl(${fg})` : "#0f172a",
-    placeholder: muted ? `hsl(${muted})` : "#94a3b8",
+    text: resolveCssColor(fg ? `hsl(${fg})` : "", "rgb(15, 23, 42)"),
+    placeholder: resolveCssColor(muted ? `hsl(${muted})` : "", "rgb(148, 163, 184)"),
   };
 }
 
@@ -62,6 +79,7 @@ function InnerForm({
   const stripe = useStripe();
   const elements = useElements();
   const queryClient = useQueryClient();
+  const cardOptions = useMemo(() => buildCardOptions(), []);
 
   const [selectedWalletId, setSelectedWalletId] = useState<string | undefined>(defaultWalletId);
   const [amount, setAmount] = useState(defaultAmount ? String(defaultAmount) : "");
@@ -215,7 +233,7 @@ function InnerForm({
           )}
         </div>
         <div className="rounded-lg border border-border bg-muted/30 px-3 py-3.5">
-          <CardElement options={buildCardOptions()} onReady={() => setCardReady(true)} />
+          <CardElement options={cardOptions} onReady={() => setCardReady(true)} />
         </div>
       </div>
 
