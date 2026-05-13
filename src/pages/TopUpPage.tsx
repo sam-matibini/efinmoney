@@ -12,6 +12,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { CheckCircle2, XCircle } from "lucide-react";
 import { ALLOWED_TOPUP_CURRENCIES, validateMinAmount, friendlyFlwError, minAmount, type FlwMethod } from "@/lib/flutterwave";
+import { MM_COUNTRIES } from "@/lib/mobileMoneyNetworks";
+
+const MM_BY_CCY = Object.fromEntries(MM_COUNTRIES.map((c) => [c.currency, c]));
 
 const METHODS: { value: FlwMethod; label: string }[] = [
   { value: "card", label: "Card" },
