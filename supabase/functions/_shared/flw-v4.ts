@@ -88,6 +88,8 @@ export async function flwFetch(path: string, opts: FlwFetchOptions = {}): Promis
     try {
       const controller = new AbortController();
       timeout = setTimeout(() => controller.abort("FLW request timeout"), timeoutMs);
+      const t0 = Date.now();
+      console.log(`[FLW REQ] ${opts.method || "GET"} ${url} body=`, typeof opts.body === "string" ? opts.body.slice(0, 1000) : "<none>");
       const res = await fetch(url, { ...opts, headers, signal: controller.signal });
       clearTimeout(timeout);
       const text = await res.text();
@@ -95,6 +97,7 @@ export async function flwFetch(path: string, opts: FlwFetchOptions = {}): Promis
       try { json = text ? JSON.parse(text) : {}; } catch { json = { raw: text }; }
       lastStatus = res.status;
       lastJson = json;
+      console.log(`[FLW RES] ${opts.method || "GET"} ${path} -> ${res.status} in ${Date.now() - t0}ms body=`, JSON.stringify(json).slice(0, 1500));
 
       if (res.ok) return { ok: true, status: res.status, json };
 
@@ -102,23 +105,23 @@ export async function flwFetch(path: string, opts: FlwFetchOptions = {}): Promis
         (typeof json?.raw === "string" && /OriginTimeout|Service unavailable|Gateway Timeout/i.test(json.raw));
 
       if (!transient || attempt === RETRY_DELAYS_MS.length) {
-        console.warn(`FLW V4 ${opts.method || "GET"} ${path} -> ${res.status}`, json);
+        console.warn(`[FLW NON-OK] ${opts.method || "GET"} ${path} -> ${res.status}`, JSON.stringify(json).slice(0, 1500));
         return { ok: false, status: res.status, json };
       }
-      console.warn(`FLW V4 ${opts.method || "GET"} ${path} -> ${res.status} (transient, retry ${attempt + 1}/${RETRY_DELAYS_MS.length})`);
+      console.warn(`[FLW TRANSIENT] ${opts.method || "GET"} ${path} -> ${res.status} (retry ${attempt + 1}/${RETRY_DELAYS_MS.length})`);
     } catch (err) {
       if (timeout) clearTimeout(timeout);
       lastErr = err;
       const timedOut = err instanceof DOMException && err.name === "AbortError";
+      console.warn(`[FLW NETERR] ${opts.method || "GET"} ${path} attempt ${attempt + 1}: ${err instanceof Error ? err.message : String(err)} (timedOut=${timedOut})`);
       if (attempt === RETRY_DELAYS_MS.length) {
-        console.error(`FLW V4 ${opts.method || "GET"} ${path} network error after retries`, err);
+        console.error(`[FLW NETERR FINAL] ${opts.method || "GET"} ${path} after retries`, err);
         return {
           ok: false,
           status: timedOut ? 504 : 0,
           json: { error: timedOut ? "Gateway Timeout" : err instanceof Error ? err.message : "network error" },
         };
       }
-      console.warn(`FLW V4 ${opts.method || "GET"} ${path} network error (retry ${attempt + 1}/${RETRY_DELAYS_MS.length})`, err);
     }
     await new Promise((r) => setTimeout(r, RETRY_DELAYS_MS[attempt]));
   }
