@@ -1,6 +1,6 @@
-// V4 Virtual account creation — POST /virtual-accounts
+// V3 Virtual account creation — POST /v3/virtual-account-numbers
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { flwFetch, isFlwSuccess } from "../_shared/flw-v4.ts";
+import { flwV3Fetch } from "../_shared/flw-v3.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -26,7 +26,7 @@ Deno.serve(async (req) => {
     if (rl === false) return new Response(JSON.stringify({ error: "Too many requests" }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-    const { data: profile } = await admin.from("profiles").select("email, first_name, last_name, phone, kyc_status").eq("user_id", userId).maybeSingle();
+    const { data: profile } = await admin.from("profiles").select("email, first_name, last_name, phone, kyc_status, bvn").eq("user_id", userId).maybeSingle();
     if (!profile) return new Response(JSON.stringify({ error: "Profile not found" }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     if (!["approved", "verified"].includes(String(profile.kyc_status))) {
       return new Response(JSON.stringify({ error: "KYC must be approved before creating a virtual account" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -43,22 +43,20 @@ Deno.serve(async (req) => {
     if (existing) return new Response(JSON.stringify({ virtual_account: existing }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     const reference = `efm_va_${userId.slice(0, 8)}_${Date.now()}`;
-    const flwBody = {
-      currency,
-      reference,
+    const flwBody: Record<string, unknown> = {
+      email: profile.email,
+      tx_ref: reference,
       is_permanent: isPermanent,
-      customer: {
-        email: profile.email,
-        first_name: profile.first_name || "eFin",
-        last_name: profile.last_name || "User",
-        phone_number: profile.phone || "",
-      },
+      firstname: profile.first_name || "eFin",
+      lastname: profile.last_name || "User",
       narration: `eFin Money - ${profile.first_name || ""} ${profile.last_name || ""}`.trim(),
+      phonenumber: profile.phone || "",
     };
+    if ((profile as any).bvn) flwBody.bvn = (profile as any).bvn;
 
-    const { ok, json } = await flwFetch("/virtual-accounts", { method: "POST", body: JSON.stringify(flwBody), idempotencyKey: reference });
-    if (!ok || !isFlwSuccess(json)) {
-      console.error("FLW V4 VA create failed", json);
+    const { ok, json } = await flwV3Fetch("/virtual-account-numbers", { method: "POST", body: JSON.stringify(flwBody), timeoutMs: 20_000 });
+    if (!ok) {
+      console.error("FLW V3 VA create failed", json);
       return new Response(JSON.stringify({ error: json?.message || "Failed to create virtual account" }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
     const d = json.data;
@@ -69,17 +67,17 @@ Deno.serve(async (req) => {
       account_number: d.account_number,
       bank_name: d.bank_name,
       account_name: d.account_name || `${profile.first_name || ""} ${profile.last_name || ""}`.trim() || profile.email,
-      flw_order_ref: d.id || d.reference || reference,
+      flw_order_ref: d.order_ref || d.flw_ref || reference,
       flw_response: d,
       is_permanent: isPermanent,
-      expires_at: d.expires_at || d.expiry_date || null,
+      expires_at: d.expiry_date || null,
       status: "active",
     }).select("*").single();
     if (insErr) throw insErr;
 
     return new Response(JSON.stringify({ virtual_account: inserted }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (err) {
-    console.error("flw-create-virtual-account V4 error", err);
+    console.error("flw-create-virtual-account V3 error", err);
     return new Response(JSON.stringify({ error: err instanceof Error ? err.message : "Unknown error" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 });
