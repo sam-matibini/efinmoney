@@ -15,6 +15,34 @@ const PAYABLE_BY_CURRENCY: Record<string, string> = {
   NGN: "2125",
 };
 
+// Map our internal payout_method codes -> Flutterwave network token used by V3_MM_BANK
+const PAYOUT_METHOD_TO_NETWORK: Record<string, string> = {
+  mtn_mobile: "mtn",
+  airtel_money: "airtel",
+  zamtel_money: "zamtel",
+  vodafone_cash: "vodafone",
+  tigo_pesa: "tigo",
+  mpesa: "mpesa",
+  bank: "bank",
+};
+
+// Fallback default network per destination currency when payout_method is generic ("mobile_money") or unknown
+const CURRENCY_DEFAULT_NETWORK: Record<string, string> = {
+  KES: "mpesa",
+  ZMW: "mtn",
+  GHS: "mtn",
+  UGX: "mtn",
+  TZS: "airtel",
+  RWF: "mtn",
+};
+
+function resolveNetwork(payoutMethod: string | null | undefined, currency: string): string {
+  if (payoutMethod && PAYOUT_METHOD_TO_NETWORK[payoutMethod]) {
+    return PAYOUT_METHOD_TO_NETWORK[payoutMethod];
+  }
+  return CURRENCY_DEFAULT_NETWORK[currency] || "mpesa";
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -203,7 +231,7 @@ Deno.serve(async (req) => {
               bank_code: transfer.recipient_bank_code,
               amount: Number(transfer.target_amount ?? transfer.source_amount),
               currency: transfer.target_currency ?? transfer.source_currency,
-              network: transfer.payout_method === "bank" ? "bank" : "mpesa",
+              network: resolveNetwork(transfer.payout_method, transfer.target_currency ?? transfer.source_currency),
               recipient_name: transfer.recipient_name,
             }),
           },
