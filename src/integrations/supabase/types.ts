@@ -3145,6 +3145,7 @@ export type Database = {
           exchange_rate: number
           failure_reason: string | null
           fee_amount: number
+          funding_source: string
           id: string
           interac_security_answer: string | null
           interac_security_question: string | null
@@ -3173,6 +3174,7 @@ export type Database = {
           exchange_rate?: number
           failure_reason?: string | null
           fee_amount?: number
+          funding_source?: string
           id?: string
           interac_security_answer?: string | null
           interac_security_question?: string | null
@@ -3201,6 +3203,7 @@ export type Database = {
           exchange_rate?: number
           failure_reason?: string | null
           fee_amount?: number
+          funding_source?: string
           id?: string
           interac_security_answer?: string | null
           interac_security_question?: string | null
