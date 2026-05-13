@@ -139,6 +139,16 @@ const RootRoute = () => {
 
 const AppRoutes = () => {
   const location = useLocation();
+
+  // Workaround for a known Radix UI bug where Dialog/DropdownMenu
+  // sometimes leaves `pointer-events: none` stuck on <body> after closing,
+  // requiring users to double-click the next interactive element.
+  useEffect(() => {
+    if (document.body.style.pointerEvents === "none") {
+      document.body.style.pointerEvents = "";
+    }
+  }, [location.pathname]);
+
   return (
     <AnimatePresence mode="wait">
       <PageTransition key={location.pathname}>
