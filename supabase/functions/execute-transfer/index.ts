@@ -188,15 +188,27 @@ Deno.serve(async (req) => {
         );
         payoutResult = await res.json();
       } else {
-        await supabase.from("transfers").update({
-          status: "failed",
-          failure_reason: "Server-side wallet payouts to African corridors are disabled — please re-initiate the transfer using card or bank funding.",
-        }).eq("id", transfer_id);
-        return new Response(JSON.stringify({
-          error: "Wallet-funded international sends are disabled. Please use card or bank funding which redirects to a hosted Flutterwave checkout.",
-        }), {
-          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        const res = await fetch(
+          `${Deno.env.get("SUPABASE_URL")}/functions/v1/flutterwave-payout`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: req.headers.get("Authorization") || "",
+            },
+            body: JSON.stringify({
+              transfer_id,
+              phone_number: transfer.recipient_phone,
+              account_number: transfer.recipient_account_number,
+              bank_code: transfer.recipient_bank_code,
+              amount: Number(transfer.destination_amount ?? transfer.source_amount),
+              currency: transfer.destination_currency ?? transfer.source_currency,
+              network: transfer.recipient_network ?? "mpesa",
+              recipient_name: transfer.recipient_name,
+            }),
+          },
+        );
+        payoutResult = await res.json();
       }
     } catch (e) {
       console.error("Payout trigger error:", e);
