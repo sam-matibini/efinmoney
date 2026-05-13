@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import NotificationsPanel from "@/components/header/NotificationsPanel";
 import SearchModal from "@/components/header/SearchModal";
+import { Logo } from "@/components/Logo";
 import ThemeToggle from "@/components/theme/ThemeToggle";
 import { useWallets } from "@/hooks/useWallets";
 
@@ -66,9 +67,7 @@ const Header = () => {
           className="flex items-center gap-3"
         >
           <Link to="/" className="flex items-center gap-3">
-            <div className="gradient-primary w-10 h-10 rounded-xl flex items-center justify-center shadow-glow">
-              <span className="text-xl font-bold text-primary-foreground">e</span>
-            </div>
+            <Logo className="w-10 h-10" />
             <span className="font-display font-bold text-xl text-foreground">eFinMoney</span>
           </Link>
           <span className="hidden lg:inline-flex items-center gap-1.5 ml-2 pl-3 border-l border-border text-sm font-medium text-muted-foreground">
