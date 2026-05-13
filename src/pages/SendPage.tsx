@@ -604,25 +604,22 @@ const SendPage = () => {
                                       <Label>Pay From</Label>
                                       <div className="grid grid-cols-3 gap-2">
                                         {([
-                                          { v: 'wallet', icon: Wallet, label: 'Wallet', disabled: true },
-                                          { v: 'bank', icon: Landmark, label: 'Bank', disabled: false },
-                                          { v: 'card', icon: CreditCard, label: 'Card', disabled: false },
-                                        ] as const).map(({ v, icon: Icon, label, disabled }) => (
+                                          { v: 'wallet', icon: Wallet, label: 'Wallet' },
+                                          { v: 'bank', icon: Landmark, label: 'Bank' },
+                                          { v: 'card', icon: CreditCard, label: 'Card' },
+                                        ] as const).map(({ v, icon: Icon, label }) => (
                                           <Button
                                             key={v}
                                             type="button"
                                             variant={fundingSource === v ? 'default' : 'outline'}
-                                            disabled={disabled}
-                                            title={disabled ? 'Wallet funding for international sends is temporarily disabled — use Card or Bank.' : undefined}
-                                            className="flex flex-col items-center gap-1 h-auto py-3 transition-all hover:-translate-y-0.5 disabled:opacity-50"
-                                            onClick={() => { if (!disabled) setFundingSource(v); }}
+                                            className="flex flex-col items-center gap-1 h-auto py-3 transition-all hover:-translate-y-0.5"
+                                            onClick={() => setFundingSource(v)}
                                           >
                                             <Icon className="w-5 h-5" />
                                             <span className="text-xs">{label}</span>
                                           </Button>
                                         ))}
                                       </div>
-                                      <p className="text-[11px] text-muted-foreground">International sends are funded via Card or Bank — wallet sends are temporarily disabled.</p>
                                     </motion.div>
 
                                     {fundingSource === 'wallet' && (
