@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence, type Variants } from "framer-motion";
 import { useSearchParams, useNavigate, Link } from "react-router-dom";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { usePlaidLink } from "react-plaid-link";
 // Flutterwave V3 SDK removed — V4 uses hosted payment links via the
 // flw-initialize-payment edge function.
 import ContactsPickerModal from "@/components/modals/ContactsPickerModal";
@@ -87,12 +89,82 @@ const SendPage = () => {
 
   const { data: wallets } = useWallets();
   const { data: fxRates } = useFxRates();
-  const { data: bankSources = [] } = useFundingSources('bank');
+  const { data: linkedBankSources = [] } = useFundingSources('bank');
   const { data: cardSources = [] } = useFundingSources('card');
   const { data: savedCards = [] } = useSavedCards();
   const { data: pricing } = usePricingConfig();
   const createTransfer = useCreateTransfer();
   const [selectedSavedCardId, setSelectedSavedCardId] = useState<string>("");
+  const qc = useQueryClient();
+
+  // Plaid-linked bank accounts (preferred path for ACH/EFT funding)
+  const { data: plaidAccounts = [] } = useQuery({
+    queryKey: ["plaid_accounts", user?.id],
+    queryFn: async () => {
+      if (!user) return [] as any[];
+      const { data, error } = await supabase
+        .from("plaid_accounts")
+        .select("id,name,mask,subtype, plaid_items(institution_name)")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user,
+  });
+
+  // Normalize Plaid accounts into the same shape as linked_funding_sources for the picker
+  const bankSources = useMemo(() => {
+    const fromPlaid = (plaidAccounts as any[]).map((a) => ({
+      id: a.id,
+      user_id: user?.id || "",
+      source_type: 'bank' as const,
+      display_name: a.name || 'Bank account',
+      institution: a.plaid_items?.institution_name || null,
+      last_four: a.mask || '',
+      currency_code: 'USD',
+      is_active: true,
+      created_at: '',
+    }));
+    return [...fromPlaid, ...linkedBankSources];
+  }, [plaidAccounts, linkedBankSources, user?.id]);
+
+  // Plaid Link: let users connect a bank right from /send if none exists
+  const [plaidLinkToken, setPlaidLinkToken] = useState<string | null>(null);
+  const [plaidLinking, setPlaidLinking] = useState(false);
+  const startPlaidLink = useCallback(async () => {
+    setPlaidLinking(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("plaid-create-link-token");
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      setPlaidLinkToken((data as any).link_token);
+    } catch (e: any) {
+      toast.error(e?.message || "Could not start bank link");
+    } finally {
+      setPlaidLinking(false);
+    }
+  }, []);
+  const onPlaidSuccess = useCallback(async (public_token: string, metadata: any) => {
+    try {
+      const { data, error } = await supabase.functions.invoke("plaid-exchange-token", {
+        body: { public_token, institution: metadata.institution },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      toast.success(`Linked ${metadata.institution?.name || "bank"}`);
+      qc.invalidateQueries({ queryKey: ["plaid_accounts", user?.id] });
+    } catch (e: any) {
+      toast.error(e?.message || "Could not link bank");
+    }
+  }, [qc, user?.id]);
+  const { open: openPlaid, ready: plaidReady } = usePlaidLink({
+    token: plaidLinkToken || "",
+    onSuccess: onPlaidSuccess,
+  });
+  useEffect(() => {
+    if (plaidLinkToken && plaidReady) openPlaid();
+  }, [plaidLinkToken, plaidReady, openPlaid]);
 
   const selectedWallet = wallets?.find(w => w.wallet_id === selectedWalletId) || wallets?.[0];
   const targetCountry = findCountryById(targetCountryId) || COUNTRIES[0];
@@ -702,12 +774,16 @@ const SendPage = () => {
                                             <div className="flex items-start gap-2">
                                               <AlertCircle className="w-4 h-4 mt-0.5 text-muted-foreground shrink-0" />
                                               <p className="text-sm text-muted-foreground">
-                                                No bank accounts linked. You can fund this transfer using your wallet or card instead.
+                                                No bank accounts linked. Connect your bank to fund transfers via ACH/EFT.
                                               </p>
                                             </div>
-                                            <Button type="button" variant="secondary" size="sm" className="w-full" onClick={() => setFundingSource('wallet')}>
+                                            <Button type="button" size="sm" className="w-full" onClick={startPlaidLink} disabled={plaidLinking}>
+                                              <Landmark className="w-4 h-4 mr-2" />
+                                              {plaidLinking ? "Starting…" : "Link bank account"}
+                                            </Button>
+                                            <Button type="button" variant="ghost" size="sm" className="w-full" onClick={() => setFundingSource('wallet')}>
                                               <Wallet className="w-4 h-4 mr-2" />
-                                              Use Wallet Instead
+                                              Use wallet instead
                                             </Button>
                                           </div>
                                         )}
