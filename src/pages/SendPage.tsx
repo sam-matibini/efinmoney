@@ -95,6 +95,7 @@ const SendPage = () => {
   const { data: cardSources = [] } = useFundingSources('card');
   const { data: savedCards = [] } = useSavedCards();
   const { data: pricing } = usePricingConfig();
+  const { data: profile } = useProfile();
   const createTransfer = useCreateTransfer();
   const [selectedSavedCardId, setSelectedSavedCardId] = useState<string>("");
   const qc = useQueryClient();
