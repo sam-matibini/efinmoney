@@ -61,12 +61,8 @@ const AddCardModal = ({ isOpen, onClose }: AddCardModalProps) => {
   const [creditLimit, setCreditLimit] = useState("10000");
   const [walletId, setWalletId] = useState<string>("");
 
-  // Link mode state
-  const [linkName, setLinkName] = useState("");
-  const [linkPan, setLinkPan] = useState("");
-  const [linkExp, setLinkExp] = useState(""); // MM/YY
-  const [linkCvv, setLinkCvv] = useState("");
-  const [linkWalletId, setLinkWalletId] = useState("");
+  // Link mode state — handled by SaveCardForm (Stripe Elements)
+
 
   const [createdCard, setCreatedCard] = useState<CardRow | null>(null);
   const [reveal, setReveal] = useState(false);
@@ -82,11 +78,6 @@ const AddCardModal = ({ isOpen, onClose }: AddCardModalProps) => {
     setSpendingLimit("5000");
     setCreditLimit("10000");
     setWalletId("");
-    setLinkName("");
-    setLinkPan("");
-    setLinkExp("");
-    setLinkCvv("");
-    setLinkWalletId("");
     setCreatedCard(null);
     setReveal(false);
     setCopied(false);
