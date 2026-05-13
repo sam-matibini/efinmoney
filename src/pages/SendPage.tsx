@@ -20,6 +20,7 @@ import { useWallets } from "@/hooks/useWallets";
 import { useFxRates } from "@/hooks/useFxRates";
 import { useCreateTransfer } from "@/hooks/useTransfers";
 import { useFundingSources } from "@/hooks/useFundingSources";
+import { useSavedCards } from "@/hooks/useSavedCards";
 import { usePricingConfig } from "@/hooks/usePricingConfig";
 import { supabase } from "@/integrations/supabase/client";
 import { friendlyFlwError, fetchFxRate, cardChargeCurrency, initializeFlwPayment } from "@/lib/flutterwave";
@@ -86,8 +87,10 @@ const SendPage = () => {
   const { data: fxRates } = useFxRates();
   const { data: bankSources = [] } = useFundingSources('bank');
   const { data: cardSources = [] } = useFundingSources('card');
+  const { data: savedCards = [] } = useSavedCards();
   const { data: pricing } = usePricingConfig();
   const createTransfer = useCreateTransfer();
+  const [selectedSavedCardId, setSelectedSavedCardId] = useState<string>("");
 
   const selectedWallet = wallets?.find(w => w.wallet_id === selectedWalletId) || wallets?.[0];
   const targetCountry = findCountryById(targetCountryId) || COUNTRIES[0];
