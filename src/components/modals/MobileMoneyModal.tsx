@@ -64,9 +64,13 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
   const [contactsOpen, setContactsOpen] = useState(false);
   const [saveContact, setSaveContact] = useState(true);
   const [pickedBeneficiaryId, setPickedBeneficiaryId] = useState<string | null>(null);
+  const [fundingSource, setFundingSource] = useState<FundingSource>('wallet');
+  const [selectedCardId, setSelectedCardId] = useState<string>("");
 
+  const navigate = useNavigate();
   const { data: wallets } = useWallets();
   const { data: contacts } = useBeneficiaries();
+  const { data: savedCards = [] } = useSavedCards();
   const { user } = useAuth();
   const createTransfer = useCreateTransfer();
   const createBeneficiary = useCreateBeneficiary();
