@@ -185,6 +185,8 @@ const CardsPage = () => {
             />
           )}
 
+          <SavedCardsSection />
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card>
               <CardContent className="pt-6">
