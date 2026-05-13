@@ -1,0 +1,1 @@
+ALTER TABLE public.saved_payment_methods ADD COLUMN IF NOT EXISTS currency_code text;
