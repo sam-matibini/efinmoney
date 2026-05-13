@@ -714,7 +714,7 @@ const SendPage = () => {
                                                 <button
                                                   key={c.id}
                                                   type="button"
-                                                  onClick={() => setSelectedSavedCardId(checked ? null : id)}
+                                                  onClick={() => setSelectedSavedCardId(checked ? "" : id)}
                                                   className={`w-full text-left flex items-center gap-3 p-3 rounded-lg border transition ${checked ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted/40'}`}
                                                 >
                                                   <CreditCard className="w-5 h-5 text-muted-foreground" />
