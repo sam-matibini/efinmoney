@@ -444,19 +444,91 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
               maxLength={24}
             />
           </div>
+          {/* Funding source selector */}
           <div>
-            <Label htmlFor="mm-wallet">From wallet</Label>
-            <Select value={walletId || wallet?.wallet_id || ""} onValueChange={setWalletId}>
-              <SelectTrigger id="mm-wallet"><SelectValue placeholder="Select wallet" /></SelectTrigger>
-              <SelectContent>
-                {(wallets || []).map((w) => (
-                  <SelectItem key={w.wallet_id} value={w.wallet_id}>
-                    {w.flag_emoji} {w.currency_code} — {w.symbol}{Number(w.balance).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label>Pay with</Label>
+            <div className="grid grid-cols-3 gap-2 mt-1.5">
+              {([
+                { v: 'wallet', icon: Wallet, label: 'Wallet' },
+                { v: 'card', icon: CreditCard, label: 'Card' },
+                { v: 'bank', icon: Landmark, label: 'Bank' },
+              ] as const).map(({ v, icon: Icon, label }) => (
+                <Button
+                  key={v}
+                  type="button"
+                  variant={fundingSource === v ? 'default' : 'outline'}
+                  className="flex flex-col items-center gap-1 h-auto py-2.5 transition-all hover:-translate-y-0.5"
+                  onClick={() => setFundingSource(v)}
+                >
+                  <Icon className="w-4 h-4" />
+                  <span className="text-xs">{label}</span>
+                </Button>
+              ))}
+            </div>
           </div>
+
+          {fundingSource === 'wallet' && (
+            <div>
+              <Label htmlFor="mm-wallet">From wallet</Label>
+              <Select value={walletId || wallet?.wallet_id || ""} onValueChange={setWalletId}>
+                <SelectTrigger id="mm-wallet"><SelectValue placeholder="Select wallet" /></SelectTrigger>
+                <SelectContent>
+                  {(wallets || []).map((w) => (
+                    <SelectItem key={w.wallet_id} value={w.wallet_id}>
+                      {w.flag_emoji} {w.currency_code} — {w.symbol}{Number(w.balance).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {fundingSource === 'card' && (
+            <div>
+              <Label>Saved card</Label>
+              {savedCards.length === 0 ? (
+                <div className="p-3 rounded-lg border border-dashed border-border bg-muted/40 space-y-2">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 mt-0.5 text-muted-foreground shrink-0" />
+                    <p className="text-sm text-muted-foreground">No saved cards yet.</p>
+                  </div>
+                  <Button type="button" variant="secondary" size="sm" className="w-full" onClick={() => { setOpen(false); navigate('/cards'); }}>
+                    Go to Cards <ArrowRight className="w-4 h-4 ml-1" />
+                  </Button>
+                </div>
+              ) : (
+                <Select
+                  value={selectedCardId || savedCards.find(c => c.is_default)?.stripe_payment_method_id || savedCards[0].stripe_payment_method_id}
+                  onValueChange={setSelectedCardId}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {savedCards.map((c) => (
+                      <SelectItem key={c.id} value={c.stripe_payment_method_id}>
+                        {(c.card_brand || 'Card')} •••• {c.last_four} {c.is_default ? '· default' : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              <p className="text-xs text-muted-foreground mt-1.5">Card charged in {walletCurrency}; funds routed via your wallet.</p>
+            </div>
+          )}
+
+          {fundingSource === 'bank' && (
+            <div className="p-3 rounded-lg border border-dashed border-border bg-muted/40 space-y-2">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 mt-0.5 text-muted-foreground shrink-0" />
+                <p className="text-sm text-muted-foreground">
+                  Bank transfers (ACH/EFT) settle in 1-2 business days. Link or pick a bank on the full Send page.
+                </p>
+              </div>
+              <Button type="button" variant="secondary" size="sm" className="w-full" onClick={() => { setOpen(false); navigate('/send'); }}>
+                Open Send page <ArrowRight className="w-4 h-4 ml-1" />
+              </Button>
+            </div>
+          )}
+
           <div>
             <Label htmlFor="mm-amount">Amount ({walletCurrency})</Label>
             <Input id="mm-amount" type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} />
@@ -483,13 +555,28 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
               </span>
             </label>
           )}
-          <Button className="w-full" onClick={handlePay} disabled={createTransfer.isPending || isLoading}>
+          <Button
+            className="w-full"
+            onClick={handlePay}
+            disabled={createTransfer.isPending || isLoading || (fundingSource === 'card' && savedCards.length === 0)}
+          >
             {createTransfer.isPending || isLoading ? (
-              <><LoaderCircle className="mr-2 h-4 w-4 animate-spin" />Preparing…</>
+              <><LoaderCircle className="mr-2 h-4 w-4 animate-spin" />Processing…</>
+            ) : fundingSource === 'wallet' ? (
+              "Send from wallet"
+            ) : fundingSource === 'card' ? (
+              "Charge card & send"
             ) : (
-              "Pay with Flutterwave"
+              "Initiate bank transfer"
             )}
           </Button>
+          <button
+            type="button"
+            className="w-full text-xs text-muted-foreground hover:text-foreground underline-offset-4 hover:underline"
+            onClick={() => { setFundingSource('flutterwave'); setTimeout(handlePay, 0); }}
+          >
+            Or pay directly on Flutterwave's page →
+          </button>
         </div>
         <ContactsPickerModal
           open={contactsOpen}
