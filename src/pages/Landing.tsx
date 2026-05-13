@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion, useInView } from "framer-motion";
 import { Link } from "react-router-dom";
 import { ArrowRight, Globe, Shield, Zap, Wallet, Send, BarChart3, Star } from "lucide-react";
-import { Logo } from "@/components/Logo";
+import { Logo, Wordmark } from "@/components/Logo";
 
 const NAV_LINKS = [
   { label: "Features", href: "#features" },
@@ -161,7 +161,7 @@ const Landing = () => {
         <nav className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
             <Logo className="w-9 h-9" />
-            <span className="font-black text-xl tracking-tight">eFinMoney</span>
+            <Wordmark className="font-black text-xl tracking-tight" />
           </Link>
           <div className="hidden md:flex items-center gap-8">
             {NAV_LINKS.map((l) => (
@@ -352,7 +352,7 @@ const Landing = () => {
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-8">
             <div className="flex items-center gap-2">
               <Logo className="w-9 h-9" />
-              <span className="font-black text-xl text-white">eFinMoney</span>
+              <Wordmark className="font-black text-xl" />
             </div>
             <div className="flex flex-wrap gap-6 text-sm">
               {["About", "Security", "Privacy", "Terms", "Contact"].map((l) => (
