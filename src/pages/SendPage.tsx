@@ -5,6 +5,7 @@ import { useSearchParams, useNavigate, Link } from "react-router-dom";
 // flw-initialize-payment edge function.
 import ContactsPickerModal from "@/components/modals/ContactsPickerModal";
 import AddBeneficiaryModal from "@/components/modals/AddBeneficiaryModal";
+import AddCardModal from "@/components/modals/AddCardModal";
 import { useBeneficiaries, recordTransferRecipient, type Beneficiary } from "@/hooks/useBeneficiaries";
 import { downloadTransferReceipt } from "@/lib/receipt";
 import { useAuth } from "@/hooks/useAuth";
@@ -64,6 +65,7 @@ const SendPage = () => {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [savePromptOpen, setSavePromptOpen] = useState(false);   // Yes/No confirm
   const [saveModalOpen, setSaveModalOpen] = useState(false);     // pre-filled Add modal
+  const [addCardOpen, setAddCardOpen] = useState(false);
   const [pickedBeneficiaryId, setPickedBeneficiaryId] = useState<string | null>(null);
   const [selectedNetworkId, setSelectedNetworkId] = useState<string | null>(null);
   const [cancelOpen, setCancelOpen] = useState(false);
@@ -682,8 +684,8 @@ const SendPage = () => {
                                               <AlertCircle className="w-4 h-4 mt-0.5 text-muted-foreground shrink-0" />
                                               <p className="text-sm text-muted-foreground">No saved cards yet. Add one to pay by card.</p>
                                             </div>
-                                            <Button asChild type="button" variant="secondary" size="sm" className="w-full">
-                                              <Link to="/cards"><CreditCard className="w-4 h-4 mr-2" />Add a card</Link>
+                                            <Button type="button" variant="secondary" size="sm" className="w-full" onClick={() => setAddCardOpen(true)}>
+                                              <CreditCard className="w-4 h-4 mr-2" />Add a card
                                             </Button>
                                           </div>
                                         ) : (
@@ -1241,6 +1243,7 @@ const SendPage = () => {
           updated_at: "",
         } as any}
       />
+      <AddCardModal isOpen={addCardOpen} onClose={() => setAddCardOpen(false)} defaultMode="link" />
       <MobileNav />
     </div>
   );
