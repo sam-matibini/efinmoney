@@ -1,6 +1,6 @@
-// V4 charge verification: GET /charges/{id}
+// V3 charge verification: GET /v3/transactions/verify_by_reference?tx_ref=...
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { flwFetch, isFlwSuccess } from "../_shared/flw-v4.ts";
+import { flwV3Fetch } from "../_shared/flw-v3.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -41,11 +41,15 @@ Deno.serve(async (req) => {
     const userId = user.id;
 
     const url = new URL(req.url);
-    const chargeId = url.searchParams.get("charge_id") || url.searchParams.get("transaction_id") || url.searchParams.get("id");
-    if (!chargeId) return new Response(JSON.stringify({ error: "charge_id required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const txRef = url.searchParams.get("tx_ref") || url.searchParams.get("reference");
+    const txId = url.searchParams.get("transaction_id") || url.searchParams.get("id") || url.searchParams.get("charge_id");
+    if (!txRef && !txId) return new Response(JSON.stringify({ error: "tx_ref or transaction_id required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-    const { ok, json } = await flwFetch(`/charges/${encodeURIComponent(chargeId)}`, { method: "GET" });
-    if (!ok || !isFlwSuccess(json)) {
+    const verifyPath = txId
+      ? `/transactions/${encodeURIComponent(txId)}/verify`
+      : `/transactions/verify_by_reference?tx_ref=${encodeURIComponent(txRef!)}`;
+    const { ok, json } = await flwV3Fetch(verifyPath, { method: "GET" });
+    if (!ok) {
       return new Response(JSON.stringify({ verified: false, error: json?.message || "Verification failed" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
     const d = json.data;
@@ -60,7 +64,7 @@ Deno.serve(async (req) => {
 
     const amount = Number(d?.amount || 0);
     const currency = String(d?.currency || "").toUpperCase();
-    const ref = String(d?.reference || d?.tx_ref || chargeId);
+    const ref = String(d?.tx_ref || d?.reference || txRef || txId);
 
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
@@ -76,7 +80,7 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify({ verified: true, status: d.status, amount, currency, charge_id: d.id }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (err) {
-    console.error("flw-verify-payment V4 error", err);
+    console.error("flw-verify-payment V3 error", err);
     return new Response(JSON.stringify({ error: err instanceof Error ? err.message : "Unknown" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 });
