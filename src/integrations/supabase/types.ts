@@ -2662,6 +2662,7 @@ export type Database = {
           card_brand: string | null
           cardholder_name: string | null
           created_at: string
+          currency_code: string | null
           exp_month: number | null
           exp_year: number | null
           id: string
@@ -2675,6 +2676,7 @@ export type Database = {
           card_brand?: string | null
           cardholder_name?: string | null
           created_at?: string
+          currency_code?: string | null
           exp_month?: number | null
           exp_year?: number | null
           id?: string
@@ -2688,6 +2690,7 @@ export type Database = {
           card_brand?: string | null
           cardholder_name?: string | null
           created_at?: string
+          currency_code?: string | null
           exp_month?: number | null
           exp_year?: number | null
           id?: string

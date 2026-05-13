@@ -14,6 +14,7 @@ export interface SavedCard {
   exp_year: number | null;
   cardholder_name: string | null;
   is_default: boolean;
+  currency_code: string | null;
   created_at: string;
 }
 

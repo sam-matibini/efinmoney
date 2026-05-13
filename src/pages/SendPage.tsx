@@ -27,6 +27,8 @@ import { useSavedCards } from "@/hooks/useSavedCards";
 import { usePricingConfig } from "@/hooks/usePricingConfig";
 import { supabase } from "@/integrations/supabase/client";
 import { friendlyFlwError, fetchFxRate, cardChargeCurrency, initializeFlwPayment } from "@/lib/flutterwave";
+import { currencySymbol, countryToCurrency } from "@/lib/currency";
+import { useProfile } from "@/hooks/useProfile";
 import { toast } from "sonner";
 import { ArrowRight, CheckCircle, Users, Clock, Shield, Wallet, Landmark, CreditCard, AlertCircle, X } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -93,6 +95,7 @@ const SendPage = () => {
   const { data: cardSources = [] } = useFundingSources('card');
   const { data: savedCards = [] } = useSavedCards();
   const { data: pricing } = usePricingConfig();
+  const { data: profile } = useProfile();
   const createTransfer = useCreateTransfer();
   const [selectedSavedCardId, setSelectedSavedCardId] = useState<string>("");
   const qc = useQueryClient();
@@ -104,7 +107,7 @@ const SendPage = () => {
       if (!user) return [] as any[];
       const { data, error } = await supabase
         .from("plaid_accounts")
-        .select("id,name,mask,subtype, plaid_items(institution_name)")
+        .select("id,name,mask,subtype,currency_code, plaid_items(institution_name)")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -122,7 +125,7 @@ const SendPage = () => {
       display_name: a.name || 'Bank account',
       institution: a.plaid_items?.institution_name || null,
       last_four: a.mask || '',
-      currency_code: 'USD',
+      currency_code: a.currency_code || 'CAD',
       is_active: true,
       created_at: '',
     }));
@@ -172,12 +175,22 @@ const SendPage = () => {
   const activeSources = fundingSource === 'bank' ? bankSources : fundingSource === 'card' ? cardSources : [];
   const selectedExternalSource = activeSources.find(s => s.id === selectedSourceId) || activeSources[0];
 
+  // Selected saved card (for card funding source) — drives charge currency
+  const activeSavedCard = savedCards.find(c => c.stripe_payment_method_id === selectedSavedCardId)
+    || savedCards.find(c => c.is_default)
+    || savedCards[0];
+
+  const profileCurrency = profile?.default_currency
+    || countryToCurrency(profile?.country_code)
+    || wallets?.find(w => w.is_default)?.currency_code
+    || null;
+
   const sourceCurrency = fundingSource === 'wallet'
-    ? (selectedWallet?.currency_code || 'USD')
-    : (selectedExternalSource?.currency_code || 'USD');
-  const sourceSymbol = fundingSource === 'wallet'
-    ? (selectedWallet?.symbol || '$')
-    : (selectedExternalSource?.currency_code === 'CAD' ? 'C$' : '$');
+    ? (selectedWallet?.currency_code || profileCurrency || 'USD')
+    : fundingSource === 'card'
+    ? (activeSavedCard?.currency_code || profileCurrency || 'USD')
+    : (selectedExternalSource?.currency_code || profileCurrency || 'USD');
+  const sourceSymbol = currencySymbol(sourceCurrency);
   const targetSymbol = targetCountry.symbol || targetCountry.code;
 
   // Network picker (for countries that expose multiple mobile money networks, e.g. Zambia)
