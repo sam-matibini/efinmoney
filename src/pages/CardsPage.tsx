@@ -106,7 +106,7 @@ const CardsPage = () => {
     <div className="min-h-screen bg-background pb-24 md:pb-8">
       <Header />
 
-      <main className="container px-4 py-6">
+      <main className="container relative z-0 px-4 py-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
