@@ -10,6 +10,7 @@ import { OperationsKPIsPanel } from "@/components/operations/OperationsKPIsPanel
 import { RegulatoryReportsPanel } from "@/components/operations/RegulatoryReportsPanel";
 import { CommunicationsPanel } from "@/components/operations/CommunicationsPanel";
 import { MakerCheckerPanel } from "@/components/operations/MakerCheckerPanel";
+import { ProviderStatusPanel } from "@/components/operations/ProviderStatusPanel";
 
 const OperationsDashboard = () => {
   return (
