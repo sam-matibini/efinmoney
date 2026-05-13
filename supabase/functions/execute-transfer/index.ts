@@ -172,7 +172,9 @@ Deno.serve(async (req) => {
     // Mark funded
     await supabase.from("transfers").update({ status: "funded" }).eq("id", transfer_id);
 
-    // Trigger payout: Paysafe for Canada, Flutterwave for African corridors
+    // Trigger payout: Paysafe for Canada. African corridors must use the
+    // hosted Flutterwave checkout flow (initiated from the frontend); we no
+    // longer call /transfers or /direct-charges from the server.
     let payoutResult: any = { stub: true };
     try {
       if (transfer.transfer_type === "domestic_canada" || transfer.recipient_country === "CA") {
@@ -186,37 +188,15 @@ Deno.serve(async (req) => {
         );
         payoutResult = await res.json();
       } else {
-        const networkMap: Record<string, string> = {
-          mpesa: "mpesa",
-          mtn_mobile: "mtn",
-          mtn: "mtn",
-          airtel_money: "airtel",
-          airtel: "airtel",
-          vodafone: "vodafone",
-          tigo: "tigo",
-          zamtel_money: "zamtel",
-          zamtel: "zamtel",
-          lumicash: "mtn",
-        };
-        const network = networkMap[transfer.payout_method] || "mpesa";
-        const res = await fetch(
-          `${Deno.env.get("SUPABASE_URL")}/functions/v1/flutterwave-payout`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: authHeader },
-            body: JSON.stringify({
-              transfer_id,
-              phone_number: transfer.recipient_phone || "",
-              account_number: (transfer as any).recipient_account || "",
-              bank_code: (transfer as any).recipient_bank_code || "",
-              amount: Number(transfer.target_amount),
-              currency: transfer.target_currency,
-              network,
-              recipient_name: transfer.recipient_name,
-            }),
-          },
-        );
-        payoutResult = await res.json();
+        await supabase.from("transfers").update({
+          status: "failed",
+          failure_reason: "Server-side wallet payouts to African corridors are disabled — please re-initiate the transfer using card or bank funding.",
+        }).eq("id", transfer_id);
+        return new Response(JSON.stringify({
+          error: "Wallet-funded international sends are disabled. Please use card or bank funding which redirects to a hosted Flutterwave checkout.",
+        }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
     } catch (e) {
       console.error("Payout trigger error:", e);
