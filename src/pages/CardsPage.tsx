@@ -152,10 +152,17 @@ const CardsPage = () => {
               onAddCard={() => setAddOpen(true)}
               renderActions={(card) => {
                 const isFrozen = card.status === "frozen";
+                const isStripe = card.id.startsWith(STRIPE_PREFIX);
                 const isExternal = card.funding_source === "external";
                 return (
                   <div className="flex items-start justify-center gap-6 pt-1">
-                    {isExternal ? (
+                    {isStripe ? (
+                      <ActionTile
+                        icon={<Send className="w-5 h-5" />}
+                        label="Use to send"
+                        onClick={() => navigate("/send?source=card")}
+                      />
+                    ) : isExternal ? (
                       <ActionTile
                         icon={<CreditCard className="w-5 h-5" />}
                         label="Fund wallet"
@@ -183,11 +190,13 @@ const CardsPage = () => {
                         </button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="center">
-                        <DropdownMenuItem onClick={() => setEditCard(card)}>
-                          <Settings className="w-4 h-4 mr-2" />
-                          Edit card
-                        </DropdownMenuItem>
-                        {!isExternal && (
+                        {!isStripe && (
+                          <DropdownMenuItem onClick={() => setEditCard(card)}>
+                            <Settings className="w-4 h-4 mr-2" />
+                            Edit card
+                          </DropdownMenuItem>
+                        )}
+                        {!isExternal && !isStripe && (
                           <DropdownMenuItem onClick={() => handleToggleFreeze(card)}>
                             <Snowflake className="w-4 h-4 mr-2" />
                             {isFrozen ? "Unfreeze" : "Freeze"} card
@@ -201,13 +210,13 @@ const CardsPage = () => {
                             Request physical
                           </DropdownMenuItem>
                         )}
-                        <DropdownMenuSeparator />
+                        {!isStripe && <DropdownMenuSeparator />}
                         <DropdownMenuItem
                           onClick={() => setDeleteTarget(card)}
                           className="text-destructive focus:text-destructive"
                         >
                           <Trash2 className="w-4 h-4 mr-2" />
-                          Delete card
+                          {isStripe ? "Remove card" : "Delete card"}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -217,7 +226,6 @@ const CardsPage = () => {
             />
           )}
 
-          <SavedCardsSection />
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card>
