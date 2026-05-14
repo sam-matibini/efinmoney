@@ -6,7 +6,6 @@ const corsHeaders = {
 };
 
 const PAYSAFE_API_KEY = Deno.env.get("PAYSAFE_API_KEY")!;
-const PAYSAFE_ACCOUNT_ID = Deno.env.get("PAYSAFE_ACCOUNT_ID")!;
 const PAYSAFE_ENV = (Deno.env.get("PAYSAFE_ENV") || "test").toLowerCase();
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const BASE = PAYSAFE_ENV === "live"
@@ -14,7 +13,7 @@ const BASE = PAYSAFE_ENV === "live"
   : "https://api.test.paysafe.com";
 
 function authHeader() {
-  // Paysafe uses HTTP Basic with the API key (already in user:pass form)
+  // Paysafe HTTP Basic with the API key (already in user:pass form)
   const b64 = btoa(PAYSAFE_API_KEY);
   return `Basic ${b64}`;
 }
@@ -30,6 +29,33 @@ function genSecurity() {
   const q = "What is the secret code I sent you?";
   const a = (Math.random().toString(36).slice(2, 8) + Math.random().toString(36).slice(2, 4)).toLowerCase();
   return { question: q, answer: a };
+}
+
+async function paysafePost(path: string, body: unknown, timeoutMs = 12000) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const resp = await fetch(`${BASE}${path}`, {
+      method: "POST",
+      headers: {
+        Authorization: authHeader(),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+      signal: ctrl.signal,
+    });
+    const json = await resp.json().catch(() => ({}));
+    return { ok: resp.ok, status: resp.status, json };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function extractError(json: any, status: number) {
+  const code = json?.error?.code;
+  const msg = json?.error?.message || json?.errorMessage || `Paysafe HTTP ${status}`;
+  const detail = Array.isArray(json?.error?.details) ? json.error.details.join("; ") : "";
+  return code ? `${msg} (code ${code})${detail ? ` — ${detail}` : ""}` : msg;
 }
 
 Deno.serve(async (req) => {
@@ -62,33 +88,32 @@ Deno.serve(async (req) => {
     const merchantRefNum = `EFM-${transfer.id}`;
     const amountCents = Math.round(Number(transfer.target_amount) * 100);
     const { firstName, lastName } = splitName(transfer.recipient_name);
-    const callbackUrl = `${SUPABASE_URL}/functions/v1/paysafe-webhook`;
 
-    let url = "";
-    let body: Record<string, unknown> = {};
+    // ---------- Step 1: Create Payment Handle ----------
+    let handleBody: Record<string, unknown> = {};
     let security: { question: string; answer: string } | null = null;
 
     if (transfer.payout_method === "interac") {
-      url = `${BASE}/alternatepayments/v1/accounts/${PAYSAFE_ACCOUNT_ID}/etransfers`;
       security = transfer.interac_security_question && transfer.interac_security_answer
         ? { question: transfer.interac_security_question, answer: transfer.interac_security_answer }
         : genSecurity();
-      body = {
-        merchantRefNum,
+      handleBody = {
+        merchantRefNum: `${merchantRefNum}-PH`,
+        transactionType: "STANDALONE_CREDIT",
+        paymentType: "INTERAC_ETRANSFER",
         amount: amountCents,
         currencyCode: "CAD",
-        recipient: {
-          firstName,
-          lastName,
-          email: transfer.recipient_account, // email stored here for interac
+        interacETransfer: {
+          consumerId: transfer.recipient_account, // email
+          consumerIdType: "EMAIL",
+          recipientName: transfer.recipient_name,
+          securityQuestion: { question: security.question, answer: security.answer },
         },
-        notification: { recipientLanguage: "en" },
-        securityQuestion: { question: security.question, answer: security.answer },
-        callbackUrl,
+        profile: { firstName, lastName },
       };
     } else if (transfer.payout_method === "eft") {
-      // recipient_account is "INST-TRANSIT-ACCT"
-      const [institutionId, transitNumber, accountNumber] = (transfer.recipient_account || "").split("-");
+      const [institutionId, transitNumber, accountNumber] =
+        (transfer.recipient_account || "").split("-");
       if (!institutionId || !transitNumber || !accountNumber) {
         await supabase.from("transfers").update({
           status: "failed",
@@ -98,10 +123,12 @@ Deno.serve(async (req) => {
           status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      url = `${BASE}/directdebit/v1/accounts/${PAYSAFE_ACCOUNT_ID}/standalonecredits`;
-      body = {
-        merchantRefNum,
+      handleBody = {
+        merchantRefNum: `${merchantRefNum}-PH`,
+        transactionType: "STANDALONE_CREDIT",
+        paymentType: "EFT",
         amount: amountCents,
+        currencyCode: "CAD",
         eft: {
           accountHolderName: transfer.recipient_name,
           institutionId,
@@ -110,7 +137,6 @@ Deno.serve(async (req) => {
           accountType: "CHECKING",
         },
         profile: { firstName, lastName },
-        callbackUrl,
       };
     } else {
       return new Response(JSON.stringify({ error: `Unsupported payout_method ${transfer.payout_method}` }), {
@@ -118,24 +144,11 @@ Deno.serve(async (req) => {
       });
     }
 
-    const ctrl = new AbortController();
-    const timeout = setTimeout(() => ctrl.abort(), 12000);
-    let resp: Response;
-    let json: any = null;
+    let handleResp: { ok: boolean; status: number; json: any };
     try {
-      resp = await fetch(url, {
-        method: "POST",
-        headers: {
-          Authorization: authHeader(),
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(body),
-        signal: ctrl.signal,
-      });
-      json = await resp.json().catch(() => ({}));
+      handleResp = await paysafePost("/paymenthub/v1/paymenthandles", handleBody);
     } catch (e) {
-      clearTimeout(timeout);
-      console.error("Paysafe network error", e);
+      console.error("Paysafe payment-handle network error", e);
       await supabase.from("transfers").update({
         status: "failed",
         failure_reason: "Paysafe network/timeout error",
@@ -144,24 +157,72 @@ Deno.serve(async (req) => {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    clearTimeout(timeout);
 
-    if (!resp.ok) {
-      const reason = json?.error?.message || json?.errorMessage || `Paysafe HTTP ${resp.status}`;
-      console.error("Paysafe error", resp.status, json);
+    if (!handleResp.ok) {
+      const reason = extractError(handleResp.json, handleResp.status);
+      console.error("Paysafe payment-handle error", handleResp.status, handleResp.json);
       await supabase.from("transfers").update({
         status: "failed",
         failure_reason: reason,
       }).eq("id", transfer.id);
-      return new Response(JSON.stringify({ success: false, error: reason, details: json }), {
+      return new Response(JSON.stringify({ success: false, error: reason, details: handleResp.json }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const handleStatus: string = handleResp.json?.status;
+    const paymentHandleToken: string | undefined = handleResp.json?.paymentHandleToken;
+
+    if (handleStatus !== "PAYABLE" || !paymentHandleToken) {
+      const reason = `Payment handle not payable (status ${handleStatus || "unknown"})`;
+      console.error("Paysafe payment-handle not payable", handleResp.json);
+      await supabase.from("transfers").update({
+        status: "failed",
+        failure_reason: reason,
+      }).eq("id", transfer.id);
+      return new Response(JSON.stringify({ success: false, error: reason, details: handleResp.json }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ---------- Step 2: Submit standalone credit ----------
+    const creditBody = {
+      merchantRefNum,
+      amount: amountCents,
+      currencyCode: "CAD",
+      paymentHandleToken,
+    };
+
+    let creditResp: { ok: boolean; status: number; json: any };
+    try {
+      creditResp = await paysafePost("/paymenthub/v1/standalonecredits", creditBody);
+    } catch (e) {
+      console.error("Paysafe standalone-credit network error", e);
+      await supabase.from("transfers").update({
+        status: "failed",
+        failure_reason: "Paysafe network/timeout error",
+      }).eq("id", transfer.id);
+      return new Response(JSON.stringify({ success: false, error: "Paysafe network error" }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (!creditResp.ok) {
+      const reason = extractError(creditResp.json, creditResp.status);
+      console.error("Paysafe standalone-credit error", creditResp.status, creditResp.json);
+      await supabase.from("transfers").update({
+        status: "failed",
+        failure_reason: reason,
+      }).eq("id", transfer.id);
+      return new Response(JSON.stringify({ success: false, error: reason, details: creditResp.json }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const updates: Record<string, unknown> = {
       status: "processing",
-      provider_reference: json?.id ?? merchantRefNum,
-      paysafe_payment_id: json?.id ?? null,
+      provider_reference: creditResp.json?.id ?? merchantRefNum,
+      paysafe_payment_id: creditResp.json?.id ?? null,
     };
     if (security) {
       updates.interac_security_question = security.question;
@@ -171,8 +232,8 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify({
       success: true,
-      paysafe_id: json?.id ?? null,
-      status: json?.status ?? "PENDING",
+      paysafe_id: creditResp.json?.id ?? null,
+      status: creditResp.json?.status ?? "PENDING",
       security: security ? { question: security.question, answer: security.answer } : null,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

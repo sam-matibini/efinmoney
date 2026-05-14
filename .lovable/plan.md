@@ -1,32 +1,93 @@
 ## Problem
 
-The Tracking Timeline shows the raw operations-only failure message:
+Transfer `EFM-7BE6995B` failed with `failure_reason: "URI not found"`. This is the Paysafe error returned when the endpoint path doesn't exist.
 
-> "Provider setup required: enable IP whitelisting on Flutterwave for ZMW payouts. Funds returned. (raw: Please enable IP Whitelisting to access this service)"
+`supabase/functions/paysafe-payout/index.ts` is calling legacy/wrong paths:
 
-That string is meant for the ops dashboard (`ProviderStatusPanel` filters on `%Provider setup required%`). Senders should see a friendly message — the user-friendly version is already built in `flutterwave-payout` and sent in notifications, but `failure_reason` on the `transfers` row stores the ops version, and `TransferTrackingPage` renders it verbatim.
+- Interac: `POST /alternatepayments/v1/accounts/{accountId}/etransfers`
+- EFT: `POST /directdebit/v1/accounts/{accountId}/standalonecredits`
 
-The actual Flutterwave IP-whitelisting toggle is **not a code change** — it's done in the Flutterwave merchant dashboard (Settings → API → IP whitelisting) by adding the Supabase Edge Function egress IPs. Once toggled, ZMW payouts succeed automatically with no redeploy. I'll surface this clearly at the end.
+Per the current Paysafe Payments API docs (https://developer.paysafe.com/en/api-docs/payments-api/add-payment-methods/interac-e-transfer), Interac e-Transfer **payouts** (and EFT credits) must go through the **Payment Hub** as a two-step flow — there is no `accounts/{id}/etransfers` endpoint, which is why the API returns "URI not found".
 
-## Fix (frontend-only, presentation)
+## Fix
 
-**`src/pages/TransferTrackingPage.tsx`** — sanitize `failure_reason` before rendering:
+Rewrite the Paysafe payout edge function to use the correct Payment Hub two-step flow for both Interac and EFT:
 
-- If it starts with `Provider setup required` (or contains `IP Whitelisting` / `whitelist`), replace with:
-  > "This payout corridor is temporarily unavailable. Your funds have been returned to your wallet. Please try again shortly or contact support."
-- If it contains `(raw: ...)`, strip the parenthetical raw segment.
-- Otherwise display the existing reason as-is.
+### Step 1 — Create a Payment Handle
+`POST {BASE}/paymenthub/v1/paymenthandles`
 
-Implementation: small helper `friendlyFailureReason(reason: string)` used only in the tracking-timeline error box.
+Interac body:
+```json
+{
+  "merchantRefNum": "EFM-{transferId}",
+  "transactionType": "STANDALONE_CREDIT",
+  "paymentType": "INTERAC_ETRANSFER",
+  "amount": <cents>,
+  "currencyCode": "CAD",
+  "interacETransfer": {
+    "consumerId": "<recipient email>",
+    "consumerIdType": "EMAIL",
+    "recipientName": "<full name>",
+    "securityQuestion": { "question": "...", "answer": "..." }   // only when not auto-deposit
+  },
+  "profile": { "firstName": "...", "lastName": "..." }
+}
+```
 
-No edge-function, no DB, no ledger changes. The ops-side `failure_reason` value stays intact for `ProviderStatusPanel` and audit.
+EFT body:
+```json
+{
+  "merchantRefNum": "EFM-{transferId}",
+  "transactionType": "STANDALONE_CREDIT",
+  "paymentType": "EFT",
+  "amount": <cents>,
+  "currencyCode": "CAD",
+  "eft": {
+    "accountHolderName": "...",
+    "institutionId": "...",
+    "transitNumber": "...",
+    "accountNumber": "...",
+    "accountType": "CHECKING"
+  },
+  "profile": { "firstName": "...", "lastName": "..." }
+}
+```
 
-## Operator action (outside code)
+Validate the response has `status === "PAYABLE"` and capture `paymentHandleToken`. If `FAILED`, mark the transfer failed with the returned error.
 
-Enable IP whitelisting on Flutterwave for ZMW payouts:
+### Step 2 — Submit the standalone credit
+`POST {BASE}/paymenthub/v1/standalonecredits`
 
-1. Log in to Flutterwave dashboard → Settings → API → IP Whitelisting
-2. Add the Supabase Edge Function egress IPs (request from Lovable Cloud support if unknown — typically a small range)
-3. Save. Retry a ZMW transfer — payout will go through automatically; no redeploy.
+```json
+{
+  "merchantRefNum": "EFM-{transferId}",
+  "amount": <cents>,
+  "currencyCode": "CAD",
+  "paymentHandleToken": "<from step 1>"
+}
+```
 
-After that, this friendly message stops appearing because the call no longer fails.
+Persist the returned `id` as `paysafe_payment_id` / `provider_reference` and set the transfer to `processing`. Existing webhook handler (`paysafe-webhook`) already consumes Paysafe events and does not need to change.
+
+### Auth & headers
+Keep the current HTTP Basic auth (`btoa(PAYSAFE_API_KEY)`). Account-id is no longer in the URL — paymenthub endpoints are account-scoped via the API key.
+
+### Error mapping
+- Bubble up `error.code` + `error.message` from Paysafe into `failure_reason` so future "URI not found"–type problems surface clearly in the tracking page.
+- Refund logic stays in `cancel-transfer` / existing reversal path; on failure here we mark `status='failed'` so the existing refund flow runs (no change needed there).
+
+### One-time DB cleanup
+Mark the stuck failed transfer's `failure_reason` to a friendlier message via a small migration (the wallet wasn't debited beyond the existing reversal, so no balance fix is required — verified: status is already `failed`).
+
+## Files touched
+
+- `supabase/functions/paysafe-payout/index.ts` — replace endpoints + payload shape with the paymenthub two-step flow.
+- (optional) `supabase/migrations/<ts>_paysafe_uri_fix_cleanup.sql` — update `failure_reason` on transfer `7be6995b-…` to the new friendly message.
+
+No frontend changes are required — `TransferTrackingPage` already renders `failure_reason` and the `friendlyFailureReason()` helper can be left as-is.
+
+## Verification
+
+1. Redeploy `paysafe-payout`.
+2. Trigger a small CAD→CAD Interac payout in the test environment; confirm the payment-handle call returns `PAYABLE` and the standalone-credit call returns an `id` with status `PROCESSING`.
+3. Confirm the tracking page moves from `Processing` → `Completed` once Paysafe sends `SA_CREDIT_COMPLETED` to `paysafe-webhook`.
