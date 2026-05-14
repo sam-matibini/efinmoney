@@ -113,7 +113,7 @@ Deno.serve(async (req) => {
       .from("ledger_entries")
       .select("id")
       .eq("reference_type", "stripe_topup")
-      .eq("reference_id", intent.id)
+      .eq("external_reference", intent.id)
       .limit(1);
     if (existing && existing.length > 0) {
       return json({ success: true, alreadyProcessed: true, payment_intent_id: intent.id });
