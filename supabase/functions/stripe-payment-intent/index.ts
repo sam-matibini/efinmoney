@@ -87,23 +87,23 @@ Deno.serve(async (req) => {
       const amount = intent.amount / 100;
       const currency = intent.currency.toUpperCase();
 
-      // Idempotency: skip if already recorded (match by stripe id in description)
+      // Idempotency: skip if this PaymentIntent was already posted
       const { data: existing } = await admin
         .from("ledger_entries")
         .select("id")
-        .eq("reference_type", "stripe_deposit")
-        .ilike("description", `%${intent.id}%`)
+        .eq("reference_type", "stripe_topup")
+        .eq("reference_id", intent.id)
         .limit(1);
       if (existing && existing.length > 0) {
         return json({ success: true, alreadyProcessed: true });
       }
 
-      // Get accounts
-      const { data: bankAcc } = await admin
+      // Dr Stripe Settlement (asset) / Cr Customer Wallet Liability (21xx)
+      const { data: stripeAsset } = await admin
         .from("ledger_accounts")
         .select("id")
-        .like("code", "11%")
         .eq("currency_code", currency)
+        .ilike("name", "Stripe Settlement%")
         .limit(1)
         .maybeSingle();
       const { data: liabAcc } = await admin
@@ -111,26 +111,27 @@ Deno.serve(async (req) => {
         .select("id")
         .like("code", "21%")
         .eq("currency_code", currency)
+        .ilike("name", "Customer Wallet Liability%")
         .limit(1)
         .maybeSingle();
 
-      if (!bankAcc || !liabAcc) {
+      if (!stripeAsset || !liabAcc) {
         return json({ error: `Ledger accounts missing for ${currency}` }, 500);
       }
 
       const journalId = crypto.randomUUID();
-      const refId = crypto.randomUUID();
-      const desc = `Card deposit via Stripe (${intent.id})`;
+      const refId = intent.id; // canonical idempotency key
+      const desc = `Stripe top-up (${intent.id}) — wallet_topup`;
       const entries = [
         {
           journal_id: journalId,
-          account_id: bankAcc.id,
+          account_id: stripeAsset.id,
           wallet_id: null,
           currency_code: currency,
           debit_amount: amount,
           credit_amount: 0,
           description: desc,
-          reference_type: "stripe_deposit",
+          reference_type: "stripe_topup",
           reference_id: refId,
           created_by: userId,
         },
@@ -142,7 +143,7 @@ Deno.serve(async (req) => {
           debit_amount: 0,
           credit_amount: amount,
           description: desc,
-          reference_type: "stripe_deposit",
+          reference_type: "stripe_topup",
           reference_id: refId,
           created_by: userId,
         },
@@ -150,6 +151,18 @@ Deno.serve(async (req) => {
 
       const { error: ledgerErr } = await admin.from("ledger_entries").insert(entries);
       if (ledgerErr) return json({ error: ledgerErr.message }, 500);
+
+      // Notify the user (best-effort)
+      try {
+        await admin.from("notifications").insert({
+          user_id: userId,
+          title: "Top-up successful",
+          message: `Your ${currency} top-up of ${amount.toFixed(2)} was successful.`,
+          type: "transfer",
+        });
+      } catch (e) {
+        console.warn("notification insert failed", e);
+      }
 
       return json({ success: true, amount, currency });
     }
