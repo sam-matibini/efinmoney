@@ -1,0 +1,1 @@
+UPDATE public.transfers SET status='completed', completed_at=now() WHERE id='ce4ab50b-bfd6-4ce7-9c7e-1c976e136917' AND status='processing';

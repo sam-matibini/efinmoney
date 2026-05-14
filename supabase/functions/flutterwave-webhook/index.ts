@@ -180,7 +180,11 @@ Deno.serve(async (req) => {
     }
 
     // ---- transfer events (existing logic)
-    const transferId = (meta as { transfer_id?: string })?.transfer_id || (typeof reference === "string" && reference.startsWith("EFM-") ? reference.split("-")[1] : null);
+    // reference format: "EFM-{uuid}-{timestamp}". UUIDs contain hyphens, so we
+    // can't just split("-")[1] — extract the full 36-char UUID instead.
+    const refStr = typeof reference === "string" ? reference : "";
+    const uuidMatch = refStr.match(/^EFM-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
+    const transferId = (meta as { transfer_id?: string })?.transfer_id || (uuidMatch ? uuidMatch[1] : null);
     if ((eventName.startsWith("transfer.") || transferId || /transfer/i.test(String((data as { entity?: string }).entity || ""))) && (transferId || flwId)) {
       let q = supabase.from("transfers").select("*");
       q = transferId ? q.eq("id", transferId) : q.eq("provider_reference", flwId);
