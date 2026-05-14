@@ -41,7 +41,7 @@ async function creditWallet(
 ) {
   // Idempotency: skip if this FLW transaction was already posted
   const { data: existing } = await supabase.from("ledger_entries").select("id")
-    .eq("reference_type", "flw_topup").eq("reference_id", idempotencyRef).limit(1);
+    .eq("reference_type", "flw_topup").eq("external_reference", idempotencyRef).limit(1);
   if (existing && existing.length > 0) {
     console.log("creditWallet: already posted", idempotencyRef);
     return false;
@@ -68,10 +68,10 @@ async function creditWallet(
   const { error } = await supabase.from("ledger_entries").insert([
     { journal_id: journalId, account_id: asset.id, wallet_id: null, currency_code: currency,
       debit_amount: amount, credit_amount: 0, description: desc,
-      reference_type: "flw_topup", reference_id: idempotencyRef },
+      reference_type: "flw_topup", external_reference: idempotencyRef },
     { journal_id: journalId, account_id: liab.id, wallet_id: walletId, currency_code: currency,
       debit_amount: 0, credit_amount: amount, description: desc,
-      reference_type: "flw_topup", reference_id: idempotencyRef },
+      reference_type: "flw_topup", external_reference: idempotencyRef },
   ]);
   if (error) { console.error("creditWallet insert failed", error); return false; }
 
