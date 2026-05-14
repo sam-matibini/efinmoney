@@ -41,7 +41,7 @@ async function creditWallet(
 ) {
   // Idempotency: skip if this FLW transaction was already posted
   const { data: existing } = await supabase.from("ledger_entries").select("id")
-    .eq("reference_type", "flw_topup").eq("reference_id", idempotencyRef).limit(1);
+    .eq("reference_type", "flw_topup").eq("external_reference", idempotencyRef).limit(1);
   if (existing && existing.length > 0) {
     console.log("creditWallet: already posted", idempotencyRef);
     return false;
