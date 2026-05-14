@@ -158,6 +158,14 @@ Deno.serve(async (req) => {
         await supabase.from("notifications").insert({ user_id: user.id, title: "Transfer failed — refunded", message: rev.reversed ? userReason : userReason.replace("Your funds have been returned to your wallet — please try again shortly.", "Please contact support."), type: "error" });
         return new Response(JSON.stringify({ success: false, error: userReason, code: "provider_setup_required", refunded: rev.reversed, provider_message: rawReason }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
+      if (isProviderBalanceError(rawReason)) {
+        const opsReason = `Provider balance low: top up your Flutterwave ${currency} settlement balance to enable payouts. Funds returned. (raw: ${rawReason})`;
+        const userReason = `${currency} payouts are temporarily unavailable due to a provider balance issue. Your funds have been returned to your wallet — please try again shortly.`;
+        const rev = await reverseTransferLedger(supabase, transfer_id);
+        await supabase.from("transfers").update({ status: "failed", failure_reason: opsReason.slice(0, 500) }).eq("id", transfer_id);
+        await supabase.from("notifications").insert({ user_id: user.id, title: "Transfer failed — refunded", message: rev.reversed ? userReason : userReason.replace("Your funds have been returned to your wallet — please try again shortly.", "Please contact support."), type: "error" });
+        return new Response(JSON.stringify({ success: false, error: userReason, code: "provider_balance_low", refunded: rev.reversed, provider_message: rawReason }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
       const rev = await reverseTransferLedger(supabase, transfer_id);
       await supabase.from("transfers").update({ status: "failed", failure_reason: reason }).eq("id", transfer_id);
       await supabase.from("notifications").insert({ user_id: user.id, title: "Transfer failed — refunded", message: rev.reversed ? `Your transfer to ${recipient_name} could not be sent — ${reason} Your wallet has been refunded.` : reason, type: "error" });
