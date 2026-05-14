@@ -29,21 +29,57 @@ async function reverseTransferLedger(supabase: SbAdmin, transferId: string): Pro
   return true;
 }
 
-async function creditWallet(supabase: SbAdmin, userId: string, walletId: string, currency: string, amount: number, ref: string, desc: string) {
+async function creditWallet(
+  supabase: SbAdmin,
+  userId: string,
+  walletId: string,
+  currency: string,
+  amount: number,
+  idempotencyRef: string,   // e.g. FLW transaction_id — guarantees no double-credit
+  desc: string,
+  source: "flutterwave" | "virtual_account" = "flutterwave",
+) {
+  // Idempotency: skip if this FLW transaction was already posted
   const { data: existing } = await supabase.from("ledger_entries").select("id")
-    .eq("reference_type", "flw_topup").eq("reference_id", ref).limit(1);
-  if (existing && existing.length > 0) return false;
-  const { data: liab } = await supabase.from("ledger_accounts").select("id").like("code", "21%").eq("currency_code", currency).limit(1).maybeSingle();
-  const { data: cash } = await supabase.from("ledger_accounts").select("id").like("code", "11%").eq("currency_code", currency).limit(1).maybeSingle();
-  if (!liab || !cash) { console.warn("Missing ledger accts for", currency); return false; }
-  const j = crypto.randomUUID();
+    .eq("reference_type", "flw_topup").eq("reference_id", idempotencyRef).limit(1);
+  if (existing && existing.length > 0) {
+    console.log("creditWallet: already posted", idempotencyRef);
+    return false;
+  }
+
+  // Asset (debit) — Flutterwave Settlement for this currency
+  const { data: asset } = await supabase.from("ledger_accounts")
+    .select("id").eq("currency_code", currency)
+    .ilike("name", "Flutterwave Settlement%")
+    .limit(1).maybeSingle();
+
+  // Liability (credit) — Customer Wallet Liability for this currency (code 21xx)
+  const { data: liab } = await supabase.from("ledger_accounts")
+    .select("id").like("code", "21%").eq("currency_code", currency)
+    .ilike("name", "Customer Wallet Liability%")
+    .limit(1).maybeSingle();
+
+  if (!asset || !liab) {
+    console.error("creditWallet: missing ledger accounts for", currency, { asset: !!asset, liab: !!liab });
+    return false;
+  }
+
+  const journalId = crypto.randomUUID();
   const { error } = await supabase.from("ledger_entries").insert([
-    { journal_id: j, account_id: cash.id, wallet_id: null, currency_code: currency, debit_amount: amount, credit_amount: 0, description: desc, reference_type: "flw_topup", reference_id: ref },
-    { journal_id: j, account_id: liab.id, wallet_id: walletId, currency_code: currency, debit_amount: 0, credit_amount: amount, description: desc, reference_type: "flw_topup", reference_id: ref },
+    { journal_id: journalId, account_id: asset.id, wallet_id: null, currency_code: currency,
+      debit_amount: amount, credit_amount: 0, description: desc,
+      reference_type: "flw_topup", reference_id: idempotencyRef },
+    { journal_id: journalId, account_id: liab.id, wallet_id: walletId, currency_code: currency,
+      debit_amount: 0, credit_amount: amount, description: desc,
+      reference_type: "flw_topup", reference_id: idempotencyRef },
   ]);
-  if (error) { console.error("credit insert failed", error); return false; }
+  if (error) { console.error("creditWallet insert failed", error); return false; }
+
   await supabase.from("notifications").insert({
-    user_id: userId, title: "Wallet credited", message: `${currency} ${amount} received in your wallet.`, type: "transfer",
+    user_id: userId,
+    title: "Top-up successful",
+    message: `Your top-up of ${amount} ${currency} was successful.`,
+    type: "transfer",
   });
   return true;
 }
@@ -95,14 +131,40 @@ Deno.serve(async (req) => {
         const txType = meta?.type ? String(meta.type) : null;
 
         // Top-up flow (initialized via /payments)
-        if (userIdMeta && (txType === "wallet_topup" || String(reference).startsWith("efm_topup_"))) {
-          const { data: wallet } = await supabase.from("wallets").select("id").eq("user_id", userIdMeta).eq("currency_code", currency).maybeSingle();
-          let walletId = wallet?.id;
-          if (!walletId) {
-            const { data: nw } = await supabase.from("wallets").insert({ user_id: userIdMeta, currency_code: currency, is_default: false }).select("id").single();
-            walletId = nw!.id;
+        if (userIdMeta && (txType === "wallet_topup" || String(reference).startsWith("efm_topup_") || String(reference).startsWith("topup-"))) {
+          const walletIdMeta = meta?.wallet_id ? String(meta.wallet_id) : null;
+          let walletId: string | undefined;
+
+          if (walletIdMeta) {
+            // Verify wallet belongs to this user and matches currency
+            const { data: w } = await supabase.from("wallets")
+              .select("id, user_id, currency_code")
+              .eq("id", walletIdMeta).maybeSingle();
+            if (w && w.user_id === userIdMeta && String(w.currency_code).toUpperCase() === currency) {
+              walletId = w.id as string;
+            } else {
+              console.warn("wallet_id from meta failed validation, falling back to user+currency lookup", { walletIdMeta, userIdMeta, currency });
+            }
           }
-          await creditWallet(supabase, userIdMeta, walletId, currency, amount, String(reference || flwId), `Top-up via Flutterwave ${flwId}`);
+
+          if (!walletId) {
+            const { data: wallet } = await supabase.from("wallets")
+              .select("id").eq("user_id", userIdMeta).eq("currency_code", currency).maybeSingle();
+            walletId = wallet?.id as string | undefined;
+            if (!walletId) {
+              const { data: nw } = await supabase.from("wallets")
+                .insert({ user_id: userIdMeta, currency_code: currency, is_default: false })
+                .select("id").single();
+              walletId = nw!.id as string;
+            }
+          }
+
+          // Idempotency keyed on FLW transaction_id (falls back to tx_ref)
+          const idempotencyRef = flwId || String(reference);
+          await creditWallet(
+            supabase, userIdMeta, walletId, currency, amount,
+            idempotencyRef, `Top-up via Flutterwave (txn ${flwId}, ref ${reference})`,
+          );
         }
         // Virtual account credit
         else {
