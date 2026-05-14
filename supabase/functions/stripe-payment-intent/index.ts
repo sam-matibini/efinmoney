@@ -120,7 +120,6 @@ Deno.serve(async (req) => {
       }
 
       const journalId = crypto.randomUUID();
-      const refId = intent.id; // canonical idempotency key
       const desc = `Stripe top-up (${intent.id}) — wallet_topup`;
       const entries = [
         {
@@ -132,7 +131,7 @@ Deno.serve(async (req) => {
           credit_amount: 0,
           description: desc,
           reference_type: "stripe_topup",
-          reference_id: refId,
+          external_reference: intent.id,
           created_by: userId,
         },
         {
@@ -144,7 +143,7 @@ Deno.serve(async (req) => {
           credit_amount: amount,
           description: desc,
           reference_type: "stripe_topup",
-          reference_id: refId,
+          external_reference: intent.id,
           created_by: userId,
         },
       ];
