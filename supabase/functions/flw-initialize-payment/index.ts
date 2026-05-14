@@ -36,6 +36,22 @@ Deno.serve(async (req) => {
     const phone = String(body?.phone || "").trim();
     const network = String(body?.network || "").toLowerCase();
     const country = String(body?.country || "").toUpperCase();
+    const walletId = body?.walletId ? String(body.walletId) : "";
+    const txType = String(body?.type || "wallet_topup");
+    const clientTxRef = body?.tx_ref ? String(body.tx_ref) : "";
+
+    // Validate the wallet (when provided) belongs to the caller and matches currency
+    if (walletId) {
+      const { data: w } = await supabase
+        .from("wallets")
+        .select("id, user_id, currency_code")
+        .eq("id", walletId)
+        .maybeSingle();
+      if (!w || w.user_id !== userId) return jr(403, { error: "Wallet not accessible" });
+      if (w.currency_code.toUpperCase() !== currency) {
+        return jr(400, { error: `Wallet currency (${w.currency_code}) does not match top-up currency (${currency})` });
+      }
+    }
 
     if (!Number.isFinite(amount) || amount <= 0) return jr(400, { error: "Invalid amount" });
     if (!redirectUrl) return jr(400, { error: "redirectUrl required" });
