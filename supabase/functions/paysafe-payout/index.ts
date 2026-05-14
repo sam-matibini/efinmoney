@@ -132,6 +132,7 @@ Deno.serve(async (req) => {
           securityQuestion: { question: security.question, answer: security.answer },
         },
         profile: { firstName, lastName },
+        billingDetails,
       };
     } else if (transfer.payout_method === "eft") {
       const [institutionId, transitNumber, accountNumber] =
@@ -159,6 +160,7 @@ Deno.serve(async (req) => {
           accountType: "CHECKING",
         },
         profile: { firstName, lastName },
+        billingDetails,
       };
     } else {
       return new Response(JSON.stringify({ error: `Unsupported payout_method ${transfer.payout_method}` }), {
