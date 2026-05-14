@@ -247,33 +247,13 @@ const TopUpPage = () => {
             </Card>
           )}
 
-          {/* Flutterwave route */}
+          {/* Flutterwave route — hosted checkout (Card, Bank Transfer, USSD, Mobile Money) */}
           {gateway === "flutterwave" && selectedWallet && (
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">2. Choose funding method</CardTitle>
+                <CardTitle className="text-base">2. Enter amount</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-2">
-                  {availableFlwMethods.map((m) => {
-                    const Icon = METHOD_ICON[m];
-                    const active = method === m;
-                    return (
-                      <button
-                        key={m}
-                        type="button"
-                        onClick={() => setMethod(m)}
-                        className={`p-3 rounded-lg border text-left transition-colors flex items-center gap-2 ${
-                          active ? "border-primary bg-primary/10" : "border-border hover:bg-muted/50"
-                        }`}
-                      >
-                        <Icon className="w-4 h-4" />
-                        <span className="text-sm font-medium">{METHOD_LABEL[m]}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-
                 <div>
                   <Label>Amount ({currency})</Label>
                   <Input
@@ -287,36 +267,14 @@ const TopUpPage = () => {
                   <p className="text-xs text-muted-foreground mt-1">Minimum: {minAmount(currency)} {currency}</p>
                 </div>
 
-                {method === "mobilemoney" && mmCountry && (
-                  <>
-                    <div>
-                      <Label>Network</Label>
-                      <Select value={network} onValueChange={setNetwork}>
-                        <SelectTrigger><SelectValue placeholder="Select network" /></SelectTrigger>
-                        <SelectContent>
-                          {mmCountry.networks.map((n) => (
-                            <SelectItem key={n.value} value={n.value}>{n.label}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label>Mobile number</Label>
-                      <div className="flex gap-2">
-                        <div className="flex items-center px-3 rounded-md border bg-muted text-sm">
-                          {mmCountry.flag} {mmCountry.dialCode}
-                        </div>
-                        <Input inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="7XX XXX XXX" />
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        You'll be prompted on your phone to authorize the payment.
-                      </p>
-                    </div>
-                  </>
-                )}
+                <div className="p-3 rounded-lg bg-accent/10 border border-accent/20">
+                  <p className="text-xs text-foreground">
+                    You will be redirected to Flutterwave's secure checkout to complete your payment via Card, Bank Transfer, Mobile Money, or USSD.
+                  </p>
+                </div>
 
                 <Button className="w-full" size="lg" onClick={handleFlutterwaveTopUp} disabled={loading}>
-                  {loading ? "Redirecting..." : `Continue to ${gatewayBadge.label}`}
+                  {loading ? "Redirecting..." : "Proceed to Payment"}
                 </Button>
               </CardContent>
             </Card>
