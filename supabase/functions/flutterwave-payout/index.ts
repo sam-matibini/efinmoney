@@ -35,6 +35,13 @@ function isTemporaryProviderSetupError(message: string): boolean {
   return m.includes("ip whitelisting") || m.includes("whitelist") || m.includes("access this service");
 }
 
+function isProviderBalanceError(message: string): boolean {
+  const m = message.toLowerCase();
+  return m.includes("insufficient funds in customer wallet") ||
+         m.includes("insufficient balance") ||
+         (m.includes("insufficient") && m.includes("wallet"));
+}
+
 async function reverseTransferLedger(supabase: ReturnType<typeof createClient>, transferId: string) {
   const { data: existing } = await supabase.from("ledger_entries").select("id").eq("reference_type", "transfer_reversal").eq("reference_id", transferId).limit(1);
   if (existing && existing.length > 0) return { reversed: false, reason: "already_reversed" };
