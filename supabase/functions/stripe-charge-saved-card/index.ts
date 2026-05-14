@@ -147,8 +147,6 @@ Deno.serve(async (req) => {
     }
 
     const journalId = crypto.randomUUID();
-    // Use Stripe payment_intent.id as the canonical reference for true idempotency
-    const refId = intent.id;
     const desc = `Stripe top-up (${intent.id}) — ${purpose}`;
     const entries = [
       {
@@ -160,7 +158,7 @@ Deno.serve(async (req) => {
         credit_amount: 0,
         description: desc,
         reference_type: "stripe_topup",
-        reference_id: refId,
+        external_reference: intent.id,
         created_by: userId,
       },
       {
@@ -172,7 +170,7 @@ Deno.serve(async (req) => {
         credit_amount: amount,
         description: desc,
         reference_type: "stripe_topup",
-        reference_id: refId,
+        external_reference: intent.id,
         created_by: userId,
       },
     ];
