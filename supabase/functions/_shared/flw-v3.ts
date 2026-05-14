@@ -1,5 +1,9 @@
 // Flutterwave V3 shared helper. Uses FLW_SECRET_KEY (FLWSECK-...) bearer auth.
-export const FLW_V3_BASE = "https://api.flutterwave.com/v3";
+// Optional: route through a Cloudflare Worker reverse proxy via FLW_PROXY_URL
+// (e.g. https://efin-flw-proxy.ukwenzyb.workers.dev) to get a trusted egress IP
+// for restricted corridors (ZMW, etc). The proxy must forward to api.flutterwave.com.
+const PROXY_BASE = (Deno.env.get("FLW_PROXY_URL") || "https://api.flutterwave.com").replace(/\/+$/, "");
+export const FLW_V3_BASE = `${PROXY_BASE}/v3`;
 
 export interface FlwV3Result { ok: boolean; status: number; json: any; }
 
