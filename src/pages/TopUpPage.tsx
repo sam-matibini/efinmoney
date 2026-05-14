@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { useSearchParams } from "react-router-dom";
 import Header from "@/components/layout/Header";
@@ -8,46 +8,96 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { CheckCircle2, XCircle } from "lucide-react";
-import { ALLOWED_TOPUP_CURRENCIES, validateMinAmount, friendlyFlwError, minAmount, type FlwMethod } from "@/lib/flutterwave";
+import { CheckCircle2, XCircle, CreditCard, Smartphone, Building2, Globe } from "lucide-react";
+import { useWallets } from "@/hooks/useWallets";
+import { useAuth } from "@/hooks/useAuth";
+import CardPaymentForm from "@/components/modals/CardPaymentForm";
+import { validateMinAmount, friendlyFlwError, minAmount, type FlwMethod } from "@/lib/flutterwave";
 import { MM_COUNTRIES } from "@/lib/mobileMoneyNetworks";
 
 const MM_BY_CCY = Object.fromEntries(MM_COUNTRIES.map((c) => [c.currency, c]));
 
-const METHODS: { value: FlwMethod; label: string }[] = [
-  { value: "card", label: "Card" },
-  { value: "banktransfer", label: "Bank Transfer" },
-  { value: "ussd", label: "USSD" },
-  { value: "mobilemoney", label: "Mobile Money" },
-];
+// Smart Gateway Routing
+const FLUTTERWAVE_CURRENCIES = ["NGN", "KES", "UGX", "ZMW", "RWF", "GHS", "TZS"];
+const STRIPE_CURRENCIES = ["USD", "CAD", "EUR", "GBP"];
+
+type Gateway = "flutterwave" | "stripe" | "unsupported";
+const routeGateway = (currency: string): Gateway => {
+  if (FLUTTERWAVE_CURRENCIES.includes(currency)) return "flutterwave";
+  if (STRIPE_CURRENCIES.includes(currency)) return "stripe";
+  return "unsupported";
+};
+
+// Per-gateway available methods
+const FLW_METHODS_BY_CCY: Record<string, FlwMethod[]> = {
+  NGN: ["card", "banktransfer", "ussd"],
+  KES: ["card", "mobilemoney"],
+  UGX: ["card", "mobilemoney"],
+  GHS: ["card", "mobilemoney"],
+  ZMW: ["card", "mobilemoney"],
+  RWF: ["card", "mobilemoney"],
+  TZS: ["card", "mobilemoney"],
+};
+
+const METHOD_LABEL: Record<FlwMethod, string> = {
+  card: "Card",
+  banktransfer: "Bank Transfer",
+  ussd: "USSD",
+  mobilemoney: "Mobile Money",
+};
+
+const METHOD_ICON: Record<FlwMethod, typeof CreditCard> = {
+  card: CreditCard,
+  banktransfer: Building2,
+  ussd: Smartphone,
+  mobilemoney: Smartphone,
+};
 
 const TopUpPage = () => {
   const [params] = useSearchParams();
+  const { user } = useAuth();
+  const { data: wallets, isLoading: walletsLoading } = useWallets();
+
+  const [selectedWalletId, setSelectedWalletId] = useState<string>("");
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState<FlwMethod>("card");
-  const [currency, setCurrency] = useState<string>(ALLOWED_TOPUP_CURRENCIES.card[0]);
-  const [loading, setLoading] = useState(false);
-  const [verifyState, setVerifyState] = useState<{ status: "verifying" | "success" | "failed"; message: string } | null>(null);
   const [network, setNetwork] = useState<string>("");
   const [phone, setPhone] = useState<string>("");
+  const [loading, setLoading] = useState(false);
+  const [verifyState, setVerifyState] = useState<{ status: "verifying" | "success" | "failed"; message: string } | null>(null);
 
+  // Initialize default wallet
+  useEffect(() => {
+    if (!selectedWalletId && wallets && wallets.length > 0) {
+      const def = wallets.find((w) => w.is_default) || wallets[0];
+      setSelectedWalletId(def.wallet_id);
+    }
+  }, [wallets, selectedWalletId]);
+
+  const selectedWallet = wallets?.find((w) => w.wallet_id === selectedWalletId);
+  const currency = selectedWallet?.currency_code || "USD";
+  const gateway = routeGateway(currency);
+  const availableFlwMethods = FLW_METHODS_BY_CCY[currency] || ["card"];
   const mmCountry = method === "mobilemoney" ? MM_BY_CCY[currency] : undefined;
 
-  // Keep currency valid for the chosen method
+  // Reset method when wallet changes
   useEffect(() => {
-    const allowed = ALLOWED_TOPUP_CURRENCIES[method];
-    if (!allowed.includes(currency)) setCurrency(allowed[0]);
-  }, [method, currency]);
+    if (gateway === "flutterwave" && !availableFlwMethods.includes(method)) {
+      setMethod(availableFlwMethods[0]);
+    }
+  }, [currency, gateway, availableFlwMethods, method]);
 
-  // Default the network when the mobile-money country changes
   useEffect(() => {
     if (mmCountry && !mmCountry.networks.find((n) => n.value === network)) {
       setNetwork(mmCountry.networks[0]?.value || "");
     }
   }, [mmCountry, network]);
 
+  // Verify FLW return callback
   useEffect(() => {
     const tx = params.get("transaction_id");
     const ref = params.get("tx_ref");
@@ -76,13 +126,9 @@ const TopUpPage = () => {
     })();
   }, [params]);
 
-  const handleTopUp = async () => {
+  const handleFlutterwaveTopUp = async () => {
     const amt = Number(amount);
     if (!Number.isFinite(amt) || amt <= 0) { toast.error("Enter a valid amount"); return; }
-    if (!ALLOWED_TOPUP_CURRENCIES[method].includes(currency)) {
-      toast.error(`${currency} is not supported for ${method}. Please choose a different currency.`);
-      return;
-    }
     const minErr = validateMinAmount(currency, amt);
     if (minErr) { toast.error(minErr); return; }
     if (method === "mobilemoney") {
@@ -95,12 +141,17 @@ const TopUpPage = () => {
     try {
       const redirectUrl = `${window.location.origin}/wallet/topup`;
       const fullPhone = mmCountry ? `${mmCountry.dialCode}${phone.replace(/\D/g, "").replace(/^0+/, "")}` : phone;
+      // Tx ref format so webhook recognizes a wallet top-up routed to a specific wallet
+      const txRef = `topup-${user?.id || "anon"}-${selectedWalletId.slice(0, 8)}-${Date.now()}`;
       const { data, error } = await supabase.functions.invoke("flw-initialize-payment", {
         body: {
           amount: amt,
           currency,
           paymentMethod: method,
           redirectUrl,
+          tx_ref: txRef,
+          type: "wallet_topup",
+          walletId: selectedWalletId,
           ...(method === "mobilemoney" ? { network, phone: fullPhone, country: mmCountry?.code } : {}),
         },
       });
@@ -115,6 +166,12 @@ const TopUpPage = () => {
     }
   };
 
+  const gatewayBadge = useMemo(() => {
+    if (gateway === "flutterwave") return { label: "Flutterwave", icon: Globe, color: "bg-orange-500/10 text-orange-500 border-orange-500/30" };
+    if (gateway === "stripe") return { label: "Stripe", icon: CreditCard, color: "bg-indigo-500/10 text-indigo-500 border-indigo-500/30" };
+    return { label: "Unavailable", icon: XCircle, color: "bg-muted text-muted-foreground" };
+  }, [gateway]);
+
   return (
     <div className="min-h-screen bg-background pb-24 md:pb-8">
       <Header />
@@ -122,7 +179,7 @@ const TopUpPage = () => {
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-xl mx-auto space-y-6">
           <div>
             <h1 className="text-2xl font-display font-bold">Add Money</h1>
-            <p className="text-muted-foreground">Top up your wallet via card, bank, USSD, or mobile money.</p>
+            <p className="text-muted-foreground">Top up your wallet using the best route for your currency.</p>
           </div>
 
           {verifyState && (
@@ -136,58 +193,141 @@ const TopUpPage = () => {
             </Card>
           )}
 
+          {/* Wallet selector */}
           <Card>
-            <CardHeader><CardTitle>Top up wallet</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label>Payment method</Label>
-                <Select value={method} onValueChange={(v) => setMethod(v as FlwMethod)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{METHODS.map((m) => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Currency</Label>
-                <Select value={currency} onValueChange={setCurrency}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+            <CardHeader>
+              <CardTitle className="text-base">1. Choose wallet to top up</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {walletsLoading ? (
+                <Skeleton className="h-12 w-full" />
+              ) : !wallets || wallets.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No wallets available. Create one first.</p>
+              ) : (
+                <Select value={selectedWalletId} onValueChange={setSelectedWalletId}>
+                  <SelectTrigger><SelectValue placeholder="Select wallet" /></SelectTrigger>
                   <SelectContent>
-                    {ALLOWED_TOPUP_CURRENCIES[method].map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    {wallets.map((w) => (
+                      <SelectItem key={w.wallet_id} value={w.wallet_id}>
+                        {w.flag_emoji} {w.currency_code} — {w.symbol}{Number(w.balance).toLocaleString()}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground mt-1">Minimum: {minAmount(currency)} {currency}</p>
-              </div>
-              <div>
-                <Label>Amount</Label>
-                <Input type="number" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" />
-              </div>
-              {method === "mobilemoney" && mmCountry && (
-                <>
-                  <div>
-                    <Label>Network</Label>
-                    <Select value={network} onValueChange={setNetwork}>
-                      <SelectTrigger><SelectValue placeholder="Select network" /></SelectTrigger>
-                      <SelectContent>
-                        {mmCountry.networks.map((n) => (
-                          <SelectItem key={n.value} value={n.value}>{n.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label>Mobile number</Label>
-                    <div className="flex gap-2">
-                      <div className="flex items-center px-3 rounded-md border bg-muted text-sm">{mmCountry.flag} {mmCountry.dialCode}</div>
-                      <Input inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="7XX XXX XXX" />
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">You'll be prompted on your phone to authorize the payment.</p>
-                  </div>
-                </>
               )}
-              <Button className="w-full" onClick={handleTopUp} disabled={loading}>
-                {loading ? "Redirecting..." : "Continue to payment"}
-              </Button>
+
+              {selectedWallet && (
+                <div className="mt-3 flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">Routed via</span>
+                  <Badge variant="outline" className={gatewayBadge.color}>
+                    <gatewayBadge.icon className="w-3 h-3 mr-1" />
+                    {gatewayBadge.label}
+                  </Badge>
+                </div>
+              )}
             </CardContent>
           </Card>
+
+          {gateway === "unsupported" && selectedWallet && (
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-sm text-muted-foreground">
+                  Top-up for <strong>{currency}</strong> is not yet available. Please contact support.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Stripe route */}
+          {gateway === "stripe" && selectedWallet && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">2. Pay with card</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <CardPaymentForm
+                  defaultWalletId={selectedWallet.wallet_id}
+                  showWalletSelect={false}
+                  onSuccess={() => toast.success("Top-up successful")}
+                />
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Flutterwave route */}
+          {gateway === "flutterwave" && selectedWallet && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">2. Choose funding method</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-2">
+                  {availableFlwMethods.map((m) => {
+                    const Icon = METHOD_ICON[m];
+                    const active = method === m;
+                    return (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => setMethod(m)}
+                        className={`p-3 rounded-lg border text-left transition-colors flex items-center gap-2 ${
+                          active ? "border-primary bg-primary/10" : "border-border hover:bg-muted/50"
+                        }`}
+                      >
+                        <Icon className="w-4 h-4" />
+                        <span className="text-sm font-medium">{METHOD_LABEL[m]}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div>
+                  <Label>Amount ({currency})</Label>
+                  <Input
+                    type="number"
+                    inputMode="decimal"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    placeholder="0.00"
+                    className="h-12 text-lg"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">Minimum: {minAmount(currency)} {currency}</p>
+                </div>
+
+                {method === "mobilemoney" && mmCountry && (
+                  <>
+                    <div>
+                      <Label>Network</Label>
+                      <Select value={network} onValueChange={setNetwork}>
+                        <SelectTrigger><SelectValue placeholder="Select network" /></SelectTrigger>
+                        <SelectContent>
+                          {mmCountry.networks.map((n) => (
+                            <SelectItem key={n.value} value={n.value}>{n.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Mobile number</Label>
+                      <div className="flex gap-2">
+                        <div className="flex items-center px-3 rounded-md border bg-muted text-sm">
+                          {mmCountry.flag} {mmCountry.dialCode}
+                        </div>
+                        <Input inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="7XX XXX XXX" />
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        You'll be prompted on your phone to authorize the payment.
+                      </p>
+                    </div>
+                  </>
+                )}
+
+                <Button className="w-full" size="lg" onClick={handleFlutterwaveTopUp} disabled={loading}>
+                  {loading ? "Redirecting..." : `Continue to ${gatewayBadge.label}`}
+                </Button>
+              </CardContent>
+            </Card>
+          )}
         </motion.div>
       </main>
       <MobileNav />
