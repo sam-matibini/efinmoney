@@ -131,28 +131,21 @@ const TopUpPage = () => {
     if (!Number.isFinite(amt) || amt <= 0) { toast.error("Enter a valid amount"); return; }
     const minErr = validateMinAmount(currency, amt);
     if (minErr) { toast.error(minErr); return; }
-    if (method === "mobilemoney") {
-      if (!mmCountry) { toast.error(`${currency} mobile money is not supported.`); return; }
-      if (!network) { toast.error("Select a mobile money network"); return; }
-      const digits = phone.replace(/\D/g, "");
-      if (digits.length < 9) { toast.error("Enter a valid mobile number"); return; }
-    }
     setLoading(true);
     try {
       const redirectUrl = `${window.location.origin}/wallet/topup`;
-      const fullPhone = mmCountry ? `${mmCountry.dialCode}${phone.replace(/\D/g, "").replace(/^0+/, "")}` : phone;
-      // Tx ref format so webhook recognizes a wallet top-up routed to a specific wallet
       const txRef = `topup-${user?.id || "anon"}-${selectedWalletId.slice(0, 8)}-${Date.now()}`;
+      // Use hosted checkout — let Flutterwave present all locally-available
+      // methods (Card, Bank Transfer, USSD, Mobile Money) for the corridor.
       const { data, error } = await supabase.functions.invoke("flw-initialize-payment", {
         body: {
           amount: amt,
           currency,
-          paymentMethod: method,
+          paymentMethod: "card",
           redirectUrl,
           tx_ref: txRef,
           type: "wallet_topup",
           walletId: selectedWalletId,
-          ...(method === "mobilemoney" ? { network, phone: fullPhone, country: mmCountry?.code } : {}),
         },
       });
       if (error) throw error;
