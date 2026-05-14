@@ -108,23 +108,25 @@ Deno.serve(async (req) => {
       return json({ success: false, error: `Payment ${intent.status}`, status: intent.status, payment_intent_id: intent.id });
     }
 
-    // Idempotency: skip ledger if already posted for this PI
+    // Idempotency: skip ledger if this payment intent was already posted
     const { data: existing } = await admin
       .from("ledger_entries")
       .select("id")
-      .eq("reference_type", "stripe_card_charge")
-      .ilike("description", `%${intent.id}%`)
+      .eq("reference_type", "stripe_topup")
+      .eq("reference_id", intent.id)
       .limit(1);
     if (existing && existing.length > 0) {
       return json({ success: true, alreadyProcessed: true, payment_intent_id: intent.id });
     }
 
-    // Post ledger
-    const { data: bankAcc } = await admin
+    // Post double-entry ledger:
+    //   Dr Stripe Settlement (asset)        — funds held by Stripe on our behalf
+    //   Cr Customer Wallet Liability (21xx) — owed back to the customer
+    const { data: stripeAsset } = await admin
       .from("ledger_accounts")
       .select("id")
-      .like("code", "11%")
       .eq("currency_code", currency)
+      .ilike("name", "Stripe Settlement%")
       .limit(1)
       .maybeSingle();
     const { data: liabAcc } = await admin
@@ -132,25 +134,32 @@ Deno.serve(async (req) => {
       .select("id")
       .like("code", "21%")
       .eq("currency_code", currency)
+      .ilike("name", "Customer Wallet Liability%")
       .limit(1)
       .maybeSingle();
-    if (!bankAcc || !liabAcc) {
-      return json({ success: true, payment_intent_id: intent.id, ledger_warning: `Missing ledger accounts for ${currency}` });
+    if (!stripeAsset || !liabAcc) {
+      console.error("Missing ledger accounts for", currency, { stripeAsset: !!stripeAsset, liabAcc: !!liabAcc });
+      return json({
+        success: true,
+        payment_intent_id: intent.id,
+        ledger_warning: `Missing ledger accounts for ${currency}`,
+      });
     }
 
     const journalId = crypto.randomUUID();
-    const refId = crypto.randomUUID();
-    const desc = `Stripe card charge (${intent.id}) — ${purpose}`;
+    // Use Stripe payment_intent.id as the canonical reference for true idempotency
+    const refId = intent.id;
+    const desc = `Stripe top-up (${intent.id}) — ${purpose}`;
     const entries = [
       {
         journal_id: journalId,
-        account_id: bankAcc.id,
+        account_id: stripeAsset.id,
         wallet_id: null,
         currency_code: currency,
         debit_amount: amount,
         credit_amount: 0,
         description: desc,
-        reference_type: "stripe_card_charge",
+        reference_type: "stripe_topup",
         reference_id: refId,
         created_by: userId,
       },
@@ -162,13 +171,25 @@ Deno.serve(async (req) => {
         debit_amount: 0,
         credit_amount: amount,
         description: desc,
-        reference_type: "stripe_card_charge",
+        reference_type: "stripe_topup",
         reference_id: refId,
         created_by: userId,
       },
     ];
     const { error: ledgerErr } = await admin.from("ledger_entries").insert(entries);
     if (ledgerErr) return json({ error: ledgerErr.message, payment_intent_id: intent.id }, 500);
+
+    // Notify the user (best-effort — never fail the response if notify fails)
+    try {
+      await admin.from("notifications").insert({
+        user_id: userId,
+        title: "Top-up successful",
+        message: `Your ${currency} top-up of ${amount.toFixed(2)} was successful.`,
+        type: "transfer",
+      });
+    } catch (e) {
+      console.warn("notification insert failed", e);
+    }
 
     return json({
       success: true,
