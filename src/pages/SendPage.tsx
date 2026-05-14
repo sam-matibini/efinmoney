@@ -277,11 +277,12 @@ const SendPage = () => {
   }, [isNGNBank, ngnBankCode, ngnAccountNumber]);
 
 
+  const isSameCurrency = sourceCurrency === targetCountry.code;
   const fxRate = fxRates?.find(
     r => r.from_currency === sourceCurrency && r.to_currency === targetCountry.code
   );
-  const effectiveRate = fxRate ? Number(fxRate.effective_rate) : 0;
-  const rateAvailable = !!fxRate;
+  const effectiveRate = isSameCurrency ? 1 : (fxRate ? Number(fxRate.effective_rate) : 0);
+  const rateAvailable = isSameCurrency || !!fxRate;
 
   const parsedAmount = Math.max(0, parseFloat(amount) || 0);
   const baseFee = pricing?.transfer_base_fee ?? 0;
