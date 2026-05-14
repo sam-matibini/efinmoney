@@ -221,7 +221,7 @@ const WalletCard = ({
       </div>
 
       {walletId && (
-        <CardPaymentModal
+        <TopUpModal
           open={topUpOpen}
           onOpenChange={setTopUpOpen}
           defaultWalletId={walletId}
