@@ -88,10 +88,16 @@ const buildTimeline = (t: Transfer): TimelineStep[] => {
     steps[2].state = "done"; steps[2].timestamp = updated;
     steps[3].state = "done"; steps[3].timestamp = completed || updated;
   } else if (failed) {
-    // mark current step as failed
-    const idx = status === "expired" ? 1 : 2;
-    steps[idx].state = "failed";
-    steps[idx].timestamp = updated;
+    if (status === "expired") {
+      steps[1].state = "failed";
+      steps[1].timestamp = updated;
+    } else {
+      // Payment was received (and likely refunded); payout step failed.
+      steps[1].state = "done";
+      steps[1].timestamp = updated;
+      steps[2].state = "failed";
+      steps[2].timestamp = updated;
+    }
   }
 
   return steps;

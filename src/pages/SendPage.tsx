@@ -396,6 +396,17 @@ const SendPage = () => {
         if (data?.success === false || data?.error) {
           const refunded = data.refunded === true || data?.payout?.refunded === true;
           const msg = data.error || data?.payout?.error || 'Payout failed';
+          // Defensive: if the edge function reports a refund or payout failure
+          // but didn't already mark the row failed, do it client-side so the
+          // user isn't stuck on "processing".
+          const looksTerminal = /refund|payout failed|unavailable|provider setup/i.test(String(msg));
+          if (looksTerminal) {
+            try {
+              await supabase.from('transfers')
+                .update({ status: 'failed', failure_reason: String(msg).slice(0, 500) })
+                .eq('id', tid);
+            } catch { /* ignore */ }
+          }
           if (refunded) {
             toast.error(msg, { description: 'Funds have been returned to your wallet.', duration: 10000 });
           } else {
@@ -517,13 +528,24 @@ const SendPage = () => {
       goToStep(4);
       toast.success(payout?.queued ? 'Card charged — payout queued' : 'Transfer sent successfully!');
     } catch (e: any) {
-      // Card already charged + wallet credited. Mark transfer processing — don't roll back.
+      const msg = String(e?.message ?? 'orchestration pending');
+      // If the payout truly failed (refund issued or partner declined), mark
+      // the row failed so the tracking page reflects reality. Otherwise leave
+      // it processing so a later webhook can resolve it.
+      const looksTerminal = /refund|payout failed|unavailable|provider setup|declined/i.test(msg);
       try {
         await supabase.from('transfers')
-          .update({ status: 'processing', failure_reason: `Payout queued — ${String(e?.message ?? 'orchestration pending')}` })
+          .update({
+            status: looksTerminal ? 'failed' : 'processing',
+            failure_reason: looksTerminal ? msg.slice(0, 500) : `Payout queued — ${msg}`.slice(0, 500),
+          })
           .eq('id', tid);
       } catch { /* ignore */ }
-      toast.success('Payment received! Payout to recipient is being processed.', { duration: 8000 });
+      if (looksTerminal) {
+        toast.error(`Payment received but payout failed: ${msg}`, { duration: 10000 });
+      } else {
+        toast.success('Payment received! Payout to recipient is being processed.', { duration: 8000 });
+      }
       goToStep(4);
     } finally {
       setConfirming(false);
