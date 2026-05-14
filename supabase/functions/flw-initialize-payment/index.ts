@@ -66,7 +66,7 @@ Deno.serve(async (req) => {
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     const { data: profile } = await admin.from("profiles").select("email, first_name, last_name, phone").eq("user_id", userId).maybeSingle();
 
-    const reference = `efm_topup_${userId.slice(0, 8)}_${Date.now()}`;
+    const reference = clientTxRef || `efm_topup_${userId.slice(0, 8)}_${Date.now()}`;
     const customerEmail = profile?.email || `${userId}@efin.money`;
     const customerName = `${profile?.first_name || ""} ${profile?.last_name || ""}`.trim() || (profile?.email ?? "eFin User");
     const customerPhone = phone || profile?.phone || "";
@@ -95,8 +95,9 @@ Deno.serve(async (req) => {
       customer: { email: customerEmail, name: customerName, phonenumber: customerPhone },
       meta: {
         user_id: userId,
-        type: body?.type || "wallet_topup",
+        type: txType,
         currency,
+        ...(walletId ? { wallet_id: walletId } : {}),
         ...(network ? { network } : {}),
         ...(country ? { country } : {}),
         ...(phone ? { phone } : {}),
