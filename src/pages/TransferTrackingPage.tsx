@@ -29,6 +29,9 @@ const friendlyFailureReason = (reason: string): string => {
   if (r.includes("provider balance low") || r.includes("insufficient funds in customer wallet") || (r.includes("insufficient") && r.includes("wallet"))) {
     return "Payouts in this currency are temporarily unavailable due to a provider balance issue. Your funds have been returned to your wallet. Please try again shortly or contact support.";
   }
+  if (r.includes("paymenthub-1") || r.includes("payment type and currency code combination")) {
+    return "This payout corridor is not yet enabled on our payments provider. Your funds have been returned to your wallet. Please try again later or contact support.";
+  }
   return reason.replace(/\s*\(raw:[^)]*\)\s*/gi, "").trim();
 };
 
