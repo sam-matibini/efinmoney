@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 import { useState } from "react";
 import { ArrowUpRight, Plus, MoreHorizontal, Star, Snowflake, Play, Pencil, Trash2 } from "lucide-react";
 import SendMoneyModal from "@/components/modals/SendMoneyModal";
-import CardPaymentModal from "@/components/modals/CardPaymentModal";
+import TopUpModal from "@/components/modals/TopUpModal";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -221,7 +221,7 @@ const WalletCard = ({
       </div>
 
       {walletId && (
-        <CardPaymentModal
+        <TopUpModal
           open={topUpOpen}
           onOpenChange={setTopUpOpen}
           defaultWalletId={walletId}
