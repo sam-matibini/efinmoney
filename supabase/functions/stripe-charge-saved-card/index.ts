@@ -113,7 +113,7 @@ Deno.serve(async (req) => {
       .from("ledger_entries")
       .select("id")
       .eq("reference_type", "stripe_topup")
-      .eq("reference_id", intent.id)
+      .eq("external_reference", intent.id)
       .limit(1);
     if (existing && existing.length > 0) {
       return json({ success: true, alreadyProcessed: true, payment_intent_id: intent.id });
@@ -147,8 +147,6 @@ Deno.serve(async (req) => {
     }
 
     const journalId = crypto.randomUUID();
-    // Use Stripe payment_intent.id as the canonical reference for true idempotency
-    const refId = intent.id;
     const desc = `Stripe top-up (${intent.id}) — ${purpose}`;
     const entries = [
       {
@@ -160,7 +158,7 @@ Deno.serve(async (req) => {
         credit_amount: 0,
         description: desc,
         reference_type: "stripe_topup",
-        reference_id: refId,
+        external_reference: intent.id,
         created_by: userId,
       },
       {
@@ -172,7 +170,7 @@ Deno.serve(async (req) => {
         credit_amount: amount,
         description: desc,
         reference_type: "stripe_topup",
-        reference_id: refId,
+        external_reference: intent.id,
         created_by: userId,
       },
     ];

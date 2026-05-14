@@ -1778,6 +1778,7 @@ export type Database = {
           currency_code: string
           debit_amount: number
           description: string | null
+          external_reference: string | null
           id: string
           journal_id: string
           reference_id: string | null
@@ -1792,6 +1793,7 @@ export type Database = {
           currency_code: string
           debit_amount?: number
           description?: string | null
+          external_reference?: string | null
           id?: string
           journal_id: string
           reference_id?: string | null
@@ -1806,6 +1808,7 @@ export type Database = {
           currency_code?: string
           debit_amount?: number
           description?: string | null
+          external_reference?: string | null
           id?: string
           journal_id?: string
           reference_id?: string | null
