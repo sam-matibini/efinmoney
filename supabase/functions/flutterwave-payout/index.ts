@@ -35,6 +35,13 @@ function isTemporaryProviderSetupError(message: string): boolean {
   return m.includes("ip whitelisting") || m.includes("whitelist") || m.includes("access this service");
 }
 
+function isProviderBalanceError(message: string): boolean {
+  const m = message.toLowerCase();
+  return m.includes("insufficient funds in customer wallet") ||
+         m.includes("insufficient balance") ||
+         (m.includes("insufficient") && m.includes("wallet"));
+}
+
 async function reverseTransferLedger(supabase: ReturnType<typeof createClient>, transferId: string) {
   const { data: existing } = await supabase.from("ledger_entries").select("id").eq("reference_type", "transfer_reversal").eq("reference_id", transferId).limit(1);
   if (existing && existing.length > 0) return { reversed: false, reason: "already_reversed" };
@@ -150,6 +157,14 @@ Deno.serve(async (req) => {
         await supabase.from("transfers").update({ status: "failed", failure_reason: opsReason.slice(0, 500) }).eq("id", transfer_id);
         await supabase.from("notifications").insert({ user_id: user.id, title: "Transfer failed — refunded", message: rev.reversed ? userReason : userReason.replace("Your funds have been returned to your wallet — please try again shortly.", "Please contact support."), type: "error" });
         return new Response(JSON.stringify({ success: false, error: userReason, code: "provider_setup_required", refunded: rev.reversed, provider_message: rawReason }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      if (isProviderBalanceError(rawReason)) {
+        const opsReason = `Provider balance low: top up your Flutterwave ${currency} settlement balance to enable payouts. Funds returned. (raw: ${rawReason})`;
+        const userReason = `${currency} payouts are temporarily unavailable due to a provider balance issue. Your funds have been returned to your wallet — please try again shortly.`;
+        const rev = await reverseTransferLedger(supabase, transfer_id);
+        await supabase.from("transfers").update({ status: "failed", failure_reason: opsReason.slice(0, 500) }).eq("id", transfer_id);
+        await supabase.from("notifications").insert({ user_id: user.id, title: "Transfer failed — refunded", message: rev.reversed ? userReason : userReason.replace("Your funds have been returned to your wallet — please try again shortly.", "Please contact support."), type: "error" });
+        return new Response(JSON.stringify({ success: false, error: userReason, code: "provider_balance_low", refunded: rev.reversed, provider_message: rawReason }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
       const rev = await reverseTransferLedger(supabase, transfer_id);
       await supabase.from("transfers").update({ status: "failed", failure_reason: reason }).eq("id", transfer_id);

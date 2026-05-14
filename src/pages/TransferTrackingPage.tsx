@@ -26,7 +26,9 @@ const friendlyFailureReason = (reason: string): string => {
   if (r.includes("provider setup required") || r.includes("ip whitelist") || r.includes("whitelisting")) {
     return "This payout corridor is temporarily unavailable. Your funds have been returned to your wallet. Please try again shortly or contact support.";
   }
-  // Strip any "(raw: ...)" debug suffix from other ops messages
+  if (r.includes("provider balance low") || r.includes("insufficient funds in customer wallet") || (r.includes("insufficient") && r.includes("wallet"))) {
+    return "Payouts in this currency are temporarily unavailable due to a provider balance issue. Your funds have been returned to your wallet. Please try again shortly or contact support.";
+  }
   return reason.replace(/\s*\(raw:[^)]*\)\s*/gi, "").trim();
 };
 
