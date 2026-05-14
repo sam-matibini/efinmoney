@@ -96,6 +96,21 @@ Deno.serve(async (req) => {
     const amountCents = Math.round(Number(transfer.target_amount) * 100);
     const { firstName, lastName } = splitName(transfer.recipient_name);
 
+    // Fetch sender profile for billingDetails (Paysafe requires it on the payment handle)
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("street_address, city, state, postal_code, address_country, country")
+      .eq("id", transfer.user_id)
+      .maybeSingle();
+
+    const billingDetails = {
+      street: profile?.street_address || "1 King St W",
+      city: profile?.city || "Toronto",
+      state: profile?.state || "ON",
+      country: profile?.address_country || profile?.country || "CA",
+      zip: (profile?.postal_code || "M5H1A1").replace(/\s+/g, "").toUpperCase(),
+    };
+
     // ---------- Step 1: Create Payment Handle ----------
     let handleBody: Record<string, unknown> = {};
     let security: { question: string; answer: string } | null = null;
@@ -117,6 +132,7 @@ Deno.serve(async (req) => {
           securityQuestion: { question: security.question, answer: security.answer },
         },
         profile: { firstName, lastName },
+        billingDetails,
       };
     } else if (transfer.payout_method === "eft") {
       const [institutionId, transitNumber, accountNumber] =
@@ -144,6 +160,7 @@ Deno.serve(async (req) => {
           accountType: "CHECKING",
         },
         profile: { firstName, lastName },
+        billingDetails,
       };
     } else {
       return new Response(JSON.stringify({ error: `Unsupported payout_method ${transfer.payout_method}` }), {
