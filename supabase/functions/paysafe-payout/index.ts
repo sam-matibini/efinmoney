@@ -55,6 +55,13 @@ function extractError(json: any, status: number) {
   const code = json?.error?.code;
   const msg = json?.error?.message || json?.errorMessage || `Paysafe HTTP ${status}`;
   const detail = Array.isArray(json?.error?.details) ? json.error.details.join("; ") : "";
+
+  // Friendly mapping for known account-configuration errors
+  const lower = `${msg} ${detail}`.toLowerCase();
+  if (code === "PAYMENTHUB-1" || lower.includes("payment type and currency code combination")) {
+    return "This payout corridor is not yet enabled on our payments provider. Your funds have been returned to your wallet. Please try again later or contact support.";
+  }
+
   return code ? `${msg} (code ${code})${detail ? ` — ${detail}` : ""}` : msg;
 }
 
