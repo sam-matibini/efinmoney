@@ -48,12 +48,11 @@ const SendMoneyModal = ({ children }: SendMoneyModalProps) => {
     r => r.from_currency === selectedWallet?.currency_code && r.to_currency === targetCountry.code
   );
 
-  const effectiveRate = fxRate ? Number(fxRate.effective_rate) : 
-    (targetCountry.code === 'KES' ? 153.45 :
-     targetCountry.code === 'UGX' ? 3742.50 :
-     targetCountry.code === 'TZS' ? 2505.00 :
-     targetCountry.code === 'ZMW' ? 26.85 :
-     targetCountry.code === 'BIF' ? 2850.00 : 1);
+  const fallbackRates: Record<string, number> = {
+    KES: 153.45, UGX: 3742.50, TZS: 2505.00, ZMW: 26.85, BIF: 2850.00,
+    NGN: 1580.00, GHS: 15.20, RWF: 1320.00, CAD: 1.36, USD: 1,
+  };
+  const effectiveRate = fxRate ? Number(fxRate.effective_rate) : (fallbackRates[targetCountry.code] ?? 1);
 
   const fee = parseFloat(amount) > 0 ? 2.99 : 0;
   const receivedAmount = parseFloat(amount) > 0 
