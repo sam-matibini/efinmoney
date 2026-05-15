@@ -408,7 +408,7 @@ const CanadaSendFlowInner = () => {
 
             <div className="space-y-2">
               <Label>Delivery Method (how recipient receives)</Label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 <Button
                   type="button"
                   variant={method === "interac" ? "default" : "outline"}
@@ -416,8 +416,8 @@ const CanadaSendFlowInner = () => {
                   onClick={() => setMethod("interac")}
                 >
                   <Mail className="w-5 h-5" />
-                  <span className="text-xs">Interac e-Transfer</span>
-                  <span className="text-[10px] opacity-70">C$0.50 fee · ~30 min</span>
+                  <span className="text-xs">Interac</span>
+                  <span className="text-[10px] opacity-70">C$0.50 · ~30 min</span>
                 </Button>
                 <Button
                   type="button"
@@ -426,8 +426,18 @@ const CanadaSendFlowInner = () => {
                   onClick={() => setMethod("eft")}
                 >
                   <Landmark className="w-5 h-5" />
-                  <span className="text-xs">Bank Transfer (EFT)</span>
-                  <span className="text-[10px] opacity-70">Free · 1–3 business days</span>
+                  <span className="text-xs">Bank (EFT)</span>
+                  <span className="text-[10px] opacity-70">Free · 1–3 days</span>
+                </Button>
+                <Button
+                  type="button"
+                  variant={method === "card_push" ? "default" : "outline"}
+                  className="flex flex-col items-center gap-1 h-auto py-3"
+                  onClick={() => setMethod("card_push")}
+                >
+                  <Zap className="w-5 h-5" />
+                  <span className="text-xs">Instant to Card</span>
+                  <span className="text-[10px] opacity-70">C$1.00 · seconds</span>
                 </Button>
               </div>
             </div>
