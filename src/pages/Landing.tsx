@@ -343,7 +343,11 @@ const Landing = () => {
                 { label: "Terms", href: "#" },
                 { label: "Contact", href: "mailto:hello@efin.money" },
               ].map((l) => (
-                <a key={l.label} href={l.href} className="hover:text-white transition-colors">{l.label}</a>
+                l.href.startsWith("/") ? (
+                  <Link key={l.label} to={l.href} className="hover:text-white transition-colors">{l.label}</Link>
+                ) : (
+                  <a key={l.label} href={l.href} className="hover:text-white transition-colors">{l.label}</a>
+                )
               ))}
             </div>
           </div>
