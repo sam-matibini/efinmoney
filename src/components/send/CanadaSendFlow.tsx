@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,7 +13,7 @@ import { useProfile } from "@/hooks/useProfile";
 import { downloadTransferReceipt } from "@/lib/receipt";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { CheckCircle, Mail, Landmark, AlertCircle, Info, CreditCard, Wallet } from "lucide-react";
+import { CheckCircle, Mail, Landmark, AlertCircle, Info, CreditCard, Wallet, Zap } from "lucide-react";
 import { tokenizeDebitCard } from "@/lib/stripePayouts";
 import { getStripe } from "@/lib/stripe";
 import type { Stripe } from "@stripe/stripe-js";
@@ -53,11 +53,88 @@ function useStripeElementStyle() {
 const elementWrapperClass =
   "flex h-10 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-within:outline-none focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2";
 
-type DeliveryMethod = "interac" | "eft";
+type DeliveryMethod = "interac" | "eft" | "card_push";
 type FundingSource = "wallet" | "card";
 
-const DELIVERY_FEES: Record<DeliveryMethod, number> = { interac: 0.5, eft: 0 };
+const DELIVERY_FEES: Record<DeliveryMethod, number> = { interac: 0.5, eft: 0, card_push: 1.0 };
 const CARD_PROCESSING_FEE = 1.5;
+
+// Recipient card section runs in its OWN <Elements> provider so it can host
+// a second CardNumberElement alongside the sender card. Exposes tokenize() via ref.
+type RecipientCardHandle = {
+  tokenize: (recipientName: string) => Promise<{ token: string; last4: string; brand: string }>;
+  isComplete: () => boolean;
+};
+
+const RecipientCardInner = forwardRef<RecipientCardHandle, { onValidityChange: (v: boolean) => void; elementStyle: any }>(
+  ({ onValidityChange, elementStyle }, ref) => {
+    const stripe = useStripe();
+    const elements = useElements();
+    const [num, setNum] = useState(false);
+    const [exp, setExp] = useState(false);
+    const [cvc, setCvc] = useState(false);
+
+    useEffect(() => { onValidityChange(num && exp && cvc); }, [num, exp, cvc, onValidityChange]);
+
+    useImperativeHandle(ref, () => ({
+      isComplete: () => num && exp && cvc,
+      tokenize: async (recipientName: string) => {
+        if (!stripe || !elements) throw new Error("Recipient card form not ready");
+        const cardEl = elements.getElement(CardNumberElement);
+        if (!cardEl) throw new Error("Recipient card form not ready");
+        return tokenizeDebitCard(stripe, cardEl, { name: recipientName || "Recipient", currency: "cad" });
+      },
+    }), [stripe, elements, num, exp, cvc]);
+
+    return (
+      <div className="space-y-4 p-4 rounded-lg border border-border bg-muted/30">
+        <div className="flex items-center gap-2 text-sm font-medium">
+          <Zap className="w-4 h-4" /> Recipient's debit card (where funds land instantly)
+        </div>
+        <div className="space-y-2">
+          <Label>Card Number</Label>
+          <div className={elementWrapperClass}>
+            <CardNumberElement
+              options={{ style: elementStyle, showIcon: true, placeholder: "Recipient debit card" }}
+              onChange={(e) => setNum(e.complete)}
+              className="w-full"
+            />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-2">
+            <Label>Expiry (MM / YY)</Label>
+            <div className={elementWrapperClass}>
+              <CardExpiryElement options={{ style: elementStyle }} onChange={(e) => setExp(e.complete)} className="w-full" />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label>CVC</Label>
+            <div className={elementWrapperClass}>
+              <CardCvcElement options={{ style: elementStyle }} onChange={(e) => setCvc(e.complete)} className="w-full" />
+            </div>
+          </div>
+        </div>
+        <p className="text-[11px] text-muted-foreground">
+          Visa Direct / Mastercard Send instant payout. Canadian debit cards only.
+        </p>
+      </div>
+    );
+  }
+);
+RecipientCardInner.displayName = "RecipientCardInner";
+
+const RecipientCardSection = forwardRef<RecipientCardHandle, { onValidityChange: (v: boolean) => void; elementStyle: any }>(
+  (props, ref) => {
+    const [stripeP] = useState<Promise<Stripe | null>>(() => getStripe());
+    return (
+      <Elements stripe={stripeP}>
+        <RecipientCardInner {...props} ref={ref} />
+      </Elements>
+    );
+  }
+);
+RecipientCardSection.displayName = "RecipientCardSection";
 
 const CanadaSendFlow = () => {
   const [stripeP] = useState<Promise<Stripe | null>>(() => getStripe());
@@ -94,6 +171,10 @@ const CanadaSendFlowInner = () => {
   const [cardCvcComplete, setCardCvcComplete] = useState(false);
   const [cardSubmitting, setCardSubmitting] = useState(false);
 
+  // Recipient debit card (separate Stripe Elements scope, only for card_push)
+  const recipientCardRef = useRef<RecipientCardHandle>(null);
+  const [recipientCardComplete, setRecipientCardComplete] = useState(false);
+
   const [lastTransferId, setLastTransferId] = useState<string | null>(null);
   const [security, setSecurity] = useState<{ question: string; answer: string } | null>(null);
 
@@ -123,6 +204,8 @@ const CanadaSendFlowInner = () => {
 
   const recipientValid = method === "interac"
     ? recipientName.trim().length > 1 && /\S+@\S+\.\S+/.test(recipientEmail)
+    : method === "card_push"
+      ? recipientName.trim().length > 1 && recipientCardComplete
     : recipientName.trim().length > 1
         && /^\d{3}$/.test(institutionNumber)
         && /^\d{5}$/.test(transitNumber)
@@ -161,12 +244,31 @@ const CanadaSendFlowInner = () => {
         }
       }
 
+      // Tokenize recipient debit card if instant card_push delivery
+      let recipientTok: { token: string; last4: string; brand: string } | null = null;
+      if (method === "card_push") {
+        if (!recipientCardRef.current?.isComplete()) {
+          toast.error("Please complete the recipient's card details");
+          return;
+        }
+        setCardSubmitting(true);
+        try {
+          recipientTok = await recipientCardRef.current.tokenize(recipientName);
+        } catch (e: any) {
+          setCardSubmitting(false);
+          toast.error(e?.message || "Couldn't tokenize recipient card");
+          return;
+        }
+      }
+
       const transfer = await createTransfer.mutateAsync({
         sender_wallet_id: (funding === "wallet" ? selectedWallet?.wallet_id : (selectedWallet?.wallet_id || fallbackWallet?.wallet_id))!,
         recipient_name: recipientName,
         recipient_account: method === "eft"
           ? `${institutionNumber}-${transitNumber}-${accountNumber}`
-          : recipientEmail,
+          : method === "card_push"
+            ? (recipientEmail || `card-${recipientTok?.last4 || "xxxx"}`)
+            : recipientEmail,
         recipient_country: "CA",
         transfer_type: "domestic_canada",
         payout_method: method,
@@ -188,6 +290,12 @@ const CanadaSendFlowInner = () => {
           body.card_token = tokenized.token;
           body.last4 = tokenized.last4;
           body.brand = tokenized.brand;
+        }
+        if (method === "card_push" && recipientTok) {
+          body.recipient_card_token = recipientTok.token;
+          body.recipient_last4 = recipientTok.last4;
+          body.recipient_brand = recipientTok.brand;
+          body.recipient_email = recipientEmail || null;
         }
         const { data: execData } = await supabase.functions.invoke("execute-transfer", { body });
         if (execData?.success === false) {
@@ -217,6 +325,8 @@ const CanadaSendFlowInner = () => {
     setRecipientName(""); setRecipientEmail(""); setMessage("");
     setInstitutionNumber(""); setTransitNumber(""); setAccountNumber(""); setBankName("");
     setCardNumComplete(false); setCardExpComplete(false); setCardCvcComplete(false);
+    setRecipientCardComplete(false);
+    setMethod("interac");
     setFunding("wallet");
     setLastTransferId(null);
     setSecurity(null);
@@ -298,7 +408,7 @@ const CanadaSendFlowInner = () => {
 
             <div className="space-y-2">
               <Label>Delivery Method (how recipient receives)</Label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 <Button
                   type="button"
                   variant={method === "interac" ? "default" : "outline"}
@@ -306,8 +416,8 @@ const CanadaSendFlowInner = () => {
                   onClick={() => setMethod("interac")}
                 >
                   <Mail className="w-5 h-5" />
-                  <span className="text-xs">Interac e-Transfer</span>
-                  <span className="text-[10px] opacity-70">C$0.50 fee · ~30 min</span>
+                  <span className="text-xs">Interac</span>
+                  <span className="text-[10px] opacity-70">C$0.50 · ~30 min</span>
                 </Button>
                 <Button
                   type="button"
@@ -316,8 +426,18 @@ const CanadaSendFlowInner = () => {
                   onClick={() => setMethod("eft")}
                 >
                   <Landmark className="w-5 h-5" />
-                  <span className="text-xs">Bank Transfer (EFT)</span>
-                  <span className="text-[10px] opacity-70">Free · 1–3 business days</span>
+                  <span className="text-xs">Bank (EFT)</span>
+                  <span className="text-[10px] opacity-70">Free · 1–3 days</span>
+                </Button>
+                <Button
+                  type="button"
+                  variant={method === "card_push" ? "default" : "outline"}
+                  className="flex flex-col items-center gap-1 h-auto py-3"
+                  onClick={() => setMethod("card_push")}
+                >
+                  <Zap className="w-5 h-5" />
+                  <span className="text-xs">Instant to Card</span>
+                  <span className="text-[10px] opacity-70">C$1.00 · seconds</span>
                 </Button>
               </div>
             </div>
@@ -350,7 +470,7 @@ const CanadaSendFlowInner = () => {
                 <Input value={recipientName} onChange={(e) => setRecipientName(e.target.value)} placeholder="Jane Doe" />
               </div>
 
-              {method === "interac" ? (
+              {method === "interac" && (
                 <>
                   <div className="space-y-2">
                     <Label>Recipient Email</Label>
@@ -361,7 +481,9 @@ const CanadaSendFlowInner = () => {
                     <Textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Thanks for dinner!" maxLength={400} rows={3} />
                   </div>
                 </>
-              ) : (
+              )}
+
+              {method === "eft" && (
                 <>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">
@@ -381,6 +503,20 @@ const CanadaSendFlowInner = () => {
                     <Label>Bank Name (optional)</Label>
                     <Input value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder="Royal Bank of Canada" />
                   </div>
+                </>
+              )}
+
+              {method === "card_push" && (
+                <>
+                  <div className="space-y-2">
+                    <Label>Recipient Email (optional, for receipt)</Label>
+                    <Input type="email" value={recipientEmail} onChange={(e) => setRecipientEmail(e.target.value)} placeholder="jane@example.com" />
+                  </div>
+                  <RecipientCardSection
+                    ref={recipientCardRef}
+                    onValidityChange={setRecipientCardComplete}
+                    elementStyle={elementStyle}
+                  />
                 </>
               )}
             </div>
@@ -463,7 +599,7 @@ const CanadaSendFlowInner = () => {
               >
                 {createTransfer.isPending || cardSubmitting
                   ? "Processing..."
-                  : `Send C$${parsedAmount.toFixed(2)} via ${method === "interac" ? "Interac" : "Bank Transfer"}`}
+                  : `Send C$${parsedAmount.toFixed(2)} via ${method === "interac" ? "Interac" : method === "eft" ? "Bank Transfer" : "Visa Direct"}`}
               </Button>
             </div>
 
@@ -478,7 +614,7 @@ const CanadaSendFlowInner = () => {
                   {" "}<strong>Total {funding === "card" ? "charged to card" : "from wallet"}: C${totalCharged.toFixed(2)}</strong>
                 </p>
                 <p>
-                  Delivery: {method === "interac" ? "Interac e-Transfer (email)" : "Bank Transfer (EFT)"}
+                  Delivery: {method === "interac" ? "Interac e-Transfer (email)" : method === "eft" ? "Bank Transfer (EFT)" : "Instant to debit card (Visa Direct)"}
                 </p>
               </div>
             </div>
@@ -508,6 +644,11 @@ const CanadaSendFlowInner = () => {
             {method === "eft" && (
               <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
                 Funds will arrive in the recipient's bank account within 1–3 business days.
+              </p>
+            )}
+            {method === "card_push" && (
+              <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
+                Funds are being pushed to {recipientName}'s debit card via Visa Direct and typically arrive within seconds.
               </p>
             )}
             {security && method === "interac" && (

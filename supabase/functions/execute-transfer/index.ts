@@ -65,7 +65,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { transfer_id } = await req.json();
+    const payload: Record<string, any> = (await req.json().catch(() => ({}))) || {};
+    const { transfer_id } = payload;
     if (!transfer_id) {
       return new Response(JSON.stringify({ error: "transfer_id required" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -104,12 +105,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Pull payload (card token, etc.) sent by the frontend — we need funding_source up front
-    let payload: Record<string, any> = {};
-    try {
-      const reqClone = req.clone();
-      payload = (await reqClone.json().catch(() => ({}))) || {};
-    } catch { /* ignore */ }
     const isCardFunded = (payload.funding_source || transfer.funding_source) === "card";
 
     // For card-funded transfers, charge the sender's card BEFORE posting any ledger.
@@ -255,12 +250,21 @@ Deno.serve(async (req) => {
       const isCanada = transfer.transfer_type === "domestic_canada" || transfer.recipient_country === "CA";
 
       if (isCanada) {
+        const isCardPush = transfer.payout_method === "card_push";
+        const fnName = isCardPush ? "stripe-payout" : "paysafe-payout";
+        const fnBody: Record<string, unknown> = { transfer_id };
+        if (isCardPush) {
+          fnBody.card_token = payload.recipient_card_token;
+          fnBody.last4 = payload.recipient_last4;
+          fnBody.brand = payload.recipient_brand;
+          fnBody.recipient_email = payload.recipient_email;
+        }
         const res = await fetch(
-          `${Deno.env.get("SUPABASE_URL")}/functions/v1/paysafe-payout`,
+          `${Deno.env.get("SUPABASE_URL")}/functions/v1/${fnName}`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ transfer_id }),
+            body: JSON.stringify(fnBody),
           },
         );
         payoutResult = await res.json();
