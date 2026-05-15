@@ -11,11 +11,15 @@ import { useCreateTransfer } from "@/hooks/useTransfers";
 import { toast } from "sonner";
 
 const targetCountries = [
+  { code: 'NGN', country: 'Nigeria', flag: '🇳🇬', method: 'Bank Transfer', payout: 'bank_transfer' },
   { code: 'KES', country: 'Kenya', flag: '🇰🇪', method: 'M-Pesa', payout: 'mpesa' },
   { code: 'UGX', country: 'Uganda', flag: '🇺🇬', method: 'Mobile Money', payout: 'airtel_money' },
+  { code: 'GHS', country: 'Ghana', flag: '🇬🇭', method: 'MTN Mobile', payout: 'mtn_mobile' },
   { code: 'TZS', country: 'Tanzania', flag: '🇹🇿', method: 'M-Pesa', payout: 'mpesa' },
   { code: 'ZMW', country: 'Zambia', flag: '🇿🇲', method: 'MTN Mobile', payout: 'mtn_mobile' },
-  { code: 'BIF', country: 'Burundi', flag: '🇧🇮', method: 'Lumicash', payout: 'lumicash' },
+  { code: 'RWF', country: 'Rwanda', flag: '🇷🇼', method: 'MTN Mobile', payout: 'mtn_mobile' },
+  { code: 'CAD', country: 'Canada', flag: '🇨🇦', method: 'Interac/EFT', payout: 'interac' },
+  { code: 'USD', country: 'United States', flag: '🇺🇸', method: 'Bank Transfer', payout: 'bank_transfer' },
 ];
 
 interface SendMoneyModalProps {
@@ -44,12 +48,11 @@ const SendMoneyModal = ({ children }: SendMoneyModalProps) => {
     r => r.from_currency === selectedWallet?.currency_code && r.to_currency === targetCountry.code
   );
 
-  const effectiveRate = fxRate ? Number(fxRate.effective_rate) : 
-    (targetCountry.code === 'KES' ? 153.45 :
-     targetCountry.code === 'UGX' ? 3742.50 :
-     targetCountry.code === 'TZS' ? 2505.00 :
-     targetCountry.code === 'ZMW' ? 26.85 :
-     targetCountry.code === 'BIF' ? 2850.00 : 1);
+  const fallbackRates: Record<string, number> = {
+    KES: 153.45, UGX: 3742.50, TZS: 2505.00, ZMW: 26.85, BIF: 2850.00,
+    NGN: 1580.00, GHS: 15.20, RWF: 1320.00, CAD: 1.36, USD: 1,
+  };
+  const effectiveRate = fxRate ? Number(fxRate.effective_rate) : (fallbackRates[targetCountry.code] ?? 1);
 
   const fee = parseFloat(amount) > 0 ? 2.99 : 0;
   const receivedAmount = parseFloat(amount) > 0 
@@ -124,7 +127,7 @@ const SendMoneyModal = ({ children }: SendMoneyModalProps) => {
       <DialogTrigger asChild>
         {children}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md bg-card border-border">
+      <DialogContent className="sm:max-w-md bg-card border-border max-h-[90vh] overflow-y-auto p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle className="font-display text-foreground">
             {step === 4 ? 'Transfer Complete!' : 'Send Money'}
