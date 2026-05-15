@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,6 +14,44 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { CheckCircle, Mail, Landmark, AlertCircle, Info, CreditCard, Zap } from "lucide-react";
 import { tokenizeDebitCard } from "@/lib/stripePayouts";
+import { getStripe } from "@/lib/stripe";
+import type { Stripe } from "@stripe/stripe-js";
+import {
+  Elements,
+  CardNumberElement,
+  CardExpiryElement,
+  CardCvcElement,
+  useStripe,
+  useElements,
+} from "@stripe/react-stripe-js";
+
+// Read an HSL CSS variable and convert it to a usable CSS color string for Stripe Elements
+function readHslVar(name: string, fallback: string): string {
+  if (typeof window === "undefined") return fallback;
+  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return v ? `hsl(${v})` : fallback;
+}
+
+function useStripeElementStyle() {
+  return useMemo(() => {
+    const fg = readHslVar("--foreground", "#0a0a0a");
+    const muted = readHslVar("--muted-foreground", "#6b7280");
+    const danger = readHslVar("--destructive", "#dc2626");
+    return {
+      base: {
+        color: fg,
+        fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
+        fontSize: "15px",
+        "::placeholder": { color: muted },
+        iconColor: muted,
+      },
+      invalid: { color: danger, iconColor: danger },
+    };
+  }, []);
+}
+
+const elementWrapperClass =
+  "flex h-10 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-within:outline-none focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2";
 
 type Method = "interac" | "eft" | "card_push";
 
