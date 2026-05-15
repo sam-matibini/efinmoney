@@ -49,6 +49,8 @@ import AdminDashboardPage from "./pages/admin/AdminDashboardPage";
 import KycQueuePage from "./pages/admin/KycQueuePage";
 import KycReviewPage from "./pages/admin/KycReviewPage";
 import AdminPlaceholderPage from "./pages/admin/AdminPlaceholderPage";
+import UsersPage from "./pages/admin/UsersPage";
+import UserDetailPage from "./pages/admin/UserDetailPage";
 
 const queryClient = new QueryClient();
 
@@ -166,8 +168,8 @@ const AppRoutes = () => {
           <Route path="/admin/dashboard" element={<AdminAuthProvider><AdminGuard><AdminDashboardPage /></AdminGuard></AdminAuthProvider>} />
           <Route path="/admin/kyc" element={<AdminAuthProvider><AdminGuard><KycQueuePage /></AdminGuard></AdminAuthProvider>} />
           <Route path="/admin/kyc/:id" element={<AdminAuthProvider><AdminGuard><KycReviewPage /></AdminGuard></AdminAuthProvider>} />
-          <Route path="/admin/users" element={<AdminAuthProvider><AdminGuard><AdminPlaceholderPage title="Users" description="User management — coming in Phase 2" /></AdminGuard></AdminAuthProvider>} />
-          <Route path="/admin/users/:id" element={<AdminAuthProvider><AdminGuard><AdminPlaceholderPage title="User detail" description="Coming in Phase 2" /></AdminGuard></AdminAuthProvider>} />
+          <Route path="/admin/users" element={<AdminAuthProvider><AdminGuard><UsersPage /></AdminGuard></AdminAuthProvider>} />
+          <Route path="/admin/users/:id" element={<AdminAuthProvider><AdminGuard><UserDetailPage /></AdminGuard></AdminAuthProvider>} />
           <Route path="/admin/risk-tiers" element={<AdminAuthProvider><AdminGuard><AdminPlaceholderPage title="Risk Tiers" description="Tier configuration — coming in Phase 2" /></AdminGuard></AdminAuthProvider>} />
           <Route path="/admin/audit-log" element={<AdminAuthProvider><AdminGuard><AdminPlaceholderPage title="Audit Log" description="Complete audit trail — coming in Phase 2" /></AdminGuard></AdminAuthProvider>} />
           <Route path="/admin/settings" element={<AdminAuthProvider><AdminGuard><AdminPlaceholderPage title="Settings" description="Admin settings — coming in Phase 2" /></AdminGuard></AdminAuthProvider>} />
