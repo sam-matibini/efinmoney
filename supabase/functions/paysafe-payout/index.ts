@@ -61,6 +61,9 @@ function extractError(json: any, status: number) {
   if (code === "PAYMENTHUB-1" || lower.includes("payment type and currency code combination")) {
     return "This payout corridor is not yet enabled on our payments provider. Your funds have been returned to your wallet. Please try again later or contact support.";
   }
+  if (code === "2008" || code === 2008 || lower.includes("routing number") || lower.includes("invalid institution") || lower.includes("invalid transit")) {
+    return "Invalid Canadian Bank details. Please check your Institution and Transit numbers.";
+  }
 
   return code ? `${msg} (code ${code})${detail ? ` — ${detail}` : ""}` : msg;
 }
@@ -135,17 +138,23 @@ Deno.serve(async (req) => {
         billingDetails,
       };
     } else if (transfer.payout_method === "eft") {
-      const [institutionId, transitNumber, accountNumber] =
-        (transfer.recipient_account || "").split("-");
-      if (!institutionId || !transitNumber || !accountNumber) {
+      const rawParts = (transfer.recipient_account || "").split("-");
+      const rawInstitution = (rawParts[0] || "").replace(/\D/g, "");
+      const rawTransit = (rawParts[1] || "").replace(/\D/g, "");
+      const accountNumber = String(rawParts[2] || "").replace(/\D/g, "");
+      if (!rawInstitution || !rawTransit || !accountNumber) {
         await supabase.from("transfers").update({
           status: "failed",
-          failure_reason: "Invalid Canadian bank coordinates",
+          failure_reason: "Invalid Canadian Bank details. Please check your Institution and Transit numbers.",
         }).eq("id", transfer.id);
-        return new Response(JSON.stringify({ error: "Invalid bank coordinates" }), {
+        return new Response(JSON.stringify({ error: "Invalid Canadian Bank details. Please check your Institution and Transit numbers." }), {
           status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+      const institutionId = rawInstitution.padStart(3, "0");
+      const transitNumber = rawTransit.padStart(5, "0");
+      // Canadian 9-digit clearing code: '0' + 3-digit institution + 5-digit transit
+      const clearingCode = `0${institutionId}${transitNumber}`;
       handleBody = {
         merchantRefNum: `${merchantRefNum}-PH`,
         transactionType: "STANDALONE_CREDIT",
@@ -156,7 +165,8 @@ Deno.serve(async (req) => {
           accountHolderName: transfer.recipient_name,
           institutionId,
           transitNumber,
-          accountNumber,
+          routingNumber: clearingCode,
+          accountNumber: String(accountNumber),
           accountType: "CHECKING",
         },
         profile: { firstName, lastName },
