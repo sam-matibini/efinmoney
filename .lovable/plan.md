@@ -1,63 +1,42 @@
-# Live mode + instant-to-card delivery
+# Fix payment key error and reactivate sender card fields
 
-Three independent changes.
+## What I’ll change
+1. Correct the backend so Stripe functions use real Stripe credentials, not the Paysafe key currently being returned to the frontend.
+2. Restore the sender debit/credit card fields in the Canada send flow so the Stripe card iframe mounts and accepts input normally.
+3. Validate the end-to-end card flow on `/send` so both the field activation and the saved-card charge error are resolved.
 
-## 1. Activate sender card fields
-The Stripe Elements provider fix from last turn is correct. The remaining cause of dead fields is almost certainly that `STRIPE_PUBLISHABLE_KEY` is missing or stale. I'll trigger the secret-update form so you paste **live** values for both:
-- `STRIPE_PUBLISHABLE_KEY` → `pk_live_…`
-- `STRIPE_SECRET_KEY` → `sk_live_…`
+## Why this is happening
+- The failing request shows `stripe-charge-saved-card` returning `Invalid API Key provided: B-qa2...`, which is not a Stripe key format.
+- The frontend request for `stripe-payment-intent?action=publishable_key` is also returning `OT-1148280:B-qa2...`, so the sender card Elements provider is being initialized with the wrong secret-derived value.
+- Because of that, the card iframe cannot initialize correctly and the sender card fields appear inactive.
 
-After submission a hard-refresh of the preview will mount the real Stripe iframes and the Card Number / Expiry / CVC inputs will accept focus and typing.
+## Implementation plan
+### 1) Audit and correct Stripe key usage
+- Review the Stripe-related edge functions that expose or consume Stripe credentials:
+  - `supabase/functions/stripe-payment-intent/index.ts`
+  - `supabase/functions/stripe-charge-saved-card/index.ts`
+  - any shared Stripe setup used by sender-card funding
+- Ensure each function reads the correct Stripe env vars:
+  - `STRIPE_PUBLISHABLE_KEY` for the frontend publishable key response
+  - `STRIPE_SECRET_KEY` for server-side Stripe API calls
+- Add defensive validation so obviously invalid non-Stripe values do not get returned as a publishable key.
 
-## 2. Switch Paysafe to production
-The code already branches on `PAYSAFE_ENV` (`live` → `https://api.paysafe.com`, otherwise → `https://api.test.paysafe.com`). No code change needed — only secrets.
+### 2) Verify the Canada send card-field wiring
+- Check `src/components/send/CanadaSendFlow.tsx` and `src/lib/stripe.ts` together.
+- Keep the current dual-Elements structure if valid, but make sure the sender funding card fields only render once Stripe is actually ready.
+- Improve the loading/fallback behavior so the form does not show dead card inputs when the key is missing or invalid.
 
-I'll trigger the secret-update form for:
-- `PAYSAFE_ENV` → `live`
-- `PAYSAFE_API_KEY` → live `username:password` Basic-auth pair from your Paysafe live account
-- `PAYSAFE_ACCOUNT_ID` → live merchant account ID for CAD (Interac + EFT + card)
-- `PAYSAFE_WEBHOOK_SECRET` → the live webhook HMAC secret you configure in Paysafe Hub
+### 3) Validate the exact user flow
+- Confirm the publishable-key endpoint now returns a proper Stripe `pk_...` key.
+- Confirm the sender card number / expiry / CVC fields become focusable and typable on `/send`.
+- Confirm the saved-card charge path no longer throws the `Invalid API key provided` error.
 
-After saving, the next /send completion will hit `api.paysafe.com` and move real money. Make sure your Paysafe live account has Interac e-Transfer, EFT **and** Credit/Debit Card payment methods enabled in CAD (your screenshot confirms all three are Enabled).
+## Technical details
+- Root cause appears to be configuration, but I’ll also harden the code so a bad secret cannot silently break the UI again.
+- If the stored Stripe secrets themselves are wrong, I’ll prompt for a secure secret update after the code-side safeguards are in place.
+- No unrelated payment-provider changes will be made in this pass.
 
-## 3. Add "Instant to debit card" as a 3rd delivery option (Visa Direct)
-Re-introduce the push-to-card payout alongside Interac and EFT.
-
-### UI (`src/components/send/CanadaSendFlow.tsx`)
-- `DeliveryMethod` becomes `"interac" | "eft" | "card_push"`.
-- Step 1 grid becomes 3 tiles:
-  - Interac e-Transfer — C$0.50 · ~30 min
-  - Bank Transfer (EFT) — Free · 1–3 business days
-  - **Instant to debit card (Visa Direct)** — C$1.00 · arrives in seconds
-- `DELIVERY_FEES.card_push = 1.0`.
-- Step 2 conditional rendering when `method === "card_push"`:
-  - Recipient name (already there)
-  - **Recipient debit card section** (new) — its own `<CardNumberElement>` / `<CardExpiryElement>` / `<CardCvcElement>` group, labeled "Recipient's debit card (where funds land)". Tokenized with `tokenizeDebitCard(stripe, recipientCardEl, { name: recipientName, currency: "cad" })` — the `currency: "cad"` is required for Visa Direct.
-  - Recipient email becomes optional (used only for the receipt notification).
-- Funding-source toggle (wallet vs sender card) stays as-is for all three delivery methods.
-- When both sender card funding AND recipient card delivery are used, the form contains **two distinct** Stripe element groups; both are tokenized in `handleSubmit` (sender first → fund, recipient second → payout token).
-- Submit button label adapts: `"Send C$X via Interac / Bank Transfer / Visa Direct"`.
-- `handleSubmit` passes `recipient_card_token` + `recipient_last4` + `recipient_brand` to `execute-transfer` when `method === "card_push"`.
-
-### Edge function (`supabase/functions/execute-transfer/index.ts`)
-- After the existing payout-routing branch on `isCanada`, split further:
-  - `payout_method === "card_push"` → POST to `stripe-payout` (already deployed) with `{ transfer_id, card_token: recipient_card_token, last4, brand, amount_cents, currency: "cad" }`.
-  - else → existing `paysafe-payout` call.
-- Keep the wallet/card **funding** logic untouched (works for all delivery methods).
-
-### `stripe-payout` function
-Already exists from the prior push-to-card work — no changes needed beyond confirming it reads `STRIPE_SECRET_KEY` (live now) and that the platform Stripe account has Visa Direct/OCT enabled for CAD. If Visa Direct isn't enabled on the Stripe account, the function will return a clear error and the transfer is marked failed — funds (if card-funded) will need a refund flow which is **not** in scope for this change.
-
-### Out of scope
-- Saving recipient cards for reuse
-- 3-D Secure on funding charges
-- Auto-refunding sender card if recipient Visa Direct push fails (manual ops for now)
-- Touching Flutterwave / Africa corridors
-- Removing legacy unused `stripe_payout_recipients` rows
-
-## Order of execution
-1. Open `update_secret` for the 5 Stripe + Paysafe secrets so you can paste them.
-2. While you fill those, edit `CanadaSendFlow.tsx` to add the 3rd delivery tile and recipient-card section.
-3. Edit `execute-transfer/index.ts` to route `card_push` to `stripe-payout`.
-4. Deploy `execute-transfer`.
-5. You hard-refresh and test all three delivery methods end-to-end with live keys.
+## Expected result
+- The error shown in your screenshot disappears.
+- Sender debit/credit card fields become active and usable.
+- Stripe funding requests use the correct Stripe credentials end-to-end.
