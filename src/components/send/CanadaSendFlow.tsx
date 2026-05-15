@@ -163,7 +163,7 @@ const CanadaSendFlowInner = () => {
       }
 
       const transfer = await createTransfer.mutateAsync({
-        sender_wallet_id: selectedWallet?.wallet_id, // still passed; required by table even when card-funded
+        sender_wallet_id: (funding === "wallet" ? selectedWallet?.wallet_id : (selectedWallet?.wallet_id || fallbackWallet?.wallet_id))!,
         recipient_name: recipientName,
         recipient_account: method === "eft"
           ? `${institutionNumber}-${transitNumber}-${accountNumber}`
