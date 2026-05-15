@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,7 +13,7 @@ import { useProfile } from "@/hooks/useProfile";
 import { downloadTransferReceipt } from "@/lib/receipt";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { CheckCircle, Mail, Landmark, AlertCircle, Info, CreditCard, Wallet } from "lucide-react";
+import { CheckCircle, Mail, Landmark, AlertCircle, Info, CreditCard, Wallet, Zap } from "lucide-react";
 import { tokenizeDebitCard } from "@/lib/stripePayouts";
 import { getStripe } from "@/lib/stripe";
 import type { Stripe } from "@stripe/stripe-js";
