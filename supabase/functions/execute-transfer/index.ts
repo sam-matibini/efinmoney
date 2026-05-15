@@ -190,11 +190,13 @@ Deno.serve(async (req) => {
         {
           journal_id: journalId,
           account_id: liabAcc.id,
-          wallet_id: transfer.sender_wallet_id,
+          wallet_id: isCardFunded ? null : transfer.sender_wallet_id,
           currency_code: transfer.source_currency,
           debit_amount: totalDebit,
           credit_amount: 0,
-          description: `Transfer to ${transfer.recipient_name} (${transfer.recipient_country})`,
+          description: isCardFunded
+            ? `Card-funded transfer to ${transfer.recipient_name} (${transfer.recipient_country})`
+            : `Transfer to ${transfer.recipient_name} (${transfer.recipient_country})`,
           reference_type: "transfer",
           reference_id: transfer_id,
           created_by: user.id,
