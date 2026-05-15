@@ -62,10 +62,16 @@ function InnerForm({ onSuccess, onCancel, ctaLabel }: Props) {
   const elements = useElements();
   const qc = useQueryClient();
   const { user } = useAuth();
+  const { data: profile } = useProfile();
   const [name, setName] = useState("");
   const [cardReady, setCardReady] = useState(false);
   const [saving, setSaving] = useState(false);
   const cardOptions = useMemo(() => buildCardOptions(), []);
+
+  useEffect(() => {
+    if (!name && profile?.full_name) setName(profile.full_name.toUpperCase());
+  }, [profile?.full_name]);
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
