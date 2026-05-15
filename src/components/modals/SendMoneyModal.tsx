@@ -11,11 +11,15 @@ import { useCreateTransfer } from "@/hooks/useTransfers";
 import { toast } from "sonner";
 
 const targetCountries = [
+  { code: 'NGN', country: 'Nigeria', flag: '🇳🇬', method: 'Bank Transfer', payout: 'bank_transfer' },
   { code: 'KES', country: 'Kenya', flag: '🇰🇪', method: 'M-Pesa', payout: 'mpesa' },
   { code: 'UGX', country: 'Uganda', flag: '🇺🇬', method: 'Mobile Money', payout: 'airtel_money' },
+  { code: 'GHS', country: 'Ghana', flag: '🇬🇭', method: 'MTN Mobile', payout: 'mtn_mobile' },
   { code: 'TZS', country: 'Tanzania', flag: '🇹🇿', method: 'M-Pesa', payout: 'mpesa' },
   { code: 'ZMW', country: 'Zambia', flag: '🇿🇲', method: 'MTN Mobile', payout: 'mtn_mobile' },
-  { code: 'BIF', country: 'Burundi', flag: '🇧🇮', method: 'Lumicash', payout: 'lumicash' },
+  { code: 'RWF', country: 'Rwanda', flag: '🇷🇼', method: 'MTN Mobile', payout: 'mtn_mobile' },
+  { code: 'CAD', country: 'Canada', flag: '🇨🇦', method: 'Interac/EFT', payout: 'interac' },
+  { code: 'USD', country: 'United States', flag: '🇺🇸', method: 'Bank Transfer', payout: 'bank_transfer' },
 ];
 
 interface SendMoneyModalProps {
