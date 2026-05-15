@@ -105,12 +105,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Pull payload (card token, etc.) sent by the frontend — we need funding_source up front
-    let payload: Record<string, any> = {};
-    try {
-      const reqClone = req.clone();
-      payload = (await reqClone.json().catch(() => ({}))) || {};
-    } catch { /* ignore */ }
     const isCardFunded = (payload.funding_source || transfer.funding_source) === "card";
 
     // For card-funded transfers, charge the sender's card BEFORE posting any ledger.
