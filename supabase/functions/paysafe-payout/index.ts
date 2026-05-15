@@ -61,6 +61,9 @@ function extractError(json: any, status: number) {
   if (code === "PAYMENTHUB-1" || lower.includes("payment type and currency code combination")) {
     return "This payout corridor is not yet enabled on our payments provider. Your funds have been returned to your wallet. Please try again later or contact support.";
   }
+  if (code === "2008" || code === 2008 || lower.includes("routing number") || lower.includes("invalid institution") || lower.includes("invalid transit")) {
+    return "Invalid Canadian Bank details. Please check your Institution and Transit numbers.";
+  }
 
   return code ? `${msg} (code ${code})${detail ? ` — ${detail}` : ""}` : msg;
 }
