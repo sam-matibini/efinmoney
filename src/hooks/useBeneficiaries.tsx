@@ -112,7 +112,10 @@ export const recordTransferRecipient = async (params: {
   phone?: string | null;
   country_code?: string | null;
   payout_method?: string | null;
+  network?: string | null;
   currency_code?: string | null;
+  bank_name?: string | null;
+  bank_account?: string | null;
 }) => {
   const now = new Date().toISOString();
   // Try to find existing
@@ -130,14 +133,19 @@ export const recordTransferRecipient = async (params: {
   const found = (existing || [])[0] as any;
 
   if (found) {
-    await supabase
-      .from("beneficiaries" as any)
-      .update({
-        transfer_count: (found.transfer_count || 0) + 1,
-        last_sent_at: now,
-      })
-      .eq("id", found.id);
-    return { beneficiary: found as Beneficiary, isNew: false };
+    // Backfill any payout details that weren't saved on the first transfer
+    // so the contact pre-fills correctly next time.
+    const patch: Record<string, any> = {
+      transfer_count: (found.transfer_count || 0) + 1,
+      last_sent_at: now,
+    };
+    if (!found.network && params.network) patch.network = params.network;
+    if (!found.payout_method && params.payout_method) patch.payout_method = params.payout_method;
+    if (!found.bank_name && params.bank_name) patch.bank_name = params.bank_name;
+    if (!found.bank_account && params.bank_account) patch.bank_account = params.bank_account;
+    if (!found.country_code && params.country_code) patch.country_code = params.country_code;
+    await supabase.from("beneficiaries" as any).update(patch).eq("id", found.id);
+    return { beneficiary: { ...found, ...patch } as Beneficiary, isNew: false };
   }
   return { beneficiary: null, isNew: true };
 };

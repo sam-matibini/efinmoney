@@ -370,6 +370,7 @@ const SendPage = () => {
           phone: isNGNBank ? "" : recipientPhone,
           country_code: targetCountry.code,
           payout_method: isNGNBank ? 'bank' : effectivePayoutMethod,
+          network: isNGNBank ? null : (activeNetwork?.id || null),
           currency_code: targetCountry.code,
           bank_name: isNGNBank ? ngnBank : null,
           bank_account: isNGNBank ? ngnAcct : null,
