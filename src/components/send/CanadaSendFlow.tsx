@@ -325,6 +325,8 @@ const CanadaSendFlowInner = () => {
     setRecipientName(""); setRecipientEmail(""); setMessage("");
     setInstitutionNumber(""); setTransitNumber(""); setAccountNumber(""); setBankName("");
     setCardNumComplete(false); setCardExpComplete(false); setCardCvcComplete(false);
+    setRecipientCardComplete(false);
+    setMethod("interac");
     setFunding("wallet");
     setLastTransferId(null);
     setSecurity(null);
