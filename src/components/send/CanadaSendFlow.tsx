@@ -166,6 +166,8 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
   const [recipientName, setRecipientName] = useState("");
   const [recipientEmail, setRecipientEmail] = useState("");
   const [message, setMessage] = useState("");
+  const [securityQuestion, setSecurityQuestion] = useState("");
+  const [securityAnswer, setSecurityAnswer] = useState("");
   // Recipient — EFT
   const [institutionNumber, setInstitutionNumber] = useState("");
   const [transitNumber, setTransitNumber] = useState("");
@@ -208,8 +210,13 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
   const isStep1Valid = parsedAmount > 0
     && (funding === "card" || (!!selectedWallet && !insufficient));
 
+  const interacQAValid = method !== "interac"
+    ? true
+    : (!securityQuestion && !securityAnswer)
+      || (securityQuestion.trim().length >= 4 && securityAnswer.trim().length >= 3);
+
   const recipientValid = method === "interac"
-    ? recipientName.trim().length > 1 && /\S+@\S+\.\S+/.test(recipientEmail)
+    ? recipientName.trim().length > 1 && /\S+@\S+\.\S+/.test(recipientEmail) && interacQAValid
     : method === "card_push"
       ? recipientName.trim().length > 1 && recipientCardComplete
     : recipientName.trim().length > 1
@@ -285,6 +292,9 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
         target_amount: receivedAmount,
         exchange_rate: 1,
         fee_amount: totalFee,
+        ...(method === "interac" && securityQuestion && securityAnswer
+          ? { interac_security_question: securityQuestion.trim(), interac_security_answer: securityAnswer.trim() }
+          : {}),
       } as any);
 
       try {
@@ -329,6 +339,7 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
     setStep(1);
     setAmount("");
     setRecipientName(""); setRecipientEmail(""); setMessage("");
+    setSecurityQuestion(""); setSecurityAnswer("");
     setInstitutionNumber(""); setTransitNumber(""); setAccountNumber(""); setBankName("");
     setCardNumComplete(false); setCardExpComplete(false); setCardCvcComplete(false);
     setRecipientCardComplete(false);
@@ -482,6 +493,17 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
                     <Label>Recipient Email</Label>
                     <Input type="email" value={recipientEmail} onChange={(e) => setRecipientEmail(e.target.value)} placeholder="jane@example.com" />
                   </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label>Security Question <span className="text-muted-foreground">(optional)</span></Label>
+                      <Input value={securityQuestion} onChange={(e) => setSecurityQuestion(e.target.value)} placeholder="What city were we in?" maxLength={120} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Security Answer <span className="text-muted-foreground">(optional)</span></Label>
+                      <Input value={securityAnswer} onChange={(e) => setSecurityAnswer(e.target.value)} placeholder="toronto" maxLength={40} />
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground -mt-2">Leave blank and we'll auto-generate one for you.</p>
                   <div className="space-y-2">
                     <Label>Message (optional)</Label>
                     <Textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Thanks for dinner!" maxLength={400} rows={3} />
