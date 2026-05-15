@@ -76,7 +76,7 @@ Deno.serve(async (req) => {
     const body: PayoutRequest = await req.json();
     const { transfer_id, phone_number, account_number, bank_code, amount, currency, network, recipient_name } = body;
     currentTransferId = transfer_id; currentUserId = user.id;
-    if (!transfer_id || !amount || amount <= 0 || !currency || !network) {
+    if (!transfer_id || !amount || amount <= 0 || !currency) {
       return new Response(JSON.stringify({ error: "Invalid payload" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
     const hasBankRail = !!(account_number && bank_code);
