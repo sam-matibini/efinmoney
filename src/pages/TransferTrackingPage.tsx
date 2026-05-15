@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { CheckCircle2, Loader2, Circle, Share2, ArrowLeft, AlertCircle, Download, XCircle } from "lucide-react";
+import { CheckCircle2, Loader2, Circle, Share2, ArrowLeft, AlertCircle, Download, XCircle, Copy } from "lucide-react";
 import { downloadTransferReceipt } from "@/lib/receipt";
 import Header from "@/components/layout/Header";
 import MobileNav from "@/components/layout/MobileNav";
@@ -344,7 +344,19 @@ const TransferTrackingPage = () => {
                     Share these with your recipient privately so they can claim the e-Transfer.
                   </p>
                   <Detail label="Security Question" value={(transfer as any).interac_security_question} />
-                  <Detail label="Answer" value={(transfer as any).interac_security_answer} />
+                  <div className="flex items-end justify-between gap-2">
+                    <Detail label="Answer" value={(transfer as any).interac_security_answer} />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        navigator.clipboard.writeText(String((transfer as any).interac_security_answer || ""));
+                        toast.success("Security answer copied");
+                      }}
+                    >
+                      <Copy className="h-4 w-4 mr-1" /> Copy Answer
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             )}
