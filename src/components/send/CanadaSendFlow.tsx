@@ -646,6 +646,11 @@ const CanadaSendFlowInner = () => {
                 Funds will arrive in the recipient's bank account within 1–3 business days.
               </p>
             )}
+            {method === "card_push" && (
+              <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
+                Funds are being pushed to {recipientName}'s debit card via Visa Direct and typically arrive within seconds.
+              </p>
+            )}
             {security && method === "interac" && (
               <div className="max-w-md mx-auto mb-6 p-4 rounded-xl border border-border bg-muted/40 text-left">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2">Security details — share with recipient</p>
