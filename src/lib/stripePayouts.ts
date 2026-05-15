@@ -7,19 +7,20 @@ export interface TokenizedCard {
 }
 
 /**
- * Tokenize a Canadian debit card via Stripe Elements.
- * The CardNumberElement keeps raw PAN inside Stripe's iframe — it never
- * touches our JS or our backend.
+ * Tokenize a card via Stripe Elements (used for charging the SENDER's funding card).
+ * Raw PAN never leaves the Stripe iframe.
+ *
+ * Pass `currency` only when the token will be used as a payout destination
+ * (Visa Direct). For regular charges, omit it.
  */
 export async function tokenizeDebitCard(
   stripe: Stripe,
   cardNumberElement: StripeCardNumberElement,
   opts: { name: string; currency?: "cad" }
 ): Promise<TokenizedCard> {
-  const result = await stripe.createToken(cardNumberElement, {
-    name: opts.name,
-    currency: opts.currency ?? "cad",
-  });
+  const tokenData: Record<string, string> = { name: opts.name };
+  if (opts.currency) tokenData.currency = opts.currency;
+  const result = await stripe.createToken(cardNumberElement, tokenData);
 
   if (result.error) {
     throw new Error(result.error.message || "Card tokenization failed");
