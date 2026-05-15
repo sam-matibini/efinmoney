@@ -21,11 +21,11 @@ const FlipCard = ({ card, flipped, onToggle, index }: FlipCardProps) => {
   const [hovering, setHovering] = useState(false);
   const [particles, setParticles] = useState<{ id: number; x: number; y: number }[]>([]);
 
-  // Premium dual-tone gradient by network/index
+  // Premium gradient by card network
   const bgClass =
-    card.card_network === "mastercard" || index % 2 === 1
-      ? "bg-[linear-gradient(135deg,#1a1a2e_0%,#16213e_45%,#0f3460_100%)]"
-      : "bg-[linear-gradient(135deg,#064e3b_0%,#047857_45%,#0f766e_100%)]";
+    card.card_network === "mastercard"
+      ? "bg-[linear-gradient(135deg,#1a1a1a_0%,#3a1d0a_45%,#eb6e1f_100%)]"
+      : "bg-[linear-gradient(135deg,#0a2540_0%,#1e3a8a_45%,#0f766e_100%)]";
 
   const expiry =
     card.expiry_month && card.expiry_year

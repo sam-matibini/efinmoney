@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Loader2, Lock, ShieldCheck } from "lucide-react";
+import { useProfile } from "@/hooks/useProfile";
 
 interface Props {
   onSuccess?: () => void;
@@ -61,10 +62,16 @@ function InnerForm({ onSuccess, onCancel, ctaLabel }: Props) {
   const elements = useElements();
   const qc = useQueryClient();
   const { user } = useAuth();
+  const { data: profile } = useProfile();
   const [name, setName] = useState("");
   const [cardReady, setCardReady] = useState(false);
   const [saving, setSaving] = useState(false);
   const cardOptions = useMemo(() => buildCardOptions(), []);
+
+  useEffect(() => {
+    if (!name && profile?.full_name) setName(profile.full_name.toUpperCase());
+  }, [profile?.full_name]);
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
