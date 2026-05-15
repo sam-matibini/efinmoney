@@ -112,10 +112,7 @@ const CanadaSendFlowInner = () => {
     ? recipientName.trim().length > 1 && /\S+@\S+\.\S+/.test(recipientEmail)
     : method === "card_push"
       ? recipientName.trim().length > 1
-          && /^\d{13,19}$/.test(cardNumber.replace(/\s+/g, ""))
-          && /^(0?[1-9]|1[0-2])$/.test(cardExpMonth)
-          && /^\d{2,4}$/.test(cardExpYear)
-          && /^\d{3,4}$/.test(cardCvc)
+          && cardNumComplete && cardExpComplete && cardCvcComplete
       : recipientName.trim().length > 1
           && /^\d{3}$/.test(institutionNumber)
           && /^\d{5}$/.test(transitNumber)
@@ -124,16 +121,21 @@ const CanadaSendFlowInner = () => {
   const handleSubmit = async () => {
     if (!selectedWallet) return;
     try {
-      // For card_push, tokenize first so the raw PAN never reaches our backend.
+      // For card_push, tokenize first via Stripe Elements so the raw PAN never reaches our backend.
       let tokenized: { token: string; last4: string; brand: string } | null = null;
       if (method === "card_push") {
+        if (!stripe || !elements) {
+          toast.error("Card form is still loading — please wait a moment");
+          return;
+        }
+        const cardEl = elements.getElement(CardNumberElement);
+        if (!cardEl) {
+          toast.error("Card form not ready");
+          return;
+        }
         setCardSubmitting(true);
         try {
-          tokenized = await tokenizeDebitCard({
-            number: cardNumber,
-            exp_month: parseInt(cardExpMonth, 10),
-            exp_year: parseInt(cardExpYear.length === 2 ? `20${cardExpYear}` : cardExpYear, 10),
-            cvc: cardCvc,
+          tokenized = await tokenizeDebitCard(stripe, cardEl, {
             name: recipientName,
             currency: "cad",
           });
@@ -191,9 +193,12 @@ const CanadaSendFlowInner = () => {
     setAmount("");
     setRecipientName(""); setRecipientEmail(""); setMessage("");
     setInstitutionNumber(""); setTransitNumber(""); setAccountNumber(""); setBankName("");
-    setCardNumber(""); setCardExpMonth(""); setCardExpYear(""); setCardCvc("");
+    setCardNumComplete(false); setCardExpComplete(false); setCardCvcComplete(false);
     setLastTransferId(null);
     setSecurity(null);
+    elements?.getElement(CardNumberElement)?.clear();
+    elements?.getElement(CardExpiryElement)?.clear();
+    elements?.getElement(CardCvcElement)?.clear();
   };
 
   return (
