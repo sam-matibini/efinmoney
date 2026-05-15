@@ -79,16 +79,16 @@ Deno.serve(async (req) => {
     if (!transfer_id || !amount || amount <= 0 || !currency || !network) {
       return new Response(JSON.stringify({ error: "Invalid payload" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
-    if (currency === "NGN") {
-      if (!account_number || !bank_code) {
-        const reason = "Nigerian payout requires bank_code and 10-digit NUBAN account_number";
-        const rev = await reverseTransferLedger(supabase, transfer_id);
-        await supabase.from("transfers").update({ status: "failed", failure_reason: reason }).eq("id", transfer_id);
-        await supabase.from("notifications").insert({ user_id: user.id, title: "Transfer failed — refunded", message: rev.reversed ? `${reason}. Funds returned to your wallet.` : reason, type: "error" });
-        return new Response(JSON.stringify({ success: false, error: reason, refunded: rev.reversed }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
-    } else if (!phone_number) {
-      return new Response(JSON.stringify({ error: "phone_number required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const hasBankRail = !!(account_number && bank_code);
+    if (currency === "NGN" && !hasBankRail) {
+      const reason = "Nigerian payout requires bank_code and 10-digit NUBAN account_number";
+      const rev = await reverseTransferLedger(supabase, transfer_id);
+      await supabase.from("transfers").update({ status: "failed", failure_reason: reason }).eq("id", transfer_id);
+      await supabase.from("notifications").insert({ user_id: user.id, title: "Transfer failed — refunded", message: rev.reversed ? `${reason}. Funds returned to your wallet.` : reason, type: "error" });
+      return new Response(JSON.stringify({ success: false, error: reason, refunded: rev.reversed }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    if (!hasBankRail && !phone_number) {
+      return new Response(JSON.stringify({ error: "phone_number required for mobile money payout" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const { data: transfer, error: tErr } = await supabase.from("transfers").select("*").eq("id", transfer_id).eq("sender_id", user.id).single();
