@@ -390,16 +390,21 @@ const SendPage = () => {
   const createTransferRecord = async (overrides?: { funding_source?: 'wallet' | 'card' | 'bank' }) => {
     const ngnAcct = isNGNBank ? ngnAccountNumber.replace(/\D/g, "") : "";
     const ngnBank = isNGNBank ? (ngnBanks.find((b) => b.code === ngnBankCode)?.name || null) : null;
+    const ghAcct = isGhanaBank ? ghAccountNumber.replace(/\D/g, "") : "";
+    const ghBank = isGhanaBank ? (ghBanks.find((b) => b.code === ghBankCode)?.name || null) : null;
+    const bankAcct = isNGNBank ? ngnAcct : isGhanaBank ? ghAcct : "";
+    const bankCode = isNGNBank ? ngnBankCode : isGhanaBank ? ghBankCode : "";
+    const bankName = isNGNBank ? ngnBank : isGhanaBank ? ghBank : null;
     const transfer = await createTransfer.mutateAsync({
       sender_wallet_id: fundingSource === 'wallet' ? selectedWallet!.wallet_id : wallets?.[0]?.wallet_id || '',
       recipient_name: recipientName,
-      recipient_phone: isNGNBank ? undefined : recipientPhone,
-      recipient_account: isNGNBank ? ngnAcct : undefined,
-      recipient_bank_code: isNGNBank ? ngnBankCode : undefined,
-      recipient_bank_name: isNGNBank ? (ngnBank || undefined) : undefined,
+      recipient_phone: isBankPayout ? undefined : recipientPhone,
+      recipient_account: isBankPayout ? bankAcct : undefined,
+      recipient_bank_code: isBankPayout ? bankCode : undefined,
+      recipient_bank_name: isBankPayout ? (bankName || undefined) : undefined,
       recipient_country: targetCountry.code,
-      transfer_type: isNGNBank ? 'bank' : 'mobile_money',
-      payout_method: isNGNBank ? 'bank' : effectivePayoutMethod,
+      transfer_type: isBankPayout ? 'bank' : 'mobile_money',
+      payout_method: isBankPayout ? 'bank' : effectivePayoutMethod,
       source_currency: sourceCurrency,
       target_currency: targetCountry.code,
       source_amount: parsedAmount,
@@ -414,13 +419,13 @@ const SendPage = () => {
         const { isNew } = await recordTransferRecipient({
           user_id: user.id,
           name: recipientName,
-          phone: isNGNBank ? "" : recipientPhone,
+          phone: isBankPayout ? "" : recipientPhone,
           country_code: targetCountry.code,
-          payout_method: isNGNBank ? 'bank' : effectivePayoutMethod,
-          network: isNGNBank ? null : (activeNetwork?.id || null),
+          payout_method: isBankPayout ? 'bank' : effectivePayoutMethod,
+          network: isBankPayout ? null : (activeNetwork?.id || null),
           currency_code: targetCountry.code,
-          bank_name: isNGNBank ? ngnBank : null,
-          bank_account: isNGNBank ? ngnAcct : null,
+          bank_name: isBankPayout ? bankName : null,
+          bank_account: isBankPayout ? bankAcct : null,
         } as any);
         if (isNew && !pickedBeneficiaryId) setSavePromptOpen(true);
       } catch { /* non-fatal */ }
