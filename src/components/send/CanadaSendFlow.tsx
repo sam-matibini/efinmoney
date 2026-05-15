@@ -59,20 +59,48 @@ const CanadaSendFlow = () => {
   const isStep1Valid = !!selectedWallet && parsedAmount > 0 && !insufficient;
   const isStep2Valid = method === "interac"
     ? recipientName.trim().length > 1 && /\S+@\S+\.\S+/.test(recipientEmail)
-    : recipientName.trim().length > 1
-        && /^\d{3}$/.test(institutionNumber)
-        && /^\d{5}$/.test(transitNumber)
-        && accountNumber.trim().length >= 4;
+    : method === "card_push"
+      ? recipientName.trim().length > 1
+          && /^\d{13,19}$/.test(cardNumber.replace(/\s+/g, ""))
+          && /^(0?[1-9]|1[0-2])$/.test(cardExpMonth)
+          && /^\d{2,4}$/.test(cardExpYear)
+          && /^\d{3,4}$/.test(cardCvc)
+      : recipientName.trim().length > 1
+          && /^\d{3}$/.test(institutionNumber)
+          && /^\d{5}$/.test(transitNumber)
+          && accountNumber.trim().length >= 4;
 
   const handleSubmit = async () => {
     if (!selectedWallet) return;
     try {
+      // For card_push, tokenize first so the raw PAN never reaches our backend.
+      let tokenized: { token: string; last4: string; brand: string } | null = null;
+      if (method === "card_push") {
+        setCardSubmitting(true);
+        try {
+          tokenized = await tokenizeDebitCard({
+            number: cardNumber,
+            exp_month: parseInt(cardExpMonth, 10),
+            exp_year: parseInt(cardExpYear.length === 2 ? `20${cardExpYear}` : cardExpYear, 10),
+            cvc: cardCvc,
+            name: recipientName,
+            currency: "cad",
+          });
+        } catch (e: any) {
+          setCardSubmitting(false);
+          toast.error(e?.message || "Couldn't tokenize card");
+          return;
+        }
+      }
+
       const transfer = await createTransfer.mutateAsync({
         sender_wallet_id: selectedWallet.wallet_id,
         recipient_name: recipientName,
         recipient_account: method === "eft"
           ? `${institutionNumber}-${transitNumber}-${accountNumber}`
-          : recipientEmail,
+          : method === "card_push"
+            ? `card-****${tokenized?.last4 || ""}`
+            : recipientEmail,
         recipient_country: "CA",
         transfer_type: "domestic_canada",
         payout_method: method,
@@ -84,17 +112,25 @@ const CanadaSendFlow = () => {
         fee_amount: fee,
       });
 
-      // Best-effort: post ledger via execute-transfer (it will skip payout for unmapped corridor)
       try {
-        const { data: execData } = await supabase.functions.invoke("execute-transfer", { body: { transfer_id: transfer.id } });
+        const body: Record<string, unknown> = { transfer_id: transfer.id };
+        if (method === "card_push" && tokenized) {
+          body.card_token = tokenized.token;
+          body.recipient_email = recipientEmail || null;
+          body.last4 = tokenized.last4;
+          body.brand = tokenized.brand;
+        }
+        const { data: execData } = await supabase.functions.invoke("execute-transfer", { body });
         const sec = execData?.payout?.security;
         if (sec?.question && sec?.answer) setSecurity({ question: sec.question, answer: sec.answer });
       } catch { /* non-fatal — record is created */ }
 
       setLastTransferId(transfer.id);
       setStep(3);
+      setCardSubmitting(false);
       toast.success("Canadian transfer initiated");
     } catch (e: any) {
+      setCardSubmitting(false);
       toast.error(e?.message || "Transfer failed");
     }
   };
@@ -104,6 +140,7 @@ const CanadaSendFlow = () => {
     setAmount("");
     setRecipientName(""); setRecipientEmail(""); setMessage("");
     setInstitutionNumber(""); setTransitNumber(""); setAccountNumber(""); setBankName("");
+    setCardNumber(""); setCardExpMonth(""); setCardExpYear(""); setCardCvc("");
     setLastTransferId(null);
     setSecurity(null);
   };
