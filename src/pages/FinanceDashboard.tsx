@@ -59,7 +59,7 @@ const FinanceDashboard = () => {
             </div>
 
             <TabsContent value="accounting" className="space-y-4">
-              <Tabs defaultValue="coa" className="space-y-4">
+              <Tabs value={accountingTab} onValueChange={setAccountingTab} className="space-y-4">
                 <TabsList>
                   <TabsTrigger value="coa">Chart of Accounts</TabsTrigger>
                   <TabsTrigger value="journal">Journal Entries</TabsTrigger>
@@ -67,13 +67,13 @@ const FinanceDashboard = () => {
                   <TabsTrigger value="tb">Trial Balance</TabsTrigger>
                 </TabsList>
                 <TabsContent value="coa">
-                  <ChartOfAccountsPanel />
+                  <ChartOfAccountsPanel onViewLedger={viewLedgerForAccount} />
                 </TabsContent>
                 <TabsContent value="journal">
                   <JournalEntriesPanel />
                 </TabsContent>
                 <TabsContent value="gl">
-                  <GeneralLedgerPanel />
+                  <GeneralLedgerPanel initialAccountId={glAccountId} />
                 </TabsContent>
                 <TabsContent value="tb">
                   <TrialBalancePanel />
