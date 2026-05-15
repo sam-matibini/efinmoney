@@ -65,7 +65,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { transfer_id } = await req.json();
+    const payload: Record<string, any> = (await req.json().catch(() => ({}))) || {};
+    const { transfer_id } = payload;
     if (!transfer_id) {
       return new Response(JSON.stringify({ error: "transfer_id required" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
