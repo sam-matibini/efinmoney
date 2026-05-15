@@ -164,7 +164,11 @@ Deno.serve(async (req) => {
             .like("code", "21%").eq("currency_code", transfer.source_currency).limit(1).single();
       const liabAcc = liabLookup.data;
 
-      const payableCode = PAYABLE_BY_CURRENCY[transfer.target_currency];
+      // Canadian payouts settle through Paysafe — credit the Paysafe Settlement clearing account.
+      // All other corridors credit the country's mobile-money payable account.
+      const isCanadaPayout =
+        transfer.transfer_type === "domestic_canada" || transfer.recipient_country === "CA";
+      const payableCode = isCanadaPayout ? "1203" : PAYABLE_BY_CURRENCY[transfer.target_currency];
       const { data: payableAcc } = payableCode
         ? await supabase.from("ledger_accounts").select("id").eq("code", payableCode).maybeSingle()
         : { data: null };
