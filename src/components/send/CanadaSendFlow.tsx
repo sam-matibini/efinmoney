@@ -138,9 +138,15 @@ RecipientCardSection.displayName = "RecipientCardSection";
 
 const CanadaSendFlow = () => {
   const [stripeP] = useState<Promise<Stripe | null>>(() => getStripe());
+  const [stripeReady, setStripeReady] = useState<boolean | null>(null);
+  useEffect(() => {
+    let ok = true;
+    stripeP.then((s) => { if (ok) setStripeReady(!!s); });
+    return () => { ok = false; };
+  }, [stripeP]);
   return (
     <Elements stripe={stripeP}>
-      <CanadaSendFlowInner />
+      <CanadaSendFlowInner stripeReady={stripeReady} />
     </Elements>
   );
 };
