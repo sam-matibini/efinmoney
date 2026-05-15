@@ -60,10 +60,9 @@ const DELIVERY_FEES: Record<DeliveryMethod, number> = { interac: 0.5, eft: 0 };
 const CARD_PROCESSING_FEE = 1.5;
 
 const CanadaSendFlow = () => {
-  const [stripeP, setStripeP] = useState<Promise<Stripe | null> | null>(null);
-  useEffect(() => { setStripeP(getStripe()); }, []);
+  const [stripeP] = useState<Promise<Stripe | null>>(() => getStripe());
   return (
-    <Elements stripe={stripeP ?? Promise.resolve(null)}>
+    <Elements stripe={stripeP}>
       <CanadaSendFlowInner />
     </Elements>
   );
