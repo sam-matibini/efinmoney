@@ -117,12 +117,35 @@ Deno.serve(async (req) => {
     let newStatus: string | null = null;
     let failure: string | null = null;
     const s = status || "";
-    if (["COMPLETED", "DELIVERED", "DEPOSITED", "RECEIVED", "PAYMENT_COMPLETED", "PAYMENT_HANDLE_COMPLETED"].some((v) => s.includes(v) || eventType.toUpperCase().includes(v))) {
+    const evU = eventType.toUpperCase();
+
+    // Reversal-class events (Interac cancelled/expired or returned disbursement) → reverse the ledger
+    const isReversal =
+      evU.includes("CANCELLED") || evU.includes("CANCELED") ||
+      evU.includes("EXPIRED") || evU.includes("RETURNED") || evU.includes("REVERSED") ||
+      s.includes("CANCELLED") || s.includes("CANCELED") ||
+      s.includes("EXPIRED") || s.includes("RETURNED") || s.includes("REVERSED");
+
+    const isCompleted =
+      evU.includes("DISBURSEMENT_COMPLETED") ||
+      ["COMPLETED", "DELIVERED", "DEPOSITED", "RECEIVED", "PAYMENT_COMPLETED", "PAYMENT_HANDLE_COMPLETED"]
+        .some((v) => s.includes(v) || evU.includes(v));
+
+    const isFailed = !isCompleted && !isReversal && (
+      evU.includes("DISBURSEMENT_FAILED") ||
+      ["FAILED", "DECLINED", "PAYMENT_FAILED", "PAYMENT_HANDLE_FAILED"]
+        .some((v) => s.includes(v) || evU.includes(v))
+    );
+
+    if (isCompleted) {
       newStatus = "completed";
-    } else if (["FAILED", "DECLINED", "CANCELLED", "EXPIRED", "RETURNED", "PAYMENT_FAILED", "PAYMENT_HANDLE_FAILED"].some((v) => s.includes(v) || eventType.toUpperCase().includes(v))) {
+    } else if (isReversal) {
+      newStatus = "reversed";
+      failure = `Paysafe reversal: ${eventType} ${s}`.trim();
+    } else if (isFailed) {
       newStatus = "failed";
       failure = `Paysafe: ${eventType} ${s}`.trim();
-    } else if (s.includes("PROCESSING") || s.includes("PENDING") || eventType.toUpperCase().includes("PROCESSING") || eventType.toUpperCase().includes("INITIATED")) {
+    } else if (s.includes("PROCESSING") || s.includes("PENDING") || evU.includes("PROCESSING") || evU.includes("INITIATED")) {
       newStatus = "processing";
     }
 
@@ -134,13 +157,15 @@ Deno.serve(async (req) => {
 
       await supabase.from("transfers").update(update).eq("id", transferId);
 
-      // Refund wallet on failure
-      if (newStatus === "failed") {
+      // Refund wallet on failure OR reversal (Interac cancelled/expired/returned)
+      if (newStatus === "failed" || newStatus === "reversed") {
         const { data: t } = await supabase.from("transfers").select("*").eq("id", transferId).single();
         if (t && t.funding_source === "wallet") {
-          // Idempotency: don't double-refund
+          const refType = newStatus === "reversed" ? "transfer_reversal" : "transfer_refund";
+          // Idempotency: don't double-refund/reverse
           const { data: existing } = await supabase.from("ledger_entries").select("id")
-            .eq("reference_type", "transfer_refund").eq("reference_id", transferId).limit(1);
+            .in("reference_type", ["transfer_refund", "transfer_reversal"])
+            .eq("reference_id", transferId).limit(1);
           if (!existing || existing.length === 0) {
             const { data: liabAcc } = await supabase
               .from("ledger_accounts").select("id").like("code", "21%")
@@ -154,8 +179,10 @@ Deno.serve(async (req) => {
                 currency_code: t.source_currency,
                 debit_amount: 0,
                 credit_amount: Number(t.source_amount) + Number(t.fee_amount || 0),
-                description: `Refund (Paysafe failure) for transfer ${transferId}`,
-                reference_type: "transfer_refund",
+                description: newStatus === "reversed"
+                  ? `Reversal (Paysafe ${eventType}) for transfer ${transferId}`
+                  : `Refund (Paysafe failure) for transfer ${transferId}`,
+                reference_type: refType,
                 reference_id: transferId,
                 created_by: t.sender_id,
               }]);
