@@ -82,8 +82,7 @@ export const validateMinAmount = (currency: string, amount: number): string | nu
 
 // Look up a current FX rate (from_currency -> to_currency) and return the
 // effective rate; returns null when no rate is available.
-export const fetchFxRate = async (from: string, to: string): Promise<number | null> => {
-  if (from === to) return 1;
+const directRate = async (from: string, to: string): Promise<number | null> => {
   const { data, error } = await supabase
     .from("fx_rates")
     .select("rate, effective_rate")
@@ -95,6 +94,30 @@ export const fetchFxRate = async (from: string, to: string): Promise<number | nu
     .maybeSingle();
   if (error || !data) return null;
   return Number(data.effective_rate || data.rate) || null;
+};
+
+export const fetchFxRate = async (from: string, to: string): Promise<number | null> => {
+  if (from === to) return 1;
+  // Try direct rate first
+  const direct = await directRate(from, to);
+  if (direct) return direct;
+  // Cross-rate via USD (e.g. NGN -> USD -> GHS)
+  if (from !== "USD" && to !== "USD") {
+    const [a, b] = await Promise.all([directRate(from, "USD"), directRate("USD", to)]);
+    if (a && b) return a * b;
+    // Try inverse legs if one direction is missing
+    const [aInv, bInv] = await Promise.all([
+      a ? Promise.resolve(null) : directRate("USD", from),
+      b ? Promise.resolve(null) : directRate(to, "USD"),
+    ]);
+    const fromUsd = a ?? (aInv ? 1 / aInv : null);
+    const usdTo = b ?? (bInv ? 1 / bInv : null);
+    if (fromUsd && usdTo) return fromUsd * usdTo;
+  }
+  // Try inverse direct
+  const inv = await directRate(to, from);
+  if (inv) return 1 / inv;
+  return null;
 };
 
 // Map a raw error / message into a friendly user-facing string. Specifically
