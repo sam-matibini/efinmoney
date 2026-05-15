@@ -72,6 +72,7 @@ const SendPage = () => {
   const [savePromptOpen, setSavePromptOpen] = useState(false);   // Yes/No confirm
   const [saveModalOpen, setSaveModalOpen] = useState(false);     // pre-filled Add modal
   const [addCardOpen, setAddCardOpen] = useState(false);
+  const [topUpOpen, setTopUpOpen] = useState(false);
   const [pickedBeneficiaryId, setPickedBeneficiaryId] = useState<string | null>(null);
   const [pendingBeneficiary, setPendingBeneficiary] = useState<Beneficiary | null>(null);
   const [selectedNetworkId, setSelectedNetworkId] = useState<string | null>(null);
