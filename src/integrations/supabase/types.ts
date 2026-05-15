@@ -2750,6 +2750,45 @@ export type Database = {
         }
         Relationships: []
       }
+      stripe_payout_recipients: {
+        Row: {
+          brand: string | null
+          created_at: string
+          id: string
+          last4: string | null
+          recipient_email: string | null
+          recipient_name: string
+          stripe_account_id: string
+          stripe_external_account_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          brand?: string | null
+          created_at?: string
+          id?: string
+          last4?: string | null
+          recipient_email?: string | null
+          recipient_name: string
+          stripe_account_id: string
+          stripe_external_account_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          brand?: string | null
+          created_at?: string
+          id?: string
+          last4?: string | null
+          recipient_email?: string | null
+          recipient_name?: string
+          stripe_account_id?: string
+          stripe_external_account_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       tax_filings: {
         Row: {
           adjustments: number
@@ -3172,6 +3211,7 @@ export type Database = {
           source_amount: number
           source_currency: string
           status: Database["public"]["Enums"]["transfer_status"]
+          stripe_payout_id: string | null
           target_amount: number
           target_currency: string
           transfer_type: Database["public"]["Enums"]["transfer_type"]
@@ -3201,6 +3241,7 @@ export type Database = {
           source_amount: number
           source_currency: string
           status?: Database["public"]["Enums"]["transfer_status"]
+          stripe_payout_id?: string | null
           target_amount: number
           target_currency: string
           transfer_type: Database["public"]["Enums"]["transfer_type"]
@@ -3230,6 +3271,7 @@ export type Database = {
           source_amount?: number
           source_currency?: string
           status?: Database["public"]["Enums"]["transfer_status"]
+          stripe_payout_id?: string | null
           target_amount?: number
           target_currency?: string
           transfer_type?: Database["public"]["Enums"]["transfer_type"]
