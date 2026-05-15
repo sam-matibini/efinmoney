@@ -171,6 +171,10 @@ const CanadaSendFlowInner = () => {
   const [cardCvcComplete, setCardCvcComplete] = useState(false);
   const [cardSubmitting, setCardSubmitting] = useState(false);
 
+  // Recipient debit card (separate Stripe Elements scope, only for card_push)
+  const recipientCardRef = useRef<RecipientCardHandle>(null);
+  const [recipientCardComplete, setRecipientCardComplete] = useState(false);
+
   const [lastTransferId, setLastTransferId] = useState<string | null>(null);
   const [security, setSecurity] = useState<{ question: string; answer: string } | null>(null);
 
@@ -200,6 +204,8 @@ const CanadaSendFlowInner = () => {
 
   const recipientValid = method === "interac"
     ? recipientName.trim().length > 1 && /\S+@\S+\.\S+/.test(recipientEmail)
+    : method === "card_push"
+      ? recipientName.trim().length > 1 && recipientCardComplete
     : recipientName.trim().length > 1
         && /^\d{3}$/.test(institutionNumber)
         && /^\d{5}$/.test(transitNumber)
