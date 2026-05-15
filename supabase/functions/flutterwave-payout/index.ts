@@ -105,8 +105,11 @@ Deno.serve(async (req) => {
     const projectRef = Deno.env.get("SUPABASE_URL")?.match(/https:\/\/([^.]+)/)?.[1];
     const callbackUrl = `https://${projectRef}.functions.supabase.co/flutterwave-webhook`;
 
+    // Bank rail = caller provided both bank_code and account_number
+    // (NGN NUBAN, GHS branch code, or any other Flutterwave-supported bank corridor).
+    const isBankRail = !!(bank_code && account_number);
     let payload: Record<string, unknown>;
-    if (currency === "NGN") {
+    if (isBankRail) {
       payload = {
         account_bank: String(bank_code),
         account_number: String(account_number).replace(/\D/g, ""),
@@ -117,7 +120,7 @@ Deno.serve(async (req) => {
         callback_url: callbackUrl,
         debit_currency: currency,
         beneficiary_name: recipient_name,
-        meta: [{ transfer_id, network }],
+        meta: [{ transfer_id, network: network || "bank" }],
       };
     } else {
       const bank = V3_MM_BANK[`${currency}:${network.toLowerCase()}`];

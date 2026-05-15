@@ -32,7 +32,11 @@ export const COUNTRIES: CountryInfo[] = [
   // AFRICA
   { id: "Kenya", country: "Kenya", code: "KES", flag: "🇰🇪", method: "M-Pesa", payout: "mpesa", region: "Africa", symbol: "KSh" },
   { id: "Nigeria", country: "Nigeria", code: "NGN", flag: "🇳🇬", method: "Bank/Mobile", payout: "bank", region: "Africa", symbol: "₦" },
-  { id: "Ghana", country: "Ghana", code: "GHS", flag: "🇬🇭", method: "MTN Mobile", payout: "mtn_mobile", region: "Africa", symbol: "GH₵" },
+  { id: "Ghana", country: "Ghana", code: "GHS", flag: "🇬🇭", method: "Mobile Money", payout: "mtn_mobile", region: "Africa", symbol: "GH₵", networks: [
+    { id: "mtn", label: "MTN Mobile Money", payout: "mtn_mobile" },
+    { id: "vodafone", label: "Vodafone Cash", payout: "vodafone_money" },
+    { id: "airteltigo", label: "AirtelTigo Money", payout: "airteltigo_money" },
+  ]},
   { id: "Uganda", country: "Uganda", code: "UGX", flag: "🇺🇬", method: "Mobile Money", payout: "airtel_money", region: "Africa", symbol: "USh" },
   { id: "Tanzania", country: "Tanzania", code: "TZS", flag: "🇹🇿", method: "M-Pesa", payout: "mpesa", region: "Africa", symbol: "TSh" },
   { id: "Zambia", country: "Zambia", code: "ZMW", flag: "🇿🇲", method: "Mobile Money", payout: "mtn_mobile", region: "Africa", symbol: "ZK", networks: [
