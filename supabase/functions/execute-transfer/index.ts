@@ -200,12 +200,35 @@ Deno.serve(async (req) => {
     // Mark funded
     await supabase.from("transfers").update({ status: "funded" }).eq("id", transfer_id);
 
-    // Trigger payout: Paysafe for Canada. African corridors must use the
-    // hosted Flutterwave checkout flow (initiated from the frontend); we no
-    // longer call /transfers or /direct-charges from the server.
+    // Trigger payout: Stripe (card push) → Paysafe (Interac/EFT) for Canada;
+    // Flutterwave hosted checkout for African corridors (initiated from frontend).
     let payoutResult: any = { stub: true };
     try {
-      if (transfer.transfer_type === "domestic_canada" || transfer.recipient_country === "CA") {
+      const isCanada = transfer.transfer_type === "domestic_canada" || transfer.recipient_country === "CA";
+      // Pull optional payout payload (card token etc.) sent by the frontend
+      let extraBody: Record<string, unknown> = {};
+      try {
+        const reqClone = req.clone();
+        const json = await reqClone.json().catch(() => ({}));
+        extraBody = {
+          card_token: json?.card_token,
+          recipient_email: json?.recipient_email,
+          last4: json?.last4,
+          brand: json?.brand,
+        };
+      } catch { /* ignore */ }
+
+      if (isCanada && transfer.payout_method === "card_push") {
+        const res = await fetch(
+          `${Deno.env.get("SUPABASE_URL")}/functions/v1/stripe-payout`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ transfer_id, ...extraBody }),
+          },
+        );
+        payoutResult = await res.json();
+      } else if (isCanada) {
         const res = await fetch(
           `${Deno.env.get("SUPABASE_URL")}/functions/v1/paysafe-payout`,
           {

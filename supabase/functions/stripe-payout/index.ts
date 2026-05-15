@@ -176,9 +176,15 @@ Deno.serve(async (req) => {
       } as any);
       externalAccountId = ext.id;
 
-      // Persist recipient vault (idempotent upsert by sender + email)
+      // Persist recipient vault (insert new, or update existing if we reused acct)
       if (recEmail) {
-        await supabase.from("stripe_payout_recipients").upsert({
+        const { data: existingRow } = await supabase
+          .from("stripe_payout_recipients")
+          .select("id")
+          .eq("user_id", senderId)
+          .eq("recipient_email", recEmail)
+          .maybeSingle();
+        const row = {
           user_id: senderId,
           recipient_name: recipientName,
           recipient_email: recEmail,
@@ -186,7 +192,12 @@ Deno.serve(async (req) => {
           brand: brand || null,
           stripe_account_id: acctId!,
           stripe_external_account_id: externalAccountId,
-        }, { onConflict: "user_id,recipient_email" } as any).select().maybeSingle();
+        };
+        if (existingRow) {
+          await supabase.from("stripe_payout_recipients").update(row).eq("id", existingRow.id);
+        } else {
+          await supabase.from("stripe_payout_recipients").insert(row);
+        }
       }
 
       // 3. Create instant payout to the debit card on the connected account
