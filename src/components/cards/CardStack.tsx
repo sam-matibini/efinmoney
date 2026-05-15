@@ -159,9 +159,9 @@ const CardStack = ({ cards, flipped, onToggleFlip, renderActions, onAddCard }: P
           {cards.map((c, i) => {
             const isActive = i === active;
             const grad =
-              c.card_network === "mastercard" || i % 2 === 1
-                ? "linear-gradient(135deg,#1a1a2e,#0f3460)"
-                : "linear-gradient(135deg,#064e3b,#0f766e)";
+              c.card_network === "mastercard"
+                ? "linear-gradient(135deg,#1a1a1a,#eb6e1f)"
+                : "linear-gradient(135deg,#0a2540,#0f766e)";
             return (
               <button
                 key={c.id}
