@@ -8,6 +8,8 @@ import { usePlaidLink } from "react-plaid-link";
 import ContactsPickerModal from "@/components/modals/ContactsPickerModal";
 import AddBeneficiaryModal from "@/components/modals/AddBeneficiaryModal";
 import AddCardModal from "@/components/modals/AddCardModal";
+import TopUpModal from "@/components/modals/TopUpModal";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useBeneficiaries, recordTransferRecipient, type Beneficiary } from "@/hooks/useBeneficiaries";
 import { downloadTransferReceipt } from "@/lib/receipt";
 import { useAuth } from "@/hooks/useAuth";
@@ -45,6 +47,19 @@ import {
 
 type FundingSource = 'wallet' | 'bank' | 'card';
 
+const cardBrandClass = (brand?: string | null) => {
+  switch ((brand ?? "").toLowerCase()) {
+    case "visa": return "from-[#1a1f71] to-[#3949ab]";
+    case "mastercard": return "from-[#eb001b] to-[#f79e1b]";
+    case "amex":
+    case "american_express": return "from-[#2671b8] to-[#1f4e8c]";
+    case "discover": return "from-[#ff6000] to-[#fda636]";
+    default: return "from-slate-700 to-slate-900";
+  }
+};
+const cardBrandLabel = (brand?: string | null) =>
+  brand ? brand.charAt(0).toUpperCase() + brand.slice(1).toLowerCase() : "Card";
+
 // Stagger helpers for form fields
 const fieldVariants: Variants = {
   hidden: { opacity: 0, y: 12 },
@@ -70,6 +85,7 @@ const SendPage = () => {
   const [savePromptOpen, setSavePromptOpen] = useState(false);   // Yes/No confirm
   const [saveModalOpen, setSaveModalOpen] = useState(false);     // pre-filled Add modal
   const [addCardOpen, setAddCardOpen] = useState(false);
+  const [topUpOpen, setTopUpOpen] = useState(false);
   const [pickedBeneficiaryId, setPickedBeneficiaryId] = useState<string | null>(null);
   const [pendingBeneficiary, setPendingBeneficiary] = useState<Beneficiary | null>(null);
   const [selectedNetworkId, setSelectedNetworkId] = useState<string | null>(null);
@@ -951,22 +967,22 @@ const SendPage = () => {
                                     )}
 
                                     {fundingSource === 'card' && (
-                                      <motion.div custom={1} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
-                                        <Label>Pay with saved card</Label>
+                                      <motion.div custom={1} variants={fieldVariants} initial="hidden" animate="show" className="space-y-3">
+                                        <div className="flex items-center justify-between">
+                                          <Label>Pay with saved card</Label>
+                                          <Button type="button" variant="ghost" size="sm" className="h-auto py-1 px-2 text-xs" onClick={() => setAddCardOpen(true)}>
+                                            <CreditCard className="w-3.5 h-3.5 mr-1" />Add new card
+                                          </Button>
+                                        </div>
                                         {savedCards.length === 0 ? (
-                                          <div className="p-3 rounded-lg border border-dashed border-border bg-muted/40 space-y-2">
+                                          <div className="p-4 rounded-xl border border-dashed border-border bg-muted/40 space-y-3">
                                             <div className="flex items-start gap-2">
                                               <AlertCircle className="w-4 h-4 mt-0.5 text-muted-foreground shrink-0" />
-                                              <p className="text-sm text-muted-foreground">No saved cards. Go to Cards page to link a card first.</p>
+                                              <p className="text-sm text-muted-foreground">No saved cards yet. Add one securely via Stripe to pay instantly.</p>
                                             </div>
-                                            <div className="flex gap-2">
-                                              <Button type="button" variant="secondary" size="sm" className="flex-1" onClick={() => setAddCardOpen(true)}>
-                                                <CreditCard className="w-4 h-4 mr-2" />Add a card
-                                              </Button>
-                                              <Button type="button" variant="outline" size="sm" className="flex-1" onClick={() => navigate('/cards')}>
-                                                Go to Cards <ArrowRight className="w-4 h-4 ml-1" />
-                                              </Button>
-                                            </div>
+                                            <Button type="button" size="sm" className="w-full" onClick={() => setAddCardOpen(true)}>
+                                              <CreditCard className="w-4 h-4 mr-2" />Add a card
+                                            </Button>
                                           </div>
                                         ) : (
                                           <div className="space-y-2">
@@ -978,29 +994,55 @@ const SendPage = () => {
                                                   key={c.id}
                                                   type="button"
                                                   onClick={() => setSelectedSavedCardId(checked ? "" : id)}
-                                                  className={`w-full text-left flex items-center gap-3 p-3 rounded-lg border transition ${checked ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted/40'}`}
+                                                  className={`w-full text-left flex items-center gap-3 p-3 rounded-xl border-2 transition ${checked ? 'border-primary bg-primary/5 shadow-sm' : 'border-border hover:bg-muted/40'}`}
                                                 >
-                                                  <CreditCard className="w-5 h-5 text-muted-foreground" />
-                                                  <div className="flex-1 min-w-0">
-                                                    <p className="text-sm font-medium capitalize">{c.card_brand ?? 'Card'} •••• {c.last_four}</p>
-                                                    <p className="text-xs text-muted-foreground">Exp {String(c.exp_month ?? '').padStart(2, '0')}/{String(c.exp_year ?? '').slice(-2)}</p>
+                                                  <div className={`w-12 h-8 rounded-md bg-gradient-to-br ${cardBrandClass(c.card_brand)} flex items-center justify-center text-white text-[10px] font-bold uppercase tracking-wider shrink-0`}>
+                                                    {cardBrandLabel(c.card_brand).slice(0, 4)}
                                                   </div>
-                                                  {checked && <CheckCircle className="w-4 h-4 text-primary" />}
+                                                  <div className="flex-1 min-w-0">
+                                                    <p className="text-sm font-medium">
+                                                      {cardBrandLabel(c.card_brand)} •••• {c.last_four}
+                                                      {c.is_default && <span className="ml-2 text-[10px] uppercase tracking-wider text-primary">Default</span>}
+                                                    </p>
+                                                    <p className="text-xs text-muted-foreground">
+                                                      Exp: {String(c.exp_month ?? '').padStart(2, '0')}/{String(c.exp_year ?? '').slice(-2)}
+                                                      {c.currency_code ? ` • ${c.currency_code}` : ''}
+                                                    </p>
+                                                  </div>
+                                                  {checked && <CheckCircle className="w-5 h-5 text-primary shrink-0" />}
                                                 </button>
                                               );
                                             })}
-                                            <div className="flex items-center justify-between pt-1">
-                                              <p className="text-xs text-muted-foreground">
-                                                {activeSavedCard && !activeSavedCard.currency_code
-                                                  ? "Detecting card currency…"
-                                                  : `Card will be charged in ${sourceCurrency}.`}
-                                              </p>
-                                              <Button type="button" variant="ghost" size="sm" className="h-auto py-1 px-2 text-xs" onClick={() => setAddCardOpen(true)}>
-                                                <CreditCard className="w-3.5 h-3.5 mr-1" />Add another
-                                              </Button>
-                                            </div>
+                                            <p className="text-xs text-muted-foreground pt-1">
+                                              {activeSavedCard && !activeSavedCard.currency_code
+                                                ? "Detecting card currency…"
+                                                : `Card will be charged in ${sourceCurrency}.`}
+                                            </p>
                                           </div>
                                         )}
+
+                                        <Alert className="bg-accent/10 border-accent/30">
+                                          <AlertCircle className="h-4 w-4 text-accent" />
+                                          <AlertDescription className="text-xs space-y-2">
+                                            <p>
+                                              Using a local African card (e.g. Naira)? Stripe does not support local cards.
+                                              Please top up your wallet first using our local gateway.
+                                            </p>
+                                            <div className="flex gap-2 pt-1">
+                                              <Button
+                                                type="button"
+                                                size="sm"
+                                                variant="secondary"
+                                                onClick={() => {
+                                                  setFundingSource('wallet');
+                                                  setTopUpOpen(true);
+                                                }}
+                                              >
+                                                <Wallet className="w-3.5 h-3.5 mr-1.5" />Top Up Wallet
+                                              </Button>
+                                            </div>
+                                          </AlertDescription>
+                                        </Alert>
                                       </motion.div>
                                     )}
 
@@ -1594,6 +1636,7 @@ const SendPage = () => {
         } as any}
       />
       <AddCardModal isOpen={addCardOpen} onClose={() => setAddCardOpen(false)} defaultMode="link" />
+      <TopUpModal open={topUpOpen} onOpenChange={setTopUpOpen} defaultWalletId={selectedWallet?.wallet_id} title="Top up wallet" />
       <MobileNav />
     </div>
   );
