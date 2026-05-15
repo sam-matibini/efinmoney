@@ -218,7 +218,7 @@ const CanadaSendFlow = () => {
 
             <div className="space-y-2">
               <Label>Delivery Method</Label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 <Button
                   type="button"
                   variant={method === "interac" ? "default" : "outline"}
@@ -239,7 +239,22 @@ const CanadaSendFlow = () => {
                   <span className="text-xs">Bank Transfer (EFT)</span>
                   <span className="text-[10px] opacity-70">Free</span>
                 </Button>
+                <Button
+                  type="button"
+                  variant={method === "card_push" ? "default" : "outline"}
+                  className="flex flex-col items-center gap-1 h-auto py-3"
+                  onClick={() => setMethod("card_push")}
+                >
+                  <CreditCard className="w-5 h-5" />
+                  <span className="text-xs flex items-center gap-1">Debit card <Zap className="w-3 h-3" /></span>
+                  <span className="text-[10px] opacity-70">C$1.50 · Instant</span>
+                </Button>
               </div>
+              {method === "card_push" && (
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Powered by Stripe (Visa Direct / Mastercard Send). Funds arrive on the recipient's Canadian debit card in seconds.
+                </p>
+              )}
             </div>
 
             <div className="p-4 rounded-xl bg-muted">
@@ -277,6 +292,43 @@ const CanadaSendFlow = () => {
                 <div className="space-y-2">
                   <Label>Message (optional)</Label>
                   <Textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Thanks for dinner!" maxLength={400} rows={3} />
+                </div>
+              </>
+            ) : method === "card_push" ? (
+              <>
+                <div className="space-y-2">
+                  <Label>Recipient Debit Card Number</Label>
+                  <Input
+                    inputMode="numeric"
+                    autoComplete="off"
+                    maxLength={23}
+                    value={cardNumber}
+                    onChange={(e) => {
+                      const digits = e.target.value.replace(/\D/g, "").slice(0, 19);
+                      setCardNumber(digits.replace(/(\d{4})(?=\d)/g, "$1 "));
+                    }}
+                    placeholder="4242 4242 4242 4242"
+                  />
+                  <p className="text-[11px] text-muted-foreground">Canadian debit card only (Visa Debit, Debit Mastercard, Interac).</p>
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="space-y-2">
+                    <Label>Exp. Month</Label>
+                    <Input inputMode="numeric" maxLength={2} value={cardExpMonth} onChange={(e) => setCardExpMonth(e.target.value.replace(/\D/g, ""))} placeholder="MM" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Exp. Year</Label>
+                    <Input inputMode="numeric" maxLength={4} value={cardExpYear} onChange={(e) => setCardExpYear(e.target.value.replace(/\D/g, ""))} placeholder="YYYY" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>CVC</Label>
+                    <Input inputMode="numeric" maxLength={4} value={cardCvc} onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, ""))} placeholder="123" />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Recipient Email (optional)</Label>
+                  <Input type="email" value={recipientEmail} onChange={(e) => setRecipientEmail(e.target.value)} placeholder="jane@example.com" />
+                  <p className="text-[11px] text-muted-foreground">Used to save this recipient for future sends.</p>
                 </div>
               </>
             ) : (
