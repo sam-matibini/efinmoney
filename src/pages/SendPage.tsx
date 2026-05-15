@@ -83,6 +83,11 @@ const SendPage = () => {
   const [ngnResolving, setNgnResolving] = useState(false);
   const [ngnResolvedName, setNgnResolvedName] = useState<string | null>(null);
   const [ngnResolveError, setNgnResolveError] = useState<string | null>(null);
+  // Ghana bank payout state (toggle between Mobile Money and Bank Transfer)
+  const [ghPayoutMode, setGhPayoutMode] = useState<'mobile' | 'bank'>('mobile');
+  const [ghBanks, setGhBanks] = useState<Array<{ code: string; name: string }>>([]);
+  const [ghBankCode, setGhBankCode] = useState<string>("");
+  const [ghAccountNumber, setGhAccountNumber] = useState<string>("");
   // V4: no public key needed
   const navigate = useNavigate();
 
@@ -217,9 +222,14 @@ const SendPage = () => {
     setNgnAccountNumber("");
     setNgnResolvedName(null);
     setNgnResolveError(null);
+    setGhPayoutMode('mobile');
+    setGhBankCode("");
+    setGhAccountNumber("");
   }, [targetCountryId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const isNGNBank = targetCountry.code === "NGN";
+  const isGhanaBank = targetCountry.code === "GHS" && ghPayoutMode === "bank";
+  const isBankPayout = isNGNBank || isGhanaBank;
 
   // Fetch Nigerian banks list when NGN destination is selected
   useEffect(() => {
