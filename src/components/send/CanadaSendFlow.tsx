@@ -210,8 +210,13 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
   const isStep1Valid = parsedAmount > 0
     && (funding === "card" || (!!selectedWallet && !insufficient));
 
+  const interacQAValid = method !== "interac"
+    ? true
+    : (!securityQuestion && !securityAnswer)
+      || (securityQuestion.trim().length >= 4 && securityAnswer.trim().length >= 3);
+
   const recipientValid = method === "interac"
-    ? recipientName.trim().length > 1 && /\S+@\S+\.\S+/.test(recipientEmail)
+    ? recipientName.trim().length > 1 && /\S+@\S+\.\S+/.test(recipientEmail) && interacQAValid
     : method === "card_push"
       ? recipientName.trim().length > 1 && recipientCardComplete
     : recipientName.trim().length > 1
