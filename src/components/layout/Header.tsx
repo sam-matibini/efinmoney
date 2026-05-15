@@ -1,6 +1,13 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, User, LogOut, Shield, Wallet, Settings, Cog, X } from "lucide-react";
+import { Search, User, LogOut, Shield, Wallet, Settings, Cog, X, Menu } from "lucide-react";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRoles } from "@/hooks/useUserRoles";
 import { Link, useLocation, useNavigate } from "react-router-dom";
