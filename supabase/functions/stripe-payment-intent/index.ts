@@ -18,7 +18,13 @@ Deno.serve(async (req) => {
   try {
     const url = new URL(req.url);
     if (req.method === "GET" && url.searchParams.get("action") === "publishable_key") {
-      return json({ publishableKey: Deno.env.get("STRIPE_PUBLISHABLE_KEY") ?? "" });
+      const pk = Deno.env.get("STRIPE_PUBLISHABLE_KEY") ?? "";
+      if (!pk.startsWith("pk_test_") && !pk.startsWith("pk_live_")) {
+        return json({
+          error: "Stripe publishable key is not configured correctly. Expected a value starting with pk_test_ or pk_live_.",
+        }, 500);
+      }
+      return json({ publishableKey: pk });
     }
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {

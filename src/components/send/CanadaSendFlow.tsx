@@ -138,14 +138,20 @@ RecipientCardSection.displayName = "RecipientCardSection";
 
 const CanadaSendFlow = () => {
   const [stripeP] = useState<Promise<Stripe | null>>(() => getStripe());
+  const [stripeReady, setStripeReady] = useState<boolean | null>(null);
+  useEffect(() => {
+    let ok = true;
+    stripeP.then((s) => { if (ok) setStripeReady(!!s); });
+    return () => { ok = false; };
+  }, [stripeP]);
   return (
     <Elements stripe={stripeP}>
-      <CanadaSendFlowInner />
+      <CanadaSendFlowInner stripeReady={stripeReady} />
     </Elements>
   );
 };
 
-const CanadaSendFlowInner = () => {
+const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) => {
   const stripe = useStripe();
   const elements = useElements();
   const elementStyle = useStripeElementStyle();
@@ -547,7 +553,21 @@ const CanadaSendFlowInner = () => {
               </div>
             </div>
 
-            {funding === "card" && (
+            {funding === "card" && stripeReady === false && (
+              <div className="p-4 rounded-lg border border-destructive/40 bg-destructive/10 text-sm text-destructive">
+                <strong>Card payments are temporarily unavailable.</strong>
+                <p className="mt-1 text-destructive/90">
+                  The Stripe publishable key is missing or invalid. Please contact support
+                  or pay from your CAD wallet instead.
+                </p>
+              </div>
+            )}
+            {funding === "card" && stripeReady === null && (
+              <div className="p-4 rounded-lg border border-border bg-muted/30 text-sm text-muted-foreground">
+                Loading secure card form…
+              </div>
+            )}
+            {funding === "card" && stripeReady === true && (
               <div className="space-y-4 p-4 rounded-lg border border-border bg-muted/30">
                 <div className="flex items-center gap-2 text-sm font-medium">
                   <CreditCard className="w-4 h-4" /> Your card details

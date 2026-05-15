@@ -1,42 +1,39 @@
-# Fix payment key error and reactivate sender card fields
+# Fix inactive card fields in Canada send flow
 
 ## What I’ll change
-1. Correct the backend so Stripe functions use real Stripe credentials, not the Paysafe key currently being returned to the frontend.
-2. Restore the sender debit/credit card fields in the Canada send flow so the Stripe card iframe mounts and accepts input normally.
-3. Validate the end-to-end card flow on `/send` so both the field activation and the saved-card charge error are resolved.
+1. Harden Stripe publishable-key loading so the send flow only mounts card Elements when a valid Stripe `pk_...` key is available.
+2. Fix the Canada send form so sender card number, expiry, and CVC fields become interactive instead of rendering as dead inputs.
+3. Add clearer fallback/error handling when the key is missing or invalid, so this can’t silently fail again.
 
 ## Why this is happening
-- The failing request shows `stripe-charge-saved-card` returning `Invalid API Key provided: B-qa2...`, which is not a Stripe key format.
-- The frontend request for `stripe-payment-intent?action=publishable_key` is also returning `OT-1148280:B-qa2...`, so the sender card Elements provider is being initialized with the wrong secret-derived value.
-- Because of that, the card iframe cannot initialize correctly and the sender card fields appear inactive.
+- The inactive sender card fields are rendered by Stripe Elements in `src/components/send/CanadaSendFlow.tsx`.
+- Those inputs only work if `src/lib/stripe.ts` successfully fetches a valid publishable key and initializes Stripe.
+- Right now the flow can still render the card UI even when Stripe is not actually ready, which makes the fields appear visible but not active.
+- The publishable key endpoint in `supabase/functions/stripe-payment-intent/index.ts` also returns whatever secret is stored, without validating that it is actually a Stripe publishable key.
 
 ## Implementation plan
-### 1) Audit and correct Stripe key usage
-- Review the Stripe-related edge functions that expose or consume Stripe credentials:
-  - `supabase/functions/stripe-payment-intent/index.ts`
-  - `supabase/functions/stripe-charge-saved-card/index.ts`
-  - any shared Stripe setup used by sender-card funding
-- Ensure each function reads the correct Stripe env vars:
-  - `STRIPE_PUBLISHABLE_KEY` for the frontend publishable key response
-  - `STRIPE_SECRET_KEY` for server-side Stripe API calls
-- Add defensive validation so obviously invalid non-Stripe values do not get returned as a publishable key.
+### 1) Validate Stripe key loading at the source
+- Update `supabase/functions/stripe-payment-intent/index.ts` to validate `STRIPE_PUBLISHABLE_KEY` before returning it.
+- If the stored value is missing or not a Stripe publishable key, return a safe error instead of returning a bad value.
 
-### 2) Verify the Canada send card-field wiring
-- Check `src/components/send/CanadaSendFlow.tsx` and `src/lib/stripe.ts` together.
-- Keep the current dual-Elements structure if valid, but make sure the sender funding card fields only render once Stripe is actually ready.
-- Improve the loading/fallback behavior so the form does not show dead card inputs when the key is missing or invalid.
+### 2) Make frontend Stripe initialization robust
+- Update `src/lib/stripe.ts` to reject invalid/non-Stripe publishable keys before calling `loadStripe`.
+- Improve the loader so it exposes a usable failure state instead of only returning `null` silently.
 
-### 3) Validate the exact user flow
-- Confirm the publishable-key endpoint now returns a proper Stripe `pk_...` key.
-- Confirm the sender card number / expiry / CVC fields become focusable and typable on `/send`.
-- Confirm the saved-card charge path no longer throws the `Invalid API key provided` error.
+### 3) Fix the Canada sender card UX
+- Update `src/components/send/CanadaSendFlow.tsx` so the sender card section only renders active Elements when Stripe is confirmed ready.
+- Show a loading or configuration error state instead of dead card fields.
+- Keep the existing sender/recipient dual-Elements structure, but guard it properly.
 
 ## Technical details
-- Root cause appears to be configuration, but I’ll also harden the code so a bad secret cannot silently break the UI again.
-- If the stored Stripe secrets themselves are wrong, I’ll prompt for a secure secret update after the code-side safeguards are in place.
-- No unrelated payment-provider changes will be made in this pass.
+- Files to change:
+  - `src/components/send/CanadaSendFlow.tsx`
+  - `src/lib/stripe.ts`
+  - `supabase/functions/stripe-payment-intent/index.ts`
+- I will not change unrelated payout logic.
+- If the stored Stripe publishable secret is still wrong, the UI will surface that cleanly and the key can then be rotated securely.
 
 ## Expected result
-- The error shown in your screenshot disappears.
-- Sender debit/credit card fields become active and usable.
-- Stripe funding requests use the correct Stripe credentials end-to-end.
+- Card number, expiry, and CVC in the Canada send flow become clickable and typable.
+- The screenshot error state disappears.
+- If Stripe is misconfigured again later, users will see a clear message instead of inactive fields.
