@@ -244,12 +244,31 @@ const CanadaSendFlowInner = () => {
         }
       }
 
+      // Tokenize recipient debit card if instant card_push delivery
+      let recipientTok: { token: string; last4: string; brand: string } | null = null;
+      if (method === "card_push") {
+        if (!recipientCardRef.current?.isComplete()) {
+          toast.error("Please complete the recipient's card details");
+          return;
+        }
+        setCardSubmitting(true);
+        try {
+          recipientTok = await recipientCardRef.current.tokenize(recipientName);
+        } catch (e: any) {
+          setCardSubmitting(false);
+          toast.error(e?.message || "Couldn't tokenize recipient card");
+          return;
+        }
+      }
+
       const transfer = await createTransfer.mutateAsync({
         sender_wallet_id: (funding === "wallet" ? selectedWallet?.wallet_id : (selectedWallet?.wallet_id || fallbackWallet?.wallet_id))!,
         recipient_name: recipientName,
         recipient_account: method === "eft"
           ? `${institutionNumber}-${transitNumber}-${accountNumber}`
-          : recipientEmail,
+          : method === "card_push"
+            ? (recipientEmail || `card-${recipientTok?.last4 || "xxxx"}`)
+            : recipientEmail,
         recipient_country: "CA",
         transfer_type: "domestic_canada",
         payout_method: method,
@@ -271,6 +290,12 @@ const CanadaSendFlowInner = () => {
           body.card_token = tokenized.token;
           body.last4 = tokenized.last4;
           body.brand = tokenized.brand;
+        }
+        if (method === "card_push" && recipientTok) {
+          body.recipient_card_token = recipientTok.token;
+          body.recipient_last4 = recipientTok.last4;
+          body.recipient_brand = recipientTok.brand;
+          body.recipient_email = recipientEmail || null;
         }
         const { data: execData } = await supabase.functions.invoke("execute-transfer", { body });
         if (execData?.success === false) {
