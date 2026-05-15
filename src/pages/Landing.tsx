@@ -355,8 +355,14 @@ const Landing = () => {
               <Wordmark className="font-black text-xl" />
             </div>
             <div className="flex flex-wrap gap-6 text-sm">
-              {["About", "Security", "Privacy", "Terms", "Contact"].map((l) => (
-                <a key={l} href="#" className="hover:text-white transition-colors">{l}</a>
+              {[
+                { label: "About", href: "#" },
+                { label: "Security", href: "#" },
+                { label: "Privacy", href: "/privacy" },
+                { label: "Terms", href: "#" },
+                { label: "Contact", href: "mailto:hello@efin.money" },
+              ].map((l) => (
+                <a key={l.label} href={l.href} className="hover:text-white transition-colors">{l.label}</a>
               ))}
             </div>
           </div>
