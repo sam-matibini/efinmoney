@@ -32,6 +32,15 @@ const friendlyFailureReason = (reason: string): string => {
   if (r.includes("paymenthub-1") || r.includes("payment type and currency code combination")) {
     return "This payout corridor is not yet enabled on our payments provider. Your funds have been returned to your wallet. Please try again later or contact support.";
   }
+  if (r.includes("payouts_not_allowed") || r.includes("card payouts are not yet enabled") || r.includes("insufficient_capabilities") || r.includes("not allowed to make payouts")) {
+    return "Card payouts are not yet enabled on our payments provider. Your funds have been returned to your wallet. Please try again later or contact support.";
+  }
+  if (r.includes("card_declined") || r.includes("card was declined")) {
+    return "The recipient's debit card was declined. Your funds have been returned to your wallet.";
+  }
+  if (r.includes("debit card") && r.includes("instant")) {
+    return "Only Canadian debit cards can receive instant payouts. Please ask the recipient for a debit card.";
+  }
   return reason.replace(/\s*\(raw:[^)]*\)\s*/gi, "").trim();
 };
 

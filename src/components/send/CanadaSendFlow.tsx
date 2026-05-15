@@ -12,11 +12,12 @@ import { useCreateTransfer } from "@/hooks/useTransfers";
 import { downloadTransferReceipt } from "@/lib/receipt";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { CheckCircle, Mail, Landmark, AlertCircle, Info } from "lucide-react";
+import { CheckCircle, Mail, Landmark, AlertCircle, Info, CreditCard, Zap } from "lucide-react";
+import { tokenizeDebitCard } from "@/lib/stripePayouts";
 
-type Method = "interac" | "eft";
+type Method = "interac" | "eft" | "card_push";
 
-const FEES: Record<Method, number> = { interac: 0.5, eft: 0 };
+const FEES: Record<Method, number> = { interac: 0.5, eft: 0, card_push: 1.5 };
 
 const CanadaSendFlow = () => {
   const [step, setStep] = useState(1);
@@ -32,6 +33,12 @@ const CanadaSendFlow = () => {
   const [transitNumber, setTransitNumber] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
   const [bankName, setBankName] = useState("");
+  // Card push (Visa Direct)
+  const [cardNumber, setCardNumber] = useState("");
+  const [cardExpMonth, setCardExpMonth] = useState("");
+  const [cardExpYear, setCardExpYear] = useState("");
+  const [cardCvc, setCardCvc] = useState("");
+  const [cardSubmitting, setCardSubmitting] = useState(false);
 
   const [lastTransferId, setLastTransferId] = useState<string | null>(null);
   const [security, setSecurity] = useState<{ question: string; answer: string } | null>(null);
@@ -52,20 +59,48 @@ const CanadaSendFlow = () => {
   const isStep1Valid = !!selectedWallet && parsedAmount > 0 && !insufficient;
   const isStep2Valid = method === "interac"
     ? recipientName.trim().length > 1 && /\S+@\S+\.\S+/.test(recipientEmail)
-    : recipientName.trim().length > 1
-        && /^\d{3}$/.test(institutionNumber)
-        && /^\d{5}$/.test(transitNumber)
-        && accountNumber.trim().length >= 4;
+    : method === "card_push"
+      ? recipientName.trim().length > 1
+          && /^\d{13,19}$/.test(cardNumber.replace(/\s+/g, ""))
+          && /^(0?[1-9]|1[0-2])$/.test(cardExpMonth)
+          && /^\d{2,4}$/.test(cardExpYear)
+          && /^\d{3,4}$/.test(cardCvc)
+      : recipientName.trim().length > 1
+          && /^\d{3}$/.test(institutionNumber)
+          && /^\d{5}$/.test(transitNumber)
+          && accountNumber.trim().length >= 4;
 
   const handleSubmit = async () => {
     if (!selectedWallet) return;
     try {
+      // For card_push, tokenize first so the raw PAN never reaches our backend.
+      let tokenized: { token: string; last4: string; brand: string } | null = null;
+      if (method === "card_push") {
+        setCardSubmitting(true);
+        try {
+          tokenized = await tokenizeDebitCard({
+            number: cardNumber,
+            exp_month: parseInt(cardExpMonth, 10),
+            exp_year: parseInt(cardExpYear.length === 2 ? `20${cardExpYear}` : cardExpYear, 10),
+            cvc: cardCvc,
+            name: recipientName,
+            currency: "cad",
+          });
+        } catch (e: any) {
+          setCardSubmitting(false);
+          toast.error(e?.message || "Couldn't tokenize card");
+          return;
+        }
+      }
+
       const transfer = await createTransfer.mutateAsync({
         sender_wallet_id: selectedWallet.wallet_id,
         recipient_name: recipientName,
         recipient_account: method === "eft"
           ? `${institutionNumber}-${transitNumber}-${accountNumber}`
-          : recipientEmail,
+          : method === "card_push"
+            ? `card-****${tokenized?.last4 || ""}`
+            : recipientEmail,
         recipient_country: "CA",
         transfer_type: "domestic_canada",
         payout_method: method,
@@ -77,17 +112,25 @@ const CanadaSendFlow = () => {
         fee_amount: fee,
       });
 
-      // Best-effort: post ledger via execute-transfer (it will skip payout for unmapped corridor)
       try {
-        const { data: execData } = await supabase.functions.invoke("execute-transfer", { body: { transfer_id: transfer.id } });
+        const body: Record<string, unknown> = { transfer_id: transfer.id };
+        if (method === "card_push" && tokenized) {
+          body.card_token = tokenized.token;
+          body.recipient_email = recipientEmail || null;
+          body.last4 = tokenized.last4;
+          body.brand = tokenized.brand;
+        }
+        const { data: execData } = await supabase.functions.invoke("execute-transfer", { body });
         const sec = execData?.payout?.security;
         if (sec?.question && sec?.answer) setSecurity({ question: sec.question, answer: sec.answer });
       } catch { /* non-fatal — record is created */ }
 
       setLastTransferId(transfer.id);
       setStep(3);
+      setCardSubmitting(false);
       toast.success("Canadian transfer initiated");
     } catch (e: any) {
+      setCardSubmitting(false);
       toast.error(e?.message || "Transfer failed");
     }
   };
@@ -97,6 +140,7 @@ const CanadaSendFlow = () => {
     setAmount("");
     setRecipientName(""); setRecipientEmail(""); setMessage("");
     setInstitutionNumber(""); setTransitNumber(""); setAccountNumber(""); setBankName("");
+    setCardNumber(""); setCardExpMonth(""); setCardExpYear(""); setCardCvc("");
     setLastTransferId(null);
     setSecurity(null);
   };
@@ -174,7 +218,7 @@ const CanadaSendFlow = () => {
 
             <div className="space-y-2">
               <Label>Delivery Method</Label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 <Button
                   type="button"
                   variant={method === "interac" ? "default" : "outline"}
@@ -195,7 +239,22 @@ const CanadaSendFlow = () => {
                   <span className="text-xs">Bank Transfer (EFT)</span>
                   <span className="text-[10px] opacity-70">Free</span>
                 </Button>
+                <Button
+                  type="button"
+                  variant={method === "card_push" ? "default" : "outline"}
+                  className="flex flex-col items-center gap-1 h-auto py-3"
+                  onClick={() => setMethod("card_push")}
+                >
+                  <CreditCard className="w-5 h-5" />
+                  <span className="text-xs flex items-center gap-1">Debit card <Zap className="w-3 h-3" /></span>
+                  <span className="text-[10px] opacity-70">C$1.50 · Instant</span>
+                </Button>
               </div>
+              {method === "card_push" && (
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Powered by Stripe (Visa Direct / Mastercard Send). Funds arrive on the recipient's Canadian debit card in seconds.
+                </p>
+              )}
             </div>
 
             <div className="p-4 rounded-xl bg-muted">
@@ -235,6 +294,43 @@ const CanadaSendFlow = () => {
                   <Textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Thanks for dinner!" maxLength={400} rows={3} />
                 </div>
               </>
+            ) : method === "card_push" ? (
+              <>
+                <div className="space-y-2">
+                  <Label>Recipient Debit Card Number</Label>
+                  <Input
+                    inputMode="numeric"
+                    autoComplete="off"
+                    maxLength={23}
+                    value={cardNumber}
+                    onChange={(e) => {
+                      const digits = e.target.value.replace(/\D/g, "").slice(0, 19);
+                      setCardNumber(digits.replace(/(\d{4})(?=\d)/g, "$1 "));
+                    }}
+                    placeholder="4242 4242 4242 4242"
+                  />
+                  <p className="text-[11px] text-muted-foreground">Canadian debit card only (Visa Debit, Debit Mastercard, Interac).</p>
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="space-y-2">
+                    <Label>Exp. Month</Label>
+                    <Input inputMode="numeric" maxLength={2} value={cardExpMonth} onChange={(e) => setCardExpMonth(e.target.value.replace(/\D/g, ""))} placeholder="MM" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Exp. Year</Label>
+                    <Input inputMode="numeric" maxLength={4} value={cardExpYear} onChange={(e) => setCardExpYear(e.target.value.replace(/\D/g, ""))} placeholder="YYYY" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>CVC</Label>
+                    <Input inputMode="numeric" maxLength={4} value={cardCvc} onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, ""))} placeholder="123" />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Recipient Email (optional)</Label>
+                  <Input type="email" value={recipientEmail} onChange={(e) => setRecipientEmail(e.target.value)} placeholder="jane@example.com" />
+                  <p className="text-[11px] text-muted-foreground">Used to save this recipient for future sends.</p>
+                </div>
+              </>
             ) : (
               <>
                 <div className="grid grid-cols-2 gap-3">
@@ -263,11 +359,11 @@ const CanadaSendFlow = () => {
               <Button
                 className="flex-1"
                 onClick={handleSubmit}
-                disabled={!isStep2Valid || createTransfer.isPending}
+                disabled={!isStep2Valid || createTransfer.isPending || cardSubmitting}
               >
-                {createTransfer.isPending
+                {createTransfer.isPending || cardSubmitting
                   ? "Processing..."
-                  : `Send C$${parsedAmount.toFixed(2)} via ${method === "interac" ? "Interac e-Transfer" : "Bank Transfer"}`}
+                  : `Send C$${parsedAmount.toFixed(2)} via ${method === "interac" ? "Interac e-Transfer" : method === "card_push" ? "Debit Card" : "Bank Transfer"}`}
               </Button>
             </div>
 
@@ -275,7 +371,7 @@ const CanadaSendFlow = () => {
               <Info className="w-4 h-4 mt-0.5 text-muted-foreground shrink-0" />
               <div className="text-xs text-muted-foreground space-y-1">
                 <p><strong>Summary:</strong> C${parsedAmount.toFixed(2)} from your CAD wallet · Fee C${fee.toFixed(2)} · Recipient gets C${receivedAmount.toFixed(2)}</p>
-                <p>Method: {method === "interac" ? "Interac e-Transfer (email)" : "Bank Transfer (EFT)"}</p>
+                <p>Method: {method === "interac" ? "Interac e-Transfer (email)" : method === "card_push" ? "Debit Card (Visa Direct, instant)" : "Bank Transfer (EFT)"}</p>
               </div>
             </div>
           </CardContent>
@@ -304,6 +400,11 @@ const CanadaSendFlow = () => {
             {method === "eft" && (
               <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
                 Funds will arrive in the recipient's bank account within 1–3 business days.
+              </p>
+            )}
+            {method === "card_push" && (
+              <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
+                Funds are being pushed to the recipient's debit card via Visa Direct. They typically arrive within seconds.
               </p>
             )}
             {security && method === "interac" && (

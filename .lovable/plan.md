@@ -1,43 +1,105 @@
-## Problem
+## Goal
 
-The transfer tracking page shows "Processing Payout" as failed with the message:
-> "This payout corridor is not yet enabled on our payments provider. Your funds have been returned to your wallet. Please try again later or contact support."
+Add **Stripe Card Push (Visa Direct / debit-card payouts)** as a third Canadian payout method alongside the existing **Interac e-Transfer** and **EFT** (both via Paysafe). User picks the method on the Canada send screen. Paysafe stays untouched; Stripe is added next to it. Uses the existing `STRIPE_SECRET_KEY` already in secrets.
 
-This is the friendly message we already map for Paysafe error **PAYMENTHUB-1** ("submitted payment type and currency code combination is not supported for your account"). It is returned because the Paysafe **test** account behind `PAYSAFE_API_KEY` does not have **INTERAC_ETRANSFER Standalone Credit (payouts) for CAD** enabled on its Payment Hub profile.
+## Important upfront caveat
 
-The code path is working correctly:
-1. Wallet was debited
-2. `paysafe-payout` called `/paymenthub/v1/paymenthandles` with `paymentType: INTERAC_ETRANSFER` + `currencyCode: CAD`
-3. Paysafe rejected with `PAYMENTHUB-1`
-4. We caught it, refunded the wallet, marked the transfer `failed`, and stored the friendly reason — exactly what the timeline shows.
+Stripe **card push payouts** (sending money TO a debit card via the Visa Direct / Mastercard Send rails) require Stripe to explicitly enable the **"Card payouts"** capability on your account. This is **not on by default** and is gated by Stripe Risk. Without it, the API call returns `parameter_invalid_empty: external_account` or `payouts_not_allowed`. Once code ships, if Stripe hasn't enabled the capability, the user-facing experience will be the same kind of friendly error we already show for Paysafe PAYMENTHUB-1 — funds refunded, transfer marked failed, message: *"Card payouts are not yet enabled on our payments provider."*
 
-So this is **not a code bug**. It is a Paysafe merchant-account provisioning issue. No code change will make the payout succeed until Paysafe enables the corridor on the account.
+The technical pattern: create a Stripe **Connect Custom connected account** for each recipient with a `card` external account (the recipient's debit card, tokenized client-side), then `POST /v1/payouts` against that connected account in CAD with `method: instant`. Funds settle to the card in seconds.
 
-## What needs to happen (Paysafe side — only the user can do this)
+## What we'll build
 
-In the Paysafe Business Portal (or by emailing Paysafe support / your account manager), request the following on the account whose API key is in `PAYSAFE_API_KEY`:
+### 1. Database
 
-1. **Interac e-Transfer — Standalone Credit (payouts) for CAD** must be enabled on the Payment Hub.
-2. If EFT payouts are also expected: **EFT — Standalone Credit for CAD**.
-3. Confirm `PAYMENTHUB` scope (not just legacy Alternate Payments / Direct Debit) is on the API key.
-4. Because `PAYSAFE_ENV=test`, the enablement must exist on the **sandbox** profile — not just live.
+New migration:
+- Add `'card_push'` to the existing `payout_method` literal usage (it's a free `text` column on `transfers`, so no enum change needed — just frontend/backend code accepts it).
+- New table `stripe_payout_recipients` (recipient card vault, per sender):
+  - `user_id` (sender), `recipient_name`, `recipient_email`, `last4`, `brand`, `stripe_account_id` (Connect acct), `stripe_external_account_id` (card token), `created_at`
+  - RLS: owner-only.
+- Extend `transfers.provider_reference` usage to also store Stripe payout id (`po_…`); no schema change needed.
 
-Once Paysafe confirms enablement, retry a small CAD→CAD Interac transfer. Expected:
-- Payment-handle response: `status: PAYABLE`
-- Standalone-credit response: `id` with `status: PROCESSING`
-- Tracking page advances `Processing Payout → Delivered to Recipient` once the `SA_CREDIT_*` webhook arrives.
+### 2. New edge function: `stripe-payout`
 
-## Code changes
+Mirrors `paysafe-payout`'s contract so `execute-transfer` can route to it:
 
-**None required.** The error handling, wallet refund, transfer status, and friendly user-facing message are already in place and working as designed (visible in your screenshot).
+Input: `{ transfer_id }`
 
-If Paysafe says the corridor *is* enabled and the same error still occurs, the next step is to inspect the raw Paysafe response in the `paysafe-payout` edge function logs and share it with Paysafe support — not to change code.
+Flow:
+1. Service-role load the transfer (`payout_method = 'card_push'`, `recipient_country = 'CA'`).
+2. Read recipient card token + cardholder details from the request payload (passed forward by `execute-transfer`, which the frontend collected via Stripe.js).
+3. Create or reuse a **Stripe Custom connected account** for `(sender_id, recipient_email)` — country `CA`, capabilities `card_payments` + `transfers`, `business_type: individual`, prefilled with cardholder name.
+4. Attach the debit card as an **external account** (`type: card`) on that connected account.
+5. Create a **payout** on the connected account: `amount`, `currency: cad`, `method: instant`, `destination: <card_id>`, `metadata: { transfer_id }`.
+6. On success → mark transfer `processing`, store `provider_reference = po_…`.
+7. On failure → call existing refund helper to credit the sender wallet back, mark `failed`, write a friendly `failure_reason`, return `{ success: false, code, refunded: true }`.
+8. Friendly error mapping for `payouts_not_allowed`, `card_declined`, `external_account_*`, `insufficient_capabilities`.
 
-## Workaround options (if you want users to be able to send CAD now, before Paysafe enables the corridor)
+### 3. New edge function: `stripe-payout-webhook`
 
-These are optional and only worth doing if you need a working payout path immediately:
+Receives Stripe events (separate endpoint from the existing `stripe-webhook` which handles top-ups; mixing them risks regressing top-up logic). Subscribe to:
+- `payout.paid` → mark transfer `completed`, set `completed_at`.
+- `payout.failed` / `payout.canceled` → mark `failed`, refund wallet, store reason.
 
-1. **Hide Interac as a payout option for CAD** in the Canada send flow until Paysafe enablement is confirmed, so users don't initiate transfers that will fail. (Frontend-only change in `src/components/send/CanadaSendFlow.tsx`.)
-2. **Switch to a different Paysafe API key** that already has the Interac payout corridor enabled (set in `PAYSAFE_API_KEY` secret).
+Verifies signature with a new secret `STRIPE_PAYOUT_WEBHOOK_SECRET` (separate from existing `STRIPE_WEBHOOK_SECRET` to keep top-up and payout webhooks isolated).
 
-Tell me if you want either of these and I'll plan that change. Otherwise, the only action is on Paysafe's side.
+`verify_jwt = false` in `supabase/config.toml` for this function.
+
+### 4. `execute-transfer` routing
+
+Add a third branch:
+
+```
+if (transfer.transfer_type === "domestic_canada" && transfer.payout_method === "card_push") {
+  → call stripe-payout
+} else if (domestic_canada) {
+  → call paysafe-payout (existing)
+} else {
+  → call flutterwave-payout (existing)
+}
+```
+
+Pass through the card token and cardholder fields it received from the frontend.
+
+### 5. Frontend: `CanadaSendFlow.tsx`
+
+- Extend `Method` from `"interac" | "eft"` to `"interac" | "eft" | "card_push"`.
+- Add `card_push` option in the method picker with label **"Debit card (instant)"**, fee `$1.50` (configurable), badge "Funds in seconds".
+- New step-2 fields when `card_push` selected:
+  - Recipient full name (cardholder name)
+  - Debit card details collected via **Stripe.js `<CardElement>`** — never touches our server unencrypted. Tokenize → get a card token, send token + last4/brand to `execute-transfer`.
+- Reuse `friendlyFailureReason()` extension on `TransferTrackingPage.tsx` to map Stripe payout error codes.
+
+### 6. Frontend: small Stripe.js helper
+
+`src/lib/stripeJs.ts` already exists for top-ups. Reuse the same `loadStripe(STRIPE_PUBLISHABLE_KEY)` instance; add a `tokenizeDebitCard(elements)` helper that returns `{ token, last4, brand }`.
+
+### 7. Settings panel (`StripeConfig.tsx`)
+
+Add a small read-only section: **"Card-push payouts (Visa Direct)"** showing whether the capability is enabled (best-effort check via `GET /v1/accounts` once on mount), with the new payout webhook URL `…/functions/v1/stripe-payout-webhook` to copy into Stripe Dashboard.
+
+## What the user must do in Stripe Dashboard
+
+1. Email Stripe support → request **"Enable card payouts (Visa Direct / Mastercard Send) in CAD on this account"**. Stripe Risk approves on a case-by-case basis.
+2. Once approved, create a **new webhook endpoint** in the Stripe Dashboard pointing to `…/functions/v1/stripe-payout-webhook`, subscribed to `payout.paid`, `payout.failed`, `payout.canceled`.
+3. Copy the webhook signing secret and we'll add it as `STRIPE_PAYOUT_WEBHOOK_SECRET` (I'll prompt at the end).
+
+Until step 1 is done, the new option will be visible but every send will fail gracefully with the friendly "card payouts not enabled" message — exactly like the Paysafe corridor situation today.
+
+## Files touched
+
+- **migration** — new `stripe_payout_recipients` table + RLS
+- **new** `supabase/functions/stripe-payout/index.ts`
+- **new** `supabase/functions/stripe-payout-webhook/index.ts`
+- **edit** `supabase/functions/execute-transfer/index.ts` — add card_push branch
+- **edit** `supabase/config.toml` — add `[functions.stripe-payout-webhook] verify_jwt = false`
+- **edit** `src/components/send/CanadaSendFlow.tsx` — third method, card form
+- **new** `src/lib/stripePayouts.ts` — Stripe.js debit-card tokenization helper
+- **edit** `src/pages/TransferTrackingPage.tsx` — extend `friendlyFailureReason()`
+- **edit** `src/components/settings/integrations/StripeConfig.tsx` — payout-webhook URL block
+
+## Out of scope (can be follow-ups)
+
+- Saving recipient cards for repeat sends (vault exists in DB; UI to pick a saved recipient is later).
+- Paysafe replacement (you chose to keep Paysafe alongside).
+- Bank-account (EFT-via-Stripe) payouts — different code path; only doing card_push now.
