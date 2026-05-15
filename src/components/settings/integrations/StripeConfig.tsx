@@ -25,6 +25,7 @@ export function StripeConfig({ onBack }: StripeConfigProps) {
   const [showWebhookSecret, setShowWebhookSecret] = useState(false);
 
   const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stripe-webhook`;
+  const payoutWebhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stripe-payout-webhook`;
 
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
@@ -209,6 +210,33 @@ export function StripeConfig({ onBack }: StripeConfigProps) {
                 </div>
               ))}
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Card-push payouts (Visa Direct) */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Card-Push Payouts (Visa Direct / Mastercard Send)</CardTitle>
+          <CardDescription>
+            Used for instant CAD payouts to a recipient's Canadian debit card from the Send → Canada flow.
+            Requires the "Card payouts" capability to be enabled on your Stripe account by Stripe support.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label>Payout Webhook URL</Label>
+            <div className="flex gap-2">
+              <Input value={payoutWebhookUrl} readOnly className="font-mono text-sm" />
+              <Button variant="outline" size="icon" onClick={() => copyToClipboard(payoutWebhookUrl, "Payout webhook URL")}>
+                <Copy className="h-4 w-4" />
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              In the Stripe Dashboard, add a separate webhook endpoint pointing here, subscribed to{" "}
+              <code>payout.paid</code>, <code>payout.failed</code>, and <code>payout.canceled</code>.
+              Paste the resulting signing secret into the <code>STRIPE_PAYOUT_WEBHOOK_SECRET</code> backend secret.
+            </p>
           </div>
         </CardContent>
       </Card>
