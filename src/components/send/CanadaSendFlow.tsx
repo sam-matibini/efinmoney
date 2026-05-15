@@ -292,6 +292,9 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
         target_amount: receivedAmount,
         exchange_rate: 1,
         fee_amount: totalFee,
+        ...(method === "interac" && securityQuestion && securityAnswer
+          ? { interac_security_question: securityQuestion.trim(), interac_security_answer: securityAnswer.trim() }
+          : {}),
       } as any);
 
       try {
