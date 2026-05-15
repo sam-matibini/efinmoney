@@ -573,17 +573,58 @@ const SendPage = () => {
 
   const applyBeneficiary = (b: Beneficiary) => {
     setRecipientName(b.name);
-    if (b.phone) setRecipientPhone(b.phone);
+    setRecipientPhone(b.phone || "");
+    setPickedBeneficiaryId(b.id);
+    setPendingBeneficiary(b);
     if (b.country_code) {
       const c = findCountryByCode(b.country_code);
       if (c) setTargetCountryId(c.id);
     }
-    setPickedBeneficiaryId(b.id);
-    // Restore saved network choice (after country reset effect runs)
-    setTimeout(() => {
-      if (b.network) setSelectedNetworkId(b.network);
-    }, 0);
   };
+
+  // Apply saved network / bank details for a picked beneficiary once the
+  // destination country (and, for NGN, the banks list) is in place.
+  useEffect(() => {
+    const b = pendingBeneficiary;
+    if (!b) return;
+    const targetIsNGNBank = targetCountry.code === "NGN";
+    const expectedCountry = b.country_code
+      ? findCountryByCode(b.country_code)
+      : null;
+    if (expectedCountry && expectedCountry.id !== targetCountryId) return;
+
+    let allApplied = true;
+
+    if (targetIsNGNBank) {
+      if (b.bank_account && !ngnAccountNumber) {
+        setNgnAccountNumber(b.bank_account);
+      }
+      if (b.bank_name && !ngnBankCode) {
+        if (ngnBanks.length === 0) {
+          allApplied = false; // wait for banks list
+        } else {
+          const wanted = b.bank_name.trim().toLowerCase();
+          const match =
+            ngnBanks.find((x) => x.name.toLowerCase() === wanted) ||
+            ngnBanks.find((x) => x.name.toLowerCase().includes(wanted)) ||
+            ngnBanks.find((x) => wanted.includes(x.name.toLowerCase()));
+          if (match) setNgnBankCode(match.code);
+          else allApplied = false;
+        }
+      }
+    } else if (availableNetworks && b.network) {
+      const wanted = b.network;
+      const match =
+        availableNetworks.find((n) => n.id === wanted) ||
+        availableNetworks.find((n) => n.payout === wanted) ||
+        availableNetworks.find((n) => n.label?.toLowerCase() === wanted.toLowerCase());
+      if (match && selectedNetworkId !== match.id) {
+        setSelectedNetworkId(match.id);
+      }
+    }
+
+    if (allApplied) setPendingBeneficiary(null);
+  }, [pendingBeneficiary, targetCountryId, ngnBanks, availableNetworks]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const bid = searchParams.get("beneficiaryId");
