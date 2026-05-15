@@ -354,31 +354,35 @@ const CanadaSendFlowInner = () => {
               <>
                 <div className="space-y-2">
                   <Label>Recipient Debit Card Number</Label>
-                  <Input
-                    inputMode="numeric"
-                    autoComplete="off"
-                    maxLength={23}
-                    value={cardNumber}
-                    onChange={(e) => {
-                      const digits = e.target.value.replace(/\D/g, "").slice(0, 19);
-                      setCardNumber(digits.replace(/(\d{4})(?=\d)/g, "$1 "));
-                    }}
-                    placeholder="4242 4242 4242 4242"
-                  />
+                  <div className={elementWrapperClass}>
+                    <CardNumberElement
+                      options={{ style: elementStyle, showIcon: true, placeholder: "1234 1234 1234 1234" }}
+                      onChange={(e) => setCardNumComplete(e.complete)}
+                      className="w-full"
+                    />
+                  </div>
                   <p className="text-[11px] text-muted-foreground">Canadian debit card only (Visa Debit, Debit Mastercard, Interac).</p>
                 </div>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
-                    <Label>Exp. Month</Label>
-                    <Input inputMode="numeric" maxLength={2} value={cardExpMonth} onChange={(e) => setCardExpMonth(e.target.value.replace(/\D/g, ""))} placeholder="MM" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Exp. Year</Label>
-                    <Input inputMode="numeric" maxLength={4} value={cardExpYear} onChange={(e) => setCardExpYear(e.target.value.replace(/\D/g, ""))} placeholder="YYYY" />
+                    <Label>Expiry (MM / YY)</Label>
+                    <div className={elementWrapperClass}>
+                      <CardExpiryElement
+                        options={{ style: elementStyle }}
+                        onChange={(e) => setCardExpComplete(e.complete)}
+                        className="w-full"
+                      />
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <Label>CVC</Label>
-                    <Input inputMode="numeric" maxLength={4} value={cardCvc} onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, ""))} placeholder="123" />
+                    <div className={elementWrapperClass}>
+                      <CardCvcElement
+                        options={{ style: elementStyle }}
+                        onChange={(e) => setCardCvcComplete(e.complete)}
+                        className="w-full"
+                      />
+                    </div>
                   </div>
                 </div>
                 <div className="space-y-2">
