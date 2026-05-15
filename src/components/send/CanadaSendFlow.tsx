@@ -470,7 +470,7 @@ const CanadaSendFlowInner = () => {
                 <Input value={recipientName} onChange={(e) => setRecipientName(e.target.value)} placeholder="Jane Doe" />
               </div>
 
-              {method === "interac" ? (
+              {method === "interac" && (
                 <>
                   <div className="space-y-2">
                     <Label>Recipient Email</Label>
@@ -481,7 +481,9 @@ const CanadaSendFlowInner = () => {
                     <Textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Thanks for dinner!" maxLength={400} rows={3} />
                   </div>
                 </>
-              ) : (
+              )}
+
+              {method === "eft" && (
                 <>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">
@@ -501,6 +503,20 @@ const CanadaSendFlowInner = () => {
                     <Label>Bank Name (optional)</Label>
                     <Input value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder="Royal Bank of Canada" />
                   </div>
+                </>
+              )}
+
+              {method === "card_push" && (
+                <>
+                  <div className="space-y-2">
+                    <Label>Recipient Email (optional, for receipt)</Label>
+                    <Input type="email" value={recipientEmail} onChange={(e) => setRecipientEmail(e.target.value)} placeholder="jane@example.com" />
+                  </div>
+                  <RecipientCardSection
+                    ref={recipientCardRef}
+                    onValidityChange={setRecipientCardComplete}
+                    elementStyle={elementStyle}
+                  />
                 </>
               )}
             </div>
