@@ -80,7 +80,7 @@ async function buildPdf(transfer: any, senderEmail: string) {
     transfer.status === "completed" ? BRAND_GREEN
     : ["failed", "reversed", "expired"].includes(transfer.status) ? rgb(0.85, 0.2, 0.2)
     : rgb(0.85, 0.65, 0.13);
-  const statusLabel = transfer.status === "completed" ? `${statusText} ✓` : statusText;
+  const statusLabel = transfer.status === "completed" ? `${statusText}` : statusText;
   const sw = bold.widthOfTextAtSize(statusLabel, 12);
   page.drawRectangle({
     x: width - M - sw - 20, y: y - 18, width: sw + 20, height: 26,
@@ -119,10 +119,10 @@ async function buildPdf(transfer: any, senderEmail: string) {
 
   drawSection("Recipient", y);
   y -= 22;
-  drawRow("Name", transfer.recipient_name || "—", y); y -= 22;
-  drawRow("Phone", transfer.recipient_phone || "—", y); y -= 22;
-  drawRow("Country", transfer.recipient_country || "—", y); y -= 22;
-  drawRow("Payout Method", (transfer.payout_method || transfer.transfer_type || "—").replace(/_/g, " "), y); y -= 30;
+  drawRow("Name", transfer.recipient_name || "-", y); y -= 22;
+  drawRow("Phone", transfer.recipient_phone || "-", y); y -= 22;
+  drawRow("Country", transfer.recipient_country || "-", y); y -= 22;
+  drawRow("Payout Method", (transfer.payout_method || transfer.transfer_type || "-").replace(/_/g, " "), y); y -= 30;
 
   // ===== Financial table =====
   drawSection("Financial Details", y);
@@ -221,7 +221,7 @@ Deno.serve(async (req) => {
     // Lookup sender email
     const { data: profile } = await supabase
       .from("profiles").select("email").eq("user_id", transfer.sender_id).maybeSingle();
-    const senderEmail = profile?.email || "—";
+    const senderEmail = profile?.email || "-";
 
     const { base64, reference } = await buildPdf(transfer, senderEmail);
     const filename = `eFinMoney-Receipt-${reference}.pdf`;
@@ -246,7 +246,7 @@ Deno.serve(async (req) => {
               <p>Amount: <strong>${formatMoney(Number(transfer.source_amount), transfer.source_currency)}</strong></p>
               <p>Reference: <strong style="font-family:monospace">${reference}</strong></p>
               <p>Your full PDF receipt is attached to this email.</p>
-              <p style="color:#64748b;font-size:12px;margin-top:32px">— eFinMoney</p>
+              <p style="color:#64748b;font-size:12px;margin-top:32px">- eFinMoney</p>
             </div>`,
             attachments: [{ filename, content: base64 }],
           }),
