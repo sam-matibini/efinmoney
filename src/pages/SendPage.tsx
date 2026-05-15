@@ -1025,7 +1025,7 @@ const SendPage = () => {
                                           <AlertCircle className="h-4 w-4 text-accent" />
                                           <AlertDescription className="text-xs space-y-2">
                                             <p>
-                                              Using a local African card (e.g. Naira)? Stripe does not support local cards.
+                                              Using a local African card (e.g. Naira)? We don't support local cards directly yet.
                                               Please top up your wallet first using our local gateway.
                                             </p>
                                             <div className="flex gap-2 pt-1">
