@@ -290,8 +290,18 @@ const SendPage = () => {
   const fxRate = fxRates?.find(
     r => r.from_currency === sourceCurrency && r.to_currency === targetCountry.code
   );
-  const effectiveRate = isSameCurrency ? 1 : (fxRate ? Number(fxRate.effective_rate) : 0);
-  const rateAvailable = isSameCurrency || !!fxRate;
+  const { data: derivedFxRate } = useQuery({
+    queryKey: ["send-fx-rate", sourceCurrency, targetCountry.code],
+    queryFn: () => fetchFxRate(sourceCurrency, targetCountry.code),
+    enabled: !isSameCurrency && !fxRate && !!sourceCurrency && !!targetCountry.code,
+    staleTime: 60_000,
+  });
+  const effectiveRate = isSameCurrency
+    ? 1
+    : fxRate
+      ? Number(fxRate.effective_rate)
+      : Number(derivedFxRate || 0);
+  const rateAvailable = isSameCurrency || !!fxRate || !!derivedFxRate;
 
   const parsedAmount = Math.max(0, parseFloat(amount) || 0);
   const baseFee = pricing?.transfer_base_fee ?? 0;
