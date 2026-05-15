@@ -181,6 +181,27 @@ const Landing = () => {
         </nav>
       </header>
 
+      {/* ============ CTA ============ */}
+      <section className="bg-emerald-500">
+        <div className="max-w-5xl mx-auto px-6 py-24 text-center">
+          <motion.h2
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+            className="text-4xl md:text-6xl font-black tracking-tight text-white mb-8"
+          >
+            Start sending money today.
+          </motion.h2>
+          <Link
+            to="/auth"
+            className="inline-flex items-center gap-2 bg-white text-emerald-600 hover:bg-neutral-50 font-bold px-10 py-4 rounded-full text-lg transition-all hover:-translate-y-0.5 shadow-xl"
+          >
+            Get Started <ArrowRight className="w-5 h-5" />
+          </Link>
+        </div>
+      </section>
+
       {/* ============ HERO ============ */}
       <section className="relative overflow-hidden">
         <div className="max-w-7xl mx-auto px-6 pt-16 pb-12 md:pt-24 md:pb-20 text-center">
@@ -325,26 +346,7 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* ============ CTA ============ */}
-      <section className="bg-emerald-500">
-        <div className="max-w-5xl mx-auto px-6 py-24 text-center">
-          <motion.h2
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-            className="text-4xl md:text-6xl font-black tracking-tight text-white mb-8"
-          >
-            Start sending money today.
-          </motion.h2>
-          <Link
-            to="/auth"
-            className="inline-flex items-center gap-2 bg-white text-emerald-600 hover:bg-neutral-50 font-bold px-10 py-4 rounded-full text-lg transition-all hover:-translate-y-0.5 shadow-xl"
-          >
-            Get Started <ArrowRight className="w-5 h-5" />
-          </Link>
-        </div>
-      </section>
+
 
       {/* ============ FOOTER ============ */}
       <footer className="bg-neutral-900 text-neutral-400">
