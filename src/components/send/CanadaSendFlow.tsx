@@ -359,11 +359,11 @@ const CanadaSendFlow = () => {
               <Button
                 className="flex-1"
                 onClick={handleSubmit}
-                disabled={!isStep2Valid || createTransfer.isPending}
+                disabled={!isStep2Valid || createTransfer.isPending || cardSubmitting}
               >
-                {createTransfer.isPending
+                {createTransfer.isPending || cardSubmitting
                   ? "Processing..."
-                  : `Send C$${parsedAmount.toFixed(2)} via ${method === "interac" ? "Interac e-Transfer" : "Bank Transfer"}`}
+                  : `Send C$${parsedAmount.toFixed(2)} via ${method === "interac" ? "Interac e-Transfer" : method === "card_push" ? "Debit Card" : "Bank Transfer"}`}
               </Button>
             </div>
 
@@ -371,7 +371,7 @@ const CanadaSendFlow = () => {
               <Info className="w-4 h-4 mt-0.5 text-muted-foreground shrink-0" />
               <div className="text-xs text-muted-foreground space-y-1">
                 <p><strong>Summary:</strong> C${parsedAmount.toFixed(2)} from your CAD wallet · Fee C${fee.toFixed(2)} · Recipient gets C${receivedAmount.toFixed(2)}</p>
-                <p>Method: {method === "interac" ? "Interac e-Transfer (email)" : "Bank Transfer (EFT)"}</p>
+                <p>Method: {method === "interac" ? "Interac e-Transfer (email)" : method === "card_push" ? "Debit Card (Visa Direct, instant)" : "Bank Transfer (EFT)"}</p>
               </div>
             </div>
           </CardContent>
