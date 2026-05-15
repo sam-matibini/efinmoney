@@ -127,7 +127,7 @@ const SendMoneyModal = ({ children }: SendMoneyModalProps) => {
       <DialogTrigger asChild>
         {children}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md bg-card border-border">
+      <DialogContent className="sm:max-w-md bg-card border-border max-h-[90vh] overflow-y-auto p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle className="font-display text-foreground">
             {step === 4 ? 'Transfer Complete!' : 'Send Money'}
