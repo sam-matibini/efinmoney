@@ -1194,7 +1194,34 @@ const SendPage = () => {
                                         className="transition-shadow focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:shadow-[0_0_0_4px_hsl(var(--primary)/0.12)]"
                                       />
                                     </motion.div>
-                                    {availableNetworks && availableNetworks.length > 1 && (
+                                    {targetCountry.code === "GHS" && (
+                                      <motion.div custom={1.2} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
+                                        <Label>Payout Method</Label>
+                                        <div className="grid grid-cols-2 gap-2">
+                                          {([
+                                            { v: 'mobile', label: 'Mobile Money' },
+                                            { v: 'bank',   label: 'Bank Transfer' },
+                                          ] as const).map(({ v, label }) => {
+                                            const active = ghPayoutMode === v;
+                                            return (
+                                              <button
+                                                key={v}
+                                                type="button"
+                                                onClick={() => setGhPayoutMode(v)}
+                                                className={`rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
+                                                  active
+                                                    ? "border-primary bg-primary/10 text-primary"
+                                                    : "border-border bg-card hover:bg-muted text-foreground"
+                                                }`}
+                                              >
+                                                {label}
+                                              </button>
+                                            );
+                                          })}
+                                        </div>
+                                      </motion.div>
+                                    )}
+                                    {availableNetworks && availableNetworks.length > 1 && !isGhanaBank && !isNGNBank && (
                                       <motion.div custom={1.5} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
                                         <Label>Mobile Money Network</Label>
                                         <div className="grid grid-cols-3 gap-2">
@@ -1260,6 +1287,33 @@ const SendPage = () => {
                                             </p>
                                           )}
                                           <p className="text-xs text-muted-foreground">Funds will be deposited directly to the bank account above.</p>
+                                        </motion.div>
+                                      </>
+                                    ) : isGhanaBank ? (
+                                      <>
+                                        <motion.div custom={2} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
+                                          <Label>Recipient Bank</Label>
+                                          <Select value={ghBankCode} onValueChange={setGhBankCode}>
+                                            <SelectTrigger>
+                                              <SelectValue placeholder={ghBanks.length ? "Select Ghanaian bank" : "Loading banks..."} />
+                                            </SelectTrigger>
+                                            <SelectContent className="max-h-[300px]">
+                                              {ghBanks.map((b) => (
+                                                <SelectItem key={b.code} value={b.code}>{b.name}</SelectItem>
+                                              ))}
+                                            </SelectContent>
+                                          </Select>
+                                        </motion.div>
+                                        <motion.div custom={2.5} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
+                                          <Label>Account Number</Label>
+                                          <Input
+                                            inputMode="numeric"
+                                            placeholder="Recipient bank account number"
+                                            value={ghAccountNumber}
+                                            onChange={(e) => setGhAccountNumber(e.target.value.replace(/\D/g, "").slice(0, 20))}
+                                            className="transition-shadow focus-visible:ring-2 focus-visible:ring-primary/40"
+                                          />
+                                          <p className="text-xs text-muted-foreground">Funds will be deposited directly to the GHS bank account above. Make sure the account number and recipient name match exactly.</p>
                                         </motion.div>
                                       </>
                                     ) : (
