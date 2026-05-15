@@ -24,6 +24,8 @@ export function StripeConfig({ onBack }: StripeConfigProps) {
   const [showSecretKey, setShowSecretKey] = useState(false);
   const [showWebhookSecret, setShowWebhookSecret] = useState(false);
 
+  const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stripe-webhook`;
+
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
     toast.success(`${label} copied to clipboard`);
@@ -149,19 +151,20 @@ export function StripeConfig({ onBack }: StripeConfigProps) {
           <div className="space-y-2">
             <Label>Webhook Endpoint URL</Label>
             <div className="flex gap-2">
-              <Input 
-                value="https://api.yourapp.com/webhooks/stripe" 
-                readOnly 
+              <Input
+                value={webhookUrl}
+                readOnly
                 className="font-mono text-sm"
               />
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 size="icon"
-                onClick={() => copyToClipboard("https://api.yourapp.com/webhooks/stripe", "Webhook URL")}
+                onClick={() => copyToClipboard(webhookUrl, "Webhook URL")}
               >
                 <Copy className="h-4 w-4" />
               </Button>
             </div>
+            <p className="text-xs text-muted-foreground">Paste this URL into your Stripe Dashboard → Developers → Webhooks.</p>
           </div>
 
           <div className="space-y-2">
