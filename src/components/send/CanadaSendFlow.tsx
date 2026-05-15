@@ -151,7 +151,7 @@ const CanadaSendFlow = () => {
   );
 };
 
-const CanadaSendFlowInner = () => {
+const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) => {
   const stripe = useStripe();
   const elements = useElements();
   const elementStyle = useStripeElementStyle();
