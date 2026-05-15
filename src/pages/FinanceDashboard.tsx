@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import Header from "@/components/layout/Header";
 import MobileNav from "@/components/layout/MobileNav";
@@ -20,6 +21,13 @@ import { ReportsCentrePanel } from "@/components/finance/ReportsCentrePanel";
 import { SalesTaxPanel } from "@/components/finance/SalesTaxPanel";
 
 const FinanceDashboard = () => {
+  const [accountingTab, setAccountingTab] = useState("coa");
+  const [glAccountId, setGlAccountId] = useState<string | undefined>(undefined);
+
+  const viewLedgerForAccount = (accountId: string) => {
+    setGlAccountId(accountId);
+    setAccountingTab("gl");
+  };
   return (
     <div className="min-h-screen bg-background">
       <Header />
