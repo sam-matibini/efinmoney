@@ -1,6 +1,13 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, User, LogOut, Shield, Wallet, Settings, Cog, X } from "lucide-react";
+import { Search, User, LogOut, Shield, Wallet, Settings, Cog, X, Menu } from "lucide-react";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRoles } from "@/hooks/useUserRoles";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -58,19 +65,63 @@ const Header = () => {
     navItems.push({ label: 'Settings', href: '/settings' });
   }
 
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
   return (
     <header className="sticky top-0 z-50 glass border-b border-border/50">
-      <div className="container flex items-center justify-between h-16 px-4">
+      <div className="container flex items-center justify-between h-16 px-4 gap-2">
         <motion.div 
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
-          className="flex items-center gap-3"
+          className="flex items-center gap-3 min-w-0 shrink"
         >
-          <Link to="/" className="flex items-center gap-3">
-            <Logo className="w-10 h-10" />
-            <Wordmark className="font-display font-bold text-xl" />
+          <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
+            <SheetTrigger asChild>
+              <button
+                className="xl:hidden p-2 rounded-xl hover:bg-muted transition-colors shrink-0"
+                aria-label="Open menu"
+              >
+                <Menu className="w-5 h-5 text-muted-foreground" />
+              </button>
+            </SheetTrigger>
+            <SheetContent side="left" className="w-72 p-0">
+              <SheetHeader className="p-4 border-b border-border">
+                <SheetTitle className="flex items-center gap-2">
+                  <Logo className="w-8 h-8" />
+                  <Wordmark className="font-display font-bold text-lg" />
+                </SheetTitle>
+              </SheetHeader>
+              <nav className="flex flex-col p-2">
+                {navItems.map((item) => {
+                  const isActive = item.href === '/'
+                    ? location.pathname === '/'
+                    : location.pathname.startsWith(item.href) && item.href !== '#';
+                  return (
+                    <Link
+                      key={item.label}
+                      to={item.href}
+                      onClick={() => setMobileNavOpen(false)}
+                      className={`px-3 py-2.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
+                        isActive ? 'bg-secondary text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                      }`}
+                    >
+                      {item.label === 'Finance' && <Wallet className="w-4 h-4" />}
+                      {item.label === 'Operations' && <Settings className="w-4 h-4" />}
+                      {item.label === 'Admin' && <Shield className="w-4 h-4" />}
+                      {item.label === 'Settings' && <Cog className="w-4 h-4" />}
+                      {item.label}
+                    </Link>
+                  );
+                })}
+              </nav>
+            </SheetContent>
+          </Sheet>
+
+          <Link to="/" className="flex items-center gap-2 min-w-0">
+            <Logo className="w-9 h-9 shrink-0" />
+            <Wordmark className="font-display font-bold text-xl truncate hidden sm:inline" />
           </Link>
-          <span className="hidden lg:inline-flex items-center gap-1.5 ml-2 pl-3 border-l border-border text-sm font-medium text-muted-foreground">
+          <span className="hidden 2xl:inline-flex items-center gap-1.5 ml-2 pl-3 border-l border-border text-sm font-medium text-muted-foreground whitespace-nowrap">
             <span className="text-base">{greeting.emoji}</span>
             {greeting.text}
           </span>
@@ -79,7 +130,7 @@ const Header = () => {
         <motion.nav 
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="hidden md:flex items-center gap-6"
+          className="hidden xl:flex items-center gap-5 min-w-0"
         >
           {navItems.map((item) => {
             const isActive = item.href === '/' 
@@ -89,7 +140,7 @@ const Header = () => {
               <Link
                 key={item.label}
                 to={item.href}
-                className={`text-sm font-medium transition-colors flex items-center gap-1.5 ${
+                className={`text-sm font-medium transition-colors flex items-center gap-1.5 whitespace-nowrap ${
                   isActive 
                     ? 'text-primary' 
                     : 'text-muted-foreground hover:text-foreground'
@@ -108,7 +159,7 @@ const Header = () => {
         <motion.div 
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
-          className="flex items-center gap-2"
+          className="flex items-center gap-1 sm:gap-2 shrink-0"
         >
           <div className="relative flex items-center">
             <AnimatePresence initial={false}>
