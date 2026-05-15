@@ -3199,6 +3199,7 @@ export type Database = {
           interac_security_question: string | null
           payout_method: string | null
           paysafe_payment_id: string | null
+          provider_charge_id: string | null
           provider_reference: string | null
           recipient_account: string | null
           recipient_bank_code: string | null
@@ -3229,6 +3230,7 @@ export type Database = {
           interac_security_question?: string | null
           payout_method?: string | null
           paysafe_payment_id?: string | null
+          provider_charge_id?: string | null
           provider_reference?: string | null
           recipient_account?: string | null
           recipient_bank_code?: string | null
@@ -3259,6 +3261,7 @@ export type Database = {
           interac_security_question?: string | null
           payout_method?: string | null
           paysafe_payment_id?: string | null
+          provider_charge_id?: string | null
           provider_reference?: string | null
           recipient_account?: string | null
           recipient_bank_code?: string | null

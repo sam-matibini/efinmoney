@@ -9,10 +9,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useWallets } from "@/hooks/useWallets";
 import { useCreateTransfer } from "@/hooks/useTransfers";
+import { useProfile } from "@/hooks/useProfile";
 import { downloadTransferReceipt } from "@/lib/receipt";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { CheckCircle, Mail, Landmark, AlertCircle, Info, CreditCard, Zap } from "lucide-react";
+import { CheckCircle, Mail, Landmark, AlertCircle, Info, CreditCard, Wallet } from "lucide-react";
 import { tokenizeDebitCard } from "@/lib/stripePayouts";
 import { getStripe } from "@/lib/stripe";
 import type { Stripe } from "@stripe/stripe-js";
@@ -25,7 +26,6 @@ import {
   useElements,
 } from "@stripe/react-stripe-js";
 
-// Read an HSL CSS variable and convert it to a usable CSS color string for Stripe Elements
 function readHslVar(name: string, fallback: string): string {
   if (typeof window === "undefined") return fallback;
   const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -53,9 +53,11 @@ function useStripeElementStyle() {
 const elementWrapperClass =
   "flex h-10 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-within:outline-none focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2";
 
-type Method = "interac" | "eft" | "card_push";
+type DeliveryMethod = "interac" | "eft";
+type FundingSource = "wallet" | "card";
 
-const FEES: Record<Method, number> = { interac: 0.5, eft: 0, card_push: 1.5 };
+const DELIVERY_FEES: Record<DeliveryMethod, number> = { interac: 0.5, eft: 0 };
+const CARD_PROCESSING_FEE = 1.5;
 
 const CanadaSendFlow = () => {
   const [stripeP, setStripeP] = useState<Promise<Stripe | null> | null>(null);
@@ -71,21 +73,23 @@ const CanadaSendFlowInner = () => {
   const stripe = useStripe();
   const elements = useElements();
   const elementStyle = useStripeElementStyle();
+  const { data: profile } = useProfile();
 
   const [step, setStep] = useState(1);
-  const [method, setMethod] = useState<Method>("interac");
+  const [method, setMethod] = useState<DeliveryMethod>("interac");
+  const [funding, setFunding] = useState<FundingSource>("wallet");
   const [amount, setAmount] = useState("");
   const [walletId, setWalletId] = useState("");
-  // Interac
+  // Recipient — Interac
   const [recipientName, setRecipientName] = useState("");
   const [recipientEmail, setRecipientEmail] = useState("");
   const [message, setMessage] = useState("");
-  // EFT
+  // Recipient — EFT
   const [institutionNumber, setInstitutionNumber] = useState("");
   const [transitNumber, setTransitNumber] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
   const [bankName, setBankName] = useState("");
-  // Card push (Visa Direct) — Stripe Elements completion state
+  // Sender card (Stripe Elements completion state)
   const [cardNumComplete, setCardNumComplete] = useState(false);
   const [cardExpComplete, setCardExpComplete] = useState(false);
   const [cardCvcComplete, setCardCvcComplete] = useState(false);
@@ -99,31 +103,44 @@ const CanadaSendFlowInner = () => {
 
   const cadWallets = (wallets || []).filter((w) => w.currency_code === "CAD");
   const selectedWallet = cadWallets.find((w) => w.wallet_id === walletId) || cadWallets[0];
+  const noCadWallet = cadWallets.length === 0;
+  // Auto-switch to card funding if user has no CAD wallet
+  useEffect(() => { if (noCadWallet && funding === "wallet") setFunding("card"); }, [noCadWallet, funding]);
+  // Any wallet to satisfy the NOT NULL FK on transfers.sender_wallet_id when paying by card
+  const fallbackWallet = (wallets || [])[0];
 
   const parsedAmount = Math.max(0, parseFloat(amount) || 0);
-  const fee = parsedAmount > 0 ? FEES[method] : 0;
-  const receivedAmount = Math.max(0, parsedAmount - fee);
-  const insufficient = !!selectedWallet && parsedAmount > 0 && (parsedAmount + fee) > Number(selectedWallet.balance);
+  const deliveryFee = parsedAmount > 0 ? DELIVERY_FEES[method] : 0;
+  const cardFee = parsedAmount > 0 && funding === "card" ? CARD_PROCESSING_FEE : 0;
+  const totalFee = deliveryFee + cardFee;
+  const receivedAmount = Math.max(0, parsedAmount - deliveryFee);
+  const totalCharged = parsedAmount + cardFee;
+  const insufficient = funding === "wallet" && !!selectedWallet && parsedAmount > 0
+    && (parsedAmount + totalFee) > Number(selectedWallet.balance);
 
-  const noCadWallet = cadWallets.length === 0;
+  // Step 1: amount, wallet (only required if funding=wallet), delivery method
+  const isStep1Valid = parsedAmount > 0
+    && (funding === "card" || (!!selectedWallet && !insufficient));
 
-  const isStep1Valid = !!selectedWallet && parsedAmount > 0 && !insufficient;
-  const isStep2Valid = method === "interac"
+  const recipientValid = method === "interac"
     ? recipientName.trim().length > 1 && /\S+@\S+\.\S+/.test(recipientEmail)
-    : method === "card_push"
-      ? recipientName.trim().length > 1
-          && cardNumComplete && cardExpComplete && cardCvcComplete
-      : recipientName.trim().length > 1
-          && /^\d{3}$/.test(institutionNumber)
-          && /^\d{5}$/.test(transitNumber)
-          && accountNumber.trim().length >= 4;
+    : recipientName.trim().length > 1
+        && /^\d{3}$/.test(institutionNumber)
+        && /^\d{5}$/.test(transitNumber)
+        && accountNumber.trim().length >= 4;
+
+  const cardFieldsValid = funding === "wallet"
+    ? true
+    : cardNumComplete && cardExpComplete && cardCvcComplete;
+
+  const isStep2Valid = recipientValid && cardFieldsValid;
 
   const handleSubmit = async () => {
-    if (!selectedWallet) return;
+    if (funding === "wallet" && !selectedWallet) return;
     try {
-      // For card_push, tokenize first via Stripe Elements so the raw PAN never reaches our backend.
+      // Tokenize sender card if card-funded
       let tokenized: { token: string; last4: string; brand: string } | null = null;
-      if (method === "card_push") {
+      if (funding === "card") {
         if (!stripe || !elements) {
           toast.error("Card form is still loading — please wait a moment");
           return;
@@ -136,8 +153,7 @@ const CanadaSendFlowInner = () => {
         setCardSubmitting(true);
         try {
           tokenized = await tokenizeDebitCard(stripe, cardEl, {
-            name: recipientName,
-            currency: "cad",
+            name: profile?.full_name || profile?.email || "Cardholder",
           });
         } catch (e: any) {
           setCardSubmitting(false);
@@ -147,36 +163,44 @@ const CanadaSendFlowInner = () => {
       }
 
       const transfer = await createTransfer.mutateAsync({
-        sender_wallet_id: selectedWallet.wallet_id,
+        sender_wallet_id: (funding === "wallet" ? selectedWallet?.wallet_id : (selectedWallet?.wallet_id || fallbackWallet?.wallet_id))!,
         recipient_name: recipientName,
         recipient_account: method === "eft"
           ? `${institutionNumber}-${transitNumber}-${accountNumber}`
-          : method === "card_push"
-            ? `card-****${tokenized?.last4 || ""}`
-            : recipientEmail,
+          : recipientEmail,
         recipient_country: "CA",
         transfer_type: "domestic_canada",
         payout_method: method,
+        funding_source: funding,
         source_currency: "CAD",
         target_currency: "CAD",
         source_amount: parsedAmount,
         target_amount: receivedAmount,
         exchange_rate: 1,
-        fee_amount: fee,
-      });
+        fee_amount: totalFee,
+      } as any);
 
       try {
-        const body: Record<string, unknown> = { transfer_id: transfer.id };
-        if (method === "card_push" && tokenized) {
+        const body: Record<string, unknown> = {
+          transfer_id: transfer.id,
+          funding_source: funding,
+        };
+        if (funding === "card" && tokenized) {
           body.card_token = tokenized.token;
-          body.recipient_email = recipientEmail || null;
           body.last4 = tokenized.last4;
           body.brand = tokenized.brand;
         }
         const { data: execData } = await supabase.functions.invoke("execute-transfer", { body });
+        if (execData?.success === false) {
+          throw new Error(execData?.error || "Transfer failed");
+        }
         const sec = execData?.payout?.security;
         if (sec?.question && sec?.answer) setSecurity({ question: sec.question, answer: sec.answer });
-      } catch { /* non-fatal — record is created */ }
+      } catch (e: any) {
+        setCardSubmitting(false);
+        toast.error(e?.message || "Transfer could not be completed");
+        return;
+      }
 
       setLastTransferId(transfer.id);
       setStep(3);
@@ -194,6 +218,7 @@ const CanadaSendFlowInner = () => {
     setRecipientName(""); setRecipientEmail(""); setMessage("");
     setInstitutionNumber(""); setTransitNumber(""); setAccountNumber(""); setBankName("");
     setCardNumComplete(false); setCardExpComplete(false); setCardCvcComplete(false);
+    setFunding("wallet");
     setLastTransferId(null);
     setSecurity(null);
     elements?.getElement(CardNumberElement)?.clear();
@@ -218,16 +243,16 @@ const CanadaSendFlowInner = () => {
 
       {step === 1 && (
         <Card>
-          <CardHeader><CardTitle>Amount & Method</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Amount & Delivery</CardTitle></CardHeader>
           <CardContent className="space-y-6">
-            {noCadWallet ? (
+            {noCadWallet && funding === "wallet" ? (
               <div className="p-3 rounded-lg border border-dashed border-border bg-muted/40 flex items-start gap-2">
                 <AlertCircle className="w-4 h-4 mt-0.5 text-muted-foreground shrink-0" />
                 <p className="text-sm text-muted-foreground">
-                  You don't have a CAD wallet. Create one from the Wallets page to send within Canada.
+                  You don't have a CAD wallet. Create one from the Wallets page, or pay by card on the next step.
                 </p>
               </div>
-            ) : (
+            ) : funding === "wallet" ? (
               <div className="space-y-2">
                 <Label>From CAD Wallet</Label>
                 <Select value={walletId || selectedWallet?.wallet_id} onValueChange={setWalletId}>
@@ -241,7 +266,7 @@ const CanadaSendFlowInner = () => {
                   </SelectContent>
                 </Select>
               </div>
-            )}
+            ) : null}
 
             <div className="space-y-2">
               <Label>Amount (CAD)</Label>
@@ -260,7 +285,7 @@ const CanadaSendFlowInner = () => {
                   className="pl-12 text-2xl h-14"
                 />
               </div>
-              {selectedWallet && (
+              {funding === "wallet" && selectedWallet && (
                 <div className="flex items-center justify-between">
                   <p className="text-sm text-muted-foreground">Available: C${Number(selectedWallet.balance).toFixed(2)}</p>
                   {insufficient && (
@@ -273,8 +298,8 @@ const CanadaSendFlowInner = () => {
             </div>
 
             <div className="space-y-2">
-              <Label>Delivery Method</Label>
-              <div className="grid grid-cols-3 gap-2">
+              <Label>Delivery Method (how recipient receives)</Label>
+              <div className="grid grid-cols-2 gap-2">
                 <Button
                   type="button"
                   variant={method === "interac" ? "default" : "outline"}
@@ -283,7 +308,7 @@ const CanadaSendFlowInner = () => {
                 >
                   <Mail className="w-5 h-5" />
                   <span className="text-xs">Interac e-Transfer</span>
-                  <span className="text-[10px] opacity-70">C$0.50 fee</span>
+                  <span className="text-[10px] opacity-70">C$0.50 fee · ~30 min</span>
                 </Button>
                 <Button
                   type="button"
@@ -293,33 +318,18 @@ const CanadaSendFlowInner = () => {
                 >
                   <Landmark className="w-5 h-5" />
                   <span className="text-xs">Bank Transfer (EFT)</span>
-                  <span className="text-[10px] opacity-70">Free</span>
-                </Button>
-                <Button
-                  type="button"
-                  variant={method === "card_push" ? "default" : "outline"}
-                  className="flex flex-col items-center gap-1 h-auto py-3"
-                  onClick={() => setMethod("card_push")}
-                >
-                  <CreditCard className="w-5 h-5" />
-                  <span className="text-xs flex items-center gap-1">Debit card <Zap className="w-3 h-3" /></span>
-                  <span className="text-[10px] opacity-70">C$1.50 · Instant</span>
+                  <span className="text-[10px] opacity-70">Free · 1–3 business days</span>
                 </Button>
               </div>
-              {method === "card_push" && (
-                <p className="text-[11px] text-muted-foreground mt-1">
-                  Powered by Stripe (Visa Direct / Mastercard Send). Funds arrive on the recipient's Canadian debit card in seconds.
-                </p>
-              )}
             </div>
 
             <div className="p-4 rounded-xl bg-muted">
-              <p className="text-sm text-muted-foreground mb-1">They receive</p>
+              <p className="text-sm text-muted-foreground mb-1">Recipient gets</p>
               <p className="text-3xl font-display font-bold text-foreground">
                 C${receivedAmount.toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
               <p className="text-sm text-muted-foreground mt-2">
-                Fee: C${fee.toFixed(2)} · Same-currency CAD → CAD
+                Delivery fee: C${deliveryFee.toFixed(2)} · Same-currency CAD → CAD
               </p>
             </div>
 
@@ -332,28 +342,83 @@ const CanadaSendFlowInner = () => {
 
       {step === 2 && (
         <Card>
-          <CardHeader><CardTitle>Recipient Details</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Recipient & Payment</CardTitle></CardHeader>
           <CardContent className="space-y-6">
-            <div className="space-y-2">
-              <Label>Recipient Full Name</Label>
-              <Input value={recipientName} onChange={(e) => setRecipientName(e.target.value)} placeholder="Jane Doe" />
+            {/* Recipient details */}
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Recipient Full Name</Label>
+                <Input value={recipientName} onChange={(e) => setRecipientName(e.target.value)} placeholder="Jane Doe" />
+              </div>
+
+              {method === "interac" ? (
+                <>
+                  <div className="space-y-2">
+                    <Label>Recipient Email</Label>
+                    <Input type="email" value={recipientEmail} onChange={(e) => setRecipientEmail(e.target.value)} placeholder="jane@example.com" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Message (optional)</Label>
+                    <Textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Thanks for dinner!" maxLength={400} rows={3} />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label>Institution # (3 digits)</Label>
+                      <Input inputMode="numeric" maxLength={3} value={institutionNumber} onChange={(e) => setInstitutionNumber(e.target.value.replace(/\D/g, ""))} placeholder="001" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Transit / Branch # (5 digits)</Label>
+                      <Input inputMode="numeric" maxLength={5} value={transitNumber} onChange={(e) => setTransitNumber(e.target.value.replace(/\D/g, ""))} placeholder="12345" />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Account Number</Label>
+                    <Input inputMode="numeric" value={accountNumber} onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, ""))} placeholder="1234567" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Bank Name (optional)</Label>
+                    <Input value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder="Royal Bank of Canada" />
+                  </div>
+                </>
+              )}
             </div>
 
-            {method === "interac" ? (
-              <>
-                <div className="space-y-2">
-                  <Label>Recipient Email</Label>
-                  <Input type="email" value={recipientEmail} onChange={(e) => setRecipientEmail(e.target.value)} placeholder="jane@example.com" />
+            {/* Funding source */}
+            <div className="space-y-2 pt-2 border-t border-border">
+              <Label>How are you paying?</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  type="button"
+                  variant={funding === "wallet" ? "default" : "outline"}
+                  className="flex items-center justify-center gap-2 h-auto py-3"
+                  onClick={() => setFunding("wallet")}
+                  disabled={noCadWallet}
+                >
+                  <Wallet className="w-4 h-4" />
+                  <span className="text-xs">Pay from CAD wallet</span>
+                </Button>
+                <Button
+                  type="button"
+                  variant={funding === "card" ? "default" : "outline"}
+                  className="flex items-center justify-center gap-2 h-auto py-3"
+                  onClick={() => setFunding("card")}
+                >
+                  <CreditCard className="w-4 h-4" />
+                  <span className="text-xs">Pay with card (+C$1.50)</span>
+                </Button>
+              </div>
+            </div>
+
+            {funding === "card" && (
+              <div className="space-y-4 p-4 rounded-lg border border-border bg-muted/30">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <CreditCard className="w-4 h-4" /> Your card details
                 </div>
                 <div className="space-y-2">
-                  <Label>Message (optional)</Label>
-                  <Textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Thanks for dinner!" maxLength={400} rows={3} />
-                </div>
-              </>
-            ) : method === "card_push" ? (
-              <>
-                <div className="space-y-2">
-                  <Label>Recipient Debit Card Number</Label>
+                  <Label>Card Number</Label>
                   <div className={elementWrapperClass}>
                     <CardNumberElement
                       options={{ style: elementStyle, showIcon: true, placeholder: "1234 1234 1234 1234" }}
@@ -361,7 +426,6 @@ const CanadaSendFlowInner = () => {
                       className="w-full"
                     />
                   </div>
-                  <p className="text-[11px] text-muted-foreground">Canadian debit card only (Visa Debit, Debit Mastercard, Interac).</p>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
@@ -385,33 +449,10 @@ const CanadaSendFlowInner = () => {
                     </div>
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <Label>Recipient Email (optional)</Label>
-                  <Input type="email" value={recipientEmail} onChange={(e) => setRecipientEmail(e.target.value)} placeholder="jane@example.com" />
-                  <p className="text-[11px] text-muted-foreground">Used to save this recipient for future sends.</p>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <Label>Institution # (3 digits)</Label>
-                    <Input inputMode="numeric" maxLength={3} value={institutionNumber} onChange={(e) => setInstitutionNumber(e.target.value.replace(/\D/g, ""))} placeholder="001" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Transit / Branch # (5 digits)</Label>
-                    <Input inputMode="numeric" maxLength={5} value={transitNumber} onChange={(e) => setTransitNumber(e.target.value.replace(/\D/g, ""))} placeholder="12345" />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Account Number</Label>
-                  <Input inputMode="numeric" value={accountNumber} onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, ""))} placeholder="1234567" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Bank Name (optional)</Label>
-                  <Input value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder="Royal Bank of Canada" />
-                </div>
-              </>
+                <p className="text-[11px] text-muted-foreground">
+                  Charged for C${totalCharged.toFixed(2)}. Your card details never touch our servers — secured by Stripe.
+                </p>
+              </div>
             )}
 
             <div className="flex gap-3">
@@ -423,15 +464,23 @@ const CanadaSendFlowInner = () => {
               >
                 {createTransfer.isPending || cardSubmitting
                   ? "Processing..."
-                  : `Send C$${parsedAmount.toFixed(2)} via ${method === "interac" ? "Interac e-Transfer" : method === "card_push" ? "Debit Card" : "Bank Transfer"}`}
+                  : `Send C$${parsedAmount.toFixed(2)} via ${method === "interac" ? "Interac" : "Bank Transfer"}`}
               </Button>
             </div>
 
             <div className="p-3 rounded-lg bg-muted/50 border border-border flex items-start gap-2">
               <Info className="w-4 h-4 mt-0.5 text-muted-foreground shrink-0" />
               <div className="text-xs text-muted-foreground space-y-1">
-                <p><strong>Summary:</strong> C${parsedAmount.toFixed(2)} from your CAD wallet · Fee C${fee.toFixed(2)} · Recipient gets C${receivedAmount.toFixed(2)}</p>
-                <p>Method: {method === "interac" ? "Interac e-Transfer (email)" : method === "card_push" ? "Debit Card (Visa Direct, instant)" : "Bank Transfer (EFT)"}</p>
+                <p>
+                  <strong>Summary:</strong>{" "}
+                  Recipient gets C${receivedAmount.toFixed(2)} ·
+                  Delivery fee C${deliveryFee.toFixed(2)}
+                  {cardFee > 0 ? ` · Card fee C$${cardFee.toFixed(2)}` : ""} ·
+                  {" "}<strong>Total {funding === "card" ? "charged to card" : "from wallet"}: C${totalCharged.toFixed(2)}</strong>
+                </p>
+                <p>
+                  Delivery: {method === "interac" ? "Interac e-Transfer (email)" : "Bank Transfer (EFT)"}
+                </p>
               </div>
             </div>
           </CardContent>
@@ -460,11 +509,6 @@ const CanadaSendFlowInner = () => {
             {method === "eft" && (
               <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
                 Funds will arrive in the recipient's bank account within 1–3 business days.
-              </p>
-            )}
-            {method === "card_push" && (
-              <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
-                Funds are being pushed to the recipient's debit card via Visa Direct. They typically arrive within seconds.
               </p>
             )}
             {security && method === "interac" && (
