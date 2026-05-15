@@ -108,6 +108,7 @@ Deno.serve(async (req) => {
     // Bank rail = caller provided both bank_code and account_number
     // (NGN NUBAN, GHS branch code, or any other Flutterwave-supported bank corridor).
     const isBankRail = !!(bank_code && account_number);
+    const debitCurrency = Deno.env.get("FLW_MERCHANT_CURRENCY") || "NGN";
     let payload: Record<string, unknown>;
     if (isBankRail) {
       payload = {
@@ -118,7 +119,7 @@ Deno.serve(async (req) => {
         currency,
         reference,
         callback_url: callbackUrl,
-        debit_currency: currency,
+        debit_currency: debitCurrency,
         beneficiary_name: recipient_name,
         meta: [{ transfer_id, network: network || "bank" }],
       };
@@ -139,7 +140,7 @@ Deno.serve(async (req) => {
         currency,
         reference,
         callback_url: callbackUrl,
-        debit_currency: currency,
+        debit_currency: debitCurrency,
         beneficiary_name: recipient_name,
         meta: [{ transfer_id, network }],
       };
