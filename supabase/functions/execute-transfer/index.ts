@@ -210,7 +210,9 @@ Deno.serve(async (req) => {
           currency_code: transfer.target_currency,
           debit_amount: 0,
           credit_amount: Number(transfer.target_amount),
-          description: `Payable to ${transfer.recipient_name}`,
+          description: isCanadaPayout
+            ? `Paysafe payout to ${transfer.recipient_name} (${transfer.payout_method || "interac"})`
+            : `Payable to ${transfer.recipient_name}`,
           reference_type: "transfer",
           reference_id: transfer_id,
           created_by: user.id,
