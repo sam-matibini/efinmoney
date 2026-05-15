@@ -259,6 +259,33 @@ const SendPage = () => {
     return () => { cancelled = true; };
   }, [isNGNBank, ngnBanks.length]);
 
+  // Fetch Ghanaian banks list when GH bank-transfer mode is selected
+  useEffect(() => {
+    if (!isGhanaBank || ghBanks.length > 0) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/flw-get-banks?country=GH`;
+        const { data: { session } } = await supabase.auth.getSession();
+        const res = await fetch(url, {
+          headers: {
+            Authorization: `Bearer ${session?.access_token || ""}`,
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+        });
+        const json = await res.json();
+        if (cancelled) return;
+        const list = Array.isArray(json?.banks)
+          ? json.banks.map((b: any) => ({ code: String(b.code || b.bank_code), name: String(b.name || b.bank_name) })).filter((b: any) => b.code && b.name)
+          : [];
+        setGhBanks(list);
+      } catch (e) {
+        console.error("Failed to load GH banks", e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isGhanaBank, ghBanks.length]);
+
   // Resolve account name when NGN bank + 10-digit account number are set
   useEffect(() => {
     if (!isNGNBank) return;
