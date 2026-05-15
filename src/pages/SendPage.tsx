@@ -83,6 +83,11 @@ const SendPage = () => {
   const [ngnResolving, setNgnResolving] = useState(false);
   const [ngnResolvedName, setNgnResolvedName] = useState<string | null>(null);
   const [ngnResolveError, setNgnResolveError] = useState<string | null>(null);
+  // Ghana bank payout state (toggle between Mobile Money and Bank Transfer)
+  const [ghPayoutMode, setGhPayoutMode] = useState<'mobile' | 'bank'>('mobile');
+  const [ghBanks, setGhBanks] = useState<Array<{ code: string; name: string }>>([]);
+  const [ghBankCode, setGhBankCode] = useState<string>("");
+  const [ghAccountNumber, setGhAccountNumber] = useState<string>("");
   // V4: no public key needed
   const navigate = useNavigate();
 
@@ -217,9 +222,14 @@ const SendPage = () => {
     setNgnAccountNumber("");
     setNgnResolvedName(null);
     setNgnResolveError(null);
+    setGhPayoutMode('mobile');
+    setGhBankCode("");
+    setGhAccountNumber("");
   }, [targetCountryId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const isNGNBank = targetCountry.code === "NGN";
+  const isGhanaBank = targetCountry.code === "GHS" && ghPayoutMode === "bank";
+  const isBankPayout = isNGNBank || isGhanaBank;
 
   // Fetch Nigerian banks list when NGN destination is selected
   useEffect(() => {
@@ -248,6 +258,33 @@ const SendPage = () => {
     })();
     return () => { cancelled = true; };
   }, [isNGNBank, ngnBanks.length]);
+
+  // Fetch Ghanaian banks list when GH bank-transfer mode is selected
+  useEffect(() => {
+    if (!isGhanaBank || ghBanks.length > 0) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/flw-get-banks?country=GH`;
+        const { data: { session } } = await supabase.auth.getSession();
+        const res = await fetch(url, {
+          headers: {
+            Authorization: `Bearer ${session?.access_token || ""}`,
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+        });
+        const json = await res.json();
+        if (cancelled) return;
+        const list = Array.isArray(json?.banks)
+          ? json.banks.map((b: any) => ({ code: String(b.code || b.bank_code), name: String(b.name || b.bank_name) })).filter((b: any) => b.code && b.name)
+          : [];
+        setGhBanks(list);
+      } catch (e) {
+        console.error("Failed to load GH banks", e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isGhanaBank, ghBanks.length]);
 
   // Resolve account name when NGN bank + 10-digit account number are set
   useEffect(() => {
@@ -353,16 +390,21 @@ const SendPage = () => {
   const createTransferRecord = async (overrides?: { funding_source?: 'wallet' | 'card' | 'bank' }) => {
     const ngnAcct = isNGNBank ? ngnAccountNumber.replace(/\D/g, "") : "";
     const ngnBank = isNGNBank ? (ngnBanks.find((b) => b.code === ngnBankCode)?.name || null) : null;
+    const ghAcct = isGhanaBank ? ghAccountNumber.replace(/\D/g, "") : "";
+    const ghBank = isGhanaBank ? (ghBanks.find((b) => b.code === ghBankCode)?.name || null) : null;
+    const bankAcct = isNGNBank ? ngnAcct : isGhanaBank ? ghAcct : "";
+    const bankCode = isNGNBank ? ngnBankCode : isGhanaBank ? ghBankCode : "";
+    const bankName = isNGNBank ? ngnBank : isGhanaBank ? ghBank : null;
     const transfer = await createTransfer.mutateAsync({
       sender_wallet_id: fundingSource === 'wallet' ? selectedWallet!.wallet_id : wallets?.[0]?.wallet_id || '',
       recipient_name: recipientName,
-      recipient_phone: isNGNBank ? undefined : recipientPhone,
-      recipient_account: isNGNBank ? ngnAcct : undefined,
-      recipient_bank_code: isNGNBank ? ngnBankCode : undefined,
-      recipient_bank_name: isNGNBank ? (ngnBank || undefined) : undefined,
+      recipient_phone: isBankPayout ? undefined : recipientPhone,
+      recipient_account: isBankPayout ? bankAcct : undefined,
+      recipient_bank_code: isBankPayout ? bankCode : undefined,
+      recipient_bank_name: isBankPayout ? (bankName || undefined) : undefined,
       recipient_country: targetCountry.code,
-      transfer_type: isNGNBank ? 'bank' : 'mobile_money',
-      payout_method: isNGNBank ? 'bank' : effectivePayoutMethod,
+      transfer_type: isBankPayout ? 'bank' : 'mobile_money',
+      payout_method: isBankPayout ? 'bank' : effectivePayoutMethod,
       source_currency: sourceCurrency,
       target_currency: targetCountry.code,
       source_amount: parsedAmount,
@@ -377,13 +419,13 @@ const SendPage = () => {
         const { isNew } = await recordTransferRecipient({
           user_id: user.id,
           name: recipientName,
-          phone: isNGNBank ? "" : recipientPhone,
+          phone: isBankPayout ? "" : recipientPhone,
           country_code: targetCountry.code,
-          payout_method: isNGNBank ? 'bank' : effectivePayoutMethod,
-          network: isNGNBank ? null : (activeNetwork?.id || null),
+          payout_method: isBankPayout ? 'bank' : effectivePayoutMethod,
+          network: isBankPayout ? null : (activeNetwork?.id || null),
           currency_code: targetCountry.code,
-          bank_name: isNGNBank ? ngnBank : null,
-          bank_account: isNGNBank ? ngnAcct : null,
+          bank_name: isBankPayout ? bankName : null,
+          bank_account: isBankPayout ? bankAcct : null,
         } as any);
         if (isNew && !pickedBeneficiaryId) setSavePromptOpen(true);
       } catch { /* non-fatal */ }
@@ -664,6 +706,8 @@ const SendPage = () => {
   const isStep1Valid = parsedAmount > 0 && parsedAmount > fee && receivedAmount > 0 && rateAvailable && !noLinkedSource && !insufficientFunds;
   const isStep2Valid = isNGNBank
     ? (!!ngnBankCode && ngnAccountNumber.replace(/\D/g, "").length === 10 && !!ngnResolvedName && receivedAmount > 0)
+    : isGhanaBank
+    ? (recipientName.trim().length > 2 && !!ghBankCode && ghAccountNumber.replace(/\D/g, "").length >= 6 && receivedAmount > 0)
     : (recipientName.length > 2 && recipientPhone.length > 8 && !!effectivePayoutMethod && receivedAmount > 0);
 
   const activeTab = searchParams.get('mode') === 'canada' ? 'canada' : 'international';
@@ -1150,7 +1194,34 @@ const SendPage = () => {
                                         className="transition-shadow focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:shadow-[0_0_0_4px_hsl(var(--primary)/0.12)]"
                                       />
                                     </motion.div>
-                                    {availableNetworks && availableNetworks.length > 1 && (
+                                    {targetCountry.code === "GHS" && (
+                                      <motion.div custom={1.2} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
+                                        <Label>Payout Method</Label>
+                                        <div className="grid grid-cols-2 gap-2">
+                                          {([
+                                            { v: 'mobile', label: 'Mobile Money' },
+                                            { v: 'bank',   label: 'Bank Transfer' },
+                                          ] as const).map(({ v, label }) => {
+                                            const active = ghPayoutMode === v;
+                                            return (
+                                              <button
+                                                key={v}
+                                                type="button"
+                                                onClick={() => setGhPayoutMode(v)}
+                                                className={`rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
+                                                  active
+                                                    ? "border-primary bg-primary/10 text-primary"
+                                                    : "border-border bg-card hover:bg-muted text-foreground"
+                                                }`}
+                                              >
+                                                {label}
+                                              </button>
+                                            );
+                                          })}
+                                        </div>
+                                      </motion.div>
+                                    )}
+                                    {availableNetworks && availableNetworks.length > 1 && !isGhanaBank && !isNGNBank && (
                                       <motion.div custom={1.5} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
                                         <Label>Mobile Money Network</Label>
                                         <div className="grid grid-cols-3 gap-2">
@@ -1218,6 +1289,33 @@ const SendPage = () => {
                                           <p className="text-xs text-muted-foreground">Funds will be deposited directly to the bank account above.</p>
                                         </motion.div>
                                       </>
+                                    ) : isGhanaBank ? (
+                                      <>
+                                        <motion.div custom={2} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
+                                          <Label>Recipient Bank</Label>
+                                          <Select value={ghBankCode} onValueChange={setGhBankCode}>
+                                            <SelectTrigger>
+                                              <SelectValue placeholder={ghBanks.length ? "Select Ghanaian bank" : "Loading banks..."} />
+                                            </SelectTrigger>
+                                            <SelectContent className="max-h-[300px]">
+                                              {ghBanks.map((b) => (
+                                                <SelectItem key={b.code} value={b.code}>{b.name}</SelectItem>
+                                              ))}
+                                            </SelectContent>
+                                          </Select>
+                                        </motion.div>
+                                        <motion.div custom={2.5} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
+                                          <Label>Account Number</Label>
+                                          <Input
+                                            inputMode="numeric"
+                                            placeholder="Recipient bank account number"
+                                            value={ghAccountNumber}
+                                            onChange={(e) => setGhAccountNumber(e.target.value.replace(/\D/g, "").slice(0, 20))}
+                                            className="transition-shadow focus-visible:ring-2 focus-visible:ring-primary/40"
+                                          />
+                                          <p className="text-xs text-muted-foreground">Funds will be deposited directly to the GHS bank account above. Make sure the account number and recipient name match exactly.</p>
+                                        </motion.div>
+                                      </>
                                     ) : (
                                       <motion.div custom={2} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
                                         <Label>Mobile Money Number</Label>
@@ -1280,9 +1378,16 @@ const SendPage = () => {
                                   <CardContent className="space-y-5">
                                     <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-2 text-sm">
                                       <div className="flex justify-between"><span className="text-muted-foreground">Recipient</span><span className="font-medium">{recipientName}</span></div>
-                                      <div className="flex justify-between"><span className="text-muted-foreground">Phone</span><span className="font-medium">{recipientPhone}</span></div>
+                                      {isBankPayout ? (
+                                        <>
+                                          <div className="flex justify-between"><span className="text-muted-foreground">Bank</span><span className="font-medium">{isNGNBank ? (ngnBanks.find((b) => b.code === ngnBankCode)?.name || "—") : (ghBanks.find((b) => b.code === ghBankCode)?.name || "—")}</span></div>
+                                          <div className="flex justify-between"><span className="text-muted-foreground">Account</span><span className="font-medium">{isNGNBank ? ngnAccountNumber : ghAccountNumber}</span></div>
+                                        </>
+                                      ) : (
+                                        <div className="flex justify-between"><span className="text-muted-foreground">Phone</span><span className="font-medium">{recipientPhone}</span></div>
+                                      )}
                                       <div className="flex justify-between"><span className="text-muted-foreground">Destination</span><span className="font-medium">{targetCountry.flag} {targetCountry.country}</span></div>
-                                      <div className="flex justify-between"><span className="text-muted-foreground">Method</span><span className="font-medium">{effectiveMethodLabel}</span></div>
+                                      <div className="flex justify-between"><span className="text-muted-foreground">Method</span><span className="font-medium">{isBankPayout ? "Bank Transfer" : effectiveMethodLabel}</span></div>
                                       <div className="flex justify-between"><span className="text-muted-foreground">Funding</span><span className="font-medium capitalize">{fundingSource}</span></div>
                                     </div>
                                     <div className="rounded-xl border border-border bg-card p-4 space-y-2 text-sm">
