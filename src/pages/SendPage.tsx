@@ -202,14 +202,22 @@ const SendPage = () => {
   const effectivePayoutMethod = activeNetwork?.payout || targetCountry.payout;
   const effectiveMethodLabel = activeNetwork?.label || targetCountry.method;
 
-  // Reset network selection when the destination country changes
+  // Reset network selection when the destination country changes.
+  // Skip the reset if we're in the middle of applying a saved beneficiary
+  // for this same country — otherwise we'd wipe their saved network/bank.
   useEffect(() => {
+    if (pendingBeneficiary) {
+      const c = pendingBeneficiary.country_code
+        ? findCountryByCode(pendingBeneficiary.country_code)
+        : null;
+      if (c && c.id === targetCountryId) return;
+    }
     setSelectedNetworkId(null);
     setNgnBankCode("");
     setNgnAccountNumber("");
     setNgnResolvedName(null);
     setNgnResolveError(null);
-  }, [targetCountryId]);
+  }, [targetCountryId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const isNGNBank = targetCountry.code === "NGN";
 
