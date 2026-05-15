@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,12 +14,64 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { CheckCircle, Mail, Landmark, AlertCircle, Info, CreditCard, Zap } from "lucide-react";
 import { tokenizeDebitCard } from "@/lib/stripePayouts";
+import { getStripe } from "@/lib/stripe";
+import type { Stripe } from "@stripe/stripe-js";
+import {
+  Elements,
+  CardNumberElement,
+  CardExpiryElement,
+  CardCvcElement,
+  useStripe,
+  useElements,
+} from "@stripe/react-stripe-js";
+
+// Read an HSL CSS variable and convert it to a usable CSS color string for Stripe Elements
+function readHslVar(name: string, fallback: string): string {
+  if (typeof window === "undefined") return fallback;
+  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return v ? `hsl(${v})` : fallback;
+}
+
+function useStripeElementStyle() {
+  return useMemo(() => {
+    const fg = readHslVar("--foreground", "#0a0a0a");
+    const muted = readHslVar("--muted-foreground", "#6b7280");
+    const danger = readHslVar("--destructive", "#dc2626");
+    return {
+      base: {
+        color: fg,
+        fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
+        fontSize: "15px",
+        "::placeholder": { color: muted },
+        iconColor: muted,
+      },
+      invalid: { color: danger, iconColor: danger },
+    };
+  }, []);
+}
+
+const elementWrapperClass =
+  "flex h-10 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-within:outline-none focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2";
 
 type Method = "interac" | "eft" | "card_push";
 
 const FEES: Record<Method, number> = { interac: 0.5, eft: 0, card_push: 1.5 };
 
 const CanadaSendFlow = () => {
+  const [stripeP, setStripeP] = useState<Promise<Stripe | null> | null>(null);
+  useEffect(() => { setStripeP(getStripe()); }, []);
+  return (
+    <Elements stripe={stripeP ?? Promise.resolve(null)}>
+      <CanadaSendFlowInner />
+    </Elements>
+  );
+};
+
+const CanadaSendFlowInner = () => {
+  const stripe = useStripe();
+  const elements = useElements();
+  const elementStyle = useStripeElementStyle();
+
   const [step, setStep] = useState(1);
   const [method, setMethod] = useState<Method>("interac");
   const [amount, setAmount] = useState("");
@@ -33,11 +85,10 @@ const CanadaSendFlow = () => {
   const [transitNumber, setTransitNumber] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
   const [bankName, setBankName] = useState("");
-  // Card push (Visa Direct)
-  const [cardNumber, setCardNumber] = useState("");
-  const [cardExpMonth, setCardExpMonth] = useState("");
-  const [cardExpYear, setCardExpYear] = useState("");
-  const [cardCvc, setCardCvc] = useState("");
+  // Card push (Visa Direct) — Stripe Elements completion state
+  const [cardNumComplete, setCardNumComplete] = useState(false);
+  const [cardExpComplete, setCardExpComplete] = useState(false);
+  const [cardCvcComplete, setCardCvcComplete] = useState(false);
   const [cardSubmitting, setCardSubmitting] = useState(false);
 
   const [lastTransferId, setLastTransferId] = useState<string | null>(null);
@@ -61,10 +112,7 @@ const CanadaSendFlow = () => {
     ? recipientName.trim().length > 1 && /\S+@\S+\.\S+/.test(recipientEmail)
     : method === "card_push"
       ? recipientName.trim().length > 1
-          && /^\d{13,19}$/.test(cardNumber.replace(/\s+/g, ""))
-          && /^(0?[1-9]|1[0-2])$/.test(cardExpMonth)
-          && /^\d{2,4}$/.test(cardExpYear)
-          && /^\d{3,4}$/.test(cardCvc)
+          && cardNumComplete && cardExpComplete && cardCvcComplete
       : recipientName.trim().length > 1
           && /^\d{3}$/.test(institutionNumber)
           && /^\d{5}$/.test(transitNumber)
@@ -73,16 +121,21 @@ const CanadaSendFlow = () => {
   const handleSubmit = async () => {
     if (!selectedWallet) return;
     try {
-      // For card_push, tokenize first so the raw PAN never reaches our backend.
+      // For card_push, tokenize first via Stripe Elements so the raw PAN never reaches our backend.
       let tokenized: { token: string; last4: string; brand: string } | null = null;
       if (method === "card_push") {
+        if (!stripe || !elements) {
+          toast.error("Card form is still loading — please wait a moment");
+          return;
+        }
+        const cardEl = elements.getElement(CardNumberElement);
+        if (!cardEl) {
+          toast.error("Card form not ready");
+          return;
+        }
         setCardSubmitting(true);
         try {
-          tokenized = await tokenizeDebitCard({
-            number: cardNumber,
-            exp_month: parseInt(cardExpMonth, 10),
-            exp_year: parseInt(cardExpYear.length === 2 ? `20${cardExpYear}` : cardExpYear, 10),
-            cvc: cardCvc,
+          tokenized = await tokenizeDebitCard(stripe, cardEl, {
             name: recipientName,
             currency: "cad",
           });
@@ -140,9 +193,12 @@ const CanadaSendFlow = () => {
     setAmount("");
     setRecipientName(""); setRecipientEmail(""); setMessage("");
     setInstitutionNumber(""); setTransitNumber(""); setAccountNumber(""); setBankName("");
-    setCardNumber(""); setCardExpMonth(""); setCardExpYear(""); setCardCvc("");
+    setCardNumComplete(false); setCardExpComplete(false); setCardCvcComplete(false);
     setLastTransferId(null);
     setSecurity(null);
+    elements?.getElement(CardNumberElement)?.clear();
+    elements?.getElement(CardExpiryElement)?.clear();
+    elements?.getElement(CardCvcElement)?.clear();
   };
 
   return (
@@ -298,31 +354,35 @@ const CanadaSendFlow = () => {
               <>
                 <div className="space-y-2">
                   <Label>Recipient Debit Card Number</Label>
-                  <Input
-                    inputMode="numeric"
-                    autoComplete="off"
-                    maxLength={23}
-                    value={cardNumber}
-                    onChange={(e) => {
-                      const digits = e.target.value.replace(/\D/g, "").slice(0, 19);
-                      setCardNumber(digits.replace(/(\d{4})(?=\d)/g, "$1 "));
-                    }}
-                    placeholder="4242 4242 4242 4242"
-                  />
+                  <div className={elementWrapperClass}>
+                    <CardNumberElement
+                      options={{ style: elementStyle, showIcon: true, placeholder: "1234 1234 1234 1234" }}
+                      onChange={(e) => setCardNumComplete(e.complete)}
+                      className="w-full"
+                    />
+                  </div>
                   <p className="text-[11px] text-muted-foreground">Canadian debit card only (Visa Debit, Debit Mastercard, Interac).</p>
                 </div>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
-                    <Label>Exp. Month</Label>
-                    <Input inputMode="numeric" maxLength={2} value={cardExpMonth} onChange={(e) => setCardExpMonth(e.target.value.replace(/\D/g, ""))} placeholder="MM" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Exp. Year</Label>
-                    <Input inputMode="numeric" maxLength={4} value={cardExpYear} onChange={(e) => setCardExpYear(e.target.value.replace(/\D/g, ""))} placeholder="YYYY" />
+                    <Label>Expiry (MM / YY)</Label>
+                    <div className={elementWrapperClass}>
+                      <CardExpiryElement
+                        options={{ style: elementStyle }}
+                        onChange={(e) => setCardExpComplete(e.complete)}
+                        className="w-full"
+                      />
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <Label>CVC</Label>
-                    <Input inputMode="numeric" maxLength={4} value={cardCvc} onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, ""))} placeholder="123" />
+                    <div className={elementWrapperClass}>
+                      <CardCvcElement
+                        options={{ style: elementStyle }}
+                        onChange={(e) => setCardCvcComplete(e.complete)}
+                        className="w-full"
+                      />
+                    </div>
                   </div>
                 </div>
                 <div className="space-y-2">
