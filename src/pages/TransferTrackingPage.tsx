@@ -330,6 +330,24 @@ const TransferTrackingPage = () => {
                 <Detail label="Initiated" value={format(new Date(transfer.created_at), "MMM d, yyyy h:mm a")} />
               </CardContent>
             </Card>
+
+            {transfer.recipient_country === "CA"
+              && transfer.payout_method === "interac"
+              && (transfer as any).interac_security_question
+              && (transfer as any).interac_security_answer && (
+              <Card className="border-primary/40 bg-primary/5">
+                <CardHeader>
+                  <CardTitle className="text-base">Interac Security Details</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3 text-sm">
+                  <p className="text-muted-foreground">
+                    Share these with your recipient privately so they can claim the e-Transfer.
+                  </p>
+                  <Detail label="Security Question" value={(transfer as any).interac_security_question} />
+                  <Detail label="Answer" value={(transfer as any).interac_security_answer} />
+                </CardContent>
+              </Card>
+            )}
           </>
         )}
       </main>
