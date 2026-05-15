@@ -166,6 +166,8 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
   const [recipientName, setRecipientName] = useState("");
   const [recipientEmail, setRecipientEmail] = useState("");
   const [message, setMessage] = useState("");
+  const [securityQuestion, setSecurityQuestion] = useState("");
+  const [securityAnswer, setSecurityAnswer] = useState("");
   // Recipient — EFT
   const [institutionNumber, setInstitutionNumber] = useState("");
   const [transitNumber, setTransitNumber] = useState("");
