@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Loader2, Lock, ShieldCheck } from "lucide-react";
+import { useProfile } from "@/hooks/useProfile";
 
 interface Props {
   onSuccess?: () => void;
