@@ -339,6 +339,7 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
     setStep(1);
     setAmount("");
     setRecipientName(""); setRecipientEmail(""); setMessage("");
+    setSecurityQuestion(""); setSecurityAnswer("");
     setInstitutionNumber(""); setTransitNumber(""); setAccountNumber(""); setBankName("");
     setCardNumComplete(false); setCardExpComplete(false); setCardCvcComplete(false);
     setRecipientCardComplete(false);
