@@ -104,6 +104,10 @@ const CanadaSendFlowInner = () => {
   const cadWallets = (wallets || []).filter((w) => w.currency_code === "CAD");
   const selectedWallet = cadWallets.find((w) => w.wallet_id === walletId) || cadWallets[0];
   const noCadWallet = cadWallets.length === 0;
+  // Auto-switch to card funding if user has no CAD wallet
+  useEffect(() => { if (noCadWallet && funding === "wallet") setFunding("card"); }, [noCadWallet, funding]);
+  // Any wallet to satisfy the NOT NULL FK on transfers.sender_wallet_id when paying by card
+  const fallbackWallet = (wallets || [])[0];
 
   const parsedAmount = Math.max(0, parseFloat(amount) || 0);
   const deliveryFee = parsedAmount > 0 ? DELIVERY_FEES[method] : 0;
