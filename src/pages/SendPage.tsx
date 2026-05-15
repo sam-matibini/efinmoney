@@ -1636,6 +1636,7 @@ const SendPage = () => {
         } as any}
       />
       <AddCardModal isOpen={addCardOpen} onClose={() => setAddCardOpen(false)} defaultMode="link" />
+      <TopUpModal open={topUpOpen} onOpenChange={setTopUpOpen} defaultWalletId={selectedWallet?.wallet_id} title="Top up wallet" />
       <MobileNav />
     </div>
   );
