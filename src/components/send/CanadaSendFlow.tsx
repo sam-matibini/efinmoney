@@ -599,7 +599,7 @@ const CanadaSendFlowInner = () => {
               >
                 {createTransfer.isPending || cardSubmitting
                   ? "Processing..."
-                  : `Send C$${parsedAmount.toFixed(2)} via ${method === "interac" ? "Interac" : "Bank Transfer"}`}
+                  : `Send C$${parsedAmount.toFixed(2)} via ${method === "interac" ? "Interac" : method === "eft" ? "Bank Transfer" : "Visa Direct"}`}
               </Button>
             </div>
 
