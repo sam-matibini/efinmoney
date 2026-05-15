@@ -53,11 +53,88 @@ function useStripeElementStyle() {
 const elementWrapperClass =
   "flex h-10 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-within:outline-none focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2";
 
-type DeliveryMethod = "interac" | "eft";
+type DeliveryMethod = "interac" | "eft" | "card_push";
 type FundingSource = "wallet" | "card";
 
-const DELIVERY_FEES: Record<DeliveryMethod, number> = { interac: 0.5, eft: 0 };
+const DELIVERY_FEES: Record<DeliveryMethod, number> = { interac: 0.5, eft: 0, card_push: 1.0 };
 const CARD_PROCESSING_FEE = 1.5;
+
+// Recipient card section runs in its OWN <Elements> provider so it can host
+// a second CardNumberElement alongside the sender card. Exposes tokenize() via ref.
+type RecipientCardHandle = {
+  tokenize: (recipientName: string) => Promise<{ token: string; last4: string; brand: string }>;
+  isComplete: () => boolean;
+};
+
+const RecipientCardInner = forwardRef<RecipientCardHandle, { onValidityChange: (v: boolean) => void; elementStyle: any }>(
+  ({ onValidityChange, elementStyle }, ref) => {
+    const stripe = useStripe();
+    const elements = useElements();
+    const [num, setNum] = useState(false);
+    const [exp, setExp] = useState(false);
+    const [cvc, setCvc] = useState(false);
+
+    useEffect(() => { onValidityChange(num && exp && cvc); }, [num, exp, cvc, onValidityChange]);
+
+    useImperativeHandle(ref, () => ({
+      isComplete: () => num && exp && cvc,
+      tokenize: async (recipientName: string) => {
+        if (!stripe || !elements) throw new Error("Recipient card form not ready");
+        const cardEl = elements.getElement(CardNumberElement);
+        if (!cardEl) throw new Error("Recipient card form not ready");
+        return tokenizeDebitCard(stripe, cardEl, { name: recipientName || "Recipient", currency: "cad" });
+      },
+    }), [stripe, elements, num, exp, cvc]);
+
+    return (
+      <div className="space-y-4 p-4 rounded-lg border border-border bg-muted/30">
+        <div className="flex items-center gap-2 text-sm font-medium">
+          <Zap className="w-4 h-4" /> Recipient's debit card (where funds land instantly)
+        </div>
+        <div className="space-y-2">
+          <Label>Card Number</Label>
+          <div className={elementWrapperClass}>
+            <CardNumberElement
+              options={{ style: elementStyle, showIcon: true, placeholder: "Recipient debit card" }}
+              onChange={(e) => setNum(e.complete)}
+              className="w-full"
+            />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-2">
+            <Label>Expiry (MM / YY)</Label>
+            <div className={elementWrapperClass}>
+              <CardExpiryElement options={{ style: elementStyle }} onChange={(e) => setExp(e.complete)} className="w-full" />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label>CVC</Label>
+            <div className={elementWrapperClass}>
+              <CardCvcElement options={{ style: elementStyle }} onChange={(e) => setCvc(e.complete)} className="w-full" />
+            </div>
+          </div>
+        </div>
+        <p className="text-[11px] text-muted-foreground">
+          Visa Direct / Mastercard Send instant payout. Canadian debit cards only.
+        </p>
+      </div>
+    );
+  }
+);
+RecipientCardInner.displayName = "RecipientCardInner";
+
+const RecipientCardSection = forwardRef<RecipientCardHandle, { onValidityChange: (v: boolean) => void; elementStyle: any }>(
+  (props, ref) => {
+    const [stripeP] = useState<Promise<Stripe | null>>(() => getStripe());
+    return (
+      <Elements stripe={stripeP}>
+        <RecipientCardInner {...props} ref={ref} />
+      </Elements>
+    );
+  }
+);
+RecipientCardSection.displayName = "RecipientCardSection";
 
 const CanadaSendFlow = () => {
   const [stripeP] = useState<Promise<Stripe | null>>(() => getStripe());
