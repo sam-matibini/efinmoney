@@ -706,6 +706,8 @@ const SendPage = () => {
   const isStep1Valid = parsedAmount > 0 && parsedAmount > fee && receivedAmount > 0 && rateAvailable && !noLinkedSource && !insufficientFunds;
   const isStep2Valid = isNGNBank
     ? (!!ngnBankCode && ngnAccountNumber.replace(/\D/g, "").length === 10 && !!ngnResolvedName && receivedAmount > 0)
+    : isGhanaBank
+    ? (recipientName.trim().length > 2 && !!ghBankCode && ghAccountNumber.replace(/\D/g, "").length >= 6 && receivedAmount > 0)
     : (recipientName.length > 2 && recipientPhone.length > 8 && !!effectivePayoutMethod && receivedAmount > 0);
 
   const activeTab = searchParams.get('mode') === 'canada' ? 'canada' : 'international';
