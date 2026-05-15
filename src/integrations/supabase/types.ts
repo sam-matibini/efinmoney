@@ -2025,6 +2025,57 @@ export type Database = {
         }
         Relationships: []
       }
+      paysafe_webhook_logs: {
+        Row: {
+          account_id: string | null
+          amount: number | null
+          created_at: string
+          currency_code: string | null
+          event_id: string | null
+          event_type: string | null
+          id: string
+          merchant_ref_num: string | null
+          payment_handle_token: string | null
+          payment_id: string | null
+          processed: boolean
+          processing_error: string | null
+          raw_payload: Json
+          status: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          amount?: number | null
+          created_at?: string
+          currency_code?: string | null
+          event_id?: string | null
+          event_type?: string | null
+          id?: string
+          merchant_ref_num?: string | null
+          payment_handle_token?: string | null
+          payment_id?: string | null
+          processed?: boolean
+          processing_error?: string | null
+          raw_payload?: Json
+          status?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          amount?: number | null
+          created_at?: string
+          currency_code?: string | null
+          event_id?: string | null
+          event_type?: string | null
+          id?: string
+          merchant_ref_num?: string | null
+          payment_handle_token?: string | null
+          payment_id?: string | null
+          processed?: boolean
+          processing_error?: string | null
+          raw_payload?: Json
+          status?: string | null
+        }
+        Relationships: []
+      }
       persona_webhook_logs: {
         Row: {
           error: string | null
