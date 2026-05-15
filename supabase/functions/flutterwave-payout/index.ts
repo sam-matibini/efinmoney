@@ -140,7 +140,7 @@ Deno.serve(async (req) => {
         currency,
         reference,
         callback_url: callbackUrl,
-        debit_currency: currency,
+        debit_currency: debitCurrency,
         beneficiary_name: recipient_name,
         meta: [{ transfer_id, network }],
       };
