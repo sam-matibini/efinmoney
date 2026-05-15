@@ -11,6 +11,7 @@ import PageTransition from "@/components/ui/PageTransition";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import Index from "./pages/Index";
 import Landing from "./pages/Landing";
+import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import FinanceDashboard from "./pages/FinanceDashboard";
@@ -157,6 +158,7 @@ const AppRoutes = () => {
       <PageTransition key={location.pathname}>
         <Routes location={location}>
           <Route path="/" element={<RootRoute />} />
+          <Route path="/privacy" element={<PrivacyPolicyPage />} />
           <Route path="/dashboard" element={<KycProtectedRoute><Index /></KycProtectedRoute>} />
           <Route path="/wallets" element={<KycProtectedRoute><WalletsPage /></KycProtectedRoute>} />
           <Route path="/send" element={<KycProtectedRoute><SendPage /></KycProtectedRoute>} />
