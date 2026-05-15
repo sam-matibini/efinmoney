@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,8 +8,16 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 
-export const GeneralLedgerPanel = () => {
-  const [selectedAccountId, setSelectedAccountId] = useState<string>("");
+interface Props {
+  initialAccountId?: string;
+}
+
+export const GeneralLedgerPanel = ({ initialAccountId }: Props = {}) => {
+  const [selectedAccountId, setSelectedAccountId] = useState<string>(initialAccountId || "");
+
+  useEffect(() => {
+    if (initialAccountId) setSelectedAccountId(initialAccountId);
+  }, [initialAccountId]);
 
   const { data: accounts = [] } = useQuery({
     queryKey: ['ledger-accounts'],

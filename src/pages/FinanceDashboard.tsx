@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import Header from "@/components/layout/Header";
 import MobileNav from "@/components/layout/MobileNav";
@@ -20,6 +21,13 @@ import { ReportsCentrePanel } from "@/components/finance/ReportsCentrePanel";
 import { SalesTaxPanel } from "@/components/finance/SalesTaxPanel";
 
 const FinanceDashboard = () => {
+  const [accountingTab, setAccountingTab] = useState("coa");
+  const [glAccountId, setGlAccountId] = useState<string | undefined>(undefined);
+
+  const viewLedgerForAccount = (accountId: string) => {
+    setGlAccountId(accountId);
+    setAccountingTab("gl");
+  };
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -51,7 +59,7 @@ const FinanceDashboard = () => {
             </div>
 
             <TabsContent value="accounting" className="space-y-4">
-              <Tabs defaultValue="coa" className="space-y-4">
+              <Tabs value={accountingTab} onValueChange={setAccountingTab} className="space-y-4">
                 <TabsList>
                   <TabsTrigger value="coa">Chart of Accounts</TabsTrigger>
                   <TabsTrigger value="journal">Journal Entries</TabsTrigger>
@@ -59,13 +67,13 @@ const FinanceDashboard = () => {
                   <TabsTrigger value="tb">Trial Balance</TabsTrigger>
                 </TabsList>
                 <TabsContent value="coa">
-                  <ChartOfAccountsPanel />
+                  <ChartOfAccountsPanel onViewLedger={viewLedgerForAccount} />
                 </TabsContent>
                 <TabsContent value="journal">
                   <JournalEntriesPanel />
                 </TabsContent>
                 <TabsContent value="gl">
-                  <GeneralLedgerPanel />
+                  <GeneralLedgerPanel initialAccountId={glAccountId} />
                 </TabsContent>
                 <TabsContent value="tb">
                   <TrialBalancePanel />

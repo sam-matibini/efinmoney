@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,10 +12,16 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Edit, ToggleLeft, ToggleRight } from "lucide-react";
 import { toast } from "sonner";
+import { currencySymbol } from "@/lib/currency";
+import { cn } from "@/lib/utils";
 
 const accountTypes = ['asset', 'liability', 'equity', 'income', 'expense'] as const;
 
-export const ChartOfAccountsPanel = () => {
+interface Props {
+  onViewLedger?: (accountId: string) => void;
+}
+
+export const ChartOfAccountsPanel = ({ onViewLedger }: Props) => {
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<any>(null);
@@ -36,6 +42,34 @@ export const ChartOfAccountsPanel = () => {
         .order('code');
       if (error) throw error;
       return data || [];
+    },
+  });
+
+  // Aggregate balances from ledger_entries
+  const { data: balances = {} } = useQuery({
+    queryKey: ['account-balances'],
+    queryFn: async () => {
+      const map: Record<string, { debit: number; credit: number }> = {};
+      const pageSize = 1000;
+      let from = 0;
+      // Paginate to bypass 1000-row default
+      while (true) {
+        const { data, error } = await supabase
+          .from('ledger_entries')
+          .select('account_id, debit_amount, credit_amount')
+          .range(from, from + pageSize - 1);
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        for (const r of data) {
+          const k = r.account_id as string;
+          if (!map[k]) map[k] = { debit: 0, credit: 0 };
+          map[k].debit += Number(r.debit_amount || 0);
+          map[k].credit += Number(r.credit_amount || 0);
+        }
+        if (data.length < pageSize) break;
+        from += pageSize;
+      }
+      return map;
     },
   });
 
@@ -69,9 +103,7 @@ export const ChartOfAccountsPanel = () => {
       toast.success('Account created successfully');
       resetForm();
     },
-    onError: (error: any) => {
-      toast.error(error.message || 'Failed to create account');
-    },
+    onError: (error: any) => toast.error(error.message || 'Failed to create account'),
   });
 
   const updateMutation = useMutation({
@@ -92,9 +124,7 @@ export const ChartOfAccountsPanel = () => {
       toast.success('Account updated successfully');
       resetForm();
     },
-    onError: (error: any) => {
-      toast.error(error.message || 'Failed to update account');
-    },
+    onError: (error: any) => toast.error(error.message || 'Failed to update account'),
   });
 
   const toggleActiveMutation = useMutation({
@@ -138,6 +168,22 @@ export const ChartOfAccountsPanel = () => {
     }
   };
 
+  const computeBalance = (account: any): number => {
+    const b = balances[account.id];
+    if (!b) return 0;
+    const debitNormal = account.account_type === 'asset' || account.account_type === 'expense';
+    return debitNormal ? b.debit - b.credit : b.credit - b.debit;
+  };
+
+  const formatBalance = (amount: number, currency?: string | null) => {
+    const sym = currencySymbol(currency);
+    const abs = Math.abs(amount).toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+    return amount < 0 ? `(${sym}${abs})` : `${sym}${abs}`;
+  };
+
   const typeColors: Record<string, string> = {
     asset: 'bg-blue-500/10 text-blue-500',
     liability: 'bg-orange-500/10 text-orange-500',
@@ -149,14 +195,10 @@ export const ChartOfAccountsPanel = () => {
   if (isLoading) {
     return (
       <Card>
-        <CardHeader>
-          <CardTitle>Chart of Accounts</CardTitle>
-        </CardHeader>
+        <CardHeader><CardTitle>Chart of Accounts</CardTitle></CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {[...Array(5)].map((_, i) => (
-              <Skeleton key={i} className="h-12 w-full" />
-            ))}
+            {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
           </div>
         </CardContent>
       </Card>
@@ -169,10 +211,7 @@ export const ChartOfAccountsPanel = () => {
         <CardTitle>Chart of Accounts</CardTitle>
         <Dialog open={isDialogOpen} onOpenChange={(open) => { if (!open) resetForm(); setIsDialogOpen(open); }}>
           <DialogTrigger asChild>
-            <Button size="sm">
-              <Plus className="w-4 h-4 mr-2" />
-              Add Account
-            </Button>
+            <Button size="sm"><Plus className="w-4 h-4 mr-2" />Add Account</Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
@@ -182,29 +221,18 @@ export const ChartOfAccountsPanel = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="code">Account Code</Label>
-                  <Input
-                    id="code"
-                    value={formData.code}
+                  <Input id="code" value={formData.code}
                     onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                    placeholder="1000"
-                    disabled={!!editingAccount}
-                    required
-                  />
+                    placeholder="1000" disabled={!!editingAccount} required />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="type">Account Type</Label>
-                  <Select
-                    value={formData.account_type}
-                    onValueChange={(value) => setFormData({ ...formData, account_type: value as typeof accountTypes[number] })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
+                  <Select value={formData.account_type}
+                    onValueChange={(value) => setFormData({ ...formData, account_type: value as typeof accountTypes[number] })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {accountTypes.map((type) => (
-                        <SelectItem key={type} value={type} className="capitalize">
-                          {type}
-                        </SelectItem>
+                        <SelectItem key={type} value={type} className="capitalize">{type}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -212,46 +240,31 @@ export const ChartOfAccountsPanel = () => {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="name">Account Name</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
+                <Input id="name" value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Cash in Bank"
-                  required
-                />
+                  placeholder="Cash in Bank" required />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="currency">Currency (Optional)</Label>
-                <Select
-                  value={formData.currency_code}
-                  onValueChange={(value) => setFormData({ ...formData, currency_code: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select currency" />
-                  </SelectTrigger>
+                <Select value={formData.currency_code}
+                  onValueChange={(value) => setFormData({ ...formData, currency_code: value })}>
+                  <SelectTrigger><SelectValue placeholder="Select currency" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="">No specific currency</SelectItem>
                     {currencies.map((c) => (
-                      <SelectItem key={c.code} value={c.code}>
-                        {c.code} - {c.name}
-                      </SelectItem>
+                      <SelectItem key={c.code} value={c.code}>{c.code} - {c.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="description">Description</Label>
-                <Input
-                  id="description"
-                  value={formData.description}
+                <Input id="description" value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Optional description"
-                />
+                  placeholder="Optional description" />
               </div>
               <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={resetForm}>
-                  Cancel
-                </Button>
+                <Button type="button" variant="outline" onClick={resetForm}>Cancel</Button>
                 <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
                   {editingAccount ? 'Update' : 'Create'}
                 </Button>
@@ -269,6 +282,7 @@ export const ChartOfAccountsPanel = () => {
                 <TableHead>Name</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Currency</TableHead>
+                <TableHead className="text-right">Balance</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -276,52 +290,64 @@ export const ChartOfAccountsPanel = () => {
             <TableBody>
               {accounts.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground">
+                  <TableCell colSpan={7} className="text-center text-muted-foreground">
                     No accounts found
                   </TableCell>
                 </TableRow>
               ) : (
-                accounts.map((account) => (
-                  <TableRow key={account.id} className={!account.is_active ? 'opacity-50' : ''}>
-                    <TableCell className="font-mono">{account.code}</TableCell>
-                    <TableCell>{account.name}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className={typeColors[account.account_type]}>
-                        {account.account_type}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{account.currency_code || '-'}</TableCell>
-                    <TableCell>
-                      <Badge variant={account.is_active ? 'default' : 'secondary'}>
-                        {account.is_active ? 'Active' : 'Inactive'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => handleEdit(account)}
-                          disabled={account.is_system}
+                accounts.map((account) => {
+                  const balance = computeBalance(account);
+                  return (
+                    <TableRow key={account.id} className={!account.is_active ? 'opacity-50' : ''}>
+                      <TableCell className="font-mono">{account.code}</TableCell>
+                      <TableCell>
+                        <button
+                          type="button"
+                          onClick={() => onViewLedger?.(account.id)}
+                          className="text-left hover:text-primary hover:underline transition-colors"
                         >
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => toggleActiveMutation.mutate({ id: account.id, is_active: !account.is_active })}
-                          disabled={account.is_system}
-                        >
-                          {account.is_active ? (
-                            <ToggleRight className="w-4 h-4 text-green-500" />
-                          ) : (
-                            <ToggleLeft className="w-4 h-4 text-muted-foreground" />
-                          )}
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
+                          {account.name}
+                        </button>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={typeColors[account.account_type]}>
+                          {account.account_type}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{account.currency_code || '-'}</TableCell>
+                      <TableCell
+                        className={cn(
+                          "text-right font-mono cursor-pointer hover:underline",
+                          balance < 0 && "text-destructive"
+                        )}
+                        onClick={() => onViewLedger?.(account.id)}
+                      >
+                        {formatBalance(balance, account.currency_code)}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={account.is_active ? 'default' : 'secondary'}>
+                          {account.is_active ? 'Active' : 'Inactive'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button size="icon" variant="ghost" onClick={() => handleEdit(account)} disabled={account.is_system}>
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button size="icon" variant="ghost"
+                            onClick={() => toggleActiveMutation.mutate({ id: account.id, is_active: !account.is_active })}
+                            disabled={account.is_system}>
+                            {account.is_active ? (
+                              <ToggleRight className="w-4 h-4 text-green-500" />
+                            ) : (
+                              <ToggleLeft className="w-4 h-4 text-muted-foreground" />
+                            )}
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
               )}
             </TableBody>
           </Table>
