@@ -2,15 +2,10 @@ import { loadStripe, Stripe } from "@stripe/stripe-js";
 import { supabase } from "@/integrations/supabase/client";
 
 let stripePromise: Promise<Stripe | null> | null = null;
+let lastError: string | null = null;
 
-async function fetchPublishableKey(): Promise<string | null> {
-  const { data, error } = await supabase.functions.invoke("stripe-payment-intent", {
-    method: "GET",
-    body: undefined as any,
-    // Pass action via query string is not supported by invoke; use fetch directly
-  });
-  if (!error && data?.publishableKey) return data.publishableKey as string;
-  return null;
+function isValidPublishableKey(k: unknown): k is string {
+  return typeof k === "string" && (k.startsWith("pk_test_") || k.startsWith("pk_live_"));
 }
 
 async function fetchKeyDirect(): Promise<string | null> {
@@ -23,10 +18,18 @@ async function fetchKeyDirect(): Promise<string | null> {
         apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
       },
     });
-    if (!res.ok) return null;
-    const j = await res.json();
-    return j.publishableKey ?? null;
-  } catch {
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      lastError = j?.error || `Failed to load Stripe key (${res.status})`;
+      return null;
+    }
+    if (!isValidPublishableKey(j?.publishableKey)) {
+      lastError = "Stripe is not configured correctly (invalid publishable key).";
+      return null;
+    }
+    return j.publishableKey as string;
+  } catch (e: any) {
+    lastError = e?.message || "Network error loading Stripe";
     return null;
   }
 }
@@ -36,11 +39,15 @@ export function getStripe(): Promise<Stripe | null> {
     stripePromise = (async () => {
       const key = await fetchKeyDirect();
       if (!key) {
-        console.error("Stripe publishable key not available");
+        console.error("Stripe publishable key not available:", lastError);
         return null;
       }
       return loadStripe(key);
     })();
   }
   return stripePromise;
+}
+
+export function getStripeLoadError(): string | null {
+  return lastError;
 }
