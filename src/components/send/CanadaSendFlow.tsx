@@ -12,11 +12,12 @@ import { useCreateTransfer } from "@/hooks/useTransfers";
 import { downloadTransferReceipt } from "@/lib/receipt";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { CheckCircle, Mail, Landmark, AlertCircle, Info } from "lucide-react";
+import { CheckCircle, Mail, Landmark, AlertCircle, Info, CreditCard, Zap } from "lucide-react";
+import { tokenizeDebitCard } from "@/lib/stripePayouts";
 
-type Method = "interac" | "eft";
+type Method = "interac" | "eft" | "card_push";
 
-const FEES: Record<Method, number> = { interac: 0.5, eft: 0 };
+const FEES: Record<Method, number> = { interac: 0.5, eft: 0, card_push: 1.5 };
 
 const CanadaSendFlow = () => {
   const [step, setStep] = useState(1);
@@ -32,6 +33,12 @@ const CanadaSendFlow = () => {
   const [transitNumber, setTransitNumber] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
   const [bankName, setBankName] = useState("");
+  // Card push (Visa Direct)
+  const [cardNumber, setCardNumber] = useState("");
+  const [cardExpMonth, setCardExpMonth] = useState("");
+  const [cardExpYear, setCardExpYear] = useState("");
+  const [cardCvc, setCardCvc] = useState("");
+  const [cardSubmitting, setCardSubmitting] = useState(false);
 
   const [lastTransferId, setLastTransferId] = useState<string | null>(null);
   const [security, setSecurity] = useState<{ question: string; answer: string } | null>(null);
