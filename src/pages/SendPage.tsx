@@ -709,6 +709,39 @@ const SendPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [beneficiaries]);
 
+  // Handoff from dashboard SendMoneyModal: prefill amount/wallet/destination
+  useEffect(() => {
+    const qAmount = searchParams.get("amount");
+    const qWalletId = searchParams.get("sourceWalletId");
+    const qCountryCode = searchParams.get("targetCountryCode");
+    let touched = false;
+    const next = new URLSearchParams(searchParams);
+
+    if (qAmount && /^\d+(\.\d+)?$/.test(qAmount)) {
+      setAmount(qAmount);
+      next.delete("amount");
+      touched = true;
+    }
+    if (qWalletId && wallets?.some((w) => w.wallet_id === qWalletId)) {
+      setSelectedWalletId(qWalletId);
+      next.delete("sourceWalletId");
+      touched = true;
+    }
+    if (qCountryCode) {
+      const c = findCountryByCode(qCountryCode);
+      if (c) {
+        setTargetCountryId(c.id);
+        next.delete("targetCountryCode");
+        touched = true;
+        // Seamless: skip straight to recipient details
+        setTimeout(() => goToStep(2), 50);
+      }
+    }
+    if (touched) setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wallets]);
+
+
   const resetForm = () => {
     setDirection(-1);
     setStep(1);
