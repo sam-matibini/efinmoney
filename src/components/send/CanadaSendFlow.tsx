@@ -58,6 +58,20 @@ type Method = "interac" | "eft" | "card_push";
 const FEES: Record<Method, number> = { interac: 0.5, eft: 0, card_push: 1.5 };
 
 const CanadaSendFlow = () => {
+  const [stripeP, setStripeP] = useState<Promise<Stripe | null> | null>(null);
+  useEffect(() => { setStripeP(getStripe()); }, []);
+  return (
+    <Elements stripe={stripeP ?? Promise.resolve(null)}>
+      <CanadaSendFlowInner />
+    </Elements>
+  );
+};
+
+const CanadaSendFlowInner = () => {
+  const stripe = useStripe();
+  const elements = useElements();
+  const elementStyle = useStripeElementStyle();
+
   const [step, setStep] = useState(1);
   const [method, setMethod] = useState<Method>("interac");
   const [amount, setAmount] = useState("");
@@ -71,11 +85,10 @@ const CanadaSendFlow = () => {
   const [transitNumber, setTransitNumber] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
   const [bankName, setBankName] = useState("");
-  // Card push (Visa Direct)
-  const [cardNumber, setCardNumber] = useState("");
-  const [cardExpMonth, setCardExpMonth] = useState("");
-  const [cardExpYear, setCardExpYear] = useState("");
-  const [cardCvc, setCardCvc] = useState("");
+  // Card push (Visa Direct) — Stripe Elements completion state
+  const [cardNumComplete, setCardNumComplete] = useState(false);
+  const [cardExpComplete, setCardExpComplete] = useState(false);
+  const [cardCvcComplete, setCardCvcComplete] = useState(false);
   const [cardSubmitting, setCardSubmitting] = useState(false);
 
   const [lastTransferId, setLastTransferId] = useState<string | null>(null);
