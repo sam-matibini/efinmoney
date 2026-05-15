@@ -341,7 +341,7 @@ const Landing = () => {
                 { label: "Security", href: "#" },
                 { label: "Privacy", href: "/privacy" },
                 { label: "Terms", href: "#" },
-                { label: "Contact", href: "mailto:hello@efin.money" },
+                { label: "Contact", href: "mailto:info@efintax.biz" },
               ].map((l) => (
                 l.href.startsWith("/") ? (
                   <Link key={l.label} to={l.href} className="hover:text-white transition-colors">{l.label}</Link>
