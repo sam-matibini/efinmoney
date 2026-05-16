@@ -44,8 +44,10 @@ const WalletCard = ({
   onToggleFreeze,
   onEdit,
   onDelete,
+  showStellarBadge = false,
 }: WalletCardProps) => {
   const [topUpOpen, setTopUpOpen] = useState(false);
+  const [stellarOpen, setStellarOpen] = useState(false);
   const formatBalance = (value: number) => {
     return new Intl.NumberFormat('en-US', {
       minimumFractionDigits: 2,
