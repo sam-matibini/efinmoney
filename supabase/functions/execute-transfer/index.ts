@@ -250,17 +250,19 @@ Deno.serve(async (req) => {
     // Mark funded
     await supabase.from("transfers").update({ status: "funded" }).eq("id", transfer_id);
 
-    // Trigger payout: Paysafe (Interac/EFT) for Canada; Stellar SEP-31 anchor for opt-in NGN; Flutterwave for other African corridors.
-    const useStellarNgn =
-      (transfer.target_currency === "NGN" || transfer.recipient_country === "NG") &&
-      (payload.use_stellar === true || transfer.use_stellar === true);
+    // Smart Route: Paysafe (Interac/EFT) for Canada; Stellar SEP-31 anchor for opt-in
+    // African corridors (NG/KE/ZM); Flutterwave for the rest.
+    const STELLAR_COUNTRIES = new Set(["NG", "KE", "ZM"]);
+    const useStellar =
+      (payload.use_stellar === true || transfer.use_stellar === true) &&
+      STELLAR_COUNTRIES.has((transfer.recipient_country ?? "").toUpperCase());
     let payoutResult: any = { stub: true };
     try {
       const isCanada = transfer.transfer_type === "domestic_canada" || transfer.recipient_country === "CA";
 
-      if (useStellarNgn) {
+      if (useStellar) {
         const res = await fetch(
-          `${Deno.env.get("SUPABASE_URL")}/functions/v1/stellar-anchor-transfer`,
+          `${Deno.env.get("SUPABASE_URL")}/functions/v1/stellar-sep31-payout`,
           {
             method: "POST",
             headers: {
