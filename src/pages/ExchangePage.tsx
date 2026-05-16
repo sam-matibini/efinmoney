@@ -76,6 +76,8 @@ const FxTradingPanel = () => {
     : 0;
 
   const handleSwap = () => {
+    // Don't allow swapping into a fiat slot from the synthetic USDC option
+    if (toWallet && "isStellar" in toWallet && toWallet.isStellar) return;
     const temp = fromWalletId;
     setFromWalletId(toWalletId);
     setToWalletId(temp);
@@ -90,36 +92,48 @@ const FxTradingPanel = () => {
     }
 
     setIsLoading(true);
+    setLastTxHash(null);
 
     try {
-      const response = await supabase.functions.invoke('fx-engine', {
-        body: {
-          action: 'execute',
-          from_wallet_id: fromWallet.wallet_id,
-          to_wallet_id: toWallet.wallet_id,
-          from_currency: fromWallet.currency_code,
-          to_currency: toWallet.currency_code,
-          from_amount: parseFloat(amount)
-        }
-      });
+      const response = isCryptoSwap
+        ? await supabase.functions.invoke('execute-crypto-swap', {
+            body: {
+              from_wallet_id: fromWallet.wallet_id,
+              from_amount: parseFloat(amount),
+              to_currency: 'USDC',
+            },
+          })
+        : await supabase.functions.invoke('fx-engine', {
+            body: {
+              action: 'execute',
+              from_wallet_id: fromWallet.wallet_id,
+              to_wallet_id: toWallet.wallet_id,
+              from_currency: fromWallet.currency_code,
+              to_currency: toWallet.currency_code,
+              from_amount: parseFloat(amount),
+            },
+          });
 
-      // Surface server-side error message if present
       const serverError = (response.data as any)?.error;
       if (response.error || serverError) {
         const msg = serverError || response.error?.message || 'Exchange failed';
         throw new Error(msg);
       }
 
+      const txHash = (response.data as any)?.stellar_tx_hash ?? null;
+      setLastTxHash(txHash);
       setSuccess(true);
       queryClient.invalidateQueries({ queryKey: ['wallets'] });
       queryClient.invalidateQueries({ queryKey: ['fx_rates'] });
       queryClient.invalidateQueries({ queryKey: ['ledger-fx'] });
-      toast.success('Exchange completed successfully!');
+      queryClient.invalidateQueries({ queryKey: ['stellar-balance', stellar.publicKey] });
+      stellar.refetchBalance?.();
+      toast.success(isCryptoSwap ? 'USDC delivered to your Stellar wallet!' : 'Exchange completed successfully!');
 
       setTimeout(() => {
         setSuccess(false);
         setAmount("");
-      }, 3000);
+      }, 4000);
     } catch (error: any) {
       console.error('Exchange error:', error);
       toast.error(error?.message || 'Exchange failed. Please try again.');
@@ -128,8 +142,8 @@ const FxTradingPanel = () => {
     }
   };
 
-  const isValid = parseFloat(amount) > 0 && 
-    fromWallet && 
+  const isValid = parseFloat(amount) > 0 &&
+    fromWallet &&
     toWallet &&
     fromWallet.wallet_id !== toWallet.wallet_id &&
     !!effectiveRate &&
