@@ -112,6 +112,47 @@ const StellarNetworkCard = () => {
                 </div>
               </div>
 
+              {/* Tokens */}
+              <div className="mb-4">
+                <p className="text-xs text-muted-foreground mb-2">Tokens</p>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-muted/40 border border-border/40">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="font-mono text-[10px]">XLM</Badge>
+                      <span className="text-xs text-muted-foreground">Stellar Lumens</span>
+                    </div>
+                    <span className="text-sm font-medium tabular-nums">
+                      {Number(balance).toLocaleString("en-US", { maximumFractionDigits: 4 })}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-muted/40 border border-border/40">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="font-mono text-[10px]">USDC</Badge>
+                      <span className="text-xs text-muted-foreground">USD Coin (Circle)</span>
+                    </div>
+                    {hasUsdcTrustline ? (
+                      <span className="text-sm font-medium tabular-nums">
+                        {Number(usdcBalance ?? "0").toLocaleString("en-US", { maximumFractionDigits: 2, minimumFractionDigits: 2 })}
+                      </span>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={enableUsdc}
+                        disabled={!funded || enablingUsdc}
+                      >
+                        {enablingUsdc ? (
+                          <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                        ) : (
+                          <Plus className="w-3.5 h-3.5 mr-1.5" />
+                        )}
+                        Enable USDC
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               <div className="flex gap-2 flex-wrap">
                 <Button
                   size="sm"
