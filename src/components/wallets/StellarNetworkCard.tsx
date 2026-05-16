@@ -1,10 +1,12 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { Copy, ExternalLink, Loader2, RefreshCw, Sparkles } from "lucide-react";
+import { Copy, ExternalLink, Loader2, RefreshCw, Send, Sparkles } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useStellarWallet } from "@/hooks/useStellarWallet";
 import { toast } from "sonner";
+import SendStellarModal from "@/components/wallets/SendStellarModal";
 
 const StellarNetworkCard = () => {
   const {
@@ -17,6 +19,7 @@ const StellarNetworkCard = () => {
     refetchBalance,
     explorerUrl,
   } = useStellarWallet();
+  const [sendOpen, setSendOpen] = useState(false);
 
   const copy = () => {
     if (!publicKey) return;
@@ -89,13 +92,21 @@ const StellarNetworkCard = () => {
 
               <div className="flex gap-2 flex-wrap">
                 <Button
+                  size="sm"
+                  onClick={() => setSendOpen(true)}
+                  disabled={!funded || Number(balance) <= 0}
+                >
+                  <Send className="w-4 h-4 mr-2" />
+                  Send XLM
+                </Button>
+                <Button
                   variant="outline"
                   size="sm"
                   onClick={() => refetchBalance()}
                   disabled={balanceLoading}
                 >
                   <RefreshCw className={`w-4 h-4 mr-2 ${balanceLoading ? "animate-spin" : ""}`} />
-                  Refresh balance
+                  Refresh
                 </Button>
                 <Button asChild variant="outline" size="sm">
                   <a
@@ -104,7 +115,7 @@ const StellarNetworkCard = () => {
                     rel="noopener noreferrer"
                   >
                     <ExternalLink className="w-4 h-4 mr-2" />
-                    View on StellarExpert
+                    StellarExpert
                   </a>
                 </Button>
               </div>
@@ -112,6 +123,13 @@ const StellarNetworkCard = () => {
           )}
         </CardContent>
       </Card>
+
+      <SendStellarModal
+        open={sendOpen}
+        onOpenChange={setSendOpen}
+        availableBalance={balance}
+        onSent={() => refetchBalance()}
+      />
     </motion.div>
   );
 };
