@@ -98,7 +98,7 @@ Deno.serve(async (req) => {
     const seed = await decryptSeed(profile.stellar_seed_encrypted);
     const keypair = StellarSdk.Keypair.fromSecret(seed);
 
-    const server = new StellarSdk.Horizon.Server(HORIZON);
+    const server = new StellarSdk.Horizon.Server(HORIZON_URL);
 
     // Verify destination exists (or create-account semantics)
     let destinationExists = true;
@@ -113,7 +113,7 @@ Deno.serve(async (req) => {
 
     const txBuilder = new StellarSdk.TransactionBuilder(account, {
       fee: String(fee),
-      networkPassphrase: StellarSdk.Networks.TESTNET,
+      networkPassphrase: NETWORK_PASSPHRASE,
     });
 
     if (destinationExists) {
@@ -192,7 +192,7 @@ Deno.serve(async (req) => {
       success: true,
       hash: txHash,
       ledger: result.ledger,
-      explorerUrl: `https://stellar.expert/explorer/testnet/tx/${txHash}`,
+      explorerUrl: `${EXPLORER_BASE}/tx/${txHash}`,
       created_account: !destinationExists,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (err) {
