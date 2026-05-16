@@ -2245,6 +2245,7 @@ export type Database = {
           postal_code: string | null
           risk_score: number | null
           state_province: string | null
+          stellar_seed_encrypted: string | null
           street_address: string | null
           stripe_customer_id: string | null
           updated_at: string
@@ -2269,6 +2270,7 @@ export type Database = {
           postal_code?: string | null
           risk_score?: number | null
           state_province?: string | null
+          stellar_seed_encrypted?: string | null
           street_address?: string | null
           stripe_customer_id?: string | null
           updated_at?: string
@@ -2293,6 +2295,7 @@ export type Database = {
           postal_code?: string | null
           risk_score?: number | null
           state_province?: string | null
+          stellar_seed_encrypted?: string | null
           street_address?: string | null
           stripe_customer_id?: string | null
           updated_at?: string
@@ -3585,6 +3588,7 @@ export type Database = {
           id: string
           is_default: boolean
           status: Database["public"]["Enums"]["wallet_status"]
+          stellar_address: string | null
           updated_at: string
           user_id: string
         }
@@ -3594,6 +3598,7 @@ export type Database = {
           id?: string
           is_default?: boolean
           status?: Database["public"]["Enums"]["wallet_status"]
+          stellar_address?: string | null
           updated_at?: string
           user_id: string
         }
@@ -3603,6 +3608,7 @@ export type Database = {
           id?: string
           is_default?: boolean
           status?: Database["public"]["Enums"]["wallet_status"]
+          stellar_address?: string | null
           updated_at?: string
           user_id?: string
         }
