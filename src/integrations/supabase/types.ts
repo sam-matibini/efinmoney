@@ -3269,6 +3269,7 @@ export type Database = {
           source_amount: number
           source_currency: string
           status: Database["public"]["Enums"]["transfer_status"]
+          stellar_tx_hash: string | null
           stripe_payout_id: string | null
           target_amount: number
           target_currency: string
@@ -3300,6 +3301,7 @@ export type Database = {
           source_amount: number
           source_currency: string
           status?: Database["public"]["Enums"]["transfer_status"]
+          stellar_tx_hash?: string | null
           stripe_payout_id?: string | null
           target_amount: number
           target_currency: string
@@ -3331,6 +3333,7 @@ export type Database = {
           source_amount?: number
           source_currency?: string
           status?: Database["public"]["Enums"]["transfer_status"]
+          stellar_tx_hash?: string | null
           stripe_payout_id?: string | null
           target_amount?: number
           target_currency?: string
