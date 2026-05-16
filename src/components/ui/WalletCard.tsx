@@ -114,6 +114,19 @@ const WalletCard = ({
                 Default
               </span>
             )}
+            {showStellarBadge && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setStellarOpen(true); }}
+                className={`flex items-center gap-1 text-[10px] sm:text-xs px-2 py-0.5 rounded-full transition-transform hover:scale-105 ${
+                  isMain ? 'bg-primary-foreground/20 text-primary-foreground' : 'bg-accent text-accent-foreground'
+                }`}
+                title="View Stellar blockchain wallet"
+              >
+                <Sparkles className="w-3 h-3" />
+                Blockchain
+              </button>
+            )}
           </div>
           {walletId && (onSetDefault || onToggleFreeze || onEdit || onDelete) && (
             <DropdownMenu>
