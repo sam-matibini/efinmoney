@@ -2,13 +2,12 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import * as StellarSdk from "npm:stellar-sdk@12";
 import { z } from "npm:zod@3";
+import { HORIZON_URL, NETWORK_PASSPHRASE, EXPLORER_BASE } from "../_shared/stellar-network.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANON = Deno.env.get("SUPABASE_ANON_KEY")!;
 const ENC_KEY = Deno.env.get("STELLAR_ENCRYPTION_KEY")!;
-
-const HORIZON = "https://horizon-testnet.stellar.org";
 
 const BodySchema = z.object({
   destinationAddress: z.string().trim().regex(/^G[A-Z2-7]{55}$/, "Invalid Stellar address"),
@@ -99,7 +98,7 @@ Deno.serve(async (req) => {
     const seed = await decryptSeed(profile.stellar_seed_encrypted);
     const keypair = StellarSdk.Keypair.fromSecret(seed);
 
-    const server = new StellarSdk.Horizon.Server(HORIZON);
+    const server = new StellarSdk.Horizon.Server(HORIZON_URL);
 
     // Verify destination exists (or create-account semantics)
     let destinationExists = true;
@@ -114,7 +113,7 @@ Deno.serve(async (req) => {
 
     const txBuilder = new StellarSdk.TransactionBuilder(account, {
       fee: String(fee),
-      networkPassphrase: StellarSdk.Networks.TESTNET,
+      networkPassphrase: NETWORK_PASSPHRASE,
     });
 
     if (destinationExists) {
@@ -193,7 +192,7 @@ Deno.serve(async (req) => {
       success: true,
       hash: txHash,
       ledger: result.ledger,
-      explorerUrl: `https://stellar.expert/explorer/testnet/tx/${txHash}`,
+      explorerUrl: `${EXPLORER_BASE}/tx/${txHash}`,
       created_account: !destinationExists,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (err) {

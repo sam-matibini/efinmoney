@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Copy, ExternalLink, Loader2, RefreshCw, Send, Sparkles } from "lucide-react";
+import { Copy, ExternalLink, Loader2, Plus, RefreshCw, Send, Sparkles } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useStellarWallet } from "@/hooks/useStellarWallet";
 import { toast } from "sonner";
 import SendStellarModal from "@/components/wallets/SendStellarModal";
+import { supabase } from "@/integrations/supabase/client";
 
 const StellarNetworkCard = () => {
   const {
@@ -15,16 +16,37 @@ const StellarNetworkCard = () => {
     generating,
     balance,
     funded,
+    balances,
+    usdcBalance,
+    hasUsdcTrustline,
     balanceLoading,
     refetchBalance,
     explorerUrl,
   } = useStellarWallet();
   const [sendOpen, setSendOpen] = useState(false);
+  const [enablingUsdc, setEnablingUsdc] = useState(false);
 
   const copy = () => {
     if (!publicKey) return;
     navigator.clipboard.writeText(publicKey);
     toast.success("Stellar address copied");
+  };
+
+  const enableUsdc = async () => {
+    setEnablingUsdc(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("stellar-add-trustline");
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast.success(
+        data?.already_existed ? "USDC already enabled" : "USDC trustline added",
+      );
+      await refetchBalance();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to enable USDC");
+    } finally {
+      setEnablingUsdc(false);
+    }
   };
 
   return (
@@ -87,6 +109,47 @@ const StellarNetworkCard = () => {
                   <Button size="icon" variant="ghost" onClick={copy} title="Copy">
                     <Copy className="w-4 h-4" />
                   </Button>
+                </div>
+              </div>
+
+              {/* Tokens */}
+              <div className="mb-4">
+                <p className="text-xs text-muted-foreground mb-2">Tokens</p>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-muted/40 border border-border/40">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="font-mono text-[10px]">XLM</Badge>
+                      <span className="text-xs text-muted-foreground">Stellar Lumens</span>
+                    </div>
+                    <span className="text-sm font-medium tabular-nums">
+                      {Number(balance).toLocaleString("en-US", { maximumFractionDigits: 4 })}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-muted/40 border border-border/40">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="font-mono text-[10px]">USDC</Badge>
+                      <span className="text-xs text-muted-foreground">USD Coin (Circle)</span>
+                    </div>
+                    {hasUsdcTrustline ? (
+                      <span className="text-sm font-medium tabular-nums">
+                        {Number(usdcBalance ?? "0").toLocaleString("en-US", { maximumFractionDigits: 2, minimumFractionDigits: 2 })}
+                      </span>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={enableUsdc}
+                        disabled={!funded || enablingUsdc}
+                      >
+                        {enablingUsdc ? (
+                          <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                        ) : (
+                          <Plus className="w-3.5 h-3.5 mr-1.5" />
+                        )}
+                        Enable USDC
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
 
