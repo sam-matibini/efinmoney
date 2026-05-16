@@ -162,8 +162,17 @@ const FxTradingPanel = () => {
           </motion.div>
           <h3 className="text-2xl font-display font-bold mb-2">Exchange Complete!</h3>
           <p className="text-muted-foreground">
-            Converted {fromWallet?.symbol}{amount} to {toWallet?.symbol}{receivedAmount.toFixed(2)}
+            Converted {fromWallet?.symbol}{amount} to {toWallet?.symbol}{receivedAmount.toFixed(2)} {toWallet?.currency_code}
           </p>
+          {lastTxHash && (
+            <a
+              href={`https://stellar.expert/explorer/testnet/tx/${lastTxHash}`}
+              target="_blank" rel="noreferrer"
+              className="mt-4 inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
+            >
+              View on StellarExpert <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          )}
         </CardContent>
       </Card>
     );
@@ -229,18 +238,27 @@ const FxTradingPanel = () => {
                 <SelectValue placeholder="Select wallet" />
               </SelectTrigger>
               <SelectContent>
-                {fiatWallets?.filter(w => w.wallet_id !== fromWalletId).map((w) => (
+                {destinationOptions.filter(w => w.wallet_id !== fromWalletId).map((w) => (
                   <SelectItem key={w.wallet_id} value={w.wallet_id}>
                     <span className="text-2xl mr-1.5 align-middle">{w.flag_emoji}</span>
-                    <span className="align-middle">{w.currency_code} - {w.symbol}{Number(w.balance).toFixed(2)}</span>
+                    <span className="align-middle">
+                      {w.currency_code}
+                      {w.isStellar ? " (Stellar)" : ""} - {w.symbol}{Number(w.balance).toFixed(w.isStellar ? 4 : 2)}
+                    </span>
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
             <div className="p-4 rounded-xl bg-muted">
               <p className="text-3xl font-display font-bold text-foreground">
-                {toWallet?.symbol}{receivedAmount.toFixed(2)}
+                {toWallet?.symbol}{receivedAmount.toFixed(isCryptoSwap ? 4 : 2)}
+                {isCryptoSwap && <span className="text-base text-muted-foreground ml-2">USDC</span>}
               </p>
+              {isCryptoSwap && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Delivered on-chain to your Stellar wallet
+                </p>
+              )}
             </div>
           </div>
 
