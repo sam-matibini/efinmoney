@@ -245,6 +245,10 @@ const WalletCard = ({
           title={`Top up ${currency} wallet`}
         />
       )}
+
+      {showStellarBadge && (
+        <StellarWalletModal open={stellarOpen} onOpenChange={setStellarOpen} />
+      )}
     </motion.div>
   );
 };
