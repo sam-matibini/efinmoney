@@ -1,10 +1,12 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { Copy, ExternalLink, Loader2, RefreshCw, Sparkles } from "lucide-react";
+import { Copy, ExternalLink, Loader2, RefreshCw, Send, Sparkles } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useStellarWallet } from "@/hooks/useStellarWallet";
 import { toast } from "sonner";
+import SendStellarModal from "@/components/wallets/SendStellarModal";
 
 const StellarNetworkCard = () => {
   const {
