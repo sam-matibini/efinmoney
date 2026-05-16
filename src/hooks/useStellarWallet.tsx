@@ -78,14 +78,22 @@ export const useStellarWallet = () => {
       if (!acct) return { xlm: "0", balances: [], funded: false };
       const balances: StellarBalance[] = (acct.balances ?? []).map((b: any) => ({
         asset: b.asset_type === "native" ? "XLM" : `${b.asset_code}`,
+        asset_code: b.asset_type === "native" ? "XLM" : b.asset_code,
+        asset_issuer: b.asset_issuer,
         balance: b.balance,
+        is_native: b.asset_type === "native",
       }));
-      const native = balances.find((b) => b.asset === "XLM");
+      const native = balances.find((b) => b.is_native);
       return { xlm: native?.balance ?? "0", balances, funded: true };
     },
     enabled: !!publicKey,
     refetchInterval: 15000,
   });
+
+  const balances = balanceQ.data?.balances ?? [];
+  const usdc = balances.find(
+    (b) => b.asset_code === USDC_ASSET_CODE && b.asset_issuer === USDC_ISSUER,
+  );
 
   return {
     publicKey,
@@ -93,7 +101,9 @@ export const useStellarWallet = () => {
     generating,
     balance: balanceQ.data?.xlm ?? "0",
     funded: balanceQ.data?.funded ?? false,
-    balances: balanceQ.data?.balances ?? [],
+    balances,
+    usdcBalance: usdc?.balance ?? null, // null = no trustline
+    hasUsdcTrustline: !!usdc,
     balanceLoading: balanceQ.isLoading,
     refetchBalance: balanceQ.refetch,
     explorerUrl: publicKey
