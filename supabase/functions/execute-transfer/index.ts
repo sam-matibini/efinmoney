@@ -258,7 +258,20 @@ Deno.serve(async (req) => {
     try {
       const isCanada = transfer.transfer_type === "domestic_canada" || transfer.recipient_country === "CA";
 
-      if (isCanada) {
+      if (useStellarNgn) {
+        const res = await fetch(
+          `${Deno.env.get("SUPABASE_URL")}/functions/v1/stellar-anchor-transfer`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: req.headers.get("Authorization") || "",
+            },
+            body: JSON.stringify({ transfer_id }),
+          },
+        );
+        payoutResult = await res.json();
+      } else if (isCanada) {
         const isCardPush = transfer.payout_method === "card_push";
         const fnName = isCardPush ? "stripe-payout" : "paysafe-payout";
         const fnBody: Record<string, unknown> = { transfer_id };
