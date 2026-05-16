@@ -1364,6 +1364,24 @@ const SendPage = () => {
                                           )}
                                           <p className="text-xs text-muted-foreground">Funds will be deposited directly to the bank account above.</p>
                                         </motion.div>
+                                        <motion.div custom={2.7} variants={fieldVariants} initial="hidden" animate="show" className="rounded-xl border border-primary/30 bg-gradient-to-br from-primary/5 via-background to-accent/5 p-4 space-y-2">
+                                          <div className="flex items-start justify-between gap-3">
+                                            <div className="flex-1">
+                                              <div className="flex items-center gap-2">
+                                                <span className="text-sm font-medium">⭐ Send via Stellar (Beta)</span>
+                                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/20 text-primary font-mono uppercase">Testnet</span>
+                                              </div>
+                                              <p className="text-xs text-muted-foreground mt-1">
+                                                Route this Naira payout over the Stellar blockchain via a SEP-31 anchor instead of Flutterwave. Settles in seconds with an on-chain receipt.
+                                              </p>
+                                            </div>
+                                            <Switch
+                                              checked={useStellar}
+                                              onCheckedChange={setUseStellar}
+                                              aria-label="Use Stellar network"
+                                            />
+                                          </div>
+                                        </motion.div>
                                       </>
                                     ) : isGhanaBank ? (
                                       <>
