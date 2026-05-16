@@ -1,0 +1,2 @@
+ALTER TABLE public.transfers ADD COLUMN IF NOT EXISTS stellar_tx_hash text;
+CREATE INDEX IF NOT EXISTS idx_transfers_stellar_tx_hash ON public.transfers (stellar_tx_hash) WHERE stellar_tx_hash IS NOT NULL;
