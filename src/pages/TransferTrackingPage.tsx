@@ -331,6 +331,35 @@ const TransferTrackingPage = () => {
               </CardContent>
             </Card>
 
+            {(transfer as any).stellar_tx_hash && (
+              <Card className="border-primary/30 bg-gradient-to-br from-primary/5 via-background to-accent/5">
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    ⭐ On-Chain Receipt
+                    <Badge variant="secondary" className="text-[10px]">Stellar</Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3 text-sm">
+                  <p className="text-muted-foreground">
+                    This transfer is being delivered through the Stellar network. You can watch the funds move in real time on the blockchain explorer.
+                  </p>
+                  <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/60 border border-border/50">
+                    <code className="text-[11px] sm:text-xs break-all flex-1 font-mono">
+                      {(transfer as any).stellar_tx_hash}
+                    </code>
+                  </div>
+                  <a
+                    href={`https://stellar.expert/explorer/testnet/tx/${(transfer as any).stellar_tx_hash}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+                  >
+                    View on StellarExpert →
+                  </a>
+                </CardContent>
+              </Card>
+            )}
+
             {transfer.recipient_country === "CA"
               && transfer.payout_method === "interac"
               && (transfer as any).interac_security_question
