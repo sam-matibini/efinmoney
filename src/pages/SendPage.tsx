@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { useWallets } from "@/hooks/useWallets";
 import { useFxRates } from "@/hooks/useFxRates";
 import { useCreateTransfer } from "@/hooks/useTransfers";
@@ -99,6 +100,7 @@ const SendPage = () => {
   const [ngnResolving, setNgnResolving] = useState(false);
   const [ngnResolvedName, setNgnResolvedName] = useState<string | null>(null);
   const [ngnResolveError, setNgnResolveError] = useState<string | null>(null);
+  const [useStellar, setUseStellar] = useState<boolean>(false);
   // Ghana bank payout state (toggle between Mobile Money and Bank Transfer)
   const [ghPayoutMode, setGhPayoutMode] = useState<'mobile' | 'bank'>('mobile');
   const [ghBanks, setGhBanks] = useState<Array<{ code: string; name: string }>>([]);
@@ -462,7 +464,7 @@ const SendPage = () => {
         let data: any = null;
         let invokeErr: any = null;
         try {
-          const res = await supabase.functions.invoke('execute-transfer', { body: { transfer_id: tid } });
+          const res = await supabase.functions.invoke('execute-transfer', { body: { transfer_id: tid, use_stellar: isNGNBank && useStellar } });
           data = res.data;
           invokeErr = res.error;
         } catch (err) {
@@ -600,7 +602,7 @@ const SendPage = () => {
 
     // Step C: trigger payout via Flutterwave
     try {
-      const { data, error } = await supabase.functions.invoke('execute-transfer', { body: { transfer_id: tid } });
+      const { data, error } = await supabase.functions.invoke('execute-transfer', { body: { transfer_id: tid, use_stellar: isNGNBank && useStellar } });
       if (error || (data as any)?.error) throw new Error((data as any)?.error || error?.message || 'Payout failed');
       const payout = (data as any)?.payout;
       if (payout && payout.success === false) throw new Error(payout.error || 'Payout failed');
@@ -1362,6 +1364,24 @@ const SendPage = () => {
                                             </p>
                                           )}
                                           <p className="text-xs text-muted-foreground">Funds will be deposited directly to the bank account above.</p>
+                                        </motion.div>
+                                        <motion.div custom={2.7} variants={fieldVariants} initial="hidden" animate="show" className="rounded-xl border border-primary/30 bg-gradient-to-br from-primary/5 via-background to-accent/5 p-4 space-y-2">
+                                          <div className="flex items-start justify-between gap-3">
+                                            <div className="flex-1">
+                                              <div className="flex items-center gap-2">
+                                                <span className="text-sm font-medium">⭐ Send via Stellar (Beta)</span>
+                                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/20 text-primary font-mono uppercase">Testnet</span>
+                                              </div>
+                                              <p className="text-xs text-muted-foreground mt-1">
+                                                Route this Naira payout over the Stellar blockchain via a SEP-31 anchor instead of Flutterwave. Settles in seconds with an on-chain receipt.
+                                              </p>
+                                            </div>
+                                            <Switch
+                                              checked={useStellar}
+                                              onCheckedChange={setUseStellar}
+                                              aria-label="Use Stellar network"
+                                            />
+                                          </div>
                                         </motion.div>
                                       </>
                                     ) : isGhanaBank ? (
