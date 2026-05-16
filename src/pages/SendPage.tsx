@@ -99,6 +99,7 @@ const SendPage = () => {
   const [ngnResolving, setNgnResolving] = useState(false);
   const [ngnResolvedName, setNgnResolvedName] = useState<string | null>(null);
   const [ngnResolveError, setNgnResolveError] = useState<string | null>(null);
+  const [useStellar, setUseStellar] = useState<boolean>(false);
   // Ghana bank payout state (toggle between Mobile Money and Bank Transfer)
   const [ghPayoutMode, setGhPayoutMode] = useState<'mobile' | 'bank'>('mobile');
   const [ghBanks, setGhBanks] = useState<Array<{ code: string; name: string }>>([]);
