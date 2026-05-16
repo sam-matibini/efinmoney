@@ -10,12 +10,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useWallets } from "@/hooks/useWallets";
 import { useFxRates, useFxRatesLastUpdated } from "@/hooks/useFxRates";
+import { useStellarWallet } from "@/hooks/useStellarWallet";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
-import { RefreshCw, ArrowUpDown, TrendingUp, CheckCircle, Bitcoin, DollarSign } from "lucide-react";
+import { RefreshCw, ArrowUpDown, TrendingUp, CheckCircle, Bitcoin, DollarSign, ExternalLink } from "lucide-react";
 import { CryptoTradingPanel } from "@/components/crypto/CryptoTradingPanel";
 import { flagForCurrency } from "@/lib/flags";
+
+// Synthetic wallet id used to represent the on-chain USDC option.
+const STELLAR_USDC_ID = "stellar-usdc";
 
 const FxTradingPanel = () => {
   const [amount, setAmount] = useState("");
@@ -24,19 +28,45 @@ const FxTradingPanel = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [swapRotation, setSwapRotation] = useState(0);
+  const [lastTxHash, setLastTxHash] = useState<string | null>(null);
 
   const { data: wallets } = useWallets();
   const { data: fxRates } = useFxRates();
+  const stellar = useStellarWallet();
   const queryClient = useQueryClient();
 
-  const fiatWallets = wallets?.filter(w => !['BTC', 'USDT', 'USDC'].includes(w.currency_code));
+  const fiatWallets = wallets?.filter(w => !['BTC', 'USDT', 'USDC'].includes(w.currency_code)) ?? [];
 
-  const fromWallet = fiatWallets?.find(w => w.wallet_id === fromWalletId) || fiatWallets?.[0];
-  const toWallet = fiatWallets?.find(w => w.wallet_id === toWalletId) || fiatWallets?.[1];
+  // Stellar USDC appears as a virtual destination wallet driven by the live
+  // on-chain balance from useStellarWallet.
+  const stellarUsdcOption = stellar.publicKey
+    ? {
+        wallet_id: STELLAR_USDC_ID,
+        currency_code: "USDC",
+        symbol: "$",
+        flag_emoji: "⭐",
+        balance: Number(stellar.usdcBalance ?? 0),
+        isStellar: true as const,
+      }
+    : null;
 
-  const fxRate = fxRates?.find(
-    r => r.from_currency === fromWallet?.currency_code && r.to_currency === toWallet?.currency_code
-  );
+  const destinationOptions = [
+    ...fiatWallets.map(w => ({ ...w, isStellar: false as const })),
+    ...(stellarUsdcOption ? [stellarUsdcOption] : []),
+  ];
+
+  const fromWallet = fiatWallets.find(w => w.wallet_id === fromWalletId) ?? fiatWallets[0];
+  const toWallet = destinationOptions.find(w => w.wallet_id === toWalletId) ?? destinationOptions[1];
+  const isCryptoSwap = toWallet && "isStellar" in toWallet && toWallet.isStellar;
+
+  // For USDC destination we use the FIAT → USD rate (USDC is pegged to USD).
+  const fxRate = toWallet
+    ? isCryptoSwap
+      ? fromWallet?.currency_code === "USD"
+        ? { effective_rate: 1, rate: 1, markup_rate: 0 }
+        : fxRates?.find(r => r.from_currency === fromWallet?.currency_code && r.to_currency === "USD")
+      : fxRates?.find(r => r.from_currency === fromWallet?.currency_code && r.to_currency === toWallet.currency_code)
+    : null;
 
   const effectiveRate = fxRate ? Number(fxRate.effective_rate) : null;
 
