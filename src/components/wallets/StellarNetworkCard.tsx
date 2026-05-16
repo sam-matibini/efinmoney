@@ -19,6 +19,7 @@ const StellarNetworkCard = () => {
     refetchBalance,
     explorerUrl,
   } = useStellarWallet();
+  const [sendOpen, setSendOpen] = useState(false);
 
   const copy = () => {
     if (!publicKey) return;
