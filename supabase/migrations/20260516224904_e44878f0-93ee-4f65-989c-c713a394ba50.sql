@@ -1,0 +1,2 @@
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS stellar_public_key TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS profiles_stellar_public_key_key ON public.profiles(stellar_public_key) WHERE stellar_public_key IS NOT NULL;

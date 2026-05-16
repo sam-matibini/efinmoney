@@ -15,6 +15,7 @@ import CreateWalletModal from "@/components/modals/CreateWalletModal";
 import EditWalletModal from "@/components/modals/EditWalletModal";
 import DeleteWalletModal from "@/components/modals/DeleteWalletModal";
 import { flagForCurrency } from "@/lib/flags";
+import StellarNetworkCard from "@/components/wallets/StellarNetworkCard";
 
 type WalletModalData = {
   walletId: string;
@@ -119,6 +120,9 @@ const WalletsPage = () => {
               </div>
             </CardContent>
           </Card>
+
+          {/* Stellar Network (Testnet) */}
+          <StellarNetworkCard />
 
           {/* Wallets Grid */}
           {isLoading ? (

@@ -86,7 +86,7 @@ Deno.serve(async (req) => {
 
     const { error: upProfileErr } = await admin
       .from("profiles")
-      .update({ stellar_seed_encrypted: encrypted })
+      .update({ stellar_seed_encrypted: encrypted, stellar_public_key: publicKey })
       .eq("user_id", user.id);
     if (upProfileErr) throw upProfileErr;
 
