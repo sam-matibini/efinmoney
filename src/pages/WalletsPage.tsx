@@ -149,6 +149,7 @@ const WalletsPage = () => {
                     onToggleFreeze={(id, freeze) => toggleFreeze({ walletId: id, freeze })}
                     onEdit={(w) => setEditWallet(w)}
                     onDelete={(w) => setDeleteWallet(w)}
+                    showStellarBadge={wallet.currency_code === 'USD'}
                   />
                 </motion.div>
               ))}
