@@ -1,8 +1,9 @@
 import { motion } from "framer-motion";
 import { useState } from "react";
-import { ArrowUpRight, Plus, MoreHorizontal, Star, Snowflake, Play, Pencil, Trash2 } from "lucide-react";
+import { ArrowUpRight, Plus, MoreHorizontal, Star, Snowflake, Play, Pencil, Trash2, Sparkles } from "lucide-react";
 import SendMoneyModal from "@/components/modals/SendMoneyModal";
 import TopUpModal from "@/components/modals/TopUpModal";
+import StellarWalletModal from "@/components/modals/StellarWalletModal";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,6 +27,7 @@ interface WalletCardProps {
   onToggleFreeze?: (walletId: string, freeze: boolean) => void;
   onEdit?: (wallet: { walletId: string; currency: string; balance: number; symbol: string; flag: string }) => void;
   onDelete?: (wallet: { walletId: string; currency: string; balance: number; symbol: string; flag: string }) => void;
+  showStellarBadge?: boolean;
 }
 
 const WalletCard = ({ 
@@ -42,8 +44,10 @@ const WalletCard = ({
   onToggleFreeze,
   onEdit,
   onDelete,
+  showStellarBadge = false,
 }: WalletCardProps) => {
   const [topUpOpen, setTopUpOpen] = useState(false);
+  const [stellarOpen, setStellarOpen] = useState(false);
   const formatBalance = (value: number) => {
     return new Intl.NumberFormat('en-US', {
       minimumFractionDigits: 2,
@@ -109,6 +113,19 @@ const WalletCard = ({
                 <Star className="w-3 h-3 fill-current" />
                 Default
               </span>
+            )}
+            {showStellarBadge && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setStellarOpen(true); }}
+                className={`flex items-center gap-1 text-[10px] sm:text-xs px-2 py-0.5 rounded-full transition-transform hover:scale-105 ${
+                  isMain ? 'bg-primary-foreground/20 text-primary-foreground' : 'bg-accent text-accent-foreground'
+                }`}
+                title="View Stellar blockchain wallet"
+              >
+                <Sparkles className="w-3 h-3" />
+                Blockchain
+              </button>
             )}
           </div>
           {walletId && (onSetDefault || onToggleFreeze || onEdit || onDelete) && (
@@ -227,6 +244,10 @@ const WalletCard = ({
           defaultWalletId={walletId}
           title={`Top up ${currency} wallet`}
         />
+      )}
+
+      {showStellarBadge && (
+        <StellarWalletModal open={stellarOpen} onOpenChange={setStellarOpen} />
       )}
     </motion.div>
   );
