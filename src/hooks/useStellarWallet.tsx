@@ -5,8 +5,15 @@ import { useAuth } from "@/hooks/useAuth";
 
 export interface StellarBalance {
   asset: string;
+  asset_code?: string;
+  asset_issuer?: string;
   balance: string;
+  is_native: boolean;
 }
+
+// Testnet USDC (Circle)
+export const USDC_ASSET_CODE = "USDC";
+export const USDC_ISSUER = "GBBD47IF6LWK7P7MDEVSCWTTCJM4RTQR6EPCEGYEZ2OM4KBS42B23HGC";
 
 const HORIZON = "https://horizon-testnet.stellar.org";
 
