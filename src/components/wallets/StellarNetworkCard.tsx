@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Copy, ExternalLink, Loader2, RefreshCw, Send, Sparkles } from "lucide-react";
+import { Copy, ExternalLink, Loader2, Plus, RefreshCw, Send, Sparkles } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useStellarWallet } from "@/hooks/useStellarWallet";
 import { toast } from "sonner";
 import SendStellarModal from "@/components/wallets/SendStellarModal";
+import { supabase } from "@/integrations/supabase/client";
 
 const StellarNetworkCard = () => {
   const {
@@ -15,16 +16,37 @@ const StellarNetworkCard = () => {
     generating,
     balance,
     funded,
+    balances,
+    usdcBalance,
+    hasUsdcTrustline,
     balanceLoading,
     refetchBalance,
     explorerUrl,
   } = useStellarWallet();
   const [sendOpen, setSendOpen] = useState(false);
+  const [enablingUsdc, setEnablingUsdc] = useState(false);
 
   const copy = () => {
     if (!publicKey) return;
     navigator.clipboard.writeText(publicKey);
     toast.success("Stellar address copied");
+  };
+
+  const enableUsdc = async () => {
+    setEnablingUsdc(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("stellar-add-trustline");
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast.success(
+        data?.already_existed ? "USDC already enabled" : "USDC trustline added",
+      );
+      await refetchBalance();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to enable USDC");
+    } finally {
+      setEnablingUsdc(false);
+    }
   };
 
   return (
