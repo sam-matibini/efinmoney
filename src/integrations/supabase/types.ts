@@ -2245,6 +2245,7 @@ export type Database = {
           postal_code: string | null
           risk_score: number | null
           state_province: string | null
+          stellar_public_key: string | null
           stellar_seed_encrypted: string | null
           street_address: string | null
           stripe_customer_id: string | null
@@ -2270,6 +2271,7 @@ export type Database = {
           postal_code?: string | null
           risk_score?: number | null
           state_province?: string | null
+          stellar_public_key?: string | null
           stellar_seed_encrypted?: string | null
           street_address?: string | null
           stripe_customer_id?: string | null
@@ -2295,6 +2297,7 @@ export type Database = {
           postal_code?: string | null
           risk_score?: number | null
           state_province?: string | null
+          stellar_public_key?: string | null
           stellar_seed_encrypted?: string | null
           street_address?: string | null
           stripe_customer_id?: string | null
