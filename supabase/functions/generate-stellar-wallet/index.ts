@@ -1,10 +1,20 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { corsHeaders } from "../_shared/cors.ts";
 import * as StellarSdk from "npm:stellar-sdk@12";
+import {
+  HORIZON_URL,
+  NETWORK_PASSPHRASE,
+  EXPLORER_BASE,
+  IS_MAINNET,
+} from "../_shared/stellar-network.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ENC_KEY = Deno.env.get("STELLAR_ENCRYPTION_KEY")!;
+const TREASURY_SEED = Deno.env.get("STELLAR_TREASURY_SEED");
+
+// Funding amount: 1 XLM base reserve + 0.5 XLM per trustline (USDC) + buffer for fees.
+const STARTING_BALANCE_XLM = "2.5";
 
 async function getKey(): Promise<CryptoKey> {
   const raw = new TextEncoder().encode(ENC_KEY);
@@ -47,7 +57,6 @@ Deno.serve(async (req) => {
 
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
 
-    // Find user's USD wallet (or default)
     const { data: wallets, error: wErr } = await admin
       .from("wallets")
       .select("id, currency_code, stellar_address, is_default")
@@ -68,6 +77,7 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({
         stellar_address: target.stellar_address,
         already_existed: true,
+        network: IS_MAINNET ? "mainnet" : "testnet",
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
@@ -77,7 +87,7 @@ Deno.serve(async (req) => {
     const secret = kp.secret();
     const encrypted = await encryptSeed(secret);
 
-    // Save to DB
+    // Save to DB first so we don't lose the seed if funding fails
     const { error: upWalletErr } = await admin
       .from("wallets")
       .update({ stellar_address: publicKey })
@@ -90,22 +100,56 @@ Deno.serve(async (req) => {
       .eq("user_id", user.id);
     if (upProfileErr) throw upProfileErr;
 
-    // Fund via Friendbot (testnet)
+    // Fund the new account on-chain via treasury CreateAccount (no Friendbot on mainnet)
     let funded = false;
     let fundError: string | null = null;
-    try {
-      const r = await fetch(`https://friendbot.stellar.org?addr=${encodeURIComponent(publicKey)}`);
-      funded = r.ok;
-      if (!r.ok) fundError = await r.text();
-    } catch (e) {
-      fundError = String(e);
+    let txHash: string | null = null;
+
+    if (!TREASURY_SEED) {
+      fundError = "STELLAR_TREASURY_SEED not configured";
+      console.error("Treasury needs more XLM: seed not configured");
+    } else {
+      try {
+        const treasury = StellarSdk.Keypair.fromSecret(TREASURY_SEED);
+        const server = new StellarSdk.Horizon.Server(HORIZON_URL);
+        const treasuryAccount = await server.loadAccount(treasury.publicKey());
+        const fee = await server.fetchBaseFee();
+
+        const tx = new StellarSdk.TransactionBuilder(treasuryAccount, {
+          fee: String(fee),
+          networkPassphrase: NETWORK_PASSPHRASE,
+        })
+          .addOperation(StellarSdk.Operation.createAccount({
+            destination: publicKey,
+            startingBalance: STARTING_BALANCE_XLM,
+          }))
+          .addMemo(StellarSdk.Memo.text(`new:${user.id.slice(0, 24)}`))
+          .setTimeout(120)
+          .build();
+
+        tx.sign(treasury);
+        const submit = await server.submitTransaction(tx);
+        txHash = submit.hash;
+        funded = true;
+      } catch (err: any) {
+        const data = err?.response?.data ?? err?.data;
+        fundError = data?.title
+          ?? data?.extras?.result_codes?.operations?.join(",")
+          ?? err?.message
+          ?? String(err);
+        console.error("Treasury needs more XLM — CreateAccount failed:", JSON.stringify(data ?? err));
+      }
     }
 
     return new Response(JSON.stringify({
       stellar_address: publicKey,
       funded,
+      starting_balance_xlm: STARTING_BALANCE_XLM,
+      tx_hash: txHash,
+      explorerUrl: txHash ? `${EXPLORER_BASE}/tx/${txHash}` : null,
       fund_error: fundError,
       already_existed: false,
+      network: IS_MAINNET ? "mainnet" : "testnet",
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (err) {
     console.error("generate-stellar-wallet error:", err);
