@@ -23,3 +23,9 @@ verify_jwt = false
 
 [functions.stripe-payout-webhook]
 verify_jwt = false
+
+[functions.elicate-webhook]
+verify_jwt = false
+
+[functions.elicate-payout]
+verify_jwt = false
