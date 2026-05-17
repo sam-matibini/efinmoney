@@ -253,14 +253,28 @@ Deno.serve(async (req) => {
     // Smart Route: Paysafe (Interac/EFT) for Canada; Stellar SEP-31 anchor for opt-in
     // African corridors (NG/KE/ZM); Flutterwave for the rest.
     const STELLAR_COUNTRIES = new Set(["NG", "KE", "ZM"]);
+    const isZambia =
+      (transfer.target_currency ?? "").toUpperCase() === "ZMW" ||
+      (transfer.recipient_country ?? "").toUpperCase() === "ZM";
     const useStellar =
+      !isZambia &&
       (payload.use_stellar === true || transfer.use_stellar === true) &&
       STELLAR_COUNTRIES.has((transfer.recipient_country ?? "").toUpperCase());
     let payoutResult: any = { stub: true };
     try {
       const isCanada = transfer.transfer_type === "domestic_canada" || transfer.recipient_country === "CA";
 
-      if (useStellar) {
+      if (isZambia) {
+        const res = await fetch(
+          `${Deno.env.get("SUPABASE_URL")}/functions/v1/elicate-payout`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ transfer_id }),
+          },
+        );
+        payoutResult = await res.json();
+      } else if (useStellar) {
         const res = await fetch(
           `${Deno.env.get("SUPABASE_URL")}/functions/v1/stellar-sep31-payout`,
           {
