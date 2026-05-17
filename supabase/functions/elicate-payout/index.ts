@@ -105,7 +105,6 @@ Deno.serve(async (req) => {
     await supabase.from("transfers").update({
       status: "processing",
       provider_reference: providerRef,
-      payout_provider: "elicate",
     }).eq("id", transfer_id);
 
     return new Response(JSON.stringify({
