@@ -1,8 +1,8 @@
 // Shared Stellar network config — switch testnet/mainnet via STELLAR_NETWORK env var.
 import * as StellarSdk from "npm:stellar-sdk@12";
 
-const NETWORK = (Deno.env.get("STELLAR_NETWORK") ?? "TESTNET").toUpperCase();
-export const IS_MAINNET = NETWORK === "MAINNET" || NETWORK === "PUBLIC";
+const NETWORK = (Deno.env.get("STELLAR_NETWORK") ?? "MAINNET").toUpperCase();
+export const IS_MAINNET = NETWORK !== "TESTNET";
 
 export const HORIZON_URL =
   Deno.env.get("STELLAR_HORIZON_URL") ??
