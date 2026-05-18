@@ -28,6 +28,7 @@ type Kind = "send" | "receive" | "exchange";
 interface Item {
   key: string;
   transferId?: string;
+  journalId?: string;
   kind: Kind;
   status: "completed" | "failed" | "pending";
   amount: number;
