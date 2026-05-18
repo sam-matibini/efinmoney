@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { AreaChart, Area, ResponsiveContainer, Tooltip } from "recharts";
-import { TrendingUp, TrendingDown, Wallet as WalletIcon, Activity } from "lucide-react";
+import { TrendingUp, TrendingDown, Wallet as WalletIcon, Activity, Eye, EyeOff } from "lucide-react";
 import { useWallets } from "@/hooks/useWallets";
 import { useTransfers } from "@/hooks/useTransfers";
 import { useFxRates } from "@/hooks/useFxRates";
@@ -29,6 +29,13 @@ const HeroBalance = () => {
   const { data: wallets, isLoading: walletsLoading } = useWallets();
   const { data: transfers } = useTransfers(200);
   const { data: fxRates } = useFxRates();
+  const [hidden, setHidden] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("efm-hide-balance") === "1";
+  });
+  useEffect(() => {
+    localStorage.setItem("efm-hide-balance", hidden ? "1" : "0");
+  }, [hidden]);
 
   const firstName =
     user?.user_metadata?.full_name?.split(" ")[0] || user?.email?.split("@")[0] || "there";
@@ -149,8 +156,15 @@ const HeroBalance = () => {
           {walletsLoading ? (
             <Skeleton className="h-16 w-72 mx-auto" />
           ) : (
-            <h2 className="text-5xl sm:text-6xl md:text-7xl font-display font-bold tracking-tight text-foreground">
-              ≈ <AnimatedBalance value={totalUsd} />
+            <h2 className="text-5xl sm:text-6xl md:text-7xl font-display font-bold tracking-tight text-foreground inline-flex items-center justify-center gap-3 sm:gap-4">
+              <span>≈ {hidden ? <span className="tracking-widest">••••••</span> : <AnimatedBalance value={totalUsd} />}</span>
+              <button
+                onClick={() => setHidden((v) => !v)}
+                aria-label={hidden ? "Show balance" : "Hide balance"}
+                className="p-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+              >
+                {hidden ? <EyeOff className="w-5 h-5 sm:w-6 sm:h-6" /> : <Eye className="w-5 h-5 sm:w-6 sm:h-6" />}
+              </button>
             </h2>
           )}
           <p className="text-sm text-muted-foreground mt-2">Total Portfolio Value</p>
