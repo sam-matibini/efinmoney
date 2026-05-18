@@ -187,6 +187,7 @@ const AppRoutes = () => {
           <Route path="/security" element={<ProtectedRoute><SecurityPage /></ProtectedRoute>} />
           <Route path="/transfers" element={<KycProtectedRoute><TransfersListPage /></KycProtectedRoute>} />
           <Route path="/transfers/:id" element={<KycProtectedRoute><TransferTrackingPage /></KycProtectedRoute>} />
+          <Route path="/transactions/:journalId" element={<KycProtectedRoute><TransactionDetailPage /></KycProtectedRoute>} />
           <Route path="/contacts" element={<KycProtectedRoute><ContactsPage /></KycProtectedRoute>} />
           <Route path="/transfers/canada" element={<KycProtectedRoute><CanadaTransferPage /></KycProtectedRoute>} />
           <Route path="/wallet/receive" element={<KycProtectedRoute><ReceivePage /></KycProtectedRoute>} />
