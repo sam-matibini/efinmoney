@@ -253,18 +253,37 @@ Deno.serve(async (req) => {
     // Smart Route: Paysafe (Interac/EFT) for Canada; Stellar SEP-31 anchor for opt-in
     // African corridors (NG/KE/ZM); Flutterwave for the rest.
     const STELLAR_COUNTRIES = new Set(["NG", "KE", "ZM"]);
+    const MTN_COUNTRIES = new Set(["GH", "UG", "ZM"]);
+    const recipientCountry = (transfer.recipient_country ?? "").toUpperCase();
     const isZambia =
       (transfer.target_currency ?? "").toUpperCase() === "ZMW" ||
-      (transfer.recipient_country ?? "").toUpperCase() === "ZM";
+      recipientCountry === "ZM";
+    const isMobileMoneyMethod =
+      (transfer.payout_method ?? "").toLowerCase().includes("mobile") ||
+      ["mtn_mobile", "airtel_money", "mpesa", "vodafone_cash", "tigo_pesa"].includes(transfer.payout_method);
+    const useMtnMomo =
+      (payload.use_mtn_momo === true || transfer.use_mtn_momo === true) &&
+      isMobileMoneyMethod &&
+      MTN_COUNTRIES.has(recipientCountry);
     const useStellar =
-      !isZambia &&
+      !useMtnMomo && !isZambia &&
       (payload.use_stellar === true || transfer.use_stellar === true) &&
-      STELLAR_COUNTRIES.has((transfer.recipient_country ?? "").toUpperCase());
+      STELLAR_COUNTRIES.has(recipientCountry);
     let payoutResult: any = { stub: true };
     try {
       const isCanada = transfer.transfer_type === "domestic_canada" || transfer.recipient_country === "CA";
 
-      if (isZambia) {
+      if (useMtnMomo) {
+        const res = await fetch(
+          `${Deno.env.get("SUPABASE_URL")}/functions/v1/mtn-momo-payout`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ transfer_id }),
+          },
+        );
+        payoutResult = await res.json();
+      } else if (isZambia) {
         const res = await fetch(
           `${Deno.env.get("SUPABASE_URL")}/functions/v1/elicate-payout`,
           {
