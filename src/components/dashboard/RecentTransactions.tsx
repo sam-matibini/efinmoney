@@ -280,6 +280,10 @@ const RecentTransactions = () => {
                     <Link to={`/transfers/${item.transferId}`} className="block">
                       {inner}
                     </Link>
+                  ) : item.journalId ? (
+                    <Link to={`/transactions/${item.journalId}`} className="block">
+                      {inner}
+                    </Link>
                   ) : (
                     inner
                   )}
