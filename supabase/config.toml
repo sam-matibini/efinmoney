@@ -29,3 +29,9 @@ verify_jwt = false
 
 [functions.elicate-payout]
 verify_jwt = false
+
+[functions.mtn-momo-payout]
+verify_jwt = false
+
+[functions.mtn-momo-webhook]
+verify_jwt = false
