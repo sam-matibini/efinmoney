@@ -29,6 +29,13 @@ const HeroBalance = () => {
   const { data: wallets, isLoading: walletsLoading } = useWallets();
   const { data: transfers } = useTransfers(200);
   const { data: fxRates } = useFxRates();
+  const [hidden, setHidden] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("efm-hide-balance") === "1";
+  });
+  useEffect(() => {
+    localStorage.setItem("efm-hide-balance", hidden ? "1" : "0");
+  }, [hidden]);
 
   const firstName =
     user?.user_metadata?.full_name?.split(" ")[0] || user?.email?.split("@")[0] || "there";
