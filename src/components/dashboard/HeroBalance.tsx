@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { AreaChart, Area, ResponsiveContainer, Tooltip } from "recharts";
-import { TrendingUp, TrendingDown, Wallet as WalletIcon, Activity } from "lucide-react";
+import { TrendingUp, TrendingDown, Wallet as WalletIcon, Activity, Eye, EyeOff } from "lucide-react";
 import { useWallets } from "@/hooks/useWallets";
 import { useTransfers } from "@/hooks/useTransfers";
 import { useFxRates } from "@/hooks/useFxRates";
