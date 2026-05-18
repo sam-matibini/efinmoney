@@ -144,8 +144,9 @@ const RecentTransactions = () => {
     createdAt: t.created_at,
   }));
 
-  const depositItems: Item[] = (deposits ?? []).map((d) => ({
+  const depositItems: Item[] = (deposits ?? []).map((d: any) => ({
     key: `d-${d.id}`,
+    journalId: d.journal_id,
     kind: "receive",
     status: "completed",
     amount: Number(d.credit_amount),
@@ -159,6 +160,7 @@ const RecentTransactions = () => {
 
   const fxItems: Item[] = (fxSwaps ?? []).map((f: any) => ({
     key: `fx-${f.id}`,
+    journalId: f.journal_id,
     kind: "exchange",
     status: "completed",
     amount: Number(f.credit_amount),
