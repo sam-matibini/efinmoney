@@ -28,6 +28,7 @@ type Kind = "send" | "receive" | "exchange";
 interface Item {
   key: string;
   transferId?: string;
+  journalId?: string;
   kind: Kind;
   status: "completed" | "failed" | "pending";
   amount: number;
@@ -79,7 +80,7 @@ const RecentTransactions = () => {
       if (!user) return [];
       const { data, error } = await supabase
         .from("ledger_entries")
-        .select("id, created_at, credit_amount, currency_code, description, reference_type")
+        .select("id, journal_id, created_at, credit_amount, currency_code, description, reference_type")
         .eq("reference_type", "stripe_deposit")
         .gt("credit_amount", 0)
         .order("created_at", { ascending: false })
@@ -143,8 +144,9 @@ const RecentTransactions = () => {
     createdAt: t.created_at,
   }));
 
-  const depositItems: Item[] = (deposits ?? []).map((d) => ({
+  const depositItems: Item[] = (deposits ?? []).map((d: any) => ({
     key: `d-${d.id}`,
+    journalId: d.journal_id,
     kind: "receive",
     status: "completed",
     amount: Number(d.credit_amount),
@@ -158,6 +160,7 @@ const RecentTransactions = () => {
 
   const fxItems: Item[] = (fxSwaps ?? []).map((f: any) => ({
     key: `fx-${f.id}`,
+    journalId: f.journal_id,
     kind: "exchange",
     status: "completed",
     amount: Number(f.credit_amount),
@@ -275,6 +278,10 @@ const RecentTransactions = () => {
                 >
                   {item.transferId ? (
                     <Link to={`/transfers/${item.transferId}`} className="block">
+                      {inner}
+                    </Link>
+                  ) : item.journalId ? (
+                    <Link to={`/transactions/${item.journalId}`} className="block">
                       {inner}
                     </Link>
                   ) : (

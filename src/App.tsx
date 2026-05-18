@@ -31,6 +31,7 @@ import DepositComplete from "./pages/DepositComplete";
 import PaymentCallback from "./pages/PaymentCallback";
 import TransferTrackingPage from "./pages/TransferTrackingPage";
 import TransfersListPage from "./pages/TransfersListPage";
+import TransactionDetailPage from "./pages/TransactionDetailPage";
 import ContactsPage from "./pages/ContactsPage";
 import CanadaTransferPage from "./pages/CanadaTransferPage";
 import ReceivePage from "./pages/ReceivePage";
@@ -186,6 +187,7 @@ const AppRoutes = () => {
           <Route path="/security" element={<ProtectedRoute><SecurityPage /></ProtectedRoute>} />
           <Route path="/transfers" element={<KycProtectedRoute><TransfersListPage /></KycProtectedRoute>} />
           <Route path="/transfers/:id" element={<KycProtectedRoute><TransferTrackingPage /></KycProtectedRoute>} />
+          <Route path="/transactions/:journalId" element={<KycProtectedRoute><TransactionDetailPage /></KycProtectedRoute>} />
           <Route path="/contacts" element={<KycProtectedRoute><ContactsPage /></KycProtectedRoute>} />
           <Route path="/transfers/canada" element={<KycProtectedRoute><CanadaTransferPage /></KycProtectedRoute>} />
           <Route path="/wallet/receive" element={<KycProtectedRoute><ReceivePage /></KycProtectedRoute>} />
