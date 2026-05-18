@@ -31,6 +31,7 @@ import DepositComplete from "./pages/DepositComplete";
 import PaymentCallback from "./pages/PaymentCallback";
 import TransferTrackingPage from "./pages/TransferTrackingPage";
 import TransfersListPage from "./pages/TransfersListPage";
+import TransactionDetailPage from "./pages/TransactionDetailPage";
 import ContactsPage from "./pages/ContactsPage";
 import CanadaTransferPage from "./pages/CanadaTransferPage";
 import ReceivePage from "./pages/ReceivePage";
