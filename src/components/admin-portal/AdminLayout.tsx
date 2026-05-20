@@ -20,6 +20,7 @@ const NAV = [
   { to: "/admin/users", label: "Users", icon: Users },
   { to: "/admin/risk-tiers", label: "Risk Tiers", icon: Layers },
   { to: "/admin/audit-log", label: "Audit Log", icon: ScrollText },
+  { to: "/admin/diagnostics", label: "Diagnostics", icon: Activity },
   { to: "/admin/settings", label: "Settings", icon: Settings },
 ];
 
