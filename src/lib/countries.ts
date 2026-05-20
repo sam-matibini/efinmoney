@@ -50,7 +50,12 @@ export const COUNTRIES: CountryInfo[] = [
   { id: "Ivory Coast", country: "Ivory Coast", code: "XOF", flag: "🇨🇮", method: "Wave/Orange", payout: "mobile_money", region: "Africa" },
   { id: "Cameroon", country: "Cameroon", code: "XAF", flag: "🇨🇲", method: "MTN Mobile", payout: "mtn_mobile", region: "Africa" },
   { id: "South Africa", country: "South Africa", code: "ZAR", flag: "🇿🇦", method: "Bank Transfer", payout: "bank", region: "Africa", symbol: "R" },
-  { id: "Mozambique", country: "Mozambique", code: "MZN", flag: "🇲🇿", method: "M-Pesa", payout: "mpesa", region: "Africa" },
+  { id: "Mozambique", country: "Mozambique", code: "MZN", flag: "🇲🇿", method: "Bank/Mobile", payout: "bank", region: "Africa", symbol: "MT", networks: [
+    { id: "bank", label: "Bank Account", payout: "bank" },
+    { id: "mpesa", label: "M-Pesa (Vodacom)", payout: "mpesa" },
+    { id: "emola", label: "eMola (Movitel)", payout: "emola" },
+    { id: "mkesh", label: "mKesh (Tmcel)", payout: "mkesh" },
+  ] },
   { id: "Malawi", country: "Malawi", code: "MWK", flag: "🇲🇼", method: "Airtel Money", payout: "airtel_money", region: "Africa" },
   { id: "Benin", country: "Benin", code: "XOF", flag: "🇧🇯", method: "Mobile Money", payout: "mobile_money", region: "Africa" },
   { id: "Togo", country: "Togo", code: "XOF", flag: "🇹🇬", method: "Mobile Money", payout: "mobile_money", region: "Africa" },
