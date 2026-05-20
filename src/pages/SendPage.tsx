@@ -33,7 +33,7 @@ import { friendlyFlwError, fetchFxRate, cardChargeCurrency, initializeFlwPayment
 import { currencySymbol, countryToCurrency } from "@/lib/currency";
 import { useProfile } from "@/hooks/useProfile";
 import { toast } from "sonner";
-import { ArrowRight, CheckCircle, Users, Clock, Shield, Wallet, Landmark, CreditCard, AlertCircle, X } from "lucide-react";
+import { ArrowRight, CheckCircle, Users, Clock, Shield, Wallet, Landmark, CreditCard, AlertCircle, X, Search } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import CanadaSendFlow from "@/components/send/CanadaSendFlow";
 import AnimatedNumber from "@/components/ui/AnimatedNumber";
