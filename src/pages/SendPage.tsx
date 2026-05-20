@@ -96,6 +96,7 @@ const SendPage = () => {
   // NGN bank payout state
   const [ngnBanks, setNgnBanks] = useState<Array<{ code: string; name: string }>>([]);
   const [ngnBankCode, setNgnBankCode] = useState<string>("");
+  const [ngnBankSearch, setNgnBankSearch] = useState("");
   const [ngnAccountNumber, setNgnAccountNumber] = useState<string>("");
   const [ngnResolving, setNgnResolving] = useState(false);
   const [ngnResolvedName, setNgnResolvedName] = useState<string | null>(null);
