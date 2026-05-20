@@ -1344,10 +1344,25 @@ const SendPage = () => {
                                             <SelectTrigger>
                                               <SelectValue placeholder={ngnBanks.length ? "Select Nigerian bank" : "Loading banks..."} />
                                             </SelectTrigger>
-                                            <SelectContent className="max-h-[300px]">
-                                              {ngnBanks.map((b) => (
-                                                <SelectItem key={b.code} value={b.code}>{b.name}</SelectItem>
-                                              ))}
+                                            <SelectContent className="max-h-[320px]">
+                                              <div className="sticky top-0 z-10 bg-popover p-2 border-b">
+                                                <div className="relative">
+                                                  <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                                                  <Input
+                                                    autoFocus
+                                                    value={ngnBankSearch}
+                                                    onChange={(e) => setNgnBankSearch(e.target.value)}
+                                                    onKeyDown={(e) => e.stopPropagation()}
+                                                    placeholder="Search bank..."
+                                                    className="pl-8 h-8"
+                                                  />
+                                                </div>
+                                              </div>
+                                              {ngnBanks
+                                                .filter((b) => b.name.toLowerCase().includes(ngnBankSearch.toLowerCase()))
+                                                .map((b) => (
+                                                  <SelectItem key={b.code} value={b.code}>{b.name}</SelectItem>
+                                                ))}
                                             </SelectContent>
                                           </Select>
                                         </motion.div>
