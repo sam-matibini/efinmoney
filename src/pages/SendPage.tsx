@@ -497,8 +497,14 @@ const SendPage = () => {
         }
         if (invokeErr) throw new Error(invokeErr.message || 'Payout failed');
         const payout = data?.payout;
+        const redirectUrl = payout?.redirect_url;
         goToStep(4);
-        toast.success(payout?.queued ? 'Transfer queued — awaiting payout partner' : 'Transfer sent successfully!');
+        if (redirectUrl) {
+          window.open(redirectUrl, '_blank', 'noopener,noreferrer');
+          toast.success('Please complete the verification on the payment page to finalize your transfer.', { duration: 10000 });
+        } else {
+          toast.success(payout?.queued ? 'Transfer queued — awaiting payout partner' : 'Transfer sent successfully!');
+        }
       } catch (e: any) {
         const raw = String(e?.message || '');
         const isUpstream =
@@ -606,8 +612,14 @@ const SendPage = () => {
       if (error || (data as any)?.error) throw new Error((data as any)?.error || error?.message || 'Payout failed');
       const payout = (data as any)?.payout;
       if (payout && payout.success === false) throw new Error(payout.error || 'Payout failed');
+      const redirectUrl = payout?.redirect_url;
       goToStep(4);
-      toast.success(payout?.queued ? 'Card charged — payout queued' : 'Transfer sent successfully!');
+      if (redirectUrl) {
+        window.open(redirectUrl, '_blank', 'noopener,noreferrer');
+        toast.success('Please complete the verification on the payment page to finalize your transfer.', { duration: 10000 });
+      } else {
+        toast.success(payout?.queued ? 'Card charged — payout queued' : 'Transfer sent successfully!');
+      }
     } catch (e: any) {
       const msg = String(e?.message ?? 'orchestration pending');
       // If the payout truly failed (refund issued or partner declined), mark
