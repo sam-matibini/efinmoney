@@ -29,6 +29,8 @@ Deno.serve(async (req) => {
   try {
     const rawBody = await req.text();
     const signature =
+      req.headers.get("x-elicatepay-signature") ||
+      req.headers.get("X-ElicatePay-Signature") ||
       req.headers.get("x-elicate-signature") ||
       req.headers.get("X-Elicate-Signature") ||
       req.headers.get("verif-hash") ||
@@ -60,23 +62,47 @@ Deno.serve(async (req) => {
     const eventType: string = payload.event || payload.type || "";
     const data = payload.data || payload;
     const providerRef: string | undefined =
-      data.transaction_id || data.transactionId || data.reference || data.id;
+      data.transaction_id || data.transactionId || data.id;
+    const merchantReference: string | undefined = data.reference;
 
-    if (!providerRef) {
+    if (!providerRef && !merchantReference) {
       return new Response(JSON.stringify({ error: "Missing reference" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     // Locate the originating transfer
-    const { data: transfer } = await supabase
-      .from("transfers")
-      .select("*")
-      .eq("provider_reference", providerRef)
-      .maybeSingle();
+    let transfer: any = null;
+
+    if (providerRef) {
+      const { data } = await supabase
+        .from("transfers")
+        .select("*")
+        .eq("provider_reference", providerRef)
+        .maybeSingle();
+      transfer = data;
+    }
+
+    if (!transfer && merchantReference) {
+      const byId = await supabase
+        .from("transfers")
+        .select("*")
+        .eq("id", merchantReference)
+        .maybeSingle();
+      transfer = byId.data;
+    }
+
+    if (!transfer && merchantReference) {
+      const byProviderRef = await supabase
+        .from("transfers")
+        .select("*")
+        .eq("provider_reference", merchantReference)
+        .maybeSingle();
+      transfer = byProviderRef.data;
+    }
 
     if (!transfer) {
-      console.warn("Elicate webhook: no transfer for ref", providerRef);
+      console.warn("Elicate webhook: no transfer for refs", { providerRef, merchantReference });
       return new Response(JSON.stringify({ received: true, matched: false }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

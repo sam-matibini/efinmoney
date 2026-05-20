@@ -42,6 +42,12 @@ function normalizeZmPhone(raw?: string | null): string {
   return phone;
 }
 
+function buildReference(transferId: string, existing?: string | null): string {
+  const candidate = String(existing || "").trim();
+  if (candidate) return candidate;
+  return transferId;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -80,8 +86,17 @@ Deno.serve(async (req) => {
     const network = resolveNetwork(transfer.payout_method || transfer.recipient_network);
     const phone = normalizeZmPhone(transfer.recipient_phone);
     const amount = Math.round(Number(transfer.target_amount ?? transfer.source_amount) * 100) / 100;
+    const reference = buildReference(transfer_id, transfer.provider_reference);
+    const customerName = String(transfer.recipient_name || "Customer").trim() || "Customer";
 
-    const payload = { amount, phone, network };
+    const payload = {
+      amount,
+      phone,
+      network,
+      currency: "ZMW",
+      reference,
+      customer_name: customerName,
+    };
 
     console.log("Elicate charge request:", { url: ELICATE_URL, payload });
 
@@ -117,7 +132,9 @@ Deno.serve(async (req) => {
     // Extract documented fields: transaction_id + meta.authorization.redirect_url
     const data = respJson?.data || respJson;
     const transactionId =
-      data?.transaction_id || data?.transactionId || data?.id || data?.reference;
+      data?.transaction_id || data?.transactionId || data?.id || null;
+    const providerReference =
+      transactionId || data?.reference || reference;
     const redirectUrl =
       data?.meta?.authorization?.redirect_url ||
       data?.authorization?.redirect_url ||
@@ -127,14 +144,14 @@ Deno.serve(async (req) => {
 
     await supabase.from("transfers").update({
       status: "processing",
-      provider_reference: transactionId || `EFM-ELC-${transfer_id.slice(0, 8)}-${Date.now()}`,
+      provider_reference: providerReference,
     }).eq("id", transfer_id);
 
     return new Response(JSON.stringify({
       success: true,
       transaction_id: transactionId,
       redirect_url: redirectUrl,
-      provider_reference: transactionId,
+      provider_reference: providerReference,
       provider_response: respJson,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (err) {
