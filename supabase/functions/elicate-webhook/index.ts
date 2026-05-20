@@ -159,7 +159,7 @@ Deno.serve(async (req) => {
         status: "completed",
         completed_at: new Date().toISOString(),
       }).eq("id", transfer.id);
-    } else if (eventType === "payout.failed" || eventType === "payout.failure") {
+    } else if (isFailure) {
       await supabase.from("transfers").update({
         status: "failed",
         failure_reason: data.reason || data.message || "Elicate payout failed",
