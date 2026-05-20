@@ -33,7 +33,7 @@ import { friendlyFlwError, fetchFxRate, cardChargeCurrency, initializeFlwPayment
 import { currencySymbol, countryToCurrency } from "@/lib/currency";
 import { useProfile } from "@/hooks/useProfile";
 import { toast } from "sonner";
-import { ArrowRight, CheckCircle, Users, Clock, Shield, Wallet, Landmark, CreditCard, AlertCircle, X } from "lucide-react";
+import { ArrowRight, CheckCircle, Users, Clock, Shield, Wallet, Landmark, CreditCard, AlertCircle, X, Search } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import CanadaSendFlow from "@/components/send/CanadaSendFlow";
 import AnimatedNumber from "@/components/ui/AnimatedNumber";
@@ -96,6 +96,7 @@ const SendPage = () => {
   // NGN bank payout state
   const [ngnBanks, setNgnBanks] = useState<Array<{ code: string; name: string }>>([]);
   const [ngnBankCode, setNgnBankCode] = useState<string>("");
+  const [ngnBankSearch, setNgnBankSearch] = useState("");
   const [ngnAccountNumber, setNgnAccountNumber] = useState<string>("");
   const [ngnResolving, setNgnResolving] = useState(false);
   const [ngnResolvedName, setNgnResolvedName] = useState<string | null>(null);
@@ -105,6 +106,7 @@ const SendPage = () => {
   const [ghPayoutMode, setGhPayoutMode] = useState<'mobile' | 'bank'>('mobile');
   const [ghBanks, setGhBanks] = useState<Array<{ code: string; name: string }>>([]);
   const [ghBankCode, setGhBankCode] = useState<string>("");
+  const [ghBankSearch, setGhBankSearch] = useState("");
   const [ghAccountNumber, setGhAccountNumber] = useState<string>("");
   // V4: no public key needed
   const navigate = useNavigate();
@@ -1342,10 +1344,25 @@ const SendPage = () => {
                                             <SelectTrigger>
                                               <SelectValue placeholder={ngnBanks.length ? "Select Nigerian bank" : "Loading banks..."} />
                                             </SelectTrigger>
-                                            <SelectContent className="max-h-[300px]">
-                                              {ngnBanks.map((b) => (
-                                                <SelectItem key={b.code} value={b.code}>{b.name}</SelectItem>
-                                              ))}
+                                            <SelectContent className="max-h-[320px]">
+                                              <div className="sticky top-0 z-10 bg-popover p-2 border-b">
+                                                <div className="relative">
+                                                  <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                                                  <Input
+                                                    autoFocus
+                                                    value={ngnBankSearch}
+                                                    onChange={(e) => setNgnBankSearch(e.target.value)}
+                                                    onKeyDown={(e) => e.stopPropagation()}
+                                                    placeholder="Search bank..."
+                                                    className="pl-8 h-8"
+                                                  />
+                                                </div>
+                                              </div>
+                                              {ngnBanks
+                                                .filter((b) => b.name.toLowerCase().includes(ngnBankSearch.toLowerCase()))
+                                                .map((b) => (
+                                                  <SelectItem key={b.code} value={b.code}>{b.name}</SelectItem>
+                                                ))}
                                             </SelectContent>
                                           </Select>
                                         </motion.div>
@@ -1404,10 +1421,25 @@ const SendPage = () => {
                                             <SelectTrigger>
                                               <SelectValue placeholder={ghBanks.length ? "Select Ghanaian bank" : "Loading banks..."} />
                                             </SelectTrigger>
-                                            <SelectContent className="max-h-[300px]">
-                                              {ghBanks.map((b) => (
-                                                <SelectItem key={b.code} value={b.code}>{b.name}</SelectItem>
-                                              ))}
+                                            <SelectContent className="max-h-[320px]">
+                                              <div className="sticky top-0 z-10 bg-popover p-2 border-b">
+                                                <div className="relative">
+                                                  <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                                                  <Input
+                                                    autoFocus
+                                                    value={ghBankSearch}
+                                                    onChange={(e) => setGhBankSearch(e.target.value)}
+                                                    onKeyDown={(e) => e.stopPropagation()}
+                                                    placeholder="Search bank..."
+                                                    className="pl-8 h-8"
+                                                  />
+                                                </div>
+                                              </div>
+                                              {ghBanks
+                                                .filter((b) => b.name.toLowerCase().includes(ghBankSearch.toLowerCase()))
+                                                .map((b) => (
+                                                  <SelectItem key={b.code} value={b.code}>{b.name}</SelectItem>
+                                                ))}
                                             </SelectContent>
                                           </Select>
                                         </motion.div>
