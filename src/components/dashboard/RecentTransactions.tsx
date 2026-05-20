@@ -228,13 +228,27 @@ const RecentTransactions = () => {
           <div className="space-y-1">
             {items.map((item, index) => {
               const meta = KIND_META[item.kind];
+              const isFailed = item.status === "failed";
+              const isPending = item.status === "pending";
+              const rowBorder = isFailed
+                ? "border-l-rose-500/40 bg-rose-500/[0.03] hover:bg-rose-500/[0.06]"
+                : isPending
+                ? "border-l-amber-500 bg-amber-500/[0.03] hover:bg-amber-500/[0.06]"
+                : `${meta.border} hover:bg-muted/60`;
+              const iconBg = isFailed ? "bg-muted text-muted-foreground" : meta.bg;
+              const amountColor = isFailed
+                ? "text-muted-foreground line-through decoration-rose-500/60"
+                : meta.amountColor;
               const inner = (
-                <div className={`group/tx flex items-center gap-3 p-3 rounded-xl hover:bg-muted/60 transition-colors cursor-pointer border-l-4 ${meta.border}`}>
-                  <div className={`shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${meta.bg}`}>
+                <div className={`group/tx flex items-center gap-3 p-3 rounded-xl transition-colors cursor-pointer border-l-4 ${rowBorder}`}>
+                  <div className={`shrink-0 w-10 h-10 rounded-full flex items-center justify-center relative ${iconBg}`}>
                     <meta.Icon className="w-5 h-5" />
+                    {isFailed && (
+                      <span className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-rose-500 text-white flex items-center justify-center text-[10px] font-bold ring-2 ring-card">!</span>
+                    )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-foreground truncate">{item.recipient}</p>
+                    <p className={`font-semibold truncate ${isFailed ? "text-muted-foreground" : "text-foreground"}`}>{item.recipient}</p>
                     <p className="text-xs text-muted-foreground truncate">
                       {item.description} · {item.date}
                     </p>
@@ -254,16 +268,17 @@ const RecentTransactions = () => {
                     <Copy className="w-3.5 h-3.5 text-muted-foreground" />
                   </button>
                   <div className="text-right shrink-0">
-                    <p className={`text-base sm:text-lg font-display font-bold tabular-nums ${meta.amountColor}`}>
+                    <p className={`text-base sm:text-lg font-display font-bold tabular-nums ${amountColor}`}>
                       {meta.sign}
                       {item.symbol}
                       {item.amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </p>
                     <span
-                      className={`inline-block mt-0.5 px-2 py-0.5 rounded-full text-[10px] font-semibold capitalize ${
+                      className={`inline-flex items-center gap-1 mt-0.5 px-2 py-0.5 rounded-full text-[10px] font-semibold capitalize ${
                         STATUS_PILL[item.status]
                       }`}
                     >
+                      <span className={`w-1.5 h-1.5 rounded-full ${item.status === "completed" ? "bg-emerald-500" : item.status === "failed" ? "bg-rose-500" : "bg-amber-500"}`} />
                       {item.status}
                     </span>
                   </div>
