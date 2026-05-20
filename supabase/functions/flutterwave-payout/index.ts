@@ -28,6 +28,24 @@ const V3_MM_BANK: Record<string, string> = {
   "RWF:mtn": "MTN", "RWF:airtel": "ATL",
 };
 
+// Flutterwave V3 requires `destination_branch_code` for payouts to some
+// corridors (Uganda UGX, Tanzania TZS). Without it, the transfer is queued
+// and then fails asynchronously with "branchcode not provided" on the webhook.
+// Keyed by `${currency}:${account_bank}` (account_bank already mapped above for
+// mobile money, or raw bank code for bank rails).
+const V3_BRANCH_CODES: Record<string, string> = {
+  "UGX:MTN": "UG010101",
+  "UGX:ATL": "UG020202",
+  "TZS:AIRTEL": "TZ010101",
+  "TZS:ATL": "TZ010101",
+  "TZS:VODACOM": "TZ020202",
+  "TZS:VOD": "TZ020202",
+  "TZS:TIGO": "TZ030303",
+};
+
+// Currencies that always require a branch code regardless of rail
+const BRANCH_CODE_REQUIRED_CURRENCIES = new Set(["UGX", "TZS"]);
+
 function normalizePhone(phone: string): string { return phone.replace(/\D/g, ""); }
 
 function isTemporaryProviderSetupError(message: string): boolean {
@@ -123,6 +141,8 @@ Deno.serve(async (req) => {
         beneficiary_name: recipient_name,
         meta: [{ transfer_id, network: network || "bank" }],
       };
+      const branch = V3_BRANCH_CODES[`${currency}:${String(bank_code)}`];
+      if (branch) (payload as Record<string, unknown>).destination_branch_code = branch;
     } else {
       const bank = V3_MM_BANK[`${currency}:${network.toLowerCase()}`];
       if (!bank) {
@@ -144,6 +164,17 @@ Deno.serve(async (req) => {
         beneficiary_name: recipient_name,
         meta: [{ transfer_id, network }],
       };
+      const branch = V3_BRANCH_CODES[`${currency}:${bank}`];
+      if (branch) (payload as Record<string, unknown>).destination_branch_code = branch;
+    }
+
+    // Hard-stop if the destination requires a branch code we don't know.
+    if (BRANCH_CODE_REQUIRED_CURRENCIES.has(currency) && !(payload as Record<string, unknown>).destination_branch_code) {
+      const reason = `Missing branch code for ${currency} payout — network not yet supported`;
+      const rev = await reverseTransferLedger(supabase, transfer_id);
+      await supabase.from("transfers").update({ status: "failed", failure_reason: reason }).eq("id", transfer_id);
+      await supabase.from("notifications").insert({ user_id: user.id, title: "Transfer failed — refunded", message: rev.reversed ? `${reason}. Funds returned to your wallet.` : reason, type: "error" });
+      return new Response(JSON.stringify({ success: false, error: reason, refunded: rev.reversed }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const { ok, status, json } = await flwV3Fetch("/transfers", { method: "POST", body: JSON.stringify(payload), timeoutMs: 25_000 });

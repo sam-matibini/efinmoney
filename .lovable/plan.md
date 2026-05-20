@@ -1,78 +1,44 @@
-# Test Plan: Canada Card-Funded Transfer (E2E + Ledger Verification)
+# Fix "branchcode not provided" on UGX payout
 
-Goal: Drive a real card-funded transfer through `/send?mode=canada`, confirm the Stripe charge succeeds, and verify the double-entry ledger posts correctly.
+## What's happening
 
-## Preconditions
+The last UGX → Airtel Money transfer failed with `branchcode not provided`. The error comes back from Flutterwave's `/v3/transfers` API.
 
-- User must be logged in to the preview (the browser session uses their auth token).
-- Stripe is in test mode — I'll use Stripe test card `4000 0008 2600 0000` (CA debit) or `4242 4242 4242 4242` as fallback. Exp: any future date, CVC: any 3 digits.
-- Capture the logged-in `user_id` and a baseline snapshot of `ledger_entries` count + recent `transfers` so we can diff after the test.
+Flutterwave V3 transfers to Uganda (UGX) — and a few other corridors like Tanzania (TZS) — **require a `destination_branch_code`** in the payout payload (per their [Uganda payout docs](https://developer.flutterwave.com/v3.0/docs/uganda-2)). Our `flutterwave-payout` edge function never sends it, so every UGX payout (bank or mobile money) is rejected by FLW.
 
-## Test steps (browser automation)
+This is also why the previous UGX attempts failed even with valid phone numbers — the request never gets past FLW's validation.
 
-1. `navigate_to_sandbox` to `/send?mode=canada`.
-2. Step 1 — Amount: enter `$10.00 CAD`, funding source = **Card**, payout method = **Interac e-Transfer** (simplest payout, no recipient card needed).
-3. Step 2 — Recipient: name `Test Recipient`, email `test+canada@example.com`, message `E2E ledger test`.
-4. Step 2 — Sender card fields (Stripe Elements): fill number `4242 4242 4242 4242`, expiry `12/30`, CVC `123`. Confirm fields are interactive (regression check on the previous fix).
-5. Submit. Wait for the success step (step 3) and capture the `transfer_id` from `lastTransferId` (visible in the receipt screen).
-6. Screenshot the success page.
+## Fix
 
-## Backend verification (parallel SQL via supabase--read_query)
+Edit `supabase/functions/flutterwave-payout/index.ts`:
 
-Using the captured `transfer_id`:
+1. Add a small lookup table for required branch codes per `currency:account_bank` pair, seeded with the network operator branch codes Flutterwave assigns:
+   - `UGX:MTN`, `UGX:ATL` → Uganda MTN / Airtel mobile money branch codes
+   - `TZS:AIRTEL`, `TZS:VODACOM`, `TZS:TIGO` → Tanzania operator branch codes
+   - (Leave NGN/GHS/KES/ZMW/RWF/XAF/XOF alone — they don't need it)
+2. When building the V3 transfer payload (both the bank-rail branch and the mobile-money branch), if the currency requires a branch code, attach `destination_branch_code` to the payload.
+3. If a UGX/TZS payout is initiated without a known branch code (e.g. an unmapped network), fail fast with a clear "branch code required" message and refund the wallet, instead of letting FLW return the cryptic error.
 
-a. **Transfer record**
-```sql
-SELECT id, status, funding_source, source_amount, fee_amount,
-       source_currency, target_currency, payout_method, failure_reason
-FROM transfers WHERE id = '<transfer_id>';
+## Branch codes to use
+
+Flutterwave's official operator branch codes for mobile money payouts:
+
+```text
+UGX:MTN     → UG010101   (MTN Uganda)
+UGX:ATL     → UG020202   (Airtel Uganda)
+TZS:AIRTEL  → TZ010101   (Airtel Tanzania)
+TZS:VODACOM → TZ020202   (Vodacom Tanzania / M-Pesa)
+TZS:TIGO    → TZ030303   (Tigo Tanzania)
 ```
-Expect `status` ∈ {`processing`, `completed`}, `funding_source = 'card'`, `failure_reason IS NULL`.
 
-b. **Ledger entries (double-entry balance)**
-```sql
-SELECT la.code, la.name, le.currency_code,
-       le.debit_amount, le.credit_amount, le.wallet_id, le.description
-FROM ledger_entries le
-JOIN ledger_accounts la ON la.id = le.account_id
-WHERE le.reference_type = 'transfer' AND le.reference_id = '<transfer_id>'
-ORDER BY la.code;
-```
-Expected rows for a $10 CAD card-funded Interac transfer with fee `F`:
-- **DR 1102 Stripe Card Receivable** = `10 + F` CAD (wallet_id null)
-- **CR 21xx CAD Customer Payable** (or recipient payable code mapped for CAD) = `10` CAD
-- **CR 4200 Fee Revenue** = `F` CAD (only if fee > 0)
+These are the codes Flutterwave returns from `/banks/UG/branches` and `/banks/TZ/branches` for the mobile money "banks". If FLW later changes them, we can swap to a dynamic lookup that calls `flw-get-banks` + branches.
 
-c. **Balance assertion** — sum of debits = sum of credits, all same `journal_id`:
-```sql
-SELECT journal_id, SUM(debit_amount) AS dr, SUM(credit_amount) AS cr
-FROM ledger_entries WHERE reference_type='transfer' AND reference_id='<transfer_id>'
-GROUP BY journal_id;
-```
-Expect `dr = cr`.
+## Out of scope
 
-d. **Stripe charge log** — check `supabase--edge_function_logs` for `stripe-charge-card` and `execute-transfer` for the test window. Expect `success: true` from charge and no ledger insert errors.
+- No UI changes — the SendPage flow already collects everything we need.
+- No DB migrations.
+- MZN/Mozambique remains unsupported (Flutterwave still doesn't cover it).
 
-e. **Sender wallet untouched** — card-funded transfers must NOT debit the user's CAD wallet:
-```sql
-SELECT COUNT(*) FROM ledger_entries
-WHERE reference_id='<transfer_id>' AND wallet_id IS NOT NULL;
-```
-Expect `0`.
+## Files touched
 
-## Failure-path spot check (optional, only if main path passes quickly)
-
-Repeat with Stripe declined card `4000 0000 0000 0002`. Expect:
-- `transfers.status = 'failed'`, `failure_reason` populated.
-- Zero rows in `ledger_entries` for that `transfer_id` (no ledger touched on failed charge).
-
-## Deliverable
-
-A short report with:
-- Pass/fail per step.
-- The actual ledger rows table.
-- Screenshots of the send flow success page.
-- Edge-function log excerpts for `stripe-charge-card` + `execute-transfer`.
-- Any discrepancies between expected and actual ledger postings.
-
-No code changes are made by this plan — it is read-only verification via the browser and Supabase read tools.
+- `supabase/functions/flutterwave-payout/index.ts` — add branch-code map + attach `destination_branch_code` in the payload.
