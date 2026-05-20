@@ -27,11 +27,19 @@ function resolveNetwork(input?: string | null): string {
   if (!input) return "MTN";
   const key = input.toLowerCase();
   if (NETWORK_MAP[key]) return NETWORK_MAP[key];
-  // Heuristic fallback: contains substring
   if (key.includes("mtn")) return "MTN";
   if (key.includes("airtel")) return "AIRTEL";
   if (key.includes("zamtel")) return "ZAMTEL";
   return input.toUpperCase();
+}
+
+// Normalize to local Zambian format (e.g. 0961234567)
+function normalizeZmPhone(raw?: string | null): string {
+  let phone = String(raw || "").replace(/[^\d]/g, "");
+  if (phone.startsWith("00")) phone = phone.slice(2);
+  if (phone.startsWith("260")) phone = phone.slice(3);
+  if (!phone.startsWith("0")) phone = "0" + phone;
+  return phone;
 }
 
 Deno.serve(async (req) => {
@@ -70,20 +78,12 @@ Deno.serve(async (req) => {
     }
 
     const network = resolveNetwork(transfer.payout_method || transfer.recipient_network);
+    const phone = normalizeZmPhone(transfer.recipient_phone);
+    const amount = Math.round(Number(transfer.target_amount ?? transfer.source_amount) * 100) / 100;
 
-    // Normalize Zambian MSISDN to 2609XXXXXXXX (no leading +, no leading 0)
-    let phone = String(transfer.recipient_phone || "").replace(/[^\d]/g, "");
-    if (phone.startsWith("00")) phone = phone.slice(2);
-    if (phone.startsWith("0")) phone = "260" + phone.slice(1);
-    if (phone.length === 9) phone = "260" + phone; // bare 9-digit
+    const payload = { amount, phone, network };
 
-    const payload = {
-      amount: Math.round(Number(transfer.target_amount ?? transfer.source_amount)),
-      phone,
-      network,
-    };
-
-    console.log("Elicate payout request:", { url: ELICATE_URL, payload });
+    console.log("Elicate charge request:", { url: ELICATE_URL, payload });
 
     const res = await fetch(ELICATE_URL, {
       method: "POST",
@@ -96,7 +96,7 @@ Deno.serve(async (req) => {
     });
 
     const respText = await res.text();
-    console.log("Elicate payout response:", res.status, respText);
+    console.log("Elicate charge response:", res.status, respText);
 
     let respJson: any = {};
     try { respJson = JSON.parse(respText); } catch { respJson = { raw: respText }; }
@@ -108,28 +108,33 @@ Deno.serve(async (req) => {
       }).eq("id", transfer_id);
       return new Response(JSON.stringify({
         success: false,
-        error: respJson?.message || respJson?.error || "Elicate payout failed",
+        error: respJson?.message || respJson?.error || "Elicate charge failed",
         provider_status: res.status,
         provider_response: respJson,
       }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const providerRef =
-      respJson?.data?.reference ||
-      respJson?.data?.id ||
-      respJson?.reference ||
-      respJson?.id ||
-      respJson?.transactionId ||
-      `EFM-ELC-${transfer_id.slice(0, 8)}-${Date.now()}`;
+    // Extract documented fields: transaction_id + meta.authorization.redirect_url
+    const data = respJson?.data || respJson;
+    const transactionId =
+      data?.transaction_id || data?.transactionId || data?.id || data?.reference;
+    const redirectUrl =
+      data?.meta?.authorization?.redirect_url ||
+      data?.authorization?.redirect_url ||
+      data?.redirect_url ||
+      respJson?.redirect_url ||
+      null;
 
     await supabase.from("transfers").update({
       status: "processing",
-      provider_reference: providerRef,
+      provider_reference: transactionId || `EFM-ELC-${transfer_id.slice(0, 8)}-${Date.now()}`,
     }).eq("id", transfer_id);
 
     return new Response(JSON.stringify({
       success: true,
-      provider_reference: providerRef,
+      transaction_id: transactionId,
+      redirect_url: redirectUrl,
+      provider_reference: transactionId,
       provider_response: respJson,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (err) {
