@@ -6,21 +6,32 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const ELICATE_BASE_URL = Deno.env.get("ELICATE_BASE_URL") || "https://api.elicatepay.com/v1";
+const ELICATE_URL =
+  Deno.env.get("ELICATE_BASE_URL") ||
+  "https://elicatepay.vercel.app/api/v1/payments/charge";
 
-// Map internal payout_method codes -> Elicate network identifier for ZMW
+// Map internal payout_method / network codes -> Elicate uppercase network string
 const NETWORK_MAP: Record<string, string> = {
-  mtn_mobile: "mtn",
-  airtel_money: "airtel",
-  zamtel_money: "zamtel",
-  mtn: "mtn",
-  airtel: "airtel",
-  zamtel: "zamtel",
+  mtn: "MTN",
+  mtn_mobile: "MTN",
+  mtn_zambia: "MTN",
+  mtn_money: "MTN",
+  airtel: "AIRTEL",
+  airtel_money: "AIRTEL",
+  airtel_zambia: "AIRTEL",
+  zamtel: "ZAMTEL",
+  zamtel_money: "ZAMTEL",
 };
 
-function resolveNetwork(payoutMethod?: string | null): string {
-  if (!payoutMethod) return "mtn";
-  return NETWORK_MAP[payoutMethod.toLowerCase()] || "mtn";
+function resolveNetwork(input?: string | null): string {
+  if (!input) return "MTN";
+  const key = input.toLowerCase();
+  if (NETWORK_MAP[key]) return NETWORK_MAP[key];
+  // Heuristic fallback: contains substring
+  if (key.includes("mtn")) return "MTN";
+  if (key.includes("airtel")) return "AIRTEL";
+  if (key.includes("zamtel")) return "ZAMTEL";
+  return input.toUpperCase();
 }
 
 Deno.serve(async (req) => {
@@ -58,18 +69,16 @@ Deno.serve(async (req) => {
       });
     }
 
-    const reference = `EFM-ELC-${transfer_id.slice(0, 8)}-${Date.now()}`;
+    const network = resolveNetwork(transfer.payout_method || transfer.recipient_network);
     const payload = {
       amount: Number(transfer.target_amount ?? transfer.source_amount),
-      currency: "ZMW",
-      recipient_phone: transfer.recipient_phone,
-      recipient_name: transfer.recipient_name,
-      network: resolveNetwork(transfer.payout_method),
-      reference,
-      narration: `Payout to ${transfer.recipient_name}`,
+      phone: transfer.recipient_phone,
+      network,
     };
 
-    const res = await fetch(`${ELICATE_BASE_URL}/payouts`, {
+    console.log("Elicate payout request:", { url: ELICATE_URL, payload });
+
+    const res = await fetch(ELICATE_URL, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${secret}`,
@@ -79,10 +88,13 @@ Deno.serve(async (req) => {
       body: JSON.stringify(payload),
     });
 
-    const respJson = await res.json().catch(() => ({}));
+    const respText = await res.text();
+    console.log("Elicate payout response:", res.status, respText);
+
+    let respJson: any = {};
+    try { respJson = JSON.parse(respText); } catch { respJson = { raw: respText }; }
 
     if (!res.ok) {
-      console.error("Elicate payout failed:", res.status, respJson);
       await supabase.from("transfers").update({
         status: "failed",
         failure_reason: respJson?.message || respJson?.error || `Elicate error ${res.status}`,
@@ -100,7 +112,8 @@ Deno.serve(async (req) => {
       respJson?.data?.id ||
       respJson?.reference ||
       respJson?.id ||
-      reference;
+      respJson?.transactionId ||
+      `EFM-ELC-${transfer_id.slice(0, 8)}-${Date.now()}`;
 
     await supabase.from("transfers").update({
       status: "processing",

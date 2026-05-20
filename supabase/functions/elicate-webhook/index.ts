@@ -81,7 +81,12 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (eventType === "payout.successful" || eventType === "payout.success") {
+    const successEvents = ["payout.successful", "payout.success", "charge.successful", "charge.success", "payment.successful", "payment.success"];
+    const failureEvents = ["payout.failed", "payout.failure", "charge.failed", "payment.failed"];
+    const isSuccess = successEvents.includes(eventType) || (data.status && ["successful", "success", "completed"].includes(String(data.status).toLowerCase()));
+    const isFailure = failureEvents.includes(eventType) || (data.status && ["failed", "failure"].includes(String(data.status).toLowerCase()));
+
+    if (isSuccess) {
       // Idempotency: skip if already completed
       if (transfer.status === "completed") {
         return new Response(JSON.stringify({ received: true, duplicate: true }), {
@@ -154,7 +159,7 @@ Deno.serve(async (req) => {
         status: "completed",
         completed_at: new Date().toISOString(),
       }).eq("id", transfer.id);
-    } else if (eventType === "payout.failed" || eventType === "payout.failure") {
+    } else if (isFailure) {
       await supabase.from("transfers").update({
         status: "failed",
         failure_reason: data.reason || data.message || "Elicate payout failed",
