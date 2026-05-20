@@ -164,14 +164,13 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Restrict to admin_users
+    // Restrict to admins (either admin_users portal row OR user_roles 'admin')
     const uid = claims.claims.sub;
-    const { data: adminRow } = await supabase
-      .from("admin_users")
-      .select("id")
-      .eq("id", uid)
-      .maybeSingle();
-    if (!adminRow) {
+    const [{ data: adminRow }, { data: roleRow }] = await Promise.all([
+      supabase.from("admin_users").select("id").eq("id", uid).maybeSingle(),
+      supabase.from("user_roles").select("role").eq("user_id", uid).eq("role", "admin").maybeSingle(),
+    ]);
+    if (!adminRow && !roleRow) {
       return new Response(JSON.stringify({ error: "Forbidden — admin only" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
