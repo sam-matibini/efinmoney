@@ -79,6 +79,11 @@ export const MM_COUNTRIES: MMCountry[] = [
     { value: "LUMICASH", label: "Lumicash (Econet)" },
     { value: "ONATEL",   label: "ONATEL" },
   ]},
+  { code: "MZ", name: "Mozambique", flag: "🇲🇿", currency: "MZN", dialCode: "+258", networks: [
+    { value: "MPS",    label: "M-Pesa (Vodacom)" },
+    { value: "EMOLA",  label: "eMola (Movitel)" },
+    { value: "MKESH",  label: "mKesh (Tmcel)" },
+  ]},
 ];
 
 export const POPULAR_MM_CODES = ["KE", "GH", "UG", "RW"];
