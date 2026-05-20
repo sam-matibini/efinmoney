@@ -106,6 +106,7 @@ const SendPage = () => {
   const [ghPayoutMode, setGhPayoutMode] = useState<'mobile' | 'bank'>('mobile');
   const [ghBanks, setGhBanks] = useState<Array<{ code: string; name: string }>>([]);
   const [ghBankCode, setGhBankCode] = useState<string>("");
+  const [ghBankSearch, setGhBankSearch] = useState("");
   const [ghAccountNumber, setGhAccountNumber] = useState<string>("");
   // V4: no public key needed
   const navigate = useNavigate();
