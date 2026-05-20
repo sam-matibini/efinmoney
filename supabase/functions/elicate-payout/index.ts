@@ -70,9 +70,16 @@ Deno.serve(async (req) => {
     }
 
     const network = resolveNetwork(transfer.payout_method || transfer.recipient_network);
+
+    // Normalize Zambian MSISDN to 2609XXXXXXXX (no leading +, no leading 0)
+    let phone = String(transfer.recipient_phone || "").replace(/[^\d]/g, "");
+    if (phone.startsWith("00")) phone = phone.slice(2);
+    if (phone.startsWith("0")) phone = "260" + phone.slice(1);
+    if (phone.length === 9) phone = "260" + phone; // bare 9-digit
+
     const payload = {
-      amount: Number(transfer.target_amount ?? transfer.source_amount),
-      phone: transfer.recipient_phone,
+      amount: Math.round(Number(transfer.target_amount ?? transfer.source_amount)),
+      phone,
       network,
     };
 
