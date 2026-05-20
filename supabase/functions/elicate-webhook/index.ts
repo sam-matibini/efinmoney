@@ -59,7 +59,8 @@ Deno.serve(async (req) => {
     const payload = JSON.parse(rawBody);
     const eventType: string = payload.event || payload.type || "";
     const data = payload.data || payload;
-    const providerRef: string | undefined = data.reference || data.id;
+    const providerRef: string | undefined =
+      data.transaction_id || data.transactionId || data.reference || data.id;
 
     if (!providerRef) {
       return new Response(JSON.stringify({ error: "Missing reference" }), {
