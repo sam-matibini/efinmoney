@@ -35,3 +35,6 @@ verify_jwt = false
 
 [functions.mtn-momo-webhook]
 verify_jwt = false
+
+[functions.test-integrations]
+verify_jwt = false
