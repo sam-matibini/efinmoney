@@ -55,6 +55,7 @@ import AdminPlaceholderPage from "./pages/admin/AdminPlaceholderPage";
 import ApiManagementPage from "./pages/admin/ApiManagementPage";
 import UsersPage from "./pages/admin/UsersPage";
 import UserDetailPage from "./pages/admin/UserDetailPage";
+import SystemDiagnosticsPage from "./pages/admin/SystemDiagnosticsPage";
 
 const queryClient = new QueryClient();
 
