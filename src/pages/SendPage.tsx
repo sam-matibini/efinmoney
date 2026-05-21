@@ -728,6 +728,7 @@ const SendPage = () => {
   // Handoff from dashboard SendMoneyModal: prefill amount/wallet/destination
   useEffect(() => {
     const qAmount = searchParams.get("amount");
+    const qFundingSource = searchParams.get("fundingSource");
     const qWalletId = searchParams.get("sourceWalletId");
     const qCountryCode = searchParams.get("targetCountryCode");
     let touched = false;
@@ -740,7 +741,13 @@ const SendPage = () => {
     }
     if (qWalletId && wallets?.some((w) => w.wallet_id === qWalletId)) {
       setSelectedWalletId(qWalletId);
+      setFundingSource('wallet');
       next.delete("sourceWalletId");
+      touched = true;
+    }
+    if (qFundingSource === 'wallet' || qFundingSource === 'bank' || qFundingSource === 'card') {
+      setFundingSource(qFundingSource);
+      next.delete("fundingSource");
       touched = true;
     }
     if (qCountryCode) {
