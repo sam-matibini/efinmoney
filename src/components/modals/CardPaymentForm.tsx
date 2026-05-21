@@ -245,7 +245,7 @@ function InnerForm({
               <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing…
             </>
           ) : (
-            ctaLabel ?? `Pay $${amountNum.toFixed(2)}`
+            ctaLabel ?? `Pay ${symbol}${amountNum.toFixed(2)} ${currency}`
           )}
         </Button>
 
