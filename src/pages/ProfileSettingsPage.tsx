@@ -9,7 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
-import { AtSign } from "lucide-react";
+import { AtSign, Copy, Hash } from "lucide-react";
 
 const ProfileSettingsPage = () => {
   const { user } = useAuth();
