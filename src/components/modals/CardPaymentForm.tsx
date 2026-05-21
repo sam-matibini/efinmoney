@@ -164,7 +164,7 @@ function InnerForm({
       await queryClient.invalidateQueries({ queryKey: ["ledger-deposits"] });
 
       const result = { amount: amountNum, currency, walletId: wallet.wallet_id };
-      setSuccess({ amount: amountNum, currency });
+      setSuccess({ amount: amountNum, currency, symbol });
       onSuccess?.(result);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Payment failed");
