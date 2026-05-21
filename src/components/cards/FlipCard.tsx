@@ -215,9 +215,16 @@ const FlipCard = ({ card, flipped, onToggle, index }: FlipCardProps) => {
                   <p className="text-[9px] uppercase tracking-widest opacity-60">Expires</p>
                   <p className="font-mono text-sm">{expiry}</p>
                 </div>
-                <span className="font-display italic font-extrabold text-2xl tracking-tight ml-3">
-                  {card.card_network === "visa" ? "VISA" : "Mastercard"}
-                </span>
+                {card.card_network === "visa" ? (
+                  <span className="font-display italic font-extrabold text-2xl tracking-tight ml-3 drop-shadow">
+                    VISA
+                  </span>
+                ) : (
+                  <div className="relative h-7 w-12 ml-3">
+                    <span className="absolute left-0 top-0 w-7 h-7 rounded-full bg-[#eb001b] shadow-[0_0_12px_rgba(235,0,27,0.5)]" />
+                    <span className="absolute right-0 top-0 w-7 h-7 rounded-full bg-[#f79e1b] mix-blend-screen shadow-[0_0_12px_rgba(247,158,27,0.5)]" />
+                  </div>
+                )}
               </div>
             </div>
           </div>
