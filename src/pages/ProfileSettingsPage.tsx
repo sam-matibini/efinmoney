@@ -190,9 +190,53 @@ const ProfileSettingsPage = () => {
               Changing your email requires confirmation via the new address.
             </p>
           </div>
+
+          <div className="pt-4 border-t border-border space-y-1">
+            <h2 className="font-display font-semibold">Billing address</h2>
+            <p className="text-xs text-muted-foreground">
+              Required for card issuance (Visa/Mastercard). Must match a verifiable residential address.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="phone">Phone number</Label>
+            <Input id="phone" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} placeholder="+1 555 123 4567" />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="street">Street address</Label>
+            <Input id="street" value={streetAddress} onChange={(e) => setStreetAddress(e.target.value)} placeholder="123 Main St" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="city">City</Label>
+              <Input id="city" value={city} onChange={(e) => setCity(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="state">State / Province</Label>
+              <Input id="state" value={stateProvince} onChange={(e) => setStateProvince(e.target.value)} placeholder="ON" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="postal">Postal code</Label>
+              <Input id="postal" value={postalCode} onChange={(e) => setPostalCode(e.target.value)} placeholder="M5V 2T6" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="country">Country (ISO-2)</Label>
+              <Input
+                id="country"
+                value={addressCountry}
+                onChange={(e) => setAddressCountry(e.target.value.toUpperCase())}
+                maxLength={2}
+                placeholder="CA"
+              />
+            </div>
+          </div>
+
           <Button onClick={handleSave} disabled={saving || isLoading}>
             {saving ? "Saving..." : "Save Changes"}
           </Button>
+
         </Card>
       </div>
     </div>
