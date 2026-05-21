@@ -18,6 +18,7 @@ import {
   useIssuedCardMutations,
 } from "@/hooks/useIssuedCards";
 import { useWallets } from "@/hooks/useWallets";
+import { useProfile } from "@/hooks/useProfile";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
