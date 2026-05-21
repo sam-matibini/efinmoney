@@ -31,6 +31,7 @@ const EfinCardDetailPage = () => {
   const { data: txns } = useCardTransactions(id);
   const { data: funding } = useCardFundingEvents(id);
   const { data: wallets } = useWallets();
+  const { data: profile } = useProfile();
   const { updateCard, fundCard } = useIssuedCardMutations();
 
   const [fundAmount, setFundAmount] = useState("");
