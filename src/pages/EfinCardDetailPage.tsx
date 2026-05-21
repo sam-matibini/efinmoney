@@ -59,6 +59,15 @@ const EfinCardDetailPage = () => {
 
   const wallet = wallets?.find((w: any) => w.wallet_id === card.funding_wallet_id);
   const isSandbox = (card.metadata as any)?.sandbox;
+  const tapToPay = (card.metadata as any)?.tap_to_pay !== false;
+
+  const handleAddToWallet = (which: "apple" | "google") => {
+    toast.info(
+      which === "apple"
+        ? "Open eFinMoney on your iPhone to add this card to Apple Pay."
+        : "Open eFinMoney on your Android device to add this card to Google Pay."
+    );
+  };
 
   const handleReveal = async () => {
     setRevealing(true);
