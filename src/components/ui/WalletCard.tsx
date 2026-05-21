@@ -99,6 +99,15 @@ const WalletCard = ({
           </div>
         </div>
       )}
+
+      {/* Full-card click target → wallet statement */}
+      {walletId && (
+        <Link
+          to={`/wallets/${walletId}/statement`}
+          aria-label={`View ${currency} wallet statement`}
+          className="absolute inset-0 z-[5]"
+        />
+      )}
       
       <div className="relative z-20">
         <div className="flex items-center justify-between mb-3 sm:mb-4">
