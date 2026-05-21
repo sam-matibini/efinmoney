@@ -119,6 +119,9 @@ export const generatePDFBlob = (rows: StatementRow[], meta: StatementMeta): Blob
   let y = 80;
   if (meta.subtitle) { doc.text(meta.subtitle, margin, y); y += 14; }
   if (meta.accountHolder) { doc.text(`Account holder: ${meta.accountHolder}`, margin, y); y += 14; }
+  if (meta.accountNumber) { doc.text(`Account number: ${meta.accountNumber}`, margin, y); y += 14; }
+  if (meta.efinTag) { doc.text(`eFin tag: ${meta.efinTag.startsWith("@") ? meta.efinTag : "@" + meta.efinTag}`, margin, y); y += 14; }
+  if (meta.accountEmail) { doc.text(`Email: ${meta.accountEmail}`, margin, y); y += 14; }
   if (meta.periodFrom || meta.periodTo) {
     doc.text(`Period: ${meta.periodFrom || "—"}  to  ${meta.periodTo || "—"}`, margin, y); y += 14;
   }
