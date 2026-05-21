@@ -114,13 +114,20 @@ export const generatePDFBlob = (rows: StatementRow[], meta: StatementMeta): Blob
   const margin = 32;
   doc.setFont("helvetica", "bold");
   doc.setFontSize(18);
-  doc.text("eFinMoney", margin, 40);
+  doc.text(meta.bankName || "eFinMoney", margin, 40);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(110);
+  doc.text("Bank · efin.money", margin, 54);
+  doc.setTextColor(0);
+  doc.setFont("helvetica", "bold");
   doc.setFontSize(14);
-  doc.text(meta.title, margin, 62);
+  doc.text(meta.title, margin, 74);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
-  let y = 80;
+  let y = 92;
   if (meta.subtitle) { doc.text(meta.subtitle, margin, y); y += 14; }
+  doc.text(`Bank: ${meta.bankName || "eFinMoney"}`, margin, y); y += 14;
   if (meta.accountHolder) { doc.text(`Account holder: ${meta.accountHolder}`, margin, y); y += 14; }
   if (meta.accountNumber) { doc.text(`Account number: ${meta.accountNumber}`, margin, y); y += 14; }
   if (meta.efinTag) { doc.text(`eFin tag: ${meta.efinTag.startsWith("@") ? meta.efinTag : "@" + meta.efinTag}`, margin, y); y += 14; }
