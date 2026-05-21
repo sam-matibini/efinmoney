@@ -1,14 +1,11 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { getElicateConfig } from "../_shared/elicate.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
-
-const ELICATE_URL =
-  Deno.env.get("ELICATE_BASE_URL") ||
-  "https://elicatepay.vercel.app/api/v1/payments/charge";
 
 // Map internal payout_method / network codes -> Elicate uppercase network string
 const NETWORK_MAP: Record<string, string> = {
@@ -101,9 +98,16 @@ Deno.serve(async (req) => {
       });
     }
 
-    const secret = Deno.env.get("ELICATE_SECRET_KEY");
+    const elicate = getElicateConfig();
+    const secret = elicate.secretKey;
+    const ELICATE_URL = elicate.url;
     if (!secret) {
-      return new Response(JSON.stringify({ success: false, error: "ELICATE_SECRET_KEY not configured" }), {
+      return new Response(JSON.stringify({ success: false, error: `ELICATE_${elicate.mode === "live" ? "LIVE_" : ""}SECRET_KEY not configured` }), {
+        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (!ELICATE_URL) {
+      return new Response(JSON.stringify({ success: false, error: "ELICATE_LIVE_BASE_URL not configured" }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -135,7 +139,7 @@ Deno.serve(async (req) => {
       customer_name: customerName,
     };
 
-    console.log("Elicate charge request:", { url: ELICATE_URL, payload });
+    console.log("Elicate charge request:", { mode: elicate.mode, url: ELICATE_URL, payload });
 
     const res = await fetch(ELICATE_URL, {
       method: "POST",

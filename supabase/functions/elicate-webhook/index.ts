@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { getElicateConfig } from "../_shared/elicate.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -36,9 +37,9 @@ Deno.serve(async (req) => {
       req.headers.get("verif-hash") ||
       "";
 
-    const webhookSecret = Deno.env.get("ELICATE_WEBHOOK_SECRET");
+    const { mode, webhookSecret } = getElicateConfig();
     if (!webhookSecret) {
-      console.error("ELICATE_WEBHOOK_SECRET not configured");
+      console.error(`ELICATE_${mode === "live" ? "LIVE_" : ""}WEBHOOK_SECRET not configured`);
       return new Response(JSON.stringify({ error: "Webhook not configured" }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
