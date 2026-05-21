@@ -154,7 +154,7 @@ const RecentTransactions = () => {
     symbol: currencySymbol(d.currency_code),
     recipient: `${flagForCurrency(d.currency_code)} Card Top-up`,
     date: formatDistanceToNow(new Date(d.created_at), { addSuffix: true }),
-    description: "Funds added via Stripe",
+    description: "Funds added via eFinMoney",
     createdAt: d.created_at,
   }));
 
