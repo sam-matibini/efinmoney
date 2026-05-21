@@ -85,7 +85,7 @@ function InnerForm({
   const [amount, setAmount] = useState(defaultAmount ? String(defaultAmount) : "");
   const [processing, setProcessing] = useState(false);
   const [cardReady, setCardReady] = useState(false);
-  const [success, setSuccess] = useState<{ amount: number; currency: string } | null>(null);
+  const [success, setSuccess] = useState<{ amount: number; currency: string; symbol: string } | null>(null);
 
   useEffect(() => {
     if (defaultAmount !== undefined) setAmount(String(defaultAmount));
@@ -97,6 +97,7 @@ function InnerForm({
 
   const wallet = wallets?.find((item) => item.wallet_id === (selectedWalletId ?? defaultWalletId)) ?? wallets?.[0];
   const currency = wallet?.currency_code ?? "USD";
+  const symbol = wallet?.symbol ?? "$";
   const amountNum = parseFloat(amount) || 0;
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
