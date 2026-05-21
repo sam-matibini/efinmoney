@@ -171,6 +171,7 @@ export const useIssuedCardMutations = () => {
       currency?: string;
       purpose?: IssuedCardPurpose;
       funding_wallet_id?: string;
+      tap_to_pay?: boolean;
       controls?: Partial<CardControls>;
     }) => {
       const { data, error } = await supabase.functions.invoke("stripe-issuing-create-card", { body: input });
