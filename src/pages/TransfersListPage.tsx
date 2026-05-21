@@ -15,6 +15,7 @@ import { useTransfers } from "@/hooks/useTransfers";
 import { ChevronRight, Inbox, Search, Download, ArrowUpRight, ArrowDownLeft } from "lucide-react";
 import { downloadTransferReceipt } from "@/lib/receipt";
 import { cleanIncomingTransactionLabel, INCOMING_REFERENCE_TYPES } from "@/lib/incomingTransactions";
+import { currencySymbol } from "@/lib/currency";
 import { format, isToday, isYesterday } from "date-fns";
 
 const refOf = (id: string) => `EFM-${id.replace(/-/g, "").slice(0, 8).toUpperCase()}`;
@@ -136,8 +137,19 @@ const TransfersListPage = () => {
     return items;
   }, [rows, filter, direction, search, from, to]);
 
-  const totalIn = filtered.filter((r) => r.direction === "in" && r.status === "completed").reduce((s, r) => s + r.amount, 0);
-  const totalOut = filtered.filter((r) => r.direction === "out" && r.status === "completed").reduce((s, r) => s + r.amount, 0);
+  const sumByCurrency = (items: Row[]) =>
+    items.reduce<Record<string, number>>((acc, r) => {
+      const c = (r.currency || "USD").toUpperCase();
+      acc[c] = (acc[c] || 0) + r.amount;
+      return acc;
+    }, {});
+  const totalsIn = sumByCurrency(filtered.filter((r) => r.direction === "in" && r.status === "completed"));
+  const totalsOut = sumByCurrency(filtered.filter((r) => r.direction === "out" && r.status === "completed"));
+  const renderTotals = (totals: Record<string, number>, sign: "+" | "-") => {
+    const entries = Object.entries(totals).sort((a, b) => b[1] - a[1]);
+    if (entries.length === 0) return `${sign}${fmt(0)}`;
+    return entries.map(([c, v]) => `${sign}${currencySymbol(c)}${fmt(v)}`).join("  ");
+  };
 
   // Group by date
   const groups = useMemo(() => {
@@ -163,11 +175,11 @@ const TransfersListPage = () => {
         <div className="grid grid-cols-2 gap-3">
           <div className="rounded-xl border border-border bg-emerald-500/[0.04] p-4">
             <div className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">Total Money In</div>
-            <div className="text-xl sm:text-2xl font-display font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">+{fmt(totalIn)}</div>
+            <div className="text-xl sm:text-2xl font-display font-bold text-emerald-600 dark:text-emerald-400 tabular-nums break-words leading-tight">{renderTotals(totalsIn, "+")}</div>
           </div>
           <div className="rounded-xl border border-border bg-rose-500/[0.04] p-4">
             <div className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">Total Money Out</div>
-            <div className="text-xl sm:text-2xl font-display font-bold text-rose-600 dark:text-rose-400 tabular-nums">-{fmt(totalOut)}</div>
+            <div className="text-xl sm:text-2xl font-display font-bold text-rose-600 dark:text-rose-400 tabular-nums break-words leading-tight">{renderTotals(totalsOut, "-")}</div>
           </div>
         </div>
 
