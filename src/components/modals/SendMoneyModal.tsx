@@ -193,7 +193,7 @@ const SendMoneyModal = ({ children }: SendMoneyModalProps) => {
                         <button
                           key={country.code}
                           type="button"
-                          onClick={() => { setTargetCountry(country); setShowTargetDropdown(false); }}
+                          onClick={() => { setTargetCountryCode(country.code); setShowTargetDropdown(false); }}
                           className="flex items-center gap-3 w-full px-4 py-3 hover:bg-muted transition-colors first:rounded-t-xl last:rounded-b-xl"
                         >
                           <span>{country.flag}</span>
