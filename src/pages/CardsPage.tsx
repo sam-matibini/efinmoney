@@ -13,7 +13,7 @@ import AddCardModal from "@/components/modals/AddCardModal";
 import CardPaymentModal from "@/components/modals/CardPaymentModal";
 import FlipCard from "@/components/cards/FlipCard";
 import CardStack from "@/components/cards/CardStack";
-import EfinCardsSection from "@/components/cards/EfinCardsSection";
+import MockEfinVisaCard from "@/components/cards/MockEfinVisaCard";
 import { useCards, useCardMutations, type Card as CardRow } from "@/hooks/useCards";
 import { useSavedCards, useDeleteSavedCard } from "@/hooks/useSavedCards";
 import {
