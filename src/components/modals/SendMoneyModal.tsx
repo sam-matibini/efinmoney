@@ -34,7 +34,7 @@ const SendMoneyModal = ({ children }: SendMoneyModalProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [amount, setAmount] = useState("");
   const [selectedWalletId, setSelectedWalletId] = useState<string | null>(null);
-  const [targetCountry, setTargetCountry] = useState(targetCountries[0]);
+  const [targetCountryCode, setTargetCountryCode] = useState<string | null>(null);
   const [showSourceDropdown, setShowSourceDropdown] = useState(false);
   const [showTargetDropdown, setShowTargetDropdown] = useState(false);
 
@@ -42,6 +42,14 @@ const SendMoneyModal = ({ children }: SendMoneyModalProps) => {
   const { data: fxRates } = useFxRates();
 
   const selectedWallet = wallets?.find(w => w.wallet_id === selectedWalletId) || wallets?.[0];
+
+  // Default target country to match the source wallet currency so amounts mirror 1:1 until user changes it
+  const sourceCode = selectedWallet?.currency_code;
+  const effectiveTargetCode =
+    targetCountryCode ??
+    (sourceCode && targetCountries.find(c => c.code === sourceCode) ? sourceCode : targetCountries[0].code);
+  const targetCountry =
+    targetCountries.find(c => c.code === effectiveTargetCode) ?? targetCountries[0];
 
   const fxRate = fxRates?.find(
     r => r.from_currency === selectedWallet?.currency_code && r.to_currency === targetCountry.code
