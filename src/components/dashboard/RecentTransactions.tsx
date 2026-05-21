@@ -4,6 +4,7 @@ import { Inbox, Send, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/useAuth";
+import { useProfile } from "@/hooks/useProfile";
 import { useStatement } from "@/hooks/useStatement";
 import { StatementActions } from "@/components/statement/StatementActions";
 import { StatementTable } from "@/components/statement/StatementTable";
