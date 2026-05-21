@@ -783,7 +783,8 @@ const SendPage = () => {
     ? (recipientName.trim().length > 2 && !!ghBankCode && ghAccountNumber.replace(/\D/g, "").length >= 6 && receivedAmount > 0)
     : (recipientName.length > 2 && recipientPhone.length > 8 && !!effectivePayoutMethod && receivedAmount > 0);
 
-  const activeTab = searchParams.get('mode') === 'canada' ? 'canada' : 'international';
+  const modeParam = searchParams.get('mode');
+  const activeTab = modeParam === 'canada' ? 'canada' : modeParam === 'efinmoney' ? 'efinmoney' : 'international';
 
   // Step transitions
   const stepVariants = {
