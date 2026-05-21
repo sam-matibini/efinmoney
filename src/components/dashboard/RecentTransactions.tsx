@@ -68,6 +68,41 @@ const dateGroupLabel = (iso: string) => {
 
 const fmtAmt = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+const DashboardStatementHeader = ({ total }: { total: number }) => {
+  const { user } = useAuth();
+  const { data: stmtRows } = useStatement(null, 500);
+  return (
+    <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
+      <div className="flex items-center gap-3">
+        <h2 className="text-lg font-display font-semibold text-foreground">Account Statement</h2>
+        <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-live-pulse" />
+          Live
+        </span>
+      </div>
+      <div className="flex items-center gap-2 flex-wrap">
+        {(stmtRows?.length ?? 0) > 0 && (
+          <StatementActions
+            rows={stmtRows ?? []}
+            meta={{
+              title: "Account Statement",
+              accountName: user?.user_metadata?.full_name || user?.email || "Account holder",
+              accountEmail: user?.email || "",
+              generatedAt: new Date().toISOString(),
+            }}
+            defaultEmail={user?.email || ""}
+          />
+        )}
+        {total > 0 && (
+          <Link to="/transfers" className="flex items-center gap-1 text-sm text-primary hover:text-primary/80 font-medium transition-colors">
+            View All <ChevronRight className="w-4 h-4" />
+          </Link>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const RecentTransactions = () => {
   const { user } = useAuth();
   const [tab, setTab] = useState<"all" | "credit" | "debit">("all");
