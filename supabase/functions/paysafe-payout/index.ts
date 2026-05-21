@@ -251,45 +251,37 @@ Deno.serve(async (req) => {
       });
     }
 
+    const failAndRefund = async (reason: string, details?: any) => {
+      const refunded = await refundWallet(supabase, transfer, reason);
+      await supabase.from("transfers").update({
+        status: "failed",
+        failure_reason: reason,
+      }).eq("id", transfer.id);
+      return new Response(JSON.stringify({
+        success: false, error: reason, refunded, details: details ?? null,
+      }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    };
+
     let handleResp: { ok: boolean; status: number; json: any };
     try {
       handleResp = await paysafePost("/paymenthub/v1/paymenthandles", handleBody);
     } catch (e) {
       console.error("Paysafe payment-handle network error", e);
-      await supabase.from("transfers").update({
-        status: "failed",
-        failure_reason: "Paysafe network/timeout error",
-      }).eq("id", transfer.id);
-      return new Response(JSON.stringify({ success: false, error: "Paysafe network error" }), {
-        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return failAndRefund("We couldn't reach our Canadian payments partner. Your money has been returned to your wallet. Please try again shortly.");
     }
 
     if (!handleResp.ok) {
       const reason = extractError(handleResp.json, handleResp.status);
       console.error("Paysafe payment-handle error", handleResp.status, handleResp.json);
-      await supabase.from("transfers").update({
-        status: "failed",
-        failure_reason: reason,
-      }).eq("id", transfer.id);
-      return new Response(JSON.stringify({ success: false, error: reason, details: handleResp.json }), {
-        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return failAndRefund(reason, handleResp.json);
     }
 
     const handleStatus: string = handleResp.json?.status;
     const paymentHandleToken: string | undefined = handleResp.json?.paymentHandleToken;
 
     if (handleStatus !== "PAYABLE" || !paymentHandleToken) {
-      const reason = `Payment handle not payable (status ${handleStatus || "unknown"})`;
       console.error("Paysafe payment-handle not payable", handleResp.json);
-      await supabase.from("transfers").update({
-        status: "failed",
-        failure_reason: reason,
-      }).eq("id", transfer.id);
-      return new Response(JSON.stringify({ success: false, error: reason, details: handleResp.json }), {
-        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return failAndRefund("Canadian transfers are temporarily unavailable. Your money has been returned to your wallet. Please try again later.", handleResp.json);
     }
 
     // ---------- Step 2: Submit standalone credit ----------
@@ -305,25 +297,13 @@ Deno.serve(async (req) => {
       creditResp = await paysafePost("/paymenthub/v1/standalonecredits", creditBody);
     } catch (e) {
       console.error("Paysafe standalone-credit network error", e);
-      await supabase.from("transfers").update({
-        status: "failed",
-        failure_reason: "Paysafe network/timeout error",
-      }).eq("id", transfer.id);
-      return new Response(JSON.stringify({ success: false, error: "Paysafe network error" }), {
-        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return failAndRefund("We couldn't reach our Canadian payments partner. Your money has been returned to your wallet. Please try again shortly.");
     }
 
     if (!creditResp.ok) {
       const reason = extractError(creditResp.json, creditResp.status);
       console.error("Paysafe standalone-credit error", creditResp.status, creditResp.json);
-      await supabase.from("transfers").update({
-        status: "failed",
-        failure_reason: reason,
-      }).eq("id", transfer.id);
-      return new Response(JSON.stringify({ success: false, error: reason, details: creditResp.json }), {
-        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return failAndRefund(reason, creditResp.json);
     }
 
     const updates: Record<string, unknown> = {
@@ -347,7 +327,24 @@ Deno.serve(async (req) => {
     });
   } catch (err) {
     console.error("paysafe-payout error", err);
-    return new Response(JSON.stringify({ success: false, error: err instanceof Error ? err.message : "Unknown" }), {
+    // Best-effort refund on unexpected error
+    try {
+      const body = await req.clone().json().catch(() => ({}));
+      if (body?.transfer_id) {
+        const { data: t } = await supabase.from("transfers").select("*").eq("id", body.transfer_id).single();
+        if (t && t.status !== "completed" && t.status !== "processing") {
+          await refundWallet(supabase, t, "Unexpected payout error");
+          await supabase.from("transfers").update({
+            status: "failed",
+            failure_reason: "We couldn't complete this Canadian transfer right now. Your money has been returned to your wallet.",
+          }).eq("id", t.id);
+        }
+      }
+    } catch (_) { /* ignore */ }
+    return new Response(JSON.stringify({
+      success: false,
+      error: "We couldn't complete this Canadian transfer right now. Your money has been returned to your wallet. Please try again later.",
+    }), {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
