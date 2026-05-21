@@ -188,9 +188,20 @@ const RecentTransactions = () => {
   );
   const filtered = tab === "all" ? all.slice(0, 8) : all.filter((i) => i.direction === tab).slice(0, 8);
 
-  // Running totals (across visible)
-  const totalIn = filtered.filter((i) => i.direction === "credit" && i.status === "completed").reduce((s, i) => s + i.amount, 0);
-  const totalOut = filtered.filter((i) => i.direction === "debit" && i.status === "completed").reduce((s, i) => s + i.amount, 0);
+  // Running totals grouped by currency (across visible completed items)
+  const sumByCurrency = (items: Item[]) =>
+    items.reduce<Record<string, number>>((acc, i) => {
+      const c = (i.currency || "USD").toUpperCase();
+      acc[c] = (acc[c] || 0) + i.amount;
+      return acc;
+    }, {});
+  const totalsIn = sumByCurrency(filtered.filter((i) => i.direction === "credit" && i.status === "completed"));
+  const totalsOut = sumByCurrency(filtered.filter((i) => i.direction === "debit" && i.status === "completed"));
+  const renderTotals = (totals: Record<string, number>, sign: "+" | "-") => {
+    const entries = Object.entries(totals).sort((a, b) => b[1] - a[1]);
+    if (entries.length === 0) return `${sign}${fmtAmt(0)}`;
+    return entries.map(([c, v]) => `${sign}${currencySymbol(c)}${fmtAmt(v)}`).join("  ");
+  };
 
   // Group by date
   const groups = filtered.reduce<Record<string, Item[]>>((acc, item) => {
