@@ -25,17 +25,46 @@ const MiniStats = () => {
     const now = new Date();
     const start = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
     const recent = (transfers || []).filter((t) => new Date(t.created_at).getTime() >= start);
-    const total = recent.reduce((s, t) => s + Number(t.source_amount), 0);
-    // Mini bars: per-week buckets (4 weeks)
-    const bars = [0, 0, 0, 0];
+
+    // Group totals by source currency
+    const byCurrency: Record<string, number> = {};
     recent.forEach((t) => {
-      const day = new Date(t.created_at).getDate();
-      const idx = Math.min(3, Math.floor((day - 1) / 7));
-      bars[idx] += Number(t.source_amount);
+      const c = (t.source_currency || "USD").toUpperCase();
+      byCurrency[c] = (byCurrency[c] || 0) + Number(t.source_amount);
     });
+    const sorted = Object.entries(byCurrency).sort((a, b) => b[1] - a[1]);
+    const primary = sorted[0] || ["USD", 0];
+    const others = sorted.slice(1);
+
+    // Bars: per-week buckets for the primary currency only
+    const bars = [0, 0, 0, 0];
+    recent
+      .filter((t) => (t.source_currency || "USD").toUpperCase() === primary[0])
+      .forEach((t) => {
+        const day = new Date(t.created_at).getDate();
+        const idx = Math.min(3, Math.floor((day - 1) / 7));
+        bars[idx] += Number(t.source_amount);
+      });
     const max = Math.max(...bars, 1);
-    return { total, bars: bars.map((b) => Math.max(8, (b / max) * 100)) };
+    return {
+      currency: primary[0] as string,
+      total: primary[1] as number,
+      others,
+      bars: bars.map((b) => Math.max(8, (b / max) * 100)),
+    };
   }, [transfers]);
+
+  const formatMoney = (amount: number, currency: string) => {
+    try {
+      return new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency,
+        maximumFractionDigits: 0,
+      }).format(amount);
+    } catch {
+      return `${currency} ${amount.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
+    }
+  };
 
   const corridors = useMemo(() => {
     const set = new Set<string>();
