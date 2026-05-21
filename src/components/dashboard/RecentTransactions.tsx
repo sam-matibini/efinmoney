@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { flagForCountryName, flagForCurrency } from "@/lib/flags";
+import { cleanIncomingTransactionLabel, getIncomingTransactionMeta, INCOMING_REFERENCE_TYPES } from "@/lib/incomingTransactions";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 
@@ -75,18 +76,30 @@ const RecentTransactions = () => {
   const { data: transfers, isLoading: loadingTransfers } = useTransfers(5);
 
   const { data: deposits, isLoading: loadingDeposits } = useQuery({
-    queryKey: ["ledger-deposits", user?.id],
+    queryKey: ["ledger-incoming", user?.id],
     queryFn: async () => {
       if (!user) return [];
+      const { data: wallets } = await supabase.from("wallets").select("id").eq("user_id", user.id);
+      const ids = (wallets ?? []).map((w) => w.id);
+      if (ids.length === 0) return [];
       const { data, error } = await supabase
         .from("ledger_entries")
-        .select("id, journal_id, created_at, credit_amount, currency_code, description, reference_type")
-        .eq("reference_type", "stripe_deposit")
+        .select("id, journal_id, created_at, credit_amount, currency_code, description, reference_type, reference_id")
+        .in("wallet_id", ids)
+        .in("reference_type", INCOMING_REFERENCE_TYPES)
         .gt("credit_amount", 0)
         .order("created_at", { ascending: false })
-        .limit(5);
+        .limit(20);
       if (error) return [];
-      return data ?? [];
+
+      const seen = new Set<string>();
+      const out: any[] = [];
+      for (const entry of data ?? []) {
+        if (seen.has(entry.journal_id)) continue;
+        seen.add(entry.journal_id);
+        out.push(entry);
+      }
+      return out.slice(0, 5);
     },
     enabled: !!user,
   });
@@ -152,9 +165,9 @@ const RecentTransactions = () => {
     amount: Number(d.credit_amount),
     currency: d.currency_code,
     symbol: currencySymbol(d.currency_code),
-    recipient: `${flagForCurrency(d.currency_code)} Card Top-up`,
+    recipient: `${flagForCurrency(d.currency_code)} ${cleanIncomingTransactionLabel(d.description, d.reference_type)}`,
     date: formatDistanceToNow(new Date(d.created_at), { addSuffix: true }),
-    description: "Funds added via eFinMoney",
+    description: getIncomingTransactionMeta(d.reference_type),
     createdAt: d.created_at,
   }));
 

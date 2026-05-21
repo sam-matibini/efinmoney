@@ -14,6 +14,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTransfers } from "@/hooks/useTransfers";
 import { ChevronRight, Inbox, Search, Download, ArrowUpRight, ArrowDownLeft } from "lucide-react";
 import { downloadTransferReceipt } from "@/lib/receipt";
+import { cleanIncomingTransactionLabel, INCOMING_REFERENCE_TYPES } from "@/lib/incomingTransactions";
 import { format } from "date-fns";
 
 const refOf = (id: string) => `EFM-${id.replace(/-/g, "").slice(0, 8).toUpperCase()}`;
@@ -29,24 +30,6 @@ const groupFor = (s: string) => {
   if (s === "completed") return "completed";
   if (["failed", "reversed", "expired"].includes(s)) return "failed";
   return "processing";
-};
-
-const INCOMING_LABELS: Record<string, string> = {
-  transfer: "Incoming transfer",
-  internal_transfer: "Received from eFinMoney user",
-  stellar_transfer: "Incoming transfer (Stellar)",
-  stripe_topup: "eFinMoney top-up",
-  flw_topup: "eFinMoney top-up",
-  manual_topup: "eFinMoney top-up",
-  wallet_topup: "eFinMoney top-up",
-};
-
-const cleanDescription = (raw: string | null | undefined, refType: string) => {
-  const fallback = INCOMING_LABELS[refType] || "Incoming";
-  if (!raw) return fallback;
-  // Hide provider names and internal identifiers from end users
-  if (/stripe|pi_[A-Za-z0-9]+|wallet_topup|flw_|flutterwave/i.test(raw)) return fallback;
-  return raw;
 };
 
 type Row = {
@@ -81,7 +64,7 @@ const TransfersListPage = () => {
         .from("ledger_entries")
         .select("id, journal_id, created_at, credit_amount, currency_code, description, reference_type, reference_id")
         .in("wallet_id", ids)
-        .in("reference_type", ["transfer", "internal_transfer", "stellar_transfer", "stripe_topup", "flw_topup", "manual_topup", "wallet_topup"])
+        .in("reference_type", INCOMING_REFERENCE_TYPES)
         .gt("credit_amount", 0)
         .order("created_at", { ascending: false })
         .limit(200);
@@ -116,7 +99,7 @@ const TransfersListPage = () => {
       .map((e: any) => ({
         id: `l-${e.id}`,
         direction: "in",
-        recipientOrSource: cleanDescription(e.description, e.reference_type),
+        recipientOrSource: cleanIncomingTransactionLabel(e.description, e.reference_type),
         amount: Number(e.credit_amount),
         currency: e.currency_code,
         status: "completed",
