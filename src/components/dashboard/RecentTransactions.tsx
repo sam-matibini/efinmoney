@@ -4,6 +4,7 @@ import { Inbox, Send, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/useAuth";
+import { useProfile } from "@/hooks/useProfile";
 import { useStatement } from "@/hooks/useStatement";
 import { StatementActions } from "@/components/statement/StatementActions";
 import { StatementTable } from "@/components/statement/StatementTable";
@@ -16,6 +17,7 @@ const fmt = (n: number) =>
 
 const RecentTransactions = () => {
   const { user } = useAuth();
+  const { data: profile } = useProfile();
   const { data: rows = [], isLoading } = useStatement(null, 500);
 
   if (isLoading) {
@@ -68,8 +70,10 @@ const RecentTransactions = () => {
               rows={rows}
               meta={{
                 title: "Account Statement",
-                accountHolder: user?.user_metadata?.full_name || user?.email || "Account holder",
-                accountEmail: user?.email || "",
+                accountHolder: profile?.full_name || user?.user_metadata?.full_name || user?.email || "Account holder",
+                accountEmail: profile?.email || user?.email || "",
+                accountNumber: profile?.account_number || undefined,
+                efinTag: profile?.efin_tag || undefined,
               }}
               defaultEmail={user?.email || ""}
             />

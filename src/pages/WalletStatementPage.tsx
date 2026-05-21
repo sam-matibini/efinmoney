@@ -61,6 +61,9 @@ const WalletStatementPage = () => {
     title: `${wallet?.currency_code || "Wallet"} Wallet Statement`,
     subtitle: `${wallet?.currency_name || ""} (${wallet?.currency_code || ""})`,
     accountHolder,
+    accountEmail: profile?.email || user?.email || "",
+    accountNumber: profile?.account_number || undefined,
+    efinTag: profile?.efin_tag || undefined,
     periodFrom: from || undefined,
     periodTo: to || undefined,
     currency: wallet?.currency_code,
@@ -80,7 +83,7 @@ const WalletStatementPage = () => {
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
           <Card className="gradient-primary text-primary-foreground overflow-hidden relative">
             <CardContent className="pt-6">
-              <div className="flex items-start justify-between gap-4">
+              <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2 text-primary-foreground/80 text-xs uppercase tracking-wider">
                     <Wallet className="w-3.5 h-3.5" /> Wallet Statement
@@ -92,8 +95,15 @@ const WalletStatementPage = () => {
                   <p className="text-primary-foreground/70 text-sm">
                     Current balance: <span className="font-semibold">{wallet ? `${fmt(Number(wallet.balance))} ${wallet.currency_code}` : "—"}</span>
                   </p>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-primary-foreground/80 pt-1">
+                    <span><strong>Holder:</strong> {accountHolder}</span>
+                    {profile?.account_number && <span><strong>Acct:</strong> {profile.account_number}</span>}
+                    {profile?.efin_tag && <span><strong>Tag:</strong> @{profile.efin_tag}</span>}
+                  </div>
                 </div>
-                <StatementActions rows={rows} meta={meta} defaultEmail={user?.email || ""} />
+                <div className="shrink-0">
+                  <StatementActions rows={rows} meta={meta} defaultEmail={user?.email || ""} />
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -117,13 +127,16 @@ const WalletStatementPage = () => {
 
         <Card>
           <CardHeader className="space-y-3">
-            <Tabs value={direction} onValueChange={(v) => setDirection(v as any)}>
-              <TabsList className="grid grid-cols-3 w-full md:w-auto">
-                <TabsTrigger value="all">All</TabsTrigger>
-                <TabsTrigger value="in">Received</TabsTrigger>
-                <TabsTrigger value="out">Sent</TabsTrigger>
-              </TabsList>
-            </Tabs>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <Tabs value={direction} onValueChange={(v) => setDirection(v as any)}>
+                <TabsList className="grid grid-cols-3 w-full md:w-auto">
+                  <TabsTrigger value="all">All</TabsTrigger>
+                  <TabsTrigger value="in">Received</TabsTrigger>
+                  <TabsTrigger value="out">Sent</TabsTrigger>
+                </TabsList>
+              </Tabs>
+              <StatementActions rows={rows} meta={meta} defaultEmail={user?.email || ""} />
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <div className="relative">
                 <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />

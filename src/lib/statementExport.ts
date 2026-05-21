@@ -12,6 +12,8 @@ export interface StatementMeta {
   subtitle?: string;
   accountHolder?: string;
   accountEmail?: string;
+  accountNumber?: string;
+  efinTag?: string;
   periodFrom?: string;
   periodTo?: string;
   currency?: string; // when single-wallet
@@ -61,6 +63,9 @@ export const downloadCSV = (rows: StatementRow[], meta: StatementMeta) => {
   lines.push(`"${meta.title.replace(/"/g, '""')}"`);
   if (meta.subtitle) lines.push(`"${meta.subtitle.replace(/"/g, '""')}"`);
   if (meta.accountHolder) lines.push(`"Account holder","${meta.accountHolder}"`);
+  if (meta.accountNumber) lines.push(`"Account number","${meta.accountNumber}"`);
+  if (meta.efinTag) lines.push(`"eFin tag","${meta.efinTag.startsWith("@") ? meta.efinTag : "@" + meta.efinTag}"`);
+  if (meta.accountEmail) lines.push(`"Email","${meta.accountEmail}"`);
   if (meta.periodFrom || meta.periodTo)
     lines.push(`"Period","${meta.periodFrom || "—"} to ${meta.periodTo || "—"}"`);
   lines.push("");
@@ -80,6 +85,9 @@ export const downloadXLSX = (rows: StatementRow[], meta: StatementMeta) => {
     [meta.title],
     meta.subtitle ? [meta.subtitle] : [],
     meta.accountHolder ? ["Account holder", meta.accountHolder] : [],
+    meta.accountNumber ? ["Account number", meta.accountNumber] : [],
+    meta.efinTag ? ["eFin tag", meta.efinTag.startsWith("@") ? meta.efinTag : "@" + meta.efinTag] : [],
+    meta.accountEmail ? ["Email", meta.accountEmail] : [],
     meta.periodFrom || meta.periodTo
       ? ["Period", `${meta.periodFrom || "—"} to ${meta.periodTo || "—"}`]
       : [],
@@ -111,6 +119,9 @@ export const generatePDFBlob = (rows: StatementRow[], meta: StatementMeta): Blob
   let y = 80;
   if (meta.subtitle) { doc.text(meta.subtitle, margin, y); y += 14; }
   if (meta.accountHolder) { doc.text(`Account holder: ${meta.accountHolder}`, margin, y); y += 14; }
+  if (meta.accountNumber) { doc.text(`Account number: ${meta.accountNumber}`, margin, y); y += 14; }
+  if (meta.efinTag) { doc.text(`eFin tag: ${meta.efinTag.startsWith("@") ? meta.efinTag : "@" + meta.efinTag}`, margin, y); y += 14; }
+  if (meta.accountEmail) { doc.text(`Email: ${meta.accountEmail}`, margin, y); y += 14; }
   if (meta.periodFrom || meta.periodTo) {
     doc.text(`Period: ${meta.periodFrom || "—"}  to  ${meta.periodTo || "—"}`, margin, y); y += 14;
   }
