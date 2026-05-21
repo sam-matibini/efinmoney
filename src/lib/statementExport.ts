@@ -63,6 +63,9 @@ export const downloadCSV = (rows: StatementRow[], meta: StatementMeta) => {
   lines.push(`"${meta.title.replace(/"/g, '""')}"`);
   if (meta.subtitle) lines.push(`"${meta.subtitle.replace(/"/g, '""')}"`);
   if (meta.accountHolder) lines.push(`"Account holder","${meta.accountHolder}"`);
+  if (meta.accountNumber) lines.push(`"Account number","${meta.accountNumber}"`);
+  if (meta.efinTag) lines.push(`"eFin tag","${meta.efinTag.startsWith("@") ? meta.efinTag : "@" + meta.efinTag}"`);
+  if (meta.accountEmail) lines.push(`"Email","${meta.accountEmail}"`);
   if (meta.periodFrom || meta.periodTo)
     lines.push(`"Period","${meta.periodFrom || "—"} to ${meta.periodTo || "—"}"`);
   lines.push("");
