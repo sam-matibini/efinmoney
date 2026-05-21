@@ -53,19 +53,92 @@ async function paysafePost(path: string, body: unknown, timeoutMs = 12000) {
 
 function extractError(json: any, status: number) {
   const code = json?.error?.code;
-  const msg = json?.error?.message || json?.errorMessage || `Paysafe HTTP ${status}`;
+  const rawMsg = json?.error?.message || json?.errorMessage || `Paysafe HTTP ${status}`;
   const detail = Array.isArray(json?.error?.details) ? json.error.details.join("; ") : "";
+  const lower = `${rawMsg} ${detail}`.toLowerCase();
 
-  // Friendly mapping for known account-configuration errors
-  const lower = `${msg} ${detail}`.toLowerCase();
-  if (code === "PAYMENTHUB-1" || lower.includes("payment type and currency code combination")) {
-    return "This payout corridor is not yet enabled on our payments provider. Your funds have been returned to your wallet. Please try again later or contact support.";
+  if (
+    code === "PAYMENTHUB-1" ||
+    lower.includes("payment type and currency code combination") ||
+    lower.includes("not enabled") ||
+    lower.includes("not allowed") ||
+    lower.includes("not supported")
+  ) {
+    return "Canadian transfers are temporarily unavailable. Your money has been returned to your wallet — please try again in a few minutes or pick a different delivery method.";
   }
-  if (code === "2008" || code === 2008 || lower.includes("routing number") || lower.includes("invalid institution") || lower.includes("invalid transit")) {
-    return "Invalid Canadian Bank details. Please check your Institution and Transit numbers.";
+  if (lower.includes("invalid api key") || lower.includes("authentication") || status === 401) {
+    return "We're having trouble reaching our Canadian payments partner. Your money has been returned to your wallet. Please try again shortly.";
   }
+  if (
+    code === "2008" || code === 2008 ||
+    lower.includes("routing number") ||
+    lower.includes("invalid institution") ||
+    lower.includes("invalid transit") ||
+    lower.includes("invalid account")
+  ) {
+    return "The Canadian bank details look incorrect. Your money has been returned. Please double-check the institution, transit, and account numbers and try again.";
+  }
+  if (lower.includes("email") && lower.includes("invalid")) {
+    return "The recipient email address is invalid. Your money has been returned. Please re-enter a valid email and try again.";
+  }
+  if (lower.includes("limit") || lower.includes("exceeded")) {
+    return "This transfer exceeds the allowed limit for now. Your money has been returned. Please try a smaller amount.";
+  }
+  if (lower.includes("duplicate")) {
+    return "A similar transfer was just submitted. Your money has been returned to avoid a duplicate — please check Recent transfers before retrying.";
+  }
+  return "We couldn't complete this Canadian transfer right now. Your money has been returned to your wallet. Please try again later.";
+}
 
-  return code ? `${msg} (code ${code})${detail ? ` — ${detail}` : ""}` : msg;
+async function refundWallet(supabase: any, transfer: any, reason: string) {
+  const { data: already } = await supabase
+    .from("ledger_entries").select("id")
+    .eq("reference_type", "transfer_refund").eq("reference_id", transfer.id).limit(1);
+  if (already && already.length > 0) return true;
+
+  const { data: liabAcc } = await supabase
+    .from("ledger_accounts").select("id")
+    .like("code", "21%").eq("currency_code", transfer.source_currency)
+    .limit(1).maybeSingle();
+  if (!liabAcc) {
+    console.error("refundWallet: no liability account for", transfer.source_currency);
+    return false;
+  }
+  const { data: clearingAcc } = await supabase
+    .from("ledger_accounts").select("id").eq("code", "1203").maybeSingle();
+  const { data: feeAcc } = await supabase
+    .from("ledger_accounts").select("id").eq("code", "4200").maybeSingle();
+
+  const journalId = crypto.randomUUID();
+  const total = Number(transfer.source_amount) + Number(transfer.fee_amount || 0);
+  const entries: any[] = [{
+    journal_id: journalId, account_id: liabAcc.id, wallet_id: transfer.sender_wallet_id,
+    currency_code: transfer.source_currency,
+    debit_amount: 0, credit_amount: total,
+    description: `Refund — Canadian transfer failed (${reason.slice(0, 80)})`,
+    reference_type: "transfer_refund", reference_id: transfer.id, created_by: transfer.sender_id,
+  }];
+  if (clearingAcc) {
+    entries.push({
+      journal_id: journalId, account_id: clearingAcc.id, wallet_id: null,
+      currency_code: transfer.target_currency || transfer.source_currency,
+      debit_amount: Number(transfer.target_amount), credit_amount: 0,
+      description: `Reverse settlement clearing — failed transfer ${transfer.id}`,
+      reference_type: "transfer_refund", reference_id: transfer.id, created_by: transfer.sender_id,
+    });
+  }
+  if (feeAcc && Number(transfer.fee_amount) > 0) {
+    entries.push({
+      journal_id: journalId, account_id: feeAcc.id, wallet_id: null,
+      currency_code: transfer.source_currency,
+      debit_amount: Number(transfer.fee_amount), credit_amount: 0,
+      description: `Reverse transfer fee — failed transfer ${transfer.id}`,
+      reference_type: "transfer_refund", reference_id: transfer.id, created_by: transfer.sender_id,
+    });
+  }
+  const { error } = await supabase.from("ledger_entries").insert(entries);
+  if (error) { console.error("refundWallet insert error", error); return false; }
+  return true;
 }
 
 Deno.serve(async (req) => {
@@ -143,12 +216,11 @@ Deno.serve(async (req) => {
       const rawTransit = (rawParts[1] || "").replace(/\D/g, "");
       const accountNumber = String(rawParts[2] || "").replace(/\D/g, "");
       if (!rawInstitution || !rawTransit || !accountNumber) {
-        await supabase.from("transfers").update({
-          status: "failed",
-          failure_reason: "Invalid Canadian Bank details. Please check your Institution and Transit numbers.",
-        }).eq("id", transfer.id);
-        return new Response(JSON.stringify({ error: "Invalid Canadian Bank details. Please check your Institution and Transit numbers." }), {
-          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        const reason = "The Canadian bank details look incorrect. Your money has been returned. Please double-check the institution, transit, and account numbers.";
+        const refunded = await refundWallet(supabase, transfer, reason);
+        await supabase.from("transfers").update({ status: "failed", failure_reason: reason }).eq("id", transfer.id);
+        return new Response(JSON.stringify({ success: false, error: reason, refunded }), {
+          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       const institutionId = rawInstitution.padStart(3, "0");
@@ -173,50 +245,45 @@ Deno.serve(async (req) => {
         billingDetails,
       };
     } else {
-      return new Response(JSON.stringify({ error: `Unsupported payout_method ${transfer.payout_method}` }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      const reason = "This Canadian delivery method isn't supported. Your money has been returned to your wallet.";
+      const refunded = await refundWallet(supabase, transfer, reason);
+      await supabase.from("transfers").update({ status: "failed", failure_reason: reason }).eq("id", transfer.id);
+      return new Response(JSON.stringify({ success: false, error: reason, refunded }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    const failAndRefund = async (reason: string, details?: any) => {
+      const refunded = await refundWallet(supabase, transfer, reason);
+      await supabase.from("transfers").update({
+        status: "failed",
+        failure_reason: reason,
+      }).eq("id", transfer.id);
+      return new Response(JSON.stringify({
+        success: false, error: reason, refunded, details: details ?? null,
+      }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    };
 
     let handleResp: { ok: boolean; status: number; json: any };
     try {
       handleResp = await paysafePost("/paymenthub/v1/paymenthandles", handleBody);
     } catch (e) {
       console.error("Paysafe payment-handle network error", e);
-      await supabase.from("transfers").update({
-        status: "failed",
-        failure_reason: "Paysafe network/timeout error",
-      }).eq("id", transfer.id);
-      return new Response(JSON.stringify({ success: false, error: "Paysafe network error" }), {
-        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return failAndRefund("We couldn't reach our Canadian payments partner. Your money has been returned to your wallet. Please try again shortly.");
     }
 
     if (!handleResp.ok) {
       const reason = extractError(handleResp.json, handleResp.status);
       console.error("Paysafe payment-handle error", handleResp.status, handleResp.json);
-      await supabase.from("transfers").update({
-        status: "failed",
-        failure_reason: reason,
-      }).eq("id", transfer.id);
-      return new Response(JSON.stringify({ success: false, error: reason, details: handleResp.json }), {
-        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return failAndRefund(reason, handleResp.json);
     }
 
     const handleStatus: string = handleResp.json?.status;
     const paymentHandleToken: string | undefined = handleResp.json?.paymentHandleToken;
 
     if (handleStatus !== "PAYABLE" || !paymentHandleToken) {
-      const reason = `Payment handle not payable (status ${handleStatus || "unknown"})`;
       console.error("Paysafe payment-handle not payable", handleResp.json);
-      await supabase.from("transfers").update({
-        status: "failed",
-        failure_reason: reason,
-      }).eq("id", transfer.id);
-      return new Response(JSON.stringify({ success: false, error: reason, details: handleResp.json }), {
-        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return failAndRefund("Canadian transfers are temporarily unavailable. Your money has been returned to your wallet. Please try again later.", handleResp.json);
     }
 
     // ---------- Step 2: Submit standalone credit ----------
@@ -232,25 +299,13 @@ Deno.serve(async (req) => {
       creditResp = await paysafePost("/paymenthub/v1/standalonecredits", creditBody);
     } catch (e) {
       console.error("Paysafe standalone-credit network error", e);
-      await supabase.from("transfers").update({
-        status: "failed",
-        failure_reason: "Paysafe network/timeout error",
-      }).eq("id", transfer.id);
-      return new Response(JSON.stringify({ success: false, error: "Paysafe network error" }), {
-        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return failAndRefund("We couldn't reach our Canadian payments partner. Your money has been returned to your wallet. Please try again shortly.");
     }
 
     if (!creditResp.ok) {
       const reason = extractError(creditResp.json, creditResp.status);
       console.error("Paysafe standalone-credit error", creditResp.status, creditResp.json);
-      await supabase.from("transfers").update({
-        status: "failed",
-        failure_reason: reason,
-      }).eq("id", transfer.id);
-      return new Response(JSON.stringify({ success: false, error: reason, details: creditResp.json }), {
-        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return failAndRefund(reason, creditResp.json);
     }
 
     const updates: Record<string, unknown> = {
@@ -274,7 +329,24 @@ Deno.serve(async (req) => {
     });
   } catch (err) {
     console.error("paysafe-payout error", err);
-    return new Response(JSON.stringify({ success: false, error: err instanceof Error ? err.message : "Unknown" }), {
+    // Best-effort refund on unexpected error
+    try {
+      const body = await req.clone().json().catch(() => ({}));
+      if (body?.transfer_id) {
+        const { data: t } = await supabase.from("transfers").select("*").eq("id", body.transfer_id).single();
+        if (t && t.status !== "completed" && t.status !== "processing") {
+          await refundWallet(supabase, t, "Unexpected payout error");
+          await supabase.from("transfers").update({
+            status: "failed",
+            failure_reason: "We couldn't complete this Canadian transfer right now. Your money has been returned to your wallet.",
+          }).eq("id", t.id);
+        }
+      }
+    } catch (_) { /* ignore */ }
+    return new Response(JSON.stringify({
+      success: false,
+      error: "We couldn't complete this Canadian transfer right now. Your money has been returned to your wallet. Please try again later.",
+    }), {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
