@@ -105,8 +105,8 @@ const TransfersListPage = () => {
           <StatementActions rows={rows} meta={meta} defaultEmail={user?.email || ""} />
         </motion.div>
 
-        {/* Totals */}
-        <div className="grid grid-cols-2 gap-3">
+        {/* Balance Totals (across the whole statement) */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div className="rounded-xl border border-border bg-emerald-500/[0.04] p-4">
             <div className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">Total Money In</div>
             <div className="text-xl sm:text-2xl font-display font-bold text-emerald-600 dark:text-emerald-400 tabular-nums break-words leading-tight">
@@ -117,6 +117,12 @@ const TransfersListPage = () => {
             <div className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">Total Money Out</div>
             <div className="text-xl sm:text-2xl font-display font-bold text-rose-600 dark:text-rose-400 tabular-nums break-words leading-tight">
               {renderTotals(totalsOut, "-")}
+            </div>
+          </div>
+          <div className="rounded-xl border border-border bg-primary/[0.06] p-4">
+            <div className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">Net Balance</div>
+            <div className="text-xl sm:text-2xl font-display font-bold text-foreground tabular-nums break-words leading-tight">
+              {renderTotals(netByCurrency, "")}
             </div>
           </div>
         </div>
