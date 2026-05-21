@@ -30,7 +30,11 @@ export const StatementActions = ({ rows, meta, defaultEmail }: Props) => {
     <div className="flex items-center gap-2">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="sm" disabled={disabled}>
+          <Button
+            size="sm"
+            disabled={disabled}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white border-0 shadow-sm"
+          >
             <Download className="w-3.5 h-3.5 mr-1.5" /> Download
           </Button>
         </DropdownMenuTrigger>
@@ -49,7 +53,12 @@ export const StatementActions = ({ rows, meta, defaultEmail }: Props) => {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <Button variant="outline" size="sm" disabled={disabled} onClick={() => setOpenEmail(true)}>
+      <Button
+        size="sm"
+        disabled={disabled}
+        onClick={() => setOpenEmail(true)}
+        className="bg-emerald-600 hover:bg-emerald-700 text-white border-0 shadow-sm"
+      >
         <Share2 className="w-3.5 h-3.5 mr-1.5" /> Share
       </Button>
 
