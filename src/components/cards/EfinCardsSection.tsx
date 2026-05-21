@@ -75,6 +75,7 @@ const EfinCardsSection = () => {
                 status={c.status}
                 expMonth={c.exp_month}
                 expYear={c.exp_year}
+                tapToPay={(c.metadata as any)?.tap_to_pay !== false}
               />
             </motion.button>
           ))}
