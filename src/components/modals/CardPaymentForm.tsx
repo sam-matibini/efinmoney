@@ -85,7 +85,7 @@ function InnerForm({
   const [amount, setAmount] = useState(defaultAmount ? String(defaultAmount) : "");
   const [processing, setProcessing] = useState(false);
   const [cardReady, setCardReady] = useState(false);
-  const [success, setSuccess] = useState<{ amount: number; currency: string } | null>(null);
+  const [success, setSuccess] = useState<{ amount: number; currency: string; symbol: string } | null>(null);
 
   useEffect(() => {
     if (defaultAmount !== undefined) setAmount(String(defaultAmount));
@@ -97,6 +97,7 @@ function InnerForm({
 
   const wallet = wallets?.find((item) => item.wallet_id === (selectedWalletId ?? defaultWalletId)) ?? wallets?.[0];
   const currency = wallet?.currency_code ?? "USD";
+  const symbol = wallet?.symbol ?? "$";
   const amountNum = parseFloat(amount) || 0;
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -163,7 +164,7 @@ function InnerForm({
       await queryClient.invalidateQueries({ queryKey: ["ledger-deposits"] });
 
       const result = { amount: amountNum, currency, walletId: wallet.wallet_id };
-      setSuccess({ amount: amountNum, currency });
+      setSuccess({ amount: amountNum, currency, symbol });
       onSuccess?.(result);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Payment failed");
@@ -180,7 +181,7 @@ function InnerForm({
         </div>
         <h3 className="text-xl font-display font-bold text-foreground">Payment successful!</h3>
         <p className="text-sm text-muted-foreground">
-          ${success.amount.toFixed(2)} added to your {success.currency} wallet
+          {success.symbol}{success.amount.toFixed(2)} added to your {success.currency} wallet
         </p>
       </div>
     );
@@ -244,7 +245,7 @@ function InnerForm({
               <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing…
             </>
           ) : (
-            ctaLabel ?? `Pay $${amountNum.toFixed(2)}`
+            ctaLabel ?? `Pay ${symbol}${amountNum.toFixed(2)} ${currency}`
           )}
         </Button>
 
