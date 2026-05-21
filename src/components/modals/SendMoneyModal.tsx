@@ -34,7 +34,7 @@ const SendMoneyModal = ({ children }: SendMoneyModalProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [amount, setAmount] = useState("");
   const [selectedWalletId, setSelectedWalletId] = useState<string | null>(null);
-  const [targetCountry, setTargetCountry] = useState(targetCountries[0]);
+  const [targetCountryCode, setTargetCountryCode] = useState<string | null>(null);
   const [showSourceDropdown, setShowSourceDropdown] = useState(false);
   const [showTargetDropdown, setShowTargetDropdown] = useState(false);
 
@@ -42,6 +42,14 @@ const SendMoneyModal = ({ children }: SendMoneyModalProps) => {
   const { data: fxRates } = useFxRates();
 
   const selectedWallet = wallets?.find(w => w.wallet_id === selectedWalletId) || wallets?.[0];
+
+  // Default target country to match the source wallet currency so amounts mirror 1:1 until user changes it
+  const sourceCode = selectedWallet?.currency_code;
+  const effectiveTargetCode =
+    targetCountryCode ??
+    (sourceCode && targetCountries.find(c => c.code === sourceCode) ? sourceCode : targetCountries[0].code);
+  const targetCountry =
+    targetCountries.find(c => c.code === effectiveTargetCode) ?? targetCountries[0];
 
   const fxRate = fxRates?.find(
     r => r.from_currency === selectedWallet?.currency_code && r.to_currency === targetCountry.code
@@ -57,7 +65,7 @@ const SendMoneyModal = ({ children }: SendMoneyModalProps) => {
   const reset = () => {
     setAmount("");
     setSelectedWalletId(null);
-    setTargetCountry(targetCountries[0]);
+    setTargetCountryCode(null);
   };
 
   const goToDomestic = () => {
@@ -185,7 +193,7 @@ const SendMoneyModal = ({ children }: SendMoneyModalProps) => {
                         <button
                           key={country.code}
                           type="button"
-                          onClick={() => { setTargetCountry(country); setShowTargetDropdown(false); }}
+                          onClick={() => { setTargetCountryCode(country.code); setShowTargetDropdown(false); }}
                           className="flex items-center gap-3 w-full px-4 py-3 hover:bg-muted transition-colors first:rounded-t-xl last:rounded-b-xl"
                         >
                           <span>{country.flag}</span>
