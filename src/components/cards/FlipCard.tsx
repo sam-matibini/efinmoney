@@ -1,6 +1,6 @@
 import { useRef, useState, MouseEvent } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Copy, Wifi } from "lucide-react";
+import { Copy, Wifi, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import type { Card as CardRow } from "@/hooks/useCards";
