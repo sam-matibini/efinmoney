@@ -74,13 +74,15 @@ Deno.serve(async (req) => {
     // Profile for cardholder data
     const { data: profile } = await admin
       .from("profiles")
-      .select("full_name, email, phone_number, address_line1, address_line2, city, state_province, postal_code, country")
+      .select("full_name, email, phone_number, street_address, city, state_province, postal_code, address_country, country_code")
       .eq("user_id", userId)
       .maybeSingle();
 
-    if (!profile?.full_name || !profile.address_line1 || !profile.city || !profile.postal_code) {
+    const addressCountry = ((profile as any)?.address_country || (profile as any)?.country_code || "CA").toUpperCase().slice(0, 2);
+
+    if (!profile?.full_name || !(profile as any).street_address || !profile.city || !profile.postal_code) {
       return json({
-        error: "Missing profile data. Please complete your name and billing address in Profile Settings.",
+        error: "Missing profile data. Please complete your full name and billing address (street, city, postal code) in Profile Settings.",
       }, 400);
     }
 
@@ -106,12 +108,11 @@ Deno.serve(async (req) => {
             phone_number: profile.phone_number || undefined,
             billing: {
               address: {
-                line1: profile.address_line1,
-                line2: profile.address_line2 || undefined,
+                line1: (profile as any).street_address,
                 city: profile.city,
                 state: profile.state_province || "ON",
                 postal_code: profile.postal_code,
-                country: (profile.country || "CA").toUpperCase().slice(0, 2),
+                country: addressCountry,
               },
             },
           }, { idempotencyKey: `cardholder:${userId}` });
@@ -130,12 +131,11 @@ Deno.serve(async (req) => {
           legal_name: profile.full_name,
           email: profile.email || claimData.claims.email,
           phone: profile.phone_number,
-          billing_line1: profile.address_line1,
-          billing_line2: profile.address_line2,
+          billing_line1: (profile as any).street_address,
           billing_city: profile.city,
           billing_state: profile.state_province || "ON",
           billing_postal_code: profile.postal_code,
-          billing_country: (profile.country || "CA").toUpperCase().slice(0, 2),
+          billing_country: addressCountry,
           kyc_verified_at: new Date().toISOString(),
         })
         .select()
