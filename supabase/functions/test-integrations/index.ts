@@ -66,22 +66,23 @@ async function checkStellar(): Promise<CheckResult> {
 
 async function checkElicate(): Promise<CheckResult> {
   try {
-    const key = Deno.env.get("ELICATE_SECRET_KEY");
-    if (!key) return { service: "elicate", status: "failed", message: "ELICATE_SECRET_KEY not configured" };
-    const r = await fetch("https://elicatepay.vercel.app/api/v1/payments/charge", {
+    const { mode, url, secretKey } = getElicateConfig();
+    if (!secretKey) return { service: "elicate", status: "failed", message: `ELICATE_${mode === "live" ? "LIVE_" : ""}SECRET_KEY not configured`, details: { mode } };
+    if (!url) return { service: "elicate", status: "failed", message: "ELICATE_LIVE_BASE_URL not configured", details: { mode } };
+    const r = await fetch(url, {
       method: "OPTIONS",
-      headers: { Authorization: `Bearer ${key}` },
+      headers: { Authorization: `Bearer ${secretKey}` },
     });
-    // OPTIONS / HEAD reachability — any HTTP response means DNS+TLS+routing OK
+    const host = (() => { try { return new URL(url).host; } catch { return url; } })();
     if (r.status >= 200 && r.status < 500) {
       return {
         service: "elicate",
         status: "healthy",
         message: "Connected Successfully",
-        details: { endpoint: "elicatepay.vercel.app", httpStatus: r.status },
+        details: { mode, endpoint: host, httpStatus: r.status },
       };
     }
-    return { service: "elicate", status: "failed", message: `API Key Invalid / Connection Failed (HTTP ${r.status})` };
+    return { service: "elicate", status: "failed", message: `API Key Invalid / Connection Failed (HTTP ${r.status})`, details: { mode, endpoint: host } };
   } catch (e) {
     return { service: "elicate", status: "failed", message: `Connection Failed: ${(e as Error).message}` };
   }
