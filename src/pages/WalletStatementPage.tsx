@@ -127,13 +127,16 @@ const WalletStatementPage = () => {
 
         <Card>
           <CardHeader className="space-y-3">
-            <Tabs value={direction} onValueChange={(v) => setDirection(v as any)}>
-              <TabsList className="grid grid-cols-3 w-full md:w-auto">
-                <TabsTrigger value="all">All</TabsTrigger>
-                <TabsTrigger value="in">Received</TabsTrigger>
-                <TabsTrigger value="out">Sent</TabsTrigger>
-              </TabsList>
-            </Tabs>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <Tabs value={direction} onValueChange={(v) => setDirection(v as any)}>
+                <TabsList className="grid grid-cols-3 w-full md:w-auto">
+                  <TabsTrigger value="all">All</TabsTrigger>
+                  <TabsTrigger value="in">Received</TabsTrigger>
+                  <TabsTrigger value="out">Sent</TabsTrigger>
+                </TabsList>
+              </Tabs>
+              <StatementActions rows={rows} meta={meta} defaultEmail={user?.email || ""} />
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <div className="relative">
                 <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
