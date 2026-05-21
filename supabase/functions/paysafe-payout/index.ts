@@ -245,8 +245,11 @@ Deno.serve(async (req) => {
         billingDetails,
       };
     } else {
-      return new Response(JSON.stringify({ error: `Unsupported payout_method ${transfer.payout_method}` }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      const reason = "This Canadian delivery method isn't supported. Your money has been returned to your wallet.";
+      const refunded = await refundWallet(supabase, transfer, reason);
+      await supabase.from("transfers").update({ status: "failed", failure_reason: reason }).eq("id", transfer.id);
+      return new Response(JSON.stringify({ success: false, error: reason, refunded }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
