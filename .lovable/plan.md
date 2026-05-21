@@ -1,49 +1,28 @@
-# Switch Elicate integration to live/production
+# Fix: Elicate still running in sandbox mode
 
-You selected **ELICATE_ENV switch** and **new live-only secrets**. The live base URL wasn't provided, so we'll also store it as a secret (`ELICATE_LIVE_BASE_URL`) — that way you can paste the production URL alongside the keys without another code edit, and we can flip back to sandbox by changing `ELICATE_ENV`.
+## Diagnosis
 
-## Secrets to add (via the secrets form)
+All five Elicate live secrets are configured (`ELICATE_LIVE_BASE_URL`, `ELICATE_LIVE_SECRET_KEY`, `ELICATE_LIVE_PUBLIC_KEY`, `ELICATE_LIVE_WEBHOOK_SECRET`, plus `ELICATE_ENV`). But `/test-integrations` confirms the resolver is still returning `mode: "sandbox"`:
 
-- `ELICATE_ENV` — value `live` (or `sandbox` to revert)
-- `ELICATE_LIVE_BASE_URL` — the production charge endpoint, e.g. `https://api.elicatepay.com/api/v1/payments/charge`
-- `ELICATE_LIVE_SECRET_KEY`
-- `ELICATE_LIVE_PUBLIC_KEY`
-- `ELICATE_LIVE_WEBHOOK_SECRET`
-
-Existing `ELICATE_SECRET_KEY` / `ELICATE_PUBLIC_KEY` / `ELICATE_WEBHOOK_SECRET` stay in place as the sandbox credentials — used when `ELICATE_ENV !== "live"`.
-
-## Code changes (edge functions only)
-
-Add a tiny shared helper inline in each function (or a new `supabase/functions/_shared/elicate.ts`) that resolves config based on `ELICATE_ENV`:
-
-```ts
-const isLive = (Deno.env.get("ELICATE_ENV") ?? "sandbox").toLowerCase() === "live";
-const ELICATE_URL    = isLive
-  ? (Deno.env.get("ELICATE_LIVE_BASE_URL") ?? "")
-  : "https://elicatepay.vercel.app/api/v1/payments/charge";
-const ELICATE_SECRET = isLive
-  ? Deno.env.get("ELICATE_LIVE_SECRET_KEY")
-  : Deno.env.get("ELICATE_SECRET_KEY");
-const ELICATE_WEBHOOK_SECRET = isLive
-  ? Deno.env.get("ELICATE_LIVE_WEBHOOK_SECRET")
-  : Deno.env.get("ELICATE_WEBHOOK_SECRET");
+```json
+{ "endpoint": "elicatepay.vercel.app", "httpStatus": 204, "mode": "sandbox" }
 ```
 
-Files to update:
+That means `ELICATE_ENV` currently holds something other than the literal string `live` (likely blank or `sandbox`). The helper at `supabase/functions/_shared/elicate.ts` only switches when the value lowercases to exactly `"live"`, so every payout still hits the sandbox URL — which is what's returning the 500 you saw in the screenshot.
 
-1. **`supabase/functions/elicate-payout/index.ts`** — replace the current `ELICATE_URL` constant and `Deno.env.get("ELICATE_SECRET_KEY")` lookup with the helper. Log `mode: isLive ? "live" : "sandbox"` for debugging. Fail fast with a clear error when `isLive && !ELICATE_LIVE_BASE_URL`.
-2. **`supabase/functions/elicate-webhook/index.ts`** — use the resolved `ELICATE_WEBHOOK_SECRET` for signature verification instead of reading `ELICATE_WEBHOOK_SECRET` directly.
-3. **`supabase/functions/test-integrations/index.ts`** — in `checkElicate()`, read the resolved URL + key, and surface `mode` in the `details` payload so the System Diagnostics page shows whether live or sandbox is active.
+## Fix
 
-No frontend, schema, or DB changes. No changes to webhook URLs on the Elicate dashboard — only the credentials they hold.
+One secret update, no code changes:
 
-## Verification steps after deploy
+1. Update `ELICATE_ENV` → set its value to `live` (lowercase, no quotes, no spaces).
+2. Edge functions pick it up immediately on the next invocation — no redeploy needed.
 
-1. Open `/admin/diagnostics` and confirm Elicate shows **Connected Successfully** with `mode: "live"`.
-2. Run a small test payout to a controlled Zambian MoMo number through `/send` and confirm the Elicate dashboard logs it as live traffic and the webhook flips the transfer to `completed`.
-3. If anything is wrong, set `ELICATE_ENV=sandbox` to instantly revert without redeploying.
+## Verify
+
+1. Open `/admin/diagnostics` → click **Test Connection** on Zambia (Elicate Pay). Confirm details show `mode: live` and the endpoint switches from `elicatepay.vercel.app` to your production host.
+2. Run a small real payout via `/send` to a controlled MTN/Airtel number and confirm Elicate's live dashboard logs it.
+3. If anything misbehaves, set `ELICATE_ENV` back to `sandbox` to revert instantly.
 
 ## What I need from you
 
-- The live base URL (paste it as the `ELICATE_LIVE_BASE_URL` secret value when the form pops up after you approve this plan).
-- The three live keys (paste into the matching `ELICATE_LIVE_*` secret fields).
+Approve this plan and I'll trigger the secret-update form for `ELICATE_ENV`. Type `live` in the value field.
