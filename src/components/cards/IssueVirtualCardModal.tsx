@@ -63,7 +63,7 @@ const IssueVirtualCardModal = ({ open, onClose, onCreated }: IssueVirtualCardMod
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 font-display">
             <Sparkles className="w-4 h-4 text-emerald-500" />
-            Issue eFinVisa Card
+            Issue eFinVISA Card
           </DialogTitle>
         </DialogHeader>
 
@@ -145,7 +145,7 @@ const IssueVirtualCardModal = ({ open, onClose, onCreated }: IssueVirtualCardMod
           </div>
 
           <p className="text-xs text-muted-foreground">
-            eFinVisa cards work instantly online. Funded from your {currency} wallet — every authorization checks your balance in real time.
+            eFinVISA cards work instantly online. Funded from your {currency} wallet — every authorization checks your balance in real time.
           </p>
         </div>
 
@@ -156,7 +156,7 @@ const IssueVirtualCardModal = ({ open, onClose, onCreated }: IssueVirtualCardMod
             disabled={createCard.isPending}
             className="bg-emerald-600 hover:bg-emerald-700 text-white"
           >
-            {createCard.isPending ? "Creating…" : "Create eFinVisa"}
+            {createCard.isPending ? "Creating…" : "Create eFinVISA"}
           </Button>
         </DialogFooter>
       </DialogContent>
