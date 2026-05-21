@@ -10,13 +10,14 @@ import { currencySymbol } from "./currency";
 export interface StatementMeta {
   title: string;
   subtitle?: string;
+  bankName?: string;
   accountHolder?: string;
   accountEmail?: string;
   accountNumber?: string;
   efinTag?: string;
   periodFrom?: string;
   periodTo?: string;
-  currency?: string; // when single-wallet
+  currency?: string;
 }
 
 const fmt = (n: number) =>
