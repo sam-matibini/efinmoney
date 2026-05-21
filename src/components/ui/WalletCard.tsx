@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { ArrowUpRight, Plus, MoreHorizontal, Star, Snowflake, Play, Pencil, Trash2, Sparkles, FileText } from "lucide-react";
 import SendMoneyModal from "@/components/modals/SendMoneyModal";
 import TopUpModal from "@/components/modals/TopUpModal";
@@ -49,6 +49,7 @@ const WalletCard = ({
 }: WalletCardProps) => {
   const [topUpOpen, setTopUpOpen] = useState(false);
   const [stellarOpen, setStellarOpen] = useState(false);
+  const navigate = useNavigate();
   const formatBalance = (value: number) => {
     return new Intl.NumberFormat('en-US', {
       minimumFractionDigits: 2,
@@ -57,6 +58,10 @@ const WalletCard = ({
   };
 
   const isFrozen = status === 'frozen';
+  const handleOpenStatement = () => {
+    if (!walletId || isFrozen) return;
+    navigate(`/wallets/${walletId}/statement`);
+  };
 
   return (
     <motion.div
@@ -64,11 +69,12 @@ const WalletCard = ({
       animate={{ opacity: 1, y: 0 }}
       whileHover={{ scale: 1.02, y: -4 }}
       transition={{ duration: 0.3 }}
+      onClick={handleOpenStatement}
       className={`group relative overflow-hidden rounded-2xl p-4 sm:p-6 ${
         isMain 
           ? 'gradient-primary shadow-glow min-h-[160px] sm:min-h-[180px]' 
           : 'glass shadow-card'
-      } ${isFrozen ? 'opacity-75' : ''}`}
+      } ${walletId && !isFrozen ? 'cursor-pointer' : ''} ${isFrozen ? 'opacity-75' : ''}`}
     >
       {/* Big country flag top-right */}
       <span className="pointer-events-none select-none absolute top-3 right-3 text-[40px] leading-none drop-shadow-md z-10">
@@ -100,15 +106,6 @@ const WalletCard = ({
         </div>
       )}
 
-      {/* Full-card click target → wallet statement */}
-      {walletId && (
-        <Link
-          to={`/wallets/${walletId}/statement`}
-          aria-label={`View ${currency} wallet statement`}
-          className="absolute inset-0 z-[5]"
-        />
-      )}
-      
       <div className="relative z-20">
         <div className="flex items-center justify-between mb-3 sm:mb-4">
           <div className="flex items-center gap-2 sm:gap-3">
@@ -127,7 +124,7 @@ const WalletCard = ({
             {showStellarBadge && (
               <button
                 type="button"
-                onClick={(e) => { e.stopPropagation(); setStellarOpen(true); }}
+                  onClick={(e) => { e.stopPropagation(); setStellarOpen(true); }}
                 className={`flex items-center gap-1 text-[10px] sm:text-xs px-2 py-0.5 rounded-full transition-transform hover:scale-105 ${
                   isMain ? 'bg-primary-foreground/20 text-primary-foreground' : 'bg-accent text-accent-foreground'
                 }`}
@@ -141,7 +138,7 @@ const WalletCard = ({
           {walletId && (onSetDefault || onToggleFreeze || onEdit || onDelete) && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className={`p-1.5 sm:p-2 rounded-full transition-colors ${
+                <button onClick={(e) => e.stopPropagation()} className={`p-1.5 sm:p-2 rounded-full transition-colors ${
                   isMain 
                     ? 'hover:bg-foreground/10' 
                     : 'hover:bg-muted'
@@ -227,6 +224,7 @@ const WalletCard = ({
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
+              onClick={(e) => e.stopPropagation()}
               disabled={isFrozen}
               className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-medium transition-colors ${
                 isMain 
@@ -242,7 +240,10 @@ const WalletCard = ({
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             disabled={isFrozen || !walletId}
-            onClick={() => walletId && setTopUpOpen(true)}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (walletId) setTopUpOpen(true);
+            }}
             className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-medium transition-colors ${
               isMain 
                 ? 'bg-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/30' 
@@ -255,6 +256,7 @@ const WalletCard = ({
           {walletId && (
             <Link
               to={`/wallets/${walletId}/statement`}
+              onClick={(e) => e.stopPropagation()}
               className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-medium transition-colors ${
                 isMain
                   ? 'bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20'
