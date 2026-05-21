@@ -45,10 +45,14 @@ const RecentTransactions = () => {
 
   const totalsIn = sumByCurrency((r) => r.moneyIn);
   const totalsOut = sumByCurrency((r) => r.moneyOut);
-  const renderTotals = (totals: Record<string, number>, sign: "+" | "-") => {
-    const entries = Object.entries(totals).sort((a, b) => b[1] - a[1]);
+  const netByCurrency: Record<string, number> = {};
+  for (const c of new Set([...Object.keys(totalsIn), ...Object.keys(totalsOut)])) {
+    netByCurrency[c] = (totalsIn[c] || 0) - (totalsOut[c] || 0);
+  }
+  const renderTotals = (totals: Record<string, number>, sign: "+" | "-" | "") => {
+    const entries = Object.entries(totals).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
     if (entries.length === 0) return `${sign}${fmt(0)}`;
-    return entries.map(([c, v]) => `${sign}${currencySymbol(c) || ""}${fmt(v)} ${c}`).join("  ·  ");
+    return entries.map(([c, v]) => `${sign}${currencySymbol(c) || ""}${fmt(Math.abs(v))} ${c}`).join("  ·  ");
   };
 
   const visible = rows.slice(0, DASHBOARD_LIMIT);
