@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import Header from "@/components/layout/Header";
 import MobileNav from "@/components/layout/MobileNav";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -15,7 +15,7 @@ import { useTransfers } from "@/hooks/useTransfers";
 import { ChevronRight, Inbox, Search, Download, ArrowUpRight, ArrowDownLeft } from "lucide-react";
 import { downloadTransferReceipt } from "@/lib/receipt";
 import { cleanIncomingTransactionLabel, INCOMING_REFERENCE_TYPES } from "@/lib/incomingTransactions";
-import { format } from "date-fns";
+import { format, isToday, isYesterday } from "date-fns";
 
 const refOf = (id: string) => `EFM-${id.replace(/-/g, "").slice(0, 8).toUpperCase()}`;
 
@@ -31,6 +31,15 @@ const groupFor = (s: string) => {
   if (["failed", "reversed", "expired"].includes(s)) return "failed";
   return "processing";
 };
+
+const dateGroupLabel = (iso: string) => {
+  const d = new Date(iso);
+  if (isToday(d)) return "Today";
+  if (isYesterday(d)) return "Yesterday";
+  return format(d, "MMM d, yyyy");
+};
+
+const fmt = (n: number) => Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 type Row = {
   id: string;
@@ -69,7 +78,6 @@ const TransfersListPage = () => {
         .order("created_at", { ascending: false })
         .limit(200);
       if (error) return [];
-      // Dedupe by journal_id
       const seen = new Set<string>();
       const out: any[] = [];
       for (const e of data ?? []) {
@@ -128,15 +136,39 @@ const TransfersListPage = () => {
     return items;
   }, [rows, filter, direction, search, from, to]);
 
+  const totalIn = filtered.filter((r) => r.direction === "in" && r.status === "completed").reduce((s, r) => s + r.amount, 0);
+  const totalOut = filtered.filter((r) => r.direction === "out" && r.status === "completed").reduce((s, r) => s + r.amount, 0);
+
+  // Group by date
+  const groups = useMemo(() => {
+    return filtered.reduce<Record<string, Row[]>>((acc, r) => {
+      const k = dateGroupLabel(r.createdAt);
+      (acc[k] ||= []).push(r);
+      return acc;
+    }, {});
+  }, [filtered]);
+
   const loading = isLoading || loadingIn;
 
   return (
     <div className="min-h-screen bg-background pb-24 md:pb-8">
       <Header />
-      <main className="container px-4 py-6 max-w-4xl mx-auto space-y-6">
+      <main className="container px-4 py-6 max-w-5xl mx-auto space-y-6">
         <div>
-          <h1 className="text-2xl font-display font-bold">All Transfers</h1>
-          <p className="text-sm text-muted-foreground">Track and review every transfer — sent and received.</p>
+          <h1 className="text-2xl font-display font-bold">Account Statement</h1>
+          <p className="text-sm text-muted-foreground">Bank-style view of all money in and money out across your wallets.</p>
+        </div>
+
+        {/* Summary */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="rounded-xl border border-border bg-emerald-500/[0.04] p-4">
+            <div className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">Total Money In</div>
+            <div className="text-xl sm:text-2xl font-display font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">+{fmt(totalIn)}</div>
+          </div>
+          <div className="rounded-xl border border-border bg-rose-500/[0.04] p-4">
+            <div className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">Total Money Out</div>
+            <div className="text-xl sm:text-2xl font-display font-bold text-rose-600 dark:text-rose-400 tabular-nums">-{fmt(totalOut)}</div>
+          </div>
         </div>
 
         <Card>
@@ -144,8 +176,8 @@ const TransfersListPage = () => {
             <Tabs value={direction} onValueChange={(v) => setDirection(v as any)}>
               <TabsList className="grid grid-cols-3 w-full">
                 <TabsTrigger value="all">All</TabsTrigger>
-                <TabsTrigger value="out">Sent</TabsTrigger>
-                <TabsTrigger value="in">Received</TabsTrigger>
+                <TabsTrigger value="in">Received (In)</TabsTrigger>
+                <TabsTrigger value="out">Sent (Out)</TabsTrigger>
               </TabsList>
             </Tabs>
             <Tabs value={filter} onValueChange={(v) => setFilter(v as any)}>
@@ -173,51 +205,87 @@ const TransfersListPage = () => {
             ) : filtered.length === 0 ? (
               <div className="text-center py-12">
                 <Inbox className="w-10 h-10 mx-auto text-muted-foreground mb-2" />
-                <p className="text-sm text-muted-foreground">No transfers match your filters.</p>
+                <p className="text-sm text-muted-foreground">No transactions match your filters.</p>
               </div>
             ) : (
-              <div className="divide-y divide-border">
-                {filtered.map((r, i) => {
-                  const isIn = r.direction === "in";
-                  const linkTo = r.transferId ? `/transfers/${r.transferId}` : `/transactions/${r.journalId}`;
-                  return (
-                    <motion.div key={r.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.02 }}>
-                      <Link to={linkTo} className="flex items-center justify-between py-4 hover:bg-muted/40 px-2 rounded-lg transition-colors">
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center ${isIn ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" : "bg-rose-500/15 text-rose-600 dark:text-rose-400"}`}>
-                            {isIn ? <ArrowDownLeft className="w-4 h-4" /> : <ArrowUpRight className="w-4 h-4" />}
-                          </div>
-                          <div className="min-w-0">
-                            <p className="font-medium text-foreground truncate">{r.recipientOrSource}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {refOf(r.transferId || r.journalId || r.id)} · {format(new Date(r.createdAt), "MMM d, yyyy")}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <div className="text-right">
-                            <p className={`font-display font-semibold tabular-nums ${isIn ? "text-emerald-600 dark:text-emerald-400" : "text-foreground"}`}>
-                              {isIn ? "+" : "-"}{Number(r.amount).toLocaleString("en-US", { minimumFractionDigits: 2 })} {r.currency}
-                            </p>
-                            <Badge variant="outline" className={`text-[10px] ${statusBadge(r.status)}`}>{r.status}</Badge>
-                          </div>
-                          {r.transferId && (
-                            <button
-                              type="button"
-                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); downloadTransferReceipt(r.transferId!); }}
-                              className="p-2 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground"
-                              title="Download receipt"
-                            >
-                              <Download className="w-4 h-4" />
-                            </button>
-                          )}
-                          <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                        </div>
-                      </Link>
-                    </motion.div>
-                  );
-                })}
-              </div>
+              <>
+                {/* Statement header (desktop) */}
+                <div className="hidden sm:grid grid-cols-[1fr_140px_140px_110px_50px] gap-2 px-3 py-2 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold border-b border-border">
+                  <div>Description</div>
+                  <div className="text-right">Money Out</div>
+                  <div className="text-right">Money In</div>
+                  <div className="text-right">Status</div>
+                  <div></div>
+                </div>
+
+                <div className="space-y-4 mt-1">
+                  {Object.entries(groups).map(([label, rs]) => (
+                    <div key={label}>
+                      <div className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground bg-muted/30 rounded-md">{label}</div>
+                      <div className="divide-y divide-border/60">
+                        {rs.map((r, i) => {
+                          const isIn = r.direction === "in";
+                          const isFailed = ["failed", "reversed", "expired"].includes(r.status);
+                          const linkTo = r.transferId ? `/transfers/${r.transferId}` : `/transactions/${r.journalId}`;
+                          const amountColor = isFailed
+                            ? "text-muted-foreground line-through decoration-rose-500/60"
+                            : isIn ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400";
+                          return (
+                            <motion.div key={r.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.02 }}>
+                              <Link to={linkTo} className="grid sm:grid-cols-[1fr_140px_140px_110px_50px] grid-cols-[1fr_auto] gap-2 items-center px-3 py-3 rounded-lg hover:bg-muted/40 transition-colors">
+                                {/* Description */}
+                                <div className="flex items-center gap-3 min-w-0">
+                                  <div className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center ${isIn ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" : "bg-rose-500/15 text-rose-600 dark:text-rose-400"}`}>
+                                    {isIn ? <ArrowDownLeft className="w-4 h-4" /> : <ArrowUpRight className="w-4 h-4" />}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="font-semibold text-foreground truncate text-sm">{r.recipientOrSource}</p>
+                                    <p className="text-[11px] text-muted-foreground truncate">
+                                      {refOf(r.transferId || r.journalId || r.id)} · {format(new Date(r.createdAt), "h:mm a")}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                {/* Mobile: single amount */}
+                                <div className="sm:hidden text-right">
+                                  <p className={`text-sm font-display font-bold tabular-nums ${amountColor}`}>
+                                    {isIn ? "+" : "-"}{fmt(r.amount)} {r.currency}
+                                  </p>
+                                  <Badge variant="outline" className={`text-[9px] mt-0.5 ${statusBadge(r.status)}`}>{r.status}</Badge>
+                                </div>
+
+                                {/* Desktop debit/credit columns */}
+                                <div className="hidden sm:block text-right tabular-nums text-sm font-semibold">
+                                  {!isIn ? <span className={amountColor}>-{fmt(r.amount)} {r.currency}</span> : <span className="text-muted-foreground/40">—</span>}
+                                </div>
+                                <div className="hidden sm:block text-right tabular-nums text-sm font-semibold">
+                                  {isIn ? <span className={amountColor}>+{fmt(r.amount)} {r.currency}</span> : <span className="text-muted-foreground/40">—</span>}
+                                </div>
+                                <div className="hidden sm:flex justify-end">
+                                  <Badge variant="outline" className={`text-[10px] ${statusBadge(r.status)}`}>{r.status}</Badge>
+                                </div>
+                                <div className="hidden sm:flex items-center justify-end gap-1">
+                                  {r.transferId && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); downloadTransferReceipt(r.transferId!); }}
+                                      className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground"
+                                      title="Download receipt"
+                                    >
+                                      <Download className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                  <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
+                                </div>
+                              </Link>
+                            </motion.div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
