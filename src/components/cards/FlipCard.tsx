@@ -1,6 +1,6 @@
 import { useRef, useState, MouseEvent } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Copy, Wifi } from "lucide-react";
+import { Copy, Wifi, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import type { Card as CardRow } from "@/hooks/useCards";
@@ -246,64 +246,91 @@ const FlipCard = ({ card, flipped, onToggle, index }: FlipCardProps) => {
               }}
             />
 
-            <div className="relative z-10 h-full flex flex-col">
-              {/* magnetic strip */}
-              <div className="mt-5 h-11 w-full bg-black/85" />
+            {isExternal ? (
+              <div className="relative z-10 h-full flex flex-col">
+                {/* magnetic strip */}
+                <div className="mt-5 h-11 w-full bg-gradient-to-b from-neutral-900 via-black to-neutral-900 shadow-inner" />
 
-              <div className="px-6 mt-5 space-y-3 text-sm flex-1">
-                {/* CVV box */}
-                <div className="flex items-center gap-3">
-                  <div className="flex-1 bg-white text-neutral-900 rounded-md h-9 flex items-center justify-end pr-3 font-mono tracking-widest text-base shadow-inner">
-                    {card.cvv ?? "•••"}
-                  </div>
-                  <span className="text-[10px] uppercase tracking-widest opacity-70">CVV</span>
-                </div>
-
-                <div>
-                  <p className="text-[10px] uppercase tracking-widest opacity-70">Card number</p>
-                  <div className="flex items-center gap-2">
-                    <p className="font-mono tracking-wider truncate">{maskedNumber}</p>
-                    {card.card_number && (
-                      <button
-                        onClick={(e) => copy("Card number", card.card_number!, e)}
-                        className="p-1 rounded-md bg-white/10 hover:bg-white/20"
-                      >
-                        <Copy className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex items-end gap-6">
-                  <div>
-                    <p className="text-[10px] uppercase tracking-widest opacity-70">Expires</p>
-                    <p className="font-mono">{expiry}</p>
-                  </div>
-                  <div className="ml-auto text-right">
-                    <p className="text-[10px] uppercase tracking-widest opacity-70">Limit</p>
-                    <p className="font-mono">
-                      ${Number(card.spending_limit).toLocaleString("en-US", { minimumFractionDigits: 0 })}
-                    </p>
-                  </div>
-                  {/* hologram */}
-                  <div className="w-9 h-9 rounded-full bg-[conic-gradient(from_0deg,#fde68a,#fca5a5,#a7f3d0,#bfdbfe,#ddd6fe,#fde68a)] shadow-inner border border-white/30" />
-                </div>
-
-                {isExternal && (
-                  <p className="text-[11px] opacity-70 pt-1">
-                    Full details not stored — used for funding only.
+                <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
+                  <motion.div
+                    animate={{ scale: [1, 1.05, 1] }}
+                    transition={{ duration: 2.6, repeat: Infinity, ease: "easeInOut" }}
+                    className="relative w-14 h-14 rounded-full bg-white/10 backdrop-blur flex items-center justify-center border border-white/20 shadow-[0_0_24px_rgba(16,185,129,0.35)]"
+                  >
+                    <div className="absolute inset-0 rounded-full bg-emerald-400/20 blur-xl" />
+                    <ShieldCheck className="relative w-7 h-7 text-emerald-300" strokeWidth={2.2} />
+                  </motion.div>
+                  <p className="mt-3 font-display font-semibold tracking-tight text-base">
+                    Bank-Grade Encryption
                   </p>
-                )}
-              </div>
+                  <p className="mt-1.5 text-[11px] leading-snug text-white/65 max-w-[260px]">
+                    For your security, this card is tokenized and vaulted by Stripe.
+                    Full card details are permanently hidden.
+                  </p>
+                </div>
 
-              <motion.p
-                animate={{ opacity: [0.5, 1, 0.5] }}
-                transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
-                className="pb-4 text-[10px] uppercase tracking-[0.3em] text-center"
-              >
-                Tap to flip back
-              </motion.p>
-            </div>
+                <motion.p
+                  animate={{ opacity: [0.4, 0.9, 0.4] }}
+                  transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
+                  className="pb-4 text-[10px] uppercase tracking-[0.3em] text-center"
+                >
+                  Tap to flip back
+                </motion.p>
+              </div>
+            ) : (
+              <div className="relative z-10 h-full flex flex-col">
+                {/* magnetic strip */}
+                <div className="mt-5 h-11 w-full bg-black/85" />
+
+                <div className="px-6 mt-5 space-y-3 text-sm flex-1">
+                  {/* CVV box */}
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 bg-white text-neutral-900 rounded-md h-9 flex items-center justify-end pr-3 font-mono tracking-widest text-base shadow-inner">
+                      {card.cvv ?? "•••"}
+                    </div>
+                    <span className="text-[10px] uppercase tracking-widest opacity-70">CVV</span>
+                  </div>
+
+                  <div>
+                    <p className="text-[10px] uppercase tracking-widest opacity-70">Card number</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-mono tracking-wider truncate">{maskedNumber}</p>
+                      {card.card_number && (
+                        <button
+                          onClick={(e) => copy("Card number", card.card_number!, e)}
+                          className="p-1 rounded-md bg-white/10 hover:bg-white/20"
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-end gap-6">
+                    <div>
+                      <p className="text-[10px] uppercase tracking-widest opacity-70">Expires</p>
+                      <p className="font-mono">{expiry}</p>
+                    </div>
+                    <div className="ml-auto text-right">
+                      <p className="text-[10px] uppercase tracking-widest opacity-70">Limit</p>
+                      <p className="font-mono">
+                        ${Number(card.spending_limit).toLocaleString("en-US", { minimumFractionDigits: 0 })}
+                      </p>
+                    </div>
+                    {/* hologram */}
+                    <div className="w-9 h-9 rounded-full bg-[conic-gradient(from_0deg,#fde68a,#fca5a5,#a7f3d0,#bfdbfe,#ddd6fe,#fde68a)] shadow-inner border border-white/30" />
+                  </div>
+                </div>
+
+                <motion.p
+                  animate={{ opacity: [0.5, 1, 0.5] }}
+                  transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
+                  className="pb-4 text-[10px] uppercase tracking-[0.3em] text-center"
+                >
+                  Tap to flip back
+                </motion.p>
+              </div>
+            )}
           </div>
         </motion.div>
       </motion.div>
