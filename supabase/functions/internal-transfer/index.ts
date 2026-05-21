@@ -165,7 +165,8 @@ Deno.serve(async (req) => {
 
     // Build double-entry journal
     const journalId = crypto.randomUUID();
-    const description = note || `eFinMoney transfer to ${recipientName}`;
+    const debitDesc = note ? `${note} · to ${recipientName}` : `Sent to ${recipientName}`;
+    const creditDesc = note ? `${note} · from ${senderName}` : `Received from ${senderName}`;
     const entries = [
       {
         journal_id: journalId,
@@ -174,7 +175,7 @@ Deno.serve(async (req) => {
         currency_code: fromCurrency,
         debit_amount: amount,
         credit_amount: 0,
-        description,
+        description: debitDesc,
         reference_type: "internal_transfer",
         reference_id: transfer.id,
         created_by: user.id,
@@ -186,7 +187,7 @@ Deno.serve(async (req) => {
         currency_code: toCurrency,
         debit_amount: 0,
         credit_amount: targetAmount,
-        description,
+        description: creditDesc,
         reference_type: "internal_transfer",
         reference_id: transfer.id,
         created_by: user.id,
