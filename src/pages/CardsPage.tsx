@@ -13,6 +13,7 @@ import AddCardModal from "@/components/modals/AddCardModal";
 import CardPaymentModal from "@/components/modals/CardPaymentModal";
 import FlipCard from "@/components/cards/FlipCard";
 import CardStack from "@/components/cards/CardStack";
+import EfinCardsSection from "@/components/cards/EfinCardsSection";
 import { useCards, useCardMutations, type Card as CardRow } from "@/hooks/useCards";
 import { useSavedCards, useDeleteSavedCard } from "@/hooks/useSavedCards";
 import {
@@ -112,6 +113,7 @@ const CardsPage = () => {
           animate={{ opacity: 1, y: 0 }}
           className="space-y-6"
         >
+          <EfinCardsSection />
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-display font-bold text-foreground">My Cards</h1>

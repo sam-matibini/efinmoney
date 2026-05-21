@@ -23,6 +23,7 @@ import WalletsPage from "./pages/WalletsPage";
 import SendPage from "./pages/SendPage";
 import ExchangePage from "./pages/ExchangePage";
 import CardsPage from "./pages/CardsPage";
+import EfinCardDetailPage from "./pages/EfinCardDetailPage";
 import CustomerPortalPage from "./pages/CustomerPortalPage";
 import ProfileSettingsPage from "./pages/ProfileSettingsPage";
 import KYCPage from "./pages/KYCPage";
@@ -169,6 +170,8 @@ const AppRoutes = () => {
           <Route path="/send" element={<KycProtectedRoute><SendPage /></KycProtectedRoute>} />
           <Route path="/exchange" element={<KycProtectedRoute><ExchangePage /></KycProtectedRoute>} />
           <Route path="/cards" element={<KycProtectedRoute><CardsPage /></KycProtectedRoute>} />
+          <Route path="/cards/efin/:id" element={<KycProtectedRoute><EfinCardDetailPage /></KycProtectedRoute>} />
+
           <Route path="/finance" element={<RoleProtectedRoute allowedRoles={['admin', 'finance']}><FinanceDashboard /></RoleProtectedRoute>} />
           <Route path="/admin/legacy" element={<RoleProtectedRoute allowedRoles={['admin']}><AdminDashboard /></RoleProtectedRoute>} />
           <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
