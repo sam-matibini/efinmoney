@@ -15,6 +15,7 @@ import { useTransfers } from "@/hooks/useTransfers";
 import { ChevronRight, Inbox, Search, Download, ArrowUpRight, ArrowDownLeft } from "lucide-react";
 import { downloadTransferReceipt } from "@/lib/receipt";
 import { cleanIncomingTransactionLabel, INCOMING_REFERENCE_TYPES } from "@/lib/incomingTransactions";
+import { currencySymbol } from "@/lib/currency";
 import { format, isToday, isYesterday } from "date-fns";
 
 const refOf = (id: string) => `EFM-${id.replace(/-/g, "").slice(0, 8).toUpperCase()}`;
