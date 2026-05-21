@@ -94,8 +94,13 @@ const MiniStats = () => {
       content: (
         <>
           <p className="text-2xl font-display font-bold text-foreground">
-            ${monthData.total.toLocaleString("en-US", { maximumFractionDigits: 0 })}
+            {formatMoney(monthData.total, monthData.currency)}
           </p>
+          {monthData.others.length > 0 && (
+            <p className="text-[11px] text-muted-foreground mt-0.5 truncate">
+              + {monthData.others.map(([c, v]) => formatMoney(v, c)).join(" · ")}
+            </p>
+          )}
           <div className="flex items-end gap-1 h-8 mt-2">
             {monthData.bars.map((h, i) => (
               <motion.div
