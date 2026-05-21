@@ -139,7 +139,7 @@ Deno.serve(async (req) => {
       customer_name: customerName,
     };
 
-    console.log("Elicate charge request:", { url: ELICATE_URL, payload });
+    console.log("Elicate charge request:", { mode: elicate.mode, url: ELICATE_URL, payload });
 
     const res = await fetch(ELICATE_URL, {
       method: "POST",
