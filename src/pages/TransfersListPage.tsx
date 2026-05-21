@@ -1,6 +1,9 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import Header from "@/components/layout/Header";
 import MobileNav from "@/components/layout/MobileNav";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTransfers } from "@/hooks/useTransfers";
-import { ChevronRight, Inbox, Search, Download } from "lucide-react";
+import { ChevronRight, Inbox, Search, Download, ArrowUpRight, ArrowDownLeft } from "lucide-react";
 import { downloadTransferReceipt } from "@/lib/receipt";
 import { format } from "date-fns";
 
@@ -28,24 +31,112 @@ const groupFor = (s: string) => {
   return "processing";
 };
 
+const INCOMING_LABELS: Record<string, string> = {
+  transfer: "Incoming transfer",
+  stellar_transfer: "Incoming transfer (Stellar)",
+  stripe_topup: "Card top-up",
+  flw_topup: "Flutterwave top-up",
+  manual_topup: "Manual top-up",
+  wallet_topup: "Wallet top-up",
+};
+
+type Row = {
+  id: string;
+  direction: "out" | "in";
+  recipientOrSource: string;
+  amount: number;
+  currency: string;
+  status: string;
+  createdAt: string;
+  transferId?: string;
+  journalId?: string;
+};
+
 const TransfersListPage = () => {
+  const { user } = useAuth();
   const { data: transfers, isLoading } = useTransfers(200);
   const [filter, setFilter] = useState<"all" | "processing" | "completed" | "failed">("all");
+  const [direction, setDirection] = useState<"all" | "out" | "in">("all");
   const [search, setSearch] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
 
+  const { data: incoming, isLoading: loadingIn } = useQuery({
+    queryKey: ["incoming-ledger", user?.id],
+    enabled: !!user,
+    queryFn: async () => {
+      const { data: wallets } = await supabase.from("wallets").select("id").eq("user_id", user!.id);
+      const ids = (wallets ?? []).map((w) => w.id);
+      if (ids.length === 0) return [];
+      const { data, error } = await supabase
+        .from("ledger_entries")
+        .select("id, journal_id, created_at, credit_amount, currency_code, description, reference_type, reference_id")
+        .in("wallet_id", ids)
+        .in("reference_type", ["transfer", "stellar_transfer", "stripe_topup", "flw_topup", "manual_topup", "wallet_topup"])
+        .gt("credit_amount", 0)
+        .order("created_at", { ascending: false })
+        .limit(200);
+      if (error) return [];
+      // Dedupe by journal_id
+      const seen = new Set<string>();
+      const out: any[] = [];
+      for (const e of data ?? []) {
+        if (seen.has(e.journal_id)) continue;
+        seen.add(e.journal_id);
+        out.push(e);
+      }
+      return out;
+    },
+  });
+
+  const outgoingIds = useMemo(() => new Set((transfers ?? []).map((t) => t.id)), [transfers]);
+
+  const rows: Row[] = useMemo(() => {
+    const outRows: Row[] = (transfers ?? []).map((t) => ({
+      id: `t-${t.id}`,
+      direction: "out",
+      recipientOrSource: t.recipient_name,
+      amount: Number(t.source_amount),
+      currency: t.source_currency,
+      status: t.status,
+      createdAt: t.created_at,
+      transferId: t.id,
+    }));
+    const inRows: Row[] = (incoming ?? [])
+      .filter((e: any) => !(e.reference_type === "transfer" && e.reference_id && outgoingIds.has(e.reference_id)))
+      .map((e: any) => ({
+        id: `l-${e.id}`,
+        direction: "in",
+        recipientOrSource: e.description || INCOMING_LABELS[e.reference_type] || "Incoming",
+        amount: Number(e.credit_amount),
+        currency: e.currency_code,
+        status: "completed",
+        createdAt: e.created_at,
+        journalId: e.journal_id,
+      }));
+    return [...outRows, ...inRows].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+  }, [transfers, incoming, outgoingIds]);
+
   const filtered = useMemo(() => {
-    let items = transfers ?? [];
-    if (filter !== "all") items = items.filter(t => groupFor(t.status) === filter);
+    let items = rows;
+    if (direction !== "all") items = items.filter((r) => r.direction === direction);
+    if (filter !== "all") items = items.filter((r) => groupFor(r.status) === filter);
     if (search.trim()) {
       const q = search.trim().toLowerCase();
-      items = items.filter(t => t.recipient_name.toLowerCase().includes(q) || refOf(t.id).toLowerCase().includes(q));
+      items = items.filter(
+        (r) =>
+          r.recipientOrSource.toLowerCase().includes(q) ||
+          refOf(r.transferId || r.journalId || r.id).toLowerCase().includes(q)
+      );
     }
-    if (from) items = items.filter(t => new Date(t.created_at) >= new Date(from));
-    if (to) items = items.filter(t => new Date(t.created_at) <= new Date(to + "T23:59:59"));
+    if (from) items = items.filter((r) => new Date(r.createdAt) >= new Date(from));
+    if (to) items = items.filter((r) => new Date(r.createdAt) <= new Date(to + "T23:59:59"));
     return items;
-  }, [transfers, filter, search, from, to]);
+  }, [rows, filter, direction, search, from, to]);
+
+  const loading = isLoading || loadingIn;
 
   return (
     <div className="min-h-screen bg-background pb-24 md:pb-8">
@@ -53,14 +144,21 @@ const TransfersListPage = () => {
       <main className="container px-4 py-6 max-w-4xl mx-auto space-y-6">
         <div>
           <h1 className="text-2xl font-display font-bold">All Transfers</h1>
-          <p className="text-sm text-muted-foreground">Track and review every transfer you've sent.</p>
+          <p className="text-sm text-muted-foreground">Track and review every transfer — sent and received.</p>
         </div>
 
         <Card>
           <CardHeader className="space-y-4">
+            <Tabs value={direction} onValueChange={(v) => setDirection(v as any)}>
+              <TabsList className="grid grid-cols-3 w-full">
+                <TabsTrigger value="all">All</TabsTrigger>
+                <TabsTrigger value="out">Sent</TabsTrigger>
+                <TabsTrigger value="in">Received</TabsTrigger>
+              </TabsList>
+            </Tabs>
             <Tabs value={filter} onValueChange={(v) => setFilter(v as any)}>
               <TabsList className="grid grid-cols-4 w-full">
-                <TabsTrigger value="all">All</TabsTrigger>
+                <TabsTrigger value="all">All status</TabsTrigger>
                 <TabsTrigger value="processing">Processing</TabsTrigger>
                 <TabsTrigger value="completed">Completed</TabsTrigger>
                 <TabsTrigger value="failed">Failed</TabsTrigger>
@@ -76,7 +174,7 @@ const TransfersListPage = () => {
             </div>
           </CardHeader>
           <CardContent>
-            {isLoading ? (
+            {loading ? (
               <div className="space-y-2">
                 {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-16" />)}
               </div>
@@ -87,35 +185,46 @@ const TransfersListPage = () => {
               </div>
             ) : (
               <div className="divide-y divide-border">
-                {filtered.map((t, i) => (
-                  <motion.div key={t.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.02 }}>
-                    <Link to={`/transfers/${t.id}`} className="flex items-center justify-between py-4 hover:bg-muted/40 px-2 rounded-lg transition-colors">
-                      <div>
-                        <p className="font-medium text-foreground">{t.recipient_name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {refOf(t.id)} · {format(new Date(t.created_at), "MMM d, yyyy")}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="text-right">
-                          <p className="font-display font-semibold">
-                            {Number(t.source_amount).toLocaleString("en-US", { minimumFractionDigits: 2 })} {t.source_currency}
-                          </p>
-                          <Badge variant="outline" className={`text-[10px] ${statusBadge(t.status)}`}>{t.status}</Badge>
+                {filtered.map((r, i) => {
+                  const isIn = r.direction === "in";
+                  const linkTo = r.transferId ? `/transfers/${r.transferId}` : `/transactions/${r.journalId}`;
+                  return (
+                    <motion.div key={r.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.02 }}>
+                      <Link to={linkTo} className="flex items-center justify-between py-4 hover:bg-muted/40 px-2 rounded-lg transition-colors">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center ${isIn ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" : "bg-rose-500/15 text-rose-600 dark:text-rose-400"}`}>
+                            {isIn ? <ArrowDownLeft className="w-4 h-4" /> : <ArrowUpRight className="w-4 h-4" />}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-medium text-foreground truncate">{r.recipientOrSource}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {refOf(r.transferId || r.journalId || r.id)} · {format(new Date(r.createdAt), "MMM d, yyyy")}
+                            </p>
+                          </div>
                         </div>
-                        <button
-                          type="button"
-                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); downloadTransferReceipt(t.id); }}
-                          className="p-2 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground"
-                          title="Download receipt"
-                        >
-                          <Download className="w-4 h-4" />
-                        </button>
-                        <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                      </div>
-                    </Link>
-                  </motion.div>
-                ))}
+                        <div className="flex items-center gap-3">
+                          <div className="text-right">
+                            <p className={`font-display font-semibold tabular-nums ${isIn ? "text-emerald-600 dark:text-emerald-400" : "text-foreground"}`}>
+                              {isIn ? "+" : "-"}{Number(r.amount).toLocaleString("en-US", { minimumFractionDigits: 2 })} {r.currency}
+                            </p>
+                            <Badge variant="outline" className={`text-[10px] ${statusBadge(r.status)}`}>{r.status}</Badge>
+                          </div>
+                          {r.transferId && (
+                            <button
+                              type="button"
+                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); downloadTransferReceipt(r.transferId!); }}
+                              className="p-2 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground"
+                              title="Download receipt"
+                            >
+                              <Download className="w-4 h-4" />
+                            </button>
+                          )}
+                          <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                        </div>
+                      </Link>
+                    </motion.div>
+                  );
+                })}
               </div>
             )}
           </CardContent>
