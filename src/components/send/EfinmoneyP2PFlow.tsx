@@ -23,6 +23,7 @@ interface Recipient {
   efin_tag: string | null;
   email: string | null;
   avatar_url: string | null;
+  account_number?: string | null;
 }
 
 const fmt = (n: number) =>
@@ -176,14 +177,14 @@ const EfinmoneyP2PFlow = () => {
           <div>
             <Label className="text-sm">Send to eFinMoney user</Label>
             <p className="text-xs text-muted-foreground mt-1">
-              Instant, free, in-network. Search by email or @tag.
+              Instant, free, in-network. Search by email, @tag, or account number.
             </p>
           </div>
           <div className="flex gap-2">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
-                placeholder="email@example.com or @username"
+                placeholder="email@example.com, @username, or 10-digit account #"
                 value={query}
                 onChange={(e) => { setQuery(e.target.value); setRecipient(null); setNotFound(false); }}
                 onKeyDown={(e) => e.key === "Enter" && handleSearch()}
@@ -217,9 +218,10 @@ const EfinmoneyP2PFlow = () => {
                 <p className="font-medium text-foreground truncate">
                   {recipient.full_name || recipient.email}
                 </p>
-                {recipient.efin_tag && (
-                  <p className="text-xs text-muted-foreground">@{recipient.efin_tag}</p>
-                )}
+                <div className="flex flex-wrap gap-x-3 text-xs text-muted-foreground">
+                  {recipient.efin_tag && <span>@{recipient.efin_tag}</span>}
+                  {recipient.account_number && <span>Acct: {recipient.account_number}</span>}
+                </div>
               </div>
               <CheckCircle2 className="w-5 h-5 text-emerald-500" />
             </motion.div>
