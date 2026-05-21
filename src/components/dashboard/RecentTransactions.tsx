@@ -86,9 +86,8 @@ const DashboardStatementHeader = ({ total }: { total: number }) => {
             rows={stmtRows ?? []}
             meta={{
               title: "Account Statement",
-              accountName: user?.user_metadata?.full_name || user?.email || "Account holder",
+              accountHolder: user?.user_metadata?.full_name || user?.email || "Account holder",
               accountEmail: user?.email || "",
-              generatedAt: new Date().toISOString(),
             }}
             defaultEmail={user?.email || ""}
           />
