@@ -13,6 +13,7 @@ interface CreateCardInput {
   purpose?: "personal" | "business" | "single_use" | "subscription";
   funding_wallet_id?: string;
   card_type?: "virtual" | "physical";
+  tap_to_pay?: boolean;
   controls?: {
     per_authorization_limit?: number;
     daily_limit?: number;
