@@ -124,6 +124,16 @@ Deno.serve(async (req) => {
       return json({ error: "Liability account missing for currency" }, 500);
     }
 
+    // Look up sender profile for receipt description
+    const { data: senderProfile } = await admin
+      .from("profiles")
+      .select("full_name, email, efin_tag")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    const senderName = senderProfile?.full_name
+      || (senderProfile?.efin_tag ? `@${senderProfile.efin_tag}` : senderProfile?.email)
+      || "eFinMoney user";
+
     // Insert transfer row first (status processing) so triggers can compute receipts/etc.
     const recipientName = recipientProfile.full_name
       || (recipientProfile.efin_tag ? `@${recipientProfile.efin_tag}` : recipientProfile.email)
@@ -155,7 +165,8 @@ Deno.serve(async (req) => {
 
     // Build double-entry journal
     const journalId = crypto.randomUUID();
-    const description = note || `eFinMoney transfer to ${recipientName}`;
+    const debitDesc = note ? `${note} · to ${recipientName}` : `Sent to ${recipientName}`;
+    const creditDesc = note ? `${note} · from ${senderName}` : `Received from ${senderName}`;
     const entries = [
       {
         journal_id: journalId,
@@ -164,7 +175,7 @@ Deno.serve(async (req) => {
         currency_code: fromCurrency,
         debit_amount: amount,
         credit_amount: 0,
-        description,
+        description: debitDesc,
         reference_type: "internal_transfer",
         reference_id: transfer.id,
         created_by: user.id,
@@ -176,7 +187,7 @@ Deno.serve(async (req) => {
         currency_code: toCurrency,
         debit_amount: 0,
         credit_amount: targetAmount,
-        description,
+        description: creditDesc,
         reference_type: "internal_transfer",
         reference_id: transfer.id,
         created_by: user.id,

@@ -33,6 +33,7 @@ const groupFor = (s: string) => {
 
 const INCOMING_LABELS: Record<string, string> = {
   transfer: "Incoming transfer",
+  internal_transfer: "Received from eFinMoney user",
   stellar_transfer: "Incoming transfer (Stellar)",
   stripe_topup: "eFinMoney top-up",
   flw_topup: "eFinMoney top-up",
@@ -80,7 +81,7 @@ const TransfersListPage = () => {
         .from("ledger_entries")
         .select("id, journal_id, created_at, credit_amount, currency_code, description, reference_type, reference_id")
         .in("wallet_id", ids)
-        .in("reference_type", ["transfer", "stellar_transfer", "stripe_topup", "flw_topup", "manual_topup", "wallet_topup"])
+        .in("reference_type", ["transfer", "internal_transfer", "stellar_transfer", "stripe_topup", "flw_topup", "manual_topup", "wallet_topup"])
         .gt("credit_amount", 0)
         .order("created_at", { ascending: false })
         .limit(200);
