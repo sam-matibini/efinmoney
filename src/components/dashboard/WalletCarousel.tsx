@@ -1,7 +1,7 @@
 import { motion, useMotionValue, useTransform } from "framer-motion";
 import { useRef, useState, useEffect } from "react";
 import { Plus, Send, Download, ArrowUpRight } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useWallets } from "@/hooks/useWallets";
 import { Skeleton } from "@/components/ui/skeleton";
 import SendMoneyModal from "@/components/modals/SendMoneyModal";
@@ -29,6 +29,7 @@ const WalletCarousel = () => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [activeIndex, setActiveIndex] = useState(0);
   const [topUpWalletId, setTopUpWalletId] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   // Track active card via scroll position
   useEffect(() => {
@@ -96,6 +97,7 @@ const WalletCarousel = () => {
               idx={idx}
               isActive={isActive}
               gradient={gradient}
+              onClick={() => navigate(`/wallets/${w.wallet_id}/statement`)}
             >
               {/* Big flag top right */}
               <span className="absolute top-3 right-3 text-[40px] leading-none drop-shadow-md select-none pointer-events-none z-10">
@@ -147,13 +149,17 @@ const WalletCarousel = () => {
                   </SendMoneyModal>
                   <Link
                     to="/wallets"
+                    onClick={(e) => e.stopPropagation()}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/20 hover:bg-white/30 text-xs font-medium transition-colors backdrop-blur-sm"
                   >
                     <ArrowUpRight className="w-3.5 h-3.5" />
                     Receive
                   </Link>
                   <button
-                    onClick={() => setTopUpWalletId(w.wallet_id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setTopUpWalletId(w.wallet_id);
+                    }}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white text-foreground hover:bg-white/90 text-xs font-semibold transition-colors"
                   >
                     <Download className="w-3.5 h-3.5" />
@@ -209,9 +215,10 @@ interface TiltCardProps {
   isActive: boolean;
   gradient: string;
   children: React.ReactNode;
+  onClick?: () => void;
 }
 
-const TiltCard = ({ idx, isActive, gradient, children }: TiltCardProps) => {
+const TiltCard = ({ idx, isActive, gradient, children, onClick }: TiltCardProps) => {
   const x = useMotionValue(0);
   const y = useMotionValue(0);
   const rotateX = useTransform(y, [-50, 50], [5, -5]);
@@ -229,10 +236,11 @@ const TiltCard = ({ idx, isActive, gradient, children }: TiltCardProps) => {
       initial={{ opacity: 0, y: 30 }}
       animate={{ opacity: 1, y: 0, scale: isActive ? 1.02 : 1 }}
       transition={{ delay: idx * 0.08, duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+      onClick={onClick}
       onMouseMove={handleMove}
       onMouseLeave={reset}
       style={{ background: gradient, rotateX, rotateY, transformPerspective: 1000 }}
-      className="group snap-center min-w-[280px] sm:min-w-[340px] aspect-[1.6/1] rounded-2xl relative overflow-hidden text-white shadow-xl"
+      className="group snap-center min-w-[280px] sm:min-w-[340px] aspect-[1.6/1] rounded-2xl relative overflow-hidden text-white shadow-xl cursor-pointer"
     >
       {children}
     </motion.div>
