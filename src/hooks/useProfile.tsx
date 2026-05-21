@@ -11,6 +11,8 @@ export interface Profile {
   default_currency: string | null;
   country_code: string | null;
   risk_score: number | null;
+  account_number: string | null;
+  efin_tag: string | null;
 }
 
 export const useProfile = () => {
@@ -22,7 +24,7 @@ export const useProfile = () => {
       if (!user) return null;
       const { data, error } = await supabase
         .from('profiles')
-        .select('user_id, full_name, email, kyc_status, kyc_tier, default_currency, country_code, risk_score')
+        .select('user_id, full_name, email, kyc_status, kyc_tier, default_currency, country_code, risk_score, account_number, efin_tag')
         .eq('user_id', user.id)
         .maybeSingle();
       if (error) throw error;
