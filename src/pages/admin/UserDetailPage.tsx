@@ -11,7 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   ArrowLeft, Mail, Phone, MapPin, Calendar, Shield, Wallet, ArrowRightLeft,
-  User as UserIcon, Hash, Activity, AlertTriangle,
+  User as UserIcon, Hash, Activity, AlertTriangle, AtSign, MessageSquare, FileWarning, Headphones,
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -94,7 +94,61 @@ const UserDetailPage = () => {
     enabled: !!id,
   });
 
-  if (isLoading) {
+  const { data: activities = [] } = useQuery({
+    queryKey: ["admin-user-activities", id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("crm_activities")
+        .select("id,activity_type,subject,description,due_date,completed_at,created_at")
+        .or(`customer_id.eq.${id},created_by.eq.${id}`)
+        .order("created_at", { ascending: false })
+        .limit(50);
+      return data || [];
+    },
+    enabled: !!id,
+  });
+
+  const { data: communications = [] } = useQuery({
+    queryKey: ["admin-user-comms", id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("customer_communications")
+        .select("id,channel,direction,subject,content,status,created_at")
+        .eq("user_id", id!)
+        .order("created_at", { ascending: false })
+        .limit(50);
+      return data || [];
+    },
+    enabled: !!id,
+  });
+
+  const { data: disputes = [] } = useQuery({
+    queryKey: ["admin-user-disputes", id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("disputes")
+        .select("id,dispute_type,status,priority,amount,currency_code,reason,created_at")
+        .eq("user_id", id!)
+        .order("created_at", { ascending: false })
+        .limit(50);
+      return data || [];
+    },
+    enabled: !!id,
+  });
+
+  const { data: alerts = [] } = useQuery({
+    queryKey: ["admin-user-alerts", id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("compliance_alerts")
+        .select("id,severity,status,alert_data,created_at")
+        .eq("user_id", id!)
+        .order("created_at", { ascending: false })
+        .limit(20);
+      return data || [];
+    },
+    enabled: !!id,
+  });
     return (
       <AdminLayout>
         <div className="space-y-4">
@@ -164,6 +218,11 @@ const UserDetailPage = () => {
                       <Hash className="w-3 h-3 mr-1" /> {profile.account_number}
                     </Badge>
                   )}
+                  {profile.efin_tag && (
+                    <Badge variant="outline">
+                      <AtSign className="w-3 h-3 mr-1" />{profile.efin_tag}
+                    </Badge>
+                  )}
                 </div>
               </div>
             </div>
@@ -171,10 +230,11 @@ const UserDetailPage = () => {
         </Card>
 
         <Tabs defaultValue="overview" className="space-y-4">
-          <TabsList>
+          <TabsList className="flex-wrap h-auto">
             <TabsTrigger value="overview"><UserIcon className="w-4 h-4 mr-2" /> Overview & KYC</TabsTrigger>
             <TabsTrigger value="wallets"><Wallet className="w-4 h-4 mr-2" /> Wallets</TabsTrigger>
             <TabsTrigger value="transfers"><ArrowRightLeft className="w-4 h-4 mr-2" /> Transfers</TabsTrigger>
+            <TabsTrigger value="crm"><Headphones className="w-4 h-4 mr-2" /> CRM</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-4">
@@ -185,6 +245,8 @@ const UserDetailPage = () => {
                   <Row label="Full name" value={profile.full_name || "—"} />
                   <Row label="Email" value={profile.email || "—"} />
                   <Row label="Phone" value={profile.phone_number || "—"} />
+                  <Row label="Account #" value={profile.account_number || "—"} icon={<Hash className="w-3.5 h-3.5" />} />
+                  <Row label="eFin tag" value={profile.efin_tag ? `@${profile.efin_tag}` : "—"} icon={<AtSign className="w-3.5 h-3.5" />} />
                   <Row label="Country" value={profile.country_code || "—"} icon={<MapPin className="w-3.5 h-3.5" />} />
                   <Row label="Default currency" value={profile.default_currency || "—"} />
                   <Row label="Risk score" value={String(profile.risk_score ?? 0)} />
