@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { useState } from "react";
-import { ArrowUpRight, Plus, MoreHorizontal, Star, Snowflake, Play, Pencil, Trash2, Sparkles } from "lucide-react";
+import { Link } from "react-router-dom";
+import { ArrowUpRight, Plus, MoreHorizontal, Star, Snowflake, Play, Pencil, Trash2, Sparkles, FileText } from "lucide-react";
 import SendMoneyModal from "@/components/modals/SendMoneyModal";
 import TopUpModal from "@/components/modals/TopUpModal";
 import StellarWalletModal from "@/components/modals/StellarWalletModal";
@@ -161,6 +162,14 @@ const WalletCard = ({
                     )}
                   </DropdownMenuItem>
                 )}
+                {walletId && (
+                  <DropdownMenuItem asChild>
+                    <Link to={`/wallets/${walletId}/statement`}>
+                      <FileText className="w-4 h-4 mr-2" />
+                      View Statement
+                    </Link>
+                  </DropdownMenuItem>
+                )}
                 {(onEdit || onDelete) && (onSetDefault || onToggleFreeze) && (
                   <DropdownMenuSeparator />
                 )}
@@ -234,6 +243,19 @@ const WalletCard = ({
             <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             Top-up
           </motion.button>
+          {walletId && (
+            <Link
+              to={`/wallets/${walletId}/statement`}
+              className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-medium transition-colors ${
+                isMain
+                  ? 'bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20'
+                  : 'bg-muted text-foreground hover:bg-muted/80'
+              }`}
+            >
+              <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              Statement
+            </Link>
+          )}
         </div>
       </div>
 
