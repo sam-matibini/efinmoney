@@ -402,6 +402,461 @@ export type Database = {
           },
         ]
       }
+      business_card_members: {
+        Row: {
+          department: string | null
+          id: string
+          invited_at: string
+          is_active: boolean
+          joined_at: string | null
+          per_member_monthly_cap: number | null
+          program_id: string
+          role: Database["public"]["Enums"]["business_card_role"]
+          user_id: string
+        }
+        Insert: {
+          department?: string | null
+          id?: string
+          invited_at?: string
+          is_active?: boolean
+          joined_at?: string | null
+          per_member_monthly_cap?: number | null
+          program_id: string
+          role?: Database["public"]["Enums"]["business_card_role"]
+          user_id: string
+        }
+        Update: {
+          department?: string | null
+          id?: string
+          invited_at?: string
+          is_active?: boolean
+          joined_at?: string | null
+          per_member_monthly_cap?: number | null
+          program_id?: string
+          role?: Database["public"]["Enums"]["business_card_role"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_card_members_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "business_card_programs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      business_card_programs: {
+        Row: {
+          created_at: string
+          default_currency: string
+          description: string | null
+          funding_wallet_id: string | null
+          id: string
+          is_active: boolean
+          name: string
+          owner_user_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          default_currency?: string
+          description?: string | null
+          funding_wallet_id?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          owner_user_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          default_currency?: string
+          description?: string | null
+          funding_wallet_id?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          owner_user_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_card_programs_funding_wallet_id_fkey"
+            columns: ["funding_wallet_id"]
+            isOneToOne: false
+            referencedRelation: "wallets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      card_authorizations: {
+        Row: {
+          amount: number
+          approved_at: string | null
+          card_id: string
+          created_at: string
+          currency: string
+          decline_reason: string | null
+          declined_at: string | null
+          id: string
+          merchant_category: string | null
+          merchant_country: string | null
+          merchant_name: string | null
+          raw_payload: Json | null
+          status: Database["public"]["Enums"]["card_authorization_status"]
+          stripe_authorization_id: string | null
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          approved_at?: string | null
+          card_id: string
+          created_at?: string
+          currency: string
+          decline_reason?: string | null
+          declined_at?: string | null
+          id?: string
+          merchant_category?: string | null
+          merchant_country?: string | null
+          merchant_name?: string | null
+          raw_payload?: Json | null
+          status?: Database["public"]["Enums"]["card_authorization_status"]
+          stripe_authorization_id?: string | null
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          approved_at?: string | null
+          card_id?: string
+          created_at?: string
+          currency?: string
+          decline_reason?: string | null
+          declined_at?: string | null
+          id?: string
+          merchant_category?: string | null
+          merchant_country?: string | null
+          merchant_name?: string | null
+          raw_payload?: Json | null
+          status?: Database["public"]["Enums"]["card_authorization_status"]
+          stripe_authorization_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_authorizations_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "issued_cards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      card_fraud_signals: {
+        Row: {
+          authorization_id: string | null
+          card_id: string
+          created_at: string
+          details: Json | null
+          id: string
+          resolved: boolean
+          resolved_at: string | null
+          resolved_by: string | null
+          score: number | null
+          severity: Database["public"]["Enums"]["card_fraud_severity"]
+          signal_type: string
+          user_id: string
+        }
+        Insert: {
+          authorization_id?: string | null
+          card_id: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          resolved?: boolean
+          resolved_at?: string | null
+          resolved_by?: string | null
+          score?: number | null
+          severity?: Database["public"]["Enums"]["card_fraud_severity"]
+          signal_type: string
+          user_id: string
+        }
+        Update: {
+          authorization_id?: string | null
+          card_id?: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          resolved?: boolean
+          resolved_at?: string | null
+          resolved_by?: string | null
+          score?: number | null
+          severity?: Database["public"]["Enums"]["card_fraud_severity"]
+          signal_type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_fraud_signals_authorization_id_fkey"
+            columns: ["authorization_id"]
+            isOneToOne: false
+            referencedRelation: "card_authorizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_fraud_signals_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "issued_cards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      card_funding_events: {
+        Row: {
+          amount: number
+          card_id: string
+          completed_at: string | null
+          created_at: string
+          currency: string
+          failure_reason: string | null
+          id: string
+          ledger_journal_id: string | null
+          source: Database["public"]["Enums"]["card_funding_source"]
+          source_wallet_id: string | null
+          status: Database["public"]["Enums"]["card_funding_status"]
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          card_id: string
+          completed_at?: string | null
+          created_at?: string
+          currency: string
+          failure_reason?: string | null
+          id?: string
+          ledger_journal_id?: string | null
+          source?: Database["public"]["Enums"]["card_funding_source"]
+          source_wallet_id?: string | null
+          status?: Database["public"]["Enums"]["card_funding_status"]
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          card_id?: string
+          completed_at?: string | null
+          created_at?: string
+          currency?: string
+          failure_reason?: string | null
+          id?: string
+          ledger_journal_id?: string | null
+          source?: Database["public"]["Enums"]["card_funding_source"]
+          source_wallet_id?: string | null
+          status?: Database["public"]["Enums"]["card_funding_status"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_funding_events_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "issued_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_funding_events_source_wallet_id_fkey"
+            columns: ["source_wallet_id"]
+            isOneToOne: false
+            referencedRelation: "wallets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      card_spending_controls: {
+        Row: {
+          allowed_categories: string[] | null
+          allowed_countries: string[] | null
+          blocked_categories: string[] | null
+          blocked_countries: string[] | null
+          card_id: string
+          created_at: string
+          daily_limit: number | null
+          id: string
+          monthly_limit: number | null
+          per_authorization_limit: number | null
+          single_use: boolean
+          subscription_lock_merchant: string | null
+          updated_at: string
+          weekly_limit: number | null
+        }
+        Insert: {
+          allowed_categories?: string[] | null
+          allowed_countries?: string[] | null
+          blocked_categories?: string[] | null
+          blocked_countries?: string[] | null
+          card_id: string
+          created_at?: string
+          daily_limit?: number | null
+          id?: string
+          monthly_limit?: number | null
+          per_authorization_limit?: number | null
+          single_use?: boolean
+          subscription_lock_merchant?: string | null
+          updated_at?: string
+          weekly_limit?: number | null
+        }
+        Update: {
+          allowed_categories?: string[] | null
+          allowed_countries?: string[] | null
+          blocked_categories?: string[] | null
+          blocked_countries?: string[] | null
+          card_id?: string
+          created_at?: string
+          daily_limit?: number | null
+          id?: string
+          monthly_limit?: number | null
+          per_authorization_limit?: number | null
+          single_use?: boolean
+          subscription_lock_merchant?: string | null
+          updated_at?: string
+          weekly_limit?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_spending_controls_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: true
+            referencedRelation: "issued_cards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      card_transactions: {
+        Row: {
+          amount: number
+          authorization_id: string | null
+          card_id: string
+          created_at: string
+          currency: string
+          id: string
+          mcc: string | null
+          merchant_category: string | null
+          merchant_name: string | null
+          posted_at: string
+          raw_payload: Json | null
+          stripe_transaction_id: string | null
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          authorization_id?: string | null
+          card_id: string
+          created_at?: string
+          currency: string
+          id?: string
+          mcc?: string | null
+          merchant_category?: string | null
+          merchant_name?: string | null
+          posted_at?: string
+          raw_payload?: Json | null
+          stripe_transaction_id?: string | null
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          authorization_id?: string | null
+          card_id?: string
+          created_at?: string
+          currency?: string
+          id?: string
+          mcc?: string | null
+          merchant_category?: string | null
+          merchant_name?: string | null
+          posted_at?: string
+          raw_payload?: Json | null
+          stripe_transaction_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_transactions_authorization_id_fkey"
+            columns: ["authorization_id"]
+            isOneToOne: false
+            referencedRelation: "card_authorizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_transactions_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "issued_cards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cardholders: {
+        Row: {
+          billing_city: string
+          billing_country: string
+          billing_line1: string
+          billing_line2: string | null
+          billing_postal_code: string
+          billing_state: string
+          created_at: string
+          email: string
+          id: string
+          kyc_verified_at: string | null
+          legal_name: string
+          metadata: Json | null
+          phone: string | null
+          status: Database["public"]["Enums"]["cardholder_status"]
+          stripe_cardholder_id: string | null
+          type: Database["public"]["Enums"]["cardholder_type"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          billing_city: string
+          billing_country?: string
+          billing_line1: string
+          billing_line2?: string | null
+          billing_postal_code: string
+          billing_state: string
+          created_at?: string
+          email: string
+          id?: string
+          kyc_verified_at?: string | null
+          legal_name: string
+          metadata?: Json | null
+          phone?: string | null
+          status?: Database["public"]["Enums"]["cardholder_status"]
+          stripe_cardholder_id?: string | null
+          type?: Database["public"]["Enums"]["cardholder_type"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          billing_city?: string
+          billing_country?: string
+          billing_line1?: string
+          billing_line2?: string | null
+          billing_postal_code?: string
+          billing_state?: string
+          created_at?: string
+          email?: string
+          id?: string
+          kyc_verified_at?: string | null
+          legal_name?: string
+          metadata?: Json | null
+          phone?: string | null
+          status?: Database["public"]["Enums"]["cardholder_status"]
+          stripe_cardholder_id?: string | null
+          type?: Database["public"]["Enums"]["cardholder_type"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       cards: {
         Row: {
           card_network: string
@@ -1555,6 +2010,84 @@ export type Database = {
             columns: ["plaid_account_id"]
             isOneToOne: false
             referencedRelation: "plaid_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      issued_cards: {
+        Row: {
+          brand: string
+          cancelled_reason: string | null
+          card_type: Database["public"]["Enums"]["issued_card_type"]
+          cardholder_id: string
+          created_at: string
+          currency: string
+          exp_month: number | null
+          exp_year: number | null
+          funding_wallet_id: string | null
+          id: string
+          last4: string | null
+          metadata: Json | null
+          nickname: string | null
+          purpose: Database["public"]["Enums"]["issued_card_purpose"]
+          status: Database["public"]["Enums"]["issued_card_status"]
+          stripe_card_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          brand?: string
+          cancelled_reason?: string | null
+          card_type?: Database["public"]["Enums"]["issued_card_type"]
+          cardholder_id: string
+          created_at?: string
+          currency?: string
+          exp_month?: number | null
+          exp_year?: number | null
+          funding_wallet_id?: string | null
+          id?: string
+          last4?: string | null
+          metadata?: Json | null
+          nickname?: string | null
+          purpose?: Database["public"]["Enums"]["issued_card_purpose"]
+          status?: Database["public"]["Enums"]["issued_card_status"]
+          stripe_card_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          brand?: string
+          cancelled_reason?: string | null
+          card_type?: Database["public"]["Enums"]["issued_card_type"]
+          cardholder_id?: string
+          created_at?: string
+          currency?: string
+          exp_month?: number | null
+          exp_year?: number | null
+          funding_wallet_id?: string | null
+          id?: string
+          last4?: string | null
+          metadata?: Json | null
+          nickname?: string | null
+          purpose?: Database["public"]["Enums"]["issued_card_purpose"]
+          status?: Database["public"]["Enums"]["issued_card_status"]
+          stripe_card_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "issued_cards_cardholder_id_fkey"
+            columns: ["cardholder_id"]
+            isOneToOne: false
+            referencedRelation: "cardholders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "issued_cards_funding_wallet_id_fkey"
+            columns: ["funding_wallet_id"]
+            isOneToOne: false
+            referencedRelation: "wallets"
             referencedColumns: ["id"]
           },
         ]
@@ -3736,6 +4269,10 @@ export type Database = {
         Returns: undefined
       }
       is_admin_user: { Args: { _uid: string }; Returns: boolean }
+      is_business_program_owner: {
+        Args: { _program_id: string; _user_id: string }
+        Returns: boolean
+      }
       is_kyc_reviewer: { Args: { _uid: string }; Returns: boolean }
       lookup_efin_recipient: {
         Args: { p_query: string }
@@ -3777,6 +4314,18 @@ export type Database = {
         | "resolved"
         | "false_positive"
       app_role: "user" | "admin" | "compliance" | "support" | "finance"
+      business_card_role: "owner" | "admin" | "member"
+      card_authorization_status:
+        | "pending"
+        | "approved"
+        | "declined"
+        | "reversed"
+        | "expired"
+      card_fraud_severity: "low" | "medium" | "high" | "critical"
+      card_funding_source: "wallet" | "eft"
+      card_funding_status: "pending" | "completed" | "failed" | "reversed"
+      cardholder_status: "active" | "inactive" | "blocked"
+      cardholder_type: "individual" | "company"
       currency_type: "fiat" | "crypto"
       invoice_status:
         | "draft"
@@ -3785,6 +4334,13 @@ export type Database = {
         | "partial"
         | "overdue"
         | "cancelled"
+      issued_card_purpose:
+        | "personal"
+        | "business"
+        | "single_use"
+        | "subscription"
+      issued_card_status: "active" | "frozen" | "cancelled" | "pending"
+      issued_card_type: "virtual" | "physical"
       kyc_address_doc_type:
         | "utility_bill"
         | "bank_statement"
@@ -3985,6 +4541,19 @@ export const Constants = {
         "false_positive",
       ],
       app_role: ["user", "admin", "compliance", "support", "finance"],
+      business_card_role: ["owner", "admin", "member"],
+      card_authorization_status: [
+        "pending",
+        "approved",
+        "declined",
+        "reversed",
+        "expired",
+      ],
+      card_fraud_severity: ["low", "medium", "high", "critical"],
+      card_funding_source: ["wallet", "eft"],
+      card_funding_status: ["pending", "completed", "failed", "reversed"],
+      cardholder_status: ["active", "inactive", "blocked"],
+      cardholder_type: ["individual", "company"],
       currency_type: ["fiat", "crypto"],
       invoice_status: [
         "draft",
@@ -3994,6 +4563,14 @@ export const Constants = {
         "overdue",
         "cancelled",
       ],
+      issued_card_purpose: [
+        "personal",
+        "business",
+        "single_use",
+        "subscription",
+      ],
+      issued_card_status: ["active", "frozen", "cancelled", "pending"],
+      issued_card_type: ["virtual", "physical"],
       kyc_address_doc_type: [
         "utility_bill",
         "bank_statement",
