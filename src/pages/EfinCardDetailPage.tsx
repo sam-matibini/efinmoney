@@ -110,6 +110,7 @@ const EfinCardDetailPage = () => {
               expMonth={card.exp_month}
               expYear={card.exp_year}
               tapToPay={tapToPay}
+              cardholderName={profile?.full_name}
             />
             {isSandbox && (
               <p className="text-[11px] text-amber-500 mt-2 text-center">Test card — Stripe Issuing pending enablement</p>
