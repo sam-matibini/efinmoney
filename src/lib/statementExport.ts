@@ -85,6 +85,7 @@ export const downloadCSV = (rows: StatementRow[], meta: StatementMeta) => {
 export const downloadXLSX = (rows: StatementRow[], meta: StatementMeta) => {
   const data = [
     [meta.title],
+    ["Bank", meta.bankName || "eFinMoney"],
     meta.subtitle ? [meta.subtitle] : [],
     meta.accountHolder ? ["Account holder", meta.accountHolder] : [],
     meta.accountNumber ? ["Account number", meta.accountNumber] : [],
