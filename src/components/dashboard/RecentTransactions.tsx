@@ -217,20 +217,8 @@ const RecentTransactions = () => {
 
   return (
     <section className="rounded-2xl bg-card border border-border p-4 sm:p-6">
-      <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
-        <div className="flex items-center gap-3">
-          <h2 className="text-lg font-display font-semibold text-foreground">Account Statement</h2>
-          <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-live-pulse" />
-            Live
-          </span>
-        </div>
-        {total > 0 && (
-          <Link to="/transfers" className="flex items-center gap-1 text-sm text-primary hover:text-primary/80 font-medium transition-colors">
-            View All <ChevronRight className="w-4 h-4" />
-          </Link>
-        )}
-      </div>
+      <DashboardStatementHeader total={total} />
+
 
       {/* In / Out summary */}
       {total > 0 && (
