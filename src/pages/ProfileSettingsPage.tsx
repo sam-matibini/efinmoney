@@ -18,13 +18,26 @@ const ProfileSettingsPage = () => {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [efinTag, setEfinTag] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [streetAddress, setStreetAddress] = useState("");
+  const [city, setCity] = useState("");
+  const [stateProvince, setStateProvince] = useState("");
+  const [postalCode, setPostalCode] = useState("");
+  const [addressCountry, setAddressCountry] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (profile) {
-      setFullName(profile.full_name || "");
-      setEmail(profile.email || user?.email || "");
-      setEfinTag((profile as any).efin_tag || "");
+      const p = profile as any;
+      setFullName(p.full_name || "");
+      setEmail(p.email || user?.email || "");
+      setEfinTag(p.efin_tag || "");
+      setPhoneNumber(p.phone_number || "");
+      setStreetAddress(p.street_address || "");
+      setCity(p.city || "");
+      setStateProvince(p.state_province || "");
+      setPostalCode(p.postal_code || "");
+      setAddressCountry(p.address_country || p.country_code || "");
     }
   }, [profile, user]);
 
@@ -39,8 +52,19 @@ const ProfileSettingsPage = () => {
     try {
       const { error } = await supabase
         .from('profiles')
-        .update({ full_name: fullName, email, efin_tag: cleanTag || null })
+        .update({
+          full_name: fullName,
+          email,
+          efin_tag: cleanTag || null,
+          phone_number: phoneNumber || null,
+          street_address: streetAddress || null,
+          city: city || null,
+          state_province: stateProvince || null,
+          postal_code: postalCode || null,
+          address_country: addressCountry ? addressCountry.toUpperCase().slice(0, 2) : null,
+        })
         .eq('user_id', user.id);
+
       if (error) {
         if (error.message.includes('duplicate') || error.code === '23505') {
           throw new Error(`@${cleanTag} is already taken`);
