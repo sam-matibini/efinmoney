@@ -98,6 +98,7 @@ const SendMoneyModal = ({ children }: SendMoneyModalProps) => {
 
     const params = new URLSearchParams({
       amount: String(parsedAmount),
+      fundingSource: "wallet",
       sourceWalletId: selectedWallet.wallet_id,
       targetCountryCode: targetCountry.code,
     });
