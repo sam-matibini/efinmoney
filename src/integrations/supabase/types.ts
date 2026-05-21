@@ -3740,6 +3740,7 @@ export type Database = {
       lookup_efin_recipient: {
         Args: { p_query: string }
         Returns: {
+          account_number: string
           avatar_url: string
           efin_tag: string
           email: string

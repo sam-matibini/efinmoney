@@ -27,6 +27,8 @@ interface ProfileRow {
   full_name: string | null;
   email: string | null;
   phone_number: string | null;
+  account_number: string | null;
+  efin_tag: string | null;
   account_status: string | null;
   kyc_status: string;
   kyc_tier: string;
@@ -68,7 +70,7 @@ const UsersPage = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("profiles")
-        .select("id,user_id,full_name,email,phone_number,account_status,kyc_status,kyc_tier,avatar_url,created_at")
+        .select("id,user_id,full_name,email,phone_number,account_number,efin_tag,account_status,kyc_status,kyc_tier,avatar_url,created_at")
         .order("created_at", { ascending: false })
         .limit(500);
       if (error) throw error;
@@ -115,7 +117,9 @@ const UsersPage = () => {
     return (
       p.full_name?.toLowerCase().includes(q) ||
       p.email?.toLowerCase().includes(q) ||
-      p.phone_number?.includes(query)
+      p.phone_number?.includes(query) ||
+      p.account_number?.includes(query) ||
+      p.efin_tag?.toLowerCase().includes(q.replace(/^@/, ""))
     );
   });
 
@@ -168,7 +172,7 @@ const UsersPage = () => {
               <Input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search name, email or phone"
+                placeholder="Search name, email, phone, @tag or acct #"
                 className="pl-9"
               />
             </div>
@@ -184,6 +188,8 @@ const UsersPage = () => {
                   <TableHeader>
                     <TableRow>
                       <TableHead>User</TableHead>
+                      <TableHead>Account #</TableHead>
+                      <TableHead>@Tag</TableHead>
                       <TableHead>Phone</TableHead>
                       <TableHead>Account</TableHead>
                       <TableHead>KYC</TableHead>
@@ -195,7 +201,7 @@ const UsersPage = () => {
                   <TableBody>
                     {filtered.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center py-10 text-muted-foreground">
+                        <TableCell colSpan={9} className="text-center py-10 text-muted-foreground">
                           {query ? "No users match your search" : "No users yet"}
                         </TableCell>
                       </TableRow>
@@ -213,6 +219,8 @@ const UsersPage = () => {
                             </div>
                           </div>
                         </TableCell>
+                        <TableCell className="font-mono text-xs">{p.account_number || "—"}</TableCell>
+                        <TableCell className="text-sm">{p.efin_tag ? `@${p.efin_tag}` : "—"}</TableCell>
                         <TableCell className="text-sm text-muted-foreground">{p.phone_number || "—"}</TableCell>
                         <TableCell>
                           <Badge variant="outline" className={accountStatusVariant(p.account_status)}>
