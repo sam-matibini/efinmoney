@@ -12,14 +12,23 @@ export interface ElicateConfig {
 }
 
 export function getElicateConfig(): ElicateConfig {
-  const isLive =
-    (Deno.env.get("ELICATE_ENV") ?? "sandbox").toLowerCase() === "live";
+  const envRaw = (Deno.env.get("ELICATE_ENV") ?? "").trim().toLowerCase();
+  const liveUrl = Deno.env.get("ELICATE_LIVE_BASE_URL");
+  const liveKey = Deno.env.get("ELICATE_LIVE_SECRET_KEY");
+  const liveCredsPresent = Boolean(liveUrl && liveKey);
+
+  // Explicit sandbox override always wins.
+  const forceSandbox = envRaw === "sandbox" || envRaw === "test";
+  // Treat any of these as "live", and also auto-promote to live when
+  // live credentials exist and the env isn't explicitly sandbox.
+  const explicitLive = ["live", "production", "prod", "1", "true"].includes(envRaw);
+  const isLive = !forceSandbox && (explicitLive || liveCredsPresent);
 
   if (isLive) {
     return {
       mode: "live",
-      url: Deno.env.get("ELICATE_LIVE_BASE_URL") ?? "",
-      secretKey: Deno.env.get("ELICATE_LIVE_SECRET_KEY"),
+      url: liveUrl ?? "",
+      secretKey: liveKey,
       publicKey: Deno.env.get("ELICATE_LIVE_PUBLIC_KEY"),
       webhookSecret: Deno.env.get("ELICATE_LIVE_WEBHOOK_SECRET"),
     };
