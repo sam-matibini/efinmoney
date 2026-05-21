@@ -22,6 +22,15 @@ async function hmacHex(secret: string, body: string): Promise<string> {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
+  // Health check for browser GETs / Elicate dashboard verification pings.
+  if (req.method === "GET" || req.method === "HEAD") {
+    return new Response(
+      JSON.stringify({ ok: true, endpoint: "elicate-webhook", message: "Webhook is live. POST signed events here." }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
+
+
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
