@@ -62,6 +62,7 @@ const totals = (rows: StatementRow[]) => {
 export const downloadCSV = (rows: StatementRow[], meta: StatementMeta) => {
   const lines: string[] = [];
   lines.push(`"${meta.title.replace(/"/g, '""')}"`);
+  lines.push(`"Bank","${(meta.bankName || "eFinMoney")}"`);
   if (meta.subtitle) lines.push(`"${meta.subtitle.replace(/"/g, '""')}"`);
   if (meta.accountHolder) lines.push(`"Account holder","${meta.accountHolder}"`);
   if (meta.accountNumber) lines.push(`"Account number","${meta.accountNumber}"`);
