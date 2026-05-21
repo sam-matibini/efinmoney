@@ -63,7 +63,7 @@ const IssueVirtualCardModal = ({ open, onClose, onCreated }: IssueVirtualCardMod
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 font-display">
             <Sparkles className="w-4 h-4 text-emerald-500" />
-            Issue Virtual Card
+            Issue eFinVisa Card
           </DialogTitle>
         </DialogHeader>
 
