@@ -25,6 +25,7 @@ const IssueVirtualCardModal = ({ open, onClose, onCreated }: IssueVirtualCardMod
   const [walletId, setWalletId] = useState<string>("");
   const [monthlyLimit, setMonthlyLimit] = useState("2000");
   const [perAuthLimit, setPerAuthLimit] = useState("500");
+  const [tapToPay, setTapToPay] = useState(true);
 
   const reset = () => {
     setNickname("");
@@ -33,6 +34,7 @@ const IssueVirtualCardModal = ({ open, onClose, onCreated }: IssueVirtualCardMod
     setWalletId("");
     setMonthlyLimit("2000");
     setPerAuthLimit("500");
+    setTapToPay(true);
   };
 
   const matchingWallets = (wallets || []).filter((w: any) => w.currency_code === currency);
@@ -43,6 +45,7 @@ const IssueVirtualCardModal = ({ open, onClose, onCreated }: IssueVirtualCardMod
       currency,
       purpose,
       funding_wallet_id: walletId || undefined,
+      tap_to_pay: tapToPay,
       controls: {
         monthly_limit: Number(monthlyLimit) || undefined,
         per_authorization_limit: Number(perAuthLimit) || undefined,
