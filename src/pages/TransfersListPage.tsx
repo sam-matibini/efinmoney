@@ -34,10 +34,18 @@ const groupFor = (s: string) => {
 const INCOMING_LABELS: Record<string, string> = {
   transfer: "Incoming transfer",
   stellar_transfer: "Incoming transfer (Stellar)",
-  stripe_topup: "Card top-up",
-  flw_topup: "Flutterwave top-up",
-  manual_topup: "Manual top-up",
-  wallet_topup: "Wallet top-up",
+  stripe_topup: "eFinMoney top-up",
+  flw_topup: "eFinMoney top-up",
+  manual_topup: "eFinMoney top-up",
+  wallet_topup: "eFinMoney top-up",
+};
+
+const cleanDescription = (raw: string | null | undefined, refType: string) => {
+  const fallback = INCOMING_LABELS[refType] || "Incoming";
+  if (!raw) return fallback;
+  // Hide provider names and internal identifiers from end users
+  if (/stripe|pi_[A-Za-z0-9]+|wallet_topup|flw_|flutterwave/i.test(raw)) return fallback;
+  return raw;
 };
 
 type Row = {
@@ -107,7 +115,7 @@ const TransfersListPage = () => {
       .map((e: any) => ({
         id: `l-${e.id}`,
         direction: "in",
-        recipientOrSource: e.description || INCOMING_LABELS[e.reference_type] || "Incoming",
+        recipientOrSource: cleanDescription(e.description, e.reference_type),
         amount: Number(e.credit_amount),
         currency: e.currency_code,
         status: "completed",
