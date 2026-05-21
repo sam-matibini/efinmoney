@@ -8,6 +8,7 @@ import VirtualCardVisual from "@/components/cards/VirtualCardVisual";
 import IssueVirtualCardModal from "@/components/cards/IssueVirtualCardModal";
 import { useIssuedCards } from "@/hooks/useIssuedCards";
 import { useKyc } from "@/hooks/useKyc";
+import { useProfile } from "@/hooks/useProfile";
 
 const EfinCardsSection = () => {
   const navigate = useNavigate();
