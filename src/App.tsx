@@ -23,6 +23,7 @@ import WalletsPage from "./pages/WalletsPage";
 import SendPage from "./pages/SendPage";
 import ExchangePage from "./pages/ExchangePage";
 import CardsPage from "./pages/CardsPage";
+import EfinCardDetailPage from "./pages/EfinCardDetailPage";
 import CustomerPortalPage from "./pages/CustomerPortalPage";
 import ProfileSettingsPage from "./pages/ProfileSettingsPage";
 import KYCPage from "./pages/KYCPage";
