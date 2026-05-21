@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { cleanIncomingTransactionLabel } from "@/lib/incomingTransactions";
 
 const TransactionDetailPage = () => {
   const { journalId } = useParams<{ journalId: string }>();
@@ -32,6 +33,9 @@ const TransactionDetailPage = () => {
   const entries = data ?? [];
   const first = entries[0];
   const totalDebit = entries.reduce((s, e) => s + Number(e.debit_amount || 0), 0);
+  const referenceLabel = first?.reference_type
+    ? cleanIncomingTransactionLabel(first.description, first.reference_type).toUpperCase()
+    : "TRANSACTION";
 
   const copyRef = () => {
     if (!journalId) return;
@@ -55,9 +59,7 @@ const TransactionDetailPage = () => {
             <div>
               <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
                 <Receipt className="w-3.5 h-3.5" />
-                {first?.reference_type
-                  ? first.reference_type.replace(/_/g, " ").toUpperCase()
-                  : "TRANSACTION"}
+                {referenceLabel}
               </div>
               <h1 className="text-2xl sm:text-3xl font-display font-bold text-foreground">
                 Transaction Details
@@ -133,7 +135,7 @@ const TransactionDetailPage = () => {
                 </table>
               </div>
 
-              {first?.reference_type === "transfer" && first?.reference_id && (
+              {(first?.reference_type === "transfer" || first?.reference_type === "internal_transfer") && first?.reference_id && (
                 <div className="mt-4 text-sm">
                   <Link
                     to={`/transfers/${first.reference_id}`}
