@@ -18,6 +18,7 @@ import {
   useIssuedCardMutations,
 } from "@/hooks/useIssuedCards";
 import { useWallets } from "@/hooks/useWallets";
+import { useProfile } from "@/hooks/useProfile";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -30,6 +31,7 @@ const EfinCardDetailPage = () => {
   const { data: txns } = useCardTransactions(id);
   const { data: funding } = useCardFundingEvents(id);
   const { data: wallets } = useWallets();
+  const { data: profile } = useProfile();
   const { updateCard, fundCard } = useIssuedCardMutations();
 
   const [fundAmount, setFundAmount] = useState("");
@@ -108,6 +110,7 @@ const EfinCardDetailPage = () => {
               expMonth={card.exp_month}
               expYear={card.exp_year}
               tapToPay={tapToPay}
+              cardholderName={profile?.full_name}
             />
             {isSandbox && (
               <p className="text-[11px] text-amber-500 mt-2 text-center">Test card — Stripe Issuing pending enablement</p>

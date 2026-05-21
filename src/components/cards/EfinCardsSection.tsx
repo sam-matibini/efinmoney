@@ -8,11 +8,13 @@ import VirtualCardVisual from "@/components/cards/VirtualCardVisual";
 import IssueVirtualCardModal from "@/components/cards/IssueVirtualCardModal";
 import { useIssuedCards } from "@/hooks/useIssuedCards";
 import { useKyc } from "@/hooks/useKyc";
+import { useProfile } from "@/hooks/useProfile";
 
 const EfinCardsSection = () => {
   const navigate = useNavigate();
   const { data: cards, isLoading } = useIssuedCards();
   const { tier } = useKyc();
+  const { data: profile } = useProfile();
   const [open, setOpen] = useState(false);
 
   const tierOk = tier?.current_tier === "tier_3" || tier?.current_tier === "tier_4";
@@ -76,6 +78,7 @@ const EfinCardsSection = () => {
                 expMonth={c.exp_month}
                 expYear={c.exp_year}
                 tapToPay={(c.metadata as any)?.tap_to_pay !== false}
+                cardholderName={profile?.full_name}
               />
             </motion.button>
           ))}
