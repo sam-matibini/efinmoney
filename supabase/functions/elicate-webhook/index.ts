@@ -38,13 +38,23 @@ Deno.serve(async (req) => {
 
   try {
     const rawBody = await req.text();
-    const signature =
-      req.headers.get("x-elicatepay-signature") ||
-      req.headers.get("X-ElicatePay-Signature") ||
-      req.headers.get("x-elicate-signature") ||
-      req.headers.get("X-Elicate-Signature") ||
-      req.headers.get("verif-hash") ||
-      "";
+    const sigHeaderNames = [
+      "x-elicatepay-signature",
+      "x-elicate-signature",
+      "verif-hash",
+      "x-webhook-signature",
+      "x-signature",
+    ];
+    let signature = "";
+    let sigHeaderUsed = "";
+    for (const h of sigHeaderNames) {
+      const v = req.headers.get(h);
+      if (v) { signature = v.trim(); sigHeaderUsed = h; break; }
+    }
+    // Strip common prefixes like "sha256=" or "t=..,v1=.."
+    let sigClean = signature.replace(/^sha256=/i, "").trim();
+    const v1Match = sigClean.match(/v1=([a-f0-9]+)/i);
+    if (v1Match) sigClean = v1Match[1];
 
     const { mode, webhookSecret } = getElicateConfig();
     if (!webhookSecret) {
@@ -54,19 +64,29 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Accept either an HMAC-SHA256 signature of the body, or a shared-token style header.
+    // Accept any of: shared-token equality, HMAC-SHA256(body), HMAC-SHA256(body) with sha256= prefix.
     const expectedHmac = await hmacHex(webhookSecret, rawBody);
     const sigValid =
-      signature === webhookSecret ||
-      signature === expectedHmac ||
-      signature.toLowerCase() === expectedHmac.toLowerCase();
+      !!signature && (
+        signature === webhookSecret ||
+        sigClean.toLowerCase() === webhookSecret.toLowerCase() ||
+        sigClean.toLowerCase() === expectedHmac.toLowerCase()
+      );
 
     if (!sigValid) {
-      console.warn("Invalid Elicate webhook signature");
+      console.warn("Invalid Elicate webhook signature", {
+        mode,
+        headerUsed: sigHeaderUsed || "(none)",
+        receivedPreview: signature ? `${signature.slice(0, 8)}…(${signature.length})` : "(empty)",
+        expectedHmacPreview: `${expectedHmac.slice(0, 8)}…`,
+        bodyBytes: rawBody.length,
+        allHeaders: Array.from(req.headers.keys()),
+      });
       return new Response(JSON.stringify({ error: "Invalid signature" }), {
         status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+    console.log("Elicate webhook signature OK", { mode, headerUsed: sigHeaderUsed });
 
     const payload = JSON.parse(rawBody);
     const eventType: string = payload.event || payload.type || "";
