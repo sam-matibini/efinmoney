@@ -171,6 +171,8 @@ Deno.serve(async (req) => {
     let expMonth: number | null = null;
     let expYear: number | null = null;
 
+    const tapToPay = body.tap_to_pay !== false; // default ON
+
     if (stripe && issuingEnabled && cardholder.stripe_cardholder_id) {
       try {
         const card = await stripe.issuing.cards.create({
@@ -179,6 +181,7 @@ Deno.serve(async (req) => {
           type: cardType,
           status: "active",
           spending_controls: Object.keys(stripeControls).length ? stripeControls : undefined,
+          metadata: { tap_to_pay: tapToPay ? "true" : "false" },
         });
         stripeCardId = card.id;
         last4 = card.last4;
