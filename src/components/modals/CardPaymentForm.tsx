@@ -181,7 +181,7 @@ function InnerForm({
         </div>
         <h3 className="text-xl font-display font-bold text-foreground">Payment successful!</h3>
         <p className="text-sm text-muted-foreground">
-          ${success.amount.toFixed(2)} added to your {success.currency} wallet
+          {success.symbol}{success.amount.toFixed(2)} added to your {success.currency} wallet
         </p>
       </div>
     );
