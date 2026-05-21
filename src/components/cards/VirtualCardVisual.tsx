@@ -48,7 +48,7 @@ const VirtualCardVisual = ({
         <div className="flex items-start justify-between">
           <div>
             <div className="text-[10px] uppercase tracking-widest opacity-70">eFinMoney</div>
-            <div className="text-sm font-semibold mt-0.5 truncate max-w-[12rem]">{nickname || "eFinVisa"}</div>
+            <div className="text-sm font-semibold mt-0.5 truncate max-w-[12rem]">{nickname || "eFinVISA"}</div>
           </div>
           <div className="flex items-center gap-2">
             {tapToPay && !dimmed && (
@@ -77,7 +77,7 @@ const VirtualCardVisual = ({
           </div>
           <div className="text-right">
             <div className="opacity-60">{currency}</div>
-            <div className="uppercase font-bold tracking-wider">eFinVisa</div>
+            <div className="uppercase font-bold tracking-wider">eFinVISA</div>
           </div>
           <CreditCard className="w-6 h-6 opacity-80" />
         </div>

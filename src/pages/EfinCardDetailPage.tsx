@@ -116,7 +116,7 @@ const EfinCardDetailPage = () => {
 
           <div className="flex-1 space-y-2 w-full">
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-xl font-display font-bold">{card.nickname || "eFinVisa"}</h1>
+              <h1 className="text-xl font-display font-bold">{card.nickname || "eFinVISA"}</h1>
               {tapToPay && card.status === "active" && (
                 <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
                   <Wifi className="w-3 h-3 rotate-90" /> Tap to pay
