@@ -52,18 +52,27 @@ const TransfersListPage = () => {
     return items;
   }, [rowsAll, direction, search, from, to]);
 
+  // Balance totals = computed across ALL rows (not the filtered view) so the
+  // tiles represent the user's true running balance per currency, not the
+  // currently selected tab/filter window.
   const totalsIn = useMemo(
-    () => rows.reduce<Record<string, number>>((a, r) => { if (r.moneyIn) a[r.currency] = (a[r.currency] || 0) + r.moneyIn; return a; }, {}),
-    [rows]
+    () => (rowsAll ?? []).reduce<Record<string, number>>((a, r) => { if (r.moneyIn) a[r.currency] = (a[r.currency] || 0) + r.moneyIn; return a; }, {}),
+    [rowsAll]
   );
   const totalsOut = useMemo(
-    () => rows.reduce<Record<string, number>>((a, r) => { if (r.moneyOut) a[r.currency] = (a[r.currency] || 0) + r.moneyOut; return a; }, {}),
-    [rows]
+    () => (rowsAll ?? []).reduce<Record<string, number>>((a, r) => { if (r.moneyOut) a[r.currency] = (a[r.currency] || 0) + r.moneyOut; return a; }, {}),
+    [rowsAll]
   );
-  const renderTotals = (totals: Record<string, number>, sign: "+" | "-") => {
+  const netByCurrency = useMemo(() => {
+    const all = new Set([...Object.keys(totalsIn), ...Object.keys(totalsOut)]);
+    const out: Record<string, number> = {};
+    for (const c of all) out[c] = (totalsIn[c] || 0) - (totalsOut[c] || 0);
+    return out;
+  }, [totalsIn, totalsOut]);
+  const renderTotals = (totals: Record<string, number>, sign: "+" | "-" | "") => {
     const entries = Object.entries(totals).sort((a, b) => b[1] - a[1]);
     if (entries.length === 0) return `${sign}${fmt(0)}`;
-    return entries.map(([c, v]) => `${sign}${currencySymbol(c)}${fmt(v)}`).join("  ");
+    return entries.map(([c, v]) => `${sign}${currencySymbol(c)}${fmt(Math.abs(v))} ${c}`).join("  ·  ");
   };
 
   const accountHolder = profile?.full_name || profile?.email || user?.email || "Account holder";
