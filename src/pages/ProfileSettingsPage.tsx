@@ -68,6 +68,63 @@ const ProfileSettingsPage = () => {
       <Header />
       <div className="container max-w-2xl mx-auto px-4 py-8">
         <h1 className="text-2xl font-bold text-foreground mb-6">Profile Settings</h1>
+
+        {/* eFinMoney identity card — what others use to send you money */}
+        <Card className="p-6 mb-4 space-y-4 border-primary/30 bg-gradient-to-br from-primary/5 to-transparent">
+          <div>
+            <p className="text-xs uppercase tracking-wider text-muted-foreground">Your eFinMoney identity</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Share either of these so other eFinMoney users can send you money instantly.
+            </p>
+          </div>
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div className="p-4 rounded-xl bg-card border border-border">
+              <div className="flex items-center gap-2 text-xs uppercase text-muted-foreground mb-1">
+                <Hash className="w-3.5 h-3.5" /> Account number
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xl font-display font-bold tracking-wide truncate">
+                  {(profile as any)?.account_number || "—"}
+                </p>
+                {(profile as any)?.account_number && (
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => {
+                      navigator.clipboard.writeText((profile as any).account_number);
+                      toast.success("Account number copied");
+                    }}
+                  >
+                    <Copy className="w-4 h-4" />
+                  </Button>
+                )}
+              </div>
+            </div>
+            <div className="p-4 rounded-xl bg-card border border-border">
+              <div className="flex items-center gap-2 text-xs uppercase text-muted-foreground mb-1">
+                <AtSign className="w-3.5 h-3.5" /> eFin tag
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xl font-display font-bold truncate">
+                  {(profile as any)?.efin_tag ? `@${(profile as any).efin_tag}` : "Not set"}
+                </p>
+                {(profile as any)?.efin_tag && (
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => {
+                      navigator.clipboard.writeText(`@${(profile as any).efin_tag}`);
+                      toast.success("Tag copied");
+                    }}
+                  >
+                    <Copy className="w-4 h-4" />
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+        </Card>
+
         <Card className="p-6 space-y-4">
           <div className="space-y-2">
             <Label htmlFor="fullName">Display Name</Label>
