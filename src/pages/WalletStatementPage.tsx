@@ -52,8 +52,10 @@ const WalletStatementPage = () => {
     return items;
   }, [rowsAll, direction, search, from, to]);
 
-  const totalIn = rows.reduce((s, r) => s + r.moneyIn, 0);
-  const totalOut = rows.reduce((s, r) => s + r.moneyOut, 0);
+  // Balance totals span the entire wallet history (not the filtered view).
+  const totalIn = (rowsAll ?? []).reduce((s, r) => s + r.moneyIn, 0);
+  const totalOut = (rowsAll ?? []).reduce((s, r) => s + r.moneyOut, 0);
+  const netBalance = totalIn - totalOut;
 
   const accountHolder = profile?.full_name || profile?.email || user?.email || "Account holder";
 
