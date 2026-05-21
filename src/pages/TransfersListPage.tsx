@@ -33,6 +33,7 @@ const groupFor = (s: string) => {
 
 const INCOMING_LABELS: Record<string, string> = {
   transfer: "Incoming transfer",
+  internal_transfer: "Received from eFinMoney user",
   stellar_transfer: "Incoming transfer (Stellar)",
   stripe_topup: "eFinMoney top-up",
   flw_topup: "eFinMoney top-up",
