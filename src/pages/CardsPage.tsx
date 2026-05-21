@@ -104,27 +104,47 @@ const CardsPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-24 md:pb-8">
+    <div className="min-h-screen pb-24 md:pb-8 relative overflow-hidden"
+      style={{
+        background:
+          "radial-gradient(ellipse 80% 60% at 20% 0%, hsl(var(--primary) / 0.10), transparent 60%), radial-gradient(ellipse 70% 50% at 90% 30%, rgba(99,102,241,0.10), transparent 65%), hsl(var(--background))",
+      }}>
       <Header />
 
       <main className="container relative z-0 px-4 py-6">
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
+          initial="hidden"
+          animate="show"
+          variants={{
+            hidden: {},
+            show: { transition: { staggerChildren: 0.08, delayChildren: 0.05 } },
+          }}
           className="space-y-6"
         >
-          <MockEfinVisaCard />
-          <div className="flex items-center justify-between">
+          <motion.div variants={{ hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 180, damping: 22 } } }}>
+            <MockEfinVisaCard />
+          </motion.div>
+
+          <motion.div
+            variants={{ hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 180, damping: 22 } } }}
+            className="flex items-center justify-between"
+          >
             <div>
               <h1 className="text-2xl font-display font-bold text-foreground">My Cards</h1>
               <p className="text-muted-foreground">Tap a card to flip and view details</p>
             </div>
-            <Button onClick={() => setAddOpen(true)}>
-              <Plus className="w-4 h-4 mr-2" />
-              New Card
-            </Button>
-          </div>
+            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+              <Button onClick={() => setAddOpen(true)} className="shadow-[0_10px_30px_-10px_hsl(var(--primary)/0.6)]">
+                <Plus className="w-4 h-4 mr-2" />
+                New Card
+              </Button>
+            </motion.div>
+          </motion.div>
 
+          <motion.div
+            variants={{ hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 180, damping: 22 } } }}
+            className="rounded-3xl border border-white/10 bg-white/[0.03] backdrop-blur-xl p-4 sm:p-6 shadow-[0_20px_60px_-30px_rgba(0,0,0,0.6)]"
+          >
           {isLoading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {[1, 2].map((i) => (
@@ -227,6 +247,8 @@ const CardsPage = () => {
               }}
             />
           )}
+          </motion.div>
+
 
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

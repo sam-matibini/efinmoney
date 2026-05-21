@@ -22,10 +22,11 @@ const FlipCard = ({ card, flipped, onToggle, index }: FlipCardProps) => {
   const [particles, setParticles] = useState<{ id: number; x: number; y: number }[]>([]);
 
   // Premium gradient by card network
+  // Premium brand gradients: Visa = deep sapphire blue, Mastercard = dark charcoal
   const bgClass =
     card.card_network === "mastercard"
-      ? "bg-[linear-gradient(135deg,#1a1a1a_0%,#3a1d0a_45%,#eb6e1f_100%)]"
-      : "bg-[linear-gradient(135deg,#0a2540_0%,#1e3a8a_45%,#0f766e_100%)]";
+      ? "bg-[linear-gradient(135deg,#0a0a0a_0%,#1a1a1a_50%,#2a2a2a_100%)]"
+      : "bg-[linear-gradient(135deg,#021431_0%,#0a2f6e_50%,#1d4ed8_100%)]";
 
   const expiry =
     card.expiry_month && card.expiry_year
@@ -214,9 +215,16 @@ const FlipCard = ({ card, flipped, onToggle, index }: FlipCardProps) => {
                   <p className="text-[9px] uppercase tracking-widest opacity-60">Expires</p>
                   <p className="font-mono text-sm">{expiry}</p>
                 </div>
-                <span className="font-display italic font-extrabold text-2xl tracking-tight ml-3">
-                  {card.card_network === "visa" ? "VISA" : "Mastercard"}
-                </span>
+                {card.card_network === "visa" ? (
+                  <span className="font-display italic font-extrabold text-2xl tracking-tight ml-3 drop-shadow">
+                    VISA
+                  </span>
+                ) : (
+                  <div className="relative h-7 w-12 ml-3">
+                    <span className="absolute left-0 top-0 w-7 h-7 rounded-full bg-[#eb001b] shadow-[0_0_12px_rgba(235,0,27,0.5)]" />
+                    <span className="absolute right-0 top-0 w-7 h-7 rounded-full bg-[#f79e1b] mix-blend-screen shadow-[0_0_12px_rgba(247,158,27,0.5)]" />
+                  </div>
+                )}
               </div>
             </div>
           </div>
