@@ -2235,6 +2235,7 @@ export type Database = {
           country_code: string | null
           created_at: string
           default_currency: string | null
+          efin_tag: string | null
           email: string | null
           full_name: string | null
           id: string
@@ -2261,6 +2262,7 @@ export type Database = {
           country_code?: string | null
           created_at?: string
           default_currency?: string | null
+          efin_tag?: string | null
           email?: string | null
           full_name?: string | null
           id?: string
@@ -2287,6 +2289,7 @@ export type Database = {
           country_code?: string | null
           created_at?: string
           default_currency?: string | null
+          efin_tag?: string | null
           email?: string | null
           full_name?: string | null
           id?: string
@@ -3734,6 +3737,16 @@ export type Database = {
       }
       is_admin_user: { Args: { _uid: string }; Returns: boolean }
       is_kyc_reviewer: { Args: { _uid: string }; Returns: boolean }
+      lookup_efin_recipient: {
+        Args: { p_query: string }
+        Returns: {
+          avatar_url: string
+          efin_tag: string
+          email: string
+          full_name: string
+          user_id: string
+        }[]
+      }
       run_compliance_checks: {
         Args: { p_transfer_id: string }
         Returns: number

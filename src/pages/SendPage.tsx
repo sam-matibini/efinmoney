@@ -36,6 +36,7 @@ import { toast } from "sonner";
 import { ArrowRight, CheckCircle, Users, Clock, Shield, Wallet, Landmark, CreditCard, AlertCircle, X, Search } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import CanadaSendFlow from "@/components/send/CanadaSendFlow";
+import EfinmoneyP2PFlow from "@/components/send/EfinmoneyP2PFlow";
 import AnimatedNumber from "@/components/ui/AnimatedNumber";
 import AnimatedCheck from "@/components/ui/AnimatedCheck";
 import ParticleBurst from "@/components/ui/ParticleBurst";
@@ -782,7 +783,8 @@ const SendPage = () => {
     ? (recipientName.trim().length > 2 && !!ghBankCode && ghAccountNumber.replace(/\D/g, "").length >= 6 && receivedAmount > 0)
     : (recipientName.length > 2 && recipientPhone.length > 8 && !!effectivePayoutMethod && receivedAmount > 0);
 
-  const activeTab = searchParams.get('mode') === 'canada' ? 'canada' : 'international';
+  const modeParam = searchParams.get('mode');
+  const activeTab = modeParam === 'canada' ? 'canada' : modeParam === 'efinmoney' ? 'efinmoney' : 'international';
 
   // Step transitions
   const stepVariants = {
@@ -820,24 +822,34 @@ const SendPage = () => {
               value={activeTab}
               onValueChange={(v) => {
                 const next = new URLSearchParams(searchParams);
-                if (v === 'canada') next.set('mode', 'canada'); else next.delete('mode');
+                if (v === 'canada') next.set('mode', 'canada');
+                else if (v === 'efinmoney') next.set('mode', 'efinmoney');
+                else next.delete('mode');
                 setSearchParams(next, { replace: true });
               }}
               className="w-full"
             >
-              <TabsList className="relative grid w-full grid-cols-2 h-12 overflow-hidden">
+              <TabsList className="relative grid w-full grid-cols-3 h-12 overflow-hidden">
                 {/* Sliding pill */}
                 <motion.div
-                  className="absolute top-1 bottom-1 w-1/2 rounded-sm bg-background shadow-sm"
+                  className="absolute top-1 bottom-1 rounded-sm bg-background shadow-sm"
                   initial={false}
-                  animate={{ left: activeTab === 'international' ? '0.25rem' : 'calc(50% + 0.25rem)' }}
-                  style={{ width: 'calc(50% - 0.5rem)' }}
+                  animate={{
+                    left:
+                      activeTab === 'international' ? '0.25rem'
+                      : activeTab === 'efinmoney' ? 'calc(33.333% + 0.25rem)'
+                      : 'calc(66.666% + 0.25rem)',
+                  }}
+                  style={{ width: 'calc(33.333% - 0.5rem)' }}
                   transition={{ type: "spring", stiffness: 380, damping: 30 }}
                 />
-                <TabsTrigger value="international" className="relative z-10 gap-1 data-[state=active]:bg-transparent data-[state=active]:shadow-none">
-                  🌍 Send Internationally
+                <TabsTrigger value="international" className="relative z-10 gap-1 text-xs sm:text-sm data-[state=active]:bg-transparent data-[state=active]:shadow-none">
+                  🌍 International
                 </TabsTrigger>
-                <TabsTrigger value="canada" className="relative z-10 gap-1 data-[state=active]:bg-transparent data-[state=active]:shadow-none">
+                <TabsTrigger value="efinmoney" className="relative z-10 gap-1 text-xs sm:text-sm data-[state=active]:bg-transparent data-[state=active]:shadow-none">
+                  💸 eFinMoney
+                </TabsTrigger>
+                <TabsTrigger value="canada" className="relative z-10 gap-1 text-xs sm:text-sm data-[state=active]:bg-transparent data-[state=active]:shadow-none">
                   🇨🇦 Domestic
                 </TabsTrigger>
               </TabsList>
@@ -855,6 +867,18 @@ const SendPage = () => {
                     >
                       <TabsContent value="canada" forceMount className="mt-0">
                         <CanadaSendFlow />
+                      </TabsContent>
+                    </motion.div>
+                  ) : activeTab === 'efinmoney' ? (
+                    <motion.div
+                      key="efinmoney"
+                      initial={{ x: 0, opacity: 0 }}
+                      animate={{ x: 0, opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+                    >
+                      <TabsContent value="efinmoney" forceMount className="mt-0">
+                        <EfinmoneyP2PFlow />
                       </TabsContent>
                     </motion.div>
                   ) : (
