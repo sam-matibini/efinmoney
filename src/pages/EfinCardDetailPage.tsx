@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Snowflake, Unlock, Trash2, Plus, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, Snowflake, Unlock, Trash2, Plus, Eye, EyeOff, Wifi, Smartphone } from "lucide-react";
 import VirtualCardVisual from "@/components/cards/VirtualCardVisual";
 import {
   useIssuedCard,
