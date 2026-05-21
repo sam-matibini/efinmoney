@@ -124,6 +124,16 @@ Deno.serve(async (req) => {
       return json({ error: "Liability account missing for currency" }, 500);
     }
 
+    // Look up sender profile for receipt description
+    const { data: senderProfile } = await admin
+      .from("profiles")
+      .select("full_name, email, efin_tag")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    const senderName = senderProfile?.full_name
+      || (senderProfile?.efin_tag ? `@${senderProfile.efin_tag}` : senderProfile?.email)
+      || "eFinMoney user";
+
     // Insert transfer row first (status processing) so triggers can compute receipts/etc.
     const recipientName = recipientProfile.full_name
       || (recipientProfile.efin_tag ? `@${recipientProfile.efin_tag}` : recipientProfile.email)
