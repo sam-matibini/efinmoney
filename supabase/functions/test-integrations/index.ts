@@ -1,6 +1,7 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import * as StellarSdk from "npm:stellar-sdk@12";
+import { getElicateConfig } from "../_shared/elicate.ts";
 
 const HORIZON_MAINNET = "https://horizon.stellar.org";
 const USDC_ISSUER_MAINNET = "GA5ZSEJYB37JRC52ZMRITGWQIPG6HSRX3VE3YIPJWZIGWG2XQ5OQ34C6";
