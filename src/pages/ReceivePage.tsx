@@ -10,13 +10,18 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { useVirtualAccounts, useCreateVirtualAccount } from "@/hooks/useVirtualAccounts";
+import { useProfile } from "@/hooks/useProfile";
+import { AtSign, Hash } from "lucide-react";
 
 const AFRICA_CURRENCIES = ["NGN", "KES", "GHS", "ZAR", "UGX", "TZS", "ZMW", "RWF", "USD"];
 
 const ReceivePage = () => {
   const { data: accounts, isLoading } = useVirtualAccounts();
+  const { data: profile } = useProfile();
   const create = useCreateVirtualAccount();
   const [currency, setCurrency] = useState("NGN");
+  const efinAcct = (profile as any)?.account_number as string | undefined;
+  const efinTag = (profile as any)?.efin_tag as string | undefined;
 
   const copy = async (txt: string) => {
     await navigator.clipboard.writeText(txt);
@@ -51,6 +56,41 @@ const ReceivePage = () => {
             <h1 className="text-2xl font-display font-bold">Receive Money</h1>
             <p className="text-muted-foreground">Share your virtual account details to get paid instantly.</p>
           </div>
+
+          {/* In-network identity: account # + @tag */}
+          <Card className="border-primary/30 bg-gradient-to-br from-primary/5 to-transparent">
+            <CardHeader>
+              <CardTitle className="text-base">Receive from another eFinMoney user</CardTitle>
+            </CardHeader>
+            <CardContent className="grid sm:grid-cols-2 gap-3">
+              <div className="p-4 rounded-xl bg-card border border-border">
+                <div className="flex items-center gap-2 text-xs uppercase text-muted-foreground mb-1">
+                  <Hash className="w-3.5 h-3.5" /> Account number
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xl font-display font-bold tracking-wide truncate">{efinAcct || "—"}</p>
+                  {efinAcct && (
+                    <Button size="sm" variant="ghost" onClick={() => copy(efinAcct)}>
+                      <Copy className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+              <div className="p-4 rounded-xl bg-card border border-border">
+                <div className="flex items-center gap-2 text-xs uppercase text-muted-foreground mb-1">
+                  <AtSign className="w-3.5 h-3.5" /> eFin tag
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xl font-display font-bold truncate">{efinTag ? `@${efinTag}` : "Not set"}</p>
+                  {efinTag && (
+                    <Button size="sm" variant="ghost" onClick={() => copy(`@${efinTag}`)}>
+                      <Copy className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
           <Card>
             <CardHeader><CardTitle>Add a virtual account</CardTitle></CardHeader>
