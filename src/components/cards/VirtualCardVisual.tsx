@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { CreditCard } from "lucide-react";
+import { CreditCard, Wifi } from "lucide-react";
 
 interface VirtualCardVisualProps {
   brand?: string;
@@ -10,6 +10,7 @@ interface VirtualCardVisualProps {
   expMonth?: number | null;
   expYear?: number | null;
   small?: boolean;
+  tapToPay?: boolean;
 }
 
 const gradientFor = (purposeOrBrand: string) => {
