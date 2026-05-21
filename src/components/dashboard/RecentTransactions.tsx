@@ -17,6 +17,7 @@ const fmt = (n: number) =>
 
 const RecentTransactions = () => {
   const { user } = useAuth();
+  const { data: profile } = useProfile();
   const { data: rows = [], isLoading } = useStatement(null, 500);
 
   if (isLoading) {
