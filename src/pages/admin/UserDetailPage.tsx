@@ -149,6 +149,8 @@ const UserDetailPage = () => {
     },
     enabled: !!id,
   });
+
+  if (isLoading) {
     return (
       <AdminLayout>
         <div className="space-y-4">
