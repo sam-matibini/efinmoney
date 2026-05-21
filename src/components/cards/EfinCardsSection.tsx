@@ -23,9 +23,9 @@ const EfinCardsSection = () => {
         <div>
           <h2 className="text-lg font-display font-bold flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-emerald-500" />
-            EfinCards · Virtual Cards
+            eFinVisa · Virtual Visa Cards
           </h2>
-          <p className="text-xs text-muted-foreground">Instant Visa cards funded from your wallets. Spend online, freeze anytime.</p>
+          <p className="text-xs text-muted-foreground">Instant Visa cards. Spend online or tap to pay with Apple Pay & Google Pay.</p>
         </div>
         <Button
           size="sm"
