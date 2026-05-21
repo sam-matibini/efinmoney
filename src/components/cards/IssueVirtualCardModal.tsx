@@ -3,10 +3,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useWallets } from "@/hooks/useWallets";
 import { useIssuedCardMutations, type IssuedCardPurpose } from "@/hooks/useIssuedCards";
-import { Sparkles } from "lucide-react";
+import { Sparkles, Wifi } from "lucide-react";
 
 interface IssueVirtualCardModalProps {
   open: boolean;
