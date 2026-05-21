@@ -252,6 +252,39 @@ const TransferTrackingPage = () => {
               </CardHeader>
             </Card>
 
+            {/* Elicate USSD waiting banner — only for Zambia mobile-money payouts in pending states */}
+            {((transfer.target_currency ?? "").toUpperCase() === "ZMW" ||
+              (transfer.recipient_country ?? "").toUpperCase() === "ZM") &&
+              ["funded", "processing"].includes(transfer.status) && (
+              <Card className="border-yellow-500/40 bg-yellow-500/5">
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Smartphone className="w-4 h-4 text-yellow-500" />
+                    Waiting for recipient to approve on their phone
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3 text-sm">
+                  <p className="text-muted-foreground">
+                    A USSD prompt has been pushed to <span className="font-medium text-foreground">{transfer.recipient_phone || "the recipient"}</span>.
+                    They need to enter their Mobile Money PIN to receive <span className="font-medium text-foreground">
+                    {currencySymbol(transfer.target_currency)}{Number(transfer.target_amount).toLocaleString("en-US", { minimumFractionDigits: 2 })} {transfer.target_currency}</span>.
+                    Funds will land instantly once they confirm.
+                  </p>
+                  <div className="rounded-lg border border-border/60 bg-muted/40 p-3 space-y-2">
+                    <p className="text-xs font-semibold text-foreground">If they didn't see the prompt, ask them to dial:</p>
+                    <ul className="text-xs space-y-1 text-muted-foreground">
+                      <li>• <span className="font-mono text-foreground">*303#</span> — MTN Money → Pending Approvals</li>
+                      <li>• <span className="font-mono text-foreground">*778#</span> — Airtel Money → My Account → Pending Transactions</li>
+                      <li>• <span className="font-mono text-foreground">*422#</span> — Zamtel Kwacha → Approvals</li>
+                    </ul>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Prompts expire after ~2 minutes. If it times out, the transfer will fail and funds return to your wallet automatically.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Timeline */}
             <Card>
               <CardHeader><CardTitle>Tracking Timeline</CardTitle></CardHeader>
