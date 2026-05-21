@@ -1,14 +1,11 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { getElicateConfig } from "../_shared/elicate.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
-
-const ELICATE_URL =
-  Deno.env.get("ELICATE_BASE_URL") ||
-  "https://elicatepay.vercel.app/api/v1/payments/charge";
 
 // Map internal payout_method / network codes -> Elicate uppercase network string
 const NETWORK_MAP: Record<string, string> = {
