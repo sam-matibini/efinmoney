@@ -98,9 +98,16 @@ Deno.serve(async (req) => {
       });
     }
 
-    const secret = Deno.env.get("ELICATE_SECRET_KEY");
+    const elicate = getElicateConfig();
+    const secret = elicate.secretKey;
+    const ELICATE_URL = elicate.url;
     if (!secret) {
-      return new Response(JSON.stringify({ success: false, error: "ELICATE_SECRET_KEY not configured" }), {
+      return new Response(JSON.stringify({ success: false, error: `ELICATE_${elicate.mode === "live" ? "LIVE_" : ""}SECRET_KEY not configured` }), {
+        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (!ELICATE_URL) {
+      return new Response(JSON.stringify({ success: false, error: "ELICATE_LIVE_BASE_URL not configured" }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
