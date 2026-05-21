@@ -22,10 +22,11 @@ const FlipCard = ({ card, flipped, onToggle, index }: FlipCardProps) => {
   const [particles, setParticles] = useState<{ id: number; x: number; y: number }[]>([]);
 
   // Premium gradient by card network
+  // Premium brand gradients: Visa = deep sapphire blue, Mastercard = dark charcoal
   const bgClass =
     card.card_network === "mastercard"
-      ? "bg-[linear-gradient(135deg,#1a1a1a_0%,#3a1d0a_45%,#eb6e1f_100%)]"
-      : "bg-[linear-gradient(135deg,#0a2540_0%,#1e3a8a_45%,#0f766e_100%)]";
+      ? "bg-[linear-gradient(135deg,#0a0a0a_0%,#1a1a1a_50%,#2a2a2a_100%)]"
+      : "bg-[linear-gradient(135deg,#021431_0%,#0a2f6e_50%,#1d4ed8_100%)]";
 
   const expiry =
     card.expiry_month && card.expiry_year
