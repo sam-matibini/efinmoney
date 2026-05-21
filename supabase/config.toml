@@ -38,3 +38,6 @@ verify_jwt = false
 
 [functions.test-integrations]
 verify_jwt = false
+
+[functions.stripe-issuing-webhook]
+verify_jwt = false
