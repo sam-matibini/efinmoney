@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
+import { AtSign } from "lucide-react";
 
 const ProfileSettingsPage = () => {
   const { user } = useAuth();
@@ -16,24 +17,36 @@ const ProfileSettingsPage = () => {
   const queryClient = useQueryClient();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
+  const [efinTag, setEfinTag] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (profile) {
       setFullName(profile.full_name || "");
       setEmail(profile.email || user?.email || "");
+      setEfinTag((profile as any).efin_tag || "");
     }
   }, [profile, user]);
 
   const handleSave = async () => {
     if (!user) return;
+    const cleanTag = efinTag.trim().replace(/^@/, "");
+    if (cleanTag && !/^[A-Za-z][A-Za-z0-9_]{2,19}$/.test(cleanTag)) {
+      toast.error("@tag must be 3-20 chars, start with a letter, letters/numbers/_ only");
+      return;
+    }
     setSaving(true);
     try {
       const { error } = await supabase
         .from('profiles')
-        .update({ full_name: fullName, email })
+        .update({ full_name: fullName, email, efin_tag: cleanTag || null })
         .eq('user_id', user.id);
-      if (error) throw error;
+      if (error) {
+        if (error.message.includes('duplicate') || error.code === '23505') {
+          throw new Error(`@${cleanTag} is already taken`);
+        }
+        throw error;
+      }
 
       if (email !== user.email) {
         const { error: emailError } = await supabase.auth.updateUser({ email });
@@ -64,6 +77,24 @@ const ProfileSettingsPage = () => {
               onChange={(e) => setFullName(e.target.value)}
               disabled={isLoading}
             />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="efinTag">eFinMoney tag</Label>
+            <div className="relative">
+              <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                id="efinTag"
+                value={efinTag}
+                onChange={(e) => setEfinTag(e.target.value.replace(/^@/, ""))}
+                placeholder="yourname"
+                disabled={isLoading}
+                className="pl-9"
+                maxLength={20}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Your unique handle so other eFinMoney users can send you money instantly. 3–20 chars, letters/numbers/_.
+            </p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
