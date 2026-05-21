@@ -55,9 +55,7 @@ const WalletStatementPage = () => {
   const totalIn = rows.reduce((s, r) => s + r.moneyIn, 0);
   const totalOut = rows.reduce((s, r) => s + r.moneyOut, 0);
 
-  const accountHolder =
-    [profile?.first_name, profile?.last_name].filter(Boolean).join(" ").trim() ||
-    profile?.email || user?.email || "Account holder";
+  const accountHolder = profile?.full_name || profile?.email || user?.email || "Account holder";
 
   const meta = {
     title: `${wallet?.currency_code || "Wallet"} Wallet Statement`,

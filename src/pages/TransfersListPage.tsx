@@ -66,11 +66,7 @@ const TransfersListPage = () => {
     return entries.map(([c, v]) => `${sign}${currencySymbol(c)}${fmt(v)}`).join("  ");
   };
 
-  const accountHolder =
-    [profile?.first_name, profile?.last_name].filter(Boolean).join(" ").trim() ||
-    profile?.email ||
-    user?.email ||
-    "Account holder";
+  const accountHolder = profile?.full_name || profile?.email || user?.email || "Account holder";
 
   const selectedWallet = wallets?.find((w) => w.wallet_id === walletFilter);
   const meta = {
