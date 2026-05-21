@@ -362,6 +362,128 @@ const UserDetailPage = () => {
               </CardContent>
             </Card>
           </TabsContent>
+
+          <TabsContent value="crm" className="space-y-4">
+            <div className="grid lg:grid-cols-2 gap-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Activity className="w-4 h-4" /> Activities ({activities.length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {activities.length === 0 ? (
+                    <p className="text-sm text-muted-foreground py-6 text-center">No activities logged</p>
+                  ) : (
+                    <ul className="space-y-3">
+                      {activities.map((a: any) => (
+                        <li key={a.id} className="border-l-2 border-primary/40 pl-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-medium text-sm">{a.subject}</span>
+                            <Badge variant="outline" className="text-xs capitalize">{a.activity_type}</Badge>
+                          </div>
+                          {a.description && <p className="text-xs text-muted-foreground mt-1">{a.description}</p>}
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {format(new Date(a.created_at), "MMM d, yyyy HH:mm")}
+                            {a.completed_at && " · completed"}
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <MessageSquare className="w-4 h-4" /> Communications ({communications.length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {communications.length === 0 ? (
+                    <p className="text-sm text-muted-foreground py-6 text-center">No messages exchanged</p>
+                  ) : (
+                    <ul className="space-y-3">
+                      {communications.map((c: any) => (
+                        <li key={c.id} className="border-l-2 border-emerald-500/40 pl-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-medium text-sm truncate">{c.subject || c.channel}</span>
+                            <Badge variant="outline" className="text-xs capitalize">{c.direction}</Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{c.content}</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {c.channel} · {format(new Date(c.created_at), "MMM d, yyyy HH:mm")} · {c.status}
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <FileWarning className="w-4 h-4" /> Disputes ({disputes.length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {disputes.length === 0 ? (
+                    <p className="text-sm text-muted-foreground py-6 text-center">No disputes raised</p>
+                  ) : (
+                    <ul className="space-y-3">
+                      {disputes.map((d: any) => (
+                        <li key={d.id} className="flex items-start justify-between gap-2 border-b border-border/40 pb-2 last:border-0">
+                          <div className="min-w-0">
+                            <div className="font-medium text-sm capitalize">{d.dispute_type?.replace(/_/g, " ")}</div>
+                            <p className="text-xs text-muted-foreground line-clamp-2">{d.reason}</p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {format(new Date(d.created_at), "MMM d, yyyy")}
+                              {d.amount && ` · ${Number(d.amount).toLocaleString()} ${d.currency_code || ""}`}
+                            </p>
+                          </div>
+                          <div className="flex flex-col items-end gap-1 shrink-0">
+                            <Badge variant="outline" className={statusColor(d.status)}>{d.status}</Badge>
+                            <Badge variant="outline" className="text-xs">{d.priority}</Badge>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4" /> Compliance alerts ({alerts.length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {alerts.length === 0 ? (
+                    <p className="text-sm text-muted-foreground py-6 text-center">No alerts triggered</p>
+                  ) : (
+                    <ul className="space-y-3">
+                      {alerts.map((a: any) => (
+                        <li key={a.id} className="flex items-center justify-between gap-2 border-b border-border/40 pb-2 last:border-0">
+                          <div className="min-w-0">
+                            <div className="text-sm font-medium capitalize">{a.status}</div>
+                            <p className="text-xs text-muted-foreground">
+                              {format(new Date(a.created_at), "MMM d, yyyy HH:mm")}
+                            </p>
+                          </div>
+                          <Badge variant="outline" className={statusColor(a.severity === "high" ? "rejected" : a.severity === "medium" ? "pending" : "active")}>
+                            {a.severity}
+                          </Badge>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
         </Tabs>
       </div>
     </AdminLayout>
