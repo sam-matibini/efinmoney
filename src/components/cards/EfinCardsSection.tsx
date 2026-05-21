@@ -14,6 +14,7 @@ const EfinCardsSection = () => {
   const navigate = useNavigate();
   const { data: cards, isLoading } = useIssuedCards();
   const { tier } = useKyc();
+  const { data: profile } = useProfile();
   const [open, setOpen] = useState(false);
 
   const tierOk = tier?.current_tier === "tier_3" || tier?.current_tier === "tier_4";
