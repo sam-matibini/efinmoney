@@ -137,8 +137,19 @@ const TransfersListPage = () => {
     return items;
   }, [rows, filter, direction, search, from, to]);
 
-  const totalIn = filtered.filter((r) => r.direction === "in" && r.status === "completed").reduce((s, r) => s + r.amount, 0);
-  const totalOut = filtered.filter((r) => r.direction === "out" && r.status === "completed").reduce((s, r) => s + r.amount, 0);
+  const sumByCurrency = (items: Row[]) =>
+    items.reduce<Record<string, number>>((acc, r) => {
+      const c = (r.currency || "USD").toUpperCase();
+      acc[c] = (acc[c] || 0) + r.amount;
+      return acc;
+    }, {});
+  const totalsIn = sumByCurrency(filtered.filter((r) => r.direction === "in" && r.status === "completed"));
+  const totalsOut = sumByCurrency(filtered.filter((r) => r.direction === "out" && r.status === "completed"));
+  const renderTotals = (totals: Record<string, number>, sign: "+" | "-") => {
+    const entries = Object.entries(totals).sort((a, b) => b[1] - a[1]);
+    if (entries.length === 0) return `${sign}${fmt(0)}`;
+    return entries.map(([c, v]) => `${sign}${currencySymbol(c)}${fmt(v)}`).join("  ");
+  };
 
   // Group by date
   const groups = useMemo(() => {
