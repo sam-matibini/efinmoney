@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown, ArrowRight, MapPin } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -7,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useWallets } from "@/hooks/useWallets";
 import { useFxRates } from "@/hooks/useFxRates";
+import { fetchFxRate } from "@/lib/flutterwave";
 import { toast } from "sonner";
 
 const targetCountries = [
@@ -19,11 +21,6 @@ const targetCountries = [
   { code: 'RWF', country: 'Rwanda', flag: '🇷🇼', method: 'MTN Mobile' },
   { code: 'USD', country: 'United States', flag: '🇺🇸', method: 'Bank Transfer' },
 ];
-
-const fallbackRates: Record<string, number> = {
-  KES: 153.45, UGX: 3742.50, TZS: 2505.00, ZMW: 26.85,
-  NGN: 1580.00, GHS: 15.20, RWF: 1320.00, CAD: 1.36, USD: 1,
-};
 
 interface SendMoneyModalProps {
   children: React.ReactNode;
@@ -51,13 +48,25 @@ const SendMoneyModal = ({ children }: SendMoneyModalProps) => {
   const targetCountry =
     targetCountries.find(c => c.code === effectiveTargetCode) ?? targetCountries[0];
 
+  const isSameCurrency = sourceCode === targetCountry.code;
   const fxRate = fxRates?.find(
     r => r.from_currency === selectedWallet?.currency_code && r.to_currency === targetCountry.code
   );
-  const effectiveRate = fxRate ? Number(fxRate.effective_rate) : (fallbackRates[targetCountry.code] ?? 1);
+  const { data: derivedFxRate } = useQuery({
+    queryKey: ["quick-send-fx-rate", sourceCode, targetCountry.code],
+    queryFn: () => fetchFxRate(sourceCode ?? "", targetCountry.code),
+    enabled: !isSameCurrency && !fxRate && !!sourceCode && !!targetCountry.code,
+    staleTime: 60_000,
+  });
+  const effectiveRate = isSameCurrency
+    ? 1
+    : fxRate
+      ? Number(fxRate.effective_rate)
+      : Number(derivedFxRate || 0);
+  const rateAvailable = isSameCurrency || !!fxRate || !!derivedFxRate;
 
   const parsedAmount = parseFloat(amount) || 0;
-  const receivedAmount = parsedAmount > 0 ? parsedAmount * effectiveRate : 0;
+  const receivedAmount = parsedAmount > 0 && rateAvailable ? parsedAmount * effectiveRate : 0;
 
   const fmt = (n: number) =>
     new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
@@ -207,12 +216,20 @@ const SendMoneyModal = ({ children }: SendMoneyModalProps) => {
                   )}
                 </div>
                 <div className="flex-1 px-4 py-3 rounded-xl bg-muted">
-                  <p className="text-2xl font-display font-bold text-foreground">{fmt(receivedAmount)}</p>
+                  <p className="text-2xl font-display font-bold text-foreground">
+                    {rateAvailable ? fmt(receivedAmount) : "Rate unavailable"}
+                  </p>
                 </div>
               </div>
               <p className="text-sm text-muted-foreground">
-                Rate: 1 {selectedWallet?.currency_code || 'USD'} = {fmt(effectiveRate)} {targetCountry.code}
-                {!fxRate && <span className="ml-1 text-amber-500">(indicative)</span>}
+                {rateAvailable ? (
+                  <>
+                    Rate: 1 {selectedWallet?.currency_code || 'USD'} = {fmt(effectiveRate)} {targetCountry.code}
+                    {!isSameCurrency && !fxRate && <span className="ml-1 text-amber-500">(indicative)</span>}
+                  </>
+                ) : (
+                  "Live exchange rate unavailable"
+                )}
               </p>
             </div>
 
