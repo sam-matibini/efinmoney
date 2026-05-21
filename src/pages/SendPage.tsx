@@ -36,6 +36,7 @@ import { toast } from "sonner";
 import { ArrowRight, CheckCircle, Users, Clock, Shield, Wallet, Landmark, CreditCard, AlertCircle, X, Search } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import CanadaSendFlow from "@/components/send/CanadaSendFlow";
+import EfinmoneyP2PFlow from "@/components/send/EfinmoneyP2PFlow";
 import AnimatedNumber from "@/components/ui/AnimatedNumber";
 import AnimatedCheck from "@/components/ui/AnimatedCheck";
 import ParticleBurst from "@/components/ui/ParticleBurst";
