@@ -31,6 +31,7 @@ const VirtualCardVisual = ({
   expMonth,
   expYear,
   small = false,
+  tapToPay = true,
 }: VirtualCardVisualProps) => {
   const dimmed = status !== "active";
   return (
@@ -47,11 +48,16 @@ const VirtualCardVisual = ({
         <div className="flex items-start justify-between">
           <div>
             <div className="text-[10px] uppercase tracking-widest opacity-70">eFinMoney</div>
-            <div className="text-sm font-semibold mt-0.5 truncate max-w-[12rem]">{nickname || "Virtual Card"}</div>
+            <div className="text-sm font-semibold mt-0.5 truncate max-w-[12rem]">{nickname || "eFinVisa"}</div>
           </div>
-          <span className="text-[10px] uppercase px-2 py-0.5 bg-white/10 rounded-full backdrop-blur">
-            {status}
-          </span>
+          <div className="flex items-center gap-2">
+            {tapToPay && !dimmed && (
+              <Wifi className="w-4 h-4 rotate-90 opacity-90" aria-label="Tap to pay enabled" />
+            )}
+            <span className="text-[10px] uppercase px-2 py-0.5 bg-white/10 rounded-full backdrop-blur">
+              {status}
+            </span>
+          </div>
         </div>
         <div>
           <div className="flex items-center gap-2 text-lg tracking-widest">
@@ -71,7 +77,7 @@ const VirtualCardVisual = ({
           </div>
           <div className="text-right">
             <div className="opacity-60">{currency}</div>
-            <div className="uppercase font-bold tracking-wider">{brand}</div>
+            <div className="uppercase font-bold tracking-wider">eFinVisa</div>
           </div>
           <CreditCard className="w-6 h-6 opacity-80" />
         </div>
