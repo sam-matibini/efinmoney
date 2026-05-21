@@ -12,6 +12,8 @@ export interface StatementMeta {
   subtitle?: string;
   accountHolder?: string;
   accountEmail?: string;
+  accountNumber?: string;
+  efinTag?: string;
   periodFrom?: string;
   periodTo?: string;
   currency?: string; // when single-wallet
