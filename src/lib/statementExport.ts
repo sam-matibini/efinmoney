@@ -85,6 +85,9 @@ export const downloadXLSX = (rows: StatementRow[], meta: StatementMeta) => {
     [meta.title],
     meta.subtitle ? [meta.subtitle] : [],
     meta.accountHolder ? ["Account holder", meta.accountHolder] : [],
+    meta.accountNumber ? ["Account number", meta.accountNumber] : [],
+    meta.efinTag ? ["eFin tag", meta.efinTag.startsWith("@") ? meta.efinTag : "@" + meta.efinTag] : [],
+    meta.accountEmail ? ["Email", meta.accountEmail] : [],
     meta.periodFrom || meta.periodTo
       ? ["Period", `${meta.periodFrom || "—"} to ${meta.periodTo || "—"}`]
       : [],
