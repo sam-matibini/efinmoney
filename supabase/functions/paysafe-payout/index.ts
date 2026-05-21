@@ -216,12 +216,11 @@ Deno.serve(async (req) => {
       const rawTransit = (rawParts[1] || "").replace(/\D/g, "");
       const accountNumber = String(rawParts[2] || "").replace(/\D/g, "");
       if (!rawInstitution || !rawTransit || !accountNumber) {
-        await supabase.from("transfers").update({
-          status: "failed",
-          failure_reason: "Invalid Canadian Bank details. Please check your Institution and Transit numbers.",
-        }).eq("id", transfer.id);
-        return new Response(JSON.stringify({ error: "Invalid Canadian Bank details. Please check your Institution and Transit numbers." }), {
-          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        const reason = "The Canadian bank details look incorrect. Your money has been returned. Please double-check the institution, transit, and account numbers.";
+        const refunded = await refundWallet(supabase, transfer, reason);
+        await supabase.from("transfers").update({ status: "failed", failure_reason: reason }).eq("id", transfer.id);
+        return new Response(JSON.stringify({ success: false, error: reason, refunded }), {
+          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       const institutionId = rawInstitution.padStart(3, "0");
