@@ -201,7 +201,7 @@ export const useIssuedCardMutations = () => {
           description: "We need your full name and billing address (street, city, postal code) before issuing a Visa/Mastercard.",
           action: {
             label: "Open Profile Settings",
-            onClick: () => { window.location.href = "/settings/profile"; },
+            onClick: () => { window.location.href = "/profile"; },
           },
           duration: 10000,
         });
