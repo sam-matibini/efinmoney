@@ -65,7 +65,7 @@ const SendMoneyModal = ({ children }: SendMoneyModalProps) => {
   const reset = () => {
     setAmount("");
     setSelectedWalletId(null);
-    setTargetCountry(targetCountries[0]);
+    setTargetCountryCode(null);
   };
 
   const goToDomestic = () => {
