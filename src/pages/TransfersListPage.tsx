@@ -115,7 +115,7 @@ const TransfersListPage = () => {
       .map((e: any) => ({
         id: `l-${e.id}`,
         direction: "in",
-        recipientOrSource: e.description || INCOMING_LABELS[e.reference_type] || "Incoming",
+        recipientOrSource: cleanDescription(e.description, e.reference_type),
         amount: Number(e.credit_amount),
         currency: e.currency_code,
         status: "completed",
