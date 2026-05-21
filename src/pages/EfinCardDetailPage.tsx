@@ -107,6 +107,7 @@ const EfinCardDetailPage = () => {
               status={card.status}
               expMonth={card.exp_month}
               expYear={card.exp_year}
+              tapToPay={tapToPay}
             />
             {isSandbox && (
               <p className="text-[11px] text-amber-500 mt-2 text-center">Test card — Stripe Issuing pending enablement</p>
@@ -114,7 +115,14 @@ const EfinCardDetailPage = () => {
           </div>
 
           <div className="flex-1 space-y-2 w-full">
-            <h1 className="text-xl font-display font-bold">{card.nickname || "Virtual Card"}</h1>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-xl font-display font-bold">{card.nickname || "eFinVisa"}</h1>
+              {tapToPay && card.status === "active" && (
+                <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                  <Wifi className="w-3 h-3 rotate-90" /> Tap to pay
+                </span>
+              )}
+            </div>
             <p className="text-sm text-muted-foreground">{card.currency} · {card.purpose} · {card.status}</p>
 
             <div className="flex flex-wrap gap-2 mt-3">
@@ -139,6 +147,17 @@ const EfinCardDetailPage = () => {
                 </Button>
               )}
             </div>
+
+            {tapToPay && card.status === "active" && (
+              <div className="flex flex-wrap gap-2 pt-2">
+                <Button size="sm" variant="secondary" onClick={() => handleAddToWallet("apple")}>
+                  <Smartphone className="w-4 h-4 mr-2" /> Add to Apple Pay
+                </Button>
+                <Button size="sm" variant="secondary" onClick={() => handleAddToWallet("google")}>
+                  <Smartphone className="w-4 h-4 mr-2" /> Add to Google Pay
+                </Button>
+              </div>
+            )}
 
             {reveal && (
               <div className="mt-3 p-3 rounded-lg bg-muted text-sm font-mono">
