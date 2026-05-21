@@ -31,6 +31,7 @@ import DepositComplete from "./pages/DepositComplete";
 import PaymentCallback from "./pages/PaymentCallback";
 import TransferTrackingPage from "./pages/TransferTrackingPage";
 import TransfersListPage from "./pages/TransfersListPage";
+import WalletStatementPage from "./pages/WalletStatementPage";
 import TransactionDetailPage from "./pages/TransactionDetailPage";
 import ContactsPage from "./pages/ContactsPage";
 import CanadaTransferPage from "./pages/CanadaTransferPage";
@@ -164,6 +165,7 @@ const AppRoutes = () => {
           <Route path="/privacy" element={<PrivacyPolicyPage />} />
           <Route path="/dashboard" element={<KycProtectedRoute><Index /></KycProtectedRoute>} />
           <Route path="/wallets" element={<KycProtectedRoute><WalletsPage /></KycProtectedRoute>} />
+          <Route path="/wallets/:walletId/statement" element={<KycProtectedRoute><WalletStatementPage /></KycProtectedRoute>} />
           <Route path="/send" element={<KycProtectedRoute><SendPage /></KycProtectedRoute>} />
           <Route path="/exchange" element={<KycProtectedRoute><ExchangePage /></KycProtectedRoute>} />
           <Route path="/cards" element={<KycProtectedRoute><CardsPage /></KycProtectedRoute>} />
