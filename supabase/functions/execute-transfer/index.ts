@@ -270,9 +270,10 @@ Deno.serve(async (req) => {
       PAWAPAY_COUNTRIES.has(recipientCountry);
     const useMtnMomo =
       !usePawapay &&
-
+      (payload.use_mtn_momo === true || transfer.use_mtn_momo === true) &&
       isMobileMoneyMethod &&
       MTN_COUNTRIES.has(recipientCountry);
+
     const useStellar =
       !useMtnMomo && !isZambia &&
       (payload.use_stellar === true || transfer.use_stellar === true) &&
@@ -281,7 +282,17 @@ Deno.serve(async (req) => {
     try {
       const isCanada = transfer.transfer_type === "domestic_canada" || transfer.recipient_country === "CA";
 
-      if (useMtnMomo) {
+      if (usePawapay) {
+        const res = await fetch(
+          `${Deno.env.get("SUPABASE_URL")}/functions/v1/pawapay-payout`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ transfer_id }),
+          },
+        );
+        payoutResult = await res.json();
+      } else if (useMtnMomo) {
         const res = await fetch(
           `${Deno.env.get("SUPABASE_URL")}/functions/v1/mtn-momo-payout`,
           {
@@ -291,6 +302,7 @@ Deno.serve(async (req) => {
           },
         );
         payoutResult = await res.json();
+
       } else if (isZambia) {
         const res = await fetch(
           `${Deno.env.get("SUPABASE_URL")}/functions/v1/elicate-payout`,
