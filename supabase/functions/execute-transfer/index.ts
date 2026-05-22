@@ -254,6 +254,9 @@ Deno.serve(async (req) => {
     // African corridors (NG/KE/ZM); Flutterwave for the rest.
     const STELLAR_COUNTRIES = new Set(["NG", "KE", "ZM"]);
     const MTN_COUNTRIES = new Set(["GH", "UG", "ZM"]);
+    const PAWAPAY_COUNTRIES = new Set([
+      "SN","CM","CI","BF","BJ","KE","UG","TZ","RW","ZM","GH","MW",
+    ]);
     const recipientCountry = (transfer.recipient_country ?? "").toUpperCase();
     const isZambia =
       (transfer.target_currency ?? "").toUpperCase() === "ZMW" ||
@@ -261,10 +264,16 @@ Deno.serve(async (req) => {
     const isMobileMoneyMethod =
       (transfer.payout_method ?? "").toLowerCase().includes("mobile") ||
       ["mtn_mobile", "airtel_money", "mpesa", "vodafone_cash", "tigo_pesa"].includes(transfer.payout_method);
+    const usePawapay =
+      (payload.use_pawapay === true || transfer.use_pawapay === true) &&
+      isMobileMoneyMethod &&
+      PAWAPAY_COUNTRIES.has(recipientCountry);
     const useMtnMomo =
+      !usePawapay &&
       (payload.use_mtn_momo === true || transfer.use_mtn_momo === true) &&
       isMobileMoneyMethod &&
       MTN_COUNTRIES.has(recipientCountry);
+
     const useStellar =
       !useMtnMomo && !isZambia &&
       (payload.use_stellar === true || transfer.use_stellar === true) &&
@@ -273,7 +282,17 @@ Deno.serve(async (req) => {
     try {
       const isCanada = transfer.transfer_type === "domestic_canada" || transfer.recipient_country === "CA";
 
-      if (useMtnMomo) {
+      if (usePawapay) {
+        const res = await fetch(
+          `${Deno.env.get("SUPABASE_URL")}/functions/v1/pawapay-payout`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ transfer_id }),
+          },
+        );
+        payoutResult = await res.json();
+      } else if (useMtnMomo) {
         const res = await fetch(
           `${Deno.env.get("SUPABASE_URL")}/functions/v1/mtn-momo-payout`,
           {
@@ -283,6 +302,7 @@ Deno.serve(async (req) => {
           },
         );
         payoutResult = await res.json();
+
       } else if (isZambia) {
         const res = await fetch(
           `${Deno.env.get("SUPABASE_URL")}/functions/v1/elicate-payout`,

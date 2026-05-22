@@ -41,3 +41,7 @@ verify_jwt = false
 
 [functions.stripe-issuing-webhook]
 verify_jwt = false
+
+[functions.pawapay-webhook]
+verify_jwt = false
+
