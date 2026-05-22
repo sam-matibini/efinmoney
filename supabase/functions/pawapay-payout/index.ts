@@ -7,8 +7,9 @@ const corsHeaders = {
 
 // Map ISO country + currency -> PawaPay correspondent (MNO) token.
 // Default values picked per PawaPay's standard correspondent list. Extend as needed.
-function resolveCorrespondent(country: string, currency: string, payoutMethod?: string | null): string {
+function resolveCorrespondent(country: string, currency: string, payoutMethod?: string | null, countryHint?: string | null): string {
   const c = (country || "").toUpperCase();
+  const hint = (countryHint || "").trim().toUpperCase();
   const m = (payoutMethod || "").toUpperCase();
 
   const table: Record<string, Record<string, string>> = {
@@ -26,7 +27,20 @@ function resolveCorrespondent(country: string, currency: string, payoutMethod?: 
     MW: { AIRTEL: "AIRTEL_OAPI_MWI", TNM: "TNM_MWI", DEFAULT: "AIRTEL_OAPI_MWI" },
   };
 
-  const entry = table[c];
+  const currencyFallback: Record<string, string> = {
+    KES: "KE",
+    UGX: "UG",
+    TZS: "TZ",
+    RWF: "RW",
+    ZMW: "ZM",
+    GHS: "GH",
+    MWK: "MW",
+    XOF: hint === "SENEGAL" ? "SN" : hint === "IVORY COAST" ? "CI" : hint === "BENIN" ? "BJ" : hint === "BURKINA FASO" ? "BF" : "",
+    XAF: hint === "CAMEROON" ? "CM" : "",
+  };
+
+  const normalizedCountry = c || currencyFallback[(currency || "").toUpperCase()] || "";
+  const entry = table[normalizedCountry];
   if (!entry) throw new Error(`PawaPay: unsupported country ${c}`);
   return entry[m] || entry.DEFAULT;
 }
@@ -47,7 +61,7 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json().catch(() => ({}));
-    const { transfer_id } = body;
+    const { transfer_id, recipient_country_hint } = body;
     if (!transfer_id) {
       return new Response(JSON.stringify({ success: false, error: "transfer_id required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -70,6 +84,7 @@ Deno.serve(async (req) => {
       transfer.recipient_country,
       transfer.target_currency,
       transfer.payout_method,
+      typeof recipient_country_hint === "string" ? recipient_country_hint : null,
     );
 
     const payoutId = crypto.randomUUID();
