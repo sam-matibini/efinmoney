@@ -17,7 +17,7 @@ Deno.serve(async (req) => {
 
   try {
     const payload = await req.json().catch(() => ({}));
-    console.log("PawaPay webhook received:", JSON.stringify(payload));
+    console.log("WEBHOOK RECEIVED:", JSON.stringify(payload));
 
     const providerRef: string | undefined =
       payload.payoutId || payload.depositId || payload.refundId;

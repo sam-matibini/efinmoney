@@ -85,28 +85,64 @@ Deno.serve(async (req) => {
       statementDescription: `eFinMoney ${transfer_id.slice(0, 8)}`.slice(0, 22),
     };
 
-    const baseUrl = Deno.env.get("PAWAPAY_BASE_URL") || "https://api.pawapay.io";
-    const res = await fetch(`${baseUrl}/payouts`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
+    const baseUrl = Deno.env.get("PAWAPAY_BASE_URL") || "https://api.sandbox.pawapay.cloud";
+    const url = `${baseUrl}/v1/payouts`;
+    console.log("PAWAPAY REQUEST:", JSON.stringify({ url, payload }));
 
-    const data = await res.json().catch(() => ({}));
-    console.log("PawaPay payout response:", res.status, data);
-
-    const status = (data?.status || "").toUpperCase();
-    if (!res.ok || status === "REJECTED" || status === "FAILED") {
-      const reason = data?.rejectionReason?.rejectionMessage || data?.failureReason?.failureMessage || data?.errorMessage || `HTTP ${res.status}`;
+    let res: Response;
+    let responseBody = "";
+    let data: Record<string, unknown> = {};
+    try {
+      res = await fetch(url, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+      responseBody = await res.text();
+      console.log("PAWAPAY RESPONSE:", res.status, responseBody);
+      try { data = responseBody ? JSON.parse(responseBody) : {}; } catch { data = {}; }
+    } catch (fetchErr) {
+      const msg = fetchErr instanceof Error ? fetchErr.message : "fetch failed";
+      console.error("PAWAPAY FETCH ERROR:", msg);
       await supabase.from("transfers").update({
         status: "failed",
-        failure_reason: `PawaPay: ${reason}`,
+        failure_reason: `PawaPay network error: ${msg}`.slice(0, 500),
         provider_reference: payoutId,
       }).eq("id", transfer_id);
-      return new Response(JSON.stringify({ success: false, error: reason, payoutId }),
+      return new Response(JSON.stringify({ success: false, error: msg, payoutId }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const okStatuses = [200, 201, 202];
+    const apiStatus = (typeof (data as { status?: unknown })?.status === "string"
+      ? (data as { status: string }).status
+      : "").toUpperCase();
+    const isApiOk = okStatuses.includes(res.status);
+    const isStatusFailure = apiStatus === "REJECTED" || apiStatus === "FAILED" || apiStatus === "DUPLICATE_IGNORED";
+
+    if (!isApiOk || isStatusFailure) {
+      const d = data as {
+        rejectionReason?: { rejectionMessage?: string };
+        failureReason?: { failureMessage?: string };
+        errorMessage?: string;
+        message?: string;
+      };
+      const reason =
+        d?.rejectionReason?.rejectionMessage ||
+        d?.failureReason?.failureMessage ||
+        d?.errorMessage ||
+        d?.message ||
+        responseBody ||
+        `HTTP ${res.status}`;
+      await supabase.from("transfers").update({
+        status: "failed",
+        failure_reason: `PawaPay: ${reason}`.slice(0, 500),
+        provider_reference: payoutId,
+      }).eq("id", transfer_id);
+      return new Response(JSON.stringify({ success: false, error: reason, payoutId, http_status: res.status }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
@@ -115,7 +151,7 @@ Deno.serve(async (req) => {
       provider_reference: payoutId,
     }).eq("id", transfer_id);
 
-    return new Response(JSON.stringify({ success: true, payoutId, status: data?.status || "ACCEPTED" }),
+    return new Response(JSON.stringify({ success: true, payoutId, status: apiStatus || "ACCEPTED" }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (err) {
     console.error("pawapay-payout error:", err);
