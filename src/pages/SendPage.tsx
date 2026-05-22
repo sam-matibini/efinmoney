@@ -469,7 +469,7 @@ const SendPage = () => {
         let data: any = null;
         let invokeErr: any = null;
         try {
-          const res = await supabase.functions.invoke('execute-transfer', { body: { transfer_id: tid, use_stellar: isNGNBank && useStellar, use_pawapay: !isBankPayout && usePawapay } });
+          const res = await supabase.functions.invoke('execute-transfer', { body: { transfer_id: tid, use_stellar: isNGNBank && useStellar, use_pawapay: !isBankPayout && usePawapay, recipient_country_hint: targetCountry.country } });
           data = res.data;
           invokeErr = res.error;
         } catch (err) {
@@ -613,7 +613,7 @@ const SendPage = () => {
 
     // Step C: trigger payout via Flutterwave
     try {
-      const { data, error } = await supabase.functions.invoke('execute-transfer', { body: { transfer_id: tid, use_stellar: isNGNBank && useStellar, use_pawapay: !isBankPayout && usePawapay } });
+      const { data, error } = await supabase.functions.invoke('execute-transfer', { body: { transfer_id: tid, use_stellar: isNGNBank && useStellar, use_pawapay: !isBankPayout && usePawapay, recipient_country_hint: targetCountry.country } });
       if (error || (data as any)?.error) throw new Error((data as any)?.error || error?.message || 'Payout failed');
       const payout = (data as any)?.payout;
       if (payout && payout.success === false) throw new Error(payout.error || 'Payout failed');

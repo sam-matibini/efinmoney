@@ -43,6 +43,44 @@ function resolveNetwork(payoutMethod: string | null | undefined, currency: strin
   return CURRENCY_DEFAULT_NETWORK[currency] || "mpesa";
 }
 
+const PAWAPAY_SUPPORTED_COUNTRY_HINTS = new Set([
+  "SENEGAL", "CAMEROON", "IVORY COAST", "BURKINA FASO", "BENIN",
+  "KENYA", "UGANDA", "TANZANIA", "RWANDA", "ZAMBIA", "GHANA", "MALAWI",
+]);
+
+const PAWAPAY_SUPPORTED_COUNTRY_CODES = new Set([
+  "SN", "CM", "CI", "BF", "BJ", "KE", "UG", "TZ", "RW", "ZM", "GH", "MW",
+]);
+
+const PAWAPAY_SUPPORTED_CURRENCIES = new Set(["KES", "UGX", "TZS", "RWF", "ZMW", "GHS", "MWK"]);
+
+function isMobileMoneyPayoutMethod(payoutMethod: string | null | undefined): boolean {
+  const method = (payoutMethod ?? "").toLowerCase();
+  return method.includes("mobile") || [
+    "mtn_mobile",
+    "airtel_money",
+    "zamtel_money",
+    "mpesa",
+    "vodafone_cash",
+    "vodafone_money",
+    "tigo_pesa",
+    "airteltigo_money",
+    "mobile_money",
+  ].includes(method);
+}
+
+function isPawapayEligible(
+  recipientCountry: string,
+  targetCurrency: string,
+  payoutMethod: string | null | undefined,
+  recipientCountryHint?: string | null,
+): boolean {
+  const hint = (recipientCountryHint ?? "").trim().toUpperCase();
+  if (PAWAPAY_SUPPORTED_COUNTRY_HINTS.has(hint)) return true;
+  if (PAWAPAY_SUPPORTED_COUNTRY_CODES.has(recipientCountry)) return true;
+  return isMobileMoneyPayoutMethod(payoutMethod) && PAWAPAY_SUPPORTED_CURRENCIES.has(targetCurrency);
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -254,20 +292,20 @@ Deno.serve(async (req) => {
     // African corridors (NG/KE/ZM); Flutterwave for the rest.
     const STELLAR_COUNTRIES = new Set(["NG", "KE", "ZM"]);
     const MTN_COUNTRIES = new Set(["GH", "UG", "ZM"]);
-    const PAWAPAY_COUNTRIES = new Set([
-      "SN","CM","CI","BF","BJ","KE","UG","TZ","RW","ZM","GH","MW",
-    ]);
     const recipientCountry = (transfer.recipient_country ?? "").toUpperCase();
+    const targetCurrency = (transfer.target_currency ?? "").toUpperCase();
+    const recipientCountryHint = typeof payload.recipient_country_hint === "string"
+      ? payload.recipient_country_hint
+      : null;
     const isZambia =
-      (transfer.target_currency ?? "").toUpperCase() === "ZMW" ||
-      recipientCountry === "ZM";
-    const isMobileMoneyMethod =
-      (transfer.payout_method ?? "").toLowerCase().includes("mobile") ||
-      ["mtn_mobile", "airtel_money", "mpesa", "vodafone_cash", "tigo_pesa"].includes(transfer.payout_method);
+      targetCurrency === "ZMW" ||
+      recipientCountry === "ZM" ||
+      (recipientCountryHint ?? "").trim().toUpperCase() === "ZAMBIA";
+    const isMobileMoneyMethod = isMobileMoneyPayoutMethod(transfer.payout_method);
     const usePawapay =
       (payload.use_pawapay === true || transfer.use_pawapay === true) &&
       isMobileMoneyMethod &&
-      PAWAPAY_COUNTRIES.has(recipientCountry);
+      isPawapayEligible(recipientCountry, targetCurrency, transfer.payout_method, recipientCountryHint);
     const useMtnMomo =
       !usePawapay &&
       (payload.use_mtn_momo === true || transfer.use_mtn_momo === true) &&
@@ -288,7 +326,7 @@ Deno.serve(async (req) => {
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ transfer_id }),
+            body: JSON.stringify({ transfer_id, recipient_country_hint: recipientCountryHint }),
           },
         );
         payoutResult = await res.json();
