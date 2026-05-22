@@ -39,9 +39,11 @@ function resolveCorrespondent(country: string, currency: string, payoutMethod?: 
     XAF: hint === "CAMEROON" ? "CM" : "",
   };
 
-  const normalizedCountry = c || currencyFallback[(currency || "").toUpperCase()] || "";
+  const normalizedCountry = table[c]
+    ? c
+    : currencyFallback[(currency || "").toUpperCase()] || "";
   const entry = table[normalizedCountry];
-  if (!entry) throw new Error(`PawaPay: unsupported country ${c}`);
+  if (!entry) throw new Error(`PawaPay: unsupported country ${normalizedCountry || c || "unknown"}`);
   return entry[m] || entry.DEFAULT;
 }
 
