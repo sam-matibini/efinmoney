@@ -254,6 +254,9 @@ Deno.serve(async (req) => {
     // African corridors (NG/KE/ZM); Flutterwave for the rest.
     const STELLAR_COUNTRIES = new Set(["NG", "KE", "ZM"]);
     const MTN_COUNTRIES = new Set(["GH", "UG", "ZM"]);
+    const PAWAPAY_COUNTRIES = new Set([
+      "SN","CM","CI","BF","BJ","KE","UG","TZ","RW","ZM","GH","MW",
+    ]);
     const recipientCountry = (transfer.recipient_country ?? "").toUpperCase();
     const isZambia =
       (transfer.target_currency ?? "").toUpperCase() === "ZMW" ||
@@ -261,8 +264,13 @@ Deno.serve(async (req) => {
     const isMobileMoneyMethod =
       (transfer.payout_method ?? "").toLowerCase().includes("mobile") ||
       ["mtn_mobile", "airtel_money", "mpesa", "vodafone_cash", "tigo_pesa"].includes(transfer.payout_method);
+    const usePawapay =
+      (payload.use_pawapay === true || transfer.use_pawapay === true) &&
+      isMobileMoneyMethod &&
+      PAWAPAY_COUNTRIES.has(recipientCountry);
     const useMtnMomo =
-      (payload.use_mtn_momo === true || transfer.use_mtn_momo === true) &&
+      !usePawapay &&
+
       isMobileMoneyMethod &&
       MTN_COUNTRIES.has(recipientCountry);
     const useStellar =
