@@ -103,6 +103,8 @@ const SendPage = () => {
   const [ngnResolvedName, setNgnResolvedName] = useState<string | null>(null);
   const [ngnResolveError, setNgnResolveError] = useState<string | null>(null);
   const [useStellar, setUseStellar] = useState<boolean>(false);
+  const [usePawapay, setUsePawapay] = useState<boolean>(false);
+
   // Ghana bank payout state (toggle between Mobile Money and Bank Transfer)
   const [ghPayoutMode, setGhPayoutMode] = useState<'mobile' | 'bank'>('mobile');
   const [ghBanks, setGhBanks] = useState<Array<{ code: string; name: string }>>([]);
@@ -467,7 +469,7 @@ const SendPage = () => {
         let data: any = null;
         let invokeErr: any = null;
         try {
-          const res = await supabase.functions.invoke('execute-transfer', { body: { transfer_id: tid, use_stellar: isNGNBank && useStellar } });
+          const res = await supabase.functions.invoke('execute-transfer', { body: { transfer_id: tid, use_stellar: isNGNBank && useStellar, use_pawapay: !isBankPayout && usePawapay } });
           data = res.data;
           invokeErr = res.error;
         } catch (err) {
@@ -611,7 +613,7 @@ const SendPage = () => {
 
     // Step C: trigger payout via Flutterwave
     try {
-      const { data, error } = await supabase.functions.invoke('execute-transfer', { body: { transfer_id: tid, use_stellar: isNGNBank && useStellar } });
+      const { data, error } = await supabase.functions.invoke('execute-transfer', { body: { transfer_id: tid, use_stellar: isNGNBank && useStellar, use_pawapay: !isBankPayout && usePawapay } });
       if (error || (data as any)?.error) throw new Error((data as any)?.error || error?.message || 'Payout failed');
       const payout = (data as any)?.payout;
       if (payout && payout.success === false) throw new Error(payout.error || 'Payout failed');
@@ -1487,6 +1489,7 @@ const SendPage = () => {
                                         </motion.div>
                                       </>
                                     ) : (
+                                      <>
                                       <motion.div custom={2} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
                                         <Label>Mobile Money Number</Label>
                                         <Input
@@ -1499,7 +1502,27 @@ const SendPage = () => {
                                           Funds will be sent via {effectiveMethodLabel}
                                         </p>
                                       </motion.div>
+                                      <motion.div custom={2.5} variants={fieldVariants} initial="hidden" animate="show" className="rounded-xl border border-emerald-500/30 bg-gradient-to-br from-emerald-500/5 via-background to-emerald-500/5 p-4">
+                                        <div className="flex items-start justify-between gap-3">
+                                          <div className="flex-1">
+                                            <div className="flex items-center gap-2">
+                                              <span className="text-sm font-medium">🟢 Send via PawaPay (Beta)</span>
+                                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-500 font-mono uppercase">Beta</span>
+                                            </div>
+                                            <p className="text-xs text-muted-foreground mt-1">
+                                              Route this mobile money payout through PawaPay's pan-African network instead of the default provider. Supports SN, CM, CI, BF, BJ, KE, UG, TZ, RW, ZM, GH, MW.
+                                            </p>
+                                          </div>
+                                          <Switch
+                                            checked={usePawapay}
+                                            onCheckedChange={setUsePawapay}
+                                            aria-label="Use PawaPay network"
+                                          />
+                                        </div>
+                                      </motion.div>
+                                      </>
                                     )}
+
 
                                     <motion.div custom={3} variants={fieldVariants} initial="hidden" animate="show" className="flex gap-3">
                                       <Button variant="outline" className="flex-1" onClick={() => goToStep(1)}>Back</Button>
