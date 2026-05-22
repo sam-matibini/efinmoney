@@ -75,17 +75,9 @@ Deno.serve(async (req) => {
         if (pawapayAcc && payableEntry) {
           const journalId = crypto.randomUUID();
           const amount = Number(transfer.target_amount);
+          // DR Payable (clears the liability set up at funding time)
+          // CR PawaPay Settlement 1207 (reduces the asset — cash sent out via PawaPay)
           const entries = [
-            {
-              journal_id: journalId,
-              account_id: pawapayAcc.id,
-              currency_code: transfer.target_currency,
-              debit_amount: amount,
-              credit_amount: 0,
-              description: `PawaPay payout settled (${providerRef})`,
-              reference_type: "transfer_settlement",
-              reference_id: transfer.id,
-            },
             {
               journal_id: journalId,
               account_id: payableEntry.account_id,
@@ -96,24 +88,22 @@ Deno.serve(async (req) => {
               reference_type: "transfer_settlement",
               reference_id: transfer.id,
             },
+            {
+              journal_id: journalId,
+              account_id: pawapayAcc.id,
+              currency_code: transfer.target_currency,
+              debit_amount: 0,
+              credit_amount: amount,
+              description: `PawaPay payout settled (${providerRef})`,
+              reference_type: "transfer_settlement",
+              reference_id: transfer.id,
+            },
           ];
-          // The pair above is unbalanced on purpose if read alone — fix: second line should credit not debit.
-          entries[1].debit_amount = 0;
-          entries[1].credit_amount = amount;
-
-          // Actually the correct double entry to clear the payable and recognize
-          // PawaPay receivable is: DR PawaPay 1207, CR Payable (already done above).
-          // The earlier funding journal credited the payable; we now debit it.
-          entries[1].debit_amount = amount;
-          entries[1].credit_amount = 0;
-          entries[0].debit_amount = 0;
-          entries[0].credit_amount = amount;
-          // Final: DR Payable / CR PawaPay 1207 — payable cleared, PawaPay records
-          // the cash-out (asset reduction reflecting external settlement).
 
           const { error: leErr } = await supabase.from("ledger_entries").insert(entries);
           if (leErr) console.error("Settlement ledger insert error:", leErr);
         }
+
       }
 
       await supabase.from("transfers").update({
