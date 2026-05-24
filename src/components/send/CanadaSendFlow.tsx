@@ -56,6 +56,9 @@ const elementWrapperClass =
 type DeliveryMethod = "interac" | "eft" | "card_push";
 type FundingSource = "wallet" | "card";
 
+// Feature flag: flip to false instantly if Paysafe Interac e-Transfer is unavailable.
+const INTERAC_ETRANSFER_ENABLED = true;
+
 const DELIVERY_FEES: Record<DeliveryMethod, number> = { interac: 0.5, eft: 0, card_push: 1.0 };
 const CARD_PROCESSING_FEE = 1.5;
 
@@ -218,10 +221,14 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
 
   const recipientValid = method === "card_push"
     ? recipientName.trim().length > 1 && recipientCardComplete
-    : recipientName.trim().length > 1
-        && /^\d{3}$/.test(institutionNumber)
-        && /^\d{5}$/.test(transitNumber)
-        && accountNumber.trim().length >= 4;
+    : method === "interac"
+      ? recipientName.trim().length > 1
+          && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail)
+          && interacQAValid
+      : recipientName.trim().length > 1
+          && /^\d{3}$/.test(institutionNumber)
+          && /^\d{5}$/.test(transitNumber)
+          && accountNumber.trim().length >= 4;
 
   const cardFieldsValid = funding === "wallet"
     ? true
@@ -424,7 +431,7 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
 
             <div className="space-y-2">
               <Label>Delivery Method (how recipient receives)</Label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className={`grid ${INTERAC_ETRANSFER_ENABLED ? "grid-cols-3" : "grid-cols-2"} gap-2`}>
                 <Button
                   type="button"
                   variant={method === "eft" ? "default" : "outline"}
@@ -435,6 +442,21 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
                   <span className="text-xs">Bank (EFT)</span>
                   <span className="text-[10px] opacity-70">Free · 1–3 days</span>
                 </Button>
+                {INTERAC_ETRANSFER_ENABLED && (
+                  <Button
+                    type="button"
+                    variant={method === "interac" ? "default" : "outline"}
+                    className="relative flex flex-col items-center gap-1 h-auto py-3"
+                    onClick={() => setMethod("interac")}
+                  >
+                    <span className="absolute top-1 right-1 text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400">
+                      BETA
+                    </span>
+                    <Zap className="w-5 h-5" />
+                    <span className="text-xs">Interac e-Transfer</span>
+                    <span className="text-[10px] opacity-70">C$0.50 · minutes</span>
+                  </Button>
+                )}
                 <Button
                   type="button"
                   variant={method === "card_push" ? "default" : "outline"}
@@ -500,17 +522,50 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
                 </>
               )}
 
-              {method === "card_push" && (
+              {method === "interac" && (
                 <>
                   <div className="space-y-2">
-                    <Label>Recipient Email (optional, for receipt)</Label>
-                    <Input type="email" value={recipientEmail} onChange={(e) => setRecipientEmail(e.target.value)} placeholder="jane@example.com" />
+                    <Label>Recipient Email</Label>
+                    <Input
+                      type="email"
+                      value={recipientEmail}
+                      onChange={(e) => setRecipientEmail(e.target.value)}
+                      placeholder="jane@example.com"
+                    />
                   </div>
-                  <RecipientCardSection
-                    ref={recipientCardRef}
-                    onValidityChange={setRecipientCardComplete}
-                    elementStyle={elementStyle}
-                  />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label>Security Question (optional)</Label>
+                      <Input
+                        value={securityQuestion}
+                        onChange={(e) => setSecurityQuestion(e.target.value)}
+                        placeholder="What's our favourite city?"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Security Answer (optional)</Label>
+                      <Input
+                        value={securityAnswer}
+                        onChange={(e) => setSecurityAnswer(e.target.value)}
+                        placeholder="Lowercase, no spaces"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Message (optional)</Label>
+                    <Textarea
+                      value={message}
+                      onChange={(e) => setMessage(e.target.value)}
+                      placeholder="Birthday gift 🎁"
+                      rows={2}
+                    />
+                  </div>
+                  <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-xs text-amber-700 dark:text-amber-400 flex items-start gap-2">
+                    <Info className="w-4 h-4 mt-0.5 shrink-0" />
+                    <span>
+                      Interac e-Transfer is currently in <strong>beta</strong> while our payout provider finalises activation. Transfers may fail until enabled — use EFT or Instant to Card in the meantime.
+                    </span>
+                  </div>
                 </>
               )}
             </div>
