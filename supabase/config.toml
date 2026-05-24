@@ -45,3 +45,7 @@ verify_jwt = false
 [functions.pawapay-webhook]
 verify_jwt = false
 
+[functions.interac-callback]
+verify_jwt = false
+
+
