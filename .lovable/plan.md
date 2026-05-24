@@ -1,49 +1,83 @@
-## Add "Save & Continue Later" to Onboarding
+## Add Interac e-Transfer as a parallel option (direct Interac for Developers)
 
-Let users pause KYC onboarding mid-flow when they don't have all documents ready, exit safely, and resume from where they left off on their next sign-in.
+Add a second Interac e-Transfer rail that calls Interac's Send Money API directly, alongside the existing Paysafe-backed Interac option. The Paysafe option stays in the codebase but is disabled in the UI until Paysafe enables Interac on the merchant account.
 
-### UX
+### Important reality-check before we build
 
-Add a secondary action in the onboarding footer on every step (Identity, Address, Liveness, Review):
+Interac for Developers exposes **Send Money** (and Money Request) APIs, but production access is currently restricted to:
+- Regulated Canadian financial institutions, or
+- A sponsor FI that fronts your traffic.
+
+The dev portal will let us register an app, get sandbox credentials, and integrate against the **sandbox** today. Going live still requires either an Interac sponsorship agreement or a connected FI partner. Build will work end-to-end against sandbox; the live switch depends on Interac approval.
+
+If that's understood, here's the plan:
+
+### UI changes (CanadaSendFlow.tsx)
+
+Add a new delivery method tile next to the existing ones:
 
 ```text
-[ Save & exit ]        [ Continue → ]
+[ Interac e-Transfer (Direct) ]  ← NEW, enabled
+[ Interac e-Transfer (Paysafe) ]  ← existing, shown disabled with "Coming back soon" badge
+[ EFT (1-3 days) ]
+[ Visa Direct (Card push) ]
 ```
 
-- Clicking **Save & exit** opens a small confirmation dialog: "Your progress is saved. You can resume anytime from your dashboard."
-- Two buttons: **Stay** / **Save & sign out** (and a third option: **Save & go to dashboard** if they want to stay logged in).
-- On confirm: persist current field values + `current_step`, then redirect.
+- New `DeliveryMethod` value: `"interac_direct"`.
+- Fee: same display logic as current `interac` (configurable; default $0.50).
+- Hide the old Paysafe Interac option entirely OR keep visible-but-disabled with a tooltip — your call (default: keep visible-but-disabled so users see it's coming back).
+- All other fields (recipient name, email, security Q/A, message) stay identical.
 
-### Where it lives
+### Backend (new edge function)
 
-Add a reusable `SaveAndExitButton` component rendered inside `OnboardingShell`'s footer area, so it appears consistently on:
-- `/onboarding/identity`
-- `/onboarding/address`
-- `/onboarding/review` (and any liveness step)
+New function: `supabase/functions/interac-send/index.ts`
 
-`OnboardingShell` already accepts a `footer` prop — extend it with an optional `onSaveDraft` callback. Each page passes a function that writes its current local state to `profiles` / `kyc_verifications` (the same patches the pages already do on Continue).
+Responsibilities:
+1. Auth: verify JWT, load sender profile + wallet, check KYC tier limits.
+2. Validate request (recipient name/email, amount, currency=CAD, security question + answer, optional message). Use Zod.
+3. Debit sender wallet via existing ledger helpers; create a `transfers` row with `status='pending'`, `provider='interac_direct'`, `funding_source='wallet'`.
+4. Call Interac Send Money API:
+   - OAuth2 client-credentials token request to Interac's token endpoint.
+   - `POST /money-transfer/v1/send` with payer reference, recipient contact, amount, security question/answer, message.
+   - Store `interac_transfer_ref` on the transfer row.
+5. On API error → refund wallet, mark transfer `failed`, return user-friendly error (mirroring `paysafe-payout` refund flow).
+6. Return `{ transferId, status }`.
 
-### Resume behaviour
+New function: `supabase/functions/interac-webhook/index.ts`
+- Receives status callbacks (`accepted`, `declined`, `expired`, `cancelled`).
+- Verifies Interac signature.
+- Updates `transfers.status`; on `declined`/`expired` → refund wallet via existing reversal journal.
 
-Already mostly works:
-- `kyc_verifications.current_step` is updated on each step.
-- Pages hydrate from `kyc` + `profiles` on mount.
+### Secrets needed
 
-Add:
-- On login, if `kyc.status === 'in_progress'` (or any step < review), redirect from `/onboarding/welcome` (or dashboard CTA) to `kyc.current_step`.
-- Add a "Resume verification" banner on the main dashboard when onboarding is incomplete, linking to the saved step.
+Add via `add_secret`:
+- `INTERAC_SEND_CLIENT_ID`
+- `INTERAC_SEND_CLIENT_SECRET`
+- `INTERAC_SEND_API_BASE` (sandbox vs production base URL)
+- `INTERAC_SEND_PAYER_ID` (originator/partner ID Interac issues)
+- `INTERAC_SEND_WEBHOOK_SECRET` (HMAC validation)
 
-### Technical details
+(Reusing the existing KYC `INTERAC_*` secrets is **not** appropriate — Send Money is a separate Interac product with its own credentials and scopes.)
 
-Files to change:
-- `src/components/kyc/OnboardingShell.tsx` — accept `onSaveDraft?: () => Promise<void>`; render `SaveAndExitButton` in header/footer.
-- `src/components/kyc/SaveAndExitButton.tsx` (new) — button + AlertDialog; calls `onSaveDraft`, then either `supabase.auth.signOut()` + `navigate('/auth')` or `navigate('/')`.
-- `src/pages/onboarding/Identity.tsx`, `Address.tsx`, `Review.tsx` — pass `onSaveDraft` that runs the same upsert logic already used (without requiring `canContinue`), and updates `kyc.current_step` to the current page's step name.
-- `src/pages/Index.tsx` (or dashboard root) — show a "Resume identity verification" banner when `kyc.status !== 'approved'` and onboarding has started, linking to `kyc.current_step`.
+### Database
 
-No DB migration needed — `kyc_verifications.current_step` and partial profile fields are already nullable.
+No schema changes required. Reuse the existing `transfers` table; just store new provider value:
+- `provider = 'interac_direct'`
+- `provider_reference = <Interac transfer ref>`
+
+If you want history filtering, an index/check constraint can be added later.
+
+### Frontend wiring
+
+- `src/lib/transfer.ts` (or wherever Canada flow submits): new branch that calls `supabase.functions.invoke('interac-send', { body })` when `delivery === 'interac_direct'`.
+- Success screen shows: "We've sent the recipient an Interac e-Transfer email. They'll deposit it within 30 days." with the receipt download.
 
 ### Out of scope
 
-- Email reminders to finish onboarding (can be added later).
-- Auto-save of file uploads beyond what already happens (uploads already persist immediately).
+- Removing Paysafe code — left intact so it can re-enable instantly once Paysafe support enables Interac on the merchant account.
+- Interac Money Request (different API; not in this change).
+- Production go-live with Interac (requires sponsor/FI agreement; we'll be sandbox-only until then).
+
+### Open question I need you to confirm before I switch to build mode
+
+Do you already have Interac for Developers credentials (sandbox at minimum), or do I add the secret placeholders so you can paste them in once you've registered the app at developer.interac.ca? Answering "go" assumes the latter — I'll request the secrets and build the integration against the documented sandbox spec.
