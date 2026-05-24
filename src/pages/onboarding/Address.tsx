@@ -120,8 +120,33 @@ const Address = () => {
     navigate("/onboarding/review");
   };
 
+  const saveDraft = async () => {
+    if (!user) return;
+    await supabase
+      .from("profiles")
+      .update({
+        street_address: street || null,
+        city: city || null,
+        state_province: stateProv || null,
+        postal_code: postal || null,
+        address_country: country || null,
+      })
+      .eq("user_id", user.id);
+    await persistKyc({
+      current_step: "address",
+      address_document_type: docType || null,
+      address_document_url: docPath || null,
+    });
+  };
+
   return (
-    <OnboardingShell step={2} title="Confirm your address" subtitle="Upload a recent proof of address and confirm your details.">
+    <OnboardingShell
+      step={2}
+      title="Confirm your address"
+      subtitle="Upload a recent proof of address and confirm your details."
+      onSaveDraft={saveDraft}
+    >
+
       <Card className="p-5 space-y-4">
         <div className="flex items-start gap-2 p-3 rounded-xl bg-yellow-500/10 text-yellow-700 dark:text-yellow-400">
           <Info className="w-4 h-4 mt-0.5" />

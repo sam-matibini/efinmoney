@@ -110,8 +110,22 @@ const Review = () => {
     navigate("/onboarding/pending");
   };
 
+  const saveDraft = async () => {
+    if (!user) return;
+    await supabase
+      .from("kyc_verifications")
+      .update({ current_step: "completed" })
+      .eq("user_id", user.id);
+  };
+
   return (
-    <OnboardingShell step={3} title="Review and submit" subtitle="Double-check your details before sending them to our compliance team.">
+    <OnboardingShell
+      step={3}
+      title="Review and submit"
+      subtitle="Double-check your details before sending them to our compliance team."
+      onSaveDraft={saveDraft}
+    >
+
       <Card className="p-5 space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="font-semibold text-foreground">Identity</h3>

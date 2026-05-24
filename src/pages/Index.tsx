@@ -6,6 +6,7 @@ import QuickActions from "@/components/dashboard/QuickActions";
 import RecentTransactions from "@/components/dashboard/RecentTransactions";
 import ExchangeRates from "@/components/dashboard/ExchangeRates";
 import MiniStats from "@/components/dashboard/MiniStats";
+import ResumeOnboardingBanner from "@/components/kyc/ResumeOnboardingBanner";
 
 const Index = () => {
   return (
@@ -13,6 +14,7 @@ const Index = () => {
       <Header />
 
       <main className="container px-4 py-4 sm:py-6">
+        <ResumeOnboardingBanner />
         <HeroBalance />
         <WalletCarousel />
         <QuickActions />
@@ -29,3 +31,4 @@ const Index = () => {
 };
 
 export default Index;
+
