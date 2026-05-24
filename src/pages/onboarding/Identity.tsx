@@ -66,7 +66,8 @@ const Identity = () => {
     if (!interac) return;
     if (interac === "success") {
       toast.success("Identity verified with Interac");
-      refetch().then(() => navigate("/onboarding/address", { replace: true }));
+      (async () => { await refetch(); navigate("/onboarding/address", { replace: true }); })();
+
     } else {
       const reason = searchParams.get("reason");
       toast.error(`Interac verification failed${reason ? `: ${reason}` : ""}. Try another method.`);
