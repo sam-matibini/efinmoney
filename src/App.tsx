@@ -58,6 +58,7 @@ import ApiManagementPage from "./pages/admin/ApiManagementPage";
 import UsersPage from "./pages/admin/UsersPage";
 import UserDetailPage from "./pages/admin/UserDetailPage";
 import SystemDiagnosticsPage from "./pages/admin/SystemDiagnosticsPage";
+import InteracCallback from "./pages/InteracCallback";
 
 const queryClient = new QueryClient();
 
@@ -202,6 +203,7 @@ const AppRoutes = () => {
           <Route path="/pay-bills" element={<KycProtectedRoute><PayBillsPage /></KycProtectedRoute>} />
           <Route path="/deposit/complete" element={<DepositComplete />} />
           <Route path="/payment-callback" element={<PaymentCallback />} />
+          <Route path="/callback" element={<InteracCallback />} />
           <Route path="/onboarding/welcome" element={<ProtectedRoute><Welcome /></ProtectedRoute>} />
           <Route path="/onboarding/identity" element={<ProtectedRoute><OnboardingIdentity /></ProtectedRoute>} />
           <Route path="/onboarding/address" element={<ProtectedRoute><OnboardingAddress /></ProtectedRoute>} />
