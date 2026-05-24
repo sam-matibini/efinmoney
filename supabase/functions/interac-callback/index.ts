@@ -10,9 +10,9 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 };
 
-const ISSUER = Deno.env.get("INTERAC_ISSUER_URL")!;
-const CLIENT_ID = Deno.env.get("INTERAC_CLIENT_ID")!;
-const CLIENT_SECRET = Deno.env.get("INTERAC_CLIENT_SECRET")!;
+const ISSUER = (Deno.env.get("INTERAC_HUB_ISSUER_URL") ?? Deno.env.get("INTERAC_ISSUER_URL"))!;
+const CLIENT_ID = (Deno.env.get("INTERAC_HUB_CLIENT_ID") ?? Deno.env.get("INTERAC_CLIENT_ID"))!;
+const CLIENT_SECRET = Deno.env.get("INTERAC_HUB_CLIENT_SECRET") ?? Deno.env.get("INTERAC_CLIENT_SECRET") ?? "";
 const APP_RETURN_BASE = Deno.env.get("INTERAC_APP_RETURN_BASE") || "https://efin.money";
 
 let discoveryCache: any = null;

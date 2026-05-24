@@ -14,7 +14,7 @@ Deno.serve((req) => {
     return new Response("Method Not Allowed", { status: 405, headers: corsHeaders });
   }
   try {
-    const raw = Deno.env.get("INTERAC_PRIVATE_JWK");
+    const raw = Deno.env.get("INTERAC_HUB_PRIVATE_JWK") ?? Deno.env.get("INTERAC_PRIVATE_JWK");
     if (!raw) {
       return new Response(JSON.stringify({ error: "INTERAC_PRIVATE_JWK not configured" }), {
         status: 500,
