@@ -568,6 +568,20 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
                   </div>
                 </>
               )}
+
+              {method === "card_push" && (
+                <>
+                  <div className="space-y-2">
+                    <Label>Recipient Email (optional, for receipt)</Label>
+                    <Input type="email" value={recipientEmail} onChange={(e) => setRecipientEmail(e.target.value)} placeholder="jane@example.com" />
+                  </div>
+                  <RecipientCardSection
+                    ref={recipientCardRef}
+                    onValidityChange={setRecipientCardComplete}
+                    elementStyle={elementStyle}
+                  />
+                </>
+              )}
             </div>
 
             {/* Funding source */}
