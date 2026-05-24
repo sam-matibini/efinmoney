@@ -158,7 +158,7 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
   const { data: profile } = useProfile();
 
   const [step, setStep] = useState(1);
-  const [method, setMethod] = useState<DeliveryMethod>("interac");
+  const [method, setMethod] = useState<DeliveryMethod>("eft");
   const [funding, setFunding] = useState<FundingSource>("wallet");
   const [amount, setAmount] = useState("");
   const [walletId, setWalletId] = useState("");
