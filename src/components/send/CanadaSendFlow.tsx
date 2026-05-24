@@ -182,6 +182,7 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
   // Recipient debit card (separate Stripe Elements scope, only for card_push)
   const recipientCardRef = useRef<RecipientCardHandle>(null);
   const [recipientCardComplete, setRecipientCardComplete] = useState(false);
+  const cardPanelRef = useRef<HTMLDivElement | null>(null);
 
   const [lastTransferId, setLastTransferId] = useState<string | null>(null);
   const [security, setSecurity] = useState<{ question: string; answer: string } | null>(null);
