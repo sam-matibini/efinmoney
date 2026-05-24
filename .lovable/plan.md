@@ -1,47 +1,27 @@
-## Goal
+## Fix: Update `INTERAC_PRIVATE_JWK` secret
 
-Wire up the two Interac OIDC endpoints the user just registered:
+The `interac-start` edge function is returning 500 with `INTERAC_PRIVATE_JWK is not valid JSON` because the secret currently contains a URL string (starts with `https://ap...`) instead of a JWK JSON object.
 
-1. **JWKS URL** → `https://efin.money/oidc/jwks` (Interac fetches our public key here to verify the signed Request Object)
-2. **Redirect URI** → `https://efin.money/callback` (where Interac sends the user after auth)
+### Step 1 — Re-prompt for the secret
 
-## Changes
+Call `secrets--update_secret` for `INTERAC_PRIVATE_JWK` so a fresh input form appears in the chat. Paste the exact one-line JSON below (must start with `{"kty":"RSA"` — **not** a URL):
 
-### 1. Publish the public JWKS at `/oidc/jwks`
+```
+{"kty":"RSA","n":"o18C3Kgle1k-x2zT8aN5W7aPmYkwapLm5W11hIK3s-O3qLxgjOjZYClef3mZadbjzgflviv8X_liuWPOf0dnYRA8tPEQu4J6nm50eKZ3TRzMZKAalBkawBXbbkPLVdh1Mrq0AIdm9eixZ8yM9SM1Kk-MpAWvM3kTWzaG1PVegBjOPGQ5cERYQJDazslHeWfAMztzoGumTc6hRwkloJu6n12oNFUzGOzTwYVk8E7hTv-jd8rxZbH-LJQcQa1L6a5ZhdC4cMqw4ARhqoP0HGfQGQta7GKWjpmgO4Xu_xA9t2aQOS7NH6DtFymYcC1Z5yO6RNZ_X2r9RiEhnaBHVuPIFw","e":"AQAB","d":"L4IHoQc8rxwKx498Kr6xIdx68dkVPUiu4HTuQbSJm0RTOjxdj1x_Khmdo1BHLqIQ6O8e_ihoYbhx3xuJBzZKd81y-eNITF7rLXtNX3B5LPF89p4gXITYZJd2kiAg1zv1COWGRskZRdV_EYJIU1kDsuQjL-d_RWamHFZE61TXQER_WBG_crb7EPh43dmSxW5EpSHZ7gZ1PqVcbd44JVmf7kesRc5-c9emWagfE37wl9WbA-Z89KIOdzt2SAjOwZxJf91Sq2u4oGVVaVWYD0y06xuFux2qX873r-s1XXJkLkL_L3D7Ymbj2sunSccaBth0LbRUoE890TmF2XZI6MPdEQ","p":"1WZvf3qJTc93n_Mjwc2SSHaMeHCiJe4xcuLVY-21vFWRoLmWP3-hkBMmcqj5eVa1n0RRePhJYlmD3mnh9dzyNu23SkRNob6auxr4ht7AVHHZRHPRIzb_9nIZ9TVSTsuQJ-LqKQbVhL06F1pXhDmPEklmEpKViEtCcmeY8osiRHU","q":"w_vm7JFo3NM3kCaz1UKB-BuXmBT_RNM1HgOPC4D1c1eHz4ajD9RsXCNPOGcB9gzkZnROqZNvtpeH4SoKl-sBPqqZOMFl36hpYnK0YK7GIirGuPiQFldk6Ax-F7UPElkOZwPDKm6SbDlhoI1hgqNPyVjKGN05NNG4ky1gTed_WNs","dp":"JiLoSh_b6cvp1OveuAPE4K5O7Dc0wxKOQ7nF6NXSZJXmMJL6Bt8IQHcrp9IKw2R7kLrk1HmKo8jbiCPj_cw-fRJ-bwdF2GH3xPhM8c1dEbpG2bTY6zIpDCHYAbpFu08ls_sZXbua7N3kQ8ghW7_tkZcMZsVLc8__T_KzoqS6uwE","dq":"kFbXBUY2r-RTmLQYYClCZYOUy2ozcvIGvdsrH_LTUyaVHI9xSrhNMjLDJqwesqNeF-LzCEtQzG6foYKAGND4srmcbUNqjyWOr_YAyPAPdpyAjTxrijjFVW3V9AniVsYGKHKJ65dR-ajtMPzPYxJ6MbVV6qgLeM44nRSfR-EGVl8","qi":"XL8pX-3j_bMDgSMY8X6KsTQSZfkwL_hRfpq2IEM5dXECsavTSb6cficaS2BHfbSE5zDxtohDEJPg2PVJ40PXV54pPpvjgv7tpQLeoGMAxpZqYtsGTMDYqzFjbbKE2Hfhvoim_oC3A8Wx3BNTyRCU-dx-f00QRZjeYfW0P_Tjnvs","alg":"PS256","kid":"0f762484-76e3-4dd9-9c2b-6464b6dc6368","use":"sig"}
+```
 
-- Add a new edge function `supabase/functions/interac-jwks/index.ts` that reads `INTERAC_PRIVATE_JWK`, strips private fields (`d`, `p`, `q`, `dp`, `dq`, `qi`), wraps it as `{ "keys": [ <publicJwk> ] }`, and returns it with `Content-Type: application/json` and permissive CORS. Public endpoint, no auth.
-- Mark it `verify_jwt = false` in `supabase/config.toml`.
-- Add a SPA-level rewrite so `https://efin.money/oidc/jwks` proxies to the function. Lovable hosting honors `public/_redirects`, so add:
-  ```
-  /oidc/jwks  https://hgmskcvaeadnyovbroup.supabase.co/functions/v1/interac-jwks  200
-  ```
-  (200 = rewrite, not redirect — Interac sees `efin.money/oidc/jwks` directly.)
+### Step 2 — Verify
 
-### 2. Make `/callback` the redirect URI
+After save, poll `https://hgmskcvaeadnyovbroup.supabase.co/functions/v1/interac-jwks` until it returns `{"keys":[...]}` and overwrite `public/oidc/jwks` with the fresh response.
 
-- Update the runtime secret `INTERAC_REDIRECT_URI` to `https://efin.money/callback`.
-- Add a rewrite in `public/_redirects` so the public callback URL proxies to the existing `interac-callback` edge function, preserving the `?code=…&state=…` query string:
-  ```
-  /callback  https://hgmskcvaeadnyovbroup.supabase.co/functions/v1/interac-callback  200
-  ```
-- The existing `interac-callback` function already reads `code` + `state` from the URL and redirects the browser back to `/onboarding/identity?interac=success|error`, so no code change is needed there.
-- `interac-start` already reads `INTERAC_REDIRECT_URI` and uses it both in the JAR claims and in the token-exchange call, so updating the secret is sufficient.
+### Step 3 — Test the flow
 
-### 3. Deploy & verify
+Retry "Verify with Interac" on `/onboarding/identity` — `interac-start` should now return an `authorization_url` (no more 500).
 
-- Deploy `interac-jwks` and (re-)deploy `interac-start`.
-- Smoke test:
-  - `curl https://efin.money/oidc/jwks` → returns `{ "keys": [ { "kty": "RSA", "n": "...", "e": "AQAB", "alg": "PS256", "kid": "...", "use": "sig" } ] }` with no `d`.
-  - Click "Verify with Interac" from `/onboarding/identity` → URL contains `?request=eyJ...`, Interac auth screen loads (no more `invalid_request`), completing it returns to `/onboarding/identity?interac=success`.
+### Note about the public JWKS
 
-## Out of scope
+In the Interac portal, register this public key block (or just point JWKS URL to `https://efin.money/oidc/jwks`):
 
-- No DB schema changes.
-- No changes to `interac-callback` logic — only the public URL in front of it changes.
-- No frontend code changes — `/callback` is handled entirely by the hosting rewrite.
-
-## Technical notes
-
-- The `_redirects` file with `200` status is a proxy/rewrite, so the browser's URL bar stays on `efin.money/callback` and Interac's strict redirect-URI matching still passes.
-- Stripping JWK private fields server-side (rather than checking in a public file) avoids any risk of leaking the private key if the secret format ever changes.
-- If Lovable's hosting layer ever stops honoring `_redirects` for these paths, the fallback is to register the raw Supabase function URLs (`https://hgmskcvaeadnyovbroup.supabase.co/functions/v1/...`) directly in the Interac portal instead.
+```json
+{"keys":[{"kty":"RSA","n":"o18C3Kgle1k-x2zT8aN5W7aPmYkwapLm5W11hIK3s-O3qLxgjOjZYClef3mZadbjzgflviv8X_liuWPOf0dnYRA8tPEQu4J6nm50eKZ3TRzMZKAalBkawBXbbkPLVdh1Mrq0AIdm9eixZ8yM9SM1Kk-MpAWvM3kTWzaG1PVegBjOPGQ5cERYQJDazslHeWfAMztzoGumTc6hRwkloJu6n12oNFUzGOzTwYVk8E7hTv-jd8rxZbH-LJQcQa1L6a5ZhdC4cMqw4ARhqoP0HGfQGQta7GKWjpmgO4Xu_xA9t2aQOS7NH6DtFymYcC1Z5yO6RNZ_X2r9RiEhnaBHVuPIFw","e":"AQAB","alg":"PS256","kid":"0f762484-76e3-4dd9-9c2b-6464b6dc6368","use":"sig"}]}
+```
