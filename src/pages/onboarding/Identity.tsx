@@ -60,6 +60,22 @@ const Identity = () => {
     if (kyc.persona_inquiry_id) setPersonaSubmitted(true);
   }, [kyc]);
 
+  // Handle Interac OIDC redirect-back
+  useEffect(() => {
+    const interac = searchParams.get("interac");
+    if (!interac) return;
+    if (interac === "success") {
+      toast.success("Identity verified with Interac");
+      refetch().then(() => navigate("/onboarding/address", { replace: true }));
+    } else {
+      const reason = searchParams.get("reason");
+      toast.error(`Interac verification failed${reason ? `: ${reason}` : ""}. Try another method.`);
+      setSearchParams({}, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+
   const requiresBack = docType === "drivers_license" || docType === "national_id";
 
   const persist = async (patch: Record<string, unknown>) => {
