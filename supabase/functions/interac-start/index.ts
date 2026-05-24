@@ -11,7 +11,7 @@ const corsHeaders = {
 const ISSUER = Deno.env.get("INTERAC_ISSUER_URL")!;
 const CLIENT_ID = Deno.env.get("INTERAC_CLIENT_ID")!;
 const REDIRECT_URI = Deno.env.get("INTERAC_REDIRECT_URI")!;
-const SCOPES = Deno.env.get("INTERAC_SCOPES") || "openid profile address";
+const SCOPES = Deno.env.get("INTERAC_SCOPES") || "openid general_scope";
 
 let discoveryCache: { authorization_endpoint: string; token_endpoint: string; userinfo_endpoint: string; jwks_uri: string; issuer: string } | null = null;
 
