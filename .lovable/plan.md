@@ -1,57 +1,44 @@
-# Pay-with-Card: Better input + processing UX
+# Fix Canadian transfers: Interac unavailable + Pay-with-card not switching
 
-## Goal
-On the Pay with Card form (`src/components/modals/CardPaymentForm.tsx`), let the user input card details in clear, separate fields, and replace the small button spinner with a polished full-form processing state.
+## What's broken
 
-## 1. Separate card input fields
+**1. Interac fails with a generic error.**
+The `paysafe-payout` edge function is returning Paysafe error `PAYMENTHUB-1: "The submitted payment type and currency code combination is not supported for your account"`. This is a **provider-side limitation** — your Paysafe merchant account isn't enabled for `INTERAC_ETRANSFER` in CAD. No amount of code can route around that; the only real fixes are (a) ask Paysafe support to enable Interac e-Transfer on your account, or (b) stop offering Interac in the UI. We'll do (b) for now.
 
-Replace the single combined `CardElement` with Stripe's individual Elements so each field is its own labeled input:
+**2. "Pay with card" tile doesn't visually switch.**
+The funding selector currently uses two `<Button>` components side-by-side with `variant={funding === "card" ? "default" : "outline"}`. Click is wired, but on dark theme the outline/default contrast is subtle enough that users perceive "nothing happened", and the card form opens far below the fold so they don't see it scroll in. We'll rebuild this as an obvious selectable card with a check indicator + auto-scroll into view.
 
-- **Card number** (`CardNumberElement`) — with live brand icon (Visa/Mastercard/Amex) on the right
-- **Expiry (MM/YY)** (`CardExpiryElement`)
-- **CVC** (`CardCvcElement`)
-- **Cardholder name** — plain `<Input>` (new), prefilled with the user's profile name, uppercased
-- **Postal/ZIP code** — plain `<Input>` (new, optional), passed in `billing_details.address.postal_code` for AVS
+## Scope
 
-Layout (desktop and mobile both work at the modal width):
-```text
-[ Cardholder name ............................. ]
-[ Card number ............................ VISA ]
-[ Expiry MM/YY ]        [ CVC ]
-[ Postal code ]
-```
+Frontend only. No edge-function code changes, no DB changes. (Interac stays wired in the backend so it can be re-enabled instantly the day Paysafe approves it.)
 
-Each Stripe sub-element keeps the existing theme-aware styling (`buildCardOptions`) so colors still match light/dark mode. Track readiness per field (`numberReady && expiryReady && cvcReady`) before enabling the Pay button.
+## Changes
 
-Validation:
-- Disable Pay until all 3 Stripe elements are `complete: true` (listen to each element's `onChange`)
-- Require non-empty cardholder name
-- Show inline red helper text under any field that emits a Stripe `error.message`
+### `src/components/send/CanadaSendFlow.tsx`
 
-## 2. Processing UX (best-practice overlay)
+**a. Hide Interac delivery method**
+- Remove the `interac` button from the Delivery Method grid (Step 1). Grid becomes 2 columns: `Bank (EFT)` and `Instant to Card`.
+- Change default `method` state from `"interac"` to `"eft"`.
+- Remove the Step-2 Interac-only block (recipient email, security Q/A, message) — only EFT and card_push branches render.
+- Remove the Step-3 Interac success copy.
+- Leave the `DeliveryMethod` type and all Interac-related submit/reset code in place (dormant), so re-enabling is a one-line UI change later.
 
-When the user clicks Pay, show a non-dismissable overlay on top of the form:
+**b. Rebuild the "How are you paying?" funding selector**
+- Replace the two `<Button>` tiles with two custom selectable cards (plain `<button type="button">` with Tailwind classes). Each card shows: icon, title, subtitle, fee badge, and a check circle in the top-right when selected.
+- Selected state uses `border-primary ring-2 ring-primary/30 bg-primary/5`; unselected uses `border-border hover:border-primary/40`. This makes the active state unambiguous on dark theme.
+- Wallet tile is disabled (greyed + cursor-not-allowed) when `noCadWallet` is true, with a small "No CAD wallet" caption.
+- When `funding` switches to `"card"`, scroll the Stripe card-details panel into view with `panelRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" })` so the user sees it immediately.
 
-- Dim the form behind it (`absolute inset-0 bg-background/80 backdrop-blur-sm`) so the user can't double-submit
-- Centered large spinner (`Loader2 h-10 w-10 animate-spin text-primary`)
-- Three-stage status text that updates as the flow progresses:
-  1. "Authorizing your card…" (during `stripe-payment-intent` create)
-  2. "Processing payment…" (during `stripe.confirmCardPayment`)
-  3. "Crediting your wallet…" (during confirm step)
-- Small `Lock` icon + "Do not close this window" caption below the spinner
-- Smooth `animate-fade-in` mount
+**c. Keep the existing card form, copy, and Send-button flow** — only the selector visuals + scroll change.
 
-The existing success state (green check + "Payment successful!") is unchanged.
+### Out of scope
+- No changes to `paysafe-payout`, `execute-transfer`, or any other edge function.
+- No DB migration.
+- No change to the African/Flutterwave flow or P2P flow.
+- No change to card_push (Stripe Visa Direct) wiring — already works.
 
-The submit button itself shows the simple inline spinner only as a fallback for the brief moment before the overlay mounts; the overlay is the primary signal.
-
-## 3. Out of scope
-- No backend / edge function changes (`stripe-payment-intent` flow is untouched)
-- No new "save card" checkbox — that lives in the separate `SaveCardForm`
-- No changes to the African/Flutterwave path in `TopUpModal`
-
-## Technical notes
-- Imports change to `CardNumberElement, CardExpiryElement, CardCvcElement` from `@stripe/react-stripe-js`
-- Need `useProfile` to prefill cardholder name (already used in `SaveCardForm.tsx` — same pattern)
-- Add a `processingStage` state (`'auth' | 'charge' | 'credit' | null`) to drive the overlay copy
-- Files touched: only `src/components/modals/CardPaymentForm.tsx`
+## Verification
+- Reload `/send` → Canada flow shows only **Bank (EFT)** and **Instant to Card** in Step 1.
+- Step 2: click "Pay with card" → tile becomes visibly selected (primary border + check icon) and the Stripe card form scrolls into view.
+- Submit an EFT or Instant-to-Card transfer end-to-end (those use working providers).
+- Interac is no longer reachable from the UI; the prior "temporarily unavailable" toast can no longer be triggered by users.

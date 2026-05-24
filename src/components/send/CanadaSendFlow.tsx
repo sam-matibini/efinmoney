@@ -13,7 +13,7 @@ import { useProfile } from "@/hooks/useProfile";
 import { downloadTransferReceipt } from "@/lib/receipt";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { CheckCircle, Mail, Landmark, AlertCircle, Info, CreditCard, Wallet, Zap } from "lucide-react";
+import { CheckCircle, Landmark, AlertCircle, Info, CreditCard, Wallet, Zap, Check } from "lucide-react";
 import { tokenizeDebitCard } from "@/lib/stripePayouts";
 import { getStripe } from "@/lib/stripe";
 import type { Stripe } from "@stripe/stripe-js";
@@ -158,7 +158,7 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
   const { data: profile } = useProfile();
 
   const [step, setStep] = useState(1);
-  const [method, setMethod] = useState<DeliveryMethod>("interac");
+  const [method, setMethod] = useState<DeliveryMethod>("eft");
   const [funding, setFunding] = useState<FundingSource>("wallet");
   const [amount, setAmount] = useState("");
   const [walletId, setWalletId] = useState("");
@@ -182,6 +182,7 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
   // Recipient debit card (separate Stripe Elements scope, only for card_push)
   const recipientCardRef = useRef<RecipientCardHandle>(null);
   const [recipientCardComplete, setRecipientCardComplete] = useState(false);
+  const cardPanelRef = useRef<HTMLDivElement | null>(null);
 
   const [lastTransferId, setLastTransferId] = useState<string | null>(null);
   const [security, setSecurity] = useState<{ question: string; answer: string } | null>(null);
@@ -215,10 +216,8 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
     : (!securityQuestion && !securityAnswer)
       || (securityQuestion.trim().length >= 4 && securityAnswer.trim().length >= 3);
 
-  const recipientValid = method === "interac"
-    ? recipientName.trim().length > 1 && /\S+@\S+\.\S+/.test(recipientEmail) && interacQAValid
-    : method === "card_push"
-      ? recipientName.trim().length > 1 && recipientCardComplete
+  const recipientValid = method === "card_push"
+    ? recipientName.trim().length > 1 && recipientCardComplete
     : recipientName.trim().length > 1
         && /^\d{3}$/.test(institutionNumber)
         && /^\d{5}$/.test(transitNumber)
@@ -343,7 +342,7 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
     setInstitutionNumber(""); setTransitNumber(""); setAccountNumber(""); setBankName("");
     setCardNumComplete(false); setCardExpComplete(false); setCardCvcComplete(false);
     setRecipientCardComplete(false);
-    setMethod("interac");
+    setMethod("eft");
     setFunding("wallet");
     setLastTransferId(null);
     setSecurity(null);
@@ -425,17 +424,7 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
 
             <div className="space-y-2">
               <Label>Delivery Method (how recipient receives)</Label>
-              <div className="grid grid-cols-3 gap-2">
-                <Button
-                  type="button"
-                  variant={method === "interac" ? "default" : "outline"}
-                  className="flex flex-col items-center gap-1 h-auto py-3"
-                  onClick={() => setMethod("interac")}
-                >
-                  <Mail className="w-5 h-5" />
-                  <span className="text-xs">Interac</span>
-                  <span className="text-[10px] opacity-70">C$0.50 · ~30 min</span>
-                </Button>
+              <div className="grid grid-cols-2 gap-2">
                 <Button
                   type="button"
                   variant={method === "eft" ? "default" : "outline"}
@@ -457,11 +446,6 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
                   <span className="text-[10px] opacity-70">C$1.00 · seconds</span>
                 </Button>
               </div>
-              {method === "interac" && (
-                <p className="text-xs text-muted-foreground mt-2">
-                  Securely send and receive your money anytime, to any Canadian bank account with Interac e-Transfer.
-                </p>
-              )}
             </div>
 
             <div className="p-4 rounded-xl bg-muted">
@@ -492,29 +476,6 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
                 <Input value={recipientName} onChange={(e) => setRecipientName(e.target.value)} placeholder="Jane Doe" />
               </div>
 
-              {method === "interac" && (
-                <>
-                  <div className="space-y-2">
-                    <Label>Recipient Email</Label>
-                    <Input type="email" value={recipientEmail} onChange={(e) => setRecipientEmail(e.target.value)} placeholder="jane@example.com" />
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="space-y-2">
-                      <Label>Security Question <span className="text-muted-foreground">(optional)</span></Label>
-                      <Input value={securityQuestion} onChange={(e) => setSecurityQuestion(e.target.value)} placeholder="What city were we in?" maxLength={120} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Security Answer <span className="text-muted-foreground">(optional)</span></Label>
-                      <Input value={securityAnswer} onChange={(e) => setSecurityAnswer(e.target.value)} placeholder="toronto" maxLength={40} />
-                    </div>
-                  </div>
-                  <p className="text-[11px] text-muted-foreground -mt-2">Leave blank and we'll auto-generate one for you.</p>
-                  <div className="space-y-2">
-                    <Label>Message (optional)</Label>
-                    <Textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Thanks for dinner!" maxLength={400} rows={3} />
-                  </div>
-                </>
-              )}
 
               {method === "eft" && (
                 <>
@@ -555,31 +516,62 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
             </div>
 
             {/* Funding source */}
-            <div className="space-y-2 pt-2 border-t border-border">
+            <div className="space-y-3 pt-2 border-t border-border">
               <Label>How are you paying?</Label>
-              <div className="grid grid-cols-2 gap-2">
-                <Button
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button
                   type="button"
-                  variant={funding === "wallet" ? "default" : "outline"}
-                  className="flex items-center justify-center gap-2 h-auto py-3"
                   onClick={() => setFunding("wallet")}
                   disabled={noCadWallet}
+                  className={`relative text-left p-4 rounded-xl border-2 transition-all ${
+                    funding === "wallet"
+                      ? "border-primary ring-2 ring-primary/30 bg-primary/5"
+                      : "border-border hover:border-primary/40"
+                  } ${noCadWallet ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
                 >
-                  <Wallet className="w-4 h-4" />
-                  <span className="text-xs">Pay from CAD wallet</span>
-                </Button>
-                <Button
+                  {funding === "wallet" && (
+                    <span className="absolute top-2 right-2 w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
+                      <Check className="w-3.5 h-3.5" />
+                    </span>
+                  )}
+                  <div className="flex items-center gap-2 mb-1">
+                    <Wallet className="w-5 h-5 text-primary" />
+                    <span className="font-medium text-sm">Pay from CAD wallet</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {noCadWallet ? "No CAD wallet available" : "Instant · no extra fee"}
+                  </p>
+                </button>
+                <button
                   type="button"
-                  variant={funding === "card" ? "default" : "outline"}
-                  className="flex items-center justify-center gap-2 h-auto py-3"
-                  onClick={() => setFunding("card")}
+                  onClick={() => {
+                    setFunding("card");
+                    setTimeout(() => cardPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 50);
+                  }}
+                  className={`relative text-left p-4 rounded-xl border-2 transition-all cursor-pointer ${
+                    funding === "card"
+                      ? "border-primary ring-2 ring-primary/30 bg-primary/5"
+                      : "border-border hover:border-primary/40"
+                  }`}
                 >
-                  <CreditCard className="w-4 h-4" />
-                  <span className="text-xs">Pay with card (+C$1.50)</span>
-                </Button>
+                  {funding === "card" && (
+                    <span className="absolute top-2 right-2 w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
+                      <Check className="w-3.5 h-3.5" />
+                    </span>
+                  )}
+                  <div className="flex items-center gap-2 mb-1">
+                    <CreditCard className="w-5 h-5 text-primary" />
+                    <span className="font-medium text-sm">Pay with card</span>
+                    <span className="ml-auto text-[10px] font-semibold px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                      +C$1.50
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Visa, Mastercard, Amex · secured by Stripe</p>
+                </button>
               </div>
             </div>
 
+            <div ref={cardPanelRef}>
             {funding === "card" && stripeReady === false && (
               <div className="p-4 rounded-lg border border-destructive/40 bg-destructive/10 text-sm text-destructive">
                 <strong>Card payments are temporarily unavailable.</strong>
@@ -636,6 +628,9 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
                 </p>
               </div>
             )}
+            </div>
+
+
 
             <div className="flex gap-3">
               <Button variant="outline" className="flex-1" onClick={() => setStep(1)}>Back</Button>
@@ -646,7 +641,7 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
               >
                 {createTransfer.isPending || cardSubmitting
                   ? "Processing..."
-                  : `Send C$${parsedAmount.toFixed(2)} via ${method === "interac" ? "Interac" : method === "eft" ? "Bank Transfer" : "Visa Direct"}`}
+                  : `Send C$${parsedAmount.toFixed(2)} via ${method === "eft" ? "Bank Transfer" : "Visa Direct"}`}
               </Button>
             </div>
 
@@ -661,7 +656,7 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
                   {" "}<strong>Total {funding === "card" ? "charged to card" : "from wallet"}: C${totalCharged.toFixed(2)}</strong>
                 </p>
                 <p>
-                  Delivery: {method === "interac" ? "Interac e-Transfer (email)" : method === "eft" ? "Bank Transfer (EFT)" : "Instant to debit card (Visa Direct)"}
+                  Delivery: {method === "eft" ? "Bank Transfer (EFT)" : "Instant to debit card (Visa Direct)"}
                 </p>
               </div>
             </div>
@@ -683,11 +678,6 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
             <p className="text-muted-foreground mb-2">
               C${parsedAmount.toFixed(2)} is on its way to {recipientName}
             </p>
-            {method === "interac" && (
-              <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
-                Interac e-Transfer will be sent within 30 minutes. {recipientName} will receive an email from eFinMoney at <strong>{recipientEmail}</strong>.
-              </p>
-            )}
             {method === "eft" && (
               <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
                 Funds will arrive in the recipient's bank account within 1–3 business days.
@@ -697,21 +687,6 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
               <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
                 Funds are being pushed to {recipientName}'s debit card via Visa Direct and typically arrive within seconds.
               </p>
-            )}
-            {security && method === "interac" && (
-              <div className="max-w-md mx-auto mb-6 p-4 rounded-xl border border-border bg-muted/40 text-left">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2">Security details — share with recipient</p>
-                <p className="text-sm"><span className="text-muted-foreground">Question:</span> <strong>{security.question}</strong></p>
-                <p className="text-sm mt-1"><span className="text-muted-foreground">Answer:</span> <strong className="font-mono">{security.answer}</strong></p>
-                <button
-                  type="button"
-                  className="mt-3 text-xs text-primary hover:underline"
-                  onClick={() => {
-                    navigator.clipboard.writeText(`Q: ${security.question}\nA: ${security.answer}`);
-                    toast.success("Copied to clipboard");
-                  }}
-                >Copy Q&amp;A</button>
-              </div>
             )}
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               {lastTransferId && (
