@@ -1,27 +1,49 @@
-## Fix: "ui-portal.hub-verify.innovation.interac.ca refused to connect"
+## Add "Save & Continue Later" to Onboarding
 
-### Root cause
-The Interac Hub Verify portal sets `X-Frame-Options: DENY`. In the Lovable preview the app runs inside an iframe, so `window.location.href = authorization_url` navigates the inner iframe to Interac, which the browser refuses to render. On the real domain (`efin.money`) there's no parent iframe, so this only shows up in preview — but the same code should handle both.
+Let users pause KYC onboarding mid-flow when they don't have all documents ready, exit safely, and resume from where they left off on their next sign-in.
 
-### Change
-Update `src/components/kyc/InteracVerification.tsx` to do a top-level navigation when possible, with a popup fallback:
+### UX
 
-```ts
-const url = data.authorization_url;
-try {
-  if (window.top && window.top !== window.self) {
-    window.top.location.href = url;   // break out of Lovable preview iframe
-  } else {
-    window.location.href = url;        // production (efin.money)
-  }
-} catch {
-  // Cross-origin iframe blocks window.top access → open new tab
-  window.open(url, "_blank", "noopener");
-}
+Add a secondary action in the onboarding footer on every step (Identity, Address, Liveness, Review):
+
+```text
+[ Save & exit ]        [ Continue → ]
 ```
 
-No backend or other UI changes needed. After this, clicking "Verify with Interac" in the Lovable preview will load Interac's portal in the top window (or a new tab) instead of being blocked.
+- Clicking **Save & exit** opens a small confirmation dialog: "Your progress is saved. You can resume anytime from your dashboard."
+- Two buttons: **Stay** / **Save & sign out** (and a third option: **Save & go to dashboard** if they want to stay logged in).
+- On confirm: persist current field values + `current_step`, then redirect.
 
-### Verification
-1. Click "Verify with Interac" from `/onboarding/identity` in the preview.
-2. Confirm browser navigates to `ui-portal.hub-verify.innovation.interac.ca` (or opens it in a new tab) instead of showing "refused to connect".
+### Where it lives
+
+Add a reusable `SaveAndExitButton` component rendered inside `OnboardingShell`'s footer area, so it appears consistently on:
+- `/onboarding/identity`
+- `/onboarding/address`
+- `/onboarding/review` (and any liveness step)
+
+`OnboardingShell` already accepts a `footer` prop — extend it with an optional `onSaveDraft` callback. Each page passes a function that writes its current local state to `profiles` / `kyc_verifications` (the same patches the pages already do on Continue).
+
+### Resume behaviour
+
+Already mostly works:
+- `kyc_verifications.current_step` is updated on each step.
+- Pages hydrate from `kyc` + `profiles` on mount.
+
+Add:
+- On login, if `kyc.status === 'in_progress'` (or any step < review), redirect from `/onboarding/welcome` (or dashboard CTA) to `kyc.current_step`.
+- Add a "Resume verification" banner on the main dashboard when onboarding is incomplete, linking to the saved step.
+
+### Technical details
+
+Files to change:
+- `src/components/kyc/OnboardingShell.tsx` — accept `onSaveDraft?: () => Promise<void>`; render `SaveAndExitButton` in header/footer.
+- `src/components/kyc/SaveAndExitButton.tsx` (new) — button + AlertDialog; calls `onSaveDraft`, then either `supabase.auth.signOut()` + `navigate('/auth')` or `navigate('/')`.
+- `src/pages/onboarding/Identity.tsx`, `Address.tsx`, `Review.tsx` — pass `onSaveDraft` that runs the same upsert logic already used (without requiring `canContinue`), and updates `kyc.current_step` to the current page's step name.
+- `src/pages/Index.tsx` (or dashboard root) — show a "Resume identity verification" banner when `kyc.status !== 'approved'` and onboarding has started, linking to `kyc.current_step`.
+
+No DB migration needed — `kyc_verifications.current_step` and partial profile fields are already nullable.
+
+### Out of scope
+
+- Email reminders to finish onboarding (can be added later).
+- Auto-save of file uploads beyond what already happens (uploads already persist immediately).
