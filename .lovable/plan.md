@@ -1,21 +1,20 @@
-## Goal
-Switch the Interac OIDC authorization request to use the scopes `openid general_scope` (instead of the current `openid profile address` default), then retest the flow.
+## Fix: Interac kicks user back to homepage
 
-## Changes
+**Root cause:** `INTERAC_REDIRECT_URI` is set to `https://www.efin.money/` (the app homepage). Interac sends the OIDC `code` there, but the homepage has no handler, so the code is never exchanged and the user appears "kicked out."
 
-1. **`supabase/functions/interac-start/index.ts`**
-   - Update the fallback default for `SCOPES` from `"openid profile address"` to `"openid general_scope"`, so the function uses the correct scope even if the `INTERAC_SCOPES` secret is not set.
-   ```ts
-   const SCOPES = Deno.env.get("INTERAC_SCOPES") || "openid general_scope";
+## Steps
+
+1. **Update the `INTERAC_REDIRECT_URI` secret** to the callback edge function URL:
    ```
+   https://hgmskcvaeadnyovbroup.supabase.co/functions/v1/interac-callback
+   ```
+   (Done via the secrets update tool — you'll get a prompt to confirm the new value.)
 
-2. **Update the `INTERAC_SCOPES` runtime secret** to `openid general_scope` via the secrets tool, so the deployed function uses the new value regardless of code fallback.
+2. **Verify `INTERAC_APP_RETURN_BASE`** is set to `https://efin.money` so that after the callback completes, the user lands back on `/onboarding/identity?interac=success`. If not set, I'll prompt to add/update it.
 
-3. **Deploy** `interac-start` edge function.
+3. **Manual step on your side (Interac Hub Verify portal):** add the exact callback URL above to the allowed `redirect_uri` list for client `5f2529ac-bf0c-477c-9584-fc39b3d3f04b`. Without this, Interac will reject the request with `invalid_redirect_uri`.
 
-4. **Test**
-   - Call `interac-start` via `supabase--curl_edge_functions` as the logged-in preview user and confirm the returned `authorization_url` contains `scope=openid+general_scope`.
-   - Then ask the user to click "Verify with Interac" on `/onboarding/identity` to validate the live redirect handshake; check `interac-start` and `interac-callback` logs for errors.
+4. **Retest:** call `interac-start` to confirm the authorization URL now uses the new `redirect_uri`, then ask you to click "Verify with Interac" on `/onboarding/identity`. I'll check `interac-callback` logs to confirm token exchange succeeds and the redirect ends at `/onboarding/identity?interac=success`.
 
 ## Out of scope
-- No UI changes, no DB schema changes, no callback logic changes.
+No code or DB changes — this is a secret + Interac portal configuration fix only.
