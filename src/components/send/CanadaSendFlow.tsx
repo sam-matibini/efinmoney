@@ -518,31 +518,62 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
             </div>
 
             {/* Funding source */}
-            <div className="space-y-2 pt-2 border-t border-border">
+            <div className="space-y-3 pt-2 border-t border-border">
               <Label>How are you paying?</Label>
-              <div className="grid grid-cols-2 gap-2">
-                <Button
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button
                   type="button"
-                  variant={funding === "wallet" ? "default" : "outline"}
-                  className="flex items-center justify-center gap-2 h-auto py-3"
                   onClick={() => setFunding("wallet")}
                   disabled={noCadWallet}
+                  className={`relative text-left p-4 rounded-xl border-2 transition-all ${
+                    funding === "wallet"
+                      ? "border-primary ring-2 ring-primary/30 bg-primary/5"
+                      : "border-border hover:border-primary/40"
+                  } ${noCadWallet ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
                 >
-                  <Wallet className="w-4 h-4" />
-                  <span className="text-xs">Pay from CAD wallet</span>
-                </Button>
-                <Button
+                  {funding === "wallet" && (
+                    <span className="absolute top-2 right-2 w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
+                      <Check className="w-3.5 h-3.5" />
+                    </span>
+                  )}
+                  <div className="flex items-center gap-2 mb-1">
+                    <Wallet className="w-5 h-5 text-primary" />
+                    <span className="font-medium text-sm">Pay from CAD wallet</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {noCadWallet ? "No CAD wallet available" : "Instant · no extra fee"}
+                  </p>
+                </button>
+                <button
                   type="button"
-                  variant={funding === "card" ? "default" : "outline"}
-                  className="flex items-center justify-center gap-2 h-auto py-3"
-                  onClick={() => setFunding("card")}
+                  onClick={() => {
+                    setFunding("card");
+                    setTimeout(() => cardPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 50);
+                  }}
+                  className={`relative text-left p-4 rounded-xl border-2 transition-all cursor-pointer ${
+                    funding === "card"
+                      ? "border-primary ring-2 ring-primary/30 bg-primary/5"
+                      : "border-border hover:border-primary/40"
+                  }`}
                 >
-                  <CreditCard className="w-4 h-4" />
-                  <span className="text-xs">Pay with card (+C$1.50)</span>
-                </Button>
+                  {funding === "card" && (
+                    <span className="absolute top-2 right-2 w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
+                      <Check className="w-3.5 h-3.5" />
+                    </span>
+                  )}
+                  <div className="flex items-center gap-2 mb-1">
+                    <CreditCard className="w-5 h-5 text-primary" />
+                    <span className="font-medium text-sm">Pay with card</span>
+                    <span className="ml-auto text-[10px] font-semibold px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                      +C$1.50
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Visa, Mastercard, Amex · secured by Stripe</p>
+                </button>
               </div>
             </div>
 
+            <div ref={cardPanelRef}>
             {funding === "card" && stripeReady === false && (
               <div className="p-4 rounded-lg border border-destructive/40 bg-destructive/10 text-sm text-destructive">
                 <strong>Card payments are temporarily unavailable.</strong>
