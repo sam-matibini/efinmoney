@@ -11,6 +11,7 @@ import OnboardingShell from "@/components/kyc/OnboardingShell";
 import DocumentUploader from "@/components/kyc/DocumentUploader";
 import SelfieCaptureModal from "@/components/kyc/SelfieCaptureModal";
 import PersonaVerification from "@/components/kyc/PersonaVerification";
+import InteracVerification from "@/components/kyc/InteracVerification";
 import { ISO_COUNTRIES } from "@/lib/isoCountries";
 import { ArrowRight, Camera, IdCard, FileText, BookUser, CheckCircle2, Info, ShieldCheck, FlaskConical } from "lucide-react";
 import { toast } from "sonner";
