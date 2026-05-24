@@ -425,17 +425,7 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
 
             <div className="space-y-2">
               <Label>Delivery Method (how recipient receives)</Label>
-              <div className="grid grid-cols-3 gap-2">
-                <Button
-                  type="button"
-                  variant={method === "interac" ? "default" : "outline"}
-                  className="flex flex-col items-center gap-1 h-auto py-3"
-                  onClick={() => setMethod("interac")}
-                >
-                  <Mail className="w-5 h-5" />
-                  <span className="text-xs">Interac</span>
-                  <span className="text-[10px] opacity-70">C$0.50 · ~30 min</span>
-                </Button>
+              <div className="grid grid-cols-2 gap-2">
                 <Button
                   type="button"
                   variant={method === "eft" ? "default" : "outline"}
@@ -457,11 +447,6 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
                   <span className="text-[10px] opacity-70">C$1.00 · seconds</span>
                 </Button>
               </div>
-              {method === "interac" && (
-                <p className="text-xs text-muted-foreground mt-2">
-                  Securely send and receive your money anytime, to any Canadian bank account with Interac e-Transfer.
-                </p>
-              )}
             </div>
 
             <div className="p-4 rounded-xl bg-muted">
