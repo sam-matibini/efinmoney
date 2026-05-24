@@ -1,6 +1,7 @@
 // Interac OIDC - Start verification
 // Returns an authorization URL the client should redirect to.
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { SignJWT, importJWK } from "npm:jose@5";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
