@@ -27,8 +27,10 @@ const DOC_TYPES: { id: IdType; label: string; icon: React.ComponentType<{ classN
 
 const Identity = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   const { kyc, refetch } = useKyc();
+
 
   const [country, setCountry] = useState<string>("");
   const [docType, setDocType] = useState<IdType | "">("");
