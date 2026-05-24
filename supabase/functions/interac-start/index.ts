@@ -9,10 +9,11 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const ISSUER = Deno.env.get("INTERAC_ISSUER_URL")!;
-const CLIENT_ID = Deno.env.get("INTERAC_CLIENT_ID")!;
-const REDIRECT_URI = Deno.env.get("INTERAC_REDIRECT_URI")!;
-const SCOPES = Deno.env.get("INTERAC_SCOPES") || "openid general_scope";
+const ISSUER = Deno.env.get("INTERAC_HUB_ISSUER_URL") ?? Deno.env.get("INTERAC_ISSUER_URL")!;
+const CLIENT_ID = Deno.env.get("INTERAC_HUB_CLIENT_ID") ?? Deno.env.get("INTERAC_CLIENT_ID")!;
+const REDIRECT_URI = Deno.env.get("INTERAC_HUB_REDIRECT_URI") ?? Deno.env.get("INTERAC_REDIRECT_URI")!;
+const SCOPES = Deno.env.get("INTERAC_HUB_SCOPES") ?? Deno.env.get("INTERAC_SCOPES") ?? "openid general_scope";
+const PRIVATE_JWK_RAW = Deno.env.get("INTERAC_HUB_PRIVATE_JWK") ?? Deno.env.get("INTERAC_PRIVATE_JWK");
 
 let discoveryCache: { authorization_endpoint: string; token_endpoint: string; userinfo_endpoint: string; jwks_uri: string; issuer: string } | null = null;
 
@@ -93,9 +94,9 @@ Deno.serve(async (req) => {
       .eq("user_id", userId);
 
     // Build JAR (RFC 9101) signed Request Object
-    const privateJwkRaw = Deno.env.get("INTERAC_PRIVATE_JWK");
+    const privateJwkRaw = PRIVATE_JWK_RAW;
     if (!privateJwkRaw) {
-      return new Response(JSON.stringify({ error: "INTERAC_PRIVATE_JWK not configured" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ error: "Interac private JWK not configured" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
     let privateJwk: Record<string, unknown>;
     try {

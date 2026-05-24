@@ -2,7 +2,7 @@
 // Takes { code, state }, exchanges for tokens, validates ID token, fetches userinfo,
 // updates KYC, and returns JSON. The browser then navigates to /onboarding/identity?interac=...
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { jwtVerify, createRemoteJWKSet } from "npm:jose@5";
+import { jwtVerify, createRemoteJWKSet, SignJWT, importJWK } from "npm:jose@5";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -10,9 +10,10 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const ISSUER = Deno.env.get("INTERAC_ISSUER_URL")!;
-const CLIENT_ID = Deno.env.get("INTERAC_CLIENT_ID")!;
-const CLIENT_SECRET = Deno.env.get("INTERAC_CLIENT_SECRET")!;
+const ISSUER = Deno.env.get("INTERAC_HUB_ISSUER_URL") ?? Deno.env.get("INTERAC_ISSUER_URL")!;
+const CLIENT_ID = Deno.env.get("INTERAC_HUB_CLIENT_ID") ?? Deno.env.get("INTERAC_CLIENT_ID")!;
+const CLIENT_SECRET = Deno.env.get("INTERAC_HUB_CLIENT_SECRET") ?? Deno.env.get("INTERAC_CLIENT_SECRET") ?? "";
+const PRIVATE_JWK_RAW = Deno.env.get("INTERAC_HUB_PRIVATE_JWK") ?? Deno.env.get("INTERAC_PRIVATE_JWK");
 
 let discoveryCache: any = null;
 let jwksCache: ReturnType<typeof createRemoteJWKSet> | null = null;
@@ -63,14 +64,42 @@ Deno.serve(async (req) => {
 
     const oidc = await discover();
 
-    const tokenBody = new URLSearchParams({
+    const tokenParams: Record<string, string> = {
       grant_type: "authorization_code",
       code,
       redirect_uri: session.redirect_uri,
       client_id: CLIENT_ID,
-      client_secret: CLIENT_SECRET,
       code_verifier: session.code_verifier,
-    });
+    };
+
+    if (CLIENT_SECRET) {
+      tokenParams.client_secret = CLIENT_SECRET;
+    } else if (PRIVATE_JWK_RAW) {
+      // private_key_jwt client assertion (RFC 7523)
+      try {
+        const jwk = JSON.parse(PRIVATE_JWK_RAW);
+        const alg = (jwk.alg as string) || "PS256";
+        const kid = jwk.kid as string | undefined;
+        const key = await importJWK(jwk, alg);
+        const now = Math.floor(Date.now() / 1000);
+        const assertion = await new SignJWT({})
+          .setProtectedHeader({ alg, ...(kid ? { kid } : {}), typ: "JWT" })
+          .setIssuer(CLIENT_ID)
+          .setSubject(CLIENT_ID)
+          .setAudience(oidc.token_endpoint)
+          .setIssuedAt(now)
+          .setExpirationTime(now + 300)
+          .setJti(crypto.randomUUID())
+          .sign(key);
+        tokenParams.client_assertion_type = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer";
+        tokenParams.client_assertion = assertion;
+      } catch (e) {
+        console.error("Failed to build client assertion:", e);
+        return fail("client_assertion_failed");
+      }
+    }
+
+    const tokenBody = new URLSearchParams(tokenParams);
 
     const tokenRes = await fetch(oidc.token_endpoint, {
       method: "POST",

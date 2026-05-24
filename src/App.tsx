@@ -59,6 +59,7 @@ import UsersPage from "./pages/admin/UsersPage";
 import UserDetailPage from "./pages/admin/UserDetailPage";
 import SystemDiagnosticsPage from "./pages/admin/SystemDiagnosticsPage";
 import InteracCallback from "./pages/InteracCallback";
+import InteracHubCallback from "./pages/InteracHubCallback";
 
 const queryClient = new QueryClient();
 
@@ -204,6 +205,7 @@ const AppRoutes = () => {
           <Route path="/deposit/complete" element={<DepositComplete />} />
           <Route path="/payment-callback" element={<PaymentCallback />} />
           <Route path="/callback" element={<InteracCallback />} />
+          <Route path="/interac/callback" element={<InteracHubCallback />} />
           <Route path="/onboarding/welcome" element={<ProtectedRoute><Welcome /></ProtectedRoute>} />
           <Route path="/onboarding/identity" element={<ProtectedRoute><OnboardingIdentity /></ProtectedRoute>} />
           <Route path="/onboarding/address" element={<ProtectedRoute><OnboardingAddress /></ProtectedRoute>} />
