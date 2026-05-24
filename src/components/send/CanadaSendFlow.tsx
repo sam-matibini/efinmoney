@@ -678,11 +678,6 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
             <p className="text-muted-foreground mb-2">
               C${parsedAmount.toFixed(2)} is on its way to {recipientName}
             </p>
-            {method === "interac" && (
-              <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
-                Interac e-Transfer will be sent within 30 minutes. {recipientName} will receive an email from eFinMoney at <strong>{recipientEmail}</strong>.
-              </p>
-            )}
             {method === "eft" && (
               <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
                 Funds will arrive in the recipient's bank account within 1–3 business days.
