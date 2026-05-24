@@ -1,1 +1,1 @@
-{"error":"Unexpected token 'h', \"https://ap\"... is not valid JSON"}
+{"keys":[{"kty":"RSA","n":"o18C3Kgle1k-x2zT8aN5W7aPmYkwapLm5W11hIK3s-O3qLxgjOjZYClef3mZadbjzgflviv8X_liuWPOf0dnYRA8tPEQu4J6nm50eKZ3TRzMZKAalBkawBXbbkPLVdh1Mrq0AIdm9eixZ8yM9SM1Kk-MpAWvM3kTWzaG1PVegBjOPGQ5cERYQJDazslHeWfAMztzoGumTc6hRwkloJu6n12oNFUzGOzTwYVk8E7hTv-jd8rxZbH-LJQcQa1L6a5ZhdC4cMqw4ARhqoP0HGfQGQta7GKWjpmgO4Xu_xA9t2aQOS7NH6DtFymYcC1Z5yO6RNZ_X2r9RiEhnaBHVuPIFw","e":"AQAB","alg":"PS256","kid":"0f762484-76e3-4dd9-9c2b-6464b6dc6368","use":"sig"}]}
