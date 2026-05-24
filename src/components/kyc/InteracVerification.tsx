@@ -21,7 +21,16 @@ export const InteracVerification = ({ className, label = "Verify with Interac" }
       if (error || !data?.authorization_url) {
         throw new Error(error?.message || data?.error || "Could not start Interac verification");
       }
-      window.location.href = data.authorization_url;
+      const url = data.authorization_url as string;
+      try {
+        if (window.top && window.top !== window.self) {
+          window.top.location.href = url;
+        } else {
+          window.location.href = url;
+        }
+      } catch {
+        window.open(url, "_blank", "noopener");
+      }
     } catch (err) {
       setLoading(false);
       console.error(err);
