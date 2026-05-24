@@ -656,7 +656,7 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
                   {" "}<strong>Total {funding === "card" ? "charged to card" : "from wallet"}: C${totalCharged.toFixed(2)}</strong>
                 </p>
                 <p>
-                  Delivery: {method === "interac" ? "Interac e-Transfer (email)" : method === "eft" ? "Bank Transfer (EFT)" : "Instant to debit card (Visa Direct)"}
+                  Delivery: {method === "eft" ? "Bank Transfer (EFT)" : "Instant to debit card (Visa Direct)"}
                 </p>
               </div>
             </div>
