@@ -752,6 +752,16 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
                 Funds will arrive in the recipient's bank account within 1–3 business days.
               </p>
             )}
+            {method === "interac" && (
+              <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
+                Interac sent {recipientEmail} an email with a deposit link. Funds typically arrive within minutes once they accept.
+                {security && (
+                  <span className="block mt-2 text-xs">
+                    Security Q: <strong>{security.question}</strong> · A: <strong>{security.answer}</strong>
+                  </span>
+                )}
+              </p>
+            )}
             {method === "card_push" && (
               <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
                 Funds are being pushed to {recipientName}'s debit card via Visa Direct and typically arrive within seconds.
