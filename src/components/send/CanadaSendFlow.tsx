@@ -641,7 +641,7 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
               >
                 {createTransfer.isPending || cardSubmitting
                   ? "Processing..."
-                  : `Send C$${parsedAmount.toFixed(2)} via ${method === "interac" ? "Interac" : method === "eft" ? "Bank Transfer" : "Visa Direct"}`}
+                  : `Send C$${parsedAmount.toFixed(2)} via ${method === "eft" ? "Bank Transfer" : "Visa Direct"}`}
               </Button>
             </div>
 
