@@ -216,10 +216,8 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
     : (!securityQuestion && !securityAnswer)
       || (securityQuestion.trim().length >= 4 && securityAnswer.trim().length >= 3);
 
-  const recipientValid = method === "interac"
-    ? recipientName.trim().length > 1 && /\S+@\S+\.\S+/.test(recipientEmail) && interacQAValid
-    : method === "card_push"
-      ? recipientName.trim().length > 1 && recipientCardComplete
+  const recipientValid = method === "card_push"
+    ? recipientName.trim().length > 1 && recipientCardComplete
     : recipientName.trim().length > 1
         && /^\d{3}$/.test(institutionNumber)
         && /^\d{5}$/.test(transitNumber)
