@@ -120,7 +120,6 @@ const Address = () => {
     navigate("/onboarding/review");
   };
 
-  return (
   const saveDraft = async () => {
     if (!user) return;
     await supabase
