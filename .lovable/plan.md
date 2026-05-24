@@ -1,28 +1,70 @@
-# Fix: Elicate still running in sandbox mode
+## Add Interac OIDC Document Verification (Production)
 
-## Diagnosis
+Integrate Interac's OpenID Connect (OIDC) client for ID verification as a **second option alongside Persona** on the onboarding Identity step. Canadian users will see both choices; the result feeds the same KYC approval pipeline.
 
-All five Elicate live secrets are configured (`ELICATE_LIVE_BASE_URL`, `ELICATE_LIVE_SECRET_KEY`, `ELICATE_LIVE_PUBLIC_KEY`, `ELICATE_LIVE_WEBHOOK_SECRET`, plus `ELICATE_ENV`). But `/test-integrations` confirms the resolver is still returning `mode: "sandbox"`:
+### 1. Secrets (request after plan approval)
 
-```json
-{ "endpoint": "elicatepay.vercel.app", "httpStatus": 204, "mode": "sandbox" }
-```
+- `INTERAC_CLIENT_ID`
+- `INTERAC_CLIENT_SECRET`
+- `INTERAC_ISSUER_URL` (production OIDC discovery base, e.g. `https://oidc.interac.ca`)
+- `INTERAC_REDIRECT_URI` (callback URL on our domain — we'll provide this for them to allowlist)
+- `INTERAC_SCOPES` (e.g. `openid profile address document_verification`) — optional, defaults sensible
 
-That means `ELICATE_ENV` currently holds something other than the literal string `live` (likely blank or `sandbox`). The helper at `supabase/functions/_shared/elicate.ts` only switches when the value lowercases to exactly `"live"`, so every payout still hits the sandbox URL — which is what's returning the 500 you saw in the screenshot.
+### 2. Database (migration)
 
-## Fix
+Extend `kyc_verifications` with:
+- `interac_session_id text` — our internal random state/nonce
+- `interac_sub text` — Interac subject identifier returned in the ID token
+- `interac_verification_status text` — `pending | approved | failed`
+- `interac_claims jsonb` — verified claims (name, DOB, address, doc type/number, issuer)
+- `interac_completed_at timestamptz`
 
-One secret update, no code changes:
+Add `verification_provider text` ("persona" | "interac" | "manual") so admin review knows the source.
 
-1. Update `ELICATE_ENV` → set its value to `live` (lowercase, no quotes, no spaces).
-2. Edge functions pick it up immediately on the next invocation — no redeploy needed.
+### 3. Edge functions
 
-## Verify
+**`interac-start`** (verify JWT)
+- Discovers OIDC config from `INTERAC_ISSUER_URL/.well-known/openid-configuration` (cached in-memory per cold start).
+- Generates `state`, `nonce`, PKCE `code_verifier`/`code_challenge`.
+- Stores them in `kyc_verifications` (`interac_session_id` = state, plus a short-lived row in a new `interac_sessions` table keyed by state holding `code_verifier`, `nonce`, `user_id`, `expires_at`).
+- Returns `{ authorization_url }` built with `response_type=code`, scopes, redirect URI, state, nonce, PKCE.
 
-1. Open `/admin/diagnostics` → click **Test Connection** on Zambia (Elicate Pay). Confirm details show `mode: live` and the endpoint switches from `elicatepay.vercel.app` to your production host.
-2. Run a small real payout via `/send` to a controlled MTN/Airtel number and confirm Elicate's live dashboard logs it.
-3. If anything misbehaves, set `ELICATE_ENV` back to `sandbox` to revert instantly.
+**`interac-callback`** (public, `verify_jwt = false`)
+- Receives `code` and `state` from Interac redirect.
+- Looks up session row, validates not expired, deletes it (single-use).
+- Exchanges code at token endpoint with `client_secret` + `code_verifier`.
+- Validates ID token: signature against JWKS, `iss`, `aud == client_id`, `exp`, `nonce` match.
+- Fetches `/userinfo` for verified document claims.
+- Updates `kyc_verifications`: stores `interac_sub`, `interac_claims`, marks `id_verification_status = 'approved'`, `verification_provider = 'interac'`, and triggers the same downstream flow Persona uses (sets `verification_status` to `pending_review` or `approved` per existing logic in `on_kyc_status_change`).
+- Redirects user back to `/onboarding/address` (or `/onboarding/pending` on failure with a query param).
 
-## What I need from you
+### 4. Frontend
 
-Approve this plan and I'll trigger the secret-update form for `ELICATE_ENV`. Type `live` in the value field.
+**`src/components/kyc/InteracVerification.tsx`** (mirrors `PersonaVerification.tsx`)
+- Button "Verify with Interac". Calls `interac-start`, then `window.location.href = authorization_url`.
+- Loading + error states identical to Persona component.
+
+**`src/pages/onboarding/Identity.tsx`**
+- Replace the single "Automated ID verification" card with a two-choice provider picker:
+  - **Persona** (current) — left card
+  - **Interac Document Verification** — right card, labeled "Recommended for Canadian residents"
+- Keep "Continue with manual upload instead" link below both.
+- After Interac redirect-back lands on `/onboarding/identity?interac=success` (or `error`), show a toast and advance the same way `onPersonaComplete` does.
+
+### 5. Admin review
+
+- `src/pages/admin/KycReviewPage.tsx` shows `verification_provider` badge and renders `interac_claims` JSON when the provider is Interac (no document images to view — Interac returns verified claims only).
+
+### Technical notes
+
+- OIDC client is built from scratch with `fetch` + `jose` (`npm:jose@5`) for JWT/JWKS validation. No SDK required.
+- Discovery cached per-function-instance; JWKS fetched fresh per token validation (acceptable for KYC volume).
+- `interac_sessions` rows expire after 10 minutes and are deleted on use; a cron-style cleanup is not required but a `DELETE WHERE expires_at < now()` runs at the top of `interac-callback`.
+- All Interac claims stored in `interac_claims` jsonb so we can adapt to schema additions without further migrations.
+- Memory: add `mem://features/interac-kyc` after build.
+
+### Out of scope
+
+- Replacing Persona (kept as a peer option).
+- Per-country auto-routing (user picks).
+- Storing or displaying any ID document images (Interac doesn't expose them).
