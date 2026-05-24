@@ -92,6 +92,20 @@ const ReceivePage = () => {
             </CardContent>
           </Card>
 
+          <Card className="border-emerald-500/30 bg-emerald-500/5">
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-500/15 text-emerald-600 text-xs font-bold">i</span>
+                Interac e-Transfer (Canada)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                Securely send and receive your money anytime, to any Canadian bank account with Interac e-Transfer.
+              </p>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader><CardTitle>Add a virtual account</CardTitle></CardHeader>
             <CardContent className="flex gap-3 items-end">

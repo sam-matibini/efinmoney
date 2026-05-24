@@ -1,21 +1,14 @@
-## Add Interac descriptive copy to Identity page
+## Add Interac e-Transfer tagline to Send and Receive
 
-Update the Interac verification card on `/onboarding/identity` to include the official Interac description.
+Add the official copy: *"Securely send and receive your money anytime, to any Canadian bank account with Interac e-Transfer."*
 
-### Change
+### Changes
 
-In `src/pages/onboarding/Identity.tsx`, replace the current short subtitle under the "Verify with Interac" heading:
+**1. `src/components/send/CanadaSendFlow.tsx`**
+Under the "Delivery Method" grid (after the 3 method buttons around line 460), when `method === "interac"`, show a small muted helper line with the tagline.
 
-> "Sign in with your Canadian bank to verify instantly."
+**2. `src/pages/ReceivePage.tsx`**
+Add a new Interac e-Transfer info card (above or below the "Receive from another eFinMoney user" card) with the Interac® brand color accent, displaying the tagline and noting the user's account email/alias used for incoming e-Transfers.
 
-with the official Interac copy:
-
-> "Verify your identity quickly and securely with Interac® verification service using trusted data sources—all with the online banking login information you already use with a participating financial institution¹"
-
-### Details
-
-- Keep the existing card layout, green accent, and "Recommended in Canada" badge.
-- Render the trailing `¹` as a small superscript footnote marker (no footnote text added unless you want one).
-- No changes to `InteracVerification.tsx`, no logic changes.
-
-Confirm and I'll switch to build mode to apply it. Want me to also add the actual footnote text (e.g. "¹ Subject to your financial institution's participation") below the card?
+### Out of scope
+No logic changes, no new edge functions — copy + presentational card only.

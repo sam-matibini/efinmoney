@@ -457,6 +457,11 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
                   <span className="text-[10px] opacity-70">C$1.00 · seconds</span>
                 </Button>
               </div>
+              {method === "interac" && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  Securely send and receive your money anytime, to any Canadian bank account with Interac e-Transfer.
+                </p>
+              )}
             </div>
 
             <div className="p-4 rounded-xl bg-muted">
