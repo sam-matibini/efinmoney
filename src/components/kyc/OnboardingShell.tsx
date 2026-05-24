@@ -1,6 +1,7 @@
 import { ReactNode } from "react";
 import { motion } from "framer-motion";
 import KYCProgressBar from "@/components/kyc/KYCProgressBar";
+import SaveAndExitButton from "@/components/kyc/SaveAndExitButton";
 
 interface Props {
   step?: 1 | 2 | 3;
@@ -8,9 +9,11 @@ interface Props {
   subtitle?: string;
   children: ReactNode;
   footer?: ReactNode;
+  onSaveDraft?: () => Promise<void> | void;
+  hideSaveExit?: boolean;
 }
 
-const OnboardingShell = ({ step, title, subtitle, children, footer }: Props) => {
+const OnboardingShell = ({ step, title, subtitle, children, footer, onSaveDraft, hideSaveExit }: Props) => {
   return (
     <div className="min-h-screen bg-background">
       <div className="container max-w-2xl mx-auto px-4 py-8 md:py-12">
@@ -29,6 +32,11 @@ const OnboardingShell = ({ step, title, subtitle, children, footer }: Props) => 
             )}
           </div>
           <div className="space-y-6">{children}</div>
+          {!hideSaveExit && (
+            <div className="mt-6 flex justify-center">
+              <SaveAndExitButton onSaveDraft={onSaveDraft} />
+            </div>
+          )}
           {footer && <div className="mt-8">{footer}</div>}
         </motion.div>
       </div>
