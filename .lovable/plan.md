@@ -1,70 +1,33 @@
-## Add Interac OIDC Document Verification (Production)
+## Goal
+Show a branded loading animation (using the eFinMoney logo) while the Interac verification flow is connecting/redirecting, instead of the plain spinner currently in the button.
 
-Integrate Interac's OpenID Connect (OIDC) client for ID verification as a **second option alongside Persona** on the onboarding Identity step. Canadian users will see both choices; the result feeds the same KYC approval pipeline.
+## Changes
 
-### 1. Secrets (request after plan approval)
+### 1. Save the uploaded icon
+- Copy `user-uploads://Icon.png` → `src/assets/efin-icon.png` (kept separate from existing `efin-logo.png` so the gold-on-blue mark is available for branded states).
 
-- `INTERAC_CLIENT_ID`
-- `INTERAC_CLIENT_SECRET`
-- `INTERAC_ISSUER_URL` (production OIDC discovery base, e.g. `https://oidc.interac.ca`)
-- `INTERAC_REDIRECT_URI` (callback URL on our domain — we'll provide this for them to allowlist)
-- `INTERAC_SCOPES` (e.g. `openid profile address document_verification`) — optional, defaults sensible
+### 2. New component: `src/components/ui/LogoLoader.tsx`
+A reusable branded loader:
+- Centered eFinMoney icon (from `src/assets/efin-icon.png`).
+- Outer rotating conic-gradient ring in emerald/primary tones.
+- Inner pulsing glow halo.
+- Subtle floating/breathing motion on the logo itself (framer-motion).
+- Optional `label` prop (e.g. "Connecting to Interac…") with animated dots.
+- Sizes: `sm | md | lg`, default `md` (~96px).
 
-### 2. Database (migration)
+### 3. Wire into Interac flow — `src/components/kyc/InteracVerification.tsx`
+- While `loading` is true OR after we have the `authorization_url` and are about to `window.location.href = …`, render a full-card overlay (or replace the button area) with `<LogoLoader label="Connecting to Interac…" />`.
+- Keep the existing button as the trigger; once clicked, swap to the loader state until the browser navigates away.
+- Add a graceful "Taking longer than expected…" secondary text after ~6s (so a stalled redirect still feels intentional).
 
-Extend `kyc_verifications` with:
-- `interac_session_id text` — our internal random state/nonce
-- `interac_sub text` — Interac subject identifier returned in the ID token
-- `interac_verification_status text` — `pending | approved | failed`
-- `interac_claims jsonb` — verified claims (name, DOB, address, doc type/number, issuer)
-- `interac_completed_at timestamptz`
+### 4. Wire into the post-redirect return — `src/pages/onboarding/Identity.tsx`
+- When `searchParams.get("interac") === "success"` we already toast + navigate. Briefly show the same `<LogoLoader label="Finalizing verification…" />` as an overlay during that handoff (currently it's invisible work).
 
-Add `verification_provider text` ("persona" | "interac" | "manual") so admin review knows the source.
+## Out of scope
+- No backend changes, no Interac SDK changes, no routing changes.
+- Error CTA work from the previous turn stays as already planned/implemented.
 
-### 3. Edge functions
-
-**`interac-start`** (verify JWT)
-- Discovers OIDC config from `INTERAC_ISSUER_URL/.well-known/openid-configuration` (cached in-memory per cold start).
-- Generates `state`, `nonce`, PKCE `code_verifier`/`code_challenge`.
-- Stores them in `kyc_verifications` (`interac_session_id` = state, plus a short-lived row in a new `interac_sessions` table keyed by state holding `code_verifier`, `nonce`, `user_id`, `expires_at`).
-- Returns `{ authorization_url }` built with `response_type=code`, scopes, redirect URI, state, nonce, PKCE.
-
-**`interac-callback`** (public, `verify_jwt = false`)
-- Receives `code` and `state` from Interac redirect.
-- Looks up session row, validates not expired, deletes it (single-use).
-- Exchanges code at token endpoint with `client_secret` + `code_verifier`.
-- Validates ID token: signature against JWKS, `iss`, `aud == client_id`, `exp`, `nonce` match.
-- Fetches `/userinfo` for verified document claims.
-- Updates `kyc_verifications`: stores `interac_sub`, `interac_claims`, marks `id_verification_status = 'approved'`, `verification_provider = 'interac'`, and triggers the same downstream flow Persona uses (sets `verification_status` to `pending_review` or `approved` per existing logic in `on_kyc_status_change`).
-- Redirects user back to `/onboarding/address` (or `/onboarding/pending` on failure with a query param).
-
-### 4. Frontend
-
-**`src/components/kyc/InteracVerification.tsx`** (mirrors `PersonaVerification.tsx`)
-- Button "Verify with Interac". Calls `interac-start`, then `window.location.href = authorization_url`.
-- Loading + error states identical to Persona component.
-
-**`src/pages/onboarding/Identity.tsx`**
-- Replace the single "Automated ID verification" card with a two-choice provider picker:
-  - **Persona** (current) — left card
-  - **Interac Document Verification** — right card, labeled "Recommended for Canadian residents"
-- Keep "Continue with manual upload instead" link below both.
-- After Interac redirect-back lands on `/onboarding/identity?interac=success` (or `error`), show a toast and advance the same way `onPersonaComplete` does.
-
-### 5. Admin review
-
-- `src/pages/admin/KycReviewPage.tsx` shows `verification_provider` badge and renders `interac_claims` JSON when the provider is Interac (no document images to view — Interac returns verified claims only).
-
-### Technical notes
-
-- OIDC client is built from scratch with `fetch` + `jose` (`npm:jose@5`) for JWT/JWKS validation. No SDK required.
-- Discovery cached per-function-instance; JWKS fetched fresh per token validation (acceptable for KYC volume).
-- `interac_sessions` rows expire after 10 minutes and are deleted on use; a cron-style cleanup is not required but a `DELETE WHERE expires_at < now()` runs at the top of `interac-callback`.
-- All Interac claims stored in `interac_claims` jsonb so we can adapt to schema additions without further migrations.
-- Memory: add `mem://features/interac-kyc` after build.
-
-### Out of scope
-
-- Replacing Persona (kept as a peer option).
-- Per-country auto-routing (user picks).
-- Storing or displaying any ID document images (Interac doesn't expose them).
+## Visual direction
+- Emerald primary ring (`hsl(var(--primary))`) matching the existing Interac card border.
+- Logo at rest with gentle `y` float (reuses the motion vocabulary already in `src/components/Logo.tsx`).
+- Dark-theme friendly; works on both the white Interac card and any overlay backdrop.
