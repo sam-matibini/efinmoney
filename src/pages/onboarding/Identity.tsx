@@ -14,6 +14,7 @@ import PersonaVerification from "@/components/kyc/PersonaVerification";
 import InteracVerification from "@/components/kyc/InteracVerification";
 import { ISO_COUNTRIES } from "@/lib/isoCountries";
 import { ArrowRight, Camera, IdCard, FileText, BookUser, CheckCircle2, Info, ShieldCheck, FlaskConical } from "lucide-react";
+import LogoLoader from "@/components/ui/LogoLoader";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -41,6 +42,7 @@ const Identity = () => {
   const [selfieOpen, setSelfieOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [personaSubmitted, setPersonaSubmitted] = useState(false);
+  const [interacFinalizing, setInteracFinalizing] = useState(false);
 
   // Hydrate from existing KYC record
   useEffect(() => {
@@ -65,9 +67,12 @@ const Identity = () => {
     const interac = searchParams.get("interac");
     if (!interac) return;
     if (interac === "success") {
+      setInteracFinalizing(true);
       toast.success("Identity verified with Interac");
-      (async () => { await refetch(); navigate("/onboarding/address", { replace: true }); })();
-
+      (async () => {
+        await refetch();
+        navigate("/onboarding/address", { replace: true });
+      })();
     } else {
       const reason = searchParams.get("reason");
       toast.error(`Interac verification failed${reason ? `: ${reason}` : ""}. Try another method.`);
@@ -144,6 +149,15 @@ const Identity = () => {
 
   return (
     <OnboardingShell step={1} title="Verify your identity" subtitle="We'll guide you through a quick automated check.">
+      {interacFinalizing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+          <LogoLoader
+            size="lg"
+            label="Finalizing verification"
+            subLabel="Securing your Interac identity check…"
+          />
+        </div>
+      )}
       {isSandbox && (
         <div className="flex items-center gap-2 rounded-xl border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
           <FlaskConical className="w-3.5 h-3.5" />

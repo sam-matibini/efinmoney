@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Loader2, ShieldCheck } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
+import LogoLoader from "@/components/ui/LogoLoader";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface Props {
   className?: string;
@@ -28,10 +30,39 @@ export const InteracVerification = ({ className, label = "Verify with Interac" }
   };
 
   return (
-    <Button size="lg" className={className} onClick={start} disabled={loading} variant="outline">
-      {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <ShieldCheck className="w-4 h-4 mr-2" />}
-      {loading ? "Redirecting…" : label}
-    </Button>
+    <div className={className}>
+      <AnimatePresence mode="wait" initial={false}>
+        {loading ? (
+          <motion.div
+            key="loader"
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.96 }}
+            transition={{ duration: 0.25 }}
+            className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 py-5 px-3"
+          >
+            <LogoLoader
+              size="md"
+              label="Connecting to Interac"
+              subLabel="You'll be redirected to your bank to verify securely."
+              slowAfterMs={6000}
+            />
+          </motion.div>
+        ) : (
+          <motion.div
+            key="cta"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <Button size="lg" className="w-full" onClick={start} variant="outline">
+              <ShieldCheck className="w-4 h-4 mr-2" />
+              {label}
+            </Button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 };
 
