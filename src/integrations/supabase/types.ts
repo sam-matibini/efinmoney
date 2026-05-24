@@ -1951,6 +1951,36 @@ export type Database = {
         }
         Relationships: []
       }
+      interac_sessions: {
+        Row: {
+          code_verifier: string
+          created_at: string
+          expires_at: string
+          nonce: string
+          redirect_uri: string
+          state: string
+          user_id: string
+        }
+        Insert: {
+          code_verifier: string
+          created_at?: string
+          expires_at: string
+          nonce: string
+          redirect_uri: string
+          state: string
+          user_id: string
+        }
+        Update: {
+          code_verifier?: string
+          created_at?: string
+          expires_at?: string
+          nonce?: string
+          redirect_uri?: string
+          state?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       intra_ca_transfers: {
         Row: {
           amount_cad: number
@@ -2160,6 +2190,11 @@ export type Database = {
           id_document_url: string | null
           id_rejection_reason: string | null
           id_verification_status: Database["public"]["Enums"]["kyc_doc_review_status"]
+          interac_claims: Json | null
+          interac_completed_at: string | null
+          interac_session_id: string | null
+          interac_sub: string | null
+          interac_verification_status: string | null
           internal_notes: string | null
           liveness_check_status: Database["public"]["Enums"]["kyc_doc_review_status"]
           persona_decision: string | null
@@ -2174,6 +2209,7 @@ export type Database = {
           submitted_at: string | null
           updated_at: string
           user_id: string
+          verification_provider: string | null
           verification_status: Database["public"]["Enums"]["kyc_verification_status"]
         }
         Insert: {
@@ -2195,6 +2231,11 @@ export type Database = {
           id_document_url?: string | null
           id_rejection_reason?: string | null
           id_verification_status?: Database["public"]["Enums"]["kyc_doc_review_status"]
+          interac_claims?: Json | null
+          interac_completed_at?: string | null
+          interac_session_id?: string | null
+          interac_sub?: string | null
+          interac_verification_status?: string | null
           internal_notes?: string | null
           liveness_check_status?: Database["public"]["Enums"]["kyc_doc_review_status"]
           persona_decision?: string | null
@@ -2209,6 +2250,7 @@ export type Database = {
           submitted_at?: string | null
           updated_at?: string
           user_id: string
+          verification_provider?: string | null
           verification_status?: Database["public"]["Enums"]["kyc_verification_status"]
         }
         Update: {
@@ -2230,6 +2272,11 @@ export type Database = {
           id_document_url?: string | null
           id_rejection_reason?: string | null
           id_verification_status?: Database["public"]["Enums"]["kyc_doc_review_status"]
+          interac_claims?: Json | null
+          interac_completed_at?: string | null
+          interac_session_id?: string | null
+          interac_sub?: string | null
+          interac_verification_status?: string | null
           internal_notes?: string | null
           liveness_check_status?: Database["public"]["Enums"]["kyc_doc_review_status"]
           persona_decision?: string | null
@@ -2244,6 +2291,7 @@ export type Database = {
           submitted_at?: string | null
           updated_at?: string
           user_id?: string
+          verification_provider?: string | null
           verification_status?: Database["public"]["Enums"]["kyc_verification_status"]
         }
         Relationships: []
