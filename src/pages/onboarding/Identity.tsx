@@ -263,7 +263,9 @@ const Identity = () => {
                   Verify with Interac
                   <span className="ml-2 text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 uppercase tracking-wide">Recommended in Canada</span>
                 </h3>
-                <p className="text-xs text-muted-foreground">Sign in with your Canadian bank to verify instantly.</p>
+                <p className="text-xs text-muted-foreground">
+                  Verify your identity quickly and securely with Interac® verification service using trusted data sources—all with the online banking login information you already use with a participating financial institution<sup>1</sup>
+                </p>
               </div>
             </div>
             <InteracVerification className="w-full" />
