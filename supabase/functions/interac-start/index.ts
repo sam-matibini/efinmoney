@@ -92,15 +92,45 @@ Deno.serve(async (req) => {
       .update({ interac_session_id: state, interac_verification_status: "pending" })
       .eq("user_id", userId);
 
+    // Build JAR (RFC 9101) signed Request Object
+    const privateJwkRaw = Deno.env.get("INTERAC_PRIVATE_JWK");
+    if (!privateJwkRaw) {
+      return new Response(JSON.stringify({ error: "INTERAC_PRIVATE_JWK not configured" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    let privateJwk: Record<string, unknown>;
+    try {
+      privateJwk = JSON.parse(privateJwkRaw);
+    } catch {
+      return new Response(JSON.stringify({ error: "INTERAC_PRIVATE_JWK is not valid JSON" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    const alg = (privateJwk.alg as string) || "PS256";
+    const kid = privateJwk.kid as string | undefined;
+    const signingKey = await importJWK(privateJwk as any, alg);
+
+    const now = Math.floor(Date.now() / 1000);
+    const requestJwt = await new SignJWT({
+      response_type: "code",
+      client_id: CLIENT_ID,
+      redirect_uri: REDIRECT_URI,
+      scope: SCOPES,
+      state,
+      nonce,
+      code_challenge: codeChallenge,
+      code_challenge_method: "S256",
+    })
+      .setProtectedHeader({ alg, ...(kid ? { kid } : {}), typ: "oauth-authz-req+jwt" })
+      .setIssuer(CLIENT_ID)
+      .setAudience(oidc.issuer)
+      .setIssuedAt(now)
+      .setExpirationTime(now + 300)
+      .setJti(randomB64Url(16))
+      .sign(signingKey);
+
     const url = new URL(oidc.authorization_endpoint);
-    url.searchParams.set("response_type", "code");
     url.searchParams.set("client_id", CLIENT_ID);
-    url.searchParams.set("redirect_uri", REDIRECT_URI);
+    url.searchParams.set("response_type", "code");
     url.searchParams.set("scope", SCOPES);
-    url.searchParams.set("state", state);
-    url.searchParams.set("nonce", nonce);
-    url.searchParams.set("code_challenge", codeChallenge);
-    url.searchParams.set("code_challenge_method", "S256");
+    url.searchParams.set("request", requestJwt);
 
     return new Response(JSON.stringify({ authorization_url: url.toString() }), {
       status: 200,
