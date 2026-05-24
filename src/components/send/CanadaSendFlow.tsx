@@ -477,29 +477,6 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
                 <Input value={recipientName} onChange={(e) => setRecipientName(e.target.value)} placeholder="Jane Doe" />
               </div>
 
-              {method === "interac" && (
-                <>
-                  <div className="space-y-2">
-                    <Label>Recipient Email</Label>
-                    <Input type="email" value={recipientEmail} onChange={(e) => setRecipientEmail(e.target.value)} placeholder="jane@example.com" />
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="space-y-2">
-                      <Label>Security Question <span className="text-muted-foreground">(optional)</span></Label>
-                      <Input value={securityQuestion} onChange={(e) => setSecurityQuestion(e.target.value)} placeholder="What city were we in?" maxLength={120} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Security Answer <span className="text-muted-foreground">(optional)</span></Label>
-                      <Input value={securityAnswer} onChange={(e) => setSecurityAnswer(e.target.value)} placeholder="toronto" maxLength={40} />
-                    </div>
-                  </div>
-                  <p className="text-[11px] text-muted-foreground -mt-2">Leave blank and we'll auto-generate one for you.</p>
-                  <div className="space-y-2">
-                    <Label>Message (optional)</Label>
-                    <Textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Thanks for dinner!" maxLength={400} rows={3} />
-                  </div>
-                </>
-              )}
 
               {method === "eft" && (
                 <>
