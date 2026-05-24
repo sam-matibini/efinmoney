@@ -94,9 +94,9 @@ Deno.serve(async (req) => {
       .eq("user_id", userId);
 
     // Build JAR (RFC 9101) signed Request Object
-    const privateJwkRaw = Deno.env.get("INTERAC_PRIVATE_JWK");
+    const privateJwkRaw = PRIVATE_JWK_RAW;
     if (!privateJwkRaw) {
-      return new Response(JSON.stringify({ error: "INTERAC_PRIVATE_JWK not configured" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ error: "Interac private JWK not configured" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
     let privateJwk: Record<string, unknown>;
     try {
