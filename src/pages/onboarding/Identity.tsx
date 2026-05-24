@@ -147,8 +147,27 @@ const Identity = () => {
 
   const isSandbox = true; // PERSONA_ENVIRONMENT lives server-side; treat preview as sandbox
 
+  const saveDraft = async () => {
+    await persist({
+      current_step: "identity",
+      id_document_country: country || null,
+      id_document_type: docType || null,
+      id_document_url:
+        frontPath || backPath
+          ? JSON.stringify({ front: frontPath, back: backPath })
+          : null,
+      selfie_url: selfiePath || null,
+    });
+  };
+
   return (
-    <OnboardingShell step={1} title="Verify your identity" subtitle="We'll guide you through a quick automated check.">
+    <OnboardingShell
+      step={1}
+      title="Verify your identity"
+      subtitle="We'll guide you through a quick automated check."
+      onSaveDraft={saveDraft}
+    >
+
       {interacFinalizing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
           <LogoLoader
