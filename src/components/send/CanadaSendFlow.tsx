@@ -342,7 +342,7 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
     setInstitutionNumber(""); setTransitNumber(""); setAccountNumber(""); setBankName("");
     setCardNumComplete(false); setCardExpComplete(false); setCardCvcComplete(false);
     setRecipientCardComplete(false);
-    setMethod("interac");
+    setMethod("eft");
     setFunding("wallet");
     setLastTransferId(null);
     setSecurity(null);
