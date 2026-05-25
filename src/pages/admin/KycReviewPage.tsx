@@ -16,6 +16,8 @@ import { useAdminAuth } from "@/contexts/AdminAuthContext";
 import { toast } from "sonner";
 import { ArrowLeft, AlertTriangle, Clock, FileText, ShieldAlert, ZoomIn, ZoomOut } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
+import { extractRiskTags } from "@/lib/personaTags";
+import { KycRiskTagChip } from "@/components/admin/KycRiskTagChip";
 
 const REJECTION_REASONS = [
   "Document is blurry or unreadable",
