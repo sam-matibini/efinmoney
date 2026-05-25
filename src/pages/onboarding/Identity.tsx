@@ -1,7 +1,9 @@
 import { useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+
 import { useKyc } from "@/hooks/useKyc";
 import PersonaVerification from "@/components/kyc/PersonaVerification";
 import InteracVerification from "@/components/kyc/InteracVerification";
