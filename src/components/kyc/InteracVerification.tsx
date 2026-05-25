@@ -64,7 +64,7 @@ export const InteracVerification = ({ className, label = "Verify with Interac" }
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
-            <Button size="lg" className="w-full" onClick={start} variant="outline">
+            <Button size="lg" className="w-full" onClick={start}>
               <ShieldCheck className="w-4 h-4 mr-2" />
               {label}
             </Button>
