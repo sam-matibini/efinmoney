@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useKyc } from "@/hooks/useKyc";
@@ -15,6 +15,8 @@ const Identity = () => {
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
   const { refetch } = useKyc();
+  const [searchParams] = useSearchParams();
+  const autoStartPersona = searchParams.get("autostart") === "persona";
 
   // Ensure a KYC row exists so subsequent webhook updates attach correctly
   useEffect(() => {
@@ -79,6 +81,7 @@ const Identity = () => {
               userId={user.id}
               className="w-full"
               label="Start with Persona"
+              autoStart={autoStartPersona}
               onComplete={onPersonaComplete}
               onError={() => toast.error("Persona is temporarily unavailable.")}
             />
