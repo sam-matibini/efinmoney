@@ -6,13 +6,14 @@ import { useKyc } from "@/hooks/useKyc";
 import PersonaVerification from "@/components/kyc/PersonaVerification";
 import InteracVerification from "@/components/kyc/InteracVerification";
 import { Card } from "@/components/ui/card";
-import { ShieldCheck } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ShieldCheck, ArrowLeft, LogOut } from "lucide-react";
 import { toast } from "sonner";
 import { Logo, Wordmark } from "@/components/Logo";
 
 const Identity = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const { refetch } = useKyc();
 
   // Ensure a KYC row exists so subsequent webhook updates attach correctly
@@ -44,9 +45,20 @@ const Identity = () => {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center px-6 py-12">
       <div className="w-full max-w-md space-y-6">
-        <div className="flex items-center justify-center gap-2">
-          <Logo className="w-8 h-8" />
-          <Wordmark className="font-black text-lg tracking-tight" />
+        <div className="flex items-center justify-between">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={async () => { await signOut(); navigate("/auth"); }}
+            className="text-muted-foreground hover:text-foreground -ml-2"
+          >
+            <ArrowLeft className="w-4 h-4 mr-1" />
+            Back to sign in
+          </Button>
+          <div className="flex items-center gap-2">
+            <Logo className="w-7 h-7" />
+            <Wordmark className="font-black text-base tracking-tight" />
+          </div>
         </div>
 
         <div className="text-center space-y-2">
