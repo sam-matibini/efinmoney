@@ -49,6 +49,13 @@ export const useKyc = () => {
   const kycQ = useQuery({
     queryKey: ["kyc", user?.id],
     enabled: !!user,
+    refetchInterval: (q) => {
+      const d = q.state.data as KycRecord | null | undefined;
+      if (!d) return false;
+      return d.verification_status === "approved" || d.verification_status === "rejected"
+        ? false
+        : 2500;
+    },
     queryFn: async () => {
       const { data, error } = await supabase
         .from("kyc_verifications")
@@ -63,6 +70,11 @@ export const useKyc = () => {
   const tierQ = useQuery({
     queryKey: ["risk-tier", user?.id],
     enabled: !!user,
+    refetchInterval: (q) => {
+      const d = q.state.data as RiskTier | null | undefined;
+      if (!d) return 2500;
+      return d.current_tier === "tier_1" ? 2500 : false;
+    },
     queryFn: async () => {
       const { data, error } = await supabase
         .from("user_risk_tiers")
@@ -73,6 +85,7 @@ export const useKyc = () => {
       return data as unknown as RiskTier | null;
     },
   });
+
 
   const isVerified =
     kycQ.data?.verification_status === "approved" &&
