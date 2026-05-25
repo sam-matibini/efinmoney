@@ -142,40 +142,11 @@ export const useKyc = () => {
   const isVerified =
     kycQ.data?.verification_status === "approved" || corePassed;
 
-  // Auto-upgrade to tier_3 once the two core checks (ID + face) pass.
-  useEffect(() => {
-    if (!user) return;
-    if (!isVerified) return;
-    const currentTier = tierQ.data?.current_tier;
-    if (currentTier === "tier_3" || currentTier === "tier_4") return;
+  // Tier upgrades and profile sync are handled server-side by the
+  // on_kyc_status_change trigger once a reviewer (or auto-approval flow)
+  // sets verification_status='approved'. Client-side writes here would be
+  // a privilege escalation vector and are intentionally omitted.
 
-    (async () => {
-      const [{ error: tierErr }, { error: profileErr }] = await Promise.all([
-        supabase
-          .from("user_risk_tiers")
-          .upsert(
-            {
-              user_id: user.id,
-              current_tier: "tier_3",
-              upgraded_at: new Date().toISOString(),
-            },
-            { onConflict: "user_id" },
-          ),
-        supabase
-          .from("profiles")
-          .update({
-            kyc_tier: "tier_3",
-            kyc_status: "verified",
-            kyc_completed_at: new Date().toISOString(),
-          })
-          .eq("user_id", user.id),
-      ]);
-      if (tierErr) console.error("tier upsert failed", tierErr);
-      if (profileErr) console.error("profile tier update failed", profileErr);
-      queryClient.invalidateQueries({ queryKey: ["risk-tier", user.id] });
-      queryClient.invalidateQueries({ queryKey: ["profile", user.id] });
-    })();
-  }, [user, isVerified, tierQ.data?.current_tier, queryClient]);
 
   return {
     kyc: kycQ.data ?? null,
