@@ -38,15 +38,16 @@ const KYCGuard = ({ children }: { children: ReactNode }) => {
       return <Navigate to={target} replace />;
     }
     case "pending_review":
-      return <Navigate to="/onboarding/pending" replace />;
+      return <Navigate to="/onboarding/approved" replace />;
     case "rejected":
       return <Navigate to="/onboarding/rejected" replace />;
     case "expired":
       return <Navigate to="/onboarding/welcome" replace />;
     case "approved":
       if (isVerified) return <>{children}</>;
-      // Approved but tier still tier_1 (edge case) — show pending
-      return <Navigate to="/onboarding/pending" replace />;
+      // Approved but tier not yet synced — show the celebratory landing while it catches up
+      return <Navigate to="/onboarding/approved" replace />;
+
     default:
       return <Navigate to="/onboarding/welcome" replace />;
   }

@@ -8,8 +8,9 @@ const STEP_ROUTE: Record<KycCurrentStep, string> = {
   identity: "/onboarding/identity",
   address: "/onboarding/identity",
   liveness: "/onboarding/identity",
-  completed: "/onboarding/pending",
+  completed: "/onboarding/approved",
 };
+
 
 const STEP_LABEL: Record<KycCurrentStep, string> = {
   identity: "identity verification",

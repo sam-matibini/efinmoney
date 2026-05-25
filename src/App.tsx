@@ -42,7 +42,7 @@ import PayBillsPage from "./pages/PayBillsPage";
 import KYCGuard from "@/components/kyc/KYCGuard";
 import Welcome from "./pages/onboarding/Welcome";
 import OnboardingIdentity from "./pages/onboarding/Identity";
-import OnboardingPending from "./pages/onboarding/Pending";
+
 import OnboardingApproved from "./pages/onboarding/Approved";
 import OnboardingRejected from "./pages/onboarding/Rejected";
 import { AdminAuthProvider } from "@/contexts/AdminAuthContext";
@@ -206,7 +206,7 @@ const AppRoutes = () => {
           <Route path="/interac/callback" element={<InteracHubCallback />} />
           <Route path="/onboarding/welcome" element={<ProtectedRoute><Welcome /></ProtectedRoute>} />
           <Route path="/onboarding/identity" element={<ProtectedRoute><OnboardingIdentity /></ProtectedRoute>} />
-          <Route path="/onboarding/pending" element={<ProtectedRoute><OnboardingPending /></ProtectedRoute>} />
+          <Route path="/onboarding/pending" element={<Navigate to="/onboarding/approved" replace />} />
           <Route path="/onboarding/approved" element={<ProtectedRoute><OnboardingApproved /></ProtectedRoute>} />
           <Route path="/onboarding/rejected" element={<ProtectedRoute><OnboardingRejected /></ProtectedRoute>} />
           <Route path="*" element={<NotFound />} />
