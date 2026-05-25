@@ -8,6 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { KycStatusBadge } from "@/components/admin-portal/Badges";
+import { KycRiskTagChip } from "@/components/admin/KycRiskTagChip";
+import { extractRiskTags } from "@/lib/personaTags";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDistanceToNow } from "date-fns";
