@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useKyc } from "@/hooks/useKyc";
 import PersonaVerification from "@/components/kyc/PersonaVerification";
+import InteracVerification from "@/components/kyc/InteracVerification";
 import { Card } from "@/components/ui/card";
 import { ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
@@ -14,7 +15,7 @@ const Identity = () => {
   const { user } = useAuth();
   const { refetch } = useKyc();
 
-  // Ensure a KYC row exists so subsequent updates from the webhook attach correctly
+  // Ensure a KYC row exists so subsequent webhook updates attach correctly
   useEffect(() => {
     if (!user) return;
     supabase
@@ -41,32 +42,61 @@ const Identity = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center px-6">
+    <div className="min-h-screen bg-background flex items-center justify-center px-6 py-12">
       <div className="w-full max-w-md space-y-6">
         <div className="flex items-center justify-center gap-2">
           <Logo className="w-8 h-8" />
           <Wordmark className="font-black text-lg tracking-tight" />
         </div>
-        <Card className="p-6 space-y-4 text-center">
-          <div className="w-12 h-12 rounded-full bg-primary/10 mx-auto flex items-center justify-center">
-            <ShieldCheck className="w-6 h-6 text-primary" />
-          </div>
-          <div>
-            <h1 className="font-semibold text-foreground">Verify your identity</h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              We're opening a secure verification window. Follow the prompts to finish.
-            </p>
+
+        <div className="text-center space-y-2">
+          <h1 className="text-2xl font-bold text-foreground">Verify your identity</h1>
+          <p className="text-sm text-muted-foreground">
+            Choose how you'd like to verify. Either method takes about 2 minutes.
+          </p>
+        </div>
+
+        <Card className="p-5 space-y-3">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+              <ShieldCheck className="w-5 h-5 text-primary" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-semibold text-foreground text-sm">Verify with Persona</h3>
+              <p className="text-xs text-muted-foreground">
+                Global ID verification with passport, driver's licence or national ID.
+              </p>
+            </div>
           </div>
           {user && (
             <PersonaVerification
               userId={user.id}
               className="w-full"
-              label="Open verification"
-              autoStart
+              label="Start with Persona"
               onComplete={onPersonaComplete}
-              onError={() => toast.error("Verification was interrupted. Tap to retry.")}
+              onError={() => toast.error("Persona is temporarily unavailable.")}
             />
           )}
+        </Card>
+
+        <Card className="p-5 space-y-3 border-emerald-500/30">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
+              <ShieldCheck className="w-5 h-5 text-emerald-600" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-semibold text-foreground text-sm">
+                Verify with Interac
+                <span className="ml-2 text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 uppercase tracking-wide">
+                  Canada
+                </span>
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                Sign in with your Canadian bank to verify instantly.
+              </p>
+            </div>
+          </div>
+          <InteracVerification className="w-full" />
         </Card>
       </div>
     </div>
