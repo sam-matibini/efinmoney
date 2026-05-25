@@ -1,57 +1,27 @@
-## Problem
+## Goal
+After Persona ID + Face check succeeds, the user should land directly on the dashboard at Tier 3 — never on the verification page again.
 
-On `https://efin.money`, clicking **Start with Persona** shows the loading spinner briefly, then resets — no modal opens, no toast, no console error, no page reload.
+## Root cause
+`onPersonaComplete` calls `get-persona-inquiry-status` once. Persona's verification decisions are async, so on that first call `idPassed`/`selfiePassed` are usually still `false`. The KYC row stays `in_progress`, the code redirects to `/kyc`, and `KYCGuard` sees `in_progress` and bounces the user back to `/onboarding/identity`. That is the loop being reported.
 
-The button's `onClick` only flips `loading=false` from three places:
-1. The `catch` in `startVerification` (would also fire a toast — not what's happening)
-2. Persona SDK `onCancel`
-3. Persona SDK `onError` (also fires a toast — not what's happening)
+## Changes (frontend only)
 
-That narrows it almost entirely to **`onCancel` firing immediately**, which on a brand-new published custom domain almost always means **Persona's hosted inquiry refuses to render because the request origin isn't on the template's allowed-domains list**.
+### 1. `src/pages/onboarding/Identity.tsx`
+Rewrite `onPersonaComplete` to:
+- Show a "Finalizing verification…" toast.
+- Poll `supabase.functions.invoke("get-persona-inquiry-status", { body: { inquiryId } })` up to 8 times, ~1.5s apart (≈12s total).
+- After each call, `await refetch()`. As soon as `isVerified || hasPassedCoreChecks` is true → `navigate("/dashboard", { replace: true })` and return.
+- The existing edge function already flips `verification_status` to `approved` and the `on_kyc_status_change` DB trigger upgrades the user to **Tier 3** automatically — no extra work needed.
+- If polling ends without approval, navigate to `/kyc` with an info toast. Never navigate back to `/onboarding/identity`.
 
-## What to change
-
-### 1. Add diagnostic logging to confirm the cause (1 file)
-
-`src/components/kyc/PersonaVerification.tsx`
-- Log the resolved `environment`, `inquiryId`, whether a `sessionToken` was returned, and whether `alreadySubmitted` was true — right after the edge-function response, before constructing the SDK client.
-- Log a clear reason inside `onCancel` ("Persona SDK cancelled before completion — check template allowed origins for this domain") and inside `onError` (full error object).
-- Show a soft toast on `onCancel` instead of silent reset, so the user gets feedback ("Verification window closed — if it didn't open, please contact support").
-
-This is the only code change needed to make the next click self-diagnose in production. No business logic touched.
-
-### 2. Verify Persona environment + template config (no code; secrets/dashboard check)
-
-Confirm with the user:
-- `PERSONA_ENVIRONMENT` secret = `production`
-- `PERSONA_TEMPLATE_ID` is a **production** template (created in Persona's Production environment, not Sandbox)
-- `PERSONA_API_KEY` is the **production** API key (matching the production template)
-
-A mismatch (e.g. prod env + sandbox template id) would cause the inquiry creation API to error — which the edge function would return as a 502 and the client would toast. The user reports no toast, so this is the second-likeliest, not the first.
-
-### 3. Allowed domains in Persona dashboard (user action — most likely root cause)
-
-In Persona dashboard → **Production** environment → the inquiry template → **Hosted Flow / Embedded settings** → **Allowed origins / domains**, add:
-- `https://efin.money`
-- `https://www.efin.money`
-- `https://efinmoney.lovable.app`
-- `https://id-preview--21d3fe3a-f461-45ad-98e8-7be292ee36d7.lovable.app` (for preview testing)
-
-After saving in Persona, re-test on `efin.money`. The SDK should now open the inquiry overlay.
-
-## Why not change the edge function
-
-The `create-persona-inquiry` function is already returning a sessionToken successfully (otherwise the client would throw before constructing the SDK and we'd see the toast error). The break is downstream, on the SDK side, after the function call.
+### 2. `src/components/kyc/KYCGuard.tsx`
+Add a safety net: if `kyc.persona_inquiry_id` is set AND `verification_status === "in_progress"`, allow the user through to protected routes instead of redirecting to `/onboarding/identity`. This prevents the loop even if the poll above misses the approval window (e.g. user closes the tab and comes back).
 
 ## Out of scope
+- No database migrations.
+- No edge-function changes (`get-persona-inquiry-status` already handles auto-approval + tier upgrade correctly).
+- No changes to the Persona SDK config in `PersonaVerification.tsx`.
 
-- No DB/schema changes
-- No edge-function changes
-- No changes to the Interac branch or any other KYC flow
-
-## Verification steps after build mode
-
-1. Publish the updated `PersonaVerification.tsx`.
-2. On `https://efin.money`, open DevTools → Console, click **Start with Persona**.
-3. The new console logs will identify which callback fires (`onCancel` vs `onError`) and any underlying error.
-4. If `onCancel` fires with no error → confirms allowed-origins issue → add the domains in Persona dashboard (step 3 above) and retest.
+## Files touched
+- `src/pages/onboarding/Identity.tsx`
+- `src/components/kyc/KYCGuard.tsx`
