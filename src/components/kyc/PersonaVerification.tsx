@@ -24,6 +24,16 @@ export const PersonaVerification = ({ userId, onComplete, onError, className, la
       const { data, error } = await supabase.functions.invoke("create-persona-inquiry", {
         body: { userId },
       });
+      console.log("[Persona] create-inquiry response", {
+        hasData: !!data,
+        environment: data?.environment,
+        inquiryId: data?.inquiryId,
+        hasSessionToken: !!data?.sessionToken,
+        alreadySubmitted: !!data?.alreadySubmitted,
+        templateId: data?.templateId,
+        error: error?.message,
+        origin: typeof window !== "undefined" ? window.location.origin : "n/a",
+      });
       if (data?.alreadySubmitted) {
         setLoading(false);
         toast.success("Verification already submitted");
@@ -41,19 +51,31 @@ export const PersonaVerification = ({ userId, onComplete, onError, className, la
       const clientConfig: Record<string, unknown> = {
         environment: data.environment || "production",
         onReady: () => {
+          console.log("[Persona] SDK ready — opening overlay");
           setLoading(false);
           client.open();
         },
         onComplete: ({ inquiryId, status }: { inquiryId: string; status: string }) => {
+          console.log("[Persona] onComplete", { inquiryId, status });
           toast.success("Identity check submitted");
           onComplete?.({ inquiryId, status });
         },
-        onCancel: () => {
+        onCancel: (payload?: unknown) => {
+          console.warn(
+            "[Persona] onCancel — SDK closed before completion. " +
+              "If the overlay never opened, verify that this domain (" +
+              (typeof window !== "undefined" ? window.location.origin : "?") +
+              ") is in the Persona template's Allowed Origins for the current environment.",
+            payload,
+          );
           setLoading(false);
+          toast.message("Verification window closed", {
+            description: "If it didn't open, please contact support or try again.",
+          });
         },
         onError: (e: unknown) => {
           setLoading(false);
-          console.error("Persona error", e);
+          console.error("[Persona] onError", e);
           toast.error("Verification was interrupted. Please try again.");
           onError?.(e);
         },
@@ -66,6 +88,7 @@ export const PersonaVerification = ({ userId, onComplete, onError, className, la
         clientConfig.referenceId = userId;
       }
       const client = new (Persona as any).Client(clientConfig);
+
     } catch (err) {
       setLoading(false);
       console.error(err);

@@ -1,29 +1,57 @@
-## Goal
+## Problem
 
-PawaPay and MTN MoMo callbacks aren't live yet, so we should not hard-fail those webhook endpoints. But we also can't go back to fail-open (that was the original vulnerability). Plan: allow internal/test traffic and log unauthenticated hits, but reject anonymous external traffic by default — and the moment you set the secret, it becomes the only accepted credential.
+On `https://efin.money`, clicking **Start with Persona** shows the loading spinner briefly, then resets — no modal opens, no toast, no console error, no page reload.
 
-## Changes
+The button's `onClick` only flips `loading=false` from three places:
+1. The `catch` in `startVerification` (would also fire a toast — not what's happening)
+2. Persona SDK `onCancel`
+3. Persona SDK `onError` (also fires a toast — not what's happening)
 
-### `supabase/functions/pawapay-webhook/index.ts`
-- Keep accepting `x-callback-secret` header or `?secret=` query param.
-- If `PAWAPAY_CALLBACK_SECRET` env var **is** set → require it (current behavior, fail-closed on mismatch).
-- If it is **not** set yet → accept the request but:
-  - Log a clear warning: `"PAWAPAY_CALLBACK_SECRET not configured — accepting webhook without authentication"`
-  - Tag the inserted webhook log row (if we have one) with `unauthenticated: true` for traceability.
-- Also accept `x-internal-secret` matching `SUPABASE_SERVICE_ROLE_KEY` so our own polling/test code always works.
+That narrows it almost entirely to **`onCancel` firing immediately**, which on a brand-new published custom domain almost always means **Persona's hosted inquiry refuses to render because the request origin isn't on the template's allowed-domains list**.
 
-### `supabase/functions/mtn-momo-webhook/index.ts`
-- Same pattern. Internal callers (service-role) always allowed.
-- If `MTN_CALLBACK_SECRET` is set → enforce it.
-- If not set → log a warning and accept the request.
+## What to change
 
-### No other files touched
-Other webhooks (`flutterwave-webhook`, `paysafe-webhook`) stay strictly fail-closed because those secrets are already configured (`FLW_WEBHOOK_HASH`, `PAYSAFE_WEBHOOK_SECRET` are in your secrets list).
+### 1. Add diagnostic logging to confirm the cause (1 file)
 
-## How to flip to fully strict later
+`src/components/kyc/PersonaVerification.tsx`
+- Log the resolved `environment`, `inquiryId`, whether a `sessionToken` was returned, and whether `alreadySubmitted` was true — right after the edge-function response, before constructing the SDK client.
+- Log a clear reason inside `onCancel` ("Persona SDK cancelled before completion — check template allowed origins for this domain") and inside `onError` (full error object).
+- Show a soft toast on `onCancel` instead of silent reset, so the user gets feedback ("Verification window closed — if it didn't open, please contact support").
 
-When PawaPay and MTN go live and you have the callback URL ready, just add `PAWAPAY_CALLBACK_SECRET` / `MTN_CALLBACK_SECRET` as secrets and configure the same value in the provider dashboard / callback URL. No code change required — the existing check automatically becomes enforced.
+This is the only code change needed to make the next click self-diagnose in production. No business logic touched.
 
-## Security trade-off
+### 2. Verify Persona environment + template config (no code; secrets/dashboard check)
 
-While the secret is unset, the endpoints can be hit by anyone, but a forged call only flips a transfer status if the attacker also knows a valid `provider_reference` UUID. The warnings in the logs make it easy to spot and respond. This matches the agreed posture: "not live yet, don't break the contract; live = strict".
+Confirm with the user:
+- `PERSONA_ENVIRONMENT` secret = `production`
+- `PERSONA_TEMPLATE_ID` is a **production** template (created in Persona's Production environment, not Sandbox)
+- `PERSONA_API_KEY` is the **production** API key (matching the production template)
+
+A mismatch (e.g. prod env + sandbox template id) would cause the inquiry creation API to error — which the edge function would return as a 502 and the client would toast. The user reports no toast, so this is the second-likeliest, not the first.
+
+### 3. Allowed domains in Persona dashboard (user action — most likely root cause)
+
+In Persona dashboard → **Production** environment → the inquiry template → **Hosted Flow / Embedded settings** → **Allowed origins / domains**, add:
+- `https://efin.money`
+- `https://www.efin.money`
+- `https://efinmoney.lovable.app`
+- `https://id-preview--21d3fe3a-f461-45ad-98e8-7be292ee36d7.lovable.app` (for preview testing)
+
+After saving in Persona, re-test on `efin.money`. The SDK should now open the inquiry overlay.
+
+## Why not change the edge function
+
+The `create-persona-inquiry` function is already returning a sessionToken successfully (otherwise the client would throw before constructing the SDK and we'd see the toast error). The break is downstream, on the SDK side, after the function call.
+
+## Out of scope
+
+- No DB/schema changes
+- No edge-function changes
+- No changes to the Interac branch or any other KYC flow
+
+## Verification steps after build mode
+
+1. Publish the updated `PersonaVerification.tsx`.
+2. On `https://efin.money`, open DevTools → Console, click **Start with Persona**.
+3. The new console logs will identify which callback fires (`onCancel` vs `onError`) and any underlying error.
+4. If `onCancel` fires with no error → confirms allowed-origins issue → add the domains in Persona dashboard (step 3 above) and retest.
