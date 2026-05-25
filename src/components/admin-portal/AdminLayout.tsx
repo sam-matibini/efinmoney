@@ -140,7 +140,7 @@ const AdminLayout = ({ children }: { children: ReactNode }) => {
               to={item.to}
               onClick={() => setMobileOpen(false)}
               className={cn(
-                "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                "relative flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
                 active
                   ? "bg-sidebar-primary text-sidebar-primary-foreground"
                   : "text-sidebar-foreground hover:bg-sidebar-accent"
