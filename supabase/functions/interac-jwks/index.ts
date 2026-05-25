@@ -7,6 +7,7 @@ const corsHeaders = {
 };
 
 const PRIVATE_FIELDS = ["d", "p", "q", "dp", "dq", "qi", "oth"];
+const REQUIRED_RSA_PUBLIC_FIELDS = ["kty", "n", "e"] as const;
 
 function parseJwk(raw: string) {
   const firstPass: unknown = JSON.parse(raw);
@@ -19,23 +20,57 @@ function parseJwk(raw: string) {
   return normalized as Record<string, unknown>;
 }
 
+function getPrivateJwkSecret() {
+  const hubValue = Deno.env.get("INTERAC_HUB_PRIVATE_JWK");
+  if (hubValue) return { secretName: "INTERAC_HUB_PRIVATE_JWK", raw: hubValue };
+
+  const legacyValue = Deno.env.get("INTERAC_PRIVATE_JWK");
+  if (legacyValue) return { secretName: "INTERAC_PRIVATE_JWK", raw: legacyValue };
+
+  return null;
+}
+
+function normalizeJwkStringField(jwk: Record<string, unknown>, field: string) {
+  const value = jwk[field];
+  if (typeof value !== "string") return;
+
+  jwk[field] = value.trim().replace(/\s+/g, "").replace(/=+$/g, "");
+}
+
+function normalizePrivateJwk(jwk: Record<string, unknown>) {
+  for (const field of [...REQUIRED_RSA_PUBLIC_FIELDS, "d", "p", "q", "dp", "dq", "qi"]) {
+    normalizeJwkStringField(jwk, field);
+  }
+
+  normalizeJwkStringField(jwk, "alg");
+  normalizeJwkStringField(jwk, "kid");
+  normalizeJwkStringField(jwk, "use");
+
+  return jwk;
+}
+
 Deno.serve((req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "GET") {
     return new Response("Method Not Allowed", { status: 405, headers: corsHeaders });
   }
   try {
-    const raw = Deno.env.get("INTERAC_HUB_PRIVATE_JWK") ?? Deno.env.get("INTERAC_PRIVATE_JWK");
-    if (!raw) {
+    const privateJwkSecret = getPrivateJwkSecret();
+    if (!privateJwkSecret) {
       return new Response(JSON.stringify({ error: "INTERAC_PRIVATE_JWK not configured" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const jwk = parseJwk(raw);
+    const jwk = normalizePrivateJwk(parseJwk(privateJwkSecret.raw));
     const pub: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(jwk)) {
       if (!PRIVATE_FIELDS.includes(k)) pub[k] = v;
+    }
+    for (const field of REQUIRED_RSA_PUBLIC_FIELDS) {
+      if (!(field in pub) || typeof pub[field] !== "string" || !(pub[field] as string)) {
+        throw new Error(`${privateJwkSecret.secretName} is missing required RSA field \"${field}\"`);
+      }
     }
     if (!pub.use) pub.use = "sig";
     return new Response(JSON.stringify({ keys: [pub] }), {
