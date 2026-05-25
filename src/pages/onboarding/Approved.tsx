@@ -22,7 +22,7 @@ const FEATURE_LABELS: Record<string, string> = {
 const Approved = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { tier } = useKyc();
+  const { tier, kyc, isVerified, refetch } = useKyc();
   const [accountNumber, setAccountNumber] = useState<string | null>(null);
   const [firstName, setFirstName] = useState("");
   const [copied, setCopied] = useState(false);
@@ -40,10 +40,17 @@ const Approved = () => {
       });
   }, [user]);
 
+  // Poll until Persona webhook has flipped the user to approved + tier_2+,
+  // then auto-navigate to dashboard (KYCGuard will allow through).
   useEffect(() => {
-    const t = setTimeout(() => navigate("/dashboard", { replace: true }), 2500);
-    return () => clearTimeout(t);
-  }, [navigate]);
+    if (isVerified) {
+      const t = setTimeout(() => navigate("/dashboard", { replace: true }), 1800);
+      return () => clearTimeout(t);
+    }
+    const poll = setInterval(() => refetch(), 1500);
+    return () => clearInterval(poll);
+  }, [isVerified, navigate, refetch]);
+
 
   const copy = async () => {
     if (!accountNumber) return;
