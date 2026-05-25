@@ -14,13 +14,16 @@ import { Logo, Wordmark } from "@/components/Logo";
 const Identity = () => {
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
-  const { refetch } = useKyc();
+  const { kyc, isVerified, hasPassedCoreChecks, refetch } = useKyc();
   const [searchParams] = useSearchParams();
   const autoStartPersona = searchParams.get("autostart") === "persona";
 
   // Ensure a KYC row exists so subsequent webhook updates attach correctly
   useEffect(() => {
     if (!user) return;
+    if (isVerified || hasPassedCoreChecks) return;
+    if (kyc?.verification_status && kyc.verification_status !== "not_started") return;
+
     supabase
       .from("kyc_verifications")
       .upsert(
@@ -28,12 +31,23 @@ const Identity = () => {
         { onConflict: "user_id" }
       )
       .then(() => refetch());
-  }, [user, refetch]);
+  }, [user, kyc?.verification_status, isVerified, hasPassedCoreChecks, refetch]);
+
+  useEffect(() => {
+    if (isVerified || hasPassedCoreChecks) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [isVerified, hasPassedCoreChecks, navigate]);
 
   const onPersonaComplete = async () => {
-    await refetch();
+    const result = await refetch();
     toast.success("You're verified — welcome!");
-    navigate("/dashboard", { replace: true });
+    if (result?.isVerified || result?.hasPassedCoreChecks) {
+      navigate("/dashboard", { replace: true });
+      return;
+    }
+
+    navigate("/kyc", { replace: true });
   };
 
 
