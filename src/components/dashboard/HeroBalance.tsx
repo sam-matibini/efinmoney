@@ -93,7 +93,9 @@ const HeroBalance = () => {
   const positive = todayChange >= 0;
   const walletCount = wallets?.length ?? 0;
 
-  const monthlyBudgetPct = 65; // decorative progress
+  // Monthly budget not yet wired to a real budget feature — default to 0% (no budget set)
+  const monthlyBudgetPct = 0;
+  const monthlyBudgetSet = false;
 
   return (
     <motion.section
@@ -174,7 +176,9 @@ const HeroBalance = () => {
             <BudgetArc pct={monthlyBudgetPct} />
             <div className="text-left">
               <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Monthly budget</p>
-              <p className="text-sm font-semibold text-foreground">{monthlyBudgetPct}% used</p>
+              <p className="text-sm font-semibold text-muted-foreground">
+                {monthlyBudgetSet ? `${monthlyBudgetPct}% used` : "Not set"}
+              </p>
             </div>
           </div>
         </motion.div>
