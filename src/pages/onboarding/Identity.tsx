@@ -29,18 +29,11 @@ const Identity = () => {
   }, [user, refetch]);
 
   const onPersonaComplete = async () => {
-    if (user) {
-      await supabase
-        .from("kyc_verifications")
-        .upsert(
-          { user_id: user.id, current_step: "completed", verification_status: "pending_review" },
-          { onConflict: "user_id" }
-        );
-    }
     await refetch();
     toast.success("Verification submitted — welcome!");
-    navigate("/onboarding/pending", { replace: true });
+    navigate("/onboarding/approved", { replace: true });
   };
+
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center px-6 py-12">
