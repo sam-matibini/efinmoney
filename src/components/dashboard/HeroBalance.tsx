@@ -176,7 +176,9 @@ const HeroBalance = () => {
             <BudgetArc pct={monthlyBudgetPct} />
             <div className="text-left">
               <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Monthly budget</p>
-              <p className="text-sm font-semibold text-foreground">{monthlyBudgetPct}% used</p>
+              <p className="text-sm font-semibold text-muted-foreground">
+                {monthlyBudgetSet ? `${monthlyBudgetPct}% used` : "Not set"}
+              </p>
             </div>
           </div>
         </motion.div>
