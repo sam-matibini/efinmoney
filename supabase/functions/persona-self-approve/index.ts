@@ -48,9 +48,24 @@ Deno.serve(async (req) => {
       .eq("user_id", userId);
     if (inquiryId) query = query.eq("persona_inquiry_id", inquiryId);
 
-    const { data: kyc, error: fetchErr } = await query.maybeSingle();
+    let { data: kyc, error: fetchErr } = await query.maybeSingle();
     if (fetchErr) return json(500, { error: fetchErr.message });
-    if (!kyc) return json(404, { error: "KYC record not found" });
+
+    // If no row exists yet for this user (legacy account created before
+    // handle_new_user inserted kyc rows), create one so we can approve it.
+    if (!kyc) {
+      const { data: created, error: insErr } = await admin
+        .from("kyc_verifications")
+        .insert({
+          user_id: userId,
+          persona_inquiry_id: inquiryId ?? null,
+          verification_status: "pending",
+        })
+        .select("id, user_id, verification_status, submitted_at, persona_inquiry_id")
+        .single();
+      if (insErr) return json(500, { error: insErr.message });
+      kyc = created;
+    }
 
     // Idempotent: nothing to do if already final.
     if (kyc.verification_status === "approved") {
