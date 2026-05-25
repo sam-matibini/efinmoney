@@ -285,7 +285,7 @@ const FlipCard = ({ card, flipped, onToggle, index }: FlipCardProps) => {
                   {/* CVV box */}
                   <div className="flex items-center gap-3">
                     <div className="flex-1 bg-white text-neutral-900 rounded-md h-9 flex items-center justify-end pr-3 font-mono tracking-widest text-base shadow-inner">
-                      {card.cvv ?? "•••"}
+                      •••
                     </div>
                     <span className="text-[10px] uppercase tracking-widest opacity-70">CVV</span>
                   </div>
@@ -294,16 +294,9 @@ const FlipCard = ({ card, flipped, onToggle, index }: FlipCardProps) => {
                     <p className="text-[10px] uppercase tracking-widest opacity-70">Card number</p>
                     <div className="flex items-center gap-2">
                       <p className="font-mono tracking-wider truncate">{maskedNumber}</p>
-                      {card.card_number && (
-                        <button
-                          onClick={(e) => copy("Card number", card.card_number!, e)}
-                          className="p-1 rounded-md bg-white/10 hover:bg-white/20"
-                        >
-                          <Copy className="w-3.5 h-3.5" />
-                        </button>
-                      )}
                     </div>
                   </div>
+
 
                   <div className="flex items-end gap-6">
                     <div>
