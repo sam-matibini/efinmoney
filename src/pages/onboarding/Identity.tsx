@@ -145,7 +145,7 @@ const Identity = () => {
     navigate("/onboarding/address");
   };
 
-  const isSandbox = true; // PERSONA_ENVIRONMENT lives server-side; treat preview as sandbox
+  const isSandbox = false; // Persona is in production
 
   const saveDraft = async () => {
     await persist({
