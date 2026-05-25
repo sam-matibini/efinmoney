@@ -104,10 +104,10 @@ export const useKyc = () => {
     refetchInterval: (q) => {
       const d = q.state.data as KycRecord | null | undefined;
       if (!d) return false;
-      return d.verification_status === "approved" || d.verification_status === "rejected"
-        ? false
-        : 2500;
+      if (d.verification_status === "approved" || d.verification_status === "rejected") return false;
+      return d.persona_inquiry_id ? 1000 : 2500;
     },
+
     queryFn: async () => {
       const { data, error } = await supabase
         .from("kyc_verifications")
