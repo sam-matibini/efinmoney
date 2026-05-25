@@ -421,6 +421,18 @@ const KycReviewPage = () => {
                       <div className="text-red-600 dark:text-red-400">{kyc.persona_decision_reason}</div>
                     </div>
                   )}
+                  {(() => {
+                    const tags = extractRiskTags(kyc.persona_verification_data);
+                    if (tags.length === 0) return null;
+                    return (
+                      <div className="pt-2 border-t">
+                        <div className="text-xs text-muted-foreground mb-2">Risk flags raised by Persona</div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {tags.map((t) => <KycRiskTagChip key={t} tag={t} size="md" />)}
+                        </div>
+                      </div>
+                    );
+                  })()}
                   {kyc.persona_verification_data && (() => {
                     const fields = (kyc.persona_verification_data as any)?.data?.attributes?.payload?.data?.attributes?.fields;
                     if (!fields) return null;
