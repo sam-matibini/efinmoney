@@ -42,8 +42,6 @@ import PayBillsPage from "./pages/PayBillsPage";
 import KYCGuard from "@/components/kyc/KYCGuard";
 import Welcome from "./pages/onboarding/Welcome";
 import OnboardingIdentity from "./pages/onboarding/Identity";
-import OnboardingAddress from "./pages/onboarding/Address";
-import OnboardingReview from "./pages/onboarding/Review";
 import OnboardingPending from "./pages/onboarding/Pending";
 import OnboardingApproved from "./pages/onboarding/Approved";
 import OnboardingRejected from "./pages/onboarding/Rejected";
