@@ -17,6 +17,17 @@ const PRIVATE_JWK_RAW = Deno.env.get("INTERAC_HUB_PRIVATE_JWK") ?? Deno.env.get(
 
 let discoveryCache: { authorization_endpoint: string; token_endpoint: string; userinfo_endpoint: string; jwks_uri: string; issuer: string } | null = null;
 
+function parseJwk(raw: string) {
+  const firstPass: unknown = JSON.parse(raw);
+  const normalized = typeof firstPass === "string" ? JSON.parse(firstPass) : firstPass;
+
+  if (!normalized || typeof normalized !== "object" || Array.isArray(normalized)) {
+    throw new Error("INTERAC_PRIVATE_JWK must be a JSON object");
+  }
+
+  return normalized as Record<string, unknown>;
+}
+
 async function discover() {
   if (discoveryCache) return discoveryCache;
   const url = ISSUER.replace(/\/$/, "") + "/.well-known/openid-configuration";
@@ -100,9 +111,9 @@ Deno.serve(async (req) => {
     }
     let privateJwk: Record<string, unknown>;
     try {
-      privateJwk = JSON.parse(privateJwkRaw);
-    } catch {
-      return new Response(JSON.stringify({ error: "INTERAC_PRIVATE_JWK is not valid JSON" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      privateJwk = parseJwk(privateJwkRaw);
+    } catch (error) {
+      return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "INTERAC_PRIVATE_JWK is not valid JSON" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
     const alg = (privateJwk.alg as string) || "PS256";
     const kid = privateJwk.kid as string | undefined;

@@ -8,6 +8,17 @@ const corsHeaders = {
 
 const PRIVATE_FIELDS = ["d", "p", "q", "dp", "dq", "qi", "oth"];
 
+function parseJwk(raw: string) {
+  const firstPass: unknown = JSON.parse(raw);
+  const normalized = typeof firstPass === "string" ? JSON.parse(firstPass) : firstPass;
+
+  if (!normalized || typeof normalized !== "object" || Array.isArray(normalized)) {
+    throw new Error("INTERAC_PRIVATE_JWK must be a JSON object");
+  }
+
+  return normalized as Record<string, unknown>;
+}
+
 Deno.serve((req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "GET") {
@@ -21,7 +32,7 @@ Deno.serve((req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const jwk = JSON.parse(raw) as Record<string, unknown>;
+    const jwk = parseJwk(raw);
     const pub: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(jwk)) {
       if (!PRIVATE_FIELDS.includes(k)) pub[k] = v;
