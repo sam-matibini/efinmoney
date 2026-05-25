@@ -75,8 +75,7 @@ const CardsPage = () => {
       card_type: "debit" as any,
       card_network: ((c.card_brand ?? "visa").toLowerCase() === "mastercard" ? "mastercard" : "visa") as any,
       last_four: c.last_four ?? "••••",
-      card_number: null,
-      cvv: null,
+
       expiry_month: c.exp_month,
       expiry_year: c.exp_year,
       cardholder_name: c.cardholder_name ?? "",
