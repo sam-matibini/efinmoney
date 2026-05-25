@@ -57,7 +57,15 @@ export const PersonaVerification = ({ userId, onComplete, onError, className, la
           toast.error("Verification was interrupted. Please try again.");
           onError?.(e);
         },
-      });
+      };
+      if (data.sessionToken) {
+        clientConfig.sessionToken = data.sessionToken;
+        if (data.inquiryId) clientConfig.inquiryId = data.inquiryId;
+      } else if (data.templateId) {
+        clientConfig.templateId = data.templateId;
+        clientConfig.referenceId = userId;
+      }
+      const client = new (Persona as any).Client(clientConfig);
     } catch (err) {
       setLoading(false);
       console.error(err);
