@@ -125,9 +125,19 @@ const Approved = () => {
         </Card>
       )}
 
-      <Button size="lg" className="w-full" onClick={() => navigate("/dashboard")}>
-        Go to Dashboard <ArrowRight className="w-4 h-4 ml-2" />
+      <Button
+        size="lg"
+        className="w-full"
+        disabled={!isVerified}
+        onClick={() => navigate("/dashboard")}
+      >
+        {isVerified ? (
+          <>Go to Dashboard <ArrowRight className="w-4 h-4 ml-2" /></>
+        ) : (
+          <>Finalizing your account…</>
+        )}
       </Button>
+
     </OnboardingShell>
   );
 };
