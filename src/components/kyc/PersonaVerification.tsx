@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import Persona from "persona";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -11,10 +11,12 @@ interface Props {
   onError?: (err: unknown) => void;
   className?: string;
   label?: string;
+  autoStart?: boolean;
 }
 
-export const PersonaVerification = ({ userId, onComplete, onError, className, label = "Start ID Verification" }: Props) => {
+export const PersonaVerification = ({ userId, onComplete, onError, className, label = "Start ID Verification", autoStart = false }: Props) => {
   const [loading, setLoading] = useState(false);
+  const autoStartedRef = useRef(false);
 
   const startVerification = async () => {
     setLoading(true);
