@@ -59,7 +59,7 @@ Deno.serve(async (req) => {
         .insert({
           user_id: userId,
           persona_inquiry_id: inquiryId ?? null,
-          verification_status: "pending",
+          verification_status: "in_progress",
         })
         .select("id, user_id, verification_status, submitted_at, persona_inquiry_id")
         .single();
