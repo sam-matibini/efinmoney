@@ -43,7 +43,7 @@ import KYCGuard from "@/components/kyc/KYCGuard";
 import Welcome from "./pages/onboarding/Welcome";
 import OnboardingIdentity from "./pages/onboarding/Identity";
 
-import OnboardingApproved from "./pages/onboarding/Approved";
+
 import OnboardingRejected from "./pages/onboarding/Rejected";
 import { AdminAuthProvider } from "@/contexts/AdminAuthContext";
 import AdminGuard from "@/components/admin-portal/AdminGuard";
