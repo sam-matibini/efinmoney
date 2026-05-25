@@ -35,6 +35,10 @@ const KYCGuard = ({ children }: { children: ReactNode }) => {
     case "not_started":
       return <Navigate to="/onboarding/identity" replace />;
     case "in_progress": {
+      // If a Persona inquiry has already been submitted, let the user into the
+      // app — auto-approval polling/webhook will flip status to "approved"
+      // shortly. This prevents bouncing back to the verification page.
+      if (kyc.persona_inquiry_id) return <>{children}</>;
       const target = "/onboarding/identity";
       if (location.pathname === target) return <>{children}</>;
       return <Navigate to={target} replace />;
