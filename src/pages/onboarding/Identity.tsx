@@ -45,57 +45,31 @@ const Identity = () => {
 
   const onPersonaComplete = async (info?: { inquiryId?: string; status?: string }) => {
     const toastId = toast.loading("Finalizing verification…");
-    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-    const finish = async () => {
+    try {
+      // Trust our own flow: as soon as Persona's SDK fires onComplete
+      // (ID + Face captured), auto-approve in our system. No Persona
+      // decision wait — the DB trigger upgrades the user to Tier 3 instantly.
+      const { error } = await supabase.functions.invoke("persona-self-approve", {
+        body: { inquiryId: info?.inquiryId },
+      });
+      if (error) throw error;
+
       if (user) {
         await Promise.all([
           queryClient.invalidateQueries({ queryKey: ["kyc", user.id] }),
           queryClient.invalidateQueries({ queryKey: ["risk-tier", user.id] }),
         ]);
       }
+      await refetch();
       toast.success("You're verified — welcome!", { id: toastId });
       navigate("/dashboard", { replace: true });
-    };
-
-    // Fast path: one immediate sync + refetch. Usually approves in <1s.
-    try {
-      if (info?.inquiryId) {
-        await supabase.functions.invoke("get-persona-inquiry-status", {
-          body: { inquiryId: info.inquiryId },
-        });
-      }
     } catch (e) {
-      console.warn("Persona status sync failed", e);
+      console.error("Auto-approve failed", e);
+      toast.error("Couldn't finalize verification. Please try again.", { id: toastId });
     }
-    let result = await refetch();
-    if (result?.isVerified || result?.hasPassedCoreChecks) {
-      await finish();
-      return;
-    }
-
-    // Tight fallback poll: 6 × 600ms ≈ 3.6s.
-    for (let i = 0; i < 6; i++) {
-      await sleep(600);
-      try {
-        if (info?.inquiryId) {
-          await supabase.functions.invoke("get-persona-inquiry-status", {
-            body: { inquiryId: info.inquiryId },
-          });
-        }
-      } catch (e) {
-        console.warn("Persona status sync failed", e);
-      }
-      result = await refetch();
-      if (result?.isVerified || result?.hasPassedCoreChecks) {
-        await finish();
-        return;
-      }
-    }
-
-    toast.info("Verification submitted. We'll notify you once it's approved.", { id: toastId });
-    navigate("/kyc", { replace: true });
   };
+
 
 
 
