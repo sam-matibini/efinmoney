@@ -93,7 +93,9 @@ const HeroBalance = () => {
   const positive = todayChange >= 0;
   const walletCount = wallets?.length ?? 0;
 
-  const monthlyBudgetPct = 65; // decorative progress
+  // Monthly budget not yet wired to a real budget feature — default to 0% (no budget set)
+  const monthlyBudgetPct = 0;
+  const monthlyBudgetSet = false;
 
   return (
     <motion.section
