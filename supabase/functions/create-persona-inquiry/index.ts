@@ -11,6 +11,7 @@ const corsHeaders = {
 
 const PERSONA_API = "https://api.withpersona.com/api/v1";
 const PERSONA_VERSION = "2023-01-05";
+const PERSONA_TEMPLATE_PREFIX = "itmpl_";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -38,10 +39,22 @@ Deno.serve(async (req) => {
 
     const apiKey = Deno.env.get("PERSONA_API_KEY");
     const templateId = Deno.env.get("PERSONA_TEMPLATE_ID");
-    const environment = Deno.env.get("PERSONA_ENVIRONMENT") || "production";
+    const rawEnvironment = Deno.env.get("PERSONA_ENVIRONMENT") || "production";
+    const environment = rawEnvironment === "sandbox" ? "sandbox" : "production";
     if (!apiKey || !templateId) {
       console.error("Missing Persona env vars");
       return json({ error: "Persona is not configured" }, 500);
+    }
+    if (!templateId.startsWith(PERSONA_TEMPLATE_PREFIX)) {
+      console.error("Invalid Persona template id", { templateId });
+      return json(
+        {
+          error:
+            "Persona is misconfigured: PERSONA_TEMPLATE_ID must be the template ID that starts with itmpl_.",
+          code: "INVALID_PERSONA_TEMPLATE_ID",
+        },
+        400,
+      );
     }
 
     const { data: existingKyc } = await supabase
@@ -106,10 +119,19 @@ Deno.serve(async (req) => {
       }),
     });
 
-    const createBody = await createRes.json();
+    const createBody = await readJson(createRes);
     if (!createRes.ok) {
       console.error("Persona create inquiry failed", createBody);
-      return json({ error: "Failed to create verification session" }, 502);
+      return json(
+        {
+          error: getPersonaErrorMessage(
+            createBody,
+            "Failed to create verification session",
+          ),
+          code: "PERSONA_CREATE_INQUIRY_FAILED",
+        },
+        mapPersonaStatus(createRes.status),
+      );
     }
 
     const inquiryId = createBody?.data?.id;
@@ -125,10 +147,19 @@ Deno.serve(async (req) => {
         "Key-Inflection": "camel",
       },
     });
-    const resumeBody = await resumeRes.json();
+    const resumeBody = await readJson(resumeRes);
     if (!resumeRes.ok) {
       console.error("Persona resume failed", resumeBody);
-      return json({ error: "Failed to start verification session" }, 502);
+      return json(
+        {
+          error: getPersonaErrorMessage(
+            resumeBody,
+            "Failed to start verification session",
+          ),
+          code: "PERSONA_RESUME_FAILED",
+        },
+        mapPersonaStatus(resumeRes.status),
+      );
     }
     const sessionToken = resumeBody?.meta?.sessionToken || resumeBody?.data?.attributes?.sessionToken;
 
@@ -172,11 +203,30 @@ async function resumeInquiry(apiKey: string, inquiryId: string) {
     },
   });
 
-  const resumeBody = await resumeRes.json().catch(() => ({}));
+  const resumeBody = await readJson(resumeRes);
   if (!resumeRes.ok) return null;
 
   return {
     sessionToken: resumeBody?.meta?.sessionToken || resumeBody?.data?.attributes?.sessionToken || null,
     status: resumeBody?.data?.attributes?.status || null,
   };
+}
+
+async function readJson(response: Response) {
+  return await response.json().catch(() => ({}));
+}
+
+function getPersonaErrorMessage(payload: any, fallback: string) {
+  const details = payload?.errors
+    ?.map((entry: { title?: string; details?: string }) => [entry.title, entry.details].filter(Boolean).join(": "))
+    ?.filter(Boolean)
+    ?.join(" | ");
+
+  return details || payload?.error || fallback;
+}
+
+function mapPersonaStatus(status: number) {
+  if (status >= 500) return 502;
+  if (status === 401 || status === 403) return 400;
+  return status || 500;
 }
