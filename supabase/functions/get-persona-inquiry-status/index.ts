@@ -65,6 +65,17 @@ Deno.serve(async (req) => {
 
   const liveStatus = body?.data?.attributes?.status ?? null;
   const liveDecision = body?.data?.attributes?.decision ?? null;
+  const isFinalStatus = kyc.verification_status === "approved" || kyc.verification_status === "rejected";
+
+  if (isFinalStatus) {
+    return json({
+      inquiryId,
+      status: liveStatus,
+      decision: liveDecision,
+      preservedStatus: kyc.verification_status,
+      raw: body,
+    });
+  }
 
   const update: Record<string, unknown> = {
     persona_inquiry_status: liveStatus,
