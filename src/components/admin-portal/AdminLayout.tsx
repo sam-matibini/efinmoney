@@ -52,6 +52,20 @@ const AdminLayout = ({ children }: { children: ReactNode }) => {
 
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 
+  // Pending KYC count for the sidebar badge
+  const { data: pendingKycCount = 0 } = useQuery({
+    queryKey: ["admin-pending-kyc-count"],
+    queryFn: async () => {
+      const { count } = await supabase
+        .from("kyc_verifications")
+        .select("id", { count: "exact", head: true })
+        .eq("verification_status", "pending_review");
+      return count || 0;
+    },
+    enabled: !!admin,
+    refetchInterval: 30000,
+  });
+
   // Realtime: KYC submissions
   useEffect(() => {
     if (!admin) return;
