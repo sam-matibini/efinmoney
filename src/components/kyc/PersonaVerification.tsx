@@ -21,6 +21,16 @@ export const PersonaVerification = ({ userId, onComplete, onError, className, la
   const startVerification = async () => {
     setLoading(true);
     try {
+      // Guard: ensure we still have an active session before invoking the edge function.
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData?.session) {
+        setLoading(false);
+        toast.error("Your session has expired. Please sign in again.");
+        await supabase.auth.signOut().catch(() => {});
+        if (typeof window !== "undefined") window.location.assign("/auth");
+        return;
+      }
+
       const { data, error } = await supabase.functions.invoke("create-persona-inquiry", {
         body: { userId },
       });
@@ -34,6 +44,14 @@ export const PersonaVerification = ({ userId, onComplete, onError, className, la
         error: error?.message,
         origin: typeof window !== "undefined" ? window.location.origin : "n/a",
       });
+      // Handle expired/invalid auth from the edge function
+      if (error && /401|unauthor/i.test(error.message || "")) {
+        setLoading(false);
+        toast.error("Your session has expired. Please sign in again.");
+        await supabase.auth.signOut().catch(() => {});
+        if (typeof window !== "undefined") window.location.assign("/auth");
+        return;
+      }
       if (data?.alreadySubmitted) {
         setLoading(false);
         toast.success("Verification already submitted");
