@@ -8,9 +8,14 @@ const corsHeaders = {
 
 const WEBHOOK_SECRET = Deno.env.get("PAYSAFE_WEBHOOK_SECRET") || "";
 
-// Placeholder verifier — kept non-blocking until Paysafe signature format is confirmed.
+// HMAC-SHA256 signature verifier. Fail-closed: rejects when secret missing,
+// signature header missing, or verification errors.
 async function verifyPaysafeSignature(rawBody: string, sigHeader: string | null): Promise<boolean> {
-  if (!WEBHOOK_SECRET || !sigHeader) return true; // non-blocking
+  if (!WEBHOOK_SECRET) {
+    console.error("PAYSAFE_WEBHOOK_SECRET not configured");
+    return false;
+  }
+  if (!sigHeader) return false;
   try {
     const enc = new TextEncoder();
     const key = await crypto.subtle.importKey(
@@ -20,8 +25,9 @@ async function verifyPaysafeSignature(rawBody: string, sigHeader: string | null)
     const hex = Array.from(new Uint8Array(mac)).map((b) => b.toString(16).padStart(2, "0")).join("");
     const provided = sigHeader.replace(/^sha256=/, "").trim();
     return hex === provided;
-  } catch (_e) {
-    return true; // fail-open until format confirmed
+  } catch (e) {
+    console.error("Paysafe signature verification error", e);
+    return false;
   }
 }
 

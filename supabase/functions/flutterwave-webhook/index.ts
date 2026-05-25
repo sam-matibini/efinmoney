@@ -98,15 +98,18 @@ Deno.serve(async (req) => {
     console.warn("webhook parse failed", e);
   }
 
-  // Signature verification (fail-soft)
+  // Signature verification — FAIL CLOSED when secret missing or signature mismatch.
   const expected = (Deno.env.get("FLW_WEBHOOK_HASH") || Deno.env.get("FLW_WEBHOOK_SECRET_HASH") || "").trim();
   const provided = req.headers.get("verif-hash") || "";
-  if (expected && provided && provided !== expected) {
+  if (!expected) {
+    console.error("FLW_WEBHOOK_HASH not configured — rejecting webhook");
+    return new Response(JSON.stringify({ error: "Webhook signing secret not configured" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  }
+  if (provided !== expected) {
     console.warn("Flutterwave webhook hash mismatch");
     await supabase.from("flw_webhook_logs").insert({ event: String((event as { event?: string }).event || "unknown"), payload: event, processed: false, error: "signature_mismatch" });
     return new Response(JSON.stringify({ error: "Invalid signature" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
-  if (!expected) console.warn("FLW_WEBHOOK_HASH not set — webhook unverified");
 
   const eventName = String((event as { event?: string }).event || "");
   let logId: string | null = null;
