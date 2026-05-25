@@ -31,11 +31,9 @@ const KYCGuard = ({ children }: { children: ReactNode }) => {
 
   switch (kyc.verification_status) {
     case "not_started":
-      return <Navigate to="/onboarding/welcome" replace />;
+      return <Navigate to="/onboarding/identity" replace />;
     case "in_progress": {
-      const step =
-        kyc.current_step === "completed" ? "review" : kyc.current_step || "identity";
-      const target = `/onboarding/${step}`;
+      const target = "/onboarding/identity";
       if (location.pathname === target) return <>{children}</>;
       return <Navigate to={target} replace />;
     }
