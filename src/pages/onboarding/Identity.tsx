@@ -30,9 +30,10 @@ const Identity = () => {
 
   const onPersonaComplete = async () => {
     await refetch();
-    toast.success("Verification submitted — welcome!");
-    navigate("/onboarding/approved", { replace: true });
+    toast.success("You're verified — welcome!");
+    navigate("/dashboard", { replace: true });
   };
+
 
 
   return (
