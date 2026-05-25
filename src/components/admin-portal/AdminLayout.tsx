@@ -83,6 +83,7 @@ const AdminLayout = ({ children }: { children: ReactNode }) => {
           }
           queryClient.invalidateQueries({ queryKey: ["admin-kyc-queue"] });
           queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] });
+          queryClient.invalidateQueries({ queryKey: ["admin-pending-kyc-count"] });
         }
       )
       .on(
