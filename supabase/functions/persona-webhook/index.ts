@@ -71,6 +71,21 @@ async function processEvent(supabase: any, eventType: string | null, inquiryId: 
 
   if (!kyc) return { skipped: true, reason: "no matching kyc_verification" };
 
+  // Idempotency guard: once a verification is approved, NEVER let a later
+  // webhook event downgrade it. Persona can send subsequent "declined" /
+  // "marked-for-review" / "failed" events from re-decisioning or duplicate
+  // inquiries — those must not flip an already-verified user to rejected.
+  const isApproved = kyc.verification_status === "approved";
+  const downgradeEvents = new Set([
+    "inquiry.declined",
+    "inquiry.marked-for-review",
+    "inquiry.failed",
+    "inquiry.expired",
+  ]);
+  if (isApproved && downgradeEvents.has(eventType)) {
+    return { skipped: true, reason: `ignored ${eventType} on already-approved verification`, kycId: kyc.id };
+  }
+
   const update: Record<string, any> = {};
   let auditAction: string | null = null;
 
