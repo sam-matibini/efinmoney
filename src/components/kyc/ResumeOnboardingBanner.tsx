@@ -6,15 +6,15 @@ import { useKyc, type KycCurrentStep } from "@/hooks/useKyc";
 
 const STEP_ROUTE: Record<KycCurrentStep, string> = {
   identity: "/onboarding/identity",
-  address: "/onboarding/address",
-  liveness: "/onboarding/review",
-  completed: "/onboarding/review",
+  address: "/onboarding/identity",
+  liveness: "/onboarding/identity",
+  completed: "/onboarding/pending",
 };
 
 const STEP_LABEL: Record<KycCurrentStep, string> = {
   identity: "identity verification",
-  address: "address verification",
-  liveness: "review step",
+  address: "identity verification",
+  liveness: "identity verification",
   completed: "review step",
 };
 
