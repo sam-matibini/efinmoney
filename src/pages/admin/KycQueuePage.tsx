@@ -30,7 +30,7 @@ const KycQueuePage = () => {
     queryFn: async () => {
       let q = supabase
         .from("kyc_verifications")
-        .select("id, user_id, verification_status, id_document_type, id_document_country, submitted_at, reviewed_by, created_at", { count: "exact" });
+        .select("id, user_id, verification_status, id_document_type, id_document_country, submitted_at, reviewed_by, created_at, persona_decision, persona_verification_data", { count: "exact" });
 
       if (statusFilter !== "all") q = q.eq("verification_status", statusFilter as "pending_review");
       if (docTypeFilter !== "all") q = q.eq("id_document_type", docTypeFilter as "passport");
