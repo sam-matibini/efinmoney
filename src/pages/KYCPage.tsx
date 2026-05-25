@@ -4,6 +4,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useProfile } from "@/hooks/useProfile";
 import { Shield, Upload, CheckCircle2, AlertTriangle, Clock } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+
 
 const KYCPage = () => {
   const { data: profile, isLoading } = useProfile();
