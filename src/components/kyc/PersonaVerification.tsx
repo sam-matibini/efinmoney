@@ -39,7 +39,7 @@ export const PersonaVerification = ({ userId, onComplete, onError, className, la
       // template (without our referenceId), producing orphan "Needs Review"
       // inquiries that can never be linked back to the user.
       const clientConfig: Record<string, unknown> = {
-        environment: data.environment || "sandbox",
+        environment: data.environment || "production",
         onReady: () => {
           setLoading(false);
           client.open();
