@@ -1,4 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -95,6 +96,7 @@ const hasPassedCoreChecks = (kyc: KycRecord | null | undefined) => {
 
 export const useKyc = () => {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
 
   const kycQ = useQuery({
     queryKey: ["kyc", user?.id],
@@ -123,7 +125,7 @@ export const useKyc = () => {
     refetchInterval: (q) => {
       const d = q.state.data as RiskTier | null | undefined;
       if (!d) return 2500;
-      return d.current_tier === "tier_1" ? 2500 : false;
+      return d.current_tier === "tier_3" || d.current_tier === "tier_4" ? false : 2500;
     },
     queryFn: async () => {
       const { data, error } = await supabase
@@ -136,16 +138,42 @@ export const useKyc = () => {
     },
   });
 
-
+  const corePassed = hasPassedCoreChecks(kycQ.data);
   const isVerified =
-    kycQ.data?.verification_status === "approved" || hasPassedCoreChecks(kycQ.data);
+    kycQ.data?.verification_status === "approved" || corePassed;
+
+  // Auto-upgrade to tier_3 once the two core checks (ID + face) pass.
+  useEffect(() => {
+    if (!user) return;
+    if (!isVerified) return;
+    const currentTier = tierQ.data?.current_tier;
+    if (currentTier === "tier_3" || currentTier === "tier_4") return;
+
+    (async () => {
+      const { error } = await supabase
+        .from("user_risk_tiers")
+        .upsert(
+          {
+            user_id: user.id,
+            current_tier: "tier_3",
+            upgraded_at: new Date().toISOString(),
+          },
+          { onConflict: "user_id" },
+        );
+      if (!error) {
+        queryClient.invalidateQueries({ queryKey: ["risk-tier", user.id] });
+      } else {
+        console.error("Failed to auto-upgrade tier to tier_3", error);
+      }
+    })();
+  }, [user, isVerified, tierQ.data?.current_tier, queryClient]);
 
   return {
     kyc: kycQ.data ?? null,
     tier: tierQ.data ?? null,
     isLoading: kycQ.isLoading || tierQ.isLoading,
     isVerified,
-    hasPassedCoreChecks: hasPassedCoreChecks(kycQ.data),
+    hasPassedCoreChecks: corePassed,
     refetch: () => {
       kycQ.refetch();
       tierQ.refetch();
