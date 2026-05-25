@@ -1,7 +1,9 @@
 import { useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+
 import { useKyc } from "@/hooks/useKyc";
 import PersonaVerification from "@/components/kyc/PersonaVerification";
 import InteracVerification from "@/components/kyc/InteracVerification";
@@ -15,6 +17,8 @@ const Identity = () => {
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
   const { kyc, isVerified, hasPassedCoreChecks, refetch } = useKyc();
+  const queryClient = useQueryClient();
+
   const [searchParams] = useSearchParams();
   const autoStartPersona = searchParams.get("autostart") === "persona";
 
@@ -43,9 +47,36 @@ const Identity = () => {
     const toastId = toast.loading("Finalizing verification…");
     const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-    // Poll status-sync edge function. It auto-approves and the DB trigger
-    // upgrades the user to Tier 3 the moment Persona reports ID + Selfie passed.
-    for (let i = 0; i < 8; i++) {
+    const finish = async () => {
+      if (user) {
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ["kyc", user.id] }),
+          queryClient.invalidateQueries({ queryKey: ["risk-tier", user.id] }),
+        ]);
+      }
+      toast.success("You're verified — welcome!", { id: toastId });
+      navigate("/dashboard", { replace: true });
+    };
+
+    // Fast path: one immediate sync + refetch. Usually approves in <1s.
+    try {
+      if (info?.inquiryId) {
+        await supabase.functions.invoke("get-persona-inquiry-status", {
+          body: { inquiryId: info.inquiryId },
+        });
+      }
+    } catch (e) {
+      console.warn("Persona status sync failed", e);
+    }
+    let result = await refetch();
+    if (result?.isVerified || result?.hasPassedCoreChecks) {
+      await finish();
+      return;
+    }
+
+    // Tight fallback poll: 6 × 600ms ≈ 3.6s.
+    for (let i = 0; i < 6; i++) {
+      await sleep(600);
       try {
         if (info?.inquiryId) {
           await supabase.functions.invoke("get-persona-inquiry-status", {
@@ -55,20 +86,17 @@ const Identity = () => {
       } catch (e) {
         console.warn("Persona status sync failed", e);
       }
-
-      const result = await refetch();
+      result = await refetch();
       if (result?.isVerified || result?.hasPassedCoreChecks) {
-        toast.success("You're verified — welcome!", { id: toastId });
-        navigate("/dashboard", { replace: true });
+        await finish();
         return;
       }
-      await sleep(1500);
     }
 
-    // Fallback: never bounce back to /onboarding/identity. Send to status page.
     toast.info("Verification submitted. We'll notify you once it's approved.", { id: toastId });
     navigate("/kyc", { replace: true });
   };
+
 
 
 
