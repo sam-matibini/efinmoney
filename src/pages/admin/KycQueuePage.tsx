@@ -146,30 +146,42 @@ const KycQueuePage = () => {
               {isLoading ? (
                 Array.from({ length: 6 }).map((_, i) => (
                   <TableRow key={i}>
-                    <TableCell colSpan={7}><Skeleton className="h-8 w-full" /></TableCell>
+                    <TableCell colSpan={8}><Skeleton className="h-8 w-full" /></TableCell>
                   </TableRow>
                 ))
               ) : data?.rows.length === 0 ? (
-                <TableRow><TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-12">No submissions match your filters.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center text-sm text-muted-foreground py-12">No submissions match your filters.</TableCell></TableRow>
               ) : (
-                data?.rows.map((row) => (
-                  <TableRow key={row.id} className="cursor-pointer" onClick={() => navigate(`/admin/kyc/${row.id}`)}>
-                    <TableCell>
-                      <div className="font-medium">{row.profile?.full_name || "—"}</div>
-                      <div className="text-xs text-muted-foreground">{row.profile?.email || "—"}</div>
-                    </TableCell>
-                    <TableCell>{row.id_document_country || "—"}</TableCell>
-                    <TableCell className="capitalize text-sm">{row.id_document_type?.replace("_", " ") || "—"}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {row.submitted_at ? formatDistanceToNow(new Date(row.submitted_at), { addSuffix: true }) : "—"}
-                    </TableCell>
-                    <TableCell><KycStatusBadge status={row.verification_status} /></TableCell>
-                    <TableCell className="text-sm">{row.reviewer?.full_name || "—"}</TableCell>
-                    <TableCell>
-                      <Button size="sm" variant="ghost"><Eye className="w-4 h-4" /></Button>
-                    </TableCell>
-                  </TableRow>
-                ))
+                data?.rows.map((row) => {
+                  const tags = extractRiskTags(row.persona_verification_data);
+                  return (
+                    <TableRow key={row.id} className="cursor-pointer" onClick={() => navigate(`/admin/kyc/${row.id}`)}>
+                      <TableCell>
+                        <div className="font-medium">{row.profile?.full_name || "—"}</div>
+                        <div className="text-xs text-muted-foreground">{row.profile?.email || "—"}</div>
+                      </TableCell>
+                      <TableCell>{row.id_document_country || "—"}</TableCell>
+                      <TableCell className="capitalize text-sm">{row.id_document_type?.replace("_", " ") || "—"}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {row.submitted_at ? formatDistanceToNow(new Date(row.submitted_at), { addSuffix: true }) : "—"}
+                      </TableCell>
+                      <TableCell><KycStatusBadge status={row.verification_status} /></TableCell>
+                      <TableCell>
+                        {tags.length === 0 ? (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        ) : (
+                          <div className="flex flex-wrap gap-1 max-w-[220px]">
+                            {tags.map((t) => <KycRiskTagChip key={t} tag={t} />)}
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm">{row.reviewer?.full_name || "—"}</TableCell>
+                      <TableCell>
+                        <Button size="sm" variant="ghost"><Eye className="w-4 h-4" /></Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
               )}
             </TableBody>
           </Table>
