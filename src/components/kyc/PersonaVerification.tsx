@@ -34,10 +34,12 @@ export const PersonaVerification = ({ userId, onComplete, onError, className, la
         throw new Error(error?.message || data?.error || "Failed to initialize verification");
       }
 
-      const client = new (Persona as any).Client({
-        templateId: data.templateId,
+      // IMPORTANT: When resuming via sessionToken, do NOT pass templateId.
+      // Passing both causes the SDK to create a brand-new inquiry from the
+      // template (without our referenceId), producing orphan "Needs Review"
+      // inquiries that can never be linked back to the user.
+      const clientConfig: Record<string, unknown> = {
         environment: data.environment || "sandbox",
-        sessionToken: data.sessionToken,
         onReady: () => {
           setLoading(false);
           client.open();
@@ -55,7 +57,15 @@ export const PersonaVerification = ({ userId, onComplete, onError, className, la
           toast.error("Verification was interrupted. Please try again.");
           onError?.(e);
         },
-      });
+      };
+      if (data.sessionToken) {
+        clientConfig.sessionToken = data.sessionToken;
+        if (data.inquiryId) clientConfig.inquiryId = data.inquiryId;
+      } else if (data.templateId) {
+        clientConfig.templateId = data.templateId;
+        clientConfig.referenceId = userId;
+      }
+      const client = new (Persona as any).Client(clientConfig);
     } catch (err) {
       setLoading(false);
       console.error(err);
