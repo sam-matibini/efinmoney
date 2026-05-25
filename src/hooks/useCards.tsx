@@ -12,8 +12,6 @@ export interface Card {
   card_type: CardType;
   card_network: CardNetwork;
   last_four: string;
-  card_number: string | null;
-  cvv: string | null;
   expiry_month: number | null;
   expiry_year: number | null;
   cardholder_name: string;
@@ -25,6 +23,7 @@ export interface Card {
   expires_at: string;
   created_at: string;
 }
+
 
 // Generate a 16-digit PAN with valid Luhn check digit
 const generatePan = (network: CardNetwork): string => {
