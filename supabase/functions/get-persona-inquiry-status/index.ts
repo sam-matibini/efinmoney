@@ -81,6 +81,10 @@ Deno.serve(async (req) => {
     update.reviewed_at = new Date().toISOString();
     if (!kyc.submitted_at) update.submitted_at = new Date().toISOString();
     auditAction = "persona_auto_approved";
+  } else if (liveStatus === "needs_review") {
+    update.persona_decision = "needs_review";
+    update.verification_status = "pending_review";
+    if (!kyc.submitted_at) update.submitted_at = new Date().toISOString();
   } else if (liveStatus === "declined" || liveDecision === "declined") {
     const reason = extractDeclineReason(body);
     update.persona_decision = "declined";
