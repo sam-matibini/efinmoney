@@ -40,7 +40,7 @@ const KYCGuard = ({ children }: { children: ReactNode }) => {
       return <Navigate to={target} replace />;
     }
     case "pending_review":
-      return <Navigate to="/dashboard" replace />;
+      return <Spinner />;
     case "rejected":
       return <Navigate to="/onboarding/rejected" replace />;
     case "expired":
