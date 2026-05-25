@@ -41,30 +41,50 @@ Deno.serve(async (req) => {
 
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
-    // Find the caller's KYC row (optionally constrained to the inquiryId).
-    let query = admin
+    // Resolve the caller's KYC row by user_id only. The user_id column has a
+    // UNIQUE constraint, so there is at most one row per user. inquiryId is
+    // treated as mutable linkage metadata, never as a lookup discriminator —
+    // otherwise a stale/null persona_inquiry_id would mask the existing row
+    // and the insert fallback would violate kyc_verifications_user_id_key.
+    let { data: kyc, error: fetchErr } = await admin
       .from("kyc_verifications")
       .select("id, user_id, verification_status, submitted_at, persona_inquiry_id")
-      .eq("user_id", userId);
-    if (inquiryId) query = query.eq("persona_inquiry_id", inquiryId);
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (fetchErr) {
+      console.error("[persona-self-approve] lookup failed", { userId, fetchErr });
+      return json(500, { error: fetchErr.message });
+    }
 
-    let { data: kyc, error: fetchErr } = await query.maybeSingle();
-    if (fetchErr) return json(500, { error: fetchErr.message });
-
-    // If no row exists yet for this user (legacy account created before
-    // handle_new_user inserted kyc rows), create one so we can approve it.
+    // Legacy accounts created before handle_new_user inserted KYC rows: use
+    // upsert on user_id so concurrent retries cannot create a duplicate row.
     if (!kyc) {
+      console.log("[persona-self-approve] no existing kyc row, upserting", { userId, inquiryId });
       const { data: created, error: insErr } = await admin
         .from("kyc_verifications")
-        .insert({
-          user_id: userId,
-          persona_inquiry_id: inquiryId ?? null,
-          verification_status: "in_progress",
-        })
+        .upsert(
+          {
+            user_id: userId,
+            persona_inquiry_id: inquiryId ?? null,
+            verification_status: "in_progress",
+          },
+          { onConflict: "user_id", ignoreDuplicates: false },
+        )
         .select("id, user_id, verification_status, submitted_at, persona_inquiry_id")
         .single();
-      if (insErr) return json(500, { error: insErr.message });
+      if (insErr) {
+        console.error("[persona-self-approve] upsert failed", { userId, insErr });
+        return json(500, { error: insErr.message });
+      }
       kyc = created;
+    } else {
+      console.log("[persona-self-approve] found existing kyc row", {
+        userId,
+        kycId: kyc.id,
+        existingInquiryId: kyc.persona_inquiry_id,
+        incomingInquiryId: inquiryId,
+        status: kyc.verification_status,
+      });
     }
 
     // Idempotent: nothing to do if already final.

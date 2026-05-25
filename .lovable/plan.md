@@ -1,40 +1,30 @@
 ## Goal
-The moment Persona reports ID + Selfie passed and the user clicks Submit, they land on `/dashboard` with Tier 3 visibly applied — no verification page, no spinner loop, no second click.
+Stop the repeated `duplicate key value violates unique constraint "kyc_verifications_user_id_key"` error in the `persona-self-approve` flow and make the approval path resilient for users whose KYC row already exists but is missing or has an out-of-sync `persona_inquiry_id`.
 
-## Current behavior
-- `onPersonaComplete` polls `get-persona-inquiry-status` up to 8× at 1.5s spacing (~12s). First successful poll navigates to `/dashboard`. Works, but feels slow because:
-  1. We `await sleep(1500)` even on the first iteration before checking.
-  2. We always call the edge function once per loop even when the previous `refetch()` already shows approved.
-  3. The KYC realtime/poll in `useKyc` runs every 2.5s, so the UI can lag behind for ~2s after approval.
-- `KYCGuard` correctly lets `in_progress + persona_inquiry_id` through, so no bounce-back.
+## What I’ll change
+1. **Fix the lookup logic in `persona-self-approve`**
+   - Change the function so it always resolves the caller’s existing KYC row by `user_id` first.
+   - Only use `inquiryId` to enrich or validate the row, not to decide whether the row exists.
+   - If multiple matching paths are possible, prefer the existing `user_id` row and update its `persona_inquiry_id` when safe.
 
-## Changes (frontend only, no DB / edge-function changes)
+2. **Make the function idempotent under retries**
+   - Replace the current “select-then-insert” fallback with logic that cannot create a duplicate row for the same user during retries or timing races.
+   - Keep existing approved/rejected guards so repeated Persona callbacks don’t break the flow.
 
-### 1. `src/pages/onboarding/Identity.tsx` — tighten the poll loop
-- Call `get-persona-inquiry-status` **once immediately** when `onPersonaComplete` fires (Persona returns `completed` synchronously when ID + Selfie passed at submit time, so this single call usually flips status to `approved` server-side).
-- Then `await refetch()` and check `isVerified || hasPassedCoreChecks` — if true, navigate to `/dashboard` in the same tick (no sleep first).
-- Only if not yet approved, enter a faster poll: up to 6 iterations at **600ms** spacing (~3.6s total) instead of 8 × 1500ms. Each iteration: invoke status sync → refetch → check.
-- Keep the existing fallback toast + `/kyc` redirect if poll exhausts.
+3. **Add lightweight diagnostics in the function**
+   - Add targeted logs around lookup, fallback, and update decisions so any future mismatch is visible in function logs instead of surfacing as another blind 500.
 
-### 2. `src/pages/onboarding/Identity.tsx` — pre-warm tier query
-- After successful approval, call `queryClient.invalidateQueries({ queryKey: ["risk-tier", user.id] })` and `["kyc", user.id]` before `navigate(...)` so the dashboard mounts with Tier 3 already present (no flash of Tier 1/2).
+4. **Validate the fix against the deployed function path**
+   - Deploy the updated edge function.
+   - Test the function with the current authenticated preview session.
+   - Confirm it returns success or a stable idempotent response instead of attempting a second insert.
 
-### 3. `src/hooks/useKyc.tsx` — speed up post-submit refetch
-- Drop the polling interval from **2500ms → 1000ms** while `verification_status === "in_progress"` and a `persona_inquiry_id` is present. Same condition for `risk-tier`. This keeps the dashboard's tier badge in sync within ≤1s of DB trigger firing, then stops polling once approved.
+## Expected result
+- Existing users with a KYC row but no linked Persona inquiry will no longer trigger a duplicate-row insert.
+- Re-running the same Persona completion flow will be safe.
+- The onboarding identity page should complete instead of throwing the same backend error again.
 
-### 4. Tier badge UI sanity check
-- Confirm `TierBadge` / dashboard header reads from `useKyc().tier?.current_tier` (no local cache). No code change expected — just verify during implementation.
-
-## Why this is enough
-- The DB trigger `on_kyc_status_change` already upgrades the user to Tier 3 the instant `verification_status` flips to `approved`. The edge function already does that flip on the first successful status sync. So the only latency the user feels is one HTTP round-trip + one query refetch — typically <1s.
-- `KYCGuard` already allows passage during the brief `in_progress` window, so even if navigation beats the DB write, the user lands on the dashboard immediately and the tier badge fills in on the next 1s tick.
-
-## Out of scope
-- No edge-function changes.
-- No DB migrations.
-- No Persona SDK config changes.
-- No changes to `KYCGuard` (already correct).
-
-## Files touched
-- `src/pages/onboarding/Identity.tsx`
-- `src/hooks/useKyc.tsx`
+## Technical notes
+- Root cause: the function currently narrows the fetch by both `user_id` and `persona_inquiry_id`; when `persona_inquiry_id` is null or different on the existing row, the lookup misses and the fallback insert violates the unique `user_id` constraint.
+- Fix strategy: treat `user_id` as the source of truth for the KYC row, and treat `persona_inquiry_id` as mutable linkage metadata.
+- Scope: edge function only; no UI redesign or unrelated onboarding changes.
