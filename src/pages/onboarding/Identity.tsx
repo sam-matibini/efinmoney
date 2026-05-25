@@ -269,6 +269,7 @@ const Identity = () => {
                 userId={user.id}
                 className="w-full"
                 label={personaSubmitted ? "Restart Persona verification" : "Start with Persona"}
+                autoStart={autoStart && !personaSubmitted}
                 onComplete={onPersonaComplete}
                 onError={() => {
                   toast.error("Persona verification is temporarily unavailable.");
