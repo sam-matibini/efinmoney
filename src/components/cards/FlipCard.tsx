@@ -33,9 +33,8 @@ const FlipCard = ({ card, flipped, onToggle, index }: FlipCardProps) => {
       ? `${String(card.expiry_month).padStart(2, "0")}/${String(card.expiry_year).slice(-2)}`
       : "--/--";
 
-  const maskedNumber = card.card_number
-    ? formatPan(card.card_number)
-    : `•••• •••• •••• ${card.last_four}`;
+  const maskedNumber = `•••• •••• •••• ${card.last_four}`;
+
 
   const copy = async (label: string, value: string, e: MouseEvent) => {
     e.stopPropagation();
