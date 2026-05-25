@@ -9,6 +9,8 @@ import { useNavigate } from "react-router-dom";
 
 const KYCPage = () => {
   const { data: profile, isLoading } = useProfile();
+  const navigate = useNavigate();
+
 
   const status = profile?.kyc_status || 'pending';
   const tier = profile?.kyc_tier || 'tier_0';
