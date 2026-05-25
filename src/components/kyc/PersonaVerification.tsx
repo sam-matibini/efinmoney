@@ -21,15 +21,23 @@ export const PersonaVerification = ({ userId, onComplete, onError, className, la
   const startVerification = async () => {
     setLoading(true);
     try {
-      // Guard: ensure we still have an active session before invoking the edge function.
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (!sessionData?.session) {
+      // Guard: ensure we still have a VALID session before invoking the edge function.
+      // getSession() can return a cached session whose token was already revoked
+      // server-side, so we proactively refresh and verify with getUser().
+      let { data: sessionData } = await supabase.auth.getSession();
+      if (sessionData?.session) {
+        const { data: refreshed } = await supabase.auth.refreshSession();
+        if (refreshed?.session) sessionData = { session: refreshed.session } as any;
+      }
+      const { data: userCheck, error: userCheckErr } = await supabase.auth.getUser();
+      if (!sessionData?.session || userCheckErr || !userCheck?.user) {
         setLoading(false);
         toast.error("Your session has expired. Please sign in again.");
         await supabase.auth.signOut().catch(() => {});
         if (typeof window !== "undefined") window.location.assign("/auth");
         return;
       }
+
 
       const { data, error } = await supabase.functions.invoke("create-persona-inquiry", {
         body: { userId },
