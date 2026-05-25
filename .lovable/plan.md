@@ -1,35 +1,23 @@
-## Diagnose: 4 real-user Persona cases with no reference ID
+## Goal
+When Persona approves a user's Government ID + Selfie (Face ID), immediately grant **Tier 3** and send them into the app. No address verification required.
 
-These are not test data — they were your real KYC attempts, but Persona never received our `referenceId` to link them to your profile. Before resolving them in Persona, we need to confirm your actual KYC state in our DB and fix the SDK linkage so it doesn't happen again.
+## Current behavior
+The `on_kyc_status_change` database trigger requires BOTH `id_verification_status = 'approved'` AND `address_verification_status = 'approved'` to assign `tier_3`. With only ID approved, it falls back to `tier_2`. Since Persona's Gov ID + Selfie flow never touches `address_verification_status`, every Persona-approved user is currently capped at Tier 2.
 
-## Step 1 — Check current DB state for your account
+The Persona webhook itself already sets `verification_status = 'approved'` and `id_verification_status = 'approved'` correctly on `inquiry.approved`, and the `/onboarding/pending` page already auto-routes to `/onboarding/approved` (then into the app) the moment `verification_status` flips to approved. So the only blocker is the tier logic.
 
-Run a read-only query against `profiles` + `kyc_verifications` for the currently logged-in user (Samuel) to determine:
-- `profiles.kyc_status` and `profiles.kyc_tier` right now
-- All rows in `kyc_verifications` for this user_id, including `verification_status`, `persona_inquiry_id`, `submitted_at`
-- Whether the most recent inquiry has a linked Persona inquiry ID at all
+## Change (single migration)
 
-This tells us whether you're already Tier 3 (cases are duplicates), still pending (need manual approval), or completely unlinked (SDK bug still live).
+Update `public.on_kyc_status_change()` so that on approval:
 
-## Step 2 — Act based on what we find
+- If `id_verification_status = 'approved'` → **Tier 3** (full limits + international + virtual card), regardless of address status.
+- Drop the Tier 2 fallback branch entirely (no longer reachable via Persona's Gov ID + Selfie path).
+- Keep account number generation, `profiles.account_status = 'active'`, `kyc_status = 'verified'`, `kyc_tier = 'tier_3'`, and the audit log insert exactly as today.
 
-**If you're already approved/Tier 3:**
-- These 4 cases are leftover orphans. Close them in Persona as "Duplicate" or "Other → resolved out of band". No app changes needed.
-
-**If you're still pending/Tier 0:**
-- Manually approve you via the admin KYC review screen (or a direct one-shot update if no `kyc_verifications` row exists). This triggers the `on_kyc_status_change` trigger and flips you to Tier 3.
-- Then close the 4 Persona cases as "Duplicate".
-
-**If no `kyc_verifications` row exists at all:**
-- Audit `src/components/kyc/PersonaVerification.tsx` and the `create-persona-inquiry` edge function to confirm `referenceId` is being passed on every fresh inquiry creation (not just resume). The existing comment in `PersonaVerification.tsx` warns about this exact issue.
-- Insert the missing verification row + approve + tier upgrade.
-- Then close the cases.
-
-## Step 3 — Prevent recurrence
-
-Once your account is correct, briefly verify that the next fresh inquiry creates a Persona inquiry with `account_reference_id` populated. This is a one-time sanity check, not new code, as long as Step 1 doesn't reveal a code bug.
+Also backfill: any existing profile with `kyc_verifications.verification_status = 'approved'` and `id_verification_status = 'approved'` currently sitting at `tier_2` gets promoted to `tier_3` (limits + features updated to match).
 
 ## Out of scope
-
-- Building a UI to reconcile orphan Persona cases back to users (could come later if this happens often).
-- Modifying the Persona workflow rules again — those are correct now.
+- Persona webhook code (already correct).
+- Onboarding routing (already auto-forwards on approval).
+- Address verification flow (remains available for any future Tier escalation use cases, but no longer required for Tier 3).
+- The 4 orphan KABC cases in Persona (decline as Duplicate, as previously agreed).
