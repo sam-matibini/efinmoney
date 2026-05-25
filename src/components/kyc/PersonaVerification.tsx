@@ -24,6 +24,12 @@ export const PersonaVerification = ({ userId, onComplete, onError, className, la
       const { data, error } = await supabase.functions.invoke("create-persona-inquiry", {
         body: { userId },
       });
+      if (data?.alreadySubmitted) {
+        setLoading(false);
+        toast.success("Verification already submitted");
+        onComplete?.({ inquiryId: data.inquiryId, status: data.status || "completed" });
+        return;
+      }
       if (error || !data?.sessionToken) {
         throw new Error(error?.message || data?.error || "Failed to initialize verification");
       }

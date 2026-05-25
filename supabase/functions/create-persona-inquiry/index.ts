@@ -44,6 +44,49 @@ Deno.serve(async (req) => {
       return json({ error: "Persona is not configured" }, 500);
     }
 
+    const { data: existingKyc } = await supabase
+      .from("kyc_verifications")
+      .select("persona_inquiry_id, persona_inquiry_status, verification_status")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (existingKyc?.persona_inquiry_id) {
+      const submittedStatuses = ["pending_review", "approved", "rejected"];
+      const submittedPersonaStates = ["completed", "needs_review", "approved", "declined", "expired", "failed"];
+
+      if (
+        submittedStatuses.includes(existingKyc.verification_status) ||
+        (existingKyc.persona_inquiry_status && submittedPersonaStates.includes(existingKyc.persona_inquiry_status))
+      ) {
+        return json({
+          templateId,
+          environment,
+          inquiryId: existingKyc.persona_inquiry_id,
+          status: existingKyc.persona_inquiry_status || existingKyc.verification_status,
+          alreadySubmitted: true,
+        });
+      }
+
+      const resumed = await resumeInquiry(apiKey, existingKyc.persona_inquiry_id);
+      if (resumed?.sessionToken) {
+        await supabase
+          .from("kyc_verifications")
+          .update({
+            persona_session_token: resumed.sessionToken,
+            persona_inquiry_status: resumed.status || existingKyc.persona_inquiry_status || "created",
+          })
+          .eq("user_id", userId);
+
+        return json({
+          templateId,
+          environment,
+          inquiryId: existingKyc.persona_inquiry_id,
+          sessionToken: resumed.sessionToken,
+          status: resumed.status || existingKyc.persona_inquiry_status || "created",
+        });
+      }
+    }
+
     // 1. Create inquiry
     const createRes = await fetch(`${PERSONA_API}/inquiries`, {
       method: "POST",
@@ -116,4 +159,24 @@ function json(payload: unknown, status = 200) {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
+}
+
+async function resumeInquiry(apiKey: string, inquiryId: string) {
+  const resumeRes = await fetch(`${PERSONA_API}/inquiries/${inquiryId}/resume`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+      "Persona-Version": PERSONA_VERSION,
+      "Key-Inflection": "camel",
+    },
+  });
+
+  const resumeBody = await resumeRes.json().catch(() => ({}));
+  if (!resumeRes.ok) return null;
+
+  return {
+    sessionToken: resumeBody?.meta?.sessionToken || resumeBody?.data?.attributes?.sessionToken || null,
+    status: resumeBody?.data?.attributes?.status || null,
+  };
 }
