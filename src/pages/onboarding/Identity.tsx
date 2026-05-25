@@ -6,7 +6,8 @@ import { useKyc } from "@/hooks/useKyc";
 import PersonaVerification from "@/components/kyc/PersonaVerification";
 import InteracVerification from "@/components/kyc/InteracVerification";
 import { Card } from "@/components/ui/card";
-import { ShieldCheck } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ShieldCheck, ArrowLeft, LogOut } from "lucide-react";
 import { toast } from "sonner";
 import { Logo, Wordmark } from "@/components/Logo";
 
