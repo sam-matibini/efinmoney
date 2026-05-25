@@ -150,21 +150,30 @@ export const useKyc = () => {
     if (currentTier === "tier_3" || currentTier === "tier_4") return;
 
     (async () => {
-      const { error } = await supabase
-        .from("user_risk_tiers")
-        .upsert(
-          {
-            user_id: user.id,
-            current_tier: "tier_3",
-            upgraded_at: new Date().toISOString(),
-          },
-          { onConflict: "user_id" },
-        );
-      if (!error) {
-        queryClient.invalidateQueries({ queryKey: ["risk-tier", user.id] });
-      } else {
-        console.error("Failed to auto-upgrade tier to tier_3", error);
-      }
+      const [{ error: tierErr }, { error: profileErr }] = await Promise.all([
+        supabase
+          .from("user_risk_tiers")
+          .upsert(
+            {
+              user_id: user.id,
+              current_tier: "tier_3",
+              upgraded_at: new Date().toISOString(),
+            },
+            { onConflict: "user_id" },
+          ),
+        supabase
+          .from("profiles")
+          .update({
+            kyc_tier: "tier_3",
+            kyc_status: "verified",
+            kyc_completed_at: new Date().toISOString(),
+          })
+          .eq("id", user.id),
+      ]);
+      if (tierErr) console.error("tier upsert failed", tierErr);
+      if (profileErr) console.error("profile tier update failed", profileErr);
+      queryClient.invalidateQueries({ queryKey: ["risk-tier", user.id] });
+      queryClient.invalidateQueries({ queryKey: ["profile", user.id] });
     })();
   }, [user, isVerified, tierQ.data?.current_tier, queryClient]);
 
