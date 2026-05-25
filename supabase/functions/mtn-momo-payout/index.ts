@@ -22,6 +22,13 @@ function sanitizeMsisdn(phone: string): string {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
+  const expectedSecret = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+  if (!expectedSecret || req.headers.get("x-internal-secret") !== expectedSecret) {
+    return new Response(JSON.stringify({ success: false, error: "Unauthorized" }), {
+      status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   const supabase = getServiceClient();
 
   try {
