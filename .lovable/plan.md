@@ -1,24 +1,35 @@
-## Fix: Monthly budget shows fake 65% for new users
+## Diagnose: 4 real-user Persona cases with no reference ID
 
-**Root cause**
-`src/components/dashboard/HeroBalance.tsx` line 96 hardcodes `const monthlyBudgetPct = 65; // decorative progress`. It was never wired to real data, so every user (including brand-new signups with $0 spent) sees "65% used".
+These are not test data — they were your real KYC attempts, but Persona never received our `referenceId` to link them to your profile. Before resolving them in Persona, we need to confirm your actual KYC state in our DB and fix the SDK linkage so it doesn't happen again.
 
-## Change
+## Step 1 — Check current DB state for your account
 
-Edit only `src/components/dashboard/HeroBalance.tsx`:
+Run a read-only query against `profiles` + `kyc_verifications` for the currently logged-in user (Samuel) to determine:
+- `profiles.kyc_status` and `profiles.kyc_tier` right now
+- All rows in `kyc_verifications` for this user_id, including `verification_status`, `persona_inquiry_id`, `submitted_at`
+- Whether the most recent inquiry has a linked Persona inquiry ID at all
 
-1. Remove the hardcoded `65`. Default `monthlyBudgetPct` to `0`.
-2. Change the label from `"{pct}% used"` to:
-   - `"Not set"` (muted text) when no budget exists
-   - `"{pct}% used"` only once a real budget is configured
-3. Render the `BudgetArc` with `pct={0}` so it shows an empty ring instead of a 65% filled arc.
-4. Keep the arc visible (so the layout doesn't shift) but make it act as a "Set budget" affordance — clicking it is a no-op for now; we'll wire a real budget feature in a future task.
+This tells us whether you're already Tier 3 (cases are duplicates), still pending (need manual approval), or completely unlinked (SDK bug still live).
 
-No DB changes, no new tables, no new hooks. Pure UI fix.
+## Step 2 — Act based on what we find
 
-## Out of scope (future work)
+**If you're already approved/Tier 3:**
+- These 4 cases are leftover orphans. Close them in Persona as "Duplicate" or "Other → resolved out of band". No app changes needed.
 
-- A real `user_budgets` table + settings page to let users set a monthly cap
-- Computing actual spend from the ledger to drive the % once budgets exist
+**If you're still pending/Tier 0:**
+- Manually approve you via the admin KYC review screen (or a direct one-shot update if no `kyc_verifications` row exists). This triggers the `on_kyc_status_change` trigger and flips you to Tier 3.
+- Then close the 4 Persona cases as "Duplicate".
 
-Both can come later as a proper feature; this PR just stops the dashboard from lying to new users.
+**If no `kyc_verifications` row exists at all:**
+- Audit `src/components/kyc/PersonaVerification.tsx` and the `create-persona-inquiry` edge function to confirm `referenceId` is being passed on every fresh inquiry creation (not just resume). The existing comment in `PersonaVerification.tsx` warns about this exact issue.
+- Insert the missing verification row + approve + tier upgrade.
+- Then close the cases.
+
+## Step 3 — Prevent recurrence
+
+Once your account is correct, briefly verify that the next fresh inquiry creates a Persona inquiry with `account_reference_id` populated. This is a one-time sanity check, not new code, as long as Step 1 doesn't reveal a code bug.
+
+## Out of scope
+
+- Building a UI to reconcile orphan Persona cases back to users (could come later if this happens often).
+- Modifying the Persona workflow rules again — those are correct now.
