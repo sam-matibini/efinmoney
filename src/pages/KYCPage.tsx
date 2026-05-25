@@ -63,10 +63,11 @@ const KYCPage = () => {
                 <p className="text-sm text-muted-foreground mb-4">
                   Upload your government-issued ID and proof of address to unlock higher transaction limits.
                 </p>
-                <Button>
+                <Button onClick={() => navigate("/onboarding/identity")}>
                   <Upload className="w-4 h-4 mr-2" />
-                  Upload Documents
+                  Start ID Verification
                 </Button>
+
               </Card>
             )}
 
