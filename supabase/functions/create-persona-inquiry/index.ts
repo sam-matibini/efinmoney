@@ -38,7 +38,7 @@ Deno.serve(async (req) => {
 
     const apiKey = Deno.env.get("PERSONA_API_KEY");
     const templateId = Deno.env.get("PERSONA_TEMPLATE_ID");
-    const environment = Deno.env.get("PERSONA_ENVIRONMENT") || "sandbox";
+    const environment = Deno.env.get("PERSONA_ENVIRONMENT") || "production";
     if (!apiKey || !templateId) {
       console.error("Missing Persona env vars");
       return json({ error: "Persona is not configured" }, 500);
