@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import Persona from "persona";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -11,10 +11,12 @@ interface Props {
   onError?: (err: unknown) => void;
   className?: string;
   label?: string;
+  autoStart?: boolean;
 }
 
-export const PersonaVerification = ({ userId, onComplete, onError, className, label = "Start ID Verification" }: Props) => {
+export const PersonaVerification = ({ userId, onComplete, onError, className, label = "Start ID Verification", autoStart = false }: Props) => {
   const [loading, setLoading] = useState(false);
+  const autoStartedRef = useRef(false);
 
   const startVerification = async () => {
     setLoading(true);
@@ -55,6 +57,14 @@ export const PersonaVerification = ({ userId, onComplete, onError, className, la
       onError?.(err);
     }
   };
+
+  useEffect(() => {
+    if (autoStart && !autoStartedRef.current && userId) {
+      autoStartedRef.current = true;
+      startVerification();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoStart, userId]);
 
   return (
     <Button size="lg" className={className} onClick={startVerification} disabled={loading}>

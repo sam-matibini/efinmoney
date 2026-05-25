@@ -82,11 +82,15 @@ const Identity = () => {
   }, [searchParams]);
 
 
+  const autoStart = searchParams.get("auto") === "1";
+
   const requiresBack = docType === "drivers_license" || docType === "national_id";
 
   const persist = async (patch: Record<string, unknown>) => {
     if (!user) return;
-    await supabase.from("kyc_verifications").update(patch).eq("user_id", user.id);
+    await supabase
+      .from("kyc_verifications")
+      .upsert({ user_id: user.id, ...patch }, { onConflict: "user_id" });
   };
 
   const uploadTo = async (folder: "identity", file: File | Blob, name: string) => {
@@ -140,9 +144,10 @@ const Identity = () => {
 
   const onPersonaComplete = async () => {
     setPersonaSubmitted(true);
-    await persist({ current_step: "address", verification_status: "in_progress" });
+    await persist({ current_step: "completed", verification_status: "pending_review" });
     await refetch();
-    navigate("/onboarding/address");
+    toast.success("Verification submitted — welcome!");
+    navigate("/", { replace: true });
   };
 
   const isSandbox = false; // Persona is in production
@@ -264,6 +269,7 @@ const Identity = () => {
                 userId={user.id}
                 className="w-full"
                 label={personaSubmitted ? "Restart Persona verification" : "Start with Persona"}
+                autoStart={autoStart && !personaSubmitted}
                 onComplete={onPersonaComplete}
                 onError={() => {
                   toast.error("Persona verification is temporarily unavailable.");
