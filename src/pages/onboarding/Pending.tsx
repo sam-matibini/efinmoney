@@ -20,6 +20,31 @@ const Pending = () => {
     return () => clearInterval(t);
   }, [refetch]);
 
+  useEffect(() => {
+    if (!kyc?.persona_inquiry_id) return;
+    if (kyc.verification_status === "approved" || kyc.verification_status === "rejected") return;
+
+    let cancelled = false;
+
+    const syncPersonaStatus = async () => {
+      const { error } = await supabase.functions.invoke("get-persona-inquiry-status", {
+        body: { inquiryId: kyc.persona_inquiry_id },
+      });
+
+      if (!cancelled && !error) {
+        refetch();
+      }
+    };
+
+    void syncPersonaStatus();
+    const t = setInterval(syncPersonaStatus, 8000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+  }, [kyc?.persona_inquiry_id, kyc?.verification_status, refetch]);
+
   // Realtime subscription: react instantly when admin approves/rejects
   useEffect(() => {
     if (!user) return;
