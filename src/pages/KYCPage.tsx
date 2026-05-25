@@ -4,9 +4,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useProfile } from "@/hooks/useProfile";
 import { Shield, Upload, CheckCircle2, AlertTriangle, Clock } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+
 
 const KYCPage = () => {
   const { data: profile, isLoading } = useProfile();
+  const navigate = useNavigate();
+
 
   const status = profile?.kyc_status || 'pending';
   const tier = profile?.kyc_tier || 'tier_0';
@@ -59,10 +63,11 @@ const KYCPage = () => {
                 <p className="text-sm text-muted-foreground mb-4">
                   Upload your government-issued ID and proof of address to unlock higher transaction limits.
                 </p>
-                <Button>
+                <Button onClick={() => navigate("/onboarding/identity")}>
                   <Upload className="w-4 h-4 mr-2" />
-                  Upload Documents
+                  Start ID Verification
                 </Button>
+
               </Card>
             )}
 
