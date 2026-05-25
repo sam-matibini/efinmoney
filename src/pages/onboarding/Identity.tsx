@@ -17,6 +17,8 @@ const Identity = () => {
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
   const { kyc, isVerified, hasPassedCoreChecks, refetch } = useKyc();
+  const queryClient = useQueryClient();
+
   const [searchParams] = useSearchParams();
   const autoStartPersona = searchParams.get("autostart") === "persona";
 
