@@ -133,6 +133,7 @@ const AdminLayout = ({ children }: { children: ReactNode }) => {
         {NAV.map((item) => {
           const Icon = item.icon;
           const active = location.pathname === item.to || location.pathname.startsWith(item.to + "/");
+          const badge = item.to === "/admin/kyc" && pendingKycCount > 0 ? pendingKycCount : null;
           return (
             <NavLink
               key={item.to}
@@ -146,7 +147,18 @@ const AdminLayout = ({ children }: { children: ReactNode }) => {
               )}
             >
               <Icon className="w-4 h-4 shrink-0" />
-              {!collapsed && <span>{item.label}</span>}
+              {!collapsed && <span className="flex-1">{item.label}</span>}
+              {badge !== null && (
+                <span
+                  className={cn(
+                    "rounded-full text-[10px] font-bold min-w-[20px] px-1.5 py-0.5 text-center",
+                    active ? "bg-sidebar-primary-foreground text-sidebar-primary" : "bg-amber-500 text-white",
+                    collapsed && "absolute top-1 right-1"
+                  )}
+                >
+                  {badge > 99 ? "99+" : badge}
+                </span>
+              )}
             </NavLink>
           );
         })}
