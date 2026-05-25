@@ -31,7 +31,7 @@ const Auth = () => {
         if (error) toast.error(error.message);
         else {
           toast.success("Account created — let's verify your identity.");
-          navigate("/onboarding/identity?auto=1");
+          navigate("/onboarding/identity");
         }
       } else {
         const { error } = await signIn(email, password);
