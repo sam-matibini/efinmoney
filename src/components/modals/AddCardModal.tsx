@@ -95,12 +95,13 @@ const AddCardModal = ({ isOpen, onClose, defaultMode = "issue" }: AddCardModalPr
   };
 
   const copyDetails = async () => {
-    if (!createdCard?.card_number) return;
-    const text = `Card: ${createdCard.card_number}\nExpiry: ${String(createdCard.expiry_month).padStart(2, "0")}/${String(createdCard.expiry_year).slice(-2)}\nCVV: ${createdCard.cvv}`;
+    if (!createdCard) return;
+    const text = `Card ending: ${createdCard.last_four}\nExpiry: ${String(createdCard.expiry_month).padStart(2, "0")}/${String(createdCard.expiry_year).slice(-2)}`;
     await navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   };
+
 
   return (
     <Dialog open={isOpen} onOpenChange={(o) => { if (!o) handleClose(); }}>
@@ -120,10 +121,9 @@ const AddCardModal = ({ isOpen, onClose, defaultMode = "issue" }: AddCardModalPr
               </div>
               <div className="flex items-center gap-2 mb-4">
                 <p className="font-mono text-lg tracking-wider">
-                  {reveal && createdCard.card_number
-                    ? formatPan(createdCard.card_number)
-                    : `•••• •••• •••• ${createdCard.last_four}`}
+                  {`•••• •••• •••• ${createdCard.last_four}`}
                 </p>
+
                 <button onClick={() => setReveal((r) => !r)} className="p-1 hover:bg-primary-foreground/10 rounded">
                   {reveal ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -141,7 +141,7 @@ const AddCardModal = ({ isOpen, onClose, defaultMode = "issue" }: AddCardModalPr
                 </div>
                 <div>
                   <p className="opacity-70 text-xs">CVV</p>
-                  <p className="font-mono">{reveal ? createdCard.cvv : "•••"}</p>
+                  <p className="font-mono">•••</p>
                 </div>
               </div>
             </div>

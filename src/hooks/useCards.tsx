@@ -12,8 +12,6 @@ export interface Card {
   card_type: CardType;
   card_network: CardNetwork;
   last_four: string;
-  card_number: string | null;
-  cvv: string | null;
   expiry_month: number | null;
   expiry_year: number | null;
   cardholder_name: string;
@@ -25,6 +23,7 @@ export interface Card {
   expires_at: string;
   created_at: string;
 }
+
 
 // Generate a 16-digit PAN with valid Luhn check digit
 const generatePan = (network: CardNetwork): string => {
@@ -104,22 +103,16 @@ export const useCardMutations = () => {
       }
 
       let last_four: string;
-      let card_number: string | null;
-      let cvv: string | null;
       let expMonth: number;
       let expYear: number;
 
       if (isExternal) {
         last_four = input.external!.last_four;
-        card_number = null;
-        cvv = null;
         expMonth = input.external!.expiry_month;
         expYear = input.external!.expiry_year;
       } else {
         const pan = generatePan(input.card_network);
         last_four = pan.slice(-4);
-        card_number = pan;
-        cvv = generateCvv();
         const now = new Date();
         expYear = now.getFullYear() + 4;
         expMonth = now.getMonth() + 1;
@@ -133,8 +126,6 @@ export const useCardMutations = () => {
           card_network: input.card_network,
           cardholder_name: input.cardholder_name,
           last_four,
-          card_number,
-          cvv,
           expiry_month: expMonth,
           expiry_year: expYear,
           spending_limit: input.spending_limit ?? 5000,
@@ -146,6 +137,7 @@ export const useCardMutations = () => {
         .single();
       if (error) throw error;
       return data as Card;
+
     },
     onSuccess: () => {
       toast.success('Card created');
