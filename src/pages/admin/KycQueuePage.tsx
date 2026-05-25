@@ -8,6 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { KycStatusBadge } from "@/components/admin-portal/Badges";
+import { KycRiskTagChip } from "@/components/admin/KycRiskTagChip";
+import { extractRiskTags } from "@/lib/personaTags";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDistanceToNow } from "date-fns";
@@ -28,7 +30,7 @@ const KycQueuePage = () => {
     queryFn: async () => {
       let q = supabase
         .from("kyc_verifications")
-        .select("id, user_id, verification_status, id_document_type, id_document_country, submitted_at, reviewed_by, created_at", { count: "exact" });
+        .select("id, user_id, verification_status, id_document_type, id_document_country, submitted_at, reviewed_by, created_at, persona_decision, persona_verification_data", { count: "exact" });
 
       if (statusFilter !== "all") q = q.eq("verification_status", statusFilter as "pending_review");
       if (docTypeFilter !== "all") q = q.eq("id_document_type", docTypeFilter as "passport");
@@ -135,6 +137,7 @@ const KycQueuePage = () => {
                 <TableHead>Document</TableHead>
                 <TableHead>Submitted</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Risk flags</TableHead>
                 <TableHead>Reviewer</TableHead>
                 <TableHead className="w-20"></TableHead>
               </TableRow>
@@ -143,30 +146,42 @@ const KycQueuePage = () => {
               {isLoading ? (
                 Array.from({ length: 6 }).map((_, i) => (
                   <TableRow key={i}>
-                    <TableCell colSpan={7}><Skeleton className="h-8 w-full" /></TableCell>
+                    <TableCell colSpan={8}><Skeleton className="h-8 w-full" /></TableCell>
                   </TableRow>
                 ))
               ) : data?.rows.length === 0 ? (
-                <TableRow><TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-12">No submissions match your filters.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center text-sm text-muted-foreground py-12">No submissions match your filters.</TableCell></TableRow>
               ) : (
-                data?.rows.map((row) => (
-                  <TableRow key={row.id} className="cursor-pointer" onClick={() => navigate(`/admin/kyc/${row.id}`)}>
-                    <TableCell>
-                      <div className="font-medium">{row.profile?.full_name || "—"}</div>
-                      <div className="text-xs text-muted-foreground">{row.profile?.email || "—"}</div>
-                    </TableCell>
-                    <TableCell>{row.id_document_country || "—"}</TableCell>
-                    <TableCell className="capitalize text-sm">{row.id_document_type?.replace("_", " ") || "—"}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {row.submitted_at ? formatDistanceToNow(new Date(row.submitted_at), { addSuffix: true }) : "—"}
-                    </TableCell>
-                    <TableCell><KycStatusBadge status={row.verification_status} /></TableCell>
-                    <TableCell className="text-sm">{row.reviewer?.full_name || "—"}</TableCell>
-                    <TableCell>
-                      <Button size="sm" variant="ghost"><Eye className="w-4 h-4" /></Button>
-                    </TableCell>
-                  </TableRow>
-                ))
+                data?.rows.map((row) => {
+                  const tags = extractRiskTags(row.persona_verification_data);
+                  return (
+                    <TableRow key={row.id} className="cursor-pointer" onClick={() => navigate(`/admin/kyc/${row.id}`)}>
+                      <TableCell>
+                        <div className="font-medium">{row.profile?.full_name || "—"}</div>
+                        <div className="text-xs text-muted-foreground">{row.profile?.email || "—"}</div>
+                      </TableCell>
+                      <TableCell>{row.id_document_country || "—"}</TableCell>
+                      <TableCell className="capitalize text-sm">{row.id_document_type?.replace("_", " ") || "—"}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {row.submitted_at ? formatDistanceToNow(new Date(row.submitted_at), { addSuffix: true }) : "—"}
+                      </TableCell>
+                      <TableCell><KycStatusBadge status={row.verification_status} /></TableCell>
+                      <TableCell>
+                        {tags.length === 0 ? (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        ) : (
+                          <div className="flex flex-wrap gap-1 max-w-[220px]">
+                            {tags.map((t) => <KycRiskTagChip key={t} tag={t} />)}
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm">{row.reviewer?.full_name || "—"}</TableCell>
+                      <TableCell>
+                        <Button size="sm" variant="ghost"><Eye className="w-4 h-4" /></Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
               )}
             </TableBody>
           </Table>

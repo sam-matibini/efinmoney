@@ -52,6 +52,20 @@ const AdminLayout = ({ children }: { children: ReactNode }) => {
 
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 
+  // Pending KYC count for the sidebar badge
+  const { data: pendingKycCount = 0 } = useQuery({
+    queryKey: ["admin-pending-kyc-count"],
+    queryFn: async () => {
+      const { count } = await supabase
+        .from("kyc_verifications")
+        .select("id", { count: "exact", head: true })
+        .eq("verification_status", "pending_review");
+      return count || 0;
+    },
+    enabled: !!admin,
+    refetchInterval: 30000,
+  });
+
   // Realtime: KYC submissions
   useEffect(() => {
     if (!admin) return;
@@ -69,6 +83,7 @@ const AdminLayout = ({ children }: { children: ReactNode }) => {
           }
           queryClient.invalidateQueries({ queryKey: ["admin-kyc-queue"] });
           queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] });
+          queryClient.invalidateQueries({ queryKey: ["admin-pending-kyc-count"] });
         }
       )
       .on(
@@ -118,20 +133,32 @@ const AdminLayout = ({ children }: { children: ReactNode }) => {
         {NAV.map((item) => {
           const Icon = item.icon;
           const active = location.pathname === item.to || location.pathname.startsWith(item.to + "/");
+          const badge = item.to === "/admin/kyc" && pendingKycCount > 0 ? pendingKycCount : null;
           return (
             <NavLink
               key={item.to}
               to={item.to}
               onClick={() => setMobileOpen(false)}
               className={cn(
-                "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                "relative flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
                 active
                   ? "bg-sidebar-primary text-sidebar-primary-foreground"
                   : "text-sidebar-foreground hover:bg-sidebar-accent"
               )}
             >
               <Icon className="w-4 h-4 shrink-0" />
-              {!collapsed && <span>{item.label}</span>}
+              {!collapsed && <span className="flex-1">{item.label}</span>}
+              {badge !== null && (
+                <span
+                  className={cn(
+                    "rounded-full text-[10px] font-bold min-w-[20px] px-1.5 py-0.5 text-center",
+                    active ? "bg-sidebar-primary-foreground text-sidebar-primary" : "bg-amber-500 text-white",
+                    collapsed && "absolute top-1 right-1"
+                  )}
+                >
+                  {badge > 99 ? "99+" : badge}
+                </span>
+              )}
             </NavLink>
           );
         })}
