@@ -10,19 +10,11 @@ const KYCStatusCard = () => {
   const navigate = useNavigate();
 
   if (isLoading || !kyc) return null;
-  if (kyc.verification_status === "approved") return null;
+  if (kyc.verification_status === "approved" || kyc.verification_status === "pending_review") return null;
 
   const cfg = (() => {
     switch (kyc.verification_status) {
-      case "pending_review":
-        return {
-          icon: Clock,
-          color: "text-yellow-500",
-          title: "Verification under review",
-          message: "We're reviewing your documents. This usually takes less than 24 hours.",
-          cta: "View status",
-          to: "/onboarding/pending",
-        };
+
       case "rejected":
         return {
           icon: AlertTriangle,
