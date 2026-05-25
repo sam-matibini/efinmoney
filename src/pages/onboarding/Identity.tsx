@@ -39,14 +39,23 @@ const Identity = () => {
     }
   }, [isVerified, hasPassedCoreChecks, navigate]);
 
-  const onPersonaComplete = async () => {
+  const onPersonaComplete = async (info?: { inquiryId?: string; status?: string }) => {
+    try {
+      if (info?.inquiryId) {
+        await supabase.functions.invoke("get-persona-inquiry-status", {
+          body: { inquiryId: info.inquiryId },
+        });
+      }
+    } catch (e) {
+      console.warn("Persona status sync failed", e);
+    }
     const result = await refetch();
-    toast.success("You're verified — welcome!");
     if (result?.isVerified || result?.hasPassedCoreChecks) {
+      toast.success("You're verified — welcome!");
       navigate("/dashboard", { replace: true });
       return;
     }
-
+    toast.info("Verification submitted. We'll notify you once it's approved.");
     navigate("/kyc", { replace: true });
   };
 
