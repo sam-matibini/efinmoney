@@ -78,7 +78,11 @@ Deno.serve(async (req) => {
     || req.headers.get("x-paysafe-signature")
     || req.headers.get("x-signature");
   const sigOk = await verifyPaysafeSignature(raw, sig);
-  // Note: non-blocking. We log signature status but still process.
+  if (!sigOk) {
+    return new Response(JSON.stringify({ error: "Invalid signature" }), {
+      status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
 
   const payload = event?.payload && typeof event.payload === "object" ? event.payload : event;
 
