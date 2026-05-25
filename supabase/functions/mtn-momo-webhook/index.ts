@@ -88,6 +88,20 @@ async function pollMtnStatus(supabase: any, referenceId: string): Promise<string
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
+  // Callback authentication. MTN MoMo callback URL must be configured with a
+  // shared secret (?secret=...) or x-callback-secret header. Internal pollers
+  // can use the SUPABASE_SERVICE_ROLE_KEY via x-internal-secret.
+  const expectedCb = Deno.env.get("MTN_CALLBACK_SECRET") || "";
+  const expectedInt = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+  const providedCb = req.headers.get("x-callback-secret") || new URL(req.url).searchParams.get("secret") || "";
+  const providedInt = req.headers.get("x-internal-secret") || "";
+  const cbOk = expectedCb && providedCb === expectedCb;
+  const intOk = expectedInt && providedInt === expectedInt;
+  if (!cbOk && !intOk) {
+    return new Response(JSON.stringify({ success: false, error: "Unauthorized" }),
+      { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  }
+
   const supabase = getServiceClient();
   try {
     let referenceId: string | null = null;
