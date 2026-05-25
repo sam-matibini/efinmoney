@@ -860,12 +860,10 @@ export type Database = {
       cards: {
         Row: {
           card_network: string
-          card_number: string | null
           card_type: string
           cardholder_name: string
           created_at: string
           credit_limit: number | null
-          cvv: string | null
           expires_at: string
           expiry_month: number | null
           expiry_year: number | null
@@ -880,12 +878,10 @@ export type Database = {
         }
         Insert: {
           card_network?: string
-          card_number?: string | null
           card_type?: string
           cardholder_name: string
           created_at?: string
           credit_limit?: number | null
-          cvv?: string | null
           expires_at?: string
           expiry_month?: number | null
           expiry_year?: number | null
@@ -900,12 +896,10 @@ export type Database = {
         }
         Update: {
           card_network?: string
-          card_number?: string | null
           card_type?: string
           cardholder_name?: string
           created_at?: string
           credit_limit?: number | null
-          cvv?: string | null
           expires_at?: string
           expiry_month?: number | null
           expiry_year?: number | null
