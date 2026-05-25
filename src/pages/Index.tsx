@@ -14,7 +14,7 @@ const Index = () => {
       <Header />
 
       <main className="container px-4 py-4 sm:py-6">
-        <ResumeOnboardingBanner />
+        
         <HeroBalance />
         <WalletCarousel />
         <QuickActions />
