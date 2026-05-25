@@ -95,12 +95,13 @@ const AddCardModal = ({ isOpen, onClose, defaultMode = "issue" }: AddCardModalPr
   };
 
   const copyDetails = async () => {
-    if (!createdCard?.card_number) return;
-    const text = `Card: ${createdCard.card_number}\nExpiry: ${String(createdCard.expiry_month).padStart(2, "0")}/${String(createdCard.expiry_year).slice(-2)}\nCVV: ${createdCard.cvv}`;
+    if (!createdCard) return;
+    const text = `Card ending: ${createdCard.last_four}\nExpiry: ${String(createdCard.expiry_month).padStart(2, "0")}/${String(createdCard.expiry_year).slice(-2)}`;
     await navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   };
+
 
   return (
     <Dialog open={isOpen} onOpenChange={(o) => { if (!o) handleClose(); }}>
