@@ -21,6 +21,10 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_ANON_KEY")!,
     { global: { headers: { Authorization: authHeader } } },
   );
+  const admin = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+  );
 
   const { data: userRes, error: userErr } = await supabase.auth.getUser();
   if (userErr || !userRes?.user) return json({ error: "Unauthorized" }, 401);
@@ -37,7 +41,7 @@ Deno.serve(async (req) => {
   // Caller must own this inquiry (or be an admin).
   const { data: kyc } = await supabase
     .from("kyc_verifications")
-    .select("user_id")
+    .select("id, user_id, verification_status, submitted_at")
     .eq("persona_inquiry_id", inquiryId)
     .maybeSingle();
   if (!kyc) return json({ error: "Inquiry not found" }, 404);
@@ -59,13 +63,73 @@ Deno.serve(async (req) => {
   const body = await res.json();
   if (!res.ok) return json({ error: "Persona API error", details: body }, 502);
 
+  const liveStatus = body?.data?.attributes?.status ?? null;
+  const liveDecision = body?.data?.attributes?.decision ?? null;
+
+  const update: Record<string, unknown> = {
+    persona_inquiry_status: liveStatus,
+    persona_verification_data: body,
+  };
+
+  let auditAction: string | null = null;
+
+  if (liveStatus === "approved" || liveDecision === "approved") {
+    update.persona_decision = "approved";
+    update.verification_status = "approved";
+    update.id_verification_status = "approved";
+    update.liveness_check_status = "approved";
+    update.reviewed_at = new Date().toISOString();
+    if (!kyc.submitted_at) update.submitted_at = new Date().toISOString();
+    auditAction = "persona_auto_approved";
+  } else if (liveStatus === "needs_review") {
+    update.persona_decision = "needs_review";
+    update.verification_status = "pending_review";
+    if (!kyc.submitted_at) update.submitted_at = new Date().toISOString();
+  } else if (liveStatus === "declined" || liveDecision === "declined") {
+    const reason = extractDeclineReason(body);
+    update.persona_decision = "declined";
+    update.persona_decision_reason = reason;
+    update.verification_status = "rejected";
+    update.id_verification_status = "rejected";
+    update.id_rejection_reason = reason;
+    auditAction = "persona_auto_rejected";
+  } else if (liveStatus === "completed") {
+    update.verification_status = "pending_review";
+    if (!kyc.submitted_at) update.submitted_at = new Date().toISOString();
+  } else if (liveStatus === "created" || liveStatus === "started") {
+    update.verification_status = "in_progress";
+  } else if (liveStatus === "failed" || liveStatus === "expired") {
+    update.verification_status = "expired";
+  }
+
+  await admin.from("kyc_verifications").update(update).eq("id", kyc.id);
+
+  if (auditAction && kyc.verification_status !== update.verification_status) {
+    await admin.from("kyc_audit_log").insert({
+      kyc_verification_id: kyc.id,
+      admin_id: null,
+      action: auditAction,
+      previous_status: kyc.verification_status,
+      new_status: String(update.verification_status),
+      notes: "Live Persona status sync",
+    });
+  }
+
   return json({
     inquiryId,
-    status: body?.data?.attributes?.status,
-    decision: body?.data?.attributes?.decision,
+    status: liveStatus,
+    decision: liveDecision,
     raw: body,
   });
 });
+
+function extractDeclineReason(payload: any): string {
+  const data = payload?.data?.attributes;
+  if (typeof data?.declineReason === "string" && data.declineReason) return data.declineReason;
+  const tags = data?.tags;
+  if (Array.isArray(tags) && tags.length) return tags.join(", ");
+  return "Declined by automated verification";
+}
 
 function json(payload: unknown, status = 200) {
   return new Response(JSON.stringify(payload), {

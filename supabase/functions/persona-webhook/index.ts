@@ -92,6 +92,8 @@ async function processEvent(supabase: any, eventType: string | null, inquiryId: 
       update.persona_decision = "approved";
       update.persona_inquiry_status = "approved";
       update.persona_verification_data = payload;
+      update.verification_status = "approved";
+      update.reviewed_at = new Date().toISOString();
       update.id_verification_status = "approved";
       update.liveness_check_status = "approved";
       auditAction = "persona_auto_approved";
