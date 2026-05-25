@@ -121,10 +121,9 @@ const AddCardModal = ({ isOpen, onClose, defaultMode = "issue" }: AddCardModalPr
               </div>
               <div className="flex items-center gap-2 mb-4">
                 <p className="font-mono text-lg tracking-wider">
-                  {reveal && createdCard.card_number
-                    ? formatPan(createdCard.card_number)
-                    : `•••• •••• •••• ${createdCard.last_four}`}
+                  {`•••• •••• •••• ${createdCard.last_four}`}
                 </p>
+
                 <button onClick={() => setReveal((r) => !r)} className="p-1 hover:bg-primary-foreground/10 rounded">
                   {reveal ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
