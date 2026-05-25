@@ -80,9 +80,6 @@ const Pending = () => {
     if (kyc.persona_decision === "declined") {
       return { tone: "error" as const, text: kyc.persona_decision_reason || "Automated verification was declined." };
     }
-    if (kyc.persona_decision === "needs_review") {
-      return { tone: "warn" as const, text: "Manual review in progress" };
-    }
     return null;
   })();
 
