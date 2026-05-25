@@ -18,6 +18,17 @@ const PRIVATE_JWK_RAW = Deno.env.get("INTERAC_HUB_PRIVATE_JWK") ?? Deno.env.get(
 let discoveryCache: any = null;
 let jwksCache: ReturnType<typeof createRemoteJWKSet> | null = null;
 
+function parseJwk(raw: string) {
+  const firstPass: unknown = JSON.parse(raw);
+  const normalized = typeof firstPass === "string" ? JSON.parse(firstPass) : firstPass;
+
+  if (!normalized || typeof normalized !== "object" || Array.isArray(normalized)) {
+    throw new Error("INTERAC_PRIVATE_JWK must be a JSON object");
+  }
+
+  return normalized as Record<string, unknown>;
+}
+
 async function discover() {
   if (discoveryCache) return discoveryCache;
   const url = ISSUER.replace(/\/$/, "") + "/.well-known/openid-configuration";
@@ -77,7 +88,7 @@ Deno.serve(async (req) => {
     } else if (PRIVATE_JWK_RAW) {
       // private_key_jwt client assertion (RFC 7523)
       try {
-        const jwk = JSON.parse(PRIVATE_JWK_RAW);
+        const jwk = parseJwk(PRIVATE_JWK_RAW);
         const alg = (jwk.alg as string) || "PS256";
         const kid = jwk.kid as string | undefined;
         const key = await importJWK(jwk, alg);
