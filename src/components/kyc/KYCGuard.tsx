@@ -16,7 +16,7 @@ const Spinner = () => (
  * Admins, finance, and compliance staff bypass KYC entirely.
  */
 const KYCGuard = ({ children }: { children: ReactNode }) => {
-  const { kyc, isLoading, isVerified } = useKyc();
+  const { kyc, isLoading, isVerified, hasPassedCoreChecks } = useKyc();
   const { roles, isLoading: rolesLoading } = useUserRoles();
   const location = useLocation();
 
@@ -29,6 +29,8 @@ const KYCGuard = ({ children }: { children: ReactNode }) => {
   // No KYC record yet — start fresh
   if (!kyc) return <Navigate to="/onboarding/welcome" replace />;
 
+  if (isVerified || hasPassedCoreChecks) return <>{children}</>;
+
   switch (kyc.verification_status) {
     case "not_started":
       return <Navigate to="/onboarding/identity" replace />;
@@ -38,16 +40,13 @@ const KYCGuard = ({ children }: { children: ReactNode }) => {
       return <Navigate to={target} replace />;
     }
     case "pending_review":
-      // Persona finalizing — webhook will flip to approved any second.
       return <Spinner />;
     case "rejected":
       return <Navigate to="/onboarding/rejected" replace />;
     case "expired":
       return <Navigate to="/onboarding/welcome" replace />;
     case "approved":
-      if (isVerified) return <>{children}</>;
-      // Approved but tier not yet synced — wait briefly
-      return <Spinner />;
+      return <>{children}</>;
 
 
     default:

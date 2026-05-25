@@ -2,6 +2,26 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 
+type PersonaVerificationData = {
+  data?: {
+    attributes?: {
+      completedAt?: string | null;
+    };
+    relationships?: {
+      verifications?: {
+        data?: Array<{ type?: string | null }>;
+      };
+    };
+  };
+  included?: Array<{
+    type?: string | null;
+    attributes?: {
+      status?: string | null;
+      checks?: Array<{ status?: string | null }>;
+    };
+  }>;
+};
+
 export type KycVerificationStatus =
   | "not_started"
   | "in_progress"
@@ -33,6 +53,7 @@ export interface KycRecord {
   persona_inquiry_status: string | null;
   persona_decision: "approved" | "declined" | "needs_review" | null;
   persona_decision_reason: string | null;
+  persona_verification_data?: PersonaVerificationData | null;
 }
 
 export interface RiskTier {
@@ -42,6 +63,35 @@ export interface RiskTier {
   single_transaction_limit: number;
   features_enabled: Record<string, boolean>;
 }
+
+const hasPassedCoreChecks = (kyc: KycRecord | null | undefined) => {
+  if (!kyc) return false;
+
+  const personaData = kyc.persona_verification_data;
+  const personaCompleted = Boolean(personaData?.data?.attributes?.completedAt);
+  const hasSelfieVerification = Boolean(
+    personaData?.data?.relationships?.verifications?.data?.some(
+      (verification) => verification?.type === "verification/selfie"
+    )
+  );
+  const selfieVerificationPassed = Boolean(
+    personaData?.included?.some(
+      (item) =>
+        item?.type === "verification/selfie" &&
+        (item.attributes?.status === "passed" ||
+          item.attributes?.status === "completed" ||
+          item.attributes?.checks?.some((check) => check.status === "passed"))
+    )
+  );
+
+  const idPassed = kyc.id_verification_status === "approved";
+  const facePassed =
+    kyc.liveness_check_status === "approved" ||
+    kyc.persona_decision === "approved" ||
+    (Boolean(kyc.selfie_url) && personaCompleted && (hasSelfieVerification || selfieVerificationPassed));
+
+  return idPassed && facePassed;
+};
 
 export const useKyc = () => {
   const { user } = useAuth();
@@ -88,16 +138,14 @@ export const useKyc = () => {
 
 
   const isVerified =
-    kycQ.data?.verification_status === "approved" &&
-    (tierQ.data?.current_tier === "tier_2" ||
-      tierQ.data?.current_tier === "tier_3" ||
-      tierQ.data?.current_tier === "tier_4");
+    kycQ.data?.verification_status === "approved" || hasPassedCoreChecks(kycQ.data);
 
   return {
     kyc: kycQ.data ?? null,
     tier: tierQ.data ?? null,
     isLoading: kycQ.isLoading || tierQ.isLoading,
     isVerified,
+    hasPassedCoreChecks: hasPassedCoreChecks(kycQ.data),
     refetch: () => {
       kycQ.refetch();
       tierQ.refetch();
