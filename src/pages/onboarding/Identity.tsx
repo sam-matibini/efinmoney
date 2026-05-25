@@ -40,22 +40,33 @@ const Identity = () => {
   }, [isVerified, hasPassedCoreChecks, navigate]);
 
   const onPersonaComplete = async (info?: { inquiryId?: string; status?: string }) => {
-    try {
-      if (info?.inquiryId) {
-        await supabase.functions.invoke("get-persona-inquiry-status", {
-          body: { inquiryId: info.inquiryId },
-        });
+    const toastId = toast.loading("Finalizing verification…");
+    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+    // Poll status-sync edge function. It auto-approves and the DB trigger
+    // upgrades the user to Tier 3 the moment Persona reports ID + Selfie passed.
+    for (let i = 0; i < 8; i++) {
+      try {
+        if (info?.inquiryId) {
+          await supabase.functions.invoke("get-persona-inquiry-status", {
+            body: { inquiryId: info.inquiryId },
+          });
+        }
+      } catch (e) {
+        console.warn("Persona status sync failed", e);
       }
-    } catch (e) {
-      console.warn("Persona status sync failed", e);
+
+      const result = await refetch();
+      if (result?.isVerified || result?.hasPassedCoreChecks) {
+        toast.success("You're verified — welcome!", { id: toastId });
+        navigate("/dashboard", { replace: true });
+        return;
+      }
+      await sleep(1500);
     }
-    const result = await refetch();
-    if (result?.isVerified || result?.hasPassedCoreChecks) {
-      toast.success("You're verified — welcome!");
-      navigate("/dashboard", { replace: true });
-      return;
-    }
-    toast.info("Verification submitted. We'll notify you once it's approved.");
+
+    // Fallback: never bounce back to /onboarding/identity. Send to status page.
+    toast.info("Verification submitted. We'll notify you once it's approved.", { id: toastId });
     navigate("/kyc", { replace: true });
   };
 
