@@ -38,15 +38,17 @@ const KYCGuard = ({ children }: { children: ReactNode }) => {
       return <Navigate to={target} replace />;
     }
     case "pending_review":
-      return <Navigate to="/onboarding/approved" replace />;
+      // Persona finalizing — webhook will flip to approved any second.
+      return <Spinner />;
     case "rejected":
       return <Navigate to="/onboarding/rejected" replace />;
     case "expired":
       return <Navigate to="/onboarding/welcome" replace />;
     case "approved":
       if (isVerified) return <>{children}</>;
-      // Approved but tier not yet synced — show the celebratory landing while it catches up
-      return <Navigate to="/onboarding/approved" replace />;
+      // Approved but tier not yet synced — wait briefly
+      return <Spinner />;
+
 
     default:
       return <Navigate to="/onboarding/welcome" replace />;
