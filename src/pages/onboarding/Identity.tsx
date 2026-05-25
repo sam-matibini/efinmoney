@@ -13,7 +13,7 @@ import { Logo, Wordmark } from "@/components/Logo";
 
 const Identity = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const { refetch } = useKyc();
 
   // Ensure a KYC row exists so subsequent webhook updates attach correctly
