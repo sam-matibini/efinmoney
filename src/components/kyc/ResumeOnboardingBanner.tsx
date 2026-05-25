@@ -8,7 +8,7 @@ const STEP_ROUTE: Record<KycCurrentStep, string> = {
   identity: "/onboarding/identity",
   address: "/onboarding/identity",
   liveness: "/onboarding/identity",
-  completed: "/onboarding/approved",
+  completed: "/dashboard",
 };
 
 
