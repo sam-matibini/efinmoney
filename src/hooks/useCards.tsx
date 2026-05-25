@@ -103,22 +103,16 @@ export const useCardMutations = () => {
       }
 
       let last_four: string;
-      let card_number: string | null;
-      let cvv: string | null;
       let expMonth: number;
       let expYear: number;
 
       if (isExternal) {
         last_four = input.external!.last_four;
-        card_number = null;
-        cvv = null;
         expMonth = input.external!.expiry_month;
         expYear = input.external!.expiry_year;
       } else {
         const pan = generatePan(input.card_network);
         last_four = pan.slice(-4);
-        card_number = pan;
-        cvv = generateCvv();
         const now = new Date();
         expYear = now.getFullYear() + 4;
         expMonth = now.getMonth() + 1;
@@ -132,8 +126,6 @@ export const useCardMutations = () => {
           card_network: input.card_network,
           cardholder_name: input.cardholder_name,
           last_four,
-          card_number,
-          cvv,
           expiry_month: expMonth,
           expiry_year: expYear,
           spending_limit: input.spending_limit ?? 5000,
@@ -145,6 +137,7 @@ export const useCardMutations = () => {
         .single();
       if (error) throw error;
       return data as Card;
+
     },
     onSuccess: () => {
       toast.success('Card created');
