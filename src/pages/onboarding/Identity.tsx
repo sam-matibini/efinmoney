@@ -81,6 +81,7 @@ const Identity = () => {
               userId={user.id}
               className="w-full"
               label="Start with Persona"
+              autoStart={autoStartPersona}
               onComplete={onPersonaComplete}
               onError={() => toast.error("Persona is temporarily unavailable.")}
             />
