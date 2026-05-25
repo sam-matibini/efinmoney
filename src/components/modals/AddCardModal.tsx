@@ -141,7 +141,7 @@ const AddCardModal = ({ isOpen, onClose, defaultMode = "issue" }: AddCardModalPr
                 </div>
                 <div>
                   <p className="opacity-70 text-xs">CVV</p>
-                  <p className="font-mono">{reveal ? createdCard.cvv : "•••"}</p>
+                  <p className="font-mono">•••</p>
                 </div>
               </div>
             </div>
