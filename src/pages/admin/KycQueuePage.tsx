@@ -137,6 +137,7 @@ const KycQueuePage = () => {
                 <TableHead>Document</TableHead>
                 <TableHead>Submitted</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Risk flags</TableHead>
                 <TableHead>Reviewer</TableHead>
                 <TableHead className="w-20"></TableHead>
               </TableRow>
