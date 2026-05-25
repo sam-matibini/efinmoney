@@ -43,6 +43,18 @@ export interface RiskTier {
   features_enabled: Record<string, boolean>;
 }
 
+const hasPassedCoreChecks = (kyc: KycRecord | null | undefined) => {
+  if (!kyc) return false;
+
+  const idPassed = kyc.id_verification_status === "approved";
+  const facePassed =
+    kyc.liveness_check_status === "approved" ||
+    kyc.persona_decision === "approved" ||
+    (Boolean(kyc.selfie_url) && kyc.persona_inquiry_status === "completed");
+
+  return idPassed && facePassed;
+};
+
 export const useKyc = () => {
   const { user } = useAuth();
 
@@ -88,16 +100,14 @@ export const useKyc = () => {
 
 
   const isVerified =
-    kycQ.data?.verification_status === "approved" &&
-    (tierQ.data?.current_tier === "tier_2" ||
-      tierQ.data?.current_tier === "tier_3" ||
-      tierQ.data?.current_tier === "tier_4");
+    kycQ.data?.verification_status === "approved" || hasPassedCoreChecks(kycQ.data);
 
   return {
     kyc: kycQ.data ?? null,
     tier: tierQ.data ?? null,
     isLoading: kycQ.isLoading || tierQ.isLoading,
     isVerified,
+    hasPassedCoreChecks: hasPassedCoreChecks(kycQ.data),
     refetch: () => {
       kycQ.refetch();
       tierQ.refetch();
