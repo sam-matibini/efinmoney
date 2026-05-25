@@ -38,7 +38,7 @@ const Identity = () => {
     }
     await refetch();
     toast.success("Verification submitted — welcome!");
-    navigate("/", { replace: true });
+    navigate("/onboarding/pending", { replace: true });
   };
 
   return (
