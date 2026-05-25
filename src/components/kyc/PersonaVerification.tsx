@@ -58,6 +58,14 @@ export const PersonaVerification = ({ userId, onComplete, onError, className, la
     }
   };
 
+  useEffect(() => {
+    if (autoStart && !autoStartedRef.current && userId) {
+      autoStartedRef.current = true;
+      startVerification();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoStart, userId]);
+
   return (
     <Button size="lg" className={className} onClick={startVerification} disabled={loading}>
       {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <ShieldCheck className="w-4 h-4 mr-2" />}
