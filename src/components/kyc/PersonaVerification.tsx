@@ -66,8 +66,20 @@ export const PersonaVerification = ({ userId, onComplete, onError, className, la
         onComplete?.({ inquiryId: data.inquiryId, status: data.status || "completed" });
         return;
       }
+      if (error) {
+        const errorMessage = error.message || data?.error || "Failed to initialize verification";
+        const isPersonaConfigError =
+          data?.code === "INVALID_PERSONA_TEMPLATE_ID" ||
+          /itmpl_|misconfigured|template id/i.test(errorMessage);
+
+        throw new Error(
+          isPersonaConfigError
+            ? "Persona template is invalid. Replace PERSONA_TEMPLATE_ID with the template ID that starts with itmpl_."
+            : errorMessage,
+        );
+      }
       if (error || !data?.sessionToken) {
-        throw new Error(error?.message || data?.error || "Failed to initialize verification");
+        throw new Error(data?.error || "Failed to initialize verification");
       }
 
       // IMPORTANT: When resuming via sessionToken, do NOT pass templateId.
