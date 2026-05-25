@@ -6,7 +6,7 @@ import QuickActions from "@/components/dashboard/QuickActions";
 import RecentTransactions from "@/components/dashboard/RecentTransactions";
 import ExchangeRates from "@/components/dashboard/ExchangeRates";
 import MiniStats from "@/components/dashboard/MiniStats";
-import ResumeOnboardingBanner from "@/components/kyc/ResumeOnboardingBanner";
+
 
 const Index = () => {
   return (
