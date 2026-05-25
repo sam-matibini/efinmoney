@@ -53,7 +53,7 @@ Deno.serve(async (req) => {
   const apiKey = Deno.env.get("PERSONA_API_KEY");
   if (!apiKey) return json({ error: "Persona not configured" }, 500);
 
-  const res = await fetch(`https://api.withpersona.com/api/v1/inquiries/${inquiryId}`, {
+  const res = await fetch(`https://api.withpersona.com/api/v1/inquiries/${inquiryId}?include=verifications`, {
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Persona-Version": "2023-01-05",
@@ -65,6 +65,20 @@ Deno.serve(async (req) => {
 
   const liveStatus = body?.data?.attributes?.status ?? null;
   const liveDecision = body?.data?.attributes?.decision ?? null;
+
+  // Inspect individual verifications: auto-approve once ID + Selfie/Liveness both pass.
+  const included: any[] = Array.isArray(body?.included) ? body.included : [];
+  let idPassed = false;
+  let selfiePassed = false;
+  for (const item of included) {
+    const t: string = item?.type || "";
+    const status: string = item?.attributes?.status || "";
+    if (!t.startsWith("verification/")) continue;
+    if (status !== "passed") continue;
+    if (t.includes("government-id") || t.includes("document")) idPassed = true;
+    if (t.includes("selfie") || t.includes("facial") || t.includes("liveness")) selfiePassed = true;
+  }
+  const coreChecksPassed = idPassed && selfiePassed;
   const isFinalStatus = kyc.verification_status === "approved" || kyc.verification_status === "rejected";
 
   if (isFinalStatus) {
@@ -72,6 +86,9 @@ Deno.serve(async (req) => {
       inquiryId,
       status: liveStatus,
       decision: liveDecision,
+      idPassed,
+      selfiePassed,
+      approved: kyc.verification_status === "approved",
       preservedStatus: kyc.verification_status,
       raw: body,
     });
@@ -83,15 +100,19 @@ Deno.serve(async (req) => {
   };
 
   let auditAction: string | null = null;
+  let approvedNow = false;
 
-  if (liveStatus === "approved" || liveDecision === "approved") {
+  if (liveStatus === "approved" || liveDecision === "approved" || coreChecksPassed) {
     update.persona_decision = "approved";
     update.verification_status = "approved";
     update.id_verification_status = "approved";
     update.liveness_check_status = "approved";
     update.reviewed_at = new Date().toISOString();
     if (!kyc.submitted_at) update.submitted_at = new Date().toISOString();
-    auditAction = "persona_auto_approved";
+    auditAction = coreChecksPassed && liveStatus !== "approved" && liveDecision !== "approved"
+      ? "persona_auto_approved_core_checks"
+      : "persona_auto_approved";
+    approvedNow = true;
   } else if (liveStatus === "needs_review") {
     update.persona_decision = "needs_review";
     update.verification_status = "pending_review";
@@ -122,7 +143,7 @@ Deno.serve(async (req) => {
       action: auditAction,
       previous_status: kyc.verification_status,
       new_status: String(update.verification_status),
-      notes: "Live Persona status sync",
+      notes: coreChecksPassed ? "Auto-approved: ID + Selfie checks passed" : "Live Persona status sync",
     });
   }
 
@@ -130,6 +151,9 @@ Deno.serve(async (req) => {
     inquiryId,
     status: liveStatus,
     decision: liveDecision,
+    idPassed,
+    selfiePassed,
+    approved: approvedNow,
     raw: body,
   });
 });
