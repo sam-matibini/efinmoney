@@ -144,9 +144,10 @@ const Identity = () => {
 
   const onPersonaComplete = async () => {
     setPersonaSubmitted(true);
-    await persist({ current_step: "address", verification_status: "in_progress" });
+    await persist({ current_step: "completed", verification_status: "pending_review" });
     await refetch();
-    navigate("/onboarding/address");
+    toast.success("Verification submitted — welcome!");
+    navigate("/", { replace: true });
   };
 
   const isSandbox = false; // Persona is in production
