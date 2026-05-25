@@ -162,7 +162,10 @@ Deno.serve(async (req) => {
         `${Deno.env.get("SUPABASE_URL")}/functions/v1/stripe-charge-card`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "x-internal-secret": Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "",
+          },
           body: JSON.stringify({
             transfer_id,
             card_token: cardToken,
@@ -325,7 +328,10 @@ Deno.serve(async (req) => {
           `${Deno.env.get("SUPABASE_URL")}/functions/v1/pawapay-payout`,
           {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              "x-internal-secret": Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "",
+            },
             body: JSON.stringify({ transfer_id, recipient_country_hint: recipientCountryHint }),
           },
         );
@@ -335,7 +341,10 @@ Deno.serve(async (req) => {
           `${Deno.env.get("SUPABASE_URL")}/functions/v1/mtn-momo-payout`,
           {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              "x-internal-secret": Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "",
+            },
             body: JSON.stringify({ transfer_id }),
           },
         );
@@ -346,7 +355,10 @@ Deno.serve(async (req) => {
           `${Deno.env.get("SUPABASE_URL")}/functions/v1/elicate-payout`,
           {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              "x-internal-secret": Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "",
+            },
             body: JSON.stringify({ transfer_id }),
           },
         );
@@ -378,7 +390,10 @@ Deno.serve(async (req) => {
           `${Deno.env.get("SUPABASE_URL")}/functions/v1/${fnName}`,
           {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              "x-internal-secret": Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "",
+            },
             body: JSON.stringify(fnBody),
           },
         );
