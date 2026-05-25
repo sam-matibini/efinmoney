@@ -34,10 +34,12 @@ export const PersonaVerification = ({ userId, onComplete, onError, className, la
         throw new Error(error?.message || data?.error || "Failed to initialize verification");
       }
 
-      const client = new (Persona as any).Client({
-        templateId: data.templateId,
+      // IMPORTANT: When resuming via sessionToken, do NOT pass templateId.
+      // Passing both causes the SDK to create a brand-new inquiry from the
+      // template (without our referenceId), producing orphan "Needs Review"
+      // inquiries that can never be linked back to the user.
+      const clientConfig: Record<string, unknown> = {
         environment: data.environment || "sandbox",
-        sessionToken: data.sessionToken,
         onReady: () => {
           setLoading(false);
           client.open();
