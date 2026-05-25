@@ -168,7 +168,7 @@ export const useKyc = () => {
             kyc_status: "verified",
             kyc_completed_at: new Date().toISOString(),
           })
-          .eq("id", user.id),
+          .eq("user_id", user.id),
       ]);
       if (tierErr) console.error("tier upsert failed", tierErr);
       if (profileErr) console.error("profile tier update failed", profileErr);
@@ -183,9 +183,18 @@ export const useKyc = () => {
     isLoading: kycQ.isLoading || tierQ.isLoading,
     isVerified,
     hasPassedCoreChecks: corePassed,
-    refetch: () => {
-      kycQ.refetch();
-      tierQ.refetch();
+    refetch: async () => {
+      const [kycResult, tierResult] = await Promise.all([kycQ.refetch(), tierQ.refetch()]);
+      const nextKyc = (kycResult.data ?? null) as KycRecord | null;
+      const nextTier = (tierResult.data ?? null) as RiskTier | null;
+      const nextCorePassed = hasPassedCoreChecks(nextKyc);
+
+      return {
+        kyc: nextKyc,
+        tier: nextTier,
+        hasPassedCoreChecks: nextCorePassed,
+        isVerified: nextKyc?.verification_status === "approved" || nextCorePassed,
+      };
     },
   };
 };
