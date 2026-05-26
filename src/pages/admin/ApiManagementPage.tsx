@@ -299,5 +299,6 @@ export default function ApiManagementPage() {
         </DialogContent>
       </Dialog>
     </div>
+    </AdminLayout>
   );
 }
