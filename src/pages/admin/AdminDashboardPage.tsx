@@ -169,7 +169,7 @@ const AdminDashboardPage = () => {
             {statsLoading ? (
               <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-8 w-full" />)}</div>
             ) : stats?.recentAudit.length === 0 ? (
-              <div className="text-sm text-muted-foreground py-6 text-center">No activity yet.</div>
+              <EmptyState icon={AlertTriangle} title="No activity yet" description="Approvals, rejections and other admin actions will appear here." size="sm" />
             ) : (
               <div className="divide-y">
                 {stats?.recentAudit.map((entry) => (
