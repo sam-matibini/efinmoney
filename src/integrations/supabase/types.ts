@@ -3403,6 +3403,42 @@ export type Database = {
         }
         Relationships: []
       }
+      short_links: {
+        Row: {
+          code: string
+          created_at: string
+          expires_at: string | null
+          max_uses: number | null
+          owner_id: string | null
+          params: Json
+          revoked_at: string | null
+          target_path: string
+          use_count: number
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          expires_at?: string | null
+          max_uses?: number | null
+          owner_id?: string | null
+          params?: Json
+          revoked_at?: string | null
+          target_path: string
+          use_count?: number
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          expires_at?: string | null
+          max_uses?: number | null
+          owner_id?: string | null
+          params?: Json
+          revoked_at?: string | null
+          target_path?: string
+          use_count?: number
+        }
+        Relationships: []
+      }
       stripe_payout_recipients: {
         Row: {
           brand: string | null
@@ -4315,6 +4351,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      _gen_short_code: { Args: { p_len?: number }; Returns: string }
       check_rate_limit: {
         Args: {
           p_key: string
@@ -4322,6 +4359,15 @@ export type Database = {
           p_window_seconds: number
         }
         Returns: boolean
+      }
+      create_short_link: {
+        Args: {
+          p_expires_at?: string
+          p_max_uses?: number
+          p_params?: Json
+          p_target_path: string
+        }
+        Returns: string
       }
       execute_fx_swap: {
         Args: {
@@ -4380,6 +4426,13 @@ export type Database = {
           email: string
           full_name: string
           user_id: string
+        }[]
+      }
+      resolve_short_link: {
+        Args: { p_code: string }
+        Returns: {
+          params: Json
+          target_path: string
         }[]
       }
       run_compliance_checks: {

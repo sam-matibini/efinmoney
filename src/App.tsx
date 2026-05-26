@@ -46,6 +46,7 @@ import OnboardingEnhanced from "./pages/onboarding/Enhanced";
 
 
 import OnboardingRejected from "./pages/onboarding/Rejected";
+import ShortLinkResolver from "./pages/ShortLinkResolver";
 import { AdminAuthProvider } from "@/contexts/AdminAuthContext";
 import AdminGuard from "@/components/admin-portal/AdminGuard";
 import AdminLogin from "./pages/admin/AdminLogin";
@@ -168,6 +169,7 @@ const AppRoutes = () => {
       <PageTransition key={location.pathname}>
         <Routes location={location}>
           <Route path="/" element={<RootRoute />} />
+          <Route path="/s/:code" element={<ShortLinkResolver />} />
           <Route path="/privacy" element={<PrivacyPolicyPage />} />
           <Route path="/dashboard" element={<KycProtectedRoute><Index /></KycProtectedRoute>} />
           <Route path="/wallets" element={<KycProtectedRoute><WalletsPage /></KycProtectedRoute>} />
