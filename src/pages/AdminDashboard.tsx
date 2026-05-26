@@ -7,6 +7,7 @@ import { ComplianceAlertsPanel } from "@/components/admin/ComplianceAlertsPanel"
 import { ComplianceRulesPanel } from "@/components/admin/ComplianceRulesPanel";
 import { AuditLogsPanel } from "@/components/admin/AuditLogsPanel";
 import { StaffManagementPanel } from "@/components/admin/StaffManagementPanel";
+import { RiskTiersPanel } from "@/components/admin/RiskTiersPanel";
 
 const AdminDashboard = () => {
   return (
@@ -25,9 +26,10 @@ const AdminDashboard = () => {
           </div>
 
           <Tabs defaultValue="users" className="space-y-4">
-            <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-flex">
+            <TabsList className="grid w-full grid-cols-6 lg:w-auto lg:inline-flex">
               <TabsTrigger value="users">Users</TabsTrigger>
               <TabsTrigger value="staff">Staff Roles</TabsTrigger>
+              <TabsTrigger value="tiers">Risk Tiers</TabsTrigger>
               <TabsTrigger value="alerts">Alerts</TabsTrigger>
               <TabsTrigger value="rules">Rules</TabsTrigger>
               <TabsTrigger value="audit">Audit Logs</TabsTrigger>
@@ -39,6 +41,10 @@ const AdminDashboard = () => {
 
             <TabsContent value="staff" className="space-y-4">
               <StaffManagementPanel />
+            </TabsContent>
+
+            <TabsContent value="tiers" className="space-y-4">
+              <RiskTiersPanel />
             </TabsContent>
 
             <TabsContent value="alerts" className="space-y-4">
