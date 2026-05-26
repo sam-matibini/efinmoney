@@ -90,21 +90,39 @@ const Enhanced = () => {
       </Card>
 
       {alreadySubmitted && (
-        <Card className="p-4 flex items-center gap-3 border-primary/30 bg-primary/5">
-          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+        <Card
+          className={
+            kyc?.verification_status === "approved"
+              ? "p-4 flex items-center gap-3 border-emerald-500/40 bg-emerald-500/10"
+              : "p-4 flex items-center gap-3 border-amber-500/50 bg-amber-500/15"
+          }
+        >
+          <div
+            className={
+              kyc?.verification_status === "approved"
+                ? "w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center"
+                : "w-10 h-10 rounded-xl bg-amber-500 flex items-center justify-center"
+            }
+          >
             {kyc?.verification_status === "approved" ? (
-              <CheckCircle2 className="w-5 h-5 text-primary" />
+              <CheckCircle2 className="w-5 h-5 text-white" />
             ) : (
-              <Clock className="w-5 h-5 text-primary" />
+              <Clock className="w-5 h-5 text-white" />
             )}
           </div>
           <div className="text-sm">
-            <p className="font-medium text-foreground">
+            <p
+              className={
+                kyc?.verification_status === "approved"
+                  ? "font-semibold text-emerald-700 dark:text-emerald-300"
+                  : "font-semibold text-amber-700 dark:text-amber-300"
+              }
+            >
               {kyc?.verification_status === "approved"
                 ? "Tier 3 verification approved"
                 : "Submitted — under review"}
             </p>
-            <p className="text-muted-foreground">
+            <p className="text-foreground/80">
               {kyc?.verification_status === "approved"
                 ? "Your enhanced documents have been approved."
                 : "Your address and source-of-funds documents are with our compliance team."}
