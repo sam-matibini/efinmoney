@@ -139,30 +139,30 @@ const WalletCarousel = () => {
                 </div>
 
                 <div className="flex gap-2">
-                  <SendMoneyModal>
-                    <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/20 hover:bg-white/30 text-xs font-medium transition-colors backdrop-blur-sm">
-                      <Send className="w-3.5 h-3.5" />
-                      Send
-                    </button>
-                  </SendMoneyModal>
                   <Link
-                    to="/wallets"
+                    to={`/send?sourceWalletId=${w.wallet_id}`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/20 hover:bg-white/30 text-xs font-medium transition-colors backdrop-blur-sm"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    Send
+                  </Link>
+                  <Link
+                    to={`/wallet/receive?walletId=${w.wallet_id}`}
                     onClick={(e) => e.stopPropagation()}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/20 hover:bg-white/30 text-xs font-medium transition-colors backdrop-blur-sm"
                   >
                     <ArrowUpRight className="w-3.5 h-3.5" />
                     Receive
                   </Link>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setTopUpWalletId(w.wallet_id);
-                    }}
+                  <Link
+                    to={`/wallet/topup?walletId=${w.wallet_id}`}
+                    onClick={(e) => e.stopPropagation()}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white text-gray-900 hover:bg-white/90 text-xs font-semibold transition-colors"
                   >
                     <Download className="w-3.5 h-3.5" />
                     Top up
-                  </button>
+                  </Link>
                 </div>
               </div>
             </TiltCard>
