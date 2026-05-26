@@ -1,6 +1,6 @@
 import { ReactNode, useEffect, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, ShieldCheck, Users, Layers, ScrollText, Settings, Bell, Search, LogOut, ChevronLeft, ChevronRight, Sun, Moon, Activity } from "lucide-react";
+import { LayoutDashboard, ShieldCheck, Users, Layers, ScrollText, Settings, Bell, Search, LogOut, ChevronLeft, ChevronRight, Sun, Moon, Activity, ExternalLink } from "lucide-react";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -221,6 +221,14 @@ const AdminLayout = ({ children }: { children: ReactNode }) => {
           </form>
 
           <div className="ml-auto flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.open("/dashboard", "_blank", "noopener,noreferrer")}
+              className="hidden sm:inline-flex gap-2"
+            >
+              <ExternalLink className="w-4 h-4" /> User portal
+            </Button>
             <Popover>
               <PopoverTrigger asChild>
                 <Button variant="ghost" size="icon" className="relative">
@@ -272,6 +280,9 @@ const AdminLayout = ({ children }: { children: ReactNode }) => {
                   {admin && <div className="mt-1"><RoleBadge role={admin.role} /></div>}
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => window.open("/dashboard", "_blank", "noopener,noreferrer")}>
+                  <ExternalLink className="w-4 h-4 mr-2" /> Open user portal
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigate("/admin/settings")}>
                   <Settings className="w-4 h-4 mr-2" /> Settings
                 </DropdownMenuItem>
