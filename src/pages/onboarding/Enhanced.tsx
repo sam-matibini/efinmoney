@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import DocumentUploader from "@/components/kyc/DocumentUploader";
-import { ShieldCheck, FileText, Briefcase } from "lucide-react";
+import { ShieldCheck, FileText, Briefcase, CheckCircle2, Clock } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useKyc } from "@/hooks/useKyc";
 import { supabase } from "@/integrations/supabase/client";
