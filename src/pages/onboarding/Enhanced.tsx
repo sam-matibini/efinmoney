@@ -212,10 +212,10 @@ const Enhanced = () => {
       >
         {submitting
           ? "Submitting..."
-          : kyc?.verification_status === "approved"
+          : tier3Approved
             ? "Approved"
-            : alreadySubmitted
-              ? "Submitted — under review"
+            : tier3Pending
+              ? "Waiting for approval"
               : "Submit for review"}
       </Button>
       <p className="text-xs text-muted-foreground text-center">
