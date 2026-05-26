@@ -131,7 +131,7 @@ const AdminDashboardPage = () => {
               {statsLoading ? (
                 <div className="space-y-2">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
               ) : stats?.urgent.length === 0 ? (
-                <div className="text-sm text-muted-foreground py-6 text-center">All caught up — no pending reviews.</div>
+                <EmptyState icon={CheckCircle2} title="All caught up" description="No pending KYC reviews right now." size="sm" />
               ) : (
                 <div className="divide-y">
                   {stats?.urgent.map((row) => {
