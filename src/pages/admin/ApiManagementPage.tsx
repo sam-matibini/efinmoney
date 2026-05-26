@@ -13,6 +13,7 @@ import {
   Eye, RefreshCw, Lock, Globe, Server,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import AdminLayout from "@/components/admin-portal/AdminLayout";
 
 type IntegrationKey = "flutterwave" | "stripe" | "paysafe" | "plaid" | "persona" | "mpesa";
 
@@ -107,6 +108,7 @@ export default function ApiManagementPage() {
   };
 
   return (
+    <AdminLayout>
     <div className="space-y-6 p-6">
       <div className="flex items-start justify-between gap-4">
         <div>
@@ -297,5 +299,6 @@ export default function ApiManagementPage() {
         </DialogContent>
       </Dialog>
     </div>
+    </AdminLayout>
   );
 }
