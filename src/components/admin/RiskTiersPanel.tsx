@@ -84,7 +84,7 @@ export const RiskTiersPanel = () => {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         {distribution.map(({ tier, count, pct }) => {
           const meta = tierMeta[tier] || tierMeta.tier_1;
           const Icon = meta.icon;
