@@ -26,9 +26,7 @@ import {
   Settings,
   ShieldQuestion,
   CreditCard,
-  Award,
   Stamp,
-  Trophy,
   ExternalLink,
 } from "lucide-react";
 
