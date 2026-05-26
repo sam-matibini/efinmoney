@@ -195,14 +195,6 @@ const WalletCarousel = () => {
         </div>
       )}
 
-      {topUpWalletId && (
-        <CardPaymentModal
-          open={!!topUpWalletId}
-          onOpenChange={(o) => !o && setTopUpWalletId(null)}
-          defaultWalletId={topUpWalletId}
-          title="Top up wallet"
-        />
-      )}
       
     </section>
   );
