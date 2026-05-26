@@ -36,21 +36,21 @@ const MiniStats = () => {
     const primary = sorted[0] || ["USD", 0];
     const others = sorted.slice(1);
 
-    // Bars: per-week buckets for the primary currency only
-    const bars = [0, 0, 0, 0];
+    // Bars: per-day buckets for the primary currency only
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const bars = new Array(daysInMonth).fill(0);
     recent
       .filter((t) => (t.source_currency || "USD").toUpperCase() === primary[0])
       .forEach((t) => {
         const day = new Date(t.created_at).getDate();
-        const idx = Math.min(3, Math.floor((day - 1) / 7));
-        bars[idx] += Number(t.source_amount);
+        bars[day - 1] += Number(t.source_amount);
       });
     const max = Math.max(...bars, 1);
     return {
       currency: primary[0] as string,
       total: primary[1] as number,
       others,
-      bars: bars.map((b) => Math.max(8, (b / max) * 100)),
+      bars: bars.map((b) => (b > 0 ? Math.max(15, (b / max) * 100) : 6)),
     };
   }, [transfers]);
 
@@ -101,14 +101,14 @@ const MiniStats = () => {
               + {monthData.others.map(([c, v]) => formatMoney(v, c)).join(" · ")}
             </p>
           )}
-          <div className="flex items-end gap-1 h-8 mt-2">
+          <div className="flex items-end gap-[2px] h-8 mt-2">
             {monthData.bars.map((h, i) => (
               <motion.div
                 key={i}
                 initial={{ height: 0 }}
                 animate={{ height: `${h}%` }}
-                transition={{ delay: 0.3 + i * 0.08, duration: 0.4, ease: "easeOut" }}
-                className="flex-1 rounded-sm bg-primary/70"
+                transition={{ delay: 0.3 + i * 0.01, duration: 0.4, ease: "easeOut" }}
+                className="flex-1 rounded-[1px] bg-primary/60"
               />
             ))}
           </div>
