@@ -152,13 +152,6 @@ const KYCPage = () => {
                           </TableCell>
                           <TableCell className="text-right">
                             {(() => {
-                              if (isCurrent) {
-                                return (
-                                  <Badge variant="secondary" className="gap-1">
-                                    <CheckCircle2 className="w-3 h-3" /> Verified
-                                  </Badge>
-                                );
-                              }
                               if (isUnlocked) {
                                 return (
                                   <Badge variant="secondary" className="gap-1">
@@ -168,6 +161,42 @@ const KYCPage = () => {
                               }
                               const canUpgrade =
                                 upgradePath && TIER_ORDER[tKey] === TIER_ORDER[currentTier] + 1;
+
+                              const targetsThisTier =
+                                (kyc as any)?.tier_target === tKey;
+                              const isPending =
+                                canUpgrade &&
+                                targetsThisTier &&
+                                kyc?.verification_status === "pending_review";
+                              const isRejected =
+                                canUpgrade &&
+                                targetsThisTier &&
+                                kyc?.verification_status === "rejected";
+
+                              if (isPending) {
+                                return (
+                                  <div className="inline-flex flex-col items-end gap-1">
+                                    <Badge className="gap-1 bg-amber-500 hover:bg-amber-500 text-white">
+                                      <Clock className="w-3 h-3" /> Submitted — under review
+                                    </Badge>
+                                    <span className="text-[10px] text-muted-foreground">
+                                      We'll get back within 24 hrs
+                                    </span>
+                                  </div>
+                                );
+                              }
+                              if (isRejected) {
+                                return (
+                                  <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    onClick={() => navigate(upgradePath!)}
+                                    className="gap-1"
+                                  >
+                                    <AlertTriangle className="w-3.5 h-3.5" /> Rejected — Reapply
+                                  </Button>
+                                );
+                              }
                               return (
                                 <Button
                                   size="sm"
@@ -208,9 +237,6 @@ const KYCPage = () => {
                   </TableBody>
                 </Table>
               </div>
-              <p className="text-xs text-muted-foreground mt-4">
-                Tier 2 requires government ID + selfie. Tier 3 additionally requires proof of address and source of funds.
-              </p>
             </Card>
 
           </div>
