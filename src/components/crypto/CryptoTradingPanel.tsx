@@ -53,7 +53,7 @@ export const CryptoTradingPanel = () => {
   const [quoteCurrency, setQuoteCurrency] = useState<string>("USD");
   const [amount, setAmount] = useState("");
 
-  const { data: pairs, isLoading: pairsLoading, refetch: refetchPairs } = useQuery({
+  const { data: pairs, isLoading: pairsLoading, error: pairsError, refetch: refetchPairs } = useQuery({
     queryKey: ["crypto-pairs"],
     queryFn: async () => {
       const response = await supabase.functions.invoke("crypto-trading", {
@@ -66,6 +66,7 @@ export const CryptoTradingPanel = () => {
       return response.data.pairs as CryptoPair[];
     },
     refetchInterval: 30000,
+    retry: 1,
   });
 
   // Available bases (sorted by priority)
@@ -224,6 +225,19 @@ export const CryptoTradingPanel = () => {
           {pairsLoading ? (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {[1, 2, 3, 4, 5, 6].map(i => <Skeleton key={i} className="h-20" />)}
+            </div>
+          ) : pairsError ? (
+            <div className="p-6 rounded-lg border border-destructive/30 bg-destructive/5 text-center space-y-3">
+              <p className="text-sm text-destructive">
+                Could not load live crypto prices: {(pairsError as Error).message}
+              </p>
+              <Button size="sm" variant="outline" onClick={() => refetchPairs()}>
+                <RefreshCw className="w-4 h-4 mr-2" /> Retry
+              </Button>
+            </div>
+          ) : !pairs?.some(p => p.price_available) ? (
+            <div className="p-6 rounded-lg border border-border bg-muted/30 text-center text-sm text-muted-foreground">
+              No live prices available right now. Please try again shortly.
             </div>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
