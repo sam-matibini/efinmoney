@@ -77,8 +77,8 @@ const WalletStatementPage = () => {
     <div className="min-h-screen bg-background pb-24 md:pb-8">
       <Header />
       <main className="container px-4 py-6 max-w-7xl mx-auto space-y-6">
-        <Button variant="ghost" size="sm" onClick={() => navigate("/wallets")} className="-ml-2">
-          <ArrowLeft className="w-4 h-4 mr-1.5" /> Back to wallets
+        <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard")} className="-ml-2">
+          <ArrowLeft className="w-4 h-4 mr-1.5" /> Back to dashboard
         </Button>
 
         {/* Hero */}
