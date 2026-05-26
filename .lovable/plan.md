@@ -1,101 +1,47 @@
-## Goal
+## Audit results
 
-Replace long, parameter-laden URLs (e.g. `…lovableproject.com/send?sourceWalletId=9cafea5c-…`) with clean branded short links like `https://efin.money/s/AbC123`. Visiting the short link transparently routes to the real in-app destination with all original params intact.
+Frontend: clean. No runtime errors, no console errors, no broken routes (the `/onboarding/address` bug was fixed earlier).
 
-Works for every shareable route in the app (send, receive, transfer tracking, statements, receipts, P2P, etc.) — not just `/send`.
+Backend security scan surfaced **4 real issues** that need fixing, plus a long tail of low-severity linter advisories.
 
-## What the user will see
+---
 
-- Anywhere the app builds a shareable URL today, it instead shows `https://efin.money/s/<code>`.
-- "Copy link", "Share", QR codes, emailed receipts, and SMS notifications all use the short form.
-- Clicking the short link opens the app and lands on the exact same screen the long URL would have opened, with the same data preloaded.
-- Codes are short (6–8 chars), URL-safe, and case-sensitive.
+## Critical (must fix)
 
-## How it works
+**1. Clients can write directly to the double-entry ledger** — ERROR
+The `ledger_entries` INSERT policy currently lets any authenticated user insert rows as long as `wallet_id` belongs to them. This bypasses the `execute_fx_swap` / transfer SECURITY DEFINER functions and allows fabricated, unbalanced journal entries (credit without matching debit). Fix: remove the wallet-ownership branch from the INSERT policy; only `finance` / `admin` roles may insert directly, all user-initiated writes flow through the designated SECURITY DEFINER functions.
 
-```text
-User clicks "Share" 
-   → app calls create_short_link({ path: "/send", params: { sourceWalletId: "..." } })
-   → backend stores row + returns code "AbC123"
-   → UI displays https://efin.money/s/AbC123
+**2. Users can modify their own transfer records after submission** — ERROR
+The `Users can update own transfers` policy applies to ALL columns with only `auth.uid() = sender_id`. A user can mutate `status`, `failure_reason`, `recipient_account`, `recipient_name`, `payout_method`, `interac_security_question`, etc. — tampering with compliance records and the outcome of a transfer. Fix: drop this policy and route status/recipient changes through SECURITY DEFINER functions. (Optional: re-add a narrow column-level UPDATE for a `user_note` field only.)
 
-Recipient opens https://efin.money/s/AbC123
-   → React route /s/:code mounts a Resolver component
-   → Resolver calls resolve_short_link(code)
-   → backend returns { path: "/send", params: {...} }, increments click counter
-   → Resolver does navigate("/send?sourceWalletId=...", { replace: true })
-   → User lands on real screen; address bar still shows /s/AbC123 briefly then switches
-```
+---
 
-Optional toggle per link: keep the `/s/<code>` URL in the address bar (no rewrite) for cleanliness, or rewrite to the real path. Default: **keep `/s/<code>`** so it stays shareable on refresh.
+## High priority
 
-## Database
+**3. Broken member-visibility RLS on `business_card_programs`** — WARN
+Policy contains `WHERE m.program_id = m.id` (compares two columns of the same alias) — always false, so members are silently denied access to their own programs. Fix: change to `m.program_id = business_card_programs.id`.
 
-New table `public.short_links`:
+**4. Realtime channel subscriptions are not authorized** — WARN
+`transfers` and `kyc_verifications` are published to Realtime but `realtime.messages` has no RLS policy, so any signed-in user can subscribe to any channel topic and observe events. Fix: add RLS on `realtime.messages` scoping topics to `auth.uid()` or staff roles.
 
-| column | type | notes |
-|---|---|---|
-| `code` | text PK | 6–8 chars, base62 |
-| `owner_id` | uuid | creator; nullable for system links |
-| `target_path` | text | e.g. `/send`, `/transfers/:id` |
-| `params` | jsonb | query + path params |
-| `expires_at` | timestamptz | nullable; default null = never |
-| `max_uses` | int | nullable |
-| `use_count` | int | default 0 |
-| `created_at` | timestamptz | default now() |
-| `revoked_at` | timestamptz | nullable |
+---
 
-RLS:
-- `authenticated` can insert their own (`owner_id = auth.uid()`)
-- Anyone (anon + authenticated) can read a single row via the `resolve_short_link(code)` security-definer function only — no direct `SELECT` grant to anon. Owners can `SELECT` their own rows for a "My links" view later.
-- Owners can revoke (`UPDATE revoked_at`).
+## Low priority (acknowledge, don't auto-fix)
 
-Two RPCs:
-- `create_short_link(target_path, params, expires_at?, max_uses?) → code` — generates a collision-checked base62 code, rate-limited via existing `check_rate_limit`.
-- `resolve_short_link(code) → { target_path, params }` — validates not revoked / not expired / under `max_uses`, increments `use_count`, returns target.
+- ~49 linter warnings about SECURITY DEFINER functions being executable by anon/authenticated, `function_search_path_mutable`, `extension_in_public`, `rls_enabled_no_policy`. These are mostly by-design (RPCs that must be callable) but warrant a one-pass review to lock down anything not intentionally exposed and to add `SET search_path = public` where missing. Not blocking.
 
-## Frontend
+---
 
-1. **New route** `/s/:code` in `App.tsx` → `<ShortLinkResolver />` component.
-   - Calls `resolve_short_link`, then `navigate(target, { replace: true })` (or keeps `/s/:code` and renders the target component inline — pick at implementation).
-   - Shows a 200ms branded spinner, then the page.
-   - Invalid / expired / revoked → friendly "Link no longer available" screen.
+## Implementation plan (migration only — no frontend changes)
 
-2. **New helper** `src/lib/shortLink.ts`:
-   ```ts
-   shortenUrl(path: string, params?: Record<string, string>): Promise<string>
-   // returns "https://efin.money/s/AbC123"
-   ```
-   Picks the public host from `window.location.origin` if it's already `efin.money`, otherwise hardcodes `https://efin.money`.
+Single migration file that:
 
-3. **Update share surfaces** (one batch):
-   - SendPage / wallet share buttons → use `shortenUrl("/send", { sourceWalletId })`
-   - ReceivePage share / QR
-   - TransferTrackingPage "Copy link"
-   - WalletStatementPage share
-   - PDF receipt link in `generate-receipt` edge fn
-   - Any future `navigator.share` / `clipboard.writeText` of an in-app URL
+1. Drops the unsafe `ledger_entries` INSERT policy and recreates it scoped to `has_role(auth.uid(), 'finance')` / `'admin'` (or to `service_role` only).
+2. Drops `Users can update own transfers`; if we want to keep a client-editable `user_note`, re-add a column-restricted policy via `GRANT UPDATE (user_note)`.
+3. Replaces the broken `business_card_programs` member SELECT policy with the corrected subquery.
+4. Adds `realtime.messages` SELECT policy restricting topic subscriptions to `auth.uid()`-scoped names plus staff roles.
+5. Adds `SET search_path = public` to any of our SECURITY DEFINER functions still missing it (sampling pass, not all 40+ warnings).
 
-   Long internal `<Link to="/send?...">` navigation is unchanged — short links are only for external sharing.
+No frontend code touches required — these are all DB-side. Existing edge functions already use `service_role` so they keep working after the policy tightening.
 
-## Edge cases handled
-
-- **Rate limiting**: per-user cap on `create_short_link` calls via existing `check_rate_limit`.
-- **Collisions**: retry loop up to 5 attempts, then 8-char code.
-- **Privacy**: `params` may contain wallet ids — RLS prevents enumeration; codes are unguessable.
-- **Expiry**: receipts/statements get 30-day expiry; send/receive links never expire by default.
-- **Custom domain**: links only look pretty on `efin.money`. On the preview domain they'll show `id-preview--…lovable.app/s/AbC123` — still works, just not as branded.
-
-## Out of scope (can add later)
-
-- Analytics dashboard for link clicks
-- Custom vanity codes (`/s/my-rent`)
-- Password-protected links
-- Open Graph preview metadata per link
-
-## Technical notes (for the agent)
-
-- Single migration creates `short_links` table + both RPCs + RLS + GRANTs.
-- Two RPCs are SECURITY DEFINER with `search_path=public`.
-- Code generator: `encode(gen_random_bytes(6), 'base64')` stripped to base62, sliced to 6 chars.
-- Update `mem://features/` with a new `short-links` memory entry.
+I'll write the migration and verify with the linter after apply.
