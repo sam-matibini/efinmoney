@@ -43,6 +43,69 @@ const statusColor = (s: string | null | undefined) => {
 const UserDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { hasPermission } = useAdminAuth();
+  const [manualBusy, setManualBusy] = useState(false);
+  const [revokeOpen, setRevokeOpen] = useState(false);
+  const [revokeReason, setRevokeReason] = useState("");
+
+  const ensureKycRow = async (): Promise<string | null> => {
+    if (!id) return null;
+    const { data: existing } = await supabase
+      .from("kyc_verifications").select("id").eq("user_id", id).maybeSingle();
+    if (existing?.id) return existing.id;
+    const { data: created, error } = await supabase
+      .from("kyc_verifications").insert({ user_id: id }).select("id").maybeSingle();
+    if (error) { toast.error(error.message); return null; }
+    return created?.id || null;
+  };
+
+  const manualApprove = async (scope: "id_only" | "id_and_address") => {
+    if (!hasPermission("approve_kyc")) { toast.error("No permission"); return; }
+    setManualBusy(true);
+    try {
+      const vid = await ensureKycRow();
+      if (!vid) return;
+      const { data: res, error } = await supabase.functions.invoke("approve-kyc", {
+        body: { verification_id: vid, scope, override: true },
+      });
+      if (error || (res && res.error)) throw new Error((res && res.error) || error?.message || "Failed");
+      toast.success(scope === "id_and_address" ? "User approved to Tier 3" : "User approved to Tier 2");
+      queryClient.invalidateQueries({ queryKey: ["admin-user-detail", id] });
+      queryClient.invalidateQueries({ queryKey: ["admin-user-kyc", id] });
+      queryClient.invalidateQueries({ queryKey: ["admin-user-tier", id] });
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setManualBusy(false);
+    }
+  };
+
+  const manualRevoke = async () => {
+    if (!hasPermission("reject_kyc")) { toast.error("No permission"); return; }
+    if (!revokeReason.trim()) { toast.error("Reason required"); return; }
+    setManualBusy(true);
+    try {
+      const vid = await ensureKycRow();
+      if (!vid) return;
+      const { data: res, error } = await supabase.functions.invoke("reject-kyc", {
+        body: { verification_id: vid, reason: revokeReason.trim(), scope: "both", override: true },
+      });
+      if (error || (res && res.error)) throw new Error((res && res.error) || error?.message || "Failed");
+      toast.success("Verification revoked");
+      setRevokeOpen(false);
+      setRevokeReason("");
+      queryClient.invalidateQueries({ queryKey: ["admin-user-detail", id] });
+      queryClient.invalidateQueries({ queryKey: ["admin-user-kyc", id] });
+      queryClient.invalidateQueries({ queryKey: ["admin-user-tier", id] });
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setManualBusy(false);
+    }
+  };
+
+
 
   const { data: profile, isLoading } = useQuery({
     queryKey: ["admin-user-detail", id],
