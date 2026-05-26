@@ -6,6 +6,7 @@ import QuickActions from "@/components/dashboard/QuickActions";
 import RecentTransactions from "@/components/dashboard/RecentTransactions";
 import ExchangeRates from "@/components/dashboard/ExchangeRates";
 import MiniStats from "@/components/dashboard/MiniStats";
+import TierProgressCard from "@/components/dashboard/TierProgressCard";
 
 
 const Index = () => {
@@ -19,6 +20,7 @@ const Index = () => {
         <WalletCarousel />
         <QuickActions />
         <MiniStats />
+        <TierProgressCard />
         <RecentTransactions />
         <div className="mt-6">
           <ExchangeRates />
