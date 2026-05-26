@@ -82,10 +82,13 @@ const Enhanced = () => {
         </p>
         <DocumentUploader
           label="Address document"
-          bucket="kyc-documents"
-          pathPrefix={`${user?.id}/address`}
-          onUploaded={setAddressUrl}
-          currentUrl={addressUrl}
+          uploadedPath={addressUrl}
+          onUpload={async (file) => {
+            const path = `${user!.id}/address/${Date.now()}-${file.name}`;
+            const { error } = await supabase.storage.from("kyc-documents").upload(path, file, { upsert: true });
+            if (error) throw error;
+            setAddressUrl(path);
+          }}
         />
       </Card>
 
@@ -107,10 +110,13 @@ const Enhanced = () => {
         </div>
         <DocumentUploader
           label="Supporting document"
-          bucket="kyc-documents"
-          pathPrefix={`${user?.id}/source-of-funds`}
-          onUploaded={setSourceUrl}
-          currentUrl={sourceUrl}
+          uploadedPath={sourceUrl}
+          onUpload={async (file) => {
+            const path = `${user!.id}/source-of-funds/${Date.now()}-${file.name}`;
+            const { error } = await supabase.storage.from("kyc-documents").upload(path, file, { upsert: true });
+            if (error) throw error;
+            setSourceUrl(path);
+          }}
         />
       </Card>
 
