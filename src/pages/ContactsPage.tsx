@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -80,13 +81,17 @@ const ContactsPage = () => {
           </div>
         ) : filtered.length === 0 ? (
           <Card>
-            <CardContent className="py-16 text-center space-y-3">
-              <Users className="w-10 h-10 mx-auto text-muted-foreground" />
-              <p className="font-medium">No contacts yet</p>
-              <p className="text-sm text-muted-foreground">Add your first contact to send money in one tap.</p>
-              <Button onClick={() => { setEditing(null); setModalOpen(true); }} className="gap-2">
-                <Plus className="w-4 h-4" /> Add Contact
-              </Button>
+            <CardContent className="p-0">
+              <EmptyState
+                icon={Users}
+                title="No contacts yet"
+                description="Add your first contact to send money in one tap."
+                action={
+                  <Button onClick={() => { setEditing(null); setModalOpen(true); }} className="gap-2">
+                    <Plus className="w-4 h-4" /> Add Contact
+                  </Button>
+                }
+              />
             </CardContent>
           </Card>
         ) : (

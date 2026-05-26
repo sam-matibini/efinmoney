@@ -6,6 +6,7 @@ import { Users, Clock, CheckCircle2, XCircle, AlertTriangle, TrendingUp } from "
 import { KycStatusBadge, TierBadge } from "@/components/admin-portal/Badges";
 import { formatDistanceToNow } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 
@@ -130,7 +131,7 @@ const AdminDashboardPage = () => {
               {statsLoading ? (
                 <div className="space-y-2">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
               ) : stats?.urgent.length === 0 ? (
-                <div className="text-sm text-muted-foreground py-6 text-center">All caught up — no pending reviews.</div>
+                <EmptyState icon={CheckCircle2} title="All caught up" description="No pending KYC reviews right now." size="sm" />
               ) : (
                 <div className="divide-y">
                   {stats?.urgent.map((row) => {
@@ -168,7 +169,7 @@ const AdminDashboardPage = () => {
             {statsLoading ? (
               <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-8 w-full" />)}</div>
             ) : stats?.recentAudit.length === 0 ? (
-              <div className="text-sm text-muted-foreground py-6 text-center">No activity yet.</div>
+              <EmptyState icon={AlertTriangle} title="No activity yet" description="Approvals, rejections and other admin actions will appear here." size="sm" />
             ) : (
               <div className="divide-y">
                 {stats?.recentAudit.map((entry) => (

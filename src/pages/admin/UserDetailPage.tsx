@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
@@ -391,7 +392,7 @@ const UserDetailPage = () => {
               <CardHeader><CardTitle className="text-base flex items-center gap-2"><Wallet className="w-4 h-4" /> Wallets ({wallets.length})</CardTitle></CardHeader>
               <CardContent>
                 {wallets.length === 0 ? (
-                  <div className="text-center text-sm text-muted-foreground py-8">No wallets yet</div>
+                  <EmptyState icon={Wallet} title="No wallets yet" description="This user hasn't created any wallets." size="sm" />
                 ) : (
                   <Table>
                     <TableHeader>
@@ -435,7 +436,7 @@ const UserDetailPage = () => {
               <CardHeader><CardTitle className="text-base flex items-center gap-2"><ArrowRightLeft className="w-4 h-4" /> Recent transfers ({transfers.length})</CardTitle></CardHeader>
               <CardContent>
                 {transfers.length === 0 ? (
-                  <div className="text-center text-sm text-muted-foreground py-8">No transfers yet</div>
+                  <EmptyState icon={ArrowRightLeft} title="No transfers yet" description="This user hasn't sent or received any transfers." size="sm" />
                 ) : (
                   <div className="overflow-x-auto">
                     <Table>
