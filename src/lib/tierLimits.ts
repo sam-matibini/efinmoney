@@ -77,7 +77,7 @@ export async function checkTransactionAllowed(
     .select("source_amount, created_at, status")
     .eq("sender_id", userId)
     .gte("created_at", startOfMonth)
-    .in("status", ["pending", "processing", "completed"]);
+    .in("status", ["initiated", "funded", "processing", "completed"]);
 
   if (error) {
     // Fail open on read error so we don't trap the user; server trigger still applies.
