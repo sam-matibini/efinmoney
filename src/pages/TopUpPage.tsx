@@ -171,10 +171,12 @@ const TopUpPage = () => {
       <Header />
       <main className="container px-4 py-6">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-xl mx-auto space-y-6">
+          <BackToDashboard />
           <div>
             <h1 className="text-2xl font-display font-bold">Add Money</h1>
             <p className="text-muted-foreground">Top up your wallet using the best route for your currency.</p>
           </div>
+
 
           {verifyState && (
             <Card>
