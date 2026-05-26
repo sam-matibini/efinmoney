@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { useSearchParams } from "react-router-dom";
 import Header from "@/components/layout/Header";
 import MobileNav from "@/components/layout/MobileNav";
+import BackToDashboard from "@/components/layout/BackToDashboard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -170,10 +171,12 @@ const TopUpPage = () => {
       <Header />
       <main className="container px-4 py-6">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-xl mx-auto space-y-6">
+          <BackToDashboard />
           <div>
             <h1 className="text-2xl font-display font-bold">Add Money</h1>
             <p className="text-muted-foreground">Top up your wallet using the best route for your currency.</p>
           </div>
+
 
           {verifyState && (
             <Card>

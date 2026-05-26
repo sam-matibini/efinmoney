@@ -16,6 +16,7 @@ import { useAuth } from "@/hooks/useAuth";
 
 import Header from "@/components/layout/Header";
 import MobileNav from "@/components/layout/MobileNav";
+import BackToDashboard from "@/components/layout/BackToDashboard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -803,6 +804,7 @@ const SendPage = () => {
 
       <main className="container px-4 py-6">
         <div className="max-w-2xl mx-auto space-y-6">
+          <BackToDashboard />
           {/* Header — slides down with fade */}
           <motion.div
             initial={{ opacity: 0, y: -24 }}

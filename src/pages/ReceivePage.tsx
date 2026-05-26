@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { Copy, Plus, Share2, Wallet as WalletIcon } from "lucide-react";
 import Header from "@/components/layout/Header";
 import MobileNav from "@/components/layout/MobileNav";
+import BackToDashboard from "@/components/layout/BackToDashboard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -52,10 +53,12 @@ const ReceivePage = () => {
       <Header />
       <main className="container px-4 py-6">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 max-w-3xl mx-auto">
+          <BackToDashboard />
           <div>
             <h1 className="text-2xl font-display font-bold">Receive Money</h1>
             <p className="text-muted-foreground">Share your virtual account details to get paid instantly.</p>
           </div>
+
 
           {/* In-network identity: account # + @tag */}
           <Card className="border-primary/30 bg-gradient-to-br from-primary/5 to-transparent">
