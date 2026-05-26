@@ -17,6 +17,7 @@ const TierProgressCard = () => {
   const { tier } = useKyc();
   const { data: profile } = useProfile();
   const { data: transfers } = useTransfers(200);
+  const { data: fxRates } = useFxRates();
 
   // Only show for new-framework users; legacy users see KYCStatusCard if needed.
   if ((profile?.kyc_framework_version ?? 2) < 2) return null;
@@ -29,15 +30,16 @@ const TierProgressCard = () => {
     const now = new Date();
     const startDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
     const startMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+    const rateMap = buildUsdRateMap((fxRates ?? []) as any);
     let d = 0, m = 0;
     for (const t of transfers ?? []) {
       const ts = new Date(t.created_at).getTime();
-      const amt = Number(t.source_amount || 0);
-      if (ts >= startMonth) m += amt;
-      if (ts >= startDay) d += amt;
+      const usd = convertToUsd(Number(t.source_amount || 0), (t as any).source_currency || "USD", rateMap) ?? 0;
+      if (ts >= startMonth) m += usd;
+      if (ts >= startDay) d += usd;
     }
     return { dailyUsed: d, monthlyUsed: m };
-  }, [transfers]);
+  }, [transfers, fxRates]);
 
   const dailyPct = Math.min(100, (dailyUsed / Number(tier.daily_transaction_limit)) * 100);
   const monthlyPct = Math.min(100, (monthlyUsed / Number(tier.monthly_transaction_limit)) * 100);
