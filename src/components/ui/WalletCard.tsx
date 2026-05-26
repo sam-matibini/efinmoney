@@ -1,9 +1,10 @@
 import { motion } from "framer-motion";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowUpRight, Plus, MoreHorizontal, Star, Snowflake, Play, Pencil, Trash2, Sparkles, FileText } from "lucide-react";
+import { ArrowUpRight, ArrowDownLeft, Plus, MoreHorizontal, Star, Snowflake, Play, Pencil, Trash2, Sparkles, FileText } from "lucide-react";
 import SendMoneyModal from "@/components/modals/SendMoneyModal";
 import TopUpModal from "@/components/modals/TopUpModal";
+import ReceiveMoneyModal from "@/components/modals/ReceiveMoneyModal";
 import StellarWalletModal from "@/components/modals/StellarWalletModal";
 import {
   DropdownMenu,
@@ -48,6 +49,7 @@ const WalletCard = ({
   showStellarBadge = false,
 }: WalletCardProps) => {
   const [topUpOpen, setTopUpOpen] = useState(false);
+  const [receiveOpen, setReceiveOpen] = useState(false);
   const [stellarOpen, setStellarOpen] = useState(false);
   const navigate = useNavigate();
   const formatBalance = (value: number) => {
