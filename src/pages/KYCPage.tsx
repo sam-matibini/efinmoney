@@ -154,42 +154,49 @@ const KYCPage = () => {
                               if (isCurrent) {
                                 return (
                                   <Badge variant="secondary" className="gap-1">
-                                    <CheckCircle2 className="w-3 h-3" /> Active
+                                    <CheckCircle2 className="w-3 h-3" /> Verified
                                   </Badge>
                                 );
                               }
                               if (isUnlocked) {
-                                return <Badge variant="outline">Unlocked</Badge>;
-                              }
-                              // Locked: must upgrade tiers sequentially
-                              const canUpgrade =
-                                upgradePath && TIER_ORDER[tKey] === TIER_ORDER[currentTier] + 1;
-                              if (canUpgrade) {
                                 return (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => navigate(upgradePath!)}
-                                    className="gap-1"
-                                  >
-                                    <Upload className="w-3.5 h-3.5" />
-                                    Upgrade
-                                    <ArrowRight className="w-3.5 h-3.5" />
-                                  </Button>
+                                  <Badge variant="secondary" className="gap-1">
+                                    <CheckCircle2 className="w-3 h-3" /> Verified
+                                  </Badge>
                                 );
                               }
-                              const prevTierLabel =
-                                tKey === "tier_3" ? "Tier 2" : "previous tier";
+                              const canUpgrade =
+                                upgradePath && TIER_ORDER[tKey] === TIER_ORDER[currentTier] + 1;
                               return (
                                 <Button
                                   size="sm"
-                                  variant="outline"
-                                  disabled
-                                  className="gap-1 cursor-not-allowed"
-                                  title={`Complete ${prevTierLabel} first`}
+                                  variant={canUpgrade ? "outline" : "ghost"}
+                                  onClick={() => {
+                                    if (canUpgrade) {
+                                      navigate(upgradePath!);
+                                    } else {
+                                      toast.error("Tier locked", {
+                                        description:
+                                          tKey === "tier_3"
+                                            ? "You must be verified at Tier 2 before upgrading to Tier 3."
+                                            : "Complete the previous tier first.",
+                                      });
+                                    }
+                                  }}
+                                  className="gap-1"
                                 >
-                                  <Lock className="w-3.5 h-3.5" />
-                                  Locked
+                                  {canUpgrade ? (
+                                    <>
+                                      <Upload className="w-3.5 h-3.5" />
+                                      Upgrade
+                                      <ArrowRight className="w-3.5 h-3.5" />
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Lock className="w-3.5 h-3.5" />
+                                      Locked
+                                    </>
+                                  )}
                                 </Button>
                               );
                             })()}
