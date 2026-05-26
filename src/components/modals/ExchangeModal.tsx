@@ -187,7 +187,7 @@ const ExchangeModal = ({ children }: ExchangeModalProps) => {
                             }}
                             className="flex items-center gap-3 w-full px-4 py-3 hover:bg-muted transition-colors first:rounded-t-xl last:rounded-b-xl"
                           >
-                            <span>{wallet.flag_emoji || '💰'}</span>
+                            <CurrencyFlag code={wallet.currency_code} />
                             <div className="text-left">
                               <p className="font-medium text-foreground">{wallet.currency_code}</p>
                               <p className="text-xs text-muted-foreground">
