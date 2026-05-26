@@ -61,7 +61,7 @@ export const RiskTiersPanel = () => {
   }, [profiles]);
 
   const distribution = useMemo(() => {
-    const counts: Record<string, number> = { tier_1: 0, tier_2: 0, tier_3: 0, tier_4: 0 };
+    const counts: Record<string, number> = { tier_1: 0, tier_2: 0, tier_3: 0 };
     tiers.forEach(t => { counts[t.current_tier] = (counts[t.current_tier] || 0) + 1; });
     const total = tiers.length || 1;
     return Object.entries(counts).map(([tier, count]) => ({
