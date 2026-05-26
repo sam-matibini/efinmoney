@@ -64,7 +64,7 @@ const statusMeta = (status: string) => {
     case "funded":
       return { label: "Processing", className: "bg-yellow-500/20 text-yellow-500 border-yellow-500/40" };
     default:
-      return { label: "Initiated", className: "bg-blue-500/20 text-blue-500 border-blue-500/40" };
+      return { label: "Initiated", className: "bg-amber-500/20 text-amber-600 border-amber-500/40" };
   }
 };
 

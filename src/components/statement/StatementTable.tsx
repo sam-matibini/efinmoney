@@ -17,10 +17,10 @@ const dateGroupLabel = (iso: string) => {
 };
 
 const statusBadge = (s: string) => {
-  if (s === "completed") return "bg-green-500/15 text-green-600 border-green-500/30";
+  if (s === "completed") return "bg-primary/15 text-primary border-primary/30";
   if (["failed", "reversed", "expired"].includes(s)) return "bg-destructive/15 text-destructive border-destructive/30";
-  if (["processing", "funded", "initiated"].includes(s)) return "bg-yellow-500/15 text-yellow-600 border-yellow-500/30";
-  return "bg-blue-500/15 text-blue-500 border-blue-500/30";
+  if (["processing", "funded", "initiated"].includes(s)) return "bg-amber-500/15 text-amber-600 border-amber-500/30";
+  return "bg-muted text-muted-foreground border-border";
 };
 
 interface Props {
