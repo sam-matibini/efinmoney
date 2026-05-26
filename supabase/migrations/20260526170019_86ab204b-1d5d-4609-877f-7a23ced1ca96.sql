@@ -1,0 +1,1 @@
+UPDATE storage.buckets SET allowed_mime_types = ARRAY['image/jpeg','image/png','image/jpg','image/tiff','image/heic','image/heif','image/webp','application/pdf'], file_size_limit = 15728640 WHERE id = 'kyc-documents';
