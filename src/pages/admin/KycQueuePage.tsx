@@ -110,10 +110,12 @@ const KycQueuePage = () => {
               <SelectContent>
                 <SelectItem value="all">All statuses</SelectItem>
                 <SelectItem value="pending_review">Pending review</SelectItem>
+                <SelectItem value="needs_signoff">Needs admin sign-off (API)</SelectItem>
                 <SelectItem value="in_progress">In progress</SelectItem>
                 <SelectItem value="approved">Approved</SelectItem>
                 <SelectItem value="rejected">Rejected</SelectItem>
               </SelectContent>
+
             </Select>
             <Select value={docTypeFilter} onValueChange={(v) => { setDocTypeFilter(v); setPage(0); }}>
               <SelectTrigger className="w-44"><SelectValue placeholder="Document type" /></SelectTrigger>
