@@ -19,7 +19,7 @@ const FEATURE_KEYS = ["receive", "send", "topup", "bills", "international", "vir
 
 const KYCPage = () => {
   const { data: profile, isLoading } = useProfile();
-  const { tier: userTier } = useKyc();
+  const { tier: userTier, kyc } = useKyc();
   const navigate = useNavigate();
 
   const { data: tierLimits } = useQuery({
