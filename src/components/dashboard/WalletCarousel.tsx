@@ -4,8 +4,6 @@ import { Plus, Send, Download, ArrowUpRight } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useWallets } from "@/hooks/useWallets";
 import { Skeleton } from "@/components/ui/skeleton";
-import SendMoneyModal from "@/components/modals/SendMoneyModal";
-import CardPaymentModal from "@/components/modals/CardPaymentModal";
 import CreateWalletModal from "@/components/modals/CreateWalletModal";
 import AnimatedNumber from "@/components/ui/AnimatedNumber";
 import { flagForCurrency } from "@/lib/flags";
