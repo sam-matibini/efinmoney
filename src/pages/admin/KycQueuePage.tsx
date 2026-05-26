@@ -92,7 +92,7 @@ const KycQueuePage = () => {
       <div className="space-y-4">
         <div className="flex items-end justify-between flex-wrap gap-2">
           <div>
-            <h1 className="font-display text-2xl font-semibold">KYC Queue</h1>
+            <h1 className="font-display text-3xl font-bold tracking-tight">KYC Queue</h1>
             <p className="text-sm text-muted-foreground">Review user identity verifications</p>
           </div>
         </div>

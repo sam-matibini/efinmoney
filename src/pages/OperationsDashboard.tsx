@@ -24,7 +24,7 @@ const OperationsDashboard = () => {
           className="space-y-6"
         >
           <div>
-            <h1 className="text-2xl font-display font-bold text-foreground">Operations Dashboard</h1>
+            <h1 className="text-3xl font-display font-bold tracking-tight text-foreground">Operations Dashboard</h1>
             <p className="text-muted-foreground">CRM, transaction monitoring, disputes, compliance & operational controls</p>
           </div>
 

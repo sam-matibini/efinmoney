@@ -135,29 +135,29 @@ const UsersPage = () => {
       <div className="space-y-6">
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div>
-            <h1 className="font-display text-2xl font-semibold flex items-center gap-2">
-              <UsersIcon className="w-6 h-6 text-primary" /> Users
+            <h1 className="font-display text-3xl font-bold tracking-tight flex items-center gap-2">
+              <UsersIcon className="w-7 h-7 text-primary" /> Users
             </h1>
             <p className="text-sm text-muted-foreground">Manage all customer accounts</p>
           </div>
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
-            { label: "Total", value: stats.total, icon: UsersIcon, color: "text-primary" },
-            { label: "Active", value: stats.active, icon: UserCheck, color: "text-emerald-500" },
-            { label: "Suspended", value: stats.suspended, icon: UserX, color: "text-red-500" },
-            { label: "Pending", value: stats.pending, icon: Clock, color: "text-yellow-500" },
+            { label: "Total", value: stats.total, icon: UsersIcon, color: "text-primary", bg: "bg-primary/10" },
+            { label: "Active", value: stats.active, icon: UserCheck, color: "text-primary", bg: "bg-primary/10" },
+            { label: "Suspended", value: stats.suspended, icon: UserX, color: "text-destructive", bg: "bg-destructive/10" },
+            { label: "Pending", value: stats.pending, icon: Clock, color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-500/10" },
           ].map((s) => (
             <Card key={s.label}>
-              <CardContent className="p-4 flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-lg bg-muted flex items-center justify-center ${s.color}`}>
-                  <s.icon className="w-5 h-5" />
+              <CardContent className="p-5 flex items-center gap-4">
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${s.bg} ${s.color}`}>
+                  <s.icon className="w-6 h-6" strokeWidth={2} />
                 </div>
                 <div>
-                  <div className="text-xs text-muted-foreground">{s.label}</div>
-                  <div className="text-xl font-semibold">{s.value}</div>
+                  <div className="text-xs text-muted-foreground uppercase tracking-wide font-medium">{s.label}</div>
+                  <div className="text-3xl font-display font-bold text-foreground tabular-nums">{s.value}</div>
                 </div>
               </CardContent>
             </Card>

@@ -54,14 +54,14 @@ const AdminDashboardPage = () => {
 
   const Kpi = ({ icon: Icon, label, value, accent }: { icon: typeof Users; label: string; value: number | string; accent: string }) => (
     <Card>
-      <CardContent className="p-4 flex items-center gap-3">
-        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${accent}`}>
-          <Icon className="w-5 h-5" />
+      <CardContent className="p-5 flex items-center gap-4">
+        <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${accent}`}>
+          <Icon className="w-6 h-6" strokeWidth={2} />
         </div>
-        <div>
-          <div className="text-xs text-muted-foreground uppercase tracking-wide">{label}</div>
-          <div className="text-2xl font-display font-semibold">
-            {statsLoading ? <Skeleton className="h-7 w-12" /> : value}
+        <div className="min-w-0">
+          <div className="text-xs text-muted-foreground uppercase tracking-wide font-medium">{label}</div>
+          <div className="text-3xl font-display font-bold text-foreground tabular-nums">
+            {statsLoading ? <Skeleton className="h-8 w-14 mt-1" /> : value}
           </div>
         </div>
       </CardContent>
@@ -72,15 +72,15 @@ const AdminDashboardPage = () => {
     <AdminLayout>
       <div className="space-y-6 max-w-7xl">
         <div>
-          <h1 className="font-display text-2xl font-semibold">Dashboard</h1>
+          <h1 className="font-display text-3xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-sm text-muted-foreground">Platform overview and KYC oversight</p>
         </div>
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <Kpi icon={Users} label="Total users" value={stats?.totalUsers ?? 0} accent="bg-blue-500/10 text-blue-600 dark:text-blue-400" />
+          <Kpi icon={Users} label="Total users" value={stats?.totalUsers ?? 0} accent="bg-primary/10 text-primary" />
           <Kpi icon={Clock} label="Pending review" value={stats?.pending ?? 0} accent="bg-amber-500/10 text-amber-600 dark:text-amber-400" />
-          <Kpi icon={CheckCircle2} label="Approved today" value={stats?.approvedToday ?? 0} accent="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" />
-          <Kpi icon={XCircle} label="Rejected today" value={stats?.rejectedToday ?? 0} accent="bg-red-500/10 text-red-600 dark:text-red-400" />
+          <Kpi icon={CheckCircle2} label="Approved today" value={stats?.approvedToday ?? 0} accent="bg-primary/10 text-primary" />
+          <Kpi icon={XCircle} label="Rejected today" value={stats?.rejectedToday ?? 0} accent="bg-destructive/10 text-destructive" />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -108,11 +108,11 @@ const AdminDashboardPage = () => {
               })}
               <div className="pt-3 border-t flex items-center justify-between text-sm">
                 <span className="text-muted-foreground flex items-center gap-1"><TrendingUp className="w-4 h-4" /> Approval rate (30d)</span>
-                <span className="font-semibold text-emerald-600 dark:text-emerald-400">{stats?.approvedRate ?? 0}%</span>
+                <span className="font-semibold text-primary">{stats?.approvedRate ?? 0}%</span>
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Rejection rate (30d)</span>
-                <span className="font-semibold text-red-600 dark:text-red-400">{stats?.rejectedRate ?? 0}%</span>
+                <span className="font-semibold text-destructive">{stats?.rejectedRate ?? 0}%</span>
               </div>
             </CardContent>
           </Card>
@@ -146,7 +146,7 @@ const AdminDashboardPage = () => {
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          {overdue && <span className="text-xs text-red-600 dark:text-red-400 font-medium">Over 24h</span>}
+                          {overdue && <span className="text-xs text-destructive font-medium">Over 24h</span>}
                           <KycStatusBadge status={row.verification_status} />
                         </div>
                       </button>
