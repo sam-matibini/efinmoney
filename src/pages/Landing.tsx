@@ -11,9 +11,9 @@ const NAV_LINKS = [
 ];
 
 const FEATURES = [
-  { icon: Shield, emoji: "🔒", title: "Bank-Grade Security", desc: "Your funds are protected with 256-bit encryption and multi-factor authentication." },
-  { icon: Zap, emoji: "⚡", title: "Instant Transfers", desc: "Send money to Kenya, Nigeria, Uganda in minutes — not days." },
-  { icon: Globe, emoji: "🌍", title: "50+ Currency Corridors", desc: "Hold USD, CAD, NGN, KES, GHS and more in one app." },
+  { icon: Shield, title: "Bank-Grade Security", desc: "Your funds are protected with 256-bit encryption and multi-factor authentication." },
+  { icon: Zap, title: "Instant Transfers", desc: "Send money to Kenya, Nigeria, Uganda in minutes — not days." },
+  { icon: Globe, title: "50+ Currency Corridors", desc: "Hold USD, CAD, NGN, KES, GHS and more in one app." },
 ];
 
 const STEPS = [
@@ -265,10 +265,10 @@ const Landing = () => {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-60px" }}
                 transition={{ duration: 0.5, delay: i * 0.12 }}
-                className="p-8 rounded-3xl bg-[#F7F7F7] hover:bg-white hover:shadow-xl hover:-translate-y-1 transition-all border border-transparent hover:border-neutral-100"
+                className="group p-8 rounded-3xl bg-white hover:shadow-xl hover:-translate-y-1 transition-all border border-neutral-200/70 hover:border-emerald-200"
               >
-                <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-3xl mb-6">
-                  {f.emoji}
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center mb-6 shadow-md shadow-emerald-500/20 group-hover:scale-105 transition-transform">
+                  <f.icon className="w-7 h-7 text-white" strokeWidth={2.25} />
                 </div>
                 <h3 className="text-xl font-black text-neutral-900 mb-3">{f.title}</h3>
                 <p className="text-neutral-600 leading-relaxed">{f.desc}</p>
