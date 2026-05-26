@@ -6,6 +6,7 @@ import { Users, Clock, CheckCircle2, XCircle, AlertTriangle, TrendingUp } from "
 import { KycStatusBadge, TierBadge } from "@/components/admin-portal/Badges";
 import { formatDistanceToNow } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 
