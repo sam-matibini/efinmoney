@@ -160,7 +160,7 @@ const WalletCarousel = () => {
                       e.stopPropagation();
                       setTopUpWalletId(w.wallet_id);
                     }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white text-foreground hover:bg-white/90 text-xs font-semibold transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white text-gray-900 hover:bg-white/90 text-xs font-semibold transition-colors"
                   >
                     <Download className="w-3.5 h-3.5" />
                     Top up
