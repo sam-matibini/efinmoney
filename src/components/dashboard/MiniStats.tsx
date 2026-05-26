@@ -138,10 +138,10 @@ const MiniStats = () => {
             {corridors.slice(0, 5).map((c, i) => (
               <span
                 key={c}
-                className="text-lg inline-flex items-center justify-center w-7 h-7 rounded-full bg-background border border-border shadow-sm"
+                className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-background border border-border shadow-sm overflow-hidden"
                 style={{ marginLeft: i === 0 ? 0 : -8, zIndex: 10 - i }}
               >
-                {flagFor(c)}
+                <FlagFor cc={c} />
               </span>
             ))}
             {corridors.length === 0 && <span className="text-xs text-muted-foreground">None yet</span>}
