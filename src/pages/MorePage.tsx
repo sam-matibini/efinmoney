@@ -114,29 +114,30 @@ const MorePage = () => {
 
           {/* Rewards */}
           <p className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground mb-3 px-1 flex items-center gap-2">
-            Rewards <Badge variant="outline" className="text-[10px] py-0">NEW</Badge>
+            Rewards
           </p>
-          <div className="grid grid-cols-3 gap-3 mb-2">
-            <div className="rounded-2xl bg-card border border-border p-4 flex flex-col items-center gap-2 shadow-card">
-              <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+          <div className="rounded-2xl bg-card border border-border p-4 mb-2 shadow-card">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
                 <Stamp className="w-5 h-5" />
               </div>
-              <p className="text-xs font-semibold text-foreground">Stamps</p>
-              <Badge variant="outline" className="text-[10px]">0/174</Badge>
-            </div>
-            <div className="rounded-2xl bg-card border border-border p-4 flex flex-col items-center gap-2 opacity-70 shadow-card">
-              <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center">
-                <Trophy className="w-5 h-5 text-muted-foreground" />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <p className="text-sm font-semibold text-foreground">Transfer stamps</p>
+                  <Badge variant="outline" className="text-[10px]">{stamps}/{stampGoal}</Badge>
+                </div>
+                <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                  <div
+                    className="h-full bg-primary transition-all"
+                    style={{ width: `${(stamps / stampGoal) * 100}%` }}
+                  />
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-1.5">
+                  {stamps >= stampGoal
+                    ? "Goal reached — more rewards coming soon."
+                    : `${stampGoal - stamps} more completed transfers to fill your card.`}
+                </p>
               </div>
-              <p className="text-xs font-semibold text-foreground">Points</p>
-              <Badge variant="secondary" className="text-[10px]">Coming soon</Badge>
-            </div>
-            <div className="rounded-2xl bg-card border border-border p-4 flex flex-col items-center gap-2 opacity-70 shadow-card">
-              <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center">
-                <Award className="w-5 h-5 text-muted-foreground" />
-              </div>
-              <p className="text-xs font-semibold text-foreground">Badges</p>
-              <Badge variant="secondary" className="text-[10px]">Coming soon</Badge>
             </div>
           </div>
 
