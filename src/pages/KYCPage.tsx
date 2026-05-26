@@ -96,12 +96,65 @@ const KYCPage = () => {
             )}
 
             <Card className="p-6">
-              <h3 className="font-semibold text-foreground mb-3">Tier Limits</h3>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between"><span className="text-muted-foreground">Tier 0</span><span>$500/day</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Tier 1</span><span>$5,000/day</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Tier 2</span><span>$25,000/day</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Tier 3</span><span>$100,000/day</span></div>
+              <h3 className="font-semibold text-foreground mb-1">Tier Limits & Features</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Your current tier is highlighted. Limits and feature access are managed by your admin and update in real time.
+              </p>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Tier</TableHead>
+                      <TableHead className="text-right">Single</TableHead>
+                      <TableHead className="text-right">Daily</TableHead>
+                      <TableHead className="text-right">Monthly</TableHead>
+                      <TableHead className="text-right">Max Balance</TableHead>
+                      <TableHead>Features</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(tierLimits ?? []).map((t: any) => {
+                      const isCurrent = t.tier === currentTier;
+                      return (
+                        <TableRow key={t.tier} className={isCurrent ? "bg-primary/5" : ""}>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Badge variant={isCurrent ? "default" : "outline"} className="uppercase">
+                                {String(t.tier).replace("_", " ")}
+                              </Badge>
+                              {isCurrent && <span className="text-xs text-primary font-medium">Current</span>}
+                            </div>
+                            <div className="text-xs text-muted-foreground mt-1">{t.label}</div>
+                          </TableCell>
+                          <TableCell className="text-right font-medium">{fmt(t.single_limit)}</TableCell>
+                          <TableCell className="text-right font-medium">{fmt(t.daily_limit)}</TableCell>
+                          <TableCell className="text-right font-medium">{fmt(t.monthly_limit)}</TableCell>
+                          <TableCell className="text-right font-medium">{fmt(t.max_balance)}</TableCell>
+                          <TableCell>
+                            <div className="flex flex-wrap gap-1.5">
+                              {FEATURE_KEYS.map((f) => {
+                                const on = Boolean(t.features_enabled?.[f]);
+                                return (
+                                  <span
+                                    key={f}
+                                    className={`inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded border ${
+                                      on
+                                        ? "border-primary/30 bg-primary/10 text-foreground"
+                                        : "border-border bg-muted/30 text-muted-foreground line-through"
+                                    }`}
+                                  >
+                                    {on ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
+                                    {f.replace("_", " ")}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
               </div>
             </Card>
           </div>
