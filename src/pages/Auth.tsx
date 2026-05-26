@@ -86,7 +86,7 @@ const Auth = () => {
                   placeholder="John Doe"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  className="h-12 bg-white border-neutral-200 focus-visible:border-emerald-500 focus-visible:ring-2 focus-visible:ring-emerald-500/20"
+                  className="h-12 bg-white border-neutral-200 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
                   required
                 />
               </div>
