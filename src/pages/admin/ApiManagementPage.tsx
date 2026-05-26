@@ -108,6 +108,7 @@ export default function ApiManagementPage() {
   };
 
   return (
+    <AdminLayout>
     <div className="space-y-6 p-6">
       <div className="flex items-start justify-between gap-4">
         <div>
