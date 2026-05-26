@@ -81,6 +81,10 @@ const MorePage = () => {
   const { signOut } = useAuth();
   const { data: profile } = useProfile();
   const { isAdmin, isFinance, isCompliance } = useUserRoles();
+  const { data: transfers } = useTransfers(500);
+  const completedCount = (transfers || []).filter(t => t.status === 'completed').length;
+  const stampGoal = 25;
+  const stamps = Math.min(completedCount, stampGoal);
 
   const verified = profile?.kyc_status === "approved" || profile?.kyc_status === "verified";
 
