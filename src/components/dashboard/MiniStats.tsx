@@ -72,9 +72,20 @@ const MiniStats = () => {
     return Array.from(set);
   }, [transfers]);
 
-  const flagFor = (cc: string) => {
-    const map: Record<string, string> = { KE: "🇰🇪", UG: "🇺🇬", TZ: "🇹🇿", ZM: "🇿🇲", BI: "🇧🇮", CA: "🇨🇦", US: "🇺🇸", GB: "🇬🇧", NG: "🇳🇬" };
-    return map[cc] || "🌍";
+  const FlagFor = ({ cc }: { cc: string }) => {
+    const code = cc?.toLowerCase();
+    if (!code || code.length !== 2) {
+      return <Globe className="w-3.5 h-3.5 text-muted-foreground" aria-label="Global" />;
+    }
+    return (
+      <img
+        src={`https://flagcdn.com/w40/${code}.png`}
+        srcSet={`https://flagcdn.com/w80/${code}.png 2x`}
+        alt={cc}
+        className="w-full h-full object-cover rounded-full"
+        loading="lazy"
+      />
+    );
   };
 
   const goalProgress = useMemo(() => {
@@ -127,10 +138,10 @@ const MiniStats = () => {
             {corridors.slice(0, 5).map((c, i) => (
               <span
                 key={c}
-                className="text-lg inline-flex items-center justify-center w-7 h-7 rounded-full bg-background border border-border shadow-sm"
+                className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-background border border-border shadow-sm overflow-hidden"
                 style={{ marginLeft: i === 0 ? 0 : -8, zIndex: 10 - i }}
               >
-                {flagFor(c)}
+                <FlagFor cc={c} />
               </span>
             ))}
             {corridors.length === 0 && <span className="text-xs text-muted-foreground">None yet</span>}
