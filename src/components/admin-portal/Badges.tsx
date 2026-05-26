@@ -32,7 +32,6 @@ const TIER_STYLES: Record<string, string> = {
   tier_1: "bg-muted text-muted-foreground border-border",
   tier_2: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
   tier_3: "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20",
-  tier_4: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20",
 };
 
 export const TierBadge = ({ tier }: { tier: string | null | undefined }) => {
