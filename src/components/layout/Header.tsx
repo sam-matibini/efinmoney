@@ -23,24 +23,21 @@ import SearchModal from "@/components/header/SearchModal";
 import { Logo, Wordmark } from "@/components/Logo";
 import ThemeToggle from "@/components/theme/ThemeToggle";
 import { useWallets } from "@/hooks/useWallets";
+import { useProfile } from "@/hooks/useProfile";
+import { getGreeting } from "@/lib/greeting";
 
 const Header = () => {
   const { signOut, user } = useAuth();
   const { isAdmin, isFinance, isCompliance } = useUserRoles();
   const { data: wallets } = useWallets();
+  const { data: profile } = useProfile();
   const defaultWallet = wallets?.find((w) => w.is_default) || wallets?.[0];
   const location = useLocation();
   const navigate = useNavigate();
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchExpanded, setSearchExpanded] = useState(false);
 
-  const hour = new Date().getHours();
-  const greeting =
-    hour < 5 ? { emoji: "🌙", text: "Good night" }
-    : hour < 12 ? { emoji: "🌅", text: "Good morning" }
-    : hour < 17 ? { emoji: "☀️", text: "Good afternoon" }
-    : hour < 21 ? { emoji: "🌆", text: "Good evening" }
-    : { emoji: "🌙", text: "Good night" };
+  const greeting = getGreeting(profile?.country_code);
 
   const navItems = [
     { label: 'Dashboard', href: '/' },

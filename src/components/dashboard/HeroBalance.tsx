@@ -9,6 +9,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { flagForCurrency } from "@/lib/flags";
 import AnimatedNumber from "@/components/ui/AnimatedNumber";
 import { useAuth } from "@/hooks/useAuth";
+import { useProfile } from "@/hooks/useProfile";
+import { getGreeting } from "@/lib/greeting";
 
 const buildUsdRateMap = (rates: { from_currency: string; to_currency: string; effective_rate: number }[]) => {
   const map = new Map<string, number>();
@@ -26,6 +28,7 @@ const buildUsdRateMap = (rates: { from_currency: string; to_currency: string; ef
 
 const HeroBalance = () => {
   const { user } = useAuth();
+  const { data: profile } = useProfile();
   const { data: wallets, isLoading: walletsLoading } = useWallets();
   const { data: transfers } = useTransfers(200);
   const { data: fxRates } = useFxRates();
@@ -39,8 +42,7 @@ const HeroBalance = () => {
 
   const firstName =
     user?.user_metadata?.full_name?.split(" ")[0] || user?.email?.split("@")[0] || "there";
-  const hour = new Date().getHours();
-  const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  const greeting = getGreeting(profile?.country_code).text;
 
   const rateMap = useMemo(() => buildUsdRateMap(fxRates || []), [fxRates]);
 
