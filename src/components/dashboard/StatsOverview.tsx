@@ -102,7 +102,7 @@ const StatsOverview = () => {
   const kycTier = profile?.kyc_tier || '';
   const isVerified = kycStatus === 'verified' || kycStatus === 'approved';
 
-  const formattedTotal = `≈ $${totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`;
+  const formattedTotal = `$${totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`;
 
   const stats = [
     {
@@ -177,7 +177,7 @@ const StatsOverview = () => {
               <Skeleton className="h-7 sm:h-8 w-20 sm:w-24 mb-1" />
             ) : stat.animated && stat.label === 'Total Balance' ? (
               <h3 className="text-lg sm:text-2xl font-display font-bold text-foreground mb-1 truncate">
-                <AnimatedNumber value={stat.numericValue as number} decimals={2} prefix="≈ $" suffix=" USD" />
+                <AnimatedNumber value={stat.numericValue as number} decimals={2} prefix="$" suffix=" USD" />
               </h3>
             ) : stat.animated ? (
               <h3 className="text-lg sm:text-2xl font-display font-bold text-foreground mb-1 truncate">

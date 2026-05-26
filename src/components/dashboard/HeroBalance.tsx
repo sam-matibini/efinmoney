@@ -159,7 +159,7 @@ const HeroBalance = () => {
             <Skeleton className="h-16 w-72 mx-auto" />
           ) : (
             <h2 className="text-5xl sm:text-6xl md:text-7xl font-display font-bold tracking-tight text-foreground inline-flex items-center justify-center gap-3 sm:gap-4">
-              <span>≈ {hidden ? <span className="tracking-widest">••••••</span> : <AnimatedBalance value={totalUsd} />}</span>
+              <span>{hidden ? <span className="tracking-widest">••••••</span> : <AnimatedBalance value={totalUsd} />}</span>
               <button
                 onClick={() => setHidden((v) => !v)}
                 aria-label={hidden ? "Show balance" : "Hide balance"}
