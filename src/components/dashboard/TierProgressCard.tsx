@@ -2,7 +2,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Shield, ArrowRight } from "lucide-react";
+import { Shield, ArrowRight, Clock, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useKyc } from "@/hooks/useKyc";
 import { useProfile } from "@/hooks/useProfile";
