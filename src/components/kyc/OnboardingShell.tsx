@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import KYCProgressBar from "@/components/kyc/KYCProgressBar";
 import SaveAndExitButton from "@/components/kyc/SaveAndExitButton";
 import BackToDashboard from "@/components/layout/BackToDashboard";
+import Header from "@/components/layout/Header";
 
 interface Props {
   step?: 1 | 2 | 3;
@@ -17,6 +18,7 @@ interface Props {
 const OnboardingShell = ({ step, title, subtitle, children, footer, onSaveDraft, hideSaveExit }: Props) => {
   return (
     <div className="min-h-screen bg-background">
+      <Header />
       <div className="container max-w-2xl mx-auto px-4 py-8 md:py-12">
         <motion.div
           initial={{ opacity: 0, y: 8 }}
