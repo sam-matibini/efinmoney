@@ -2,6 +2,7 @@ import { ReactNode } from "react";
 import { motion } from "framer-motion";
 import KYCProgressBar from "@/components/kyc/KYCProgressBar";
 import SaveAndExitButton from "@/components/kyc/SaveAndExitButton";
+import BackToDashboard from "@/components/layout/BackToDashboard";
 
 interface Props {
   step?: 1 | 2 | 3;
@@ -22,6 +23,7 @@ const OnboardingShell = ({ step, title, subtitle, children, footer, onSaveDraft,
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.35 }}
         >
+          <BackToDashboard className="mb-6" />
           {step && <KYCProgressBar currentStep={step} className="mb-10" />}
           <div className="space-y-2 mb-8">
             <h1 className="text-2xl md:text-3xl font-bold text-foreground tracking-tight">
