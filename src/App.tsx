@@ -169,6 +169,7 @@ const AppRoutes = () => {
       <PageTransition key={location.pathname}>
         <Routes location={location}>
           <Route path="/" element={<RootRoute />} />
+          <Route path="/s/:code" element={<ShortLinkResolver />} />
           <Route path="/privacy" element={<PrivacyPolicyPage />} />
           <Route path="/dashboard" element={<KycProtectedRoute><Index /></KycProtectedRoute>} />
           <Route path="/wallets" element={<KycProtectedRoute><WalletsPage /></KycProtectedRoute>} />
