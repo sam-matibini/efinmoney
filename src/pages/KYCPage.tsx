@@ -82,24 +82,10 @@ const KYCPage = () => {
               </div>
             </Card>
 
-            {!isVerified && (
-              <Card className="p-6">
-                <h3 className="font-semibold text-foreground mb-2">Complete Your Verification</h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Upload your government-issued ID and proof of address to unlock higher transaction limits.
-                </p>
-                <Button onClick={() => navigate("/onboarding/identity?autostart=persona")}>
-                  <Upload className="w-4 h-4 mr-2" />
-                  Start ID Verification
-                </Button>
-
-              </Card>
-            )}
-
             <Card className="p-6">
               <h3 className="font-semibold text-foreground mb-1">Tier Limits & Features</h3>
               <p className="text-sm text-muted-foreground mb-4">
-                Your current tier is highlighted. Limits and feature access are managed by your admin and update in real time.
+                Your current tier is highlighted. Unlock higher tiers by completing the matching verification step.
               </p>
               <div className="overflow-x-auto">
                 <Table>
@@ -111,19 +97,30 @@ const KYCPage = () => {
                       <TableHead className="text-right">Monthly</TableHead>
                       <TableHead className="text-right">Max Balance</TableHead>
                       <TableHead>Features</TableHead>
+                      <TableHead className="text-right">Access</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {(tierLimits ?? []).map((t: any) => {
-                      const isCurrent = t.tier === currentTier;
+                      const tKey = t.tier as TierKey;
+                      const isCurrent = tKey === currentTier;
+                      const isUnlocked = TIER_ORDER[tKey] <= TIER_ORDER[currentTier];
+                      const isLocked = !isUnlocked;
+                      const upgradePath =
+                        tKey === "tier_2"
+                          ? "/onboarding/identity?autostart=persona"
+                          : tKey === "tier_3"
+                          ? "/onboarding/enhanced"
+                          : null;
                       return (
-                        <TableRow key={t.tier} className={isCurrent ? "bg-primary/5" : ""}>
+                        <TableRow key={t.tier} className={isCurrent ? "bg-primary/5" : isLocked ? "opacity-70" : ""}>
                           <TableCell>
                             <div className="flex items-center gap-2">
                               <Badge variant={isCurrent ? "default" : "outline"} className="uppercase">
                                 {String(t.tier).replace("_", " ")}
                               </Badge>
                               {isCurrent && <span className="text-xs text-primary font-medium">Current</span>}
+                              {isLocked && <Lock className="w-3.5 h-3.5 text-muted-foreground" />}
                             </div>
                             <div className="text-xs text-muted-foreground mt-1">{t.label}</div>
                           </TableCell>
@@ -151,13 +148,41 @@ const KYCPage = () => {
                               })}
                             </div>
                           </TableCell>
+                          <TableCell className="text-right">
+                            {isCurrent ? (
+                              <Badge variant="secondary" className="gap-1">
+                                <CheckCircle2 className="w-3 h-3" /> Active
+                              </Badge>
+                            ) : isUnlocked ? (
+                              <Badge variant="outline">Unlocked</Badge>
+                            ) : upgradePath ? (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => navigate(upgradePath)}
+                                className="gap-1"
+                              >
+                                <Upload className="w-3.5 h-3.5" />
+                                Upgrade
+                                <ArrowRight className="w-3.5 h-3.5" />
+                              </Button>
+                            ) : (
+                              <Badge variant="outline" className="gap-1">
+                                <Lock className="w-3 h-3" /> Locked
+                              </Badge>
+                            )}
+                          </TableCell>
                         </TableRow>
                       );
                     })}
                   </TableBody>
                 </Table>
               </div>
+              <p className="text-xs text-muted-foreground mt-4">
+                Tier 2 requires government ID + selfie. Tier 3 additionally requires proof of address and source of funds.
+              </p>
             </Card>
+
           </div>
         )}
       </div>
