@@ -2,7 +2,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Shield, ArrowRight } from "lucide-react";
+import { Shield, ArrowRight, Clock, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useKyc } from "@/hooks/useKyc";
 import { useProfile } from "@/hooks/useProfile";
@@ -14,7 +14,7 @@ import { nextTier, tierLabel, upgradeRoute, type Tier } from "@/lib/tierLimits";
 
 const TierProgressCard = () => {
   const navigate = useNavigate();
-  const { tier } = useKyc();
+  const { tier, kyc } = useKyc();
   const { data: profile } = useProfile();
   const { data: transfers } = useTransfers(200);
   const { data: fxRates } = useFxRates();
@@ -61,10 +61,43 @@ const TierProgressCard = () => {
             </p>
           </div>
         </div>
-        {upgradeTo && (
-          <Button size="sm" variant="outline" onClick={() => navigate(upgradeRoute(current))}>
-            Upgrade <ArrowRight className="w-3 h-3 ml-1" />
-          </Button>
+        {upgradeTo && (() => {
+          const pendingUpgrade =
+            kyc?.verification_status === "pending_review" &&
+            (kyc as any)?.tier_target && (kyc as any).tier_target !== current;
+          const rejectedUpgrade =
+            kyc?.verification_status === "rejected" &&
+            (kyc as any)?.tier_target && (kyc as any).tier_target !== current;
+
+          if (pendingUpgrade) {
+            return (
+              <Button size="sm" variant="secondary" disabled className="gap-1">
+                <Clock className="w-3 h-3" /> Submitted
+              </Button>
+            );
+          }
+          if (rejectedUpgrade) {
+            return (
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={() => navigate(upgradeRoute(current))}
+                className="gap-1"
+              >
+                <AlertTriangle className="w-3 h-3" /> Rejected — Reapply
+              </Button>
+            );
+          }
+          return (
+            <Button size="sm" variant="outline" onClick={() => navigate(upgradeRoute(current))}>
+              Upgrade <ArrowRight className="w-3 h-3 ml-1" />
+            </Button>
+          );
+        })()}
+        {!upgradeTo && (
+          <Badge variant="secondary" className="gap-1 text-[10px]">
+            <CheckCircle2 className="w-3 h-3" /> Max tier
+          </Badge>
         )}
       </div>
 
