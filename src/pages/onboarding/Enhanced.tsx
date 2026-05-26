@@ -182,49 +182,6 @@ const Enhanced = () => {
             ? "Resubmit for review"
             : "Submit for review"}
       </Button>
-
-          label="Address document"
-          uploadedPath={addressUrl}
-          onUpload={async (file) => {
-            const path = `${user!.id}/address/${Date.now()}-${file.name}`;
-            const { error } = await supabase.storage.from("kyc-documents").upload(path, file, { upsert: true });
-            if (error) throw error;
-            setAddressUrl(path);
-          }}
-        />
-      </Card>
-
-      <Card className="p-5 space-y-4">
-        <div className="flex items-center gap-2">
-          <Briefcase className="w-4 h-4 text-primary" />
-          <h3 className="font-semibold text-foreground">Source of funds</h3>
-        </div>
-        <div className="space-y-2">
-          <Label>Type</Label>
-          <Select value={sourceType} onValueChange={setSourceType}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {SOURCE_OPTIONS.map((o) => (
-                <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <DocumentUploader
-          label="Supporting document"
-          uploadedPath={sourceUrl}
-          onUpload={async (file) => {
-            const path = `${user!.id}/source-of-funds/${Date.now()}-${file.name}`;
-            const { error } = await supabase.storage.from("kyc-documents").upload(path, file, { upsert: true });
-            if (error) throw error;
-            setSourceUrl(path);
-          }}
-        />
-      </Card>
-
-      <Button size="lg" className="w-full" onClick={submit} disabled={submitting}>
-        {submitting ? "Submitting..." : "Submit for review"}
-      </Button>
       <p className="text-xs text-muted-foreground text-center">
         Manual compliance review · usually 1–2 business days.
       </p>
