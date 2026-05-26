@@ -509,17 +509,34 @@ const KycReviewPage = () => {
           </div>
         </div>
 
-        {/* Sticky action bar */}
-        {!isFinal && (
-          <div className="fixed bottom-0 left-0 right-0 lg:left-64 bg-card border-t border-border p-3 z-20">
-            <div className="max-w-7xl mx-auto flex flex-wrap gap-2 justify-end">
-              <Button variant="outline" disabled={!hasPermission("escalate") || actionLoading} onClick={handleEscalate}>Escalate</Button>
-              <Button variant="outline" disabled={!hasPermission("request_info") || actionLoading} onClick={() => setInfoOpen(true)}>Request more info</Button>
-              <Button variant="destructive" disabled={!hasPermission("reject_kyc") || actionLoading} onClick={() => setRejectOpen(true)}>Reject</Button>
-              <Button disabled={!hasPermission("approve_kyc") || actionLoading} onClick={() => setApproveOpen(true)}>Approve</Button>
-            </div>
+        {/* Sticky action bar — always rendered, relabels as Override when final */}
+        <div className="fixed bottom-0 left-0 right-0 lg:left-64 bg-card border-t border-border p-3 z-20">
+          <div className="max-w-7xl mx-auto flex flex-wrap gap-2 items-center justify-end">
+            {isFinal && (
+              <span className="text-xs text-amber-600 dark:text-amber-400 mr-auto flex items-center gap-1">
+                <AlertTriangle className="w-3.5 h-3.5" />
+                Already {kyc.verification_status} — actions will overwrite and be logged.
+              </span>
+            )}
+            {!isFinal && kyc.persona_decision === "approved" && !kyc.reviewed_by && (
+              <span className="text-xs text-amber-600 dark:text-amber-400 mr-auto flex items-center gap-1">
+                <ShieldAlert className="w-3.5 h-3.5" />
+                Persona auto-approved — awaiting admin sign-off.
+              </span>
+            )}
+            <Button variant="outline" disabled={!hasPermission("escalate") || actionLoading} onClick={handleEscalate}>Escalate</Button>
+            <Button variant="outline" disabled={!hasPermission("request_info") || actionLoading} onClick={() => setInfoOpen(true)}>
+              {isFinal ? "Re-request info" : "Request more info"}
+            </Button>
+            <Button variant="destructive" disabled={!hasPermission("reject_kyc") || actionLoading} onClick={() => setRejectOpen(true)}>
+              {isFinal ? "Override → Reject" : "Reject"}
+            </Button>
+            <Button disabled={!hasPermission("approve_kyc") || actionLoading} onClick={() => setApproveOpen(true)}>
+              {isFinal ? "Override → Approve" : "Approve"}
+            </Button>
           </div>
-        )}
+        </div>
+
       </div>
 
       {/* Approve dialog */}
