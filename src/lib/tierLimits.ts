@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { convertToUsd, fetchUsdRateMap } from "@/lib/fx";
 
 export type Tier = "tier_1" | "tier_2" | "tier_3" | "tier_4";
 
