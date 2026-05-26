@@ -25,10 +25,27 @@ const Enhanced = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { kyc, refetch } = useKyc();
-  const [addressUrl, setAddressUrl] = useState<string | null>(kyc?.address_document_url ?? null);
+  const kycAny = kyc as (typeof kyc & {
+    source_of_funds_url?: string | null;
+    source_of_funds_type?: string | null;
+    source_of_funds_status?: string | null;
+  }) | null;
+  const [addressUrl, setAddressUrl] = useState<string | null>(null);
   const [sourceUrl, setSourceUrl] = useState<string | null>(null);
   const [sourceType, setSourceType] = useState<string>("employment");
   const [submitting, setSubmitting] = useState(false);
+
+  // Hydrate state from existing kyc record so returning users see their uploads
+  useEffect(() => {
+    if (!kycAny) return;
+    if (kycAny.address_document_url) setAddressUrl(kycAny.address_document_url);
+    if (kycAny.source_of_funds_url) setSourceUrl(kycAny.source_of_funds_url);
+    if (kycAny.source_of_funds_type) setSourceType(kycAny.source_of_funds_type);
+  }, [kycAny?.address_document_url, kycAny?.source_of_funds_url, kycAny?.source_of_funds_type]);
+
+  const alreadySubmitted =
+    kyc?.verification_status === "pending_review" || kyc?.verification_status === "approved";
+
 
   const submit = async () => {
     if (!user) return;
