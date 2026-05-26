@@ -43,8 +43,11 @@ const Enhanced = () => {
     if (kycAny.source_of_funds_type) setSourceType(kycAny.source_of_funds_type);
   }, [kycAny?.address_document_url, kycAny?.source_of_funds_url, kycAny?.source_of_funds_type]);
 
+  const targetsTier3 = (kycAny as any)?.tier_target === "tier_3";
   const alreadySubmitted =
-    kyc?.verification_status === "pending_review" || kyc?.verification_status === "approved";
+    targetsTier3 &&
+    (kyc?.verification_status === "pending_review" ||
+      kyc?.verification_status === "approved");
 
 
   const submit = async () => {
