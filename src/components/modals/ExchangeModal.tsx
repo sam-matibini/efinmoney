@@ -233,7 +233,7 @@ const ExchangeModal = ({ children }: ExchangeModalProps) => {
                       onClick={() => setShowToDropdown(!showToDropdown)}
                       className="flex items-center gap-2 px-4 py-3 rounded-xl bg-secondary hover:bg-secondary/80 transition-colors min-w-[100px]"
                     >
-                      <span className="text-lg">{toWallet?.flag_emoji || '💰'}</span>
+                      <CurrencyFlag code={toWallet?.currency_code} />
                       <span className="font-medium text-foreground">{toWallet?.currency_code || 'CAD'}</span>
                       <ChevronDown className="w-4 h-4 text-muted-foreground" />
                     </button>
