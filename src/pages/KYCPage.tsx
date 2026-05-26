@@ -37,7 +37,7 @@ const KYCPage = () => {
 
 
   const status = profile?.kyc_status || 'pending';
-  const tier = profile?.kyc_tier || 'tier_0';
+  const tier = currentTier;
 
   const isVerified = status === 'verified' || status === 'approved';
 
