@@ -104,19 +104,19 @@ const Enhanced = () => {
       {alreadySubmitted && (
         <Card
           className={
-            kyc?.verification_status === "approved"
+            tier3Approved
               ? "p-4 flex items-center gap-3 border-emerald-500/40 bg-emerald-500/10"
               : "p-4 flex items-center gap-3 border-amber-500/50 bg-amber-500/15"
           }
         >
           <div
             className={
-              kyc?.verification_status === "approved"
+              tier3Approved
                 ? "w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center"
                 : "w-10 h-10 rounded-xl bg-amber-500 flex items-center justify-center"
             }
           >
-            {kyc?.verification_status === "approved" ? (
+            {tier3Approved ? (
               <CheckCircle2 className="w-5 h-5 text-white" />
             ) : (
               <Clock className="w-5 h-5 text-white" />
@@ -125,19 +125,17 @@ const Enhanced = () => {
           <div className="text-sm">
             <p
               className={
-                kyc?.verification_status === "approved"
+                tier3Approved
                   ? "font-semibold text-emerald-700 dark:text-emerald-300"
                   : "font-semibold text-amber-700 dark:text-amber-300"
               }
             >
-              {kyc?.verification_status === "approved"
-                ? "Tier 3 verification approved"
-                : "Submitted — under review"}
+              {tier3Approved ? "Approved" : "Waiting for approval"}
             </p>
             <p className="text-foreground/80">
-              {kyc?.verification_status === "approved"
-                ? "Your enhanced documents have been approved."
-                : "Your address and source-of-funds documents are with our compliance team."}
+              {tier3Approved
+                ? "Your Tier 3 documents have been approved."
+                : "Your documents have been submitted. We'll get back within 24 hours."}
             </p>
           </div>
         </Card>
