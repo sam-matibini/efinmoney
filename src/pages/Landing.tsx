@@ -272,9 +272,9 @@ const Landing = () => {
 
                 <div className="relative">
                   <div className="relative w-14 h-14 mb-7">
-                    <div className="absolute inset-0 rounded-2xl bg-emerald-500/10 blur-md group-hover:bg-emerald-500/20 transition-colors" />
-                    <div className="relative w-14 h-14 rounded-2xl bg-gradient-to-br from-neutral-900 to-neutral-800 flex items-center justify-center ring-1 ring-neutral-800/50 shadow-lg shadow-neutral-900/10 group-hover:shadow-emerald-500/20 transition-all">
-                      <f.icon className="w-6 h-6 text-emerald-400" strokeWidth={2} />
+                    <div className="absolute inset-0 rounded-2xl bg-emerald-500/10 blur-md group-hover:bg-emerald-500/25 transition-colors" />
+                    <div className="relative w-14 h-14 rounded-2xl bg-white flex items-center justify-center ring-1 ring-emerald-100 shadow-sm shadow-emerald-500/5 group-hover:ring-emerald-300 group-hover:shadow-emerald-500/20 transition-all">
+                      <f.icon className="w-6 h-6 text-emerald-600" strokeWidth={2} />
                     </div>
                   </div>
                   <h3 className="text-lg font-bold text-neutral-900 mb-2 tracking-tight">{f.title}</h3>
