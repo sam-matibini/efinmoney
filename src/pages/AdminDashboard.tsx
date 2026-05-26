@@ -7,6 +7,7 @@ import { ComplianceAlertsPanel } from "@/components/admin/ComplianceAlertsPanel"
 import { ComplianceRulesPanel } from "@/components/admin/ComplianceRulesPanel";
 import { AuditLogsPanel } from "@/components/admin/AuditLogsPanel";
 import { StaffManagementPanel } from "@/components/admin/StaffManagementPanel";
+import { RiskTiersPanel } from "@/components/admin/RiskTiersPanel";
 
 const AdminDashboard = () => {
   return (
