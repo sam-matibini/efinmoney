@@ -1,30 +1,55 @@
 ## Goal
-Stop the repeated `duplicate key value violates unique constraint "kyc_verifications_user_id_key"` error in the `persona-self-approve` flow and make the approval path resilient for users whose KYC row already exists but is missing or has an out-of-sync `persona_inquiry_id`.
 
-## What I’ll change
-1. **Fix the lookup logic in `persona-self-approve`**
-   - Change the function so it always resolves the caller’s existing KYC row by `user_id` first.
-   - Only use `inquiryId` to enrich or validate the row, not to decide whether the row exists.
-   - If multiple matching paths are possible, prefer the existing `user_id` row and update its `persona_inquiry_id` when safe.
+Any user who completes Persona ID + selfie verification is **auto-approved** (kyc_status=verified, account_status=active, kyc_tier=tier_3) — no manual admin review. Also backfill the 8 users currently stuck on "pending verification".
 
-2. **Make the function idempotent under retries**
-   - Replace the current “select-then-insert” fallback with logic that cannot create a duplicate row for the same user during retries or timing races.
-   - Keep existing approved/rejected guards so repeated Persona callbacks don’t break the flow.
+## What already exists
 
-3. **Add lightweight diagnostics in the function**
-   - Add targeted logs around lookup, fallback, and update decisions so any future mismatch is visible in function logs instead of surfacing as another blind 500.
+- `on_kyc_status_change` trigger already promotes a user to Tier 3 + active when `kyc_verifications.verification_status` flips to `approved` AND `id_verification_status = 'approved'`.
+- `persona-webhook` edge function receives Persona events.
+- `persona-self-approve` edge function exists for the user-driven self-approval flow.
 
-4. **Validate the fix against the deployed function path**
-   - Deploy the updated edge function.
-   - Test the function with the current authenticated preview session.
-   - Confirm it returns success or a stable idempotent response instead of attempting a second insert.
+The gap: the Persona webhook (and/or self-approve path) is setting `id_verification_status='approved'` but **not** flipping `verification_status` to `approved` in the same write, so the trigger never fires. The 8 pending users are evidence.
 
-## Expected result
-- Existing users with a KYC row but no linked Persona inquiry will no longer trigger a duplicate-row insert.
-- Re-running the same Persona completion flow will be safe.
-- The onboarding identity page should complete instead of throwing the same backend error again.
+## Changes
 
-## Technical notes
-- Root cause: the function currently narrows the fetch by both `user_id` and `persona_inquiry_id`; when `persona_inquiry_id` is null or different on the existing row, the lookup misses and the fallback insert violates the unique `user_id` constraint.
-- Fix strategy: treat `user_id` as the source of truth for the KYC row, and treat `persona_inquiry_id` as mutable linkage metadata.
-- Scope: edge function only; no UI redesign or unrelated onboarding changes.
+### 1. Backfill the 8 pending users (data fix, one-time)
+Run an UPDATE on `kyc_verifications` for every row where `verification_status = 'pending'`, setting:
+- `verification_status = 'approved'`
+- `id_verification_status = 'approved'`
+- `selfie_verification_status = 'approved'`
+- `reviewed_at = now()`
+
+This triggers `on_kyc_status_change`, which automatically:
+- promotes to `tier_3`
+- sets `profiles.account_status = 'active'`
+- sets `profiles.kyc_status = 'verified'`
+- generates account number if missing
+- writes an audit log row
+- sends the `kyc_update` email
+
+### 2. Fix `persona-webhook` for future verifications
+On any Persona event where the inquiry status is `approved` / `completed` / `passed`, the function must write **both** fields in a single update:
+```
+verification_status: 'approved'
+id_verification_status: 'approved'
+selfie_verification_status: 'approved'  (if selfie collected)
+reviewed_at: now()
+```
+That single write fires the existing trigger and the rest is automatic. No manual admin step.
+
+### 3. Mirror the same logic in `persona-self-approve`
+The self-approve path (called from the client after Persona returns success) must do the same combined update so the trigger fires immediately and the UI updates without a refresh.
+
+### 4. UI confirmation
+No component changes needed — `AdminUsers` and `UserDetail` already read `profiles.account_status` and `kyc_status`, so once the trigger flips them the table re-renders correctly on next fetch. We'll just verify after the backfill.
+
+## Out of scope
+
+- No changes to RLS, no new tables, no compliance/AML loosening.
+- We are NOT auto-approving users who haven't actually been through Persona going forward — only the existing 8 stuck rows get the one-time backfill (per your confirmation).
+
+## Verification
+
+1. After backfill: query `profiles` for the 8 emails → all should show `kyc_status=verified`, `account_status=active`, `kyc_tier=tier_3`, and have an `account_number`.
+2. Reload `/admin/users` → status badges flip from "pending verification" to "active".
+3. End-to-end: a fresh test user runs Persona → webhook fires → user lands on dashboard already Tier 3.
