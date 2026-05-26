@@ -58,7 +58,7 @@ export interface KycRecord {
 }
 
 export interface RiskTier {
-  current_tier: "tier_1" | "tier_2" | "tier_3" | "tier_4";
+  current_tier: "tier_1" | "tier_2" | "tier_3";
   daily_transaction_limit: number;
   monthly_transaction_limit: number;
   single_transaction_limit: number;
