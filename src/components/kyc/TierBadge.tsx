@@ -10,9 +10,9 @@ interface Props {
 }
 
 const LABELS: Record<Props["tier"], string> = {
-  tier_1: "Tier 1 · Basic",
-  tier_2: "Tier 2 · Verified",
-  tier_3: "Tier 3 · Plus",
+  tier_1: "Tier 1 · Minimal",
+  tier_2: "Tier 2 · Standard",
+  tier_3: "Tier 3 · Enhanced",
   tier_4: "Tier 4 · Premium",
 };
 
