@@ -107,7 +107,7 @@ const HeroBalance = () => {
       className="relative overflow-hidden rounded-3xl border border-border mb-8 animate-hero-shift"
       style={{
         backgroundImage:
-          "linear-gradient(120deg, hsl(var(--background)) 0%, hsl(160 84% 96%) 50%, hsl(var(--background)) 100%)",
+          "linear-gradient(120deg, hsl(var(--background)) 0%, hsl(var(--primary) / 0.08) 50%, hsl(var(--background)) 100%)",
       }}
     >
       <div className="absolute -top-20 -right-20 h-64 w-64 rounded-full bg-primary/10 blur-3xl pointer-events-none" />
