@@ -1,6 +1,7 @@
 import { Navigate, useLocation } from "react-router-dom";
 import { useKyc } from "@/hooks/useKyc";
 import { useUserRoles } from "@/hooks/useUserRoles";
+import { useProfile } from "@/hooks/useProfile";
 import { ReactNode } from "react";
 
 const Spinner = () => (
@@ -10,34 +11,39 @@ const Spinner = () => (
 );
 
 /**
- * Gates protected app routes behind successful KYC verification.
- * Allows access only when verification_status === 'approved'
- * AND user_risk_tiers.current_tier is tier_2 or higher.
- * Admins, finance, and compliance staff bypass KYC entirely.
+ * Gates protected app routes.
+ *
+ * v2 (3-tier framework, new users): Tier 1 is granted on signup and gives full
+ *   app access. Verification is *optional* and only required to raise limits.
+ *   We never bounce v2 users to /onboarding.
+ *
+ * v1 (legacy): keeps the original behavior — must be approved (or pass core
+ *   Persona checks) to enter the app.
  */
 const KYCGuard = ({ children }: { children: ReactNode }) => {
   const { kyc, isLoading, isVerified, hasPassedCoreChecks } = useKyc();
   const { roles, isLoading: rolesLoading } = useUserRoles();
+  const { data: profile, isLoading: profileLoading } = useProfile();
   const location = useLocation();
 
-  if (isLoading || rolesLoading) return <Spinner />;
+  if (isLoading || rolesLoading || profileLoading) return <Spinner />;
 
   // Staff roles bypass KYC entirely
   const isStaff = roles?.some((r) => ["admin", "finance", "compliance"].includes(r));
   if (isStaff) return <>{children}</>;
 
-  // No KYC record yet — start fresh
-  if (!kyc) return <Navigate to="/onboarding/welcome" replace />;
+  // New 3-tier framework: never block app access at the route level.
+  // Limit enforcement happens at action time via tierLimits helpers.
+  if ((profile?.kyc_framework_version ?? 2) >= 2) return <>{children}</>;
 
+  // ---- Legacy v1 flow ----
+  if (!kyc) return <Navigate to="/onboarding/welcome" replace />;
   if (isVerified || hasPassedCoreChecks) return <>{children}</>;
 
   switch (kyc.verification_status) {
     case "not_started":
       return <Navigate to="/onboarding/identity" replace />;
     case "in_progress": {
-      // If a Persona inquiry has already been submitted, let the user into the
-      // app — auto-approval polling/webhook will flip status to "approved"
-      // shortly. This prevents bouncing back to the verification page.
       if (kyc.persona_inquiry_id) return <>{children}</>;
       const target = "/onboarding/identity";
       if (location.pathname === target) return <>{children}</>;
@@ -51,8 +57,6 @@ const KYCGuard = ({ children }: { children: ReactNode }) => {
       return <Navigate to="/onboarding/welcome" replace />;
     case "approved":
       return <>{children}</>;
-
-
     default:
       return <Navigate to="/onboarding/welcome" replace />;
   }
