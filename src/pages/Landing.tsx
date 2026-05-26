@@ -265,13 +265,23 @@ const Landing = () => {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-60px" }}
                 transition={{ duration: 0.5, delay: i * 0.12 }}
-                className="group p-8 rounded-3xl bg-white hover:shadow-xl hover:-translate-y-1 transition-all border border-neutral-200/70 hover:border-emerald-200"
+                className="group relative p-8 rounded-3xl bg-white border border-neutral-200/80 hover:border-emerald-300/60 hover:-translate-y-1.5 hover:shadow-[0_20px_50px_-20px_rgba(16,185,129,0.25)] transition-all duration-300 overflow-hidden"
               >
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center mb-6 shadow-md shadow-emerald-500/20 group-hover:scale-105 transition-transform">
-                  <f.icon className="w-7 h-7 text-white" strokeWidth={2.25} />
+                {/* subtle corner glow */}
+                <div className="absolute -top-16 -right-16 w-40 h-40 rounded-full bg-emerald-500/5 blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+                <div className="relative">
+                  <div className="relative w-14 h-14 mb-7">
+                    <div className="absolute inset-0 rounded-2xl bg-emerald-500/10 blur-md group-hover:bg-emerald-500/20 transition-colors" />
+                    <div className="relative w-14 h-14 rounded-2xl bg-gradient-to-br from-neutral-900 to-neutral-800 flex items-center justify-center ring-1 ring-neutral-800/50 shadow-lg shadow-neutral-900/10 group-hover:shadow-emerald-500/20 transition-all">
+                      <f.icon className="w-6 h-6 text-emerald-400" strokeWidth={2} />
+                    </div>
+                  </div>
+                  <h3 className="text-lg font-bold text-neutral-900 mb-2 tracking-tight">{f.title}</h3>
+                  <p className="text-[15px] text-neutral-500 leading-relaxed">{f.desc}</p>
+
+                  <div className="mt-6 h-px w-10 bg-gradient-to-r from-emerald-500 to-transparent group-hover:w-20 transition-all duration-300" />
                 </div>
-                <h3 className="text-xl font-black text-neutral-900 mb-3">{f.title}</h3>
-                <p className="text-neutral-600 leading-relaxed">{f.desc}</p>
               </motion.div>
             ))}
           </div>
