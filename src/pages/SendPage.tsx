@@ -804,6 +804,7 @@ const SendPage = () => {
 
       <main className="container px-4 py-6">
         <div className="max-w-2xl mx-auto space-y-6">
+          <BackToDashboard />
           {/* Header — slides down with fade */}
           <motion.div
             initial={{ opacity: 0, y: -24 }}
