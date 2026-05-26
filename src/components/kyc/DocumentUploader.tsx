@@ -17,7 +17,7 @@ interface Props {
 
 const DocumentUploader = ({
   label,
-  accept = ".jpg,.jpeg,.png,.pdf,.tif,.tiff,.heic,.webp",
+  accept = ".jpg,.jpeg,.png,.pdf,.tif,.tiff,.heic,.heif,.webp,.doc,.docx,.xls,.xlsx",
   maxSizeMb = 10,
   uploadedPath,
   uploadedPreviewUrl,
