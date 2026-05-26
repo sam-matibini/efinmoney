@@ -209,6 +209,7 @@ const AppRoutes = () => {
           <Route path="/interac/callback" element={<InteracHubCallback />} />
           <Route path="/onboarding/welcome" element={<ProtectedRoute><Welcome /></ProtectedRoute>} />
           <Route path="/onboarding/identity" element={<ProtectedRoute><OnboardingIdentity /></ProtectedRoute>} />
+          <Route path="/onboarding/enhanced" element={<ProtectedRoute><OnboardingEnhanced /></ProtectedRoute>} />
           <Route path="/onboarding/pending" element={<Navigate to="/dashboard" replace />} />
           <Route path="/onboarding/approved" element={<Navigate to="/dashboard" replace />} />
 
