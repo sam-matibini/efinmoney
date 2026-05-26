@@ -28,7 +28,8 @@ const Rejected = () => {
       .eq("user_id", user.id);
     await refetch();
     setBusy(false);
-    navigate(`/onboarding/${target}`);
+    // /onboarding/identity handles both identity and address resubmission via current_step
+    navigate("/onboarding/identity");
   };
 
   return (
