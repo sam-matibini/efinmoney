@@ -175,7 +175,10 @@ const TransferTrackingPage = () => {
   }, [id, user]);
 
   const handleShare = async () => {
-    const url = window.location.href;
+    const { shortenUrl } = await import("@/lib/shortLink");
+    const url = id
+      ? await shortenUrl(`/transfers/${id}`, {})
+      : window.location.href;
     try {
       if (navigator.share) {
         await navigator.share({ title: "Track my transfer", url });
