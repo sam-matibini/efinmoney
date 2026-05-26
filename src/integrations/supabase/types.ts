@@ -4316,6 +4316,7 @@ export type Database = {
         Returns: boolean
       }
       is_kyc_reviewer: { Args: { _uid: string }; Returns: boolean }
+      is_super_admin: { Args: { _uid: string }; Returns: boolean }
       lookup_efin_recipient: {
         Args: { p_query: string }
         Returns: {
