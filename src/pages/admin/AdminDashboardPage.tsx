@@ -108,11 +108,11 @@ const AdminDashboardPage = () => {
               })}
               <div className="pt-3 border-t flex items-center justify-between text-sm">
                 <span className="text-muted-foreground flex items-center gap-1"><TrendingUp className="w-4 h-4" /> Approval rate (30d)</span>
-                <span className="font-semibold text-emerald-600 dark:text-emerald-400">{stats?.approvedRate ?? 0}%</span>
+                <span className="font-semibold text-primary">{stats?.approvedRate ?? 0}%</span>
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Rejection rate (30d)</span>
-                <span className="font-semibold text-red-600 dark:text-red-400">{stats?.rejectedRate ?? 0}%</span>
+                <span className="font-semibold text-destructive">{stats?.rejectedRate ?? 0}%</span>
               </div>
             </CardContent>
           </Card>
