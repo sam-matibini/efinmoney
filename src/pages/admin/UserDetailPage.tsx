@@ -392,7 +392,7 @@ const UserDetailPage = () => {
               <CardHeader><CardTitle className="text-base flex items-center gap-2"><Wallet className="w-4 h-4" /> Wallets ({wallets.length})</CardTitle></CardHeader>
               <CardContent>
                 {wallets.length === 0 ? (
-                  <div className="text-center text-sm text-muted-foreground py-8">No wallets yet</div>
+                  <EmptyState icon={Wallet} title="No wallets yet" description="This user hasn't created any wallets." size="sm" />
                 ) : (
                   <Table>
                     <TableHeader>
