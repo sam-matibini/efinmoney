@@ -98,10 +98,18 @@ async function processEvent(supabase: any, eventType: string | null, inquiryId: 
       update.verification_status = "in_progress";
       break;
     case "inquiry.completed":
+      // Auto-approve on completion: trust the SDK's onComplete + Persona's
+      // synchronous "completed" event. The on_kyc_status_change trigger
+      // promotes the user to Tier 3 / active in the same transaction.
       update.persona_inquiry_status = "completed";
       update.persona_verification_data = payload;
-      update.verification_status = "pending_review";
+      update.verification_status = "approved";
+      update.id_verification_status = "approved";
+      update.liveness_check_status = "approved";
+      update.persona_decision = "approved";
+      update.reviewed_at = new Date().toISOString();
       if (!kyc.submitted_at) update.submitted_at = new Date().toISOString();
+      auditAction = "persona_auto_approved_on_complete";
       break;
     case "inquiry.approved":
       update.persona_decision = "approved";
