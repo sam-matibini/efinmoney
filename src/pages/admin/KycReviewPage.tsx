@@ -82,7 +82,18 @@ const DocImage = ({ path, label }: { path: string | null | undefined; label: str
       </div>
       <div className="overflow-auto max-h-96 flex items-center justify-center p-2">
         {isPdf ? (
-          <iframe src={url} title={label} className="w-full h-96" />
+          <div className="w-full flex flex-col items-center gap-3 py-6">
+            <FileText className="w-12 h-12 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">PDF document</p>
+            <div className="flex gap-2">
+              <Button size="sm" variant="default" onClick={() => window.open(url, "_blank", "noopener,noreferrer")}>
+                Open in new tab
+              </Button>
+              <Button size="sm" variant="outline" asChild>
+                <a href={url} download target="_blank" rel="noopener noreferrer">Download</a>
+              </Button>
+            </div>
+          </div>
         ) : (
           <img src={url} alt={label} style={{ transform: `scale(${zoom})`, transformOrigin: "center" }} className="max-w-full transition-transform" />
         )}
