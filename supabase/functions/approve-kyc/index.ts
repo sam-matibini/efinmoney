@@ -44,6 +44,8 @@ Deno.serve(async (req) => {
     if (!kyc) return json(404, { error: "Verification not found" });
 
     const previous = kyc.verification_status;
+    const isOverride = previous === "approved" || previous === "rejected" || body?.override === true;
+
     const update: Record<string, unknown> = {
       verification_status: "approved",
       reviewed_at: new Date().toISOString(),
@@ -55,13 +57,21 @@ Deno.serve(async (req) => {
     const { error: upErr } = await admin.from("kyc_verifications").update(update).eq("id", verification_id);
     if (upErr) return json(500, { error: upErr.message });
 
+    const noteParts: string[] = [
+      scope === "id_and_address" ? "Approved ID + address (Tier 3)" : "Approved ID only (Tier 2)",
+    ];
+    if (isOverride) {
+      noteParts.push(`OVERRIDE — previous: ${previous}`);
+      if (kyc.persona_decision) noteParts.push(`Persona: ${kyc.persona_decision}`);
+    }
+
     await admin.from("kyc_audit_log").insert({
       kyc_verification_id: verification_id,
       admin_id: adminRow.id,
-      action: "approved",
+      action: isOverride ? "approved_override" : "approved",
       previous_status: previous,
       new_status: "approved",
-      notes: scope === "id_and_address" ? "Approved ID + address (Tier 3)" : "Approved ID only (Tier 2)",
+      notes: noteParts.join(" • "),
     });
 
     // Best-effort user notification (non-blocking)

@@ -32,12 +32,17 @@ const KycQueuePage = () => {
         .from("kyc_verifications")
         .select("id, user_id, verification_status, id_document_type, id_document_country, submitted_at, reviewed_by, created_at, persona_decision, persona_verification_data", { count: "exact" });
 
-      if (statusFilter !== "all") q = q.eq("verification_status", statusFilter as "pending_review");
+      if (statusFilter === "needs_signoff") {
+        // Persona auto-decided but no admin has reviewed yet
+        q = q.not("persona_decision", "is", null).is("reviewed_by", null);
+      } else if (statusFilter !== "all") {
+        q = q.eq("verification_status", statusFilter as "pending_review");
+      }
       if (docTypeFilter !== "all") q = q.eq("id_document_type", docTypeFilter as "passport");
       if (countryFilter !== "all") q = q.eq("id_document_country", countryFilter);
 
-      // Sort: pending_review oldest first, others newest first
-      const ascending = statusFilter === "pending_review";
+      // Sort: pending_review / needs_signoff oldest first, others newest first
+      const ascending = statusFilter === "pending_review" || statusFilter === "needs_signoff";
       q = q.order(ascending ? "submitted_at" : "created_at", { ascending, nullsFirst: false });
       q = q.range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1);
 
@@ -73,6 +78,7 @@ const KycQueuePage = () => {
     },
   });
 
+
   const totalPages = Math.max(1, Math.ceil((data?.total || 0) / PAGE_SIZE));
 
   const countryOptions = useMemo(() => {
@@ -104,10 +110,12 @@ const KycQueuePage = () => {
               <SelectContent>
                 <SelectItem value="all">All statuses</SelectItem>
                 <SelectItem value="pending_review">Pending review</SelectItem>
+                <SelectItem value="needs_signoff">Needs admin sign-off (API)</SelectItem>
                 <SelectItem value="in_progress">In progress</SelectItem>
                 <SelectItem value="approved">Approved</SelectItem>
                 <SelectItem value="rejected">Rejected</SelectItem>
               </SelectContent>
+
             </Select>
             <Select value={docTypeFilter} onValueChange={(v) => { setDocTypeFilter(v); setPage(0); }}>
               <SelectTrigger className="w-44"><SelectValue placeholder="Document type" /></SelectTrigger>
@@ -137,23 +145,31 @@ const KycQueuePage = () => {
                 <TableHead>Document</TableHead>
                 <TableHead>Submitted</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>API decision</TableHead>
                 <TableHead>Risk flags</TableHead>
                 <TableHead>Reviewer</TableHead>
                 <TableHead className="w-20"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
+
               {isLoading ? (
                 Array.from({ length: 6 }).map((_, i) => (
                   <TableRow key={i}>
-                    <TableCell colSpan={8}><Skeleton className="h-8 w-full" /></TableCell>
+                    <TableCell colSpan={9}><Skeleton className="h-8 w-full" /></TableCell>
                   </TableRow>
                 ))
               ) : data?.rows.length === 0 ? (
-                <TableRow><TableCell colSpan={8} className="text-center text-sm text-muted-foreground py-12">No submissions match your filters.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={9} className="text-center text-sm text-muted-foreground py-12">No submissions match your filters.</TableCell></TableRow>
               ) : (
                 data?.rows.map((row) => {
                   const tags = extractRiskTags(row.persona_verification_data);
+                  const apiDecision = row.persona_decision as string | null;
+                  const apiClass =
+                    apiDecision === "approved" ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" :
+                    apiDecision === "declined" ? "bg-red-500/10 text-red-600 border-red-500/20" :
+                    apiDecision === "needs_review" ? "bg-amber-500/10 text-amber-600 border-amber-500/20" :
+                    "bg-muted text-muted-foreground";
                   return (
                     <TableRow key={row.id} className="cursor-pointer" onClick={() => navigate(`/admin/kyc/${row.id}`)}>
                       <TableCell>
@@ -166,6 +182,16 @@ const KycQueuePage = () => {
                         {row.submitted_at ? formatDistanceToNow(new Date(row.submitted_at), { addSuffix: true }) : "—"}
                       </TableCell>
                       <TableCell><KycStatusBadge status={row.verification_status} /></TableCell>
+                      <TableCell>
+                        {apiDecision ? (
+                          <span className={`text-xs px-2 py-0.5 rounded border capitalize ${apiClass}`}>
+                            {apiDecision.replace("_", " ")}
+                            {!row.reviewed_by && <span className="ml-1 opacity-70">• needs sign-off</span>}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
                       <TableCell>
                         {tags.length === 0 ? (
                           <span className="text-xs text-muted-foreground">—</span>
@@ -183,6 +209,7 @@ const KycQueuePage = () => {
                   );
                 })
               )}
+
             </TableBody>
           </Table>
           {data && data.total > PAGE_SIZE && (
