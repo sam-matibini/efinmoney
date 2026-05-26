@@ -9,6 +9,7 @@ import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useKyc } from "@/hooks/useKyc";
+import { cn } from "@/lib/utils";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 type TierKey = "tier_1" | "tier_2" | "tier_3";
@@ -18,7 +19,7 @@ const FEATURE_KEYS = ["receive", "send", "topup", "bills", "international", "vir
 
 const KYCPage = () => {
   const { data: profile, isLoading } = useProfile();
-  const { tier: userTier } = useKyc();
+  const { tier: userTier, kyc } = useKyc();
   const navigate = useNavigate();
 
   const { data: tierLimits } = useQuery({
@@ -151,13 +152,6 @@ const KYCPage = () => {
                           </TableCell>
                           <TableCell className="text-right">
                             {(() => {
-                              if (isCurrent) {
-                                return (
-                                  <Badge variant="secondary" className="gap-1">
-                                    <CheckCircle2 className="w-3 h-3" /> Verified
-                                  </Badge>
-                                );
-                              }
                               if (isUnlocked) {
                                 return (
                                   <Badge variant="secondary" className="gap-1">
@@ -167,6 +161,42 @@ const KYCPage = () => {
                               }
                               const canUpgrade =
                                 upgradePath && TIER_ORDER[tKey] === TIER_ORDER[currentTier] + 1;
+
+                              const targetsThisTier =
+                                (kyc as any)?.tier_target === tKey;
+                              const isPending =
+                                canUpgrade &&
+                                targetsThisTier &&
+                                kyc?.verification_status === "pending_review";
+                              const isRejected =
+                                canUpgrade &&
+                                targetsThisTier &&
+                                kyc?.verification_status === "rejected";
+
+                              if (isPending) {
+                                return (
+                                  <div className="inline-flex flex-col items-end gap-1">
+                                    <Badge className="gap-1 bg-amber-500 hover:bg-amber-500 text-white">
+                                      <Clock className="w-3 h-3" /> Submitted — under review
+                                    </Badge>
+                                    <span className="text-[10px] text-muted-foreground">
+                                      We'll get back within 24 hrs
+                                    </span>
+                                  </div>
+                                );
+                              }
+                              if (isRejected) {
+                                return (
+                                  <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    onClick={() => navigate(upgradePath!)}
+                                    className="gap-1"
+                                  >
+                                    <AlertTriangle className="w-3.5 h-3.5" /> Rejected — Reapply
+                                  </Button>
+                                );
+                              }
                               return (
                                 <Button
                                   size="sm"
@@ -207,9 +237,6 @@ const KYCPage = () => {
                   </TableBody>
                 </Table>
               </div>
-              <p className="text-xs text-muted-foreground mt-4">
-                Tier 2 requires government ID + selfie. Tier 3 additionally requires proof of address and source of funds.
-              </p>
             </Card>
 
           </div>
