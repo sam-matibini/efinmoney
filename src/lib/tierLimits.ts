@@ -1,7 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { convertToUsd, fetchUsdRateMap } from "@/lib/fx";
 
-export type Tier = "tier_1" | "tier_2" | "tier_3" | "tier_4";
+export type Tier = "tier_1" | "tier_2" | "tier_3";
 
 export interface TierLimits {
   tier: Tier;
@@ -17,18 +17,16 @@ const NEXT_TIER: Record<Tier, Tier | null> = {
   tier_1: "tier_2",
   tier_2: "tier_3",
   tier_3: null,
-  tier_4: null,
 };
 
 const UPGRADE_ROUTE: Record<Tier, string> = {
   tier_1: "/onboarding/identity",
   tier_2: "/onboarding/enhanced",
   tier_3: "/onboarding/enhanced",
-  tier_4: "/onboarding/enhanced",
 };
 
 export const tierLabel = (t: Tier) =>
-  ({ tier_1: "Minimal", tier_2: "Standard", tier_3: "Enhanced", tier_4: "Premium" }[t]);
+  ({ tier_1: "Minimal", tier_2: "Standard", tier_3: "Enhanced" }[t]);
 
 export const nextTier = (t: Tier) => NEXT_TIER[t];
 export const upgradeRoute = (t: Tier) => UPGRADE_ROUTE[t];

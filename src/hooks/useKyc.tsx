@@ -58,7 +58,7 @@ export interface KycRecord {
 }
 
 export interface RiskTier {
-  current_tier: "tier_1" | "tier_2" | "tier_3" | "tier_4";
+  current_tier: "tier_1" | "tier_2" | "tier_3";
   daily_transaction_limit: number;
   monthly_transaction_limit: number;
   single_transaction_limit: number;
@@ -125,7 +125,7 @@ export const useKyc = () => {
     refetchInterval: (q) => {
       const d = q.state.data as RiskTier | null | undefined;
       if (!d) return 1000;
-      return d.current_tier === "tier_3" || d.current_tier === "tier_4" ? false : 1000;
+      return d.current_tier === "tier_3" ? false : 1000;
     },
 
     queryFn: async () => {

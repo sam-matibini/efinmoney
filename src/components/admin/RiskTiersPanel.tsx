@@ -12,8 +12,7 @@ import { format } from "date-fns";
 const tierMeta: Record<string, { label: string; color: string; icon: any }> = {
   tier_1: { label: "Tier 1 · Basic", color: "bg-muted text-muted-foreground", icon: Shield },
   tier_2: { label: "Tier 2 · Verified", color: "bg-blue-500/10 text-blue-500", icon: ShieldCheck },
-  tier_3: { label: "Tier 3 · Enhanced", color: "bg-green-500/10 text-green-500", icon: ShieldCheck },
-  tier_4: { label: "Tier 4 · Premium", color: "bg-purple-500/10 text-purple-500", icon: ShieldAlert },
+  tier_3: { label: "Tier 3 · Enhanced", color: "bg-green-500/10 text-green-500", icon: ShieldAlert },
 };
 
 interface RiskTierRow {
@@ -62,7 +61,7 @@ export const RiskTiersPanel = () => {
   }, [profiles]);
 
   const distribution = useMemo(() => {
-    const counts: Record<string, number> = { tier_1: 0, tier_2: 0, tier_3: 0, tier_4: 0 };
+    const counts: Record<string, number> = { tier_1: 0, tier_2: 0, tier_3: 0 };
     tiers.forEach(t => { counts[t.current_tier] = (counts[t.current_tier] || 0) + 1; });
     const total = tiers.length || 1;
     return Object.entries(counts).map(([tier, count]) => ({
@@ -85,7 +84,7 @@ export const RiskTiersPanel = () => {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         {distribution.map(({ tier, count, pct }) => {
           const meta = tierMeta[tier] || tierMeta.tier_1;
           const Icon = meta.icon;

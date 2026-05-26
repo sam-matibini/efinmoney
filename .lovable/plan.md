@@ -1,21 +1,19 @@
-## Problem
+## Hide Tier 4 from the UI
 
-On each wallet card in `WalletCarousel`, the three action buttons don't behave as routes:
-- **Send** opens `SendMoneyModal` (and the click bubbles to the card, navigating to the wallet statement)
-- **Receive** links to `/wallets` (generic list, not a receive view)
-- **Top up** opens a top‑up modal (and also bubbles to the card)
+Tier 4 exists only as a leftover enum value in the database — the KYC approval logic (`on_kyc_status_change`) never assigns it, so it's always empty. Make Tier 3 the visible ceiling everywhere a user or admin sees tiers.
 
-## Fix (frontend only, single file)
+### UI changes
+- `src/components/admin/RiskTiersPanel.tsx` — remove `tier_4` from `tierMeta` and from the distribution counter so the grid shows 3 cards.
+- `src/pages/admin/AdminDashboardPage.tsx` — remove `tier_4: 0` from the tier counts initializer.
+- `src/components/kyc/TierBadge.tsx` — drop the `tier_4` label entry.
+- `src/components/admin-portal/Badges.tsx` — drop the `tier_4` color entry.
+- `src/lib/tierLimits.ts` — narrow `Tier` to `"tier_1" | "tier_2" | "tier_3"`, remove `tier_4` from the upgrade-route map and label map. `nextTier("tier_3")` returns `null` (already the case).
+- `src/hooks/useKyc.tsx` — narrow the `current_tier` type to the three tiers; drop the `|| tier_4` check in the refetch-interval (treat `tier_3` as the terminal tier).
+- `src/components/cards/EfinCardsSection.tsx` — `tierOk` becomes just `tier?.current_tier === "tier_3"`.
 
-Edit `src/components/dashboard/WalletCarousel.tsx`:
+### Not touched
+- Database enum `user_risk_tier` keeps `tier_4` (removing Postgres enum values requires a destructive migration and is not needed since no row uses it). `src/integrations/supabase/types.ts` is auto-generated and reflects the DB — left as-is.
+- No backend / RLS / ledger changes.
 
-1. Replace the `SendMoneyModal` wrapper with a `<Link to={`/send?sourceWalletId=${w.wallet_id}`}>` styled identically. Add `onClick={(e) => e.stopPropagation()}` so the card's statement-navigation doesn't fire.
-2. Change the Receive `<Link>` from `to="/wallets"` to `to={`/wallet/receive?walletId=${w.wallet_id}`}` (route already exists in `App.tsx`). Keeps existing `stopPropagation`.
-3. Replace the Top up `<button>` (which set local `topUpWalletId` state) with a `<Link to={`/wallet/topup?walletId=${w.wallet_id}`}>` styled identically, with `stopPropagation`. Remove the now-unused `topUpWalletId` state and any `CardPaymentModal` it was driving.
-4. Clean up unused imports: `SendMoneyModal`, `CardPaymentModal`, and `useState` if no longer used.
-
-## Technical notes
-
-- Routes already registered: `/send` (SendPage reads `sourceWalletId`), `/wallet/receive` (ReceivePage), `/wallet/topup` (TopUpPage). Receive/TopUp pages don't currently read `walletId`, but passing it is forward-compatible and doesn't break them.
-- All three buttons must `stopPropagation` because the parent `TiltCard` has an `onClick` that navigates to the wallet statement.
-- No backend, schema, or business-logic changes.
+### Result
+Risk Tiers admin page shows 3 distribution cards (Tier 1 / 2 / 3). Anywhere tiers are labeled, Tier 3 · Enhanced is the highest.

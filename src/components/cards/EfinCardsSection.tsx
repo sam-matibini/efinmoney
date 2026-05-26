@@ -17,7 +17,7 @@ const EfinCardsSection = () => {
   const { data: profile } = useProfile();
   const [open, setOpen] = useState(false);
 
-  const tierOk = tier?.current_tier === "tier_3" || tier?.current_tier === "tier_4";
+  const tierOk = tier?.current_tier === "tier_3";
 
   return (
     <section className="space-y-4">
