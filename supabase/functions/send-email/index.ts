@@ -86,7 +86,7 @@ Deno.serve(async (req) => {
     let html = "";
     if (type === "welcome") {
       subject = "Welcome to eFinMoney";
-      html = welcomeHtml(data.name || "");
+      html = welcomeHtml(data.name || "", data.account_number, data.efin_tag, data.app_url);
     } else if (type === "transfer_completed") {
       subject = `Transfer to ${data.recipient_name || "recipient"} completed`;
       html = transferReceiptHtml(data);
