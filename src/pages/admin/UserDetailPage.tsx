@@ -603,8 +603,30 @@ const UserDetailPage = () => {
           </TabsContent>
         </Tabs>
       </div>
+
+      <Dialog open={revokeOpen} onOpenChange={setRevokeOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Revoke verification</DialogTitle>
+            <DialogDescription>
+              This will mark the user's verification as rejected and notify them. Tier will not be auto-downgraded — adjust risk tier separately if needed.
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            value={revokeReason}
+            onChange={(e) => setRevokeReason(e.target.value)}
+            placeholder="Reason (required)…"
+            rows={3}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRevokeOpen(false)}>Cancel</Button>
+            <Button variant="destructive" disabled={manualBusy} onClick={manualRevoke}>Confirm revoke</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AdminLayout>
   );
+
 };
 
 const Row = ({ label, value, icon }: { label: string; value: string; icon?: React.ReactNode }) => (
