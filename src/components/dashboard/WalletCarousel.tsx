@@ -4,8 +4,6 @@ import { Plus, Send, Download, ArrowUpRight } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useWallets } from "@/hooks/useWallets";
 import { Skeleton } from "@/components/ui/skeleton";
-import SendMoneyModal from "@/components/modals/SendMoneyModal";
-import CardPaymentModal from "@/components/modals/CardPaymentModal";
 import CreateWalletModal from "@/components/modals/CreateWalletModal";
 import AnimatedNumber from "@/components/ui/AnimatedNumber";
 import { flagForCurrency } from "@/lib/flags";
@@ -28,7 +26,6 @@ const WalletCarousel = () => {
   const { data: wallets, isLoading } = useWallets();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [activeIndex, setActiveIndex] = useState(0);
-  const [topUpWalletId, setTopUpWalletId] = useState<string | null>(null);
   const navigate = useNavigate();
 
   // Track active card via scroll position
@@ -141,30 +138,30 @@ const WalletCarousel = () => {
                 </div>
 
                 <div className="flex gap-2">
-                  <SendMoneyModal>
-                    <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/20 hover:bg-white/30 text-xs font-medium transition-colors backdrop-blur-sm">
-                      <Send className="w-3.5 h-3.5" />
-                      Send
-                    </button>
-                  </SendMoneyModal>
                   <Link
-                    to="/wallets"
+                    to={`/send?sourceWalletId=${w.wallet_id}`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/20 hover:bg-white/30 text-xs font-medium transition-colors backdrop-blur-sm"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    Send
+                  </Link>
+                  <Link
+                    to={`/wallet/receive?walletId=${w.wallet_id}`}
                     onClick={(e) => e.stopPropagation()}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/20 hover:bg-white/30 text-xs font-medium transition-colors backdrop-blur-sm"
                   >
                     <ArrowUpRight className="w-3.5 h-3.5" />
                     Receive
                   </Link>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setTopUpWalletId(w.wallet_id);
-                    }}
+                  <Link
+                    to={`/wallet/topup?walletId=${w.wallet_id}`}
+                    onClick={(e) => e.stopPropagation()}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white text-gray-900 hover:bg-white/90 text-xs font-semibold transition-colors"
                   >
                     <Download className="w-3.5 h-3.5" />
                     Top up
-                  </button>
+                  </Link>
                 </div>
               </div>
             </TiltCard>
@@ -197,14 +194,6 @@ const WalletCarousel = () => {
         </div>
       )}
 
-      {topUpWalletId && (
-        <CardPaymentModal
-          open={!!topUpWalletId}
-          onOpenChange={(o) => !o && setTopUpWalletId(null)}
-          defaultWalletId={topUpWalletId}
-          title="Top up wallet"
-        />
-      )}
       
     </section>
   );
