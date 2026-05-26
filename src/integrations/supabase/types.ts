@@ -2170,6 +2170,7 @@ export type Database = {
             | Database["public"]["Enums"]["kyc_address_doc_type"]
             | null
           address_document_url: string | null
+          address_proof_url: string | null
           address_rejection_reason: string | null
           address_verification_status: Database["public"]["Enums"]["kyc_doc_review_status"]
           created_at: string
@@ -2200,7 +2201,11 @@ export type Database = {
           reviewed_at: string | null
           reviewed_by: string | null
           selfie_url: string | null
+          source_of_funds_status: string
+          source_of_funds_type: string | null
+          source_of_funds_url: string | null
           submitted_at: string | null
+          tier_target: Database["public"]["Enums"]["user_risk_tier"] | null
           updated_at: string
           user_id: string
           verification_provider: string | null
@@ -2211,6 +2216,7 @@ export type Database = {
             | Database["public"]["Enums"]["kyc_address_doc_type"]
             | null
           address_document_url?: string | null
+          address_proof_url?: string | null
           address_rejection_reason?: string | null
           address_verification_status?: Database["public"]["Enums"]["kyc_doc_review_status"]
           created_at?: string
@@ -2241,7 +2247,11 @@ export type Database = {
           reviewed_at?: string | null
           reviewed_by?: string | null
           selfie_url?: string | null
+          source_of_funds_status?: string
+          source_of_funds_type?: string | null
+          source_of_funds_url?: string | null
           submitted_at?: string | null
+          tier_target?: Database["public"]["Enums"]["user_risk_tier"] | null
           updated_at?: string
           user_id: string
           verification_provider?: string | null
@@ -2252,6 +2262,7 @@ export type Database = {
             | Database["public"]["Enums"]["kyc_address_doc_type"]
             | null
           address_document_url?: string | null
+          address_proof_url?: string | null
           address_rejection_reason?: string | null
           address_verification_status?: Database["public"]["Enums"]["kyc_doc_review_status"]
           created_at?: string
@@ -2282,7 +2293,11 @@ export type Database = {
           reviewed_at?: string | null
           reviewed_by?: string | null
           selfie_url?: string | null
+          source_of_funds_status?: string
+          source_of_funds_type?: string | null
+          source_of_funds_url?: string | null
           submitted_at?: string | null
+          tier_target?: Database["public"]["Enums"]["user_risk_tier"] | null
           updated_at?: string
           user_id?: string
           verification_provider?: string | null
@@ -2815,6 +2830,7 @@ export type Database = {
           full_name: string | null
           id: string
           kyc_completed_at: string | null
+          kyc_framework_version: number
           kyc_status: Database["public"]["Enums"]["kyc_status"]
           kyc_tier: Database["public"]["Enums"]["kyc_tier"]
           phone_number: string | null
@@ -2842,6 +2858,7 @@ export type Database = {
           full_name?: string | null
           id?: string
           kyc_completed_at?: string | null
+          kyc_framework_version?: number
           kyc_status?: Database["public"]["Enums"]["kyc_status"]
           kyc_tier?: Database["public"]["Enums"]["kyc_tier"]
           phone_number?: string | null
@@ -2869,6 +2886,7 @@ export type Database = {
           full_name?: string | null
           id?: string
           kyc_completed_at?: string | null
+          kyc_framework_version?: number
           kyc_status?: Database["public"]["Enums"]["kyc_status"]
           kyc_tier?: Database["public"]["Enums"]["kyc_tier"]
           phone_number?: string | null
@@ -3687,6 +3705,42 @@ export type Database = {
           is_taxable?: boolean
           service_code?: string
           service_name?: string
+        }
+        Relationships: []
+      }
+      tier_limits: {
+        Row: {
+          created_at: string
+          daily_limit: number
+          features_enabled: Json
+          label: string
+          max_balance: number
+          monthly_limit: number
+          single_limit: number
+          tier: Database["public"]["Enums"]["user_risk_tier"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          daily_limit: number
+          features_enabled?: Json
+          label: string
+          max_balance: number
+          monthly_limit: number
+          single_limit: number
+          tier: Database["public"]["Enums"]["user_risk_tier"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          daily_limit?: number
+          features_enabled?: Json
+          label?: string
+          max_balance?: number
+          monthly_limit?: number
+          single_limit?: number
+          tier?: Database["public"]["Enums"]["user_risk_tier"]
+          updated_at?: string
         }
         Relationships: []
       }
