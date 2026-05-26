@@ -7,7 +7,9 @@ import { useNavigate } from "react-router-dom";
 import { useKyc } from "@/hooks/useKyc";
 import { useProfile } from "@/hooks/useProfile";
 import { useTransfers } from "@/hooks/useTransfers";
+import { useFxRates } from "@/hooks/useFxRates";
 import { useMemo } from "react";
+import { buildUsdRateMap, convertToUsd } from "@/lib/fx";
 import { nextTier, tierLabel, upgradeRoute, type Tier } from "@/lib/tierLimits";
 
 const TierProgressCard = () => {
