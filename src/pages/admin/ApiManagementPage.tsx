@@ -13,6 +13,7 @@ import {
   Eye, RefreshCw, Lock, Globe, Server,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import AdminLayout from "@/components/admin-portal/AdminLayout";
 
 type IntegrationKey = "flutterwave" | "stripe" | "paysafe" | "plaid" | "persona" | "mpesa";
 
