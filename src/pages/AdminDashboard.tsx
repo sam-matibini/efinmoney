@@ -43,6 +43,10 @@ const AdminDashboard = () => {
               <StaffManagementPanel />
             </TabsContent>
 
+            <TabsContent value="tiers" className="space-y-4">
+              <RiskTiersPanel />
+            </TabsContent>
+
             <TabsContent value="alerts" className="space-y-4">
               <ComplianceAlertsPanel />
             </TabsContent>
