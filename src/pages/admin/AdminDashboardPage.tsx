@@ -146,7 +146,7 @@ const AdminDashboardPage = () => {
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          {overdue && <span className="text-xs text-red-600 dark:text-red-400 font-medium">Over 24h</span>}
+                          {overdue && <span className="text-xs text-destructive font-medium">Over 24h</span>}
                           <KycStatusBadge status={row.verification_status} />
                         </div>
                       </button>
