@@ -14,7 +14,7 @@ import { nextTier, tierLabel, upgradeRoute, type Tier } from "@/lib/tierLimits";
 
 const TierProgressCard = () => {
   const navigate = useNavigate();
-  const { tier } = useKyc();
+  const { tier, kyc } = useKyc();
   const { data: profile } = useProfile();
   const { data: transfers } = useTransfers(200);
   const { data: fxRates } = useFxRates();
