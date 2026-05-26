@@ -385,6 +385,21 @@ const KycReviewPage = () => {
               </Card>
             </div>
 
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Source of Funds Document</CardTitle>
+                <p className="text-xs text-muted-foreground capitalize">
+                  {(kyc as any).source_of_funds_type?.replace(/_/g, " ") || "—"}
+                  {" · "}
+                  Status: {(kyc as any).source_of_funds_status || "pending"}
+                </p>
+              </CardHeader>
+              <CardContent>
+                <DocImage path={(kyc as any).source_of_funds_url} label="Source of Funds" />
+              </CardContent>
+            </Card>
+
+
             {/* Internal notes */}
             {/* Persona Verification Results */}
             {(kyc.persona_inquiry_id || kyc.persona_decision) && (
