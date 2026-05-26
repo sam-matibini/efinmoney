@@ -53,6 +53,8 @@ import AdminDashboardPage from "./pages/admin/AdminDashboardPage";
 import KycQueuePage from "./pages/admin/KycQueuePage";
 import KycReviewPage from "./pages/admin/KycReviewPage";
 import AdminPlaceholderPage from "./pages/admin/AdminPlaceholderPage";
+import RiskTiersPage from "./pages/admin/RiskTiersPage";
+import AuditLogPage from "./pages/admin/AuditLogPage";
 import ApiManagementPage from "./pages/admin/ApiManagementPage";
 import UsersPage from "./pages/admin/UsersPage";
 import UserDetailPage from "./pages/admin/UserDetailPage";
