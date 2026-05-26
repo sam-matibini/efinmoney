@@ -10,6 +10,34 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 
+// ISO-4217 currency -> ISO-3166-1 alpha-2 country code for flag CDN
+const currencyToCountry: Record<string, string> = {
+  KES: "ke", UGX: "ug", TZS: "tz", ZMW: "zm", BIF: "bi", RWF: "rw",
+  USD: "us", CAD: "ca", GBP: "gb", NGN: "ng", ZAR: "za", GHS: "gh",
+  ETB: "et", XOF: "sn", XAF: "cm", MAD: "ma", EGP: "eg", AUD: "au",
+  CHF: "ch", JPY: "jp", CNY: "cn", INR: "in",
+};
+
+const CurrencyFlag = ({ code, size = "w-5 h-5" }: { code?: string | null; size?: string }) => {
+  const cc = code ? currencyToCountry[code.toUpperCase()] : null;
+  if (!cc) {
+    return (
+      <span className={`${size} inline-flex items-center justify-center rounded-full bg-muted text-xs`}>
+        🌐
+      </span>
+    );
+  }
+  return (
+    <img
+      src={`https://flagcdn.com/w40/${cc}.png`}
+      srcSet={`https://flagcdn.com/w80/${cc}.png 2x`}
+      alt={code || ""}
+      className={`${size} rounded-full object-cover ring-1 ring-border`}
+      loading="lazy"
+    />
+  );
+};
+
 interface ExchangeModalProps {
   children: React.ReactNode;
 }
@@ -144,7 +172,7 @@ const ExchangeModal = ({ children }: ExchangeModalProps) => {
                       onClick={() => setShowFromDropdown(!showFromDropdown)}
                       className="flex items-center gap-2 px-4 py-3 rounded-xl bg-secondary hover:bg-secondary/80 transition-colors min-w-[100px]"
                     >
-                      <span className="text-lg">{fromWallet?.flag_emoji || '💰'}</span>
+                      <CurrencyFlag code={fromWallet?.currency_code} />
                       <span className="font-medium text-foreground">{fromWallet?.currency_code || 'USD'}</span>
                       <ChevronDown className="w-4 h-4 text-muted-foreground" />
                     </button>
@@ -159,7 +187,7 @@ const ExchangeModal = ({ children }: ExchangeModalProps) => {
                             }}
                             className="flex items-center gap-3 w-full px-4 py-3 hover:bg-muted transition-colors first:rounded-t-xl last:rounded-b-xl"
                           >
-                            <span>{wallet.flag_emoji || '💰'}</span>
+                            <CurrencyFlag code={wallet.currency_code} />
                             <div className="text-left">
                               <p className="font-medium text-foreground">{wallet.currency_code}</p>
                               <p className="text-xs text-muted-foreground">
@@ -205,7 +233,7 @@ const ExchangeModal = ({ children }: ExchangeModalProps) => {
                       onClick={() => setShowToDropdown(!showToDropdown)}
                       className="flex items-center gap-2 px-4 py-3 rounded-xl bg-secondary hover:bg-secondary/80 transition-colors min-w-[100px]"
                     >
-                      <span className="text-lg">{toWallet?.flag_emoji || '💰'}</span>
+                      <CurrencyFlag code={toWallet?.currency_code} />
                       <span className="font-medium text-foreground">{toWallet?.currency_code || 'CAD'}</span>
                       <ChevronDown className="w-4 h-4 text-muted-foreground" />
                     </button>
@@ -220,7 +248,7 @@ const ExchangeModal = ({ children }: ExchangeModalProps) => {
                             }}
                             className="flex items-center gap-3 w-full px-4 py-3 hover:bg-muted transition-colors first:rounded-t-xl last:rounded-b-xl"
                           >
-                            <span>{wallet.flag_emoji || '💰'}</span>
+                            <CurrencyFlag code={wallet.currency_code} />
                             <div className="text-left">
                               <p className="font-medium text-foreground">{wallet.currency_code}</p>
                               <p className="text-xs text-muted-foreground">
