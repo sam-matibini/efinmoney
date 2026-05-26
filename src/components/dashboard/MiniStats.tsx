@@ -212,10 +212,12 @@ const MiniStats = () => {
           transition={{ delay: i * 0.08, duration: 0.4 }}
           className={`${cardClass} ${cardBg[s.key] || ""}`}
         >
-          <div className="flex items-start justify-between mb-2">
+          <div className="flex items-start justify-between mb-3">
             <p className="text-xs font-medium text-muted-foreground">{s.label}</p>
-            <div className={`p-1.5 rounded-lg ${s.iconBg}`}>
-              <s.icon className="w-3.5 h-3.5" />
+            <div
+              className={`relative p-2.5 rounded-xl ${s.iconBg} ring-1 ring-inset ring-white/10 shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3`}
+            >
+              <s.icon className="w-5 h-5" strokeWidth={2.25} />
             </div>
           </div>
           {s.content}
