@@ -32,12 +32,17 @@ const KycQueuePage = () => {
         .from("kyc_verifications")
         .select("id, user_id, verification_status, id_document_type, id_document_country, submitted_at, reviewed_by, created_at, persona_decision, persona_verification_data", { count: "exact" });
 
-      if (statusFilter !== "all") q = q.eq("verification_status", statusFilter as "pending_review");
+      if (statusFilter === "needs_signoff") {
+        // Persona auto-decided but no admin has reviewed yet
+        q = q.not("persona_decision", "is", null).is("reviewed_by", null);
+      } else if (statusFilter !== "all") {
+        q = q.eq("verification_status", statusFilter as "pending_review");
+      }
       if (docTypeFilter !== "all") q = q.eq("id_document_type", docTypeFilter as "passport");
       if (countryFilter !== "all") q = q.eq("id_document_country", countryFilter);
 
-      // Sort: pending_review oldest first, others newest first
-      const ascending = statusFilter === "pending_review";
+      // Sort: pending_review / needs_signoff oldest first, others newest first
+      const ascending = statusFilter === "pending_review" || statusFilter === "needs_signoff";
       q = q.order(ascending ? "submitted_at" : "created_at", { ascending, nullsFirst: false });
       q = q.range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1);
 
@@ -72,6 +77,7 @@ const KycQueuePage = () => {
       return { rows: enriched, total: count || 0 };
     },
   });
+
 
   const totalPages = Math.max(1, Math.ceil((data?.total || 0) / PAGE_SIZE));
 
