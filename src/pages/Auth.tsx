@@ -148,7 +148,7 @@ const Auth = () => {
             {isSignUp ? "Already have an account?" : "Don't have an account?"}
             <button
               onClick={() => setIsSignUp(!isSignUp)}
-              className="ml-2 text-emerald-600 hover:text-emerald-700 font-bold"
+              className="ml-2 text-primary hover:text-primary/80 font-bold"
             >
               {isSignUp ? "Sign in" : "Create one"}
             </button>
