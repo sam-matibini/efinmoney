@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Copy, Check, Download } from "lucide-react";
+import { Copy, Check, Download, AtSign, Hash, Mail } from "lucide-react";
 import { QRCodeCanvas } from "qrcode.react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { useProfile } from "@/hooks/useProfile";
 
 interface ReceiveMoneyModalProps {
   isOpen: boolean;
@@ -18,18 +19,26 @@ interface ReceiveMoneyModalProps {
 }
 
 const ReceiveMoneyModal = ({ isOpen, onClose, wallet }: ReceiveMoneyModalProps) => {
-  const [copied, setCopied] = useState(false);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const { data: profile } = useProfile();
 
   if (!wallet) return null;
 
-  const walletIdentifier = wallet.walletId;
+  const accountNumber = profile?.account_number ?? "";
+  const efinTag = profile?.efin_tag ?? "";
+  const email = profile?.email ?? "";
 
-  const handleCopy = async () => {
+  // Primary identifier preference: account number → @tag → email
+  const primary = accountNumber || efinTag || email || wallet.walletId;
+  const qrPayload = `efin://pay?to=${encodeURIComponent(primary)}&currency=${wallet.currency}`;
+
+  const copy = async (label: string, value: string) => {
+    if (!value) return;
     try {
-      await navigator.clipboard.writeText(walletIdentifier);
-      setCopied(true);
-      toast.success("Wallet ID copied to clipboard");
-      setTimeout(() => setCopied(false), 2000);
+      await navigator.clipboard.writeText(value);
+      setCopiedKey(label);
+      toast.success(`${label} copied`);
+      setTimeout(() => setCopiedKey(null), 1800);
     } catch {
       toast.error("Failed to copy");
     }
@@ -41,9 +50,14 @@ const ReceiveMoneyModal = ({ isOpen, onClose, wallet }: ReceiveMoneyModalProps) 
     const url = canvas.toDataURL("image/png");
     const link = document.createElement("a");
     link.href = url;
-    link.download = `wallet-${wallet.currency}-${wallet.walletId.slice(0, 8)}.png`;
+    link.download = `efinmoney-${wallet.currency}-${(accountNumber || wallet.walletId).slice(0, 10)}.png`;
     link.click();
   };
+
+  const rows: Array<{ key: string; icon: any; label: string; value: string }> = [];
+  if (accountNumber) rows.push({ key: "Account number", icon: Hash, label: "Account number", value: accountNumber });
+  if (efinTag) rows.push({ key: "eFin tag", icon: AtSign, label: "eFin tag", value: `@${efinTag.replace(/^@/, "")}` });
+  if (email) rows.push({ key: "Email", icon: Mail, label: "Email", value: email });
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -58,9 +72,8 @@ const ReceiveMoneyModal = ({ isOpen, onClose, wallet }: ReceiveMoneyModalProps) 
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="space-y-6 py-4"
+          className="space-y-5 py-2"
         >
-          {/* Wallet Info */}
           <div className="p-4 rounded-xl bg-muted/50 space-y-1">
             <p className="text-xs text-muted-foreground">Wallet</p>
             <p className="font-display font-semibold text-foreground">
@@ -75,47 +88,50 @@ const ReceiveMoneyModal = ({ isOpen, onClose, wallet }: ReceiveMoneyModalProps) 
             </p>
           </div>
 
-          {/* QR Code */}
           <div className="flex flex-col items-center gap-3">
             <div className="p-4 bg-white rounded-2xl shadow-card">
               <QRCodeCanvas
                 id="receive-qr-code"
-                value={walletIdentifier}
+                value={qrPayload}
                 size={200}
                 level="H"
                 includeMargin={false}
               />
             </div>
             <p className="text-xs text-muted-foreground text-center max-w-xs">
-              Scan this QR code to send funds to this {wallet.currency} wallet
+              Other eFinMoney users can scan this code to send you {wallet.currency} instantly.
             </p>
           </div>
 
-          {/* Wallet Identifier */}
           <div className="space-y-2">
-            <label className="text-xs text-muted-foreground">Wallet ID</label>
-            <div className="flex gap-2">
-              <div className="flex-1 px-3 py-3 rounded-xl bg-secondary border border-border overflow-hidden">
-                <p className="text-sm font-mono text-foreground truncate">
-                  {walletIdentifier}
-                </p>
+            {rows.length === 0 && (
+              <div className="text-xs text-muted-foreground text-center p-3 rounded-lg bg-muted/40">
+                Complete your KYC to get an account number and @eFin tag for receiving funds.
               </div>
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={handleCopy}
-                className="px-4 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors flex items-center gap-2"
-              >
-                {copied ? (
-                  <Check className="w-4 h-4" />
-                ) : (
-                  <Copy className="w-4 h-4" />
-                )}
-              </motion.button>
-            </div>
+            )}
+            {rows.map(({ key, icon: Icon, label, value }) => (
+              <div key={key} className="space-y-1">
+                <label className="text-[11px] uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+                  <Icon className="w-3 h-3" /> {label}
+                </label>
+                <div className="flex gap-2">
+                  <div className="flex-1 px-3 py-2.5 rounded-xl bg-secondary border border-border overflow-hidden">
+                    <p className="text-sm font-mono text-foreground truncate">{value}</p>
+                  </div>
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => copy(label, value)}
+                    className="px-3 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors flex items-center gap-2"
+                    aria-label={`Copy ${label}`}
+                  >
+                    {copiedKey === label ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                  </motion.button>
+                </div>
+              </div>
+            ))}
           </div>
 
-          {/* Download QR */}
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
