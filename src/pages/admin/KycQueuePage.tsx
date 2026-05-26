@@ -156,14 +156,20 @@ const KycQueuePage = () => {
               {isLoading ? (
                 Array.from({ length: 6 }).map((_, i) => (
                   <TableRow key={i}>
-                    <TableCell colSpan={8}><Skeleton className="h-8 w-full" /></TableCell>
+                    <TableCell colSpan={9}><Skeleton className="h-8 w-full" /></TableCell>
                   </TableRow>
                 ))
               ) : data?.rows.length === 0 ? (
-                <TableRow><TableCell colSpan={8} className="text-center text-sm text-muted-foreground py-12">No submissions match your filters.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={9} className="text-center text-sm text-muted-foreground py-12">No submissions match your filters.</TableCell></TableRow>
               ) : (
                 data?.rows.map((row) => {
                   const tags = extractRiskTags(row.persona_verification_data);
+                  const apiDecision = row.persona_decision as string | null;
+                  const apiClass =
+                    apiDecision === "approved" ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" :
+                    apiDecision === "declined" ? "bg-red-500/10 text-red-600 border-red-500/20" :
+                    apiDecision === "needs_review" ? "bg-amber-500/10 text-amber-600 border-amber-500/20" :
+                    "bg-muted text-muted-foreground";
                   return (
                     <TableRow key={row.id} className="cursor-pointer" onClick={() => navigate(`/admin/kyc/${row.id}`)}>
                       <TableCell>
@@ -176,6 +182,16 @@ const KycQueuePage = () => {
                         {row.submitted_at ? formatDistanceToNow(new Date(row.submitted_at), { addSuffix: true }) : "—"}
                       </TableCell>
                       <TableCell><KycStatusBadge status={row.verification_status} /></TableCell>
+                      <TableCell>
+                        {apiDecision ? (
+                          <span className={`text-xs px-2 py-0.5 rounded border capitalize ${apiClass}`}>
+                            {apiDecision.replace("_", " ")}
+                            {!row.reviewed_by && <span className="ml-1 opacity-70">• needs sign-off</span>}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
                       <TableCell>
                         {tags.length === 0 ? (
                           <span className="text-xs text-muted-foreground">—</span>
@@ -193,6 +209,7 @@ const KycQueuePage = () => {
                   );
                 })
               )}
+
             </TableBody>
           </Table>
           {data && data.total > PAGE_SIZE && (
