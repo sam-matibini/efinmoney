@@ -436,7 +436,7 @@ const UserDetailPage = () => {
               <CardHeader><CardTitle className="text-base flex items-center gap-2"><ArrowRightLeft className="w-4 h-4" /> Recent transfers ({transfers.length})</CardTitle></CardHeader>
               <CardContent>
                 {transfers.length === 0 ? (
-                  <div className="text-center text-sm text-muted-foreground py-8">No transfers yet</div>
+                  <EmptyState icon={ArrowRightLeft} title="No transfers yet" description="This user hasn't sent or received any transfers." size="sm" />
                 ) : (
                   <div className="overflow-x-auto">
                     <Table>
