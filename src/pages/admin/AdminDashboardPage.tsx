@@ -27,7 +27,7 @@ const AdminDashboardPage = () => {
         supabase.from("kyc_verifications").select("id, user_id, submitted_at, verification_status").eq("verification_status", "pending_review").order("submitted_at", { ascending: true }).limit(5),
       ]);
 
-      const tierCounts: Record<string, number> = { tier_1: 0, tier_2: 0, tier_3: 0, tier_4: 0 };
+      const tierCounts: Record<string, number> = { tier_1: 0, tier_2: 0, tier_3: 0 };
       (tiers.data || []).forEach((t) => { tierCounts[t.current_tier as string] = (tierCounts[t.current_tier as string] || 0) + 1; });
 
       // Approval/rejection rate (last 30 days)
