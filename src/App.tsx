@@ -53,6 +53,8 @@ import AdminDashboardPage from "./pages/admin/AdminDashboardPage";
 import KycQueuePage from "./pages/admin/KycQueuePage";
 import KycReviewPage from "./pages/admin/KycReviewPage";
 import AdminPlaceholderPage from "./pages/admin/AdminPlaceholderPage";
+import RiskTiersPage from "./pages/admin/RiskTiersPage";
+import AuditLogPage from "./pages/admin/AuditLogPage";
 import ApiManagementPage from "./pages/admin/ApiManagementPage";
 import UsersPage from "./pages/admin/UsersPage";
 import UserDetailPage from "./pages/admin/UserDetailPage";
@@ -183,8 +185,8 @@ const AppRoutes = () => {
           <Route path="/admin/kyc/:id" element={<AdminAuthProvider><AdminGuard><KycReviewPage /></AdminGuard></AdminAuthProvider>} />
           <Route path="/admin/users" element={<AdminAuthProvider><AdminGuard><UsersPage /></AdminGuard></AdminAuthProvider>} />
           <Route path="/admin/users/:id" element={<AdminAuthProvider><AdminGuard><UserDetailPage /></AdminGuard></AdminAuthProvider>} />
-          <Route path="/admin/risk-tiers" element={<AdminAuthProvider><AdminGuard><AdminPlaceholderPage title="Risk Tiers" description="Tier configuration — coming in Phase 2" /></AdminGuard></AdminAuthProvider>} />
-          <Route path="/admin/audit-log" element={<AdminAuthProvider><AdminGuard><AdminPlaceholderPage title="Audit Log" description="Complete audit trail — coming in Phase 2" /></AdminGuard></AdminAuthProvider>} />
+          <Route path="/admin/risk-tiers" element={<AdminAuthProvider><AdminGuard><RiskTiersPage /></AdminGuard></AdminAuthProvider>} />
+          <Route path="/admin/audit-log" element={<AdminAuthProvider><AdminGuard><AuditLogPage /></AdminGuard></AdminAuthProvider>} />
           <Route path="/admin/settings" element={<AdminAuthProvider><AdminGuard><ApiManagementPage /></AdminGuard></AdminAuthProvider>} />
           <Route path="/admin/diagnostics" element={<AdminAuthProvider><AdminGuard><SystemDiagnosticsPage /></AdminGuard></AdminAuthProvider>} />
           <Route path="/settings" element={<RoleProtectedRoute allowedRoles={['admin']}><SettingsDashboard /></RoleProtectedRoute>} />
