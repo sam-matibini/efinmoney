@@ -89,15 +89,100 @@ const Enhanced = () => {
         </div>
       </Card>
 
+      {alreadySubmitted && (
+        <Card className="p-4 flex items-center gap-3 border-primary/30 bg-primary/5">
+          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+            {kyc?.verification_status === "approved" ? (
+              <CheckCircle2 className="w-5 h-5 text-primary" />
+            ) : (
+              <Clock className="w-5 h-5 text-primary" />
+            )}
+          </div>
+          <div className="text-sm">
+            <p className="font-medium text-foreground">
+              {kyc?.verification_status === "approved"
+                ? "Tier 3 verification approved"
+                : "Submitted — under review"}
+            </p>
+            <p className="text-muted-foreground">
+              {kyc?.verification_status === "approved"
+                ? "Your enhanced documents have been approved."
+                : "Your address and source-of-funds documents are with our compliance team."}
+            </p>
+          </div>
+        </Card>
+      )}
+
       <Card className="p-5 space-y-4">
-        <div className="flex items-center gap-2">
-          <FileText className="w-4 h-4 text-primary" />
-          <h3 className="font-semibold text-foreground">Proof of address</h3>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <FileText className="w-4 h-4 text-primary" />
+            <h3 className="font-semibold text-foreground">Proof of address</h3>
+          </div>
+          {addressUrl && (
+            <span className="text-xs flex items-center gap-1 text-primary font-medium">
+              <CheckCircle2 className="w-3.5 h-3.5" /> Uploaded
+            </span>
+          )}
         </div>
         <p className="text-xs text-muted-foreground">
           Recent utility bill, bank statement, or government letter (dated within the last 90 days).
         </p>
         <DocumentUploader
+          label="Address document"
+          uploadedPath={addressUrl}
+          onUpload={async (file) => {
+            const path = `${user!.id}/address/${Date.now()}-${file.name}`;
+            const { error } = await supabase.storage.from("kyc-documents").upload(path, file, { upsert: true });
+            if (error) throw error;
+            setAddressUrl(path);
+          }}
+        />
+      </Card>
+
+      <Card className="p-5 space-y-4">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Briefcase className="w-4 h-4 text-primary" />
+            <h3 className="font-semibold text-foreground">Source of funds</h3>
+          </div>
+          {sourceUrl && (
+            <span className="text-xs flex items-center gap-1 text-primary font-medium">
+              <CheckCircle2 className="w-3.5 h-3.5" /> Uploaded
+            </span>
+          )}
+        </div>
+        <div className="space-y-2">
+          <Label>Type</Label>
+          <Select value={sourceType} onValueChange={setSourceType}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {SOURCE_OPTIONS.map((o) => (
+                <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <DocumentUploader
+          label="Supporting document"
+          uploadedPath={sourceUrl}
+          onUpload={async (file) => {
+            const path = `${user!.id}/source-of-funds/${Date.now()}-${file.name}`;
+            const { error } = await supabase.storage.from("kyc-documents").upload(path, file, { upsert: true });
+            if (error) throw error;
+            setSourceUrl(path);
+          }}
+        />
+      </Card>
+
+      <Button size="lg" className="w-full" onClick={submit} disabled={submitting}>
+        {submitting
+          ? "Submitting..."
+          : alreadySubmitted
+            ? "Resubmit for review"
+            : "Submit for review"}
+      </Button>
+
           label="Address document"
           uploadedPath={addressUrl}
           onUpload={async (file) => {
