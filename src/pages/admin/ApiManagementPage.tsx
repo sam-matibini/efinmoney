@@ -123,6 +123,26 @@ export default function ApiManagementPage() {
         </div>
       </div>
 
+      <Link
+        to="/admin/kyc-config"
+        className="block group rounded-xl border bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-5 hover:border-primary/50 transition-colors"
+      >
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="h-11 w-11 rounded-lg bg-primary/15 flex items-center justify-center">
+              <ShieldCheck className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <div className="font-semibold">KYC Tier Configuration</div>
+              <p className="text-sm text-muted-foreground">
+                Edit tier limits, feature gates, and override any user's KYC tier. Reflects in the user portal in real time.
+              </p>
+            </div>
+          </div>
+          <ArrowRight className="h-5 w-5 text-muted-foreground group-hover:translate-x-1 transition-transform" />
+        </div>
+      </Link>
+
       <Tabs defaultValue="integrations" className="w-full">
         <TabsList className="grid w-full grid-cols-3 max-w-2xl">
           <TabsTrigger value="integrations" className="gap-2"><Plug className="h-4 w-4" />Integrations</TabsTrigger>
