@@ -72,7 +72,7 @@ const TierProgressCard = () => {
         <div className="flex justify-between text-xs">
           <span className="text-muted-foreground">Today</span>
           <span className="font-medium text-foreground">
-            ${dailyUsed.toLocaleString()} / ${Number(tier.daily_transaction_limit).toLocaleString()}
+            ${dailyUsed.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / ${Number(tier.daily_transaction_limit).toLocaleString()}
           </span>
         </div>
         <Progress value={dailyPct} className="h-1.5" />
@@ -80,7 +80,7 @@ const TierProgressCard = () => {
         <div className="flex justify-between text-xs pt-1">
           <span className="text-muted-foreground">This month</span>
           <span className="font-medium text-foreground">
-            ${monthlyUsed.toLocaleString()} / ${Number(tier.monthly_transaction_limit).toLocaleString()}
+            ${monthlyUsed.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / ${Number(tier.monthly_transaction_limit).toLocaleString()}
           </span>
         </div>
         <Progress value={monthlyPct} className="h-1.5" />
