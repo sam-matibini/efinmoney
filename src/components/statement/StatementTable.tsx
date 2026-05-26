@@ -4,6 +4,7 @@ import { format, isToday, isYesterday } from "date-fns";
 import { ArrowUpRight, ArrowDownLeft, Inbox, ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 import type { StatementRow } from "@/hooks/useStatement";
 
 const fmt = (n: number) =>
