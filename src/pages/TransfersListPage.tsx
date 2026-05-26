@@ -109,13 +109,13 @@ const TransfersListPage = () => {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div className="rounded-xl border border-border bg-emerald-500/[0.04] p-4">
             <div className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">Total Money In</div>
-            <div className="text-xl sm:text-2xl font-display font-bold text-emerald-600 dark:text-emerald-400 tabular-nums break-words leading-tight">
+            <div className="text-xl sm:text-2xl font-display font-bold text-primary tabular-nums break-words leading-tight">
               {renderTotals(totalsIn, "+")}
             </div>
           </div>
           <div className="rounded-xl border border-border bg-rose-500/[0.04] p-4">
             <div className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">Total Money Out</div>
-            <div className="text-xl sm:text-2xl font-display font-bold text-rose-600 dark:text-rose-400 tabular-nums break-words leading-tight">
+            <div className="text-xl sm:text-2xl font-display font-bold text-destructive tabular-nums break-words leading-tight">
               {renderTotals(totalsOut, "-")}
             </div>
           </div>

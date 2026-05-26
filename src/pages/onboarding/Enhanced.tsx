@@ -105,19 +105,19 @@ const Enhanced = () => {
         <Card
           className={
             tier3Approved
-              ? "p-4 flex items-center gap-3 border-emerald-500/40 bg-emerald-500/10"
+              ? "p-4 flex items-center gap-3 border-primary/40 bg-primary/10"
               : "p-4 flex items-center gap-3 border-amber-500/50 bg-amber-500/15"
           }
         >
           <div
             className={
               tier3Approved
-                ? "w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center"
+                ? "w-10 h-10 rounded-xl bg-primary flex items-center justify-center"
                 : "w-10 h-10 rounded-xl bg-amber-500 flex items-center justify-center"
             }
           >
             {tier3Approved ? (
-              <CheckCircle2 className="w-5 h-5 text-white" />
+              <CheckCircle2 className="w-5 h-5 text-primary-foreground" />
             ) : (
               <Clock className="w-5 h-5 text-white" />
             )}
@@ -126,7 +126,7 @@ const Enhanced = () => {
             <p
               className={
                 tier3Approved
-                  ? "font-semibold text-emerald-700 dark:text-emerald-300"
+                  ? "font-semibold text-primary"
                   : "font-semibold text-amber-700 dark:text-amber-300"
               }
             >

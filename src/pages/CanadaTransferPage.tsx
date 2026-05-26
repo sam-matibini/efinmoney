@@ -173,7 +173,7 @@ export default function CanadaTransferPage() {
                     )}
                   </div>
                 </div>
-                {a.institution_number ? <CheckCircle2 className="w-5 h-5 text-green-500" /> : <AlertCircle className="w-5 h-5 text-amber-500" />}
+                {a.institution_number ? <CheckCircle2 className="w-5 h-5 text-primary" /> : <AlertCircle className="w-5 h-5 text-amber-500" />}
               </div>
             ))}
             <Button onClick={fetchLinkToken} disabled={linking} variant="outline" className="w-full">
@@ -256,7 +256,7 @@ export default function CanadaTransferPage() {
 
             {lastResult && (
               <Alert className="border-green-500/30 bg-green-500/5">
-                <CheckCircle2 className="h-4 w-4 text-green-500" />
+                <CheckCircle2 className="h-4 w-4 text-primary" />
                 <AlertDescription>
                   <div className="font-medium">Transfer {lastResult.reference} created</div>
                   <div className="text-xs mt-1">

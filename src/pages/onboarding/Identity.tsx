@@ -124,15 +124,15 @@ const Identity = () => {
           )}
         </Card>
 
-        <Card className="p-5 space-y-3 border-emerald-500/30">
+        <Card className="p-5 space-y-3 border-primary/30">
           <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
-              <ShieldCheck className="w-5 h-5 text-emerald-600" />
+            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+              <ShieldCheck className="w-5 h-5 text-primary" />
             </div>
             <div className="flex-1">
               <h3 className="font-semibold text-foreground text-sm">
                 Verify with Interac
-                <span className="ml-2 text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 uppercase tracking-wide">
+                <span className="ml-2 text-[10px] font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary uppercase tracking-wide">
                   Canada
                 </span>
               </h3>

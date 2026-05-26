@@ -63,7 +63,7 @@ const RecentTransactions = () => {
       <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
         <div className="flex items-center gap-3">
           <h2 className="text-lg font-display font-semibold text-foreground">Account Statement</h2>
-          <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+          <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-primary">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-live-pulse" />
             Live
           </span>
@@ -98,13 +98,13 @@ const RecentTransactions = () => {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-4">
           <div className="rounded-xl border border-border bg-emerald-500/[0.04] px-3 py-2.5">
             <div className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">Total Money In</div>
-            <div className="text-base font-display font-bold text-emerald-600 dark:text-emerald-400 tabular-nums break-words leading-tight">
+            <div className="text-base font-display font-bold text-primary tabular-nums break-words leading-tight">
               {renderTotals(totalsIn, "+")}
             </div>
           </div>
           <div className="rounded-xl border border-border bg-rose-500/[0.04] px-3 py-2.5">
             <div className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">Total Money Out</div>
-            <div className="text-base font-display font-bold text-rose-600 dark:text-rose-400 tabular-nums break-words leading-tight">
+            <div className="text-base font-display font-bold text-destructive tabular-nums break-words leading-tight">
               {renderTotals(totalsOut, "-")}
             </div>
           </div>

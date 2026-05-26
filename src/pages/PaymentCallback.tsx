@@ -181,7 +181,7 @@ const PaymentCallback = () => {
                 transition={{ type: "spring", stiffness: 200, damping: 14 }}
                 className="mx-auto h-20 w-20 rounded-full bg-emerald-500/15 flex items-center justify-center"
               >
-                <CheckCircle2 className="h-12 w-12 text-emerald-500" />
+                <CheckCircle2 className="h-12 w-12 text-primary" />
               </motion.div>
               <h1 className="text-2xl font-display font-bold">Payment Successful! 🎉</h1>
               {info?.amount && info.currency && (

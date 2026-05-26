@@ -86,7 +86,7 @@ const Auth = () => {
                   placeholder="John Doe"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  className="h-12 bg-white border-neutral-200 focus-visible:border-emerald-500 focus-visible:ring-2 focus-visible:ring-emerald-500/20"
+                  className="h-12 bg-white border-neutral-200 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
                   required
                 />
               </div>
@@ -100,7 +100,7 @@ const Auth = () => {
                 placeholder="you@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="h-12 bg-white border-neutral-200 focus-visible:border-emerald-500 focus-visible:ring-2 focus-visible:ring-emerald-500/20"
+                className="h-12 bg-white border-neutral-200 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
                 required
               />
             </div>
@@ -114,7 +114,7 @@ const Auth = () => {
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="h-12 pr-12 bg-white border-neutral-200 focus-visible:border-emerald-500 focus-visible:ring-2 focus-visible:ring-emerald-500/20"
+                  className="h-12 pr-12 bg-white border-neutral-200 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
                   required
                   minLength={6}
                 />
@@ -131,10 +131,10 @@ const Auth = () => {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full h-12 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2 transition-all hover:-translate-y-0.5 shadow-lg shadow-emerald-500/20"
+              className="w-full h-12 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2 transition-all hover:-translate-y-0.5 shadow-lg shadow-primary/20"
             >
               {isLoading ? (
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <div className="w-5 h-5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
               ) : (
                 <>
                   {isSignUp ? "Create account" : "Sign in"}
@@ -148,7 +148,7 @@ const Auth = () => {
             {isSignUp ? "Already have an account?" : "Don't have an account?"}
             <button
               onClick={() => setIsSignUp(!isSignUp)}
-              className="ml-2 text-emerald-600 hover:text-emerald-700 font-bold"
+              className="ml-2 text-primary hover:text-primary/80 font-bold"
             >
               {isSignUp ? "Sign in" : "Create one"}
             </button>

@@ -55,7 +55,7 @@ const currencySymbol = (code: string) => {
 const statusMeta = (status: string) => {
   switch (status) {
     case "completed":
-      return { label: "Completed", className: "bg-green-500/20 text-green-500 border-green-500/40" };
+      return { label: "Completed", className: "bg-green-500/20 text-primary border-green-500/40" };
     case "failed":
     case "reversed":
     case "expired":
@@ -303,7 +303,7 @@ const TransferTrackingPage = () => {
                     >
                       <div className="flex flex-col items-center">
                         {step.state === "done" && (
-                          <CheckCircle2 className="w-6 h-6 text-green-500" />
+                          <CheckCircle2 className="w-6 h-6 text-primary" />
                         )}
                         {step.state === "current" && (
                           <div className="relative">

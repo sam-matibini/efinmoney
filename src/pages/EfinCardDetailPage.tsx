@@ -252,7 +252,7 @@ const EfinCardDetailPage = () => {
                       <div>Wallet top-up</div>
                       <div className="text-xs text-muted-foreground">{new Date(f.created_at).toLocaleString()}</div>
                     </div>
-                    <div className="text-emerald-500">+{f.currency} {Number(f.amount).toFixed(2)}</div>
+                    <div className="text-primary">+{f.currency} {Number(f.amount).toFixed(2)}</div>
                   </div>
                 ))}
               </div>

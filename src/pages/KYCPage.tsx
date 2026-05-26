@@ -45,8 +45,8 @@ const KYCPage = () => {
   const isVerified = status === 'verified' || status === 'approved';
 
   const statusConfig = {
-    verified: { icon: CheckCircle2, color: 'text-green-500', label: 'Verified' },
-    approved: { icon: CheckCircle2, color: 'text-green-500', label: 'Approved' },
+    verified: { icon: CheckCircle2, color: 'text-primary', label: 'Verified' },
+    approved: { icon: CheckCircle2, color: 'text-primary', label: 'Approved' },
     pending: { icon: Clock, color: 'text-yellow-500', label: 'Pending Review' },
     rejected: { icon: AlertTriangle, color: 'text-destructive', label: 'Rejected' },
   } as const;

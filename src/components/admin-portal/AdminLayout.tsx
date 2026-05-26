@@ -153,7 +153,7 @@ const AdminLayout = ({ children }: { children: ReactNode }) => {
                 <span
                   className={cn(
                     "rounded-full text-[10px] font-bold min-w-[20px] px-1.5 py-0.5 text-center",
-                    active ? "bg-sidebar-primary-foreground text-sidebar-primary" : "bg-amber-500 text-white",
+                    active ? "bg-sidebar-primary-foreground text-sidebar-primary" : "bg-destructive text-destructive-foreground",
                     collapsed && "absolute top-1 right-1"
                   )}
                 >
