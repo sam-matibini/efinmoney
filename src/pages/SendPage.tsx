@@ -16,6 +16,7 @@ import { useAuth } from "@/hooks/useAuth";
 
 import Header from "@/components/layout/Header";
 import MobileNav from "@/components/layout/MobileNav";
+import BackToDashboard from "@/components/layout/BackToDashboard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
