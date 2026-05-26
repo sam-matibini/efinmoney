@@ -338,7 +338,7 @@ const Landing = () => {
 
 
       {/* ============ FOOTER ============ */}
-      <footer className="bg-neutral-900 text-neutral-400">
+      <footer className="bg-white text-neutral-600 border-t border-neutral-200">
         <div className="max-w-7xl mx-auto px-6 py-14">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-8">
             <div className="flex items-center gap-2">
@@ -354,14 +354,14 @@ const Landing = () => {
                 { label: "Contact", href: "mailto:info@efintax.biz" },
               ].map((l) => (
                 l.href.startsWith("/") ? (
-                  <Link key={l.label} to={l.href} className="hover:text-white transition-colors">{l.label}</Link>
+                  <Link key={l.label} to={l.href} className="hover:text-neutral-900 transition-colors">{l.label}</Link>
                 ) : (
-                  <a key={l.label} href={l.href} className="hover:text-white transition-colors">{l.label}</a>
+                  <a key={l.label} href={l.href} className="hover:text-neutral-900 transition-colors">{l.label}</a>
                 )
               ))}
             </div>
           </div>
-          <div className="mt-10 pt-8 border-t border-neutral-800 flex flex-col md:flex-row justify-between gap-3 text-xs">
+          <div className="mt-10 pt-8 border-t border-neutral-200 flex flex-col md:flex-row justify-between gap-3 text-xs">
             <span>© {new Date().getFullYear()} eFinMoney. All rights reserved.</span>
             <span>Licensed Money Services Business</span>
           </div>
