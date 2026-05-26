@@ -1,45 +1,66 @@
-# Admin can always approve in the portal
+## Phase 1 — Critical Fixes (Exchange & Core Flows)
 
-## Problem
-Today the admin KYC portal (`/admin/kyc`) only shows entries with `verification_status = pending_review` and the Approve/Reject/Escalate action bar is hidden once status is `approved` or `rejected`. So when Persona or Interac auto-decides a verification, admins can no longer take action from their portal — the API outcome is final.
+Note: A scan of the codebase shows the project has moved past several items in `KNOWN_ISSUES.md` (last updated 2026-04-11):
+- `fx_rates` already holds 60+ live pairs (multi-corridor, valid_until=NULL).
+- `ExchangePage.tsx` no longer uses hardcoded `1.35` fallbacks — it surfaces a toast when no rate exists.
+- `crypto-trading` and `fx-engine` edge functions have full validation, rate limiting, and routing; no errors in recent logs (logs empty = no recent invocations to confirm health).
+- `WalletCard` "Receive" button was replaced with "Top-up" + "Statement". There is still no dedicated **Receive** flow showing account number / QR.
 
-The user wants admins to always be able to approve in their portal, even when an API already returned a decision.
+So Phase 1 narrows to four concrete, high-value fixes:
 
-## Scope (frontend + thin edge-function tweak)
+---
 
-### 1. KYC Queue — surface API-decided cases
-`src/pages/admin/KycQueuePage.tsx`
-- Add a new "Needs admin sign-off" quick filter that returns rows where `persona_decision` is set (`approved`, `needs_review`, or `declined`) regardless of `verification_status`. Default queue still opens on `pending_review`.
-- Add a small "API" column showing the Persona decision badge (auto-approved / needs review / declined / —) so reviewers see at a glance which entries were handled by the API.
+### 1. Smoke-test & instrument the Exchange edge functions
 
-### 2. KYC Review page — always allow override
-`src/pages/admin/KycReviewPage.tsx`
-- Remove the `!isFinal` gate on the sticky action bar. The bar always renders, but when the record is already `approved` / `rejected`, the buttons relabel to **Override approval**, **Override rejection**, **Re-request info**, and a confirmation note appears ("This will overwrite the current decision and be logged in the audit trail").
-- Add an "API-approved, awaiting human sign-off" yellow banner on entries where `persona_decision = 'approved'` but `reviewed_by` is null — making it obvious the admin still owns the final call.
-- Persona/Interac result card stays as-is.
+Goal: prove `crypto-trading` and `fx-engine` work end-to-end and surface failures clearly.
 
-### 3. Edge functions — allow override
-`supabase/functions/approve-kyc/index.ts` and `reject-kyc/index.ts`
-- Today both functions just `UPDATE` the row, so they technically work on already-final records. Add:
-  - Accept an `override: true` flag from the client when the row is already final.
-  - When `override` is true, write the audit-log `action` as `approved_override` / `rejected_override` and include the previous decision and Persona decision in `notes` for traceability.
-  - Require `super_admin` or `compliance_officer` role for overrides (same roles already gate approve/reject — just enforce explicitly when override flag is set).
+- Invoke `crypto-trading` with `{ action: 'pairs' }`, `{ action: 'quote', ... }`, and `{ action: 'execute', ... }` against the deployed function; confirm 200s and check ledger entries for `execute`.
+- Invoke `fx-engine` with `quote` and `execute` for an existing user wallet pair (e.g. USD→CAD); verify a journal_id is returned and `execute_fx_swap` posts balanced debit/credit ledger entries.
+- If any path fails, fix the routing/handler in `supabase/functions/<name>/index.ts` and redeploy.
+- Add a single `console.error('[fn:action]', err)` line at each catch so future failures show up in logs.
 
-### 4. User detail page — manual tier approval
-`src/pages/admin/UserDetailPage.tsx` (existing)
-- Add a small "Manual KYC action" card with two buttons:
-  - **Approve to Tier 2** / **Approve to Tier 3** — invokes `approve-kyc` against the user's latest `kyc_verifications` row (creating one if none exists via a small upsert before invoking).
-  - **Revoke verification** — invokes `reject-kyc` with `scope=both` and a reason.
-- This gives ops a one-click path even when the user never opened a Persona flow.
+### 2. Tighten client-side error UX in Exchange
 
-## Out of scope
-- No database schema changes. `kyc_audit_log` already accepts free-text `action`, so override events fit without a migration.
-- No changes to the user-facing KYC page (`src/pages/KYCPage.tsx`) or onboarding.
-- No changes to Persona webhook handling — auto-approval still flows through, admin just gets the ability to override afterwards.
+Goal: never fail silently if the edge function returns an error.
 
-## Files touched
-- `src/pages/admin/KycQueuePage.tsx`
-- `src/pages/admin/KycReviewPage.tsx`
-- `src/pages/admin/UserDetailPage.tsx`
-- `supabase/functions/approve-kyc/index.ts`
-- `supabase/functions/reject-kyc/index.ts`
+- In `src/components/crypto/CryptoTradingPanel.tsx` and `src/pages/ExchangePage.tsx` (`FxTradingPanel`): when `supabase.functions.invoke` returns `{ error }` OR `data.error`, surface the message via `toast.error(...)` and keep the form enabled.
+- Replace silent empty states for crypto prices/pairs with a retry button and a visible error message.
+
+### 3. Build the Receive flow on `WalletCard`
+
+Goal: replace the missing "Receive" affordance with a real modal showing how to fund this wallet.
+
+- Add a new `ReceiveMoneyModal` component (`src/components/wallet/ReceiveMoneyModal.tsx`) that, for the selected wallet, shows:
+  - The user's `profiles.account_number` and `@efin_tag` (already in DB).
+  - A QR code encoding `efin://pay?to=<account_number>&currency=<code>` using `qrcode.react` (add dependency).
+  - Copy-to-clipboard buttons for account number, tag, and email.
+  - A short "Share payment request" link.
+- Add a small **Receive** button beside Send/Top-up in `WalletCard.tsx` (keep Top-up as the funding/CAD-in entry point).
+- No DB changes required — fields already exist.
+
+### 4. Refresh FX rates on a schedule
+
+Goal: keep `fx_rates` fresh so quotes don't drift; the table already has data but no auto-refresh cadence visible.
+
+- Confirm whether an `fx-refresh` (or equivalent) edge function + pg_cron job exists. If not, add a pg_cron entry (every 15 min) that calls the existing rate-fetch function (OpenExchangeRates is already configured via `OPENEXCHANGERATES_APP_ID`).
+- Insert via the insert tool (per stateful-data rule), not a migration.
+
+---
+
+### Technical details
+
+- **Files to edit:**
+  - `src/components/ui/WalletCard.tsx` — add Receive button
+  - `src/components/wallet/ReceiveMoneyModal.tsx` (new)
+  - `src/components/crypto/CryptoTradingPanel.tsx` — error surfacing
+  - `src/pages/ExchangePage.tsx` — error surfacing
+  - `supabase/functions/crypto-trading/index.ts` and `supabase/functions/fx-engine/index.ts` — only if smoke test reveals bugs
+- **Dependencies:** `qrcode.react`
+- **DB:** no schema changes. Possibly one pg_cron insert for FX refresh.
+- **Out of scope for Phase 1:** Phase 2 (Cards persistence, Send funding sources → bank_accounts) and Phase 3 (Quick Actions, notifications, profile pages). The doc itself queues those.
+
+### Verification
+
+- Deploy edge functions, run `curl_edge_functions` against each action, inspect logs.
+- Open `/exchange`, perform a small USD→CAD swap, confirm balances move and a journal entry is recorded.
+- Open `/wallets`, click new Receive button, verify QR + account number render and copy works.
