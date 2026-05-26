@@ -10,8 +10,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { toast } from "sonner";
 import {
   Activity, CheckCircle2, AlertTriangle, Plug, Webhook, Code2,
-  Eye, RefreshCw, Lock, Globe, Server,
+  Eye, RefreshCw, Lock, Globe, Server, ShieldCheck, ArrowRight,
 } from "lucide-react";
+import { Link } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
 import AdminLayout from "@/components/admin-portal/AdminLayout";
 
