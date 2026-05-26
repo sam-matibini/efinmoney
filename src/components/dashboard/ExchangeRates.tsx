@@ -93,8 +93,10 @@ const ExchangeRates = () => {
                   }
                   className="shrink-0 flex items-center gap-3 px-4 py-3 rounded-xl border border-border bg-background hover:border-primary/50 hover:shadow-md transition-all"
                 >
-                  <span className="text-lg leading-none">
-                    {flagOf[r.from] || "🌍"} <span className="text-muted-foreground/60 mx-0.5">→</span> {flagOf[r.to] || "🌍"}
+                  <span className="inline-flex items-center gap-1.5 leading-none">
+                    <CurrencyBadge code={r.from} />
+                    <span className="text-muted-foreground/60 text-xs">→</span>
+                    <CurrencyBadge code={r.to} />
                   </span>
                   <div className="text-left">
                     <p className="text-xs font-semibold text-foreground">
