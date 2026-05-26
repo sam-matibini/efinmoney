@@ -56,6 +56,7 @@ import AdminPlaceholderPage from "./pages/admin/AdminPlaceholderPage";
 import RiskTiersPage from "./pages/admin/RiskTiersPage";
 import AuditLogPage from "./pages/admin/AuditLogPage";
 import ApiManagementPage from "./pages/admin/ApiManagementPage";
+import KycConfigPage from "./pages/admin/KycConfigPage";
 import UsersPage from "./pages/admin/UsersPage";
 import UserDetailPage from "./pages/admin/UserDetailPage";
 import SystemDiagnosticsPage from "./pages/admin/SystemDiagnosticsPage";
@@ -188,6 +189,7 @@ const AppRoutes = () => {
           <Route path="/admin/risk-tiers" element={<AdminAuthProvider><AdminGuard><RiskTiersPage /></AdminGuard></AdminAuthProvider>} />
           <Route path="/admin/audit-log" element={<AdminAuthProvider><AdminGuard><AuditLogPage /></AdminGuard></AdminAuthProvider>} />
           <Route path="/admin/settings" element={<AdminAuthProvider><AdminGuard><ApiManagementPage /></AdminGuard></AdminAuthProvider>} />
+          <Route path="/admin/kyc-config" element={<AdminAuthProvider><AdminGuard><KycConfigPage /></AdminGuard></AdminAuthProvider>} />
           <Route path="/admin/diagnostics" element={<AdminAuthProvider><AdminGuard><SystemDiagnosticsPage /></AdminGuard></AdminAuthProvider>} />
           <Route path="/settings" element={<RoleProtectedRoute allowedRoles={['admin']}><SettingsDashboard /></RoleProtectedRoute>} />
           <Route path="/operations" element={<RoleProtectedRoute allowedRoles={['admin', 'compliance', 'finance']}><OperationsDashboard /></RoleProtectedRoute>} />

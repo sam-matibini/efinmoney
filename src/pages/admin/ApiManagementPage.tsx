@@ -10,8 +10,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { toast } from "sonner";
 import {
   Activity, CheckCircle2, AlertTriangle, Plug, Webhook, Code2,
-  Eye, RefreshCw, Lock, Globe, Server,
+  Eye, RefreshCw, Lock, Globe, Server, ShieldCheck, ArrowRight,
 } from "lucide-react";
+import { Link } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
 import AdminLayout from "@/components/admin-portal/AdminLayout";
 
@@ -121,6 +122,26 @@ export default function ApiManagementPage() {
           </p>
         </div>
       </div>
+
+      <Link
+        to="/admin/kyc-config"
+        className="block group rounded-xl border bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-5 hover:border-primary/50 transition-colors"
+      >
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="h-11 w-11 rounded-lg bg-primary/15 flex items-center justify-center">
+              <ShieldCheck className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <div className="font-semibold">KYC Tier Configuration</div>
+              <p className="text-sm text-muted-foreground">
+                Edit tier limits, feature gates, and override any user's KYC tier. Reflects in the user portal in real time.
+              </p>
+            </div>
+          </div>
+          <ArrowRight className="h-5 w-5 text-muted-foreground group-hover:translate-x-1 transition-transform" />
+        </div>
+      </Link>
 
       <Tabs defaultValue="integrations" className="w-full">
         <TabsList className="grid w-full grid-cols-3 max-w-2xl">
