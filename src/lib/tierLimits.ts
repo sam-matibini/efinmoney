@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { convertToUsd, fetchUsdRateMap } from "@/lib/fx";
 
 export type Tier = "tier_1" | "tier_2" | "tier_3" | "tier_4";
 
@@ -74,7 +75,7 @@ export async function checkTransactionAllowed(
   // Sum of completed/pending outbound transfers from this user
   const { data, error } = await supabase
     .from("transfers")
-    .select("source_amount, created_at, status")
+    .select("source_amount, source_currency, created_at, status")
     .eq("sender_id", userId)
     .gte("created_at", startOfMonth)
     .in("status", ["initiated", "funded", "processing", "completed"]);
@@ -84,10 +85,17 @@ export async function checkTransactionAllowed(
     return { allowed: true };
   }
 
+  const rateMap = await fetchUsdRateMap();
+  const toUsd = (amt: number, ccy: string) =>
+    convertToUsd(Number(amt || 0), ccy || "USD", rateMap) ?? 0;
+
   const daily = (data ?? [])
     .filter((r) => r.created_at >= startOfDay)
-    .reduce((s, r) => s + Number(r.source_amount || 0), 0);
-  const monthly = (data ?? []).reduce((s, r) => s + Number(r.source_amount || 0), 0);
+    .reduce((s, r) => s + toUsd(Number(r.source_amount), r.source_currency as string), 0);
+  const monthly = (data ?? []).reduce(
+    (s, r) => s + toUsd(Number(r.source_amount), r.source_currency as string),
+    0,
+  );
 
   if (daily + amountUsd > dailyLimit) {
     return blocked(
