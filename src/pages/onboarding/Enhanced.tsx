@@ -175,12 +175,20 @@ const Enhanced = () => {
         />
       </Card>
 
-      <Button size="lg" className="w-full" onClick={submit} disabled={submitting}>
+      <Button
+        size="lg"
+        className="w-full"
+        onClick={submit}
+        disabled={submitting || alreadySubmitted}
+        variant={alreadySubmitted ? "secondary" : "default"}
+      >
         {submitting
           ? "Submitting..."
-          : alreadySubmitted
-            ? "Resubmit for review"
-            : "Submit for review"}
+          : kyc?.verification_status === "approved"
+            ? "Approved"
+            : alreadySubmitted
+              ? "Submitted — under review"
+              : "Submit for review"}
       </Button>
       <p className="text-xs text-muted-foreground text-center">
         Manual compliance review · usually 1–2 business days.
