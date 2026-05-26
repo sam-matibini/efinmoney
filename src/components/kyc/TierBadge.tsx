@@ -3,7 +3,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Shield } from "lucide-react";
 
 interface Props {
-  tier: "tier_1" | "tier_2" | "tier_3" | "tier_4";
+  tier: "tier_1" | "tier_2" | "tier_3";
   daily?: number;
   monthly?: number;
   single?: number;
@@ -13,7 +13,6 @@ const LABELS: Record<Props["tier"], string> = {
   tier_1: "Tier 1 · Minimal",
   tier_2: "Tier 2 · Standard",
   tier_3: "Tier 3 · Enhanced",
-  tier_4: "Tier 4 · Premium",
 };
 
 const TierBadge = ({ tier, daily, monthly, single }: Props) => {
