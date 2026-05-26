@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { Copy, Plus, Share2, Wallet as WalletIcon } from "lucide-react";
 import Header from "@/components/layout/Header";
 import MobileNav from "@/components/layout/MobileNav";
+import BackToDashboard from "@/components/layout/BackToDashboard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
