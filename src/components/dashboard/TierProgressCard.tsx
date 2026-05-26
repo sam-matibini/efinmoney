@@ -71,8 +71,12 @@ const TierProgressCard = () => {
 
           if (pendingUpgrade) {
             return (
-              <Button size="sm" variant="secondary" disabled className="gap-1">
-                <Clock className="w-3 h-3" /> Submitted
+              <Button
+                size="sm"
+                disabled
+                className="gap-1 bg-amber-500 hover:bg-amber-500 text-white disabled:opacity-100 shadow-sm"
+              >
+                <Clock className="w-3 h-3" /> Submitted — under review
               </Button>
             );
           }
