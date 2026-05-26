@@ -42,6 +42,7 @@ import PayBillsPage from "./pages/PayBillsPage";
 import KYCGuard from "@/components/kyc/KYCGuard";
 import Welcome from "./pages/onboarding/Welcome";
 import OnboardingIdentity from "./pages/onboarding/Identity";
+import OnboardingEnhanced from "./pages/onboarding/Enhanced";
 
 
 import OnboardingRejected from "./pages/onboarding/Rejected";
@@ -208,6 +209,7 @@ const AppRoutes = () => {
           <Route path="/interac/callback" element={<InteracHubCallback />} />
           <Route path="/onboarding/welcome" element={<ProtectedRoute><Welcome /></ProtectedRoute>} />
           <Route path="/onboarding/identity" element={<ProtectedRoute><OnboardingIdentity /></ProtectedRoute>} />
+          <Route path="/onboarding/enhanced" element={<ProtectedRoute><OnboardingEnhanced /></ProtectedRoute>} />
           <Route path="/onboarding/pending" element={<Navigate to="/dashboard" replace />} />
           <Route path="/onboarding/approved" element={<Navigate to="/dashboard" replace />} />
 
