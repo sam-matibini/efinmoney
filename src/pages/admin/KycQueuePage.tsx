@@ -145,12 +145,14 @@ const KycQueuePage = () => {
                 <TableHead>Document</TableHead>
                 <TableHead>Submitted</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>API decision</TableHead>
                 <TableHead>Risk flags</TableHead>
                 <TableHead>Reviewer</TableHead>
                 <TableHead className="w-20"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
+
               {isLoading ? (
                 Array.from({ length: 6 }).map((_, i) => (
                   <TableRow key={i}>
