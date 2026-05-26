@@ -112,7 +112,7 @@ const WalletsPage = () => {
                 )}
               </div>
               <p className="text-4xl font-display font-bold">
-                ≈ ${totalUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+                ${totalUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
               </p>
               <div className="flex items-center gap-2 mt-2 text-primary-foreground/70">
                 <TrendingUp className="w-4 h-4" />
