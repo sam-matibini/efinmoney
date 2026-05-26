@@ -339,7 +339,52 @@ const UserDetailPage = () => {
                 </CardContent>
               </Card>
             </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4" /> Manual KYC action
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  Approve or revoke this user's verification directly. Overrides any prior decision (including Persona / Interac auto-decisions) and is recorded in the audit trail.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={manualBusy || !hasPermission("approve_kyc")}
+                    onClick={() => manualApprove("id_only")}
+                  >
+                    <ShieldCheck className="w-4 h-4 mr-1" /> Approve to Tier 2
+                  </Button>
+                  <Button
+                    size="sm"
+                    disabled={manualBusy || !hasPermission("approve_kyc")}
+                    onClick={() => manualApprove("id_and_address")}
+                  >
+                    <ShieldCheck className="w-4 h-4 mr-1" /> Approve to Tier 3
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    disabled={manualBusy || !hasPermission("reject_kyc")}
+                    onClick={() => setRevokeOpen(true)}
+                  >
+                    <ShieldOff className="w-4 h-4 mr-1" /> Revoke verification
+                  </Button>
+                  {kyc?.id && (
+                    <Button size="sm" variant="ghost" onClick={() => navigate(`/admin/kyc/${kyc.id}`)}>
+                      Open full review →
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
+
+
 
           <TabsContent value="wallets">
             <Card>
