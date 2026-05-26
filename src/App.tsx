@@ -56,6 +56,7 @@ import AdminPlaceholderPage from "./pages/admin/AdminPlaceholderPage";
 import RiskTiersPage from "./pages/admin/RiskTiersPage";
 import AuditLogPage from "./pages/admin/AuditLogPage";
 import ApiManagementPage from "./pages/admin/ApiManagementPage";
+import KycConfigPage from "./pages/admin/KycConfigPage";
 import UsersPage from "./pages/admin/UsersPage";
 import UserDetailPage from "./pages/admin/UserDetailPage";
 import SystemDiagnosticsPage from "./pages/admin/SystemDiagnosticsPage";
