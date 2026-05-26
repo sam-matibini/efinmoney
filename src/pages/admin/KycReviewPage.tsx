@@ -149,8 +149,8 @@ const KycReviewPage = () => {
     if (!requirePermission("approve_kyc") || !id) return;
     setActionLoading(true);
     try {
-      await callEdge("approve-kyc", { verification_id: id, scope: approveScope });
-      toast.success("Verification approved");
+      await callEdge("approve-kyc", { verification_id: id, scope: approveScope, override: isFinal });
+      toast.success(isFinal ? "Decision overridden — approved" : "Verification approved");
       setApproveOpen(false);
       queryClient.invalidateQueries({ queryKey: ["admin-kyc-detail", id] });
       queryClient.invalidateQueries({ queryKey: ["admin-kyc-queue"] });
@@ -173,8 +173,8 @@ const KycReviewPage = () => {
     if (!reason) { toast.error("Please provide a reason"); return; }
     setActionLoading(true);
     try {
-      await callEdge("reject-kyc", { verification_id: id, reason, scope: rejectScope });
-      toast.success("Verification rejected — user notified");
+      await callEdge("reject-kyc", { verification_id: id, reason, scope: rejectScope, override: isFinal });
+      toast.success(isFinal ? "Decision overridden — rejected" : "Verification rejected — user notified");
       setRejectOpen(false);
       queryClient.invalidateQueries({ queryKey: ["admin-kyc-detail", id] });
       queryClient.invalidateQueries({ queryKey: ["admin-kyc-queue"] });
@@ -184,6 +184,7 @@ const KycReviewPage = () => {
       setActionLoading(false);
     }
   };
+
 
   // Request more info
   const [infoOpen, setInfoOpen] = useState(false);
