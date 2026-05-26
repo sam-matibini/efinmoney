@@ -100,7 +100,7 @@ const MockEfinVisaCard = () => {
             />
             {/* corner glow */}
             <div className="absolute -top-16 -right-16 w-44 h-44 rounded-full bg-emerald-400/25 blur-3xl pointer-events-none" />
-            <div className="absolute -bottom-16 -left-16 w-44 h-44 rounded-full bg-indigo-500/25 blur-3xl pointer-events-none" />
+            <div className="absolute -bottom-16 -left-16 w-44 h-44 rounded-full bg-emerald-700/30 blur-3xl pointer-events-none" />
 
             <div className="relative h-full flex flex-col justify-between">
               <div className="flex items-start justify-between">

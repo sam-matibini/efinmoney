@@ -12,11 +12,11 @@ import { flagForCurrency } from "@/lib/flags";
 
 const gradients: Record<string, string> = {
   USD: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-  CAD: "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)",
-  NGN: "linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)",
-  GBP: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)",
-  EUR: "linear-gradient(135deg, #06b6d4 0%, #0e7490 100%)",
-  KES: "linear-gradient(135deg, #f59e0b 0%, #b45309 100%)",
+  CAD: "linear-gradient(135deg, #0f766e 0%, #134e4a 100%)",
+  NGN: "linear-gradient(135deg, #047857 0%, #064e3b 100%)",
+  GBP: "linear-gradient(135deg, #14b8a6 0%, #0f766e 100%)",
+  EUR: "linear-gradient(135deg, #34d399 0%, #047857 100%)",
+  KES: "linear-gradient(135deg, #65a30d 0%, #3f6212 100%)",
 };
 
 const fallbackGradient = "linear-gradient(135deg, #475569 0%, #1e293b 100%)";

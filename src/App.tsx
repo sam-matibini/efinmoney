@@ -58,6 +58,7 @@ import UserDetailPage from "./pages/admin/UserDetailPage";
 import SystemDiagnosticsPage from "./pages/admin/SystemDiagnosticsPage";
 import InteracCallback from "./pages/InteracCallback";
 import InteracHubCallback from "./pages/InteracHubCallback";
+import MorePage from "./pages/MorePage";
 
 const queryClient = new QueryClient();
 
@@ -190,6 +191,7 @@ const AppRoutes = () => {
           <Route path="/auth" element={<PublicRoute><Auth /></PublicRoute>} />
           <Route path="/portal" element={<CustomerPortalPage />} />
           <Route path="/profile" element={<ProtectedRoute><ProfileSettingsPage /></ProtectedRoute>} />
+          <Route path="/more" element={<KycProtectedRoute><MorePage /></KycProtectedRoute>} />
           <Route path="/kyc" element={<ProtectedRoute><KYCPage /></ProtectedRoute>} />
           <Route path="/security" element={<ProtectedRoute><SecurityPage /></ProtectedRoute>} />
           <Route path="/transfers" element={<KycProtectedRoute><TransfersListPage /></KycProtectedRoute>} />

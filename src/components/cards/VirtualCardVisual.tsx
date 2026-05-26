@@ -39,7 +39,7 @@ const VirtualCardVisual = ({
       }`}
       style={{
         background:
-          "linear-gradient(135deg, #0b1f4a 0%, #112a63 35%, #1d4ed8 70%, #2563eb 100%)",
+          "linear-gradient(135deg, #0a1f1c 0%, #0f3a30 35%, #065f46 70%, #0d7a5f 100%)",
       }}
     >
       {/* diagonal shine band */}

@@ -100,7 +100,7 @@ const WalletCard = ({
       {isFrozen && (
         <div className="absolute inset-0 bg-muted/30 backdrop-blur-[1px] z-10 flex items-center justify-center">
           <div className="flex items-center gap-2 bg-background/80 px-3 py-1.5 rounded-full">
-            <Snowflake className="w-4 h-4 text-blue-500" />
+            <Snowflake className="w-4 h-4 text-primary" />
             <span className="text-sm font-medium text-muted-foreground">Frozen</span>
           </div>
         </div>

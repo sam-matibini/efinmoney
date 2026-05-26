@@ -11,7 +11,7 @@ const cardClass =
 
 const cardBg: Record<string, string> = {
   sent: "bg-gradient-to-br from-emerald-500/5 to-transparent",
-  corridors: "bg-gradient-to-br from-blue-500/5 to-transparent",
+  corridors: "bg-gradient-to-br from-primary/5 to-transparent",
   savings: "bg-gradient-to-br from-teal-500/5 to-transparent",
   kyc: "bg-gradient-to-br from-amber-500/10 to-transparent",
 };
@@ -138,7 +138,7 @@ const MiniStats = () => {
         </>
       ),
       icon: Globe,
-      iconBg: "bg-blue-500/15 text-blue-600 dark:text-blue-400",
+      iconBg: "bg-primary/15 text-primary",
     },
     {
       key: "savings",

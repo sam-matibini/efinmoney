@@ -1,45 +1,50 @@
 import { motion } from "framer-motion";
-import { Home, Wallet, Send, Users, CreditCard } from "lucide-react";
+import { Home, CreditCard, Activity, MoreHorizontal } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 
 const navItems = [
-  { icon: Home, label: 'Home', href: '/' },
-  { icon: Send, label: 'Send', href: '/send' },
-  { icon: Users, label: 'Contacts', href: '/contacts' },
-  { icon: Wallet, label: 'Wallets', href: '/wallets' },
-  { icon: CreditCard, label: 'Cards', href: '/cards' },
+  { icon: Home, label: "Home", href: "/dashboard", match: ["/dashboard", "/"] },
+  { icon: CreditCard, label: "Cards", href: "/cards", match: ["/cards"] },
+  { icon: Activity, label: "History", href: "/transfers", match: ["/transfers", "/transactions"] },
+  { icon: MoreHorizontal, label: "More", href: "/more", match: ["/more", "/profile", "/security", "/kyc", "/contacts", "/settings"] },
 ];
 
 const MobileNav = () => {
   const location = useLocation();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 glass border-t border-border/50 md:hidden">
-      <div className="flex items-center justify-around py-3 px-4">
+    <nav
+      className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-card/95 backdrop-blur-xl border-t border-border"
+      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+    >
+      <div className="flex items-center justify-around py-2 px-2">
         {navItems.map((item) => {
-          const isActive = item.href === '/' 
-            ? location.pathname === '/' 
-            : location.pathname.startsWith(item.href);
-          
+          const isActive = item.match.some((m) =>
+            m === "/" ? location.pathname === "/" : location.pathname.startsWith(m)
+          );
+
           return (
-            <Link
-              key={item.label}
-              to={item.href}
-            >
+            <Link key={item.label} to={item.href} className="flex-1 flex justify-center">
               <motion.div
                 whileTap={{ scale: 0.9 }}
-                className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-colors ${
-                  isActive 
-                    ? 'text-primary' 
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
+                className="flex flex-col items-center gap-1 py-1.5 px-2 min-w-[56px]"
               >
-                <div className={`p-2 rounded-xl transition-all ${
-                  isActive ? 'gradient-primary shadow-glow' : ''
-                }`}>
-                  <item.icon className={`w-5 h-5 ${isActive ? 'text-primary-foreground' : ''}`} />
+                <div
+                  className={`flex items-center justify-center w-10 h-10 rounded-2xl transition-all ${
+                    isActive
+                      ? "bg-primary text-primary-foreground shadow-[0_6px_16px_-6px_hsl(var(--primary)/0.6)]"
+                      : "text-muted-foreground"
+                  }`}
+                >
+                  <item.icon className={`w-5 h-5 ${isActive ? "" : "stroke-[1.75]"}`} />
                 </div>
-                <span className="text-xs font-medium">{item.label}</span>
+                <span
+                  className={`text-[11px] font-semibold ${
+                    isActive ? "text-primary" : "text-muted-foreground"
+                  }`}
+                >
+                  {item.label}
+                </span>
               </motion.div>
             </Link>
           );
