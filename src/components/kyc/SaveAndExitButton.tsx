@@ -59,11 +59,15 @@ const SaveAndExitButton = ({ onSaveDraft, className }: Props) => {
     <>
       <Button
         type="button"
-        variant="ghost"
-        className={className}
+        variant="outline"
+        size="sm"
+        className={
+          "group rounded-full border-primary/20 bg-primary/5 px-4 py-2 text-xs font-medium text-foreground/80 shadow-sm backdrop-blur transition-all hover:border-primary/40 hover:bg-primary/10 hover:text-foreground hover:shadow-md " +
+          (className ?? "")
+        }
         onClick={() => setOpen(true)}
       >
-        <Save className="w-4 h-4 mr-2" />
+        <Save className="w-3.5 h-3.5 mr-2 text-primary transition-transform group-hover:-translate-y-0.5" />
         Save & continue later
       </Button>
 
