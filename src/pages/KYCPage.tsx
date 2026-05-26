@@ -163,6 +163,7 @@ const KYCPage = () => {
                                 upgradePath && TIER_ORDER[tKey] === TIER_ORDER[currentTier] + 1;
 
                               const targetsThisTier =
+                                (kyc as any)?.tier_target == null ||
                                 (kyc as any)?.tier_target === tKey;
                               const isPending =
                                 canUpgrade &&
