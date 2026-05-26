@@ -3,11 +3,42 @@ import { useNavigate } from "react-router-dom";
 import { TrendingUp, TrendingDown, RefreshCw } from "lucide-react";
 import { useFxRates } from "@/hooks/useFxRates";
 import { Skeleton } from "@/components/ui/skeleton";
+import efinIcon from "@/assets/efin-icon.png";
 
-const flagOf: Record<string, string> = {
-  KES: "🇰🇪", UGX: "🇺🇬", TZS: "🇹🇿", ZMW: "🇿🇲", BIF: "🇧🇮",
-  USD: "🇺🇸", CAD: "🇨🇦", EUR: "🇪🇺", GBP: "🇬🇧", NGN: "🇳🇬",
+// ISO-4217 currency -> ISO-3166-1 alpha-2 country code for flag CDN
+const currencyToCountry: Record<string, string> = {
+  KES: "ke", UGX: "ug", TZS: "tz", ZMW: "zm", BIF: "bi", RWF: "rw",
+  USD: "us", CAD: "ca", GBP: "gb", NGN: "ng", ZAR: "za", GHS: "gh",
+  ETB: "et", XOF: "sn", XAF: "cm", MAD: "ma", EGP: "eg", AUD: "au",
+  CHF: "ch", JPY: "jp", CNY: "cn", INR: "in",
 };
+
+// Multi-country currencies use the eFinMoney brand mark
+const brandedCurrencies = new Set(["EUR"]);
+
+const CurrencyBadge = ({ code }: { code: string }) => {
+  const cc = currencyToCountry[code];
+  if (brandedCurrencies.has(code) || !cc) {
+    return (
+      <img
+        src={efinIcon}
+        alt={code}
+        className="w-5 h-5 rounded-full object-cover ring-1 ring-border bg-background"
+        loading="lazy"
+      />
+    );
+  }
+  return (
+    <img
+      src={`https://flagcdn.com/w40/${cc}.png`}
+      srcSet={`https://flagcdn.com/w80/${cc}.png 2x`}
+      alt={code}
+      className="w-5 h-5 rounded-full object-cover ring-1 ring-border"
+      loading="lazy"
+    />
+  );
+};
+
 
 const ExchangeRates = () => {
   const { data: rates, isLoading, refetch } = useFxRates();
