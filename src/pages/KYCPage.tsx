@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useProfile } from "@/hooks/useProfile";
-import { Shield, Upload, CheckCircle2, AlertTriangle, Clock, Check, X } from "lucide-react";
+import { Shield, Upload, CheckCircle2, AlertTriangle, Clock, Check, X, Lock, ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 
 type TierKey = "tier_1" | "tier_2" | "tier_3";
 const VISIBLE_TIERS: TierKey[] = ["tier_1", "tier_2", "tier_3"];
+const TIER_ORDER: Record<TierKey, number> = { tier_1: 1, tier_2: 2, tier_3: 3 };
 const FEATURE_KEYS = ["receive", "send", "topup", "bills", "international", "virtual_card", "business"] as const;
 
 const KYCPage = () => {
