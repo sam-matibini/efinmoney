@@ -1295,7 +1295,7 @@ const SendPage = () => {
                                       <motion.div
                                         initial={{ opacity: 0, y: -6 }}
                                         animate={{ opacity: 1, y: 0 }}
-                                        className="flex items-center justify-between gap-3 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300"
+                                        className="flex items-center justify-between gap-3 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-primary dark:text-emerald-300"
                                       >
                                         <span className="inline-flex items-center gap-2 text-sm font-medium">
                                           <CheckCircle className="w-4 h-4" /> Contact selected ✓ — {recipientName}
@@ -1303,7 +1303,7 @@ const SendPage = () => {
                                         <button
                                           type="button"
                                           onClick={() => { setPickedBeneficiaryId(null); setRecipientName(""); setRecipientPhone(""); }}
-                                          className="text-emerald-700/80 dark:text-emerald-300/80 hover:opacity-100 opacity-70"
+                                          className="text-primary/80 dark:text-emerald-300/80 hover:opacity-100 opacity-70"
                                           aria-label="Clear selected contact"
                                         >
                                           <X className="w-4 h-4" />
@@ -1418,7 +1418,7 @@ const SendPage = () => {
                                             </p>
                                           )}
                                           {ngnResolvedName && !ngnResolving && (
-                                            <p className="text-sm text-emerald-600 dark:text-emerald-400 inline-flex items-center gap-1">
+                                            <p className="text-sm text-primary inline-flex items-center gap-1">
                                               <CheckCircle className="w-3.5 h-3.5" /> {ngnResolvedName}
                                             </p>
                                           )}
@@ -1509,7 +1509,7 @@ const SendPage = () => {
                                           <div className="flex-1">
                                             <div className="flex items-center gap-2">
                                               <span className="text-sm font-medium">🟢 Send via PawaPay (Beta)</span>
-                                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-500 font-mono uppercase">Beta</span>
+                                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-primary font-mono uppercase">Beta</span>
                                             </div>
                                             <p className="text-xs text-muted-foreground mt-1">
                                               Route this mobile money payout through PawaPay's pan-African network instead of the default provider. Supports SN, CM, CI, BF, BJ, KE, UG, TZ, RW, ZM, GH, MW.

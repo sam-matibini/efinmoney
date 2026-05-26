@@ -126,7 +126,7 @@ const MiniStats = () => {
         </>
       ),
       icon: Send,
-      iconBg: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
+      iconBg: "bg-emerald-500/15 text-primary",
     },
     {
       key: "corridors",

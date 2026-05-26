@@ -98,7 +98,7 @@ const ReceivePage = () => {
           <Card className="border-emerald-500/30 bg-emerald-500/5">
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2">
-                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-500/15 text-emerald-600 text-xs font-bold">i</span>
+                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-500/15 text-primary text-xs font-bold">i</span>
                 Interac e-Transfer (Canada)
               </CardTitle>
             </CardHeader>

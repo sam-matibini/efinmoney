@@ -158,7 +158,7 @@ const FxTradingPanel = () => {
             animate={{ scale: 1 }}
             className="w-20 h-20 mx-auto mb-6 rounded-full bg-green-500/20 flex items-center justify-center"
           >
-            <CheckCircle className="w-10 h-10 text-green-500" />
+            <CheckCircle className="w-10 h-10 text-primary" />
           </motion.div>
           <h3 className="text-2xl font-display font-bold mb-2">Exchange Complete!</h3>
           <p className="text-muted-foreground">
