@@ -39,7 +39,7 @@ export default function KycConfigPage() {
       const { data, error } = await supabase
         .from("tier_limits")
         .select("*")
-        .in("tier", VISIBLE_TIERS as unknown as string[])
+        .in("tier", VISIBLE_TIERS)
         .order("tier");
       if (error) throw error;
       return (data ?? []) as unknown as TierRow[];
