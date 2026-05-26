@@ -221,7 +221,7 @@ const WalletCard = ({
           )}
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <SendMoneyModal>
             <motion.button
               whileHover={{ scale: 1.05 }}
@@ -238,6 +238,23 @@ const WalletCard = ({
               Send
             </motion.button>
           </SendMoneyModal>
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            disabled={isFrozen || !walletId}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (walletId) setReceiveOpen(true);
+            }}
+            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-medium transition-colors ${
+              isMain
+                ? 'bg-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/30'
+                : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+            } disabled:opacity-50 disabled:cursor-not-allowed`}
+          >
+            <ArrowDownLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            Receive
+          </motion.button>
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
@@ -271,6 +288,15 @@ const WalletCard = ({
           )}
         </div>
       </div>
+
+      {walletId && (
+        <ReceiveMoneyModal
+          isOpen={receiveOpen}
+          onClose={() => setReceiveOpen(false)}
+          wallet={{ walletId, currency, balance, symbol, flag }}
+        />
+      )}
+
 
       {walletId && (
         <TopUpModal
