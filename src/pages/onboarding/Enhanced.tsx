@@ -218,9 +218,18 @@ const Enhanced = () => {
               ? "Waiting for approval"
               : "Submit for review"}
       </Button>
-      <p className="text-xs text-muted-foreground text-center">
-        Manual compliance review · usually 1–2 business days.
-      </p>
+      <div className="flex items-center justify-center gap-2 mt-2">
+        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20">
+          <Clock className="w-3.5 h-3.5 text-primary" />
+          <span className="text-xs font-medium text-foreground">
+            Manual compliance review
+          </span>
+          <span className="text-xs text-muted-foreground">·</span>
+          <span className="text-xs font-semibold text-primary">
+            within 24 hours
+          </span>
+        </span>
+      </div>
     </OnboardingShell>
   );
 };
