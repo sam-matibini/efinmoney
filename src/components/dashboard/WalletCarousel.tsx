@@ -26,7 +26,6 @@ const WalletCarousel = () => {
   const { data: wallets, isLoading } = useWallets();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [activeIndex, setActiveIndex] = useState(0);
-  const [topUpWalletId, setTopUpWalletId] = useState<string | null>(null);
   const navigate = useNavigate();
 
   // Track active card via scroll position
