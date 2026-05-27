@@ -41,6 +41,8 @@ interface UserProfile {
   kyc_tier: string;
   risk_score: number | null;
   avatar_url: string | null;
+  account_number: string | null;
+  efin_tag: string | null;
   created_at: string;
 }
 
