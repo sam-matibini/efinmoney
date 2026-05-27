@@ -154,6 +154,8 @@ export const UsersPanel = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead>User</TableHead>
+                  <TableHead>Account #</TableHead>
+                  <TableHead>eFin Tag</TableHead>
                   <TableHead>KYC Status</TableHead>
                   <TableHead>Tier</TableHead>
                   <TableHead>Risk Score</TableHead>
@@ -165,7 +167,7 @@ export const UsersPanel = () => {
               <TableBody>
                 {filteredProfiles.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                       {searchQuery ? 'No users match your search' : 'No users found'}
                     </TableCell>
                   </TableRow>
