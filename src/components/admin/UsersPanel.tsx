@@ -102,7 +102,9 @@ export const UsersPanel = () => {
     return (
       profile.email?.toLowerCase().includes(query) ||
       profile.full_name?.toLowerCase().includes(query) ||
-      profile.phone_number?.includes(query)
+      profile.phone_number?.includes(query) ||
+      profile.account_number?.includes(query) ||
+      profile.efin_tag?.toLowerCase().includes(query.replace(/^@/, ''))
     );
   });
 
