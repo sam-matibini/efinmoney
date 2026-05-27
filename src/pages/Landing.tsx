@@ -13,7 +13,7 @@ const NAV_LINKS = [
 const FEATURES = [
   { icon: Shield, title: "Bank-Grade Security", desc: "Your funds are protected with 256-bit encryption and multi-factor authentication." },
   { icon: Zap, title: "Instant Transfers", desc: "Send money to Kenya, Nigeria, Uganda in minutes — not days." },
-  { icon: Globe, title: "50+ Currency Corridors", desc: "Hold USD, CAD, NGN, KES, GHS and more in one app." },
+  { icon: Globe, title: "50+ Currency Corridors", desc: "Hold USD, CAD, NGN, KES, GHS, ZMW and more in one app." },
 ];
 
 const STEPS = [
