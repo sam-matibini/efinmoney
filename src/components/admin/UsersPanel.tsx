@@ -191,6 +191,20 @@ export const UsersPanel = () => {
                           </div>
                         </TableCell>
                         <TableCell>
+                          {profile.account_number ? (
+                            <span className="font-mono text-xs">{profile.account_number}</span>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {profile.efin_tag ? (
+                            <Badge variant="secondary" className="text-xs font-mono">@{profile.efin_tag}</Badge>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
                           <Badge className={kycStatusColors[profile.kyc_status] || kycStatusColors.pending}>
                             {profile.kyc_status}
                           </Badge>
