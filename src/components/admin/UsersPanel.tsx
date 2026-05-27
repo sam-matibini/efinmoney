@@ -41,6 +41,8 @@ interface UserProfile {
   kyc_tier: string;
   risk_score: number | null;
   avatar_url: string | null;
+  account_number: string | null;
+  efin_tag: string | null;
   created_at: string;
 }
 
@@ -66,6 +68,8 @@ export const UsersPanel = () => {
           kyc_tier,
           risk_score,
           avatar_url,
+          account_number,
+          efin_tag,
           created_at
         `)
         .order('created_at', { ascending: false })
@@ -98,7 +102,9 @@ export const UsersPanel = () => {
     return (
       profile.email?.toLowerCase().includes(query) ||
       profile.full_name?.toLowerCase().includes(query) ||
-      profile.phone_number?.includes(query)
+      profile.phone_number?.includes(query) ||
+      profile.account_number?.includes(query) ||
+      profile.efin_tag?.toLowerCase().includes(query.replace(/^@/, ''))
     );
   });
 
@@ -148,6 +154,8 @@ export const UsersPanel = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead>User</TableHead>
+                  <TableHead>Account #</TableHead>
+                  <TableHead>eFin Tag</TableHead>
                   <TableHead>KYC Status</TableHead>
                   <TableHead>Tier</TableHead>
                   <TableHead>Risk Score</TableHead>
@@ -159,7 +167,7 @@ export const UsersPanel = () => {
               <TableBody>
                 {filteredProfiles.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                       {searchQuery ? 'No users match your search' : 'No users found'}
                     </TableCell>
                   </TableRow>
@@ -181,6 +189,20 @@ export const UsersPanel = () => {
                               <p className="text-xs text-muted-foreground">{profile.email}</p>
                             </div>
                           </div>
+                        </TableCell>
+                        <TableCell>
+                          {profile.account_number ? (
+                            <span className="font-mono text-xs">{profile.account_number}</span>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {profile.efin_tag ? (
+                            <Badge variant="secondary" className="text-xs font-mono">@{profile.efin_tag}</Badge>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
                         </TableCell>
                         <TableCell>
                           <Badge className={kycStatusColors[profile.kyc_status] || kycStatusColors.pending}>
