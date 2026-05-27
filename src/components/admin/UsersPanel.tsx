@@ -68,6 +68,8 @@ export const UsersPanel = () => {
           kyc_tier,
           risk_score,
           avatar_url,
+          account_number,
+          efin_tag,
           created_at
         `)
         .order('created_at', { ascending: false })
