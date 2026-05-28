@@ -17,6 +17,7 @@ import { formatDistanceToNow } from "date-fns";
 const NAV = [
   { to: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/admin/kyc", label: "KYC Queue", icon: ShieldCheck },
+  { to: "/admin/aml", label: "AML & PEP", icon: ShieldAlert },
   { to: "/admin/users", label: "Users", icon: Users },
   { to: "/admin/risk-tiers", label: "Risk Tiers", icon: Layers },
   { to: "/admin/kyc-config", label: "KYC Config", icon: SlidersHorizontal },
