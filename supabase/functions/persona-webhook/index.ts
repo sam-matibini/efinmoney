@@ -162,6 +162,17 @@ async function processEvent(supabase: any, eventType: string | null, inquiryId: 
       notes: `Persona event: ${eventType}`,
     });
   }
+
+  // Fire AML/PEP screening on approval events (non-blocking)
+  if (update.verification_status === "approved" && kyc.user_id) {
+    try {
+      await supabase.functions.invoke("aml-screen", {
+        body: { user_id: kyc.user_id, trigger: "kyc", trigger_ref: kyc.id },
+      });
+    } catch (e) {
+      console.error("aml-screen invoke failed", e);
+    }
+  }
   return { kycId: kyc.id, eventType };
 }
 
