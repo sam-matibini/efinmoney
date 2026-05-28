@@ -68,162 +68,6 @@ export type Database = {
         }
         Relationships: []
       }
-      aml_matches: {
-        Row: {
-          created_at: string
-          disposition: Database["public"]["Enums"]["aml_match_disposition"]
-          id: string
-          match_type: string
-          notes: string | null
-          reviewed_at: string | null
-          reviewed_by: string | null
-          score: number
-          screening_id: string
-          watchlist_id: string
-        }
-        Insert: {
-          created_at?: string
-          disposition?: Database["public"]["Enums"]["aml_match_disposition"]
-          id?: string
-          match_type: string
-          notes?: string | null
-          reviewed_at?: string | null
-          reviewed_by?: string | null
-          score: number
-          screening_id: string
-          watchlist_id: string
-        }
-        Update: {
-          created_at?: string
-          disposition?: Database["public"]["Enums"]["aml_match_disposition"]
-          id?: string
-          match_type?: string
-          notes?: string | null
-          reviewed_at?: string | null
-          reviewed_by?: string | null
-          score?: number
-          screening_id?: string
-          watchlist_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "aml_matches_screening_id_fkey"
-            columns: ["screening_id"]
-            isOneToOne: false
-            referencedRelation: "aml_screenings"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "aml_matches_watchlist_id_fkey"
-            columns: ["watchlist_id"]
-            isOneToOne: false
-            referencedRelation: "aml_watchlist"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      aml_screenings: {
-        Row: {
-          id: string
-          match_count: number
-          screened_at: string
-          screened_by: string | null
-          status: Database["public"]["Enums"]["aml_screening_status"]
-          subject_country: string | null
-          subject_dob: string | null
-          subject_name: string
-          trigger: Database["public"]["Enums"]["aml_screening_trigger"]
-          trigger_ref: string | null
-          user_id: string
-        }
-        Insert: {
-          id?: string
-          match_count?: number
-          screened_at?: string
-          screened_by?: string | null
-          status?: Database["public"]["Enums"]["aml_screening_status"]
-          subject_country?: string | null
-          subject_dob?: string | null
-          subject_name: string
-          trigger: Database["public"]["Enums"]["aml_screening_trigger"]
-          trigger_ref?: string | null
-          user_id: string
-        }
-        Update: {
-          id?: string
-          match_count?: number
-          screened_at?: string
-          screened_by?: string | null
-          status?: Database["public"]["Enums"]["aml_screening_status"]
-          subject_country?: string | null
-          subject_dob?: string | null
-          subject_name?: string
-          trigger?: Database["public"]["Enums"]["aml_screening_trigger"]
-          trigger_ref?: string | null
-          user_id?: string
-        }
-        Relationships: []
-      }
-      aml_watchlist: {
-        Row: {
-          aliases: string[]
-          countries: string[]
-          dob: string | null
-          dob_year: number | null
-          entity_type: Database["public"]["Enums"]["aml_entity_type"]
-          id: string
-          ingested_at: string
-          list_published_at: string | null
-          name: string
-          name_normalized: string
-          nationalities: string[]
-          programs: string[]
-          raw: Json | null
-          remarks: string | null
-          source: Database["public"]["Enums"]["aml_source"]
-          source_id: string
-          source_url: string | null
-        }
-        Insert: {
-          aliases?: string[]
-          countries?: string[]
-          dob?: string | null
-          dob_year?: number | null
-          entity_type?: Database["public"]["Enums"]["aml_entity_type"]
-          id?: string
-          ingested_at?: string
-          list_published_at?: string | null
-          name: string
-          name_normalized: string
-          nationalities?: string[]
-          programs?: string[]
-          raw?: Json | null
-          remarks?: string | null
-          source: Database["public"]["Enums"]["aml_source"]
-          source_id: string
-          source_url?: string | null
-        }
-        Update: {
-          aliases?: string[]
-          countries?: string[]
-          dob?: string | null
-          dob_year?: number | null
-          entity_type?: Database["public"]["Enums"]["aml_entity_type"]
-          id?: string
-          ingested_at?: string
-          list_published_at?: string | null
-          name?: string
-          name_normalized?: string
-          nationalities?: string[]
-          programs?: string[]
-          raw?: Json | null
-          remarks?: string | null
-          source?: Database["public"]["Enums"]["aml_source"]
-          source_id?: string
-          source_url?: string | null
-        }
-        Relationships: []
-      }
       audit_logs: {
         Row: {
           action: string
@@ -2976,8 +2820,6 @@ export type Database = {
           account_number: string | null
           account_status: Database["public"]["Enums"]["account_status_enum"]
           address_country: string | null
-          aml_last_screened_at: string | null
-          aml_status: Database["public"]["Enums"]["aml_profile_status"]
           avatar_url: string | null
           city: string | null
           country_code: string | null
@@ -3006,8 +2848,6 @@ export type Database = {
           account_number?: string | null
           account_status?: Database["public"]["Enums"]["account_status_enum"]
           address_country?: string | null
-          aml_last_screened_at?: string | null
-          aml_status?: Database["public"]["Enums"]["aml_profile_status"]
           avatar_url?: string | null
           city?: string | null
           country_code?: string | null
@@ -3036,8 +2876,6 @@ export type Database = {
           account_number?: string | null
           account_status?: Database["public"]["Enums"]["account_status_enum"]
           address_country?: string | null
-          aml_last_screened_at?: string | null
-          aml_status?: Database["public"]["Enums"]["aml_profile_status"]
           avatar_url?: string | null
           city?: string | null
           country_code?: string | null
@@ -4514,7 +4352,6 @@ export type Database = {
     }
     Functions: {
       _gen_short_code: { Args: { p_len?: number }; Returns: string }
-      aml_normalize_name: { Args: { p_name: string }; Returns: string }
       check_rate_limit: {
         Args: {
           p_key: string
@@ -4602,8 +4439,6 @@ export type Database = {
         Args: { p_transfer_id: string }
         Returns: number
       }
-      show_limit: { Args: never; Returns: number }
-      show_trgm: { Args: { "": string }; Returns: string[] }
       validate_compliance_parameters: {
         Args: { p_parameters: Json; p_rule_type: string }
         Returns: boolean
@@ -4628,21 +4463,6 @@ export type Database = {
         | "escalated"
         | "resolved"
         | "false_positive"
-      aml_entity_type:
-        | "individual"
-        | "entity"
-        | "vessel"
-        | "aircraft"
-        | "unknown"
-      aml_match_disposition:
-        | "pending"
-        | "true_match"
-        | "false_positive"
-        | "escalated"
-      aml_profile_status: "unscreened" | "clear" | "hit" | "review"
-      aml_screening_status: "clear" | "hit" | "error"
-      aml_screening_trigger: "kyc" | "transfer" | "p2p" | "manual" | "rescreen"
-      aml_source: "ofac" | "un" | "eu" | "uk" | "ca" | "pep"
       app_role: "user" | "admin" | "compliance" | "support" | "finance"
       business_card_role: "owner" | "admin" | "member"
       card_authorization_status:
@@ -4870,23 +4690,6 @@ export const Constants = {
         "resolved",
         "false_positive",
       ],
-      aml_entity_type: [
-        "individual",
-        "entity",
-        "vessel",
-        "aircraft",
-        "unknown",
-      ],
-      aml_match_disposition: [
-        "pending",
-        "true_match",
-        "false_positive",
-        "escalated",
-      ],
-      aml_profile_status: ["unscreened", "clear", "hit", "review"],
-      aml_screening_status: ["clear", "hit", "error"],
-      aml_screening_trigger: ["kyc", "transfer", "p2p", "manual", "rescreen"],
-      aml_source: ["ofac", "un", "eu", "uk", "ca", "pep"],
       app_role: ["user", "admin", "compliance", "support", "finance"],
       business_card_role: ["owner", "admin", "member"],
       card_authorization_status: [

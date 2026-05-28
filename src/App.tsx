@@ -61,7 +61,6 @@ import KycConfigPage from "./pages/admin/KycConfigPage";
 import UsersPage from "./pages/admin/UsersPage";
 import UserDetailPage from "./pages/admin/UserDetailPage";
 import SystemDiagnosticsPage from "./pages/admin/SystemDiagnosticsPage";
-import AmlReviewPage from "./pages/admin/AmlReviewPage";
 import InteracCallback from "./pages/InteracCallback";
 import InteracHubCallback from "./pages/InteracHubCallback";
 import MorePage from "./pages/MorePage";
@@ -187,7 +186,6 @@ const AppRoutes = () => {
           <Route path="/admin/dashboard" element={<AdminAuthProvider><AdminGuard><AdminDashboardPage /></AdminGuard></AdminAuthProvider>} />
           <Route path="/admin/kyc" element={<AdminAuthProvider><AdminGuard><KycQueuePage /></AdminGuard></AdminAuthProvider>} />
           <Route path="/admin/kyc/:id" element={<AdminAuthProvider><AdminGuard><KycReviewPage /></AdminGuard></AdminAuthProvider>} />
-          <Route path="/admin/aml" element={<AdminAuthProvider><AdminGuard><AmlReviewPage /></AdminGuard></AdminAuthProvider>} />
           <Route path="/admin/users" element={<AdminAuthProvider><AdminGuard><UsersPage /></AdminGuard></AdminAuthProvider>} />
           <Route path="/admin/users/:id" element={<AdminAuthProvider><AdminGuard><UserDetailPage /></AdminGuard></AdminAuthProvider>} />
           <Route path="/admin/risk-tiers" element={<AdminAuthProvider><AdminGuard><RiskTiersPage /></AdminGuard></AdminAuthProvider>} />

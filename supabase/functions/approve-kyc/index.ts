@@ -81,13 +81,6 @@ Deno.serve(async (req) => {
       });
     } catch { /* ignore */ }
 
-    // Best-effort AML/PEP screening (non-blocking)
-    try {
-      await admin.functions.invoke("aml-screen", {
-        body: { user_id: kyc.user_id, trigger: "kyc", trigger_ref: verification_id },
-      });
-    } catch { /* ignore */ }
-
     return json(200, { ok: true });
   } catch (e) {
     return json(500, { error: (e as Error).message });
