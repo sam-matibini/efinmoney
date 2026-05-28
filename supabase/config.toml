@@ -48,4 +48,11 @@ verify_jwt = false
 [functions.interac-callback]
 verify_jwt = false
 
+[functions.aml-screen]
+verify_jwt = false
+
+[functions.aml-ingest-lists]
+verify_jwt = false
+
+
 
