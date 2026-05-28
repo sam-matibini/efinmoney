@@ -61,6 +61,7 @@ import KycConfigPage from "./pages/admin/KycConfigPage";
 import UsersPage from "./pages/admin/UsersPage";
 import UserDetailPage from "./pages/admin/UserDetailPage";
 import SystemDiagnosticsPage from "./pages/admin/SystemDiagnosticsPage";
+import AmlReviewPage from "./pages/admin/AmlReviewPage";
 import InteracCallback from "./pages/InteracCallback";
 import InteracHubCallback from "./pages/InteracHubCallback";
 import MorePage from "./pages/MorePage";
