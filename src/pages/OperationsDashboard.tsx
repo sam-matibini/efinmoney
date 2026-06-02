@@ -11,6 +11,7 @@ import { RegulatoryReportsPanel } from "@/components/operations/RegulatoryReport
 import { CommunicationsPanel } from "@/components/operations/CommunicationsPanel";
 import { MakerCheckerPanel } from "@/components/operations/MakerCheckerPanel";
 import { ProviderStatusPanel } from "@/components/operations/ProviderStatusPanel";
+import { CircleCpnHealthCard } from "@/components/operations/CircleCpnHealthCard";
 
 const OperationsDashboard = () => {
   return (
