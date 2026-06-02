@@ -1078,6 +1078,33 @@ export type Database = {
           },
         ]
       }
+      circle_webhook_events: {
+        Row: {
+          circle_event_id: string
+          created_at: string
+          event_type: string
+          id: string
+          payload: Json
+          processed_at: string | null
+        }
+        Insert: {
+          circle_event_id: string
+          created_at?: string
+          event_type: string
+          id?: string
+          payload: Json
+          processed_at?: string | null
+        }
+        Update: {
+          circle_event_id?: string
+          created_at?: string
+          event_type?: string
+          id?: string
+          payload?: Json
+          processed_at?: string | null
+        }
+        Relationships: []
+      }
       compliance_alerts: {
         Row: {
           alert_data: Json
@@ -1210,6 +1237,51 @@ export type Database = {
           rule_name?: string
           rule_type?: string
           severity?: Database["public"]["Enums"]["alert_severity"]
+        }
+        Relationships: []
+      }
+      cpn_corridors: {
+        Row: {
+          created_at: string
+          dest_country: string
+          dest_currency: string
+          enabled: boolean
+          est_minutes: number
+          id: string
+          markup_bps: number
+          max_amount: number
+          min_amount: number
+          payout_method: string
+          source_currency: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          dest_country: string
+          dest_currency: string
+          enabled?: boolean
+          est_minutes?: number
+          id?: string
+          markup_bps?: number
+          max_amount?: number
+          min_amount?: number
+          payout_method?: string
+          source_currency: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          dest_country?: string
+          dest_currency?: string
+          enabled?: boolean
+          est_minutes?: number
+          id?: string
+          markup_bps?: number
+          max_amount?: number
+          min_amount?: number
+          payout_method?: string
+          source_currency?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -4075,6 +4147,11 @@ export type Database = {
       }
       transfers: {
         Row: {
+          circle_idempotency_key: string | null
+          circle_payload: Json | null
+          circle_quote_id: string | null
+          circle_status: string | null
+          circle_transfer_id: string | null
           completed_at: string | null
           created_at: string
           exchange_rate: number
@@ -4107,6 +4184,11 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          circle_idempotency_key?: string | null
+          circle_payload?: Json | null
+          circle_quote_id?: string | null
+          circle_status?: string | null
+          circle_transfer_id?: string | null
           completed_at?: string | null
           created_at?: string
           exchange_rate?: number
@@ -4139,6 +4221,11 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          circle_idempotency_key?: string | null
+          circle_payload?: Json | null
+          circle_quote_id?: string | null
+          circle_status?: string | null
+          circle_transfer_id?: string | null
           completed_at?: string | null
           created_at?: string
           exchange_rate?: number
