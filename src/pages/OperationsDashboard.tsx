@@ -11,6 +11,7 @@ import { RegulatoryReportsPanel } from "@/components/operations/RegulatoryReport
 import { CommunicationsPanel } from "@/components/operations/CommunicationsPanel";
 import { MakerCheckerPanel } from "@/components/operations/MakerCheckerPanel";
 import { ProviderStatusPanel } from "@/components/operations/ProviderStatusPanel";
+import { CircleCpnHealthCard } from "@/components/operations/CircleCpnHealthCard";
 
 const OperationsDashboard = () => {
   return (
@@ -29,7 +30,10 @@ const OperationsDashboard = () => {
           </div>
 
 
-          <ProviderStatusPanel />
+          <div className="grid lg:grid-cols-2 gap-4">
+            <ProviderStatusPanel />
+            <CircleCpnHealthCard />
+          </div>
 
           <Tabs defaultValue="crm" className="space-y-4">
             <div className="overflow-x-auto pb-2">

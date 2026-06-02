@@ -816,6 +816,21 @@ const SendPage = () => {
             <p className="text-muted-foreground">Choose how you'd like to send</p>
           </motion.div>
 
+          <Link
+            to="/send/cpn"
+            className="block rounded-xl border border-primary/30 bg-gradient-to-r from-primary/10 to-primary/5 px-4 py-3 hover:from-primary/15 hover:to-primary/10 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <div className="rounded-full bg-primary/20 p-2 text-primary text-lg">🌐</div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground">New: Circle Payments Network</p>
+                <p className="text-xs text-muted-foreground">USDC-settled cross-border bank payouts to new corridors.</p>
+              </div>
+              <ArrowRight className="h-4 w-4 text-primary shrink-0" />
+            </div>
+          </Link>
+
+
           {/* Tabs — spring bounce in */}
           <motion.div
             initial={{ opacity: 0, scale: 0.85, y: 10 }}
