@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import Header from "@/components/layout/Header";
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -16,7 +17,7 @@ import AddBeneficiaryModal, { BENEFICIARY_COUNTRIES } from "@/components/modals/
 import {
   useBeneficiaries, useDeleteBeneficiary, type Beneficiary,
 } from "@/hooks/useBeneficiaries";
-import { Search, Plus, Send, Pencil, Trash2, Users } from "lucide-react";
+import { Search, Plus, Send, Pencil, Trash2, Users, LayoutGrid, List as ListIcon } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 
@@ -27,6 +28,9 @@ const methodLabel = (b: Beneficiary) => {
   return BENEFICIARY_COUNTRIES.find((c) => c.code === b.country_code)?.method || "Mobile Money";
 };
 
+type ViewMode = "grid" | "list";
+const VIEW_KEY = "contacts.viewMode";
+
 const ContactsPage = () => {
   const navigate = useNavigate();
   const { data: contacts, isLoading } = useBeneficiaries();
@@ -35,6 +39,14 @@ const ContactsPage = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Beneficiary | null>(null);
   const [deleting, setDeleting] = useState<Beneficiary | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    if (typeof window === "undefined") return "grid";
+    return (localStorage.getItem(VIEW_KEY) as ViewMode) || "grid";
+  });
+
+  useEffect(() => {
+    try { localStorage.setItem(VIEW_KEY, viewMode); } catch {}
+  }, [viewMode]);
 
   const filtered = useMemo(() => {
     const items = contacts || [];
@@ -65,19 +77,34 @@ const ContactsPage = () => {
           </Button>
         </div>
 
-        <div className="relative">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search by name, nickname, or phone"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-          />
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search by name, nickname, or phone"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          <ToggleGroup
+            type="single"
+            value={viewMode}
+            onValueChange={(v) => v && setViewMode(v as ViewMode)}
+            className="border border-border rounded-md"
+          >
+            <ToggleGroupItem value="grid" aria-label="Grid view" className="px-3">
+              <LayoutGrid className="w-4 h-4" />
+            </ToggleGroupItem>
+            <ToggleGroupItem value="list" aria-label="List view" className="px-3">
+              <ListIcon className="w-4 h-4" />
+            </ToggleGroupItem>
+          </ToggleGroup>
         </div>
 
         {isLoading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-44" />)}
+          <div className={viewMode === "grid" ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" : "space-y-2"}>
+            {[1, 2, 3, 4].map((i) => <Skeleton key={i} className={viewMode === "grid" ? "h-44" : "h-16"} />)}
           </div>
         ) : filtered.length === 0 ? (
           <Card>
@@ -94,7 +121,7 @@ const ContactsPage = () => {
               />
             </CardContent>
           </Card>
-        ) : (
+        ) : viewMode === "grid" ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {filtered.map((c, i) => (
               <motion.div
@@ -146,6 +173,56 @@ const ContactsPage = () => {
               </motion.div>
             ))}
           </div>
+        ) : (
+          <Card>
+            <CardContent className="p-0">
+              <ul className="divide-y divide-border">
+                {filtered.map((c, i) => (
+                  <motion.li
+                    key={c.id}
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.02 }}
+                    className="flex items-center gap-3 px-4 py-3 hover:bg-muted/40 transition-colors"
+                  >
+                    <div className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center text-primary-foreground text-sm font-bold shrink-0">
+                      {c.avatar_initials || c.name.slice(0, 2).toUpperCase()}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <p className="font-medium truncate">{c.nickname || c.name}</p>
+                        <span className="text-base leading-none" aria-hidden>{flagFor(c.country_code)}</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {methodLabel(c)}
+                        {c.phone ? ` · ${c.phone}` : c.bank_account ? ` · ${c.bank_account}` : ""}
+                      </p>
+                    </div>
+                    <div className="hidden sm:block text-right text-xs text-muted-foreground shrink-0 min-w-[120px]">
+                      <p>{c.transfer_count} transfer{c.transfer_count === 1 ? "" : "s"}</p>
+                      <p>
+                        {c.last_sent_at
+                          ? formatDistanceToNow(new Date(c.last_sent_at), { addSuffix: true })
+                          : "—"}
+                      </p>
+                    </div>
+                    <div className="flex gap-1 shrink-0">
+                      <Button size="sm" className="gap-1" onClick={() => handleSendTo(c)}>
+                        <Send className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">Send</span>
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => { setEditing(c); setModalOpen(true); }}>
+                        <Pencil className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setDeleting(c)}>
+                        <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                      </Button>
+                    </div>
+                  </motion.li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
         )}
       </main>
 
