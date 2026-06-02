@@ -21,6 +21,7 @@ import OperationsDashboard from "./pages/OperationsDashboard";
 import SettingsDashboard from "./pages/SettingsDashboard";
 import WalletsPage from "./pages/WalletsPage";
 import SendPage from "./pages/SendPage";
+import SendCpnPage from "./pages/SendCpnPage";
 import ExchangePage from "./pages/ExchangePage";
 import CardsPage from "./pages/CardsPage";
 import EfinCardDetailPage from "./pages/EfinCardDetailPage";
