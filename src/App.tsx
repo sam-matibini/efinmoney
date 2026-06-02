@@ -176,6 +176,7 @@ const AppRoutes = () => {
           <Route path="/wallets" element={<KycProtectedRoute><WalletsPage /></KycProtectedRoute>} />
           <Route path="/wallets/:walletId/statement" element={<KycProtectedRoute><WalletStatementPage /></KycProtectedRoute>} />
           <Route path="/send" element={<KycProtectedRoute><SendPage /></KycProtectedRoute>} />
+          <Route path="/send/cpn" element={<KycProtectedRoute><SendCpnPage /></KycProtectedRoute>} />
           <Route path="/exchange" element={<KycProtectedRoute><ExchangePage /></KycProtectedRoute>} />
           <Route path="/cards" element={<KycProtectedRoute><CardsPage /></KycProtectedRoute>} />
           <Route path="/cards/efin/:id" element={<KycProtectedRoute><EfinCardDetailPage /></KycProtectedRoute>} />
