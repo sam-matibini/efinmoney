@@ -147,44 +147,54 @@ Deno.serve(async (req) => {
 
     // For card-funded transfers, charge the sender's card BEFORE posting any ledger.
     // If the charge fails, we never touch the ledger and the transfer is marked failed.
+    // If the caller already charged the card upstream (e.g. via stripe-charge-saved-card),
+    // they pass `prefunded: true` and we skip the re-charge — only record the reference.
     if (isCardFunded) {
-      const cardToken = payload.card_token;
-      if (!cardToken) {
-        await supabase.from("transfers").update({
-          status: "failed", failure_reason: "Missing card token for card-funded transfer",
-        }).eq("id", transfer_id);
-        return new Response(JSON.stringify({ success: false, error: "card_token required for card funding" }), {
-          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      const totalCents = Math.round((Number(transfer.source_amount) + Number(transfer.fee_amount || 0)) * 100);
-      const chargeRes = await fetch(
-        `${Deno.env.get("SUPABASE_URL")}/functions/v1/stripe-charge-card`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-internal-secret": Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "",
+      if (payload.prefunded) {
+        if (payload.charge_reference) {
+          await supabase.from("transfers")
+            .update({ provider_reference: String(payload.charge_reference) })
+            .eq("id", transfer_id);
+        }
+      } else {
+        const cardToken = payload.card_token;
+        if (!cardToken) {
+          await supabase.from("transfers").update({
+            status: "failed", failure_reason: "Missing card token for card-funded transfer",
+          }).eq("id", transfer_id);
+          return new Response(JSON.stringify({ success: false, error: "card_token required for card funding" }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const totalCents = Math.round((Number(transfer.source_amount) + Number(transfer.fee_amount || 0)) * 100);
+        const chargeRes = await fetch(
+          `${Deno.env.get("SUPABASE_URL")}/functions/v1/stripe-charge-card`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-internal-secret": Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "",
+            },
+            body: JSON.stringify({
+              transfer_id,
+              card_token: cardToken,
+              amount_cents: totalCents,
+              currency: (transfer.source_currency || "cad").toLowerCase(),
+            }),
           },
-          body: JSON.stringify({
-            transfer_id,
-            card_token: cardToken,
-            amount_cents: totalCents,
-            currency: (transfer.source_currency || "cad").toLowerCase(),
-          }),
-        },
-      );
-      const chargeJson = await chargeRes.json();
-      if (!chargeJson?.success) {
-        await supabase.from("transfers").update({
-          status: "failed",
-          failure_reason: chargeJson?.error || "Card charge failed",
-        }).eq("id", transfer_id);
-        return new Response(JSON.stringify({
-          success: false,
-          error: chargeJson?.error || "Card charge failed",
-          code: chargeJson?.code,
-        }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        );
+        const chargeJson = await chargeRes.json();
+        if (!chargeJson?.success) {
+          await supabase.from("transfers").update({
+            status: "failed",
+            failure_reason: chargeJson?.error || "Card charge failed",
+          }).eq("id", transfer_id);
+          return new Response(JSON.stringify({
+            success: false,
+            error: chargeJson?.error || "Card charge failed",
+            code: chargeJson?.code,
+          }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
       }
     }
 
