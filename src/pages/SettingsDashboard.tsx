@@ -7,6 +7,7 @@ import { ModuleAccessPanel } from "@/components/settings/ModuleAccessPanel";
 import { SystemSettingsPanel } from "@/components/settings/SystemSettingsPanel";
 import { IntegrationsPanel } from "@/components/settings/IntegrationsPanel";
 import { CurrencyManagementPanel } from "@/components/settings/CurrencyManagementPanel";
+import { CircleCpnConfigPanel } from "@/components/settings/CircleCpnConfigPanel";
 
 const SettingsDashboard = () => {
   return (
@@ -31,6 +32,7 @@ const SettingsDashboard = () => {
                 <TabsTrigger value="currencies">Currencies</TabsTrigger>
                 <TabsTrigger value="modules">Module Access</TabsTrigger>
                 <TabsTrigger value="integrations">Integrations</TabsTrigger>
+                <TabsTrigger value="circle_cpn">Circle CPN</TabsTrigger>
                 <TabsTrigger value="system">System Settings</TabsTrigger>
               </TabsList>
             </div>
@@ -49,6 +51,10 @@ const SettingsDashboard = () => {
 
             <TabsContent value="integrations" className="space-y-4">
               <IntegrationsPanel />
+            </TabsContent>
+
+            <TabsContent value="circle_cpn" className="space-y-4">
+              <CircleCpnConfigPanel />
             </TabsContent>
 
             <TabsContent value="system" className="space-y-4">
