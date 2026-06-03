@@ -354,10 +354,10 @@ const Landing = () => {
       </section>
 
       {/* ============ STATS (deep purple band) ============ */}
-      <section id="trust" className="relative bg-grid-purple text-white py-24 overflow-hidden">
+      <section id="trust" className="relative bg-grid-amber text-white py-24 overflow-hidden">
         <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[360px] rounded-full bg-[hsl(var(--brand-500)/0.25)] blur-[120px]" />
-          <div className="absolute -top-20 -left-20 w-72 h-72 rounded-full bg-[hsl(var(--accent-amber)/0.12)] blur-3xl" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[360px] rounded-full bg-[hsl(var(--accent-amber)/0.22)] blur-[120px]" />
+          <div className="absolute -top-20 -left-20 w-72 h-72 rounded-full bg-[hsl(var(--accent-amber)/0.15)] blur-3xl" />
         </div>
 
         <div className="relative max-w-6xl mx-auto px-6">
