@@ -429,32 +429,104 @@ const Landing = () => {
 
 
       {/* ============ FOOTER ============ */}
-      <footer className="bg-white text-neutral-600 border-t border-neutral-200">
-        <div className="max-w-7xl mx-auto px-6 py-14">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-8">
-            <div className="flex items-center gap-2">
-              <Logo className="w-9 h-9" />
-              <Wordmark className="font-black text-xl" />
+      <footer className="relative bg-[hsl(var(--brand-900))] text-white/70 overflow-hidden">
+        <div className="absolute inset-0 bg-grid-purple opacity-50 pointer-events-none" />
+        <div className="absolute -top-32 left-1/4 w-96 h-96 rounded-full bg-[hsl(var(--primary)/0.18)] blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-32 right-1/4 w-96 h-96 rounded-full bg-[hsl(var(--accent-amber)/0.08)] blur-3xl pointer-events-none" />
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[hsl(var(--accent-amber))]/40 to-transparent" />
+
+        <div className="relative max-w-7xl mx-auto px-6 pt-20 pb-10">
+          {/* Top grid */}
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-12 pb-14 border-b border-white/10">
+            {/* Brand */}
+            <div className="md:col-span-5">
+              <div className="flex items-center gap-2">
+                <Logo className="w-10 h-10" />
+                <Wordmark className="font-black text-2xl text-white" />
+              </div>
+              <p className="mt-5 text-sm text-white/60 max-w-sm leading-relaxed">
+                The smartest way to move, hold and exchange money across borders. Built for individuals and businesses worldwide.
+              </p>
+              <div className="mt-6 flex flex-wrap gap-2">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-[0.18em] bg-white/5 border border-white/10 text-white/70">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[hsl(var(--accent-amber))]" />
+                  MSB Licensed
+                </span>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-[0.18em] bg-white/5 border border-white/10 text-white/70">
+                  <Shield className="w-3 h-3 text-[hsl(var(--accent-amber))]" />
+                  SOC 2 Type II
+                </span>
+              </div>
             </div>
-            <div className="flex flex-wrap gap-6 text-sm">
-              {[
-                { label: "About", href: "#" },
-                { label: "Security", href: "#" },
-                { label: "Privacy", href: "/privacy" },
-                { label: "Terms", href: "#" },
-                { label: "Contact", href: "mailto:info@efintax.biz" },
-              ].map((l) => (
-                l.href.startsWith("/") ? (
-                  <Link key={l.label} to={l.href} className="hover:text-neutral-900 transition-colors">{l.label}</Link>
-                ) : (
-                  <a key={l.label} href={l.href} className="hover:text-neutral-900 transition-colors">{l.label}</a>
-                )
-              ))}
-            </div>
+
+            {/* Link columns */}
+            {[
+              {
+                title: "Product",
+                links: [
+                  { label: "Send Money", href: "/send" },
+                  { label: "Exchange", href: "/exchange" },
+                  { label: "Wallets", href: "/wallets" },
+                  { label: "Cards", href: "/cards" },
+                ],
+              },
+              {
+                title: "Company",
+                links: [
+                  { label: "About", href: "#" },
+                  { label: "Security", href: "#" },
+                  { label: "Careers", href: "#" },
+                  { label: "Contact", href: "mailto:info@efintax.biz" },
+                ],
+              },
+              {
+                title: "Legal",
+                links: [
+                  { label: "Privacy", href: "/privacy" },
+                  { label: "Terms", href: "#" },
+                  { label: "Compliance", href: "#" },
+                  { label: "Cookies", href: "#" },
+                ],
+              },
+            ].map((col) => (
+              <div key={col.title} className="md:col-span-2">
+                <h4 className="text-xs font-bold uppercase tracking-[0.2em] text-[hsl(var(--accent-amber))] mb-4">
+                  {col.title}
+                </h4>
+                <ul className="space-y-3 text-sm">
+                  {col.links.map((l) =>
+                    l.href.startsWith("/") ? (
+                      <li key={l.label}>
+                        <Link to={l.href} className="text-white/65 hover:text-white transition-colors">
+                          {l.label}
+                        </Link>
+                      </li>
+                    ) : (
+                      <li key={l.label}>
+                        <a href={l.href} className="text-white/65 hover:text-white transition-colors">
+                          {l.label}
+                        </a>
+                      </li>
+                    )
+                  )}
+                </ul>
+              </div>
+            ))}
+
+            {/* Newsletter */}
+            <div className="md:col-span-1 md:hidden" />
           </div>
-          <div className="mt-10 pt-8 border-t border-neutral-200 flex flex-col md:flex-row justify-between gap-3 text-xs">
+
+          {/* Bottom bar */}
+          <div className="pt-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 text-xs text-white/50">
             <span>© {new Date().getFullYear()} eFinMoney. All rights reserved.</span>
-            <span>Licensed Money Services Business</span>
+            <div className="flex items-center gap-5">
+              <span className="hidden sm:inline">Built with care, regulated by design.</span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                All systems operational
+              </span>
+            </div>
           </div>
         </div>
       </footer>
