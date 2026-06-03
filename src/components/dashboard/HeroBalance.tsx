@@ -135,7 +135,7 @@ const HeroBalance = () => {
           transition={{ delay: 0.05, duration: 0.4 }}
           className="flex items-center justify-center gap-2 mb-6"
         >
-          <h1 className="text-lg sm:text-xl font-display font-semibold text-foreground">
+          <h1 className="text-lg sm:text-xl font-display font-semibold text-white/85">
             {greeting}, {firstName}
           </h1>
           <span
