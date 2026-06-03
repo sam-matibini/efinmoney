@@ -371,21 +371,16 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* ============ FINAL CTA ============ */}
-      <section className="bg-white py-20">
-        <div className="max-w-3xl mx-auto px-6 text-center">
-          <h2 className="text-3xl md:text-5xl font-black tracking-tight text-neutral-900">
-            Ready to move money the smart way?
-          </h2>
-          <p className="mt-4 text-lg text-neutral-600">Open a free account in under 2 minutes.</p>
-          <Link
-            to="/auth"
-            className="mt-8 inline-flex items-center gap-2 bg-[hsl(var(--accent-amber))] hover:brightness-110 text-[hsl(var(--brand-900))] font-bold px-8 py-4 rounded-full text-base transition-all hover:-translate-y-0.5 shadow-cta-amber"
-          >
-            Get Started <ArrowRight className="w-5 h-5" />
-          </Link>
-        </div>
+      {/* ============ BRAND DIVIDER ============ */}
+      <section aria-hidden className="relative h-32 overflow-hidden bg-grid-purple">
+        <div className="absolute inset-0 bg-[hsl(var(--brand-900))]" />
+        <div className="absolute inset-0 bg-grid-purple opacity-60" />
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[hsl(var(--accent-amber))]/60 to-transparent" />
+        <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-[hsl(var(--primary))]/60 to-transparent" />
+        <div className="absolute -top-16 left-1/4 w-72 h-72 rounded-full bg-[hsl(var(--primary))]/30 blur-3xl" />
+        <div className="absolute -bottom-16 right-1/4 w-72 h-72 rounded-full bg-[hsl(var(--accent-amber))]/20 blur-3xl" />
       </section>
+
 
 
 
