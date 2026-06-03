@@ -192,8 +192,8 @@ const HeroBalance = () => {
             <AreaChart data={sparkData}>
               <defs>
                 <linearGradient id="hero-area" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#6366f1" stopOpacity={0.55} />
-                  <stop offset="100%" stopColor="#6366f1" stopOpacity={0} />
+                  <stop offset="0%" stopColor="hsl(250 85% 70%)" stopOpacity={0.55} />
+                  <stop offset="100%" stopColor="hsl(250 85% 70%)" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <Tooltip
@@ -211,7 +211,7 @@ const HeroBalance = () => {
               <Area
                 type="monotone"
                 dataKey="value"
-                stroke="#6366f1"
+                stroke="hsl(250 85% 70%)"
                 strokeWidth={2.5}
                 fill="url(#hero-area)"
                 isAnimationActive
