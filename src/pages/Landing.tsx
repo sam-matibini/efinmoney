@@ -17,7 +17,7 @@ const FEATURES = [
 ];
 
 const STEPS = [
-  { n: 1, title: "Create your account", desc: "Sign up in under 2 minutes — no paperwork required." },
+  { n: 1, title: "Create your account" },
   { n: 2, title: "Add funds via card or bank", desc: "Top up instantly with your debit card or linked bank." },
   { n: 3, title: "Send money anywhere in Africa", desc: "Mobile money, bank deposit, or wallet — your choice." },
 ];
@@ -346,7 +346,7 @@ const Landing = () => {
                   {s.n}
                 </div>
                 <h3 className="text-xl font-black text-primary mb-3">{s.title}</h3>
-                <p className="text-white/80">{s.desc}</p>
+                {s.desc && <p className="text-white/80">{s.desc}</p>}
               </motion.div>
             ))}
           </div>
