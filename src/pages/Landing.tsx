@@ -235,16 +235,10 @@ const Landing = () => {
               className="mt-9 flex flex-col sm:flex-row items-center lg:items-start justify-center lg:justify-start gap-3"
             >
               <Link
-                to="/auth"
+                to="/"
                 className="group inline-flex items-center gap-2 bg-[hsl(var(--accent-amber))] hover:brightness-110 text-[hsl(var(--brand-900))] font-bold px-7 py-3.5 rounded-full text-base transition-all hover:-translate-y-0.5 shadow-cta-amber"
               >
                 Get eFinMoney <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-              </Link>
-              <Link
-                to="/auth"
-                className="inline-flex items-center gap-2 border border-white/25 text-white hover:bg-white/10 font-semibold px-7 py-3.5 rounded-full text-base transition-all backdrop-blur"
-              >
-                Try Teams Plan
               </Link>
             </motion.div>
 
