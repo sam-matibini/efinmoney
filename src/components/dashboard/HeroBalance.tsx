@@ -156,25 +156,25 @@ const HeroBalance = () => {
           {walletsLoading ? (
             <Skeleton className="h-16 w-72 mx-auto" />
           ) : (
-            <h2 className="text-5xl sm:text-6xl md:text-7xl font-display font-bold tracking-tight text-foreground inline-flex items-center justify-center gap-3 sm:gap-4">
+            <h2 className="text-5xl sm:text-6xl md:text-7xl font-display font-bold tracking-tight text-white inline-flex items-center justify-center gap-3 sm:gap-4">
               <span>{hidden ? <span className="tracking-widest">••••••</span> : <AnimatedBalance value={totalUsd} />}</span>
               <button
                 onClick={() => setHidden((v) => !v)}
                 aria-label={hidden ? "Show balance" : "Hide balance"}
-                className="p-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+                className="p-2 rounded-full text-white/60 hover:text-white hover:bg-white/10 transition-colors"
               >
                 {hidden ? <EyeOff className="w-5 h-5 sm:w-6 sm:h-6" /> : <Eye className="w-5 h-5 sm:w-6 sm:h-6" />}
               </button>
             </h2>
           )}
-          <p className="text-sm text-muted-foreground mt-2">Total Portfolio Value</p>
+          <p className="text-sm text-white/55 mt-2">Total Portfolio Value</p>
 
           {/* Decorative monthly budget arc */}
           <div className="mt-4 flex items-center justify-center gap-3">
             <BudgetArc pct={monthlyBudgetPct} />
             <div className="text-left">
-              <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Monthly budget</p>
-              <p className="text-sm font-semibold text-muted-foreground">
+              <p className="text-[11px] uppercase tracking-wider text-white/50">Monthly budget</p>
+              <p className="text-sm font-semibold text-white/75">
                 {monthlyBudgetSet ? `${monthlyBudgetPct}% used` : "Not set"}
               </p>
             </div>
