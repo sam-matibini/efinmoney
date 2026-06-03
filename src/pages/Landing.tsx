@@ -358,19 +358,42 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* ============ STATS ============ */}
-      <section id="trust" className="bg-white py-20">
-        <div className="max-w-6xl mx-auto px-6">
+      {/* ============ STATS (deep purple band) ============ */}
+      <section id="trust" className="relative bg-grid-purple text-white py-20 overflow-hidden">
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[300px] rounded-full bg-[hsl(var(--brand-500)/0.25)] blur-[120px]" />
+        </div>
+        <div className="relative max-w-6xl mx-auto px-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-10 text-center">
             {STATS.map((s) => (
               <div key={s.label}>
-                <Counter to={s.value} decimals={s.decimals ?? 0} prefix={s.prefix} suffix={s.suffix} />
-                <div className="mt-2 text-sm font-medium text-neutral-500 uppercase tracking-wide">{s.label}</div>
+                <div className="text-4xl md:text-5xl font-black text-white">
+                  <Counter to={s.value} decimals={s.decimals ?? 0} prefix={s.prefix} suffix={s.suffix} />
+                </div>
+                <div className="mt-2 text-xs font-semibold text-white/55 uppercase tracking-[0.2em]">{s.label}</div>
               </div>
             ))}
           </div>
         </div>
       </section>
+
+      {/* ============ FINAL CTA ============ */}
+      <section className="bg-white py-20">
+        <div className="max-w-3xl mx-auto px-6 text-center">
+          <h2 className="text-3xl md:text-5xl font-black tracking-tight text-neutral-900">
+            Ready to move money the smart way?
+          </h2>
+          <p className="mt-4 text-lg text-neutral-600">Open a free account in under 2 minutes.</p>
+          <Link
+            to="/auth"
+            className="mt-8 inline-flex items-center gap-2 bg-[hsl(var(--accent-amber))] hover:brightness-110 text-[hsl(var(--brand-900))] font-bold px-8 py-4 rounded-full text-base transition-all hover:-translate-y-0.5 shadow-cta-amber"
+          >
+            Get Started <ArrowRight className="w-5 h-5" />
+          </Link>
+        </div>
+      </section>
+
+
 
 
 
