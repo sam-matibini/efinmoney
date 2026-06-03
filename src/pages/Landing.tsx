@@ -140,7 +140,7 @@ const Counter = ({ to, decimals = 0, prefix = "", suffix = "" }: { to: number; d
     return () => cancelAnimationFrame(raf);
   }, [inView, to]);
   const display = to >= 1000 ? Math.round(val).toLocaleString() : val.toFixed(decimals);
-  return <div ref={ref} className="text-4xl md:text-5xl font-black text-neutral-900">{prefix}{display}{suffix}</div>;
+  return <div ref={ref} className="text-4xl md:text-5xl font-black text-inherit">{prefix}{display}{suffix}</div>;
 };
 
 const HERO_WORDS = ["Send", "money", "across", "borders,", "instantly."];
