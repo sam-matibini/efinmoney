@@ -321,14 +321,14 @@ const Landing = () => {
       </section>
 
       {/* ============ HOW IT WORKS ============ */}
-      <section id="how" className="bg-[#F7F7F7] py-24">
+      <section id="how" className="bg-primary py-24">
         <div className="max-w-7xl mx-auto px-6">
           <motion.h2
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: "-80px" }}
             transition={{ duration: 0.6 }}
-            className="text-4xl md:text-5xl font-black tracking-tight text-neutral-900 text-center mb-16"
+            className="text-4xl md:text-5xl font-black tracking-tight text-white text-center mb-16"
           >
             How it works
           </motion.h2>
@@ -345,8 +345,8 @@ const Landing = () => {
                 <div className="mx-auto w-16 h-16 rounded-full bg-[hsl(var(--accent-amber))] text-[hsl(var(--brand-900))] text-2xl font-black flex items-center justify-center mb-6 shadow-cta-amber">
                   {s.n}
                 </div>
-                <h3 className="text-xl font-black text-neutral-900 mb-3">{s.title}</h3>
-                <p className="text-neutral-600">{s.desc}</p>
+                <h3 className="text-xl font-black text-white mb-3">{s.title}</h3>
+                <p className="text-white/80">{s.desc}</p>
               </motion.div>
             ))}
           </div>
