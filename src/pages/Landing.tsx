@@ -276,7 +276,7 @@ const Landing = () => {
 
 
       {/* ============ FEATURES ============ */}
-      <section id="features" className="bg-primary py-24">
+      <section id="features" className="bg-grid-purple py-24">
         <div className="max-w-7xl mx-auto px-6">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
