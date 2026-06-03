@@ -503,7 +503,7 @@ const Landing = () => {
                       </li>
                     ) : (
                       <li key={l.label}>
-                        <a href={l.href} className="text-[hsl(var(--accent-amber)/0.70)] hover:text-[hsl(var(--accent-amber))] transition-colors">
+                        <a href={l.href} className="text-[hsl(var(--brand-500)/0.80)] hover:text-[hsl(var(--brand-500))] transition-colors">
                           {l.label}
                         </a>
                       </li>
