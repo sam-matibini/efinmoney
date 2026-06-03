@@ -444,7 +444,7 @@ const Landing = () => {
                 <Logo className="w-10 h-10" />
                 <Wordmark className="font-black text-2xl" />
               </div>
-              <p className="mt-5 text-sm text-[hsl(var(--brand-500)/0.95)] max-w-sm leading-relaxed">
+              <p className="mt-5 text-sm text-[hsl(var(--primary)/0.95)] max-w-sm leading-relaxed">
                 The smartest way to move, hold and exchange money across borders. Built for individuals and businesses worldwide.
               </p>
               <div className="mt-6 flex flex-wrap gap-2">
@@ -490,20 +490,20 @@ const Landing = () => {
               },
             ].map((col) => (
               <div key={col.title} className="md:col-span-2">
-                <h4 className="text-xs font-bold uppercase tracking-[0.2em] text-[hsl(var(--brand-500))] mb-4">
+                <h4 className="text-xs font-bold uppercase tracking-[0.2em] text-[hsl(var(--primary))] mb-4">
                   {col.title}
                 </h4>
                 <ul className="space-y-3 text-sm">
                   {col.links.map((l) =>
                     l.href.startsWith("/") ? (
                       <li key={l.label}>
-                        <Link to={l.href} className="text-[hsl(var(--brand-500)/0.80)] hover:text-[hsl(var(--brand-500))] transition-colors">
+                        <Link to={l.href} className="text-[hsl(var(--primary)/0.80)] hover:text-[hsl(var(--primary))] transition-colors">
                           {l.label}
                         </Link>
                       </li>
                     ) : (
                       <li key={l.label}>
-                        <a href={l.href} className="text-[hsl(var(--brand-500)/0.80)] hover:text-[hsl(var(--brand-500))] transition-colors">
+                        <a href={l.href} className="text-[hsl(var(--primary)/0.80)] hover:text-[hsl(var(--primary))] transition-colors">
                           {l.label}
                         </a>
                       </li>
@@ -518,7 +518,7 @@ const Landing = () => {
           </div>
 
           {/* Bottom bar */}
-          <div className="pt-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 text-xs text-[hsl(var(--brand-500))]">
+          <div className="pt-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 text-xs text-[hsl(var(--primary))]">
             <span>© {new Date().getFullYear()} eFinMoney. All rights reserved.</span>
             <span className="hidden sm:inline">Built with efinmoney.</span>
           </div>
