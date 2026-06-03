@@ -321,7 +321,7 @@ const Landing = () => {
       </section>
 
       {/* ============ HOW IT WORKS ============ */}
-      <section id="how" className="bg-primary py-24">
+      <section id="how" className="bg-grid-purple py-24">
         <div className="max-w-7xl mx-auto px-6">
           <motion.h2
             initial={{ opacity: 0, y: 30 }}
