@@ -285,7 +285,7 @@ const Landing = () => {
             transition={{ duration: 0.6 }}
             className="text-center mb-16"
           >
-            <h2 className="text-4xl md:text-5xl font-black tracking-tight text-primary">
+            <h2 className="text-4xl md:text-5xl font-black tracking-tight text-white">
               Built for the way you move money.
             </h2>
           </motion.div>
