@@ -520,13 +520,7 @@ const Landing = () => {
           {/* Bottom bar */}
           <div className="pt-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 text-xs text-white/50">
             <span>© {new Date().getFullYear()} eFinMoney. All rights reserved.</span>
-            <div className="flex items-center gap-5">
-              <span className="hidden sm:inline">Built with care, regulated by design.</span>
-              <span className="inline-flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                All systems operational
-              </span>
-            </div>
+            <span className="hidden sm:inline">Built with efinmoney.</span>
           </div>
         </div>
       </footer>
