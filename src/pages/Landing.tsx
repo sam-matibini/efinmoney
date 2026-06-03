@@ -497,7 +497,7 @@ const Landing = () => {
                   {col.links.map((l) =>
                     l.href.startsWith("/") ? (
                       <li key={l.label}>
-                        <Link to={l.href} className="text-white/65 hover:text-white transition-colors">
+                        <Link to={l.href} className="text-[hsl(var(--accent-amber)/0.70)] hover:text-[hsl(var(--accent-amber))] transition-colors">
                           {l.label}
                         </Link>
                       </li>
