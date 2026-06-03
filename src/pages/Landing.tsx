@@ -162,7 +162,7 @@ const Landing = () => {
         <nav className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
             <Logo className="w-9 h-9" />
-            <Wordmark className="font-black text-xl tracking-tight text-white" />
+            <Wordmark className="font-black text-xl tracking-tight" />
           </Link>
           <div className="hidden md:flex items-center gap-8">
             {NAV_LINKS.map((l) => (
@@ -442,7 +442,7 @@ const Landing = () => {
             <div className="md:col-span-5">
               <div className="flex items-center gap-2">
                 <Logo className="w-10 h-10" />
-                <Wordmark className="font-black text-2xl text-white" />
+                <Wordmark className="font-black text-2xl" />
               </div>
               <p className="mt-5 text-sm text-white/60 max-w-sm leading-relaxed">
                 The smartest way to move, hold and exchange money across borders. Built for individuals and businesses worldwide.
