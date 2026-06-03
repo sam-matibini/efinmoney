@@ -518,7 +518,7 @@ const Landing = () => {
           </div>
 
           {/* Bottom bar */}
-          <div className="pt-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 text-xs text-white/50">
+          <div className="pt-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 text-xs text-[hsl(var(--accent-amber))]">
             <span>© {new Date().getFullYear()} eFinMoney. All rights reserved.</span>
             <span className="hidden sm:inline">Built with efinmoney.</span>
           </div>
