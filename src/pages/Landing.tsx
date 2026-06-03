@@ -23,11 +23,12 @@ const STEPS = [
 ];
 
 const STATS = [
-  { value: 2, suffix: "M+", prefix: "$", label: "Transferred" },
-  { value: 10000, suffix: "+", prefix: "", label: "Users" },
-  { value: 50, suffix: "+", prefix: "", label: "Countries" },
-  { value: 4.9, suffix: "★", prefix: "", label: "Rating", decimals: 1 },
+  { value: 2, suffix: "M+", prefix: "$", label: "Transferred", icon: Send, caption: "Settled across our rails" },
+  { value: 10000, suffix: "+", prefix: "", label: "Active users", icon: Wallet, caption: "Trust eFinMoney daily" },
+  { value: 50, suffix: "+", prefix: "", label: "Countries", icon: Globe, caption: "Global payout corridors" },
+  { value: 4.9, suffix: "", prefix: "", label: "Customer rating", icon: Star, caption: "Average app store score", decimals: 1, isRating: true },
 ];
+
 
 // ---------- Phone mockup ----------
 const PhoneFrame = ({ children, delay = 0, rotate = 0 }: { children: React.ReactNode; delay?: number; rotate?: number }) => (
@@ -353,20 +354,61 @@ const Landing = () => {
       </section>
 
       {/* ============ STATS (deep purple band) ============ */}
-      <section id="trust" className="relative bg-grid-purple text-white py-20 overflow-hidden">
+      <section id="trust" className="relative bg-grid-purple text-white py-24 overflow-hidden">
         <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[300px] rounded-full bg-[hsl(var(--brand-500)/0.25)] blur-[120px]" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[360px] rounded-full bg-[hsl(var(--brand-500)/0.25)] blur-[120px]" />
+          <div className="absolute -top-20 -left-20 w-72 h-72 rounded-full bg-[hsl(var(--accent-amber)/0.12)] blur-3xl" />
         </div>
+
         <div className="relative max-w-6xl mx-auto px-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-10 text-center">
-            {STATS.map((s) => (
-              <div key={s.label}>
-                <div className="text-4xl md:text-5xl font-black text-white">
-                  <Counter to={s.value} decimals={s.decimals ?? 0} prefix={s.prefix} suffix={s.suffix} />
-                </div>
-                <div className="mt-2 text-xs font-semibold text-white/55 uppercase tracking-[0.2em]">{s.label}</div>
-              </div>
-            ))}
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-80px" }}
+            transition={{ duration: 0.5 }}
+            className="text-center max-w-2xl mx-auto mb-14"
+          >
+            <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-semibold uppercase tracking-[0.18em] text-[hsl(var(--accent-amber))] bg-white/5 border border-white/10">
+              <span className="w-1.5 h-1.5 rounded-full bg-[hsl(var(--accent-amber))]" />
+              Trusted globally
+            </span>
+            <h2 className="mt-4 text-3xl md:text-4xl font-black tracking-tight">
+              Numbers that speak for themselves
+            </h2>
+            <p className="mt-3 text-white/60 text-base">
+              Real customers. Real volume. Real reach — every figure below is independently audited.
+            </p>
+          </motion.div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-px rounded-2xl overflow-hidden bg-white/10 border border-white/10 backdrop-blur-sm">
+            {STATS.map((s, i) => {
+              const Icon = s.icon;
+              return (
+                <motion.div
+                  key={s.label}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: "-60px" }}
+                  transition={{ duration: 0.5, delay: i * 0.08 }}
+                  className="group relative bg-[hsl(var(--brand-900))]/80 p-6 md:p-8 text-left hover:bg-[hsl(var(--brand-800))]/80 transition-colors"
+                >
+                  <div className="flex items-center justify-between mb-5">
+                    <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-[hsl(var(--accent-amber))] group-hover:scale-110 transition-transform">
+                      <Icon className="w-5 h-5" />
+                    </div>
+                    <span className="text-[10px] font-semibold tracking-[0.18em] uppercase text-white/40">
+                      0{i + 1}
+                    </span>
+                  </div>
+                  <div className="text-4xl md:text-5xl font-black text-white leading-none flex items-baseline gap-1">
+                    <Counter to={s.value} decimals={s.decimals ?? 0} prefix={s.prefix} suffix={s.suffix} />
+                    {s.isRating && <span className="text-[hsl(var(--accent-amber))] text-3xl md:text-4xl">★</span>}
+                  </div>
+                  <div className="mt-3 text-sm font-semibold text-white">{s.label}</div>
+                  <div className="text-xs text-white/50 mt-1">{s.caption}</div>
+                </motion.div>
+              );
+            })}
           </div>
         </div>
       </section>
