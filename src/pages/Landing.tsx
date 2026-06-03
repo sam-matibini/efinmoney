@@ -215,7 +215,7 @@ const Landing = () => {
                   transition={{ delay: 0.15 + i * 0.1, duration: 0.55, ease: "easeOut" }}
                   className="inline-block mr-3"
                 >
-                  {i === 0 ? <span className="text-[hsl(var(--primary))]">{w}</span> : i >= 3 ? <span className="text-[hsl(var(--accent-amber))]">{w}</span> : w}
+                  {i === 0 ? <span className="text-[hsl(var(--brand-500))]">{w}</span> : i >= 3 ? <span className="text-[hsl(var(--accent-amber))]">{w}</span> : w}
                 </motion.span>
               ))}
             </h1>
