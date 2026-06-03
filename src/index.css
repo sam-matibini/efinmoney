@@ -155,6 +155,34 @@
     box-shadow: var(--shadow-elevated);
   }
 
+  .shadow-cta-amber {
+    box-shadow: var(--shadow-cta-amber);
+  }
+
+  .shadow-card-purple {
+    box-shadow: var(--shadow-card-purple);
+  }
+
+  /* PureVPN-style deep purple hero background with grid + dot map */
+  .bg-hero-deep {
+    background: var(--gradient-hero-deep);
+  }
+
+  .bg-grid-purple {
+    background-color: hsl(var(--brand-900));
+    background-image:
+      radial-gradient(ellipse 80% 60% at 50% 0%, hsl(var(--brand-500) / 0.35), transparent 70%),
+      linear-gradient(to right, hsl(var(--brand-500) / 0.08) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--brand-500) / 0.08) 1px, transparent 1px);
+    background-size: auto, 48px 48px, 48px 48px;
+  }
+  .bg-grid-purple-soft {
+    background-image:
+      linear-gradient(to right, hsl(var(--brand-500) / 0.07) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--brand-500) / 0.07) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
   .text-gradient {
     @apply bg-clip-text text-transparent;
     background: var(--gradient-primary);
