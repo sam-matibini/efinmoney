@@ -400,7 +400,7 @@ const Landing = () => {
                       0{i + 1}
                     </span>
                   </div>
-                  <div className="text-4xl md:text-5xl font-black text-white leading-none flex items-baseline gap-1">
+                  <div className="text-4xl md:text-5xl font-black text-[hsl(var(--accent-amber))] leading-none flex items-baseline gap-1">
                     <Counter to={s.value} decimals={s.decimals ?? 0} prefix={s.prefix} suffix={s.suffix} />
                     {s.isRating && <span className="text-[hsl(var(--accent-amber))] text-3xl md:text-4xl">★</span>}
                   </div>
