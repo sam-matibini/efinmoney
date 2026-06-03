@@ -23,11 +23,12 @@ const STEPS = [
 ];
 
 const STATS = [
-  { value: 2, suffix: "M+", prefix: "$", label: "Transferred" },
-  { value: 10000, suffix: "+", prefix: "", label: "Users" },
-  { value: 50, suffix: "+", prefix: "", label: "Countries" },
-  { value: 4.9, suffix: "★", prefix: "", label: "Rating", decimals: 1 },
+  { value: 2, suffix: "M+", prefix: "$", label: "Transferred", icon: Send, caption: "Settled across our rails" },
+  { value: 10000, suffix: "+", prefix: "", label: "Active users", icon: Wallet, caption: "Trust eFinMoney daily" },
+  { value: 50, suffix: "+", prefix: "", label: "Countries", icon: Globe, caption: "Global payout corridors" },
+  { value: 4.9, suffix: "", prefix: "", label: "Customer rating", icon: Star, caption: "Average app store score", decimals: 1, isRating: true },
 ];
+
 
 // ---------- Phone mockup ----------
 const PhoneFrame = ({ children, delay = 0, rotate = 0 }: { children: React.ReactNode; delay?: number; rotate?: number }) => (
