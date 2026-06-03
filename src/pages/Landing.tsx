@@ -276,7 +276,7 @@ const Landing = () => {
 
 
       {/* ============ FEATURES ============ */}
-      <section id="features" className="bg-white py-24">
+      <section id="features" className="bg-primary py-24">
         <div className="max-w-7xl mx-auto px-6">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
@@ -285,7 +285,7 @@ const Landing = () => {
             transition={{ duration: 0.6 }}
             className="text-center mb-16"
           >
-            <h2 className="text-4xl md:text-5xl font-black tracking-tight text-primary">
+            <h2 className="text-4xl md:text-5xl font-black tracking-tight text-white">
               Built for the way you move money.
             </h2>
           </motion.div>
