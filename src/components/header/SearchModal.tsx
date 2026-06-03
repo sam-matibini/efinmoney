@@ -164,7 +164,7 @@ const SearchModal = ({ open, onOpenChange }: SearchModalProps) => {
         id: `issued-${c.id}`,
         title: c.nickname || `${c.brand || "Card"} •••• ${c.last4 || ""}`.trim(),
         subtitle: `${c.brand || ""} ${c.currency || ""}`.trim() || "eFin card",
-        href: `/cards/${c.id}`,
+        href: `/cards/efin/${c.id}`,
       }));
 
       const ledgerResults: ResultItem[] = (ledgerRes.data || []).map((l: any) => {
