@@ -444,7 +444,7 @@ const Landing = () => {
                 <Logo className="w-10 h-10" />
                 <Wordmark className="font-black text-2xl" />
               </div>
-              <p className="mt-5 text-sm text-[hsl(var(--accent-amber)/0.85)] max-w-sm leading-relaxed">
+              <p className="mt-5 text-sm text-[hsl(var(--brand-500)/0.95)] max-w-sm leading-relaxed">
                 The smartest way to move, hold and exchange money across borders. Built for individuals and businesses worldwide.
               </p>
               <div className="mt-6 flex flex-wrap gap-2">
