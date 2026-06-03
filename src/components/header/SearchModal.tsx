@@ -128,7 +128,7 @@ const SearchModal = ({ open, onOpenChange }: SearchModalProps) => {
         id: t.id,
         title: t.recipient_name,
         subtitle: `${t.source_amount} ${t.source_currency} → ${t.target_currency}`,
-        href: `/transfer/${t.id}`,
+        href: `/transfers/${t.id}`,
       }));
 
       const walletResults: ResultItem[] = (walletsRes.data || []).map((w: any) => ({
