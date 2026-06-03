@@ -231,22 +231,22 @@ const HeroBalance = () => {
           <span
             className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold ${
               positive
-                ? "bg-primary/10 text-primary"
-                : "bg-destructive/10 text-destructive"
+                ? "bg-[hsl(var(--accent-amber)/0.18)] text-[hsl(var(--accent-amber))]"
+                : "bg-destructive/15 text-destructive"
             }`}
           >
             {positive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
             {positive ? "+" : ""}
             {todayChange.toFixed(2)}% today
           </span>
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold bg-muted text-foreground/80">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold bg-white/10 text-white/85 backdrop-blur">
             {(wallets || []).slice(0, 6).map((w) => {
               const f = flagForCurrency(w.currency_code);
               return <span key={w.wallet_id} title={w.currency_code}>{f !== "🌍" ? f : (w.flag_emoji || "💰")}</span>;
             })}
             {walletCount === 0 && <WalletIcon className="w-3 h-3" />}
           </span>
-          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-white/10 text-white/85 backdrop-blur">
             <Activity className="w-3 h-3" /> Active
           </span>
         </motion.div>
