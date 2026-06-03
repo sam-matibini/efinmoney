@@ -104,14 +104,10 @@ const HeroBalance = () => {
       initial={{ opacity: 0, y: -16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-      className="relative overflow-hidden rounded-3xl border border-border mb-8 animate-hero-shift"
-      style={{
-        backgroundImage:
-          "linear-gradient(120deg, hsl(var(--background)) 0%, hsl(var(--primary) / 0.08) 50%, hsl(var(--background)) 100%)",
-      }}
+      className="relative overflow-hidden rounded-3xl bg-grid-purple text-white mb-8 shadow-card-purple"
     >
-      <div className="absolute -top-20 -right-20 h-64 w-64 rounded-full bg-primary/10 blur-3xl pointer-events-none" />
-      <div className="absolute -bottom-16 -left-16 h-56 w-56 rounded-full bg-primary/5 blur-3xl pointer-events-none" />
+      <div className="absolute -top-32 left-1/2 -translate-x-1/2 h-72 w-[700px] rounded-full bg-[hsl(var(--brand-500)/0.35)] blur-[120px] pointer-events-none" />
+      <div className="absolute -bottom-20 -right-20 h-64 w-64 rounded-full bg-[hsl(var(--accent-amber)/0.12)] blur-3xl pointer-events-none" />
 
       {/* Floating currency symbols (decorative) */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
@@ -139,7 +135,7 @@ const HeroBalance = () => {
           transition={{ delay: 0.05, duration: 0.4 }}
           className="flex items-center justify-center gap-2 mb-6"
         >
-          <h1 className="text-lg sm:text-xl font-display font-semibold text-foreground">
+          <h1 className="text-lg sm:text-xl font-display font-semibold text-white/85">
             {greeting}, {firstName}
           </h1>
           <span
@@ -160,25 +156,25 @@ const HeroBalance = () => {
           {walletsLoading ? (
             <Skeleton className="h-16 w-72 mx-auto" />
           ) : (
-            <h2 className="text-5xl sm:text-6xl md:text-7xl font-display font-bold tracking-tight text-foreground inline-flex items-center justify-center gap-3 sm:gap-4">
+            <h2 className="text-5xl sm:text-6xl md:text-7xl font-display font-bold tracking-tight text-white inline-flex items-center justify-center gap-3 sm:gap-4">
               <span>{hidden ? <span className="tracking-widest">••••••</span> : <AnimatedBalance value={totalUsd} />}</span>
               <button
                 onClick={() => setHidden((v) => !v)}
                 aria-label={hidden ? "Show balance" : "Hide balance"}
-                className="p-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+                className="p-2 rounded-full text-white/60 hover:text-white hover:bg-white/10 transition-colors"
               >
                 {hidden ? <EyeOff className="w-5 h-5 sm:w-6 sm:h-6" /> : <Eye className="w-5 h-5 sm:w-6 sm:h-6" />}
               </button>
             </h2>
           )}
-          <p className="text-sm text-muted-foreground mt-2">Total Portfolio Value</p>
+          <p className="text-sm text-white/55 mt-2">Total Portfolio Value</p>
 
           {/* Decorative monthly budget arc */}
           <div className="mt-4 flex items-center justify-center gap-3">
             <BudgetArc pct={monthlyBudgetPct} />
             <div className="text-left">
-              <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Monthly budget</p>
-              <p className="text-sm font-semibold text-muted-foreground">
+              <p className="text-[11px] uppercase tracking-wider text-white/50">Monthly budget</p>
+              <p className="text-sm font-semibold text-white/75">
                 {monthlyBudgetSet ? `${monthlyBudgetPct}% used` : "Not set"}
               </p>
             </div>
@@ -196,8 +192,8 @@ const HeroBalance = () => {
             <AreaChart data={sparkData}>
               <defs>
                 <linearGradient id="hero-area" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#6366f1" stopOpacity={0.55} />
-                  <stop offset="100%" stopColor="#6366f1" stopOpacity={0} />
+                  <stop offset="0%" stopColor="hsl(250 85% 70%)" stopOpacity={0.55} />
+                  <stop offset="100%" stopColor="hsl(250 85% 70%)" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <Tooltip
@@ -215,7 +211,7 @@ const HeroBalance = () => {
               <Area
                 type="monotone"
                 dataKey="value"
-                stroke="#6366f1"
+                stroke="hsl(250 85% 70%)"
                 strokeWidth={2.5}
                 fill="url(#hero-area)"
                 isAnimationActive
@@ -235,22 +231,22 @@ const HeroBalance = () => {
           <span
             className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold ${
               positive
-                ? "bg-primary/10 text-primary"
-                : "bg-destructive/10 text-destructive"
+                ? "bg-[hsl(var(--accent-amber)/0.18)] text-[hsl(var(--accent-amber))]"
+                : "bg-destructive/15 text-destructive"
             }`}
           >
             {positive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
             {positive ? "+" : ""}
             {todayChange.toFixed(2)}% today
           </span>
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold bg-muted text-foreground/80">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold bg-white/10 text-white/85 backdrop-blur">
             {(wallets || []).slice(0, 6).map((w) => {
               const f = flagForCurrency(w.currency_code);
               return <span key={w.wallet_id} title={w.currency_code}>{f !== "🌍" ? f : (w.flag_emoji || "💰")}</span>;
             })}
             {walletCount === 0 && <WalletIcon className="w-3 h-3" />}
           </span>
-          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-white/10 text-white/85 backdrop-blur">
             <Activity className="w-3 h-3" /> Active
           </span>
         </motion.div>
@@ -276,10 +272,10 @@ const BudgetArc = ({ pct }: { pct: number }) => {
   const offset = c - (pct / 100) * c;
   return (
     <svg width="56" height="56" viewBox="0 0 56 56" className="-rotate-90">
-      <circle cx="28" cy="28" r={r} fill="none" stroke="hsl(var(--muted))" strokeWidth="5" />
+      <circle cx="28" cy="28" r={r} fill="none" stroke="hsl(0 0% 100% / 0.18)" strokeWidth="5" />
       <motion.circle
         cx="28" cy="28" r={r} fill="none"
-        stroke="hsl(var(--primary))"
+        stroke="hsl(var(--accent-amber))"
         strokeWidth="5"
         strokeLinecap="round"
         strokeDasharray={c}
