@@ -156,92 +156,129 @@ const Landing = () => {
 
   return (
     <div className="min-h-screen bg-white text-neutral-900 font-sans">
-      {/* ============ NAVBAR ============ */}
-      <header className="sticky top-0 z-50 bg-white/90 backdrop-blur border-b border-neutral-100">
+      {/* ============ NAVBAR (on dark hero) ============ */}
+      <header className="absolute top-0 inset-x-0 z-50">
         <nav className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
             <Logo className="w-9 h-9" />
-            <Wordmark className="font-black text-xl tracking-tight" />
+            <Wordmark className="font-black text-xl tracking-tight text-white" />
           </Link>
           <div className="hidden md:flex items-center gap-8">
             {NAV_LINKS.map((l) => (
-              <a key={l.href} href={l.href} className="text-sm font-medium text-neutral-700 hover:text-neutral-900 transition-colors">
+              <a key={l.href} href={l.href} className="text-sm font-medium text-white/70 hover:text-white transition-colors">
                 {l.label}
               </a>
             ))}
           </div>
           <div className="flex items-center gap-3">
-            <Link to="/auth" className="text-sm font-semibold text-neutral-900 hover:text-indigo-600 transition-colors px-3 py-2">
+            <Link to="/auth" className="text-sm font-semibold text-white/90 hover:text-white transition-colors px-3 py-2">
               Sign in
             </Link>
-            <Link to="/auth" className="text-sm font-bold bg-indigo-500 hover:bg-indigo-600 text-white px-5 py-2.5 rounded-full transition-all hover:-translate-y-0.5 shadow-sm">
+            <Link
+              to="/auth"
+              className="text-sm font-bold bg-[hsl(var(--accent-amber))] text-[hsl(var(--brand-900))] px-5 py-2.5 rounded-full transition-all hover:-translate-y-0.5 shadow-cta-amber"
+            >
               Get Started
             </Link>
           </div>
         </nav>
       </header>
 
-      {/* ============ HERO ============ */}
-      <section className="relative overflow-hidden">
-        <div className="max-w-7xl mx-auto px-6 pt-16 pb-12 md:pt-24 md:pb-20 text-center">
-          <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-black tracking-tight leading-[1.05] text-neutral-900">
-            {HERO_WORDS.map((w, i) => (
-              <motion.span
-                key={i}
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 + i * 0.12, duration: 0.6, ease: "easeOut" }}
-                className="inline-block mr-3"
+      {/* ============ HERO (deep purple, PureVPN-style) ============ */}
+      <section className="relative overflow-hidden bg-grid-purple text-white">
+        {/* radial vignette + soft amber spotlight */}
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-[900px] h-[600px] rounded-full bg-[hsl(var(--brand-500)/0.45)] blur-[140px]" />
+          <div className="absolute bottom-0 right-0 w-[500px] h-[400px] rounded-full bg-[hsl(var(--accent-amber)/0.10)] blur-[120px]" />
+        </div>
+
+        <div className="relative max-w-7xl mx-auto px-6 pt-32 pb-16 md:pt-40 md:pb-24 grid lg:grid-cols-2 gap-12 items-center">
+          {/* LEFT: copy */}
+          <div className="text-center lg:text-left">
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.05 }}
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/15 backdrop-blur text-xs font-semibold text-white/90 mb-6"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-[hsl(var(--accent-amber))] animate-pulse" />
+              Secure. Fast. Global. That's eFinMoney.
+            </motion.div>
+
+            <h1 className="text-5xl sm:text-6xl md:text-7xl font-black tracking-tight leading-[1.02] text-white">
+              {HERO_WORDS.map((w, i) => (
+                <motion.span
+                  key={i}
+                  initial={{ opacity: 0, y: 30 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.15 + i * 0.1, duration: 0.55, ease: "easeOut" }}
+                  className="inline-block mr-3"
+                >
+                  {i >= 3 ? <span className="text-[hsl(var(--accent-amber))]">{w}</span> : w}
+                </motion.span>
+              ))}
+            </h1>
+
+            <motion.p
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.85, duration: 0.55 }}
+              className="mt-7 max-w-xl text-base md:text-lg text-white/70 mx-auto lg:mx-0"
+            >
+              Multi-currency wallets, FX trading, crypto, and mobile money transfers to Africa — settled in minutes, not days.
+            </motion.p>
+
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 1.05, duration: 0.55 }}
+              className="mt-9 flex flex-col sm:flex-row items-center lg:items-start justify-center lg:justify-start gap-3"
+            >
+              <Link
+                to="/auth"
+                className="group inline-flex items-center gap-2 bg-[hsl(var(--accent-amber))] hover:brightness-110 text-[hsl(var(--brand-900))] font-bold px-7 py-3.5 rounded-full text-base transition-all hover:-translate-y-0.5 shadow-cta-amber"
               >
-                {i >= 3 ? <span className="text-indigo-500">{w}</span> : w}
-              </motion.span>
-            ))}
-          </h1>
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.9, duration: 0.6 }}
-            className="mt-8 max-w-2xl mx-auto text-lg md:text-xl text-neutral-600"
-          >
-            Multi-currency wallets, FX trading, crypto, and mobile money transfers to Africa.
-          </motion.p>
+                Get eFinMoney <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              </Link>
+              <Link
+                to="/auth"
+                className="inline-flex items-center gap-2 border border-white/25 text-white hover:bg-white/10 font-semibold px-7 py-3.5 rounded-full text-base transition-all backdrop-blur"
+              >
+                Try Teams Plan
+              </Link>
+            </motion.div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 1.1, duration: 0.6 }}
-            className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-3"
-          >
-            <Link to="/auth" className="group inline-flex items-center gap-2 bg-indigo-500 hover:bg-indigo-600 text-white font-bold px-8 py-4 rounded-full text-base transition-all hover:-translate-y-0.5 shadow-lg shadow-indigo-500/20">
-              Get Started <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-            </Link>
-            <Link to="/auth" className="inline-flex items-center gap-2 border-2 border-neutral-900 text-neutral-900 hover:bg-neutral-900 hover:text-white font-bold px-8 py-4 rounded-full text-base transition-all">
-              Sign in
-            </Link>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 1.4 }}
-            className="mt-6 inline-flex items-center gap-2 text-sm text-neutral-500"
-          >
-            <Globe className="w-4 h-4" />
-            Available on Web · iOS & Android coming soon
-          </motion.div>
-        </div>
-
-        {/* Phone mockups */}
-        <div className="relative max-w-7xl mx-auto px-6 pb-24">
-          <div className="flex items-end justify-center gap-2 sm:gap-6 flex-wrap">
-            <div className="hidden sm:block"><PhoneFrame delay={0.2} rotate={-6}><WalletScreen /></PhoneFrame></div>
-            <PhoneFrame delay={0.4}><SendScreen /></PhoneFrame>
-            <div className="hidden sm:block"><PhoneFrame delay={0.6} rotate={6}><ExchangeScreen /></PhoneFrame></div>
+            {/* Press strip */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 1.4, duration: 0.6 }}
+              className="mt-12 flex flex-wrap items-center justify-center lg:justify-start gap-x-7 gap-y-3 text-[11px] uppercase tracking-[0.2em] text-white/45 font-semibold"
+            >
+              <span>Forbes</span>
+              <span className="opacity-50">·</span>
+              <span>TechCrunch</span>
+              <span className="opacity-50">·</span>
+              <span>PCMag</span>
+              <span className="opacity-50">·</span>
+              <span>Mashable</span>
+              <span className="opacity-50">·</span>
+              <span>Yahoo Finance</span>
+            </motion.div>
           </div>
-          {/* soft glow */}
-          <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-white to-transparent pointer-events-none" />
+
+          {/* RIGHT: phone mockups */}
+          <div className="relative flex items-end justify-center gap-3 lg:gap-5">
+            <div className="hidden md:block"><PhoneFrame delay={0.3} rotate={-6}><WalletScreen /></PhoneFrame></div>
+            <PhoneFrame delay={0.5}><SendScreen /></PhoneFrame>
+            <div className="hidden lg:block"><PhoneFrame delay={0.7} rotate={6}><ExchangeScreen /></PhoneFrame></div>
+          </div>
         </div>
+
+        {/* bottom fade into white sections */}
+        <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-white to-transparent pointer-events-none" />
       </section>
+
 
       {/* ============ FEATURES ============ */}
       <section id="features" className="bg-white py-24">
