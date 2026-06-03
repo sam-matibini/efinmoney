@@ -98,7 +98,7 @@ export const TrialBalancePanel = () => {
           </p>
         </div>
         <div className={`px-3 py-1 rounded-full text-sm font-medium ${
-          isBalanced ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'
+          isBalanced ? 'bg-indigo-500/10 text-indigo-500' : 'bg-red-500/10 text-red-500'
         }`}>
           {isBalanced ? 'Balanced' : 'Unbalanced'}
         </div>

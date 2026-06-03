@@ -53,7 +53,7 @@ const MockEfinVisaCard = () => {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-display font-bold flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-emerald-400" />
+            <Sparkles className="w-4 h-4 text-indigo-400" />
             eFinVISA · Virtual Visa Card
           </h2>
           <p className="text-xs text-muted-foreground">
@@ -99,8 +99,8 @@ const MockEfinVisaCard = () => {
               }}
             />
             {/* corner glow */}
-            <div className="absolute -top-16 -right-16 w-44 h-44 rounded-full bg-emerald-400/25 blur-3xl pointer-events-none" />
-            <div className="absolute -bottom-16 -left-16 w-44 h-44 rounded-full bg-emerald-700/30 blur-3xl pointer-events-none" />
+            <div className="absolute -top-16 -right-16 w-44 h-44 rounded-full bg-indigo-400/25 blur-3xl pointer-events-none" />
+            <div className="absolute -bottom-16 -left-16 w-44 h-44 rounded-full bg-indigo-700/30 blur-3xl pointer-events-none" />
 
             <div className="relative h-full flex flex-col justify-between">
               <div className="flex items-start justify-between">

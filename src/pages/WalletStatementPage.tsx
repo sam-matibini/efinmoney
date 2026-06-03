@@ -124,7 +124,7 @@ const WalletStatementPage = () => {
 
         {/* Balance Totals (whole wallet history) */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div className="rounded-xl border border-border bg-emerald-500/[0.04] p-4">
+          <div className="rounded-xl border border-border bg-indigo-500/[0.04] p-4">
             <div className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">Total Money In</div>
             <div className="text-xl sm:text-2xl font-display font-bold text-primary tabular-nums">
               +{fmt(totalIn)} {wallet?.currency_code}

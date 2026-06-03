@@ -28,9 +28,9 @@ import { format } from "date-fns";
 
 const channelConfig: Record<string, { icon: typeof Mail; color: string; label: string }> = {
   email: { icon: Mail, color: 'bg-blue-500/10 text-blue-600', label: 'Email' },
-  sms: { icon: MessageCircle, color: 'bg-green-500/10 text-green-600', label: 'SMS' },
+  sms: { icon: MessageCircle, color: 'bg-indigo-500/10 text-indigo-600', label: 'SMS' },
   in_app: { icon: Bell, color: 'bg-purple-500/10 text-purple-600', label: 'In-App' },
-  whatsapp: { icon: MessageCircle, color: 'bg-emerald-500/10 text-emerald-600', label: 'WhatsApp' },
+  whatsapp: { icon: MessageCircle, color: 'bg-indigo-500/10 text-indigo-600', label: 'WhatsApp' },
   push: { icon: Bell, color: 'bg-amber-500/10 text-amber-600', label: 'Push' },
   phone_call: { icon: Phone, color: 'bg-orange-500/10 text-orange-600', label: 'Phone Call' },
 };
@@ -38,8 +38,8 @@ const channelConfig: Record<string, { icon: typeof Mail; color: string; label: s
 const statusConfig: Record<string, { color: string }> = {
   draft: { color: 'bg-muted text-muted-foreground' },
   scheduled: { color: 'bg-blue-500/10 text-blue-600' },
-  sent: { color: 'bg-green-500/10 text-green-600' },
-  delivered: { color: 'bg-green-500/10 text-green-600' },
+  sent: { color: 'bg-indigo-500/10 text-indigo-600' },
+  delivered: { color: 'bg-indigo-500/10 text-indigo-600' },
   failed: { color: 'bg-red-500/10 text-red-600' },
   read: { color: 'bg-purple-500/10 text-purple-600' },
 };
@@ -155,7 +155,7 @@ export const CommunicationsPanel = () => {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-2">
-              <ArrowUpRight className="w-5 h-5 text-green-500" />
+              <ArrowUpRight className="w-5 h-5 text-indigo-500" />
               <div>
                 <p className="text-2xl font-bold">{communications.filter(c => c.direction === 'outbound').length}</p>
                 <p className="text-xs text-muted-foreground">Outbound</p>
@@ -295,7 +295,7 @@ export const CommunicationsPanel = () => {
                         </TableCell>
                         <TableCell>
                           {comm.direction === 'outbound' ? (
-                            <Badge variant="outline" className="text-green-600">
+                            <Badge variant="outline" className="text-indigo-600">
                               <ArrowUpRight className="w-3 h-3 mr-1" />
                               Out
                             </Badge>

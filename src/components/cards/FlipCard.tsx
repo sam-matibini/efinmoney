@@ -102,7 +102,7 @@ const FlipCard = ({ card, flipped, onToggle, index }: FlipCardProps) => {
           scale: hovering ? 1.04 : 1,
         }}
         transition={{ duration: 0.3 }}
-        className="absolute -inset-4 rounded-[28px] bg-emerald-500/30 blur-2xl pointer-events-none"
+        className="absolute -inset-4 rounded-[28px] bg-indigo-500/30 blur-2xl pointer-events-none"
       />
 
       <motion.div
@@ -256,8 +256,8 @@ const FlipCard = ({ card, flipped, onToggle, index }: FlipCardProps) => {
                     transition={{ duration: 2.6, repeat: Infinity, ease: "easeInOut" }}
                     className="relative w-14 h-14 rounded-full bg-white/10 backdrop-blur flex items-center justify-center border border-white/20 shadow-[0_0_24px_rgba(16,185,129,0.35)]"
                   >
-                    <div className="absolute inset-0 rounded-full bg-emerald-400/20 blur-xl" />
-                    <ShieldCheck className="relative w-7 h-7 text-emerald-300" strokeWidth={2.2} />
+                    <div className="absolute inset-0 rounded-full bg-indigo-400/20 blur-xl" />
+                    <ShieldCheck className="relative w-7 h-7 text-indigo-300" strokeWidth={2.2} />
                   </motion.div>
                   <p className="mt-3 font-display font-semibold tracking-tight text-base">
                     Bank-Grade Encryption
@@ -310,7 +310,7 @@ const FlipCard = ({ card, flipped, onToggle, index }: FlipCardProps) => {
                       </p>
                     </div>
                     {/* hologram */}
-                    <div className="w-9 h-9 rounded-full bg-[conic-gradient(from_0deg,#fde68a,#fca5a5,#a7f3d0,#bfdbfe,#ddd6fe,#fde68a)] shadow-inner border border-white/30" />
+                    <div className="w-9 h-9 rounded-full bg-[conic-gradient(from_0deg,#fde68a,#fca5a5,#c7d2fe,#bfdbfe,#ddd6fe,#fde68a)] shadow-inner border border-white/30" />
                   </div>
                 </div>
 
@@ -336,7 +336,7 @@ const FlipCard = ({ card, flipped, onToggle, index }: FlipCardProps) => {
             animate={{ opacity: 0, x: p.x * 90, y: p.y * 90, scale: 0.4 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.6, ease: "easeOut" }}
-            className="absolute top-1/2 left-1/2 w-2 h-2 -ml-1 -mt-1 rounded-full bg-emerald-400 pointer-events-none"
+            className="absolute top-1/2 left-1/2 w-2 h-2 -ml-1 -mt-1 rounded-full bg-indigo-400 pointer-events-none"
             style={{ boxShadow: "0 0 8px rgba(16,185,129,0.8)" }}
           />
         ))}

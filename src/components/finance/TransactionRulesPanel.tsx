@@ -293,8 +293,8 @@ export const TransactionRulesPanel = () => {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-green-500/10">
-                <CheckCircle2 className="h-5 w-5 text-green-500" />
+              <div className="p-2 rounded-lg bg-indigo-500/10">
+                <CheckCircle2 className="h-5 w-5 text-indigo-500" />
               </div>
               <div>
                 <p className="text-2xl font-bold">{activeRules}</p>
@@ -581,7 +581,7 @@ export const TransactionRulesPanel = () => {
                       </TableCell>
                       <TableCell>
                         {rule.auto_post ? (
-                          <Badge className="bg-green-500/10 text-green-600 border-green-500/20">
+                          <Badge className="bg-indigo-500/10 text-indigo-600 border-indigo-500/20">
                             <Zap className="h-3 w-3 mr-1" />
                             Auto
                           </Badge>

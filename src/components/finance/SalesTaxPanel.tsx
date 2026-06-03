@@ -383,8 +383,8 @@ const TaxTransactionsTab = () => {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-green-500/10">
-                <DollarSign className="h-5 w-5 text-green-500" />
+              <div className="p-2 rounded-lg bg-indigo-500/10">
+                <DollarSign className="h-5 w-5 text-indigo-500" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Total Tax Collected</p>
@@ -569,7 +569,7 @@ const TaxFilingsTab = () => {
                     </TableCell>
                     <TableCell><Badge variant="outline">{filing.tax_type}</Badge></TableCell>
                     <TableCell className="text-right font-mono">${Number(filing.tax_collected).toFixed(2)}</TableCell>
-                    <TableCell className="text-right font-mono text-green-600">
+                    <TableCell className="text-right font-mono text-indigo-600">
                       -${Number(filing.input_tax_credits).toFixed(2)}
                     </TableCell>
                     <TableCell className="text-right font-mono font-semibold">

@@ -434,11 +434,11 @@ export const ReportsCentrePanel = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">Fee Income</p>
-                    <p className="text-2xl font-bold text-green-600">{formatCurrency(summaryData?.totalFees || 0)}</p>
+                    <p className="text-2xl font-bold text-indigo-600">{formatCurrency(summaryData?.totalFees || 0)}</p>
                     <p className="text-xs text-muted-foreground">Transfer & FX fees</p>
                   </div>
-                  <div className="h-12 w-12 rounded-full bg-green-500/10 flex items-center justify-center">
-                    <DollarSign className="h-6 w-6 text-green-600" />
+                  <div className="h-12 w-12 rounded-full bg-indigo-500/10 flex items-center justify-center">
+                    <DollarSign className="h-6 w-6 text-indigo-600" />
                   </div>
                 </div>
               </CardContent>
@@ -618,7 +618,7 @@ export const ReportsCentrePanel = () => {
                 <div className="grid gap-6 lg:grid-cols-2">
                   <div>
                     <h4 className="font-semibold mb-3 flex items-center gap-2">
-                      <TrendingUp className="h-4 w-4 text-green-600" />
+                      <TrendingUp className="h-4 w-4 text-indigo-600" />
                       Income
                     </h4>
                     <Table>
@@ -626,12 +626,12 @@ export const ReportsCentrePanel = () => {
                         {Object.entries(plData?.income || {}).map(([account, amount]) => (
                           <TableRow key={account}>
                             <TableCell>{account}</TableCell>
-                            <TableCell className="text-right text-green-600">{formatCurrency(amount)}</TableCell>
+                            <TableCell className="text-right text-indigo-600">{formatCurrency(amount)}</TableCell>
                           </TableRow>
                         ))}
                         <TableRow className="font-bold border-t-2">
                           <TableCell>Total Income</TableCell>
-                          <TableCell className="text-right text-green-600">{formatCurrency(plData?.totalIncome || 0)}</TableCell>
+                          <TableCell className="text-right text-indigo-600">{formatCurrency(plData?.totalIncome || 0)}</TableCell>
                         </TableRow>
                       </TableBody>
                     </Table>
@@ -659,14 +659,14 @@ export const ReportsCentrePanel = () => {
                   <div className="lg:col-span-2">
                     <Card className={cn(
                       "border-2",
-                      (plData?.netIncome || 0) >= 0 ? "border-green-500/20 bg-green-500/5" : "border-red-500/20 bg-red-500/5"
+                      (plData?.netIncome || 0) >= 0 ? "border-indigo-500/20 bg-indigo-500/5" : "border-red-500/20 bg-red-500/5"
                     )}>
                       <CardContent className="pt-6">
                         <div className="flex items-center justify-between">
                           <span className="text-lg font-semibold">Net Income</span>
                           <span className={cn(
                             "text-2xl font-bold",
-                            (plData?.netIncome || 0) >= 0 ? "text-green-600" : "text-red-600"
+                            (plData?.netIncome || 0) >= 0 ? "text-indigo-600" : "text-red-600"
                           )}>
                             {formatCurrency(plData?.netIncome || 0)}
                           </span>

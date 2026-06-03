@@ -27,7 +27,7 @@ interface InvoiceLine {
 const statusColors: Record<string, string> = {
   draft: 'bg-gray-500/10 text-gray-500',
   sent: 'bg-blue-500/10 text-blue-500',
-  paid: 'bg-green-500/10 text-green-500',
+  paid: 'bg-indigo-500/10 text-indigo-500',
   partial: 'bg-yellow-500/10 text-yellow-500',
   overdue: 'bg-red-500/10 text-red-500',
   cancelled: 'bg-gray-500/10 text-gray-400',

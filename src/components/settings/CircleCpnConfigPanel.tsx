@@ -88,7 +88,7 @@ export function CircleCpnConfigPanel() {
                 Stellar treasury to Circle → Circle pays out local fiat to recipient bank.
               </CardDescription>
             </div>
-            <Badge className="bg-green-500/10 text-green-600 border-green-500/20">
+            <Badge className="bg-indigo-500/10 text-indigo-600 border-indigo-500/20">
               <CheckCircle2 className="h-3 w-3 mr-1" /> Keys configured
             </Badge>
           </div>
@@ -100,7 +100,7 @@ export function CircleCpnConfigPanel() {
               Test connection (USD→MXN $100 quote)
             </Button>
             {testResult && (
-              <span className={`text-sm ${testResult.startsWith("OK") ? "text-green-600" : "text-destructive"}`}>
+              <span className={`text-sm ${testResult.startsWith("OK") ? "text-indigo-600" : "text-destructive"}`}>
                 {testResult.startsWith("OK") ? <CheckCircle2 className="h-4 w-4 inline mr-1" /> : <AlertCircle className="h-4 w-4 inline mr-1" />}
                 {testResult}
               </span>
@@ -133,7 +133,7 @@ export function CircleCpnConfigPanel() {
                       </span>
                       <Badge variant="outline" className="text-xs">{c.payout_method}</Badge>
                       {c.enabled && (
-                        <Badge className="bg-green-500/10 text-green-600 border-green-500/20 text-xs">Live</Badge>
+                        <Badge className="bg-indigo-500/10 text-indigo-600 border-indigo-500/20 text-xs">Live</Badge>
                       )}
                     </div>
                     <div className="text-xs text-muted-foreground mt-1">

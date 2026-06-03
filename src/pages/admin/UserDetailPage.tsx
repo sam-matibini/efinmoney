@@ -28,7 +28,7 @@ const statusColor = (s: string | null | undefined) => {
     case "active":
     case "approved":
     case "completed":
-    case "verified": return "bg-emerald-500/10 text-emerald-500 border-emerald-500/20";
+    case "verified": return "bg-indigo-500/10 text-indigo-500 border-indigo-500/20";
     case "suspended":
     case "rejected":
     case "failed": return "bg-red-500/10 text-red-500 border-red-500/20";
@@ -524,7 +524,7 @@ const UserDetailPage = () => {
                   ) : (
                     <ul className="space-y-3">
                       {communications.map((c: any) => (
-                        <li key={c.id} className="border-l-2 border-emerald-500/40 pl-3">
+                        <li key={c.id} className="border-l-2 border-indigo-500/40 pl-3">
                           <div className="flex items-center justify-between gap-2">
                             <span className="font-medium text-sm truncate">{c.subject || c.channel}</span>
                             <Badge variant="outline" className="text-xs capitalize">{c.direction}</Badge>

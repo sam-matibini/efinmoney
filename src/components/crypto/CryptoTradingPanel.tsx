@@ -294,7 +294,7 @@ export const CryptoTradingPanel = () => {
         <CardContent>
           <Tabs value={side} onValueChange={(v) => { setSide(v as "buy" | "sell"); setAmount(""); }}>
             <TabsList className="grid w-full grid-cols-2 mb-6">
-              <TabsTrigger value="buy" className="data-[state=active]:bg-green-600 data-[state=active]:text-white">
+              <TabsTrigger value="buy" className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white">
                 <TrendingUp className="w-4 h-4 mr-2" /> Buy Crypto
               </TabsTrigger>
               <TabsTrigger value="sell" className="data-[state=active]:bg-red-600 data-[state=active]:text-white">
@@ -400,7 +400,7 @@ export const CryptoTradingPanel = () => {
               <Button
                 size="lg"
                 className={`w-full h-14 text-base ${
-                  side === "buy" ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"
+                  side === "buy" ? "bg-indigo-600 hover:bg-indigo-700" : "bg-red-600 hover:bg-red-700"
                 }`}
                 disabled={!canTrade}
                 onClick={() => tradeMutation.mutate()}

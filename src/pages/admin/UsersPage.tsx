@@ -38,7 +38,7 @@ interface ProfileRow {
 
 const accountStatusVariant = (s: string | null) => {
   switch (s) {
-    case "active": return "bg-emerald-500/10 text-emerald-500 border-emerald-500/20";
+    case "active": return "bg-indigo-500/10 text-indigo-500 border-indigo-500/20";
     case "suspended": return "bg-red-500/10 text-red-500 border-red-500/20";
     case "pending_verification": return "bg-yellow-500/10 text-yellow-500 border-yellow-500/20";
     case "closed": return "bg-gray-500/10 text-gray-500 border-gray-500/20";
@@ -49,7 +49,7 @@ const accountStatusVariant = (s: string | null) => {
 const kycVariant = (s: string) => {
   switch (s) {
     case "approved":
-    case "verified": return "bg-emerald-500/10 text-emerald-500 border-emerald-500/20";
+    case "verified": return "bg-indigo-500/10 text-indigo-500 border-indigo-500/20";
     case "pending":
     case "submitted":
     case "pending_review": return "bg-yellow-500/10 text-yellow-500 border-yellow-500/20";

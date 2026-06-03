@@ -64,7 +64,7 @@ const RecentTransactions = () => {
         <div className="flex items-center gap-3">
           <h2 className="text-lg font-display font-semibold text-foreground">Account Statement</h2>
           <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-primary">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-live-pulse" />
+            <span className="w-2 h-2 rounded-full bg-indigo-500 animate-live-pulse" />
             Live
           </span>
         </div>
@@ -96,7 +96,7 @@ const RecentTransactions = () => {
       {/* Balance Money In / Out / Net tiles */}
       {hasItems && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-4">
-          <div className="rounded-xl border border-border bg-emerald-500/[0.04] px-3 py-2.5">
+          <div className="rounded-xl border border-border bg-indigo-500/[0.04] px-3 py-2.5">
             <div className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">Total Money In</div>
             <div className="text-base font-display font-bold text-primary tabular-nums break-words leading-tight">
               {renderTotals(totalsIn, "+")}

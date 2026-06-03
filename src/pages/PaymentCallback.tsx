@@ -179,7 +179,7 @@ const PaymentCallback = () => {
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
                 transition={{ type: "spring", stiffness: 200, damping: 14 }}
-                className="mx-auto h-20 w-20 rounded-full bg-emerald-500/15 flex items-center justify-center"
+                className="mx-auto h-20 w-20 rounded-full bg-indigo-500/15 flex items-center justify-center"
               >
                 <CheckCircle2 className="h-12 w-12 text-primary" />
               </motion.div>

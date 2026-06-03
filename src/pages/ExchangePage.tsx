@@ -156,7 +156,7 @@ const FxTradingPanel = () => {
           <motion.div
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
-            className="w-20 h-20 mx-auto mb-6 rounded-full bg-green-500/20 flex items-center justify-center"
+            className="w-20 h-20 mx-auto mb-6 rounded-full bg-indigo-500/20 flex items-center justify-center"
           >
             <CheckCircle className="w-10 h-10 text-primary" />
           </motion.div>

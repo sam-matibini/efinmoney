@@ -48,7 +48,7 @@ export const InteracVerification = ({ className, label = "Verify with Interac" }
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.96 }}
             transition={{ duration: 0.25 }}
-            className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 py-5 px-3"
+            className="rounded-xl border border-indigo-500/30 bg-indigo-500/5 py-5 px-3"
           >
             <LogoLoader
               size="md"

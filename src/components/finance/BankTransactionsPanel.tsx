@@ -355,7 +355,7 @@ export const BankTransactionsPanel = () => {
                           <TableCell className="max-w-[250px]">
                             <div className="flex items-center gap-2">
                               {Number(txn.credit_amount) > 0 ? (
-                                <ArrowDownLeft className="w-4 h-4 text-green-500 flex-shrink-0" />
+                                <ArrowDownLeft className="w-4 h-4 text-indigo-500 flex-shrink-0" />
                               ) : (
                                 <ArrowUpRight className="w-4 h-4 text-red-500 flex-shrink-0" />
                               )}
@@ -388,12 +388,12 @@ export const BankTransactionsPanel = () => {
                           <TableCell className="text-right font-mono text-red-600">
                             {Number(txn.debit_amount) > 0 ? Number(txn.debit_amount).toFixed(2) : '-'}
                           </TableCell>
-                          <TableCell className="text-right font-mono text-green-600">
+                          <TableCell className="text-right font-mono text-indigo-600">
                             {Number(txn.credit_amount) > 0 ? Number(txn.credit_amount).toFixed(2) : '-'}
                           </TableCell>
                           <TableCell>
                             {txn.is_posted ? (
-                              <Badge className="bg-green-500/10 text-green-600 border-green-500/20">
+                              <Badge className="bg-indigo-500/10 text-indigo-600 border-indigo-500/20">
                                 <CheckCircle2 className="h-3 w-3 mr-1" />
                                 Posted
                               </Badge>

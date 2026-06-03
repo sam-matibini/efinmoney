@@ -28,8 +28,8 @@ const statusConfig: Record<string, { color: string; label: string }> = {
   draft: { color: 'bg-muted text-muted-foreground', label: 'Draft' },
   pending_review: { color: 'bg-amber-500/10 text-amber-600', label: 'Pending Review' },
   approved: { color: 'bg-blue-500/10 text-blue-600', label: 'Approved' },
-  submitted: { color: 'bg-green-500/10 text-green-600', label: 'Submitted' },
-  acknowledged: { color: 'bg-green-500/10 text-green-600', label: 'Acknowledged' },
+  submitted: { color: 'bg-indigo-500/10 text-indigo-600', label: 'Submitted' },
+  acknowledged: { color: 'bg-indigo-500/10 text-indigo-600', label: 'Acknowledged' },
 };
 
 const reportTypeConfig: Record<string, { label: string; description: string }> = {
@@ -169,7 +169,7 @@ export const RegulatoryReportsPanel = () => {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-green-500" />
+              <CheckCircle2 className="w-5 h-5 text-indigo-500" />
               <div>
                 <p className="text-2xl font-bold">{reports.filter(r => r.status === 'submitted').length}</p>
                 <p className="text-xs text-muted-foreground">Submitted</p>

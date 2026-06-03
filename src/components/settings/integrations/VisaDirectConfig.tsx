@@ -40,7 +40,7 @@ export function VisaDirectConfig({ onBack }: VisaDirectConfigProps) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             Connection Status
-            <Badge className="bg-green-500/10 text-green-600 border-green-500/20">
+            <Badge className="bg-indigo-500/10 text-indigo-600 border-indigo-500/20">
               <CheckCircle2 className="h-3 w-3 mr-1" /> Connected
             </Badge>
           </CardTitle>
@@ -137,7 +137,7 @@ export function VisaDirectConfig({ onBack }: VisaDirectConfigProps) {
               <div className="p-4 border rounded-lg space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="font-medium">Client Certificate</span>
-                  <Badge variant="outline" className="text-green-600">Valid</Badge>
+                  <Badge variant="outline" className="text-indigo-600">Valid</Badge>
                 </div>
                 <p className="text-sm text-muted-foreground">client_cert_prod.pem</p>
                 <Button variant="outline" size="sm">
@@ -147,7 +147,7 @@ export function VisaDirectConfig({ onBack }: VisaDirectConfigProps) {
               <div className="p-4 border rounded-lg space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="font-medium">Private Key</span>
-                  <Badge variant="outline" className="text-green-600">Valid</Badge>
+                  <Badge variant="outline" className="text-indigo-600">Valid</Badge>
                 </div>
                 <p className="text-sm text-muted-foreground">private_key_prod.pem</p>
                 <Button variant="outline" size="sm">

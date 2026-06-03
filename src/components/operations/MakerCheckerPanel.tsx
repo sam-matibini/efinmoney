@@ -24,7 +24,7 @@ import { Input } from "@/components/ui/input";
 
 const statusConfig: Record<string, { icon: typeof Clock; color: string; label: string }> = {
   pending: { icon: Clock, color: 'bg-amber-500/10 text-amber-600', label: 'Pending' },
-  approved: { icon: CheckCircle2, color: 'bg-green-500/10 text-green-600', label: 'Approved' },
+  approved: { icon: CheckCircle2, color: 'bg-indigo-500/10 text-indigo-600', label: 'Approved' },
   rejected: { icon: XCircle, color: 'bg-red-500/10 text-red-600', label: 'Rejected' },
   expired: { icon: AlertTriangle, color: 'bg-muted text-muted-foreground', label: 'Expired' },
   cancelled: { icon: XCircle, color: 'bg-muted text-muted-foreground', label: 'Cancelled' },
@@ -133,7 +133,7 @@ export const MakerCheckerPanel = () => {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-green-500" />
+              <CheckCircle2 className="w-5 h-5 text-indigo-500" />
               <div>
                 <p className="text-2xl font-bold">{requests.filter(r => r.status === 'approved').length}</p>
                 <p className="text-xs text-muted-foreground">Approved</p>

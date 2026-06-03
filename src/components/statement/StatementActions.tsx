@@ -33,7 +33,7 @@ export const StatementActions = ({ rows, meta, defaultEmail }: Props) => {
           <Button
             size="sm"
             disabled={disabled}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white border-0 shadow-sm"
+            className="bg-indigo-600 hover:bg-indigo-700 text-white border-0 shadow-sm"
           >
             <Download className="w-3.5 h-3.5 mr-1.5" /> Download
           </Button>
@@ -45,7 +45,7 @@ export const StatementActions = ({ rows, meta, defaultEmail }: Props) => {
             <FileType className="w-4 h-4 mr-2 text-rose-500" /> PDF
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => downloadXLSX(rows, meta)}>
-            <FileSpreadsheet className="w-4 h-4 mr-2 text-emerald-600" /> Excel (.xlsx)
+            <FileSpreadsheet className="w-4 h-4 mr-2 text-indigo-600" /> Excel (.xlsx)
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => downloadCSV(rows, meta)}>
             <FileText className="w-4 h-4 mr-2 text-sky-500" /> CSV
@@ -57,7 +57,7 @@ export const StatementActions = ({ rows, meta, defaultEmail }: Props) => {
         size="sm"
         disabled={disabled}
         onClick={() => setOpenEmail(true)}
-        className="bg-emerald-600 hover:bg-emerald-700 text-white border-0 shadow-sm"
+        className="bg-indigo-600 hover:bg-indigo-700 text-white border-0 shadow-sm"
       >
         <Share2 className="w-3.5 h-3.5 mr-1.5" /> Share
       </Button>

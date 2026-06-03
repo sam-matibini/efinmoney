@@ -255,7 +255,7 @@ export default function CanadaTransferPage() {
             </Button>
 
             {lastResult && (
-              <Alert className="border-green-500/30 bg-green-500/5">
+              <Alert className="border-indigo-500/30 bg-indigo-500/5">
                 <CheckCircle2 className="h-4 w-4 text-primary" />
                 <AlertDescription>
                   <div className="font-medium">Transfer {lastResult.reference} created</div>

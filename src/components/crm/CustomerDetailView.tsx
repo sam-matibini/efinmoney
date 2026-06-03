@@ -43,7 +43,7 @@ const kycStatuses = [
 ];
 
 const riskLevels = [
-  { value: 'low', label: 'Low Risk', color: 'text-green-600' },
+  { value: 'low', label: 'Low Risk', color: 'text-indigo-600' },
   { value: 'medium', label: 'Medium Risk', color: 'text-amber-600' },
   { value: 'high', label: 'High Risk', color: 'text-red-600' },
 ];

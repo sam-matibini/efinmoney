@@ -22,7 +22,7 @@ import EditUserModal from "./modals/EditUserModal";
 import DeleteUserModal from "./modals/DeleteUserModal";
 
 const kycStatusColors: Record<string, string> = {
-  verified: 'bg-green-500/10 text-green-500',
+  verified: 'bg-indigo-500/10 text-indigo-500',
   pending: 'bg-yellow-500/10 text-yellow-500',
   submitted: 'bg-blue-500/10 text-blue-500',
   rejected: 'bg-red-500/10 text-red-500',

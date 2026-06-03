@@ -207,7 +207,7 @@ const EfinmoneyP2PFlow = () => {
             <motion.div
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              className="flex items-center gap-3 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30"
+              className="flex items-center gap-3 p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/30"
             >
               <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
                 {recipient.avatar_url
@@ -223,7 +223,7 @@ const EfinmoneyP2PFlow = () => {
                   {recipient.account_number && <span>Acct: {recipient.account_number}</span>}
                 </div>
               </div>
-              <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+              <CheckCircle2 className="w-5 h-5 text-indigo-500" />
             </motion.div>
           )}
         </CardContent>

@@ -62,7 +62,7 @@ const IssueVirtualCardModal = ({ open, onClose, onCreated }: IssueVirtualCardMod
       <DialogContent className="sm:max-w-[460px] bg-card border-border max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 font-display">
-            <Sparkles className="w-4 h-4 text-emerald-500" />
+            <Sparkles className="w-4 h-4 text-indigo-500" />
             Issue eFinVISA Card
           </DialogTitle>
         </DialogHeader>
@@ -133,7 +133,7 @@ const IssueVirtualCardModal = ({ open, onClose, onCreated }: IssueVirtualCardMod
 
           <div className="flex items-start justify-between gap-3 rounded-lg border border-border bg-muted/30 p-3">
             <div className="flex gap-3">
-              <Wifi className="w-4 h-4 mt-0.5 text-emerald-500 rotate-90" />
+              <Wifi className="w-4 h-4 mt-0.5 text-indigo-500 rotate-90" />
               <div>
                 <Label htmlFor="tap-to-pay" className="text-sm">Tap to pay</Label>
                 <p className="text-xs text-muted-foreground mt-0.5">
@@ -154,7 +154,7 @@ const IssueVirtualCardModal = ({ open, onClose, onCreated }: IssueVirtualCardMod
           <Button
             onClick={submit}
             disabled={createCard.isPending}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white"
+            className="bg-indigo-600 hover:bg-indigo-700 text-white"
           >
             {createCard.isPending ? "Creating…" : "Create eFinVISA"}
           </Button>

@@ -26,7 +26,7 @@ const roleConfig: Record<string, { color: string; description: string }> = {
   admin: { color: 'bg-red-500/10 text-red-600', description: 'Full system access' },
   compliance: { color: 'bg-purple-500/10 text-purple-600', description: 'Compliance & AML operations' },
   finance: { color: 'bg-blue-500/10 text-blue-600', description: 'Finance & accounting access' },
-  support: { color: 'bg-green-500/10 text-green-600', description: 'Customer support operations' },
+  support: { color: 'bg-indigo-500/10 text-indigo-600', description: 'Customer support operations' },
   user: { color: 'bg-muted text-muted-foreground', description: 'Standard user access' },
 };
 

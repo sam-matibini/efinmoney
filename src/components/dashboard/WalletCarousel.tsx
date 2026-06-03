@@ -9,11 +9,11 @@ import AnimatedNumber from "@/components/ui/AnimatedNumber";
 import { flagForCurrency } from "@/lib/flags";
 
 const gradients: Record<string, string> = {
-  USD: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+  USD: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)",
   CAD: "linear-gradient(135deg, #0f766e 0%, #134e4a 100%)",
-  NGN: "linear-gradient(135deg, #047857 0%, #064e3b 100%)",
+  NGN: "linear-gradient(135deg, #4338ca 0%, #312e81 100%)",
   GBP: "linear-gradient(135deg, #14b8a6 0%, #0f766e 100%)",
-  EUR: "linear-gradient(135deg, #34d399 0%, #047857 100%)",
+  EUR: "linear-gradient(135deg, #8b5cf6 0%, #4338ca 100%)",
   KES: "linear-gradient(135deg, #65a30d 0%, #3f6212 100%)",
 };
 

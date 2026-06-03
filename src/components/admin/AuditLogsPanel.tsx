@@ -7,7 +7,7 @@ import { format } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const actionColors: Record<string, string> = {
-  INSERT: 'bg-green-500/10 text-green-500',
+  INSERT: 'bg-indigo-500/10 text-indigo-500',
   UPDATE: 'bg-blue-500/10 text-blue-500',
   DELETE: 'bg-red-500/10 text-red-500',
   LOGIN: 'bg-purple-500/10 text-purple-500',

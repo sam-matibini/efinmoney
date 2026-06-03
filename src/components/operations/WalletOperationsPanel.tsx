@@ -25,7 +25,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 
 const statusConfig: Record<string, { icon: typeof CheckCircle2; color: string; label: string }> = {
-  active: { icon: CheckCircle2, color: 'bg-green-500/10 text-green-600', label: 'Active' },
+  active: { icon: CheckCircle2, color: 'bg-indigo-500/10 text-indigo-600', label: 'Active' },
   frozen: { icon: Lock, color: 'bg-blue-500/10 text-blue-600', label: 'Frozen' },
   suspended: { icon: AlertTriangle, color: 'bg-amber-500/10 text-amber-600', label: 'Suspended' },
   closed: { icon: Ban, color: 'bg-red-500/10 text-red-600', label: 'Closed' },
@@ -164,7 +164,7 @@ export const WalletOperationsPanel = () => {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-green-500" />
+              <CheckCircle2 className="w-5 h-5 text-indigo-500" />
               <div>
                 <p className="text-2xl font-bold">{wallets.filter(w => w.status === 'active').length}</p>
                 <p className="text-xs text-muted-foreground">Active</p>
@@ -351,7 +351,7 @@ export const WalletOperationsPanel = () => {
             {walletOps.slice(0, 5).map((op) => (
               <div key={op.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                 <div className="flex items-center gap-3">
-                  {op.operation_type === 'freeze' ? <Lock className="w-4 h-4 text-blue-500" /> : <Unlock className="w-4 h-4 text-green-500" />}
+                  {op.operation_type === 'freeze' ? <Lock className="w-4 h-4 text-blue-500" /> : <Unlock className="w-4 h-4 text-indigo-500" />}
                   <div>
                     <p className="font-medium text-sm">{op.operation_type?.replace('_', ' ')}</p>
                     <p className="text-xs text-muted-foreground">{op.reason?.slice(0, 50)}...</p>

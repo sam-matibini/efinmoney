@@ -8,8 +8,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowUpRight, ArrowDownLeft } from "lucide-react";
 
 const statusColors: Record<string, string> = {
-  executed: 'bg-green-500/10 text-green-500',
-  completed: 'bg-green-500/10 text-green-500',
+  executed: 'bg-indigo-500/10 text-indigo-500',
+  completed: 'bg-indigo-500/10 text-indigo-500',
   pending: 'bg-yellow-500/10 text-yellow-500',
   failed: 'bg-red-500/10 text-red-500',
   cancelled: 'bg-muted text-muted-foreground',
@@ -104,11 +104,11 @@ export const CryptoTradesPanel = () => {
                       <TableCell>
                         <div className="flex items-center gap-1">
                           {trade.side === 'buy' ? (
-                            <ArrowDownLeft className="w-4 h-4 text-green-500" />
+                            <ArrowDownLeft className="w-4 h-4 text-indigo-500" />
                           ) : (
                             <ArrowUpRight className="w-4 h-4 text-red-500" />
                           )}
-                          <span className={trade.side === 'buy' ? 'text-green-500' : 'text-red-500'}>
+                          <span className={trade.side === 'buy' ? 'text-indigo-500' : 'text-red-500'}>
                             {trade.side.toUpperCase()}
                           </span>
                         </div>

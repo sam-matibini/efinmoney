@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { CheckCircle, XCircle, AlertTriangle, Clock } from "lucide-react";
 
 const statusConfig = {
-  matched: { icon: CheckCircle, color: 'text-green-500', bg: 'bg-green-500/10' },
+  matched: { icon: CheckCircle, color: 'text-indigo-500', bg: 'bg-indigo-500/10' },
   unmatched: { icon: XCircle, color: 'text-red-500', bg: 'bg-red-500/10' },
   exception: { icon: AlertTriangle, color: 'text-yellow-500', bg: 'bg-yellow-500/10' },
   pending: { icon: Clock, color: 'text-muted-foreground', bg: 'bg-muted' },

@@ -14,7 +14,7 @@ const ParticleBurst = ({ count = 18, className }: Props) => {
     "hsl(var(--primary))",
     "hsl(var(--primary) / 0.7)",
     "#fbbf24",
-    "#34d399",
+    "#8b5cf6",
     "#60a5fa",
   ];
   return (

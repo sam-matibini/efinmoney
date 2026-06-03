@@ -47,7 +47,7 @@ export function StripeConfig({ onBack }: StripeConfigProps) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             Connection Status
-            <Badge className="bg-green-500/10 text-green-600 border-green-500/20">
+            <Badge className="bg-indigo-500/10 text-indigo-600 border-indigo-500/20">
               <CheckCircle2 className="h-3 w-3 mr-1" /> Connected
             </Badge>
           </CardTitle>

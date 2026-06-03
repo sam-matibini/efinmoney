@@ -67,7 +67,7 @@ export function ComplianceConfig({ onBack, provider }: ComplianceConfigProps) {
           <CardTitle className="flex items-center gap-2">
             Connection Status
             {config.status === "connected" ? (
-              <Badge className="bg-green-500/10 text-green-600 border-green-500/20">
+              <Badge className="bg-indigo-500/10 text-indigo-600 border-indigo-500/20">
                 <CheckCircle2 className="h-3 w-3 mr-1" /> Connected
               </Badge>
             ) : (
@@ -89,7 +89,7 @@ export function ComplianceConfig({ onBack, provider }: ComplianceConfigProps) {
             </div>
             <div className="p-4 bg-muted rounded-lg">
               <p className="text-sm text-muted-foreground">Pass Rate</p>
-              <p className="text-sm font-medium text-green-600">94.2%</p>
+              <p className="text-sm font-medium text-indigo-600">94.2%</p>
             </div>
             <div className="p-4 bg-muted rounded-lg">
               <p className="text-sm text-muted-foreground">Avg Response Time</p>

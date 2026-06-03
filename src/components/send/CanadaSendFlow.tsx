@@ -739,9 +739,9 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
             <motion.div
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
-              className="w-20 h-20 mx-auto mb-6 rounded-full bg-green-500/20 flex items-center justify-center"
+              className="w-20 h-20 mx-auto mb-6 rounded-full bg-indigo-500/20 flex items-center justify-center"
             >
-              <CheckCircle className="w-10 h-10 text-green-500" />
+              <CheckCircle className="w-10 h-10 text-indigo-500" />
             </motion.div>
             <h3 className="text-2xl font-display font-bold mb-2">Transfer sent!</h3>
             <p className="text-muted-foreground mb-2">

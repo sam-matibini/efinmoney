@@ -139,7 +139,7 @@ const DocumentUploader = ({
               <FileText className="w-10 h-10 text-primary" />
             )}
             <div className="flex items-center gap-2 text-sm text-foreground">
-              <CheckCircle2 className="w-4 h-4 text-green-500" />
+              <CheckCircle2 className="w-4 h-4 text-indigo-500" />
               <span className="truncate max-w-[200px]">
                 {fileName || "Uploaded"}
               </span>

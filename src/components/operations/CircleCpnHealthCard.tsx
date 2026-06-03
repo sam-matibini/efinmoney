@@ -60,7 +60,7 @@ export const CircleCpnHealthCard = () => {
         ) : (
           <div className="space-y-3 text-sm">
             <div className="flex gap-2 flex-wrap">
-              <Badge variant="outline" className="gap-1"><CheckCircle2 className="w-3 h-3 text-green-600" /> {rows.length - pending.length - failed.length} settled</Badge>
+              <Badge variant="outline" className="gap-1"><CheckCircle2 className="w-3 h-3 text-indigo-600" /> {rows.length - pending.length - failed.length} settled</Badge>
               <Badge variant="outline" className="gap-1"><Clock className="w-3 h-3 text-amber-500" /> {pending.length} pending</Badge>
               <Badge variant="outline" className="gap-1"><AlertTriangle className="w-3 h-3 text-destructive" /> {failed.length} failed</Badge>
             </div>
