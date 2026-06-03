@@ -345,7 +345,7 @@ const Landing = () => {
                 <div className="mx-auto w-16 h-16 rounded-full bg-[hsl(var(--accent-amber))] text-[hsl(var(--brand-900))] text-2xl font-black flex items-center justify-center mb-6 shadow-cta-amber">
                   {s.n}
                 </div>
-                <h3 className="text-xl font-black text-white mb-3">{s.title}</h3>
+                <h3 className="text-xl font-black text-primary mb-3">{s.title}</h3>
                 <p className="text-white/80">{s.desc}</p>
               </motion.div>
             ))}
