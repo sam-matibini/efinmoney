@@ -606,7 +606,7 @@ export const FinancialStatementsPanel = () => {
                   {formatCurrency(cd[sectionKey]?.net || 0)}
                 </span>
               ))}
-              <span className={cn("font-mono font-semibold min-w-[100px] text-right", net >= 0 ? "text-green-600" : "text-red-600")}>
+              <span className={cn("font-mono font-semibold min-w-[100px] text-right", net >= 0 ? "text-indigo-600" : "text-red-600")}>
                 {formatCurrency(net)}
               </span>
             </div>
@@ -622,7 +622,7 @@ export const FinancialStatementsPanel = () => {
                     {formatCurrency(cd[sectionKey]?.inflows || 0)}
                   </span>
                 ))}
-                <span className="font-mono text-sm text-green-600 min-w-[100px] text-right">+{formatCurrency(inflows)}</span>
+                <span className="font-mono text-sm text-indigo-600 min-w-[100px] text-right">+{formatCurrency(inflows)}</span>
               </div>
             </div>
             <div className="flex justify-between items-center py-1.5 px-3 border-l-2 border-muted">
@@ -696,16 +696,16 @@ export const FinancialStatementsPanel = () => {
           <div className="pt-4 border-t-2">
             <div className={cn(
               "flex justify-between items-center py-4 px-4 rounded-lg font-bold text-lg",
-              data.netChange >= 0 ? "bg-green-500/20" : "bg-red-500/20"
+              data.netChange >= 0 ? "bg-indigo-500/20" : "bg-red-500/20"
             )}>
               <span>Net Change in Cash</span>
               <div className="flex items-center gap-4">
                 {hasComparison && comparisonCashFlow.map((cd, idx) => (
-                  <span key={idx} className={cn("font-mono text-sm min-w-[90px] text-right", (cd.netChange || 0) >= 0 ? "text-green-600/70" : "text-red-600/70")}>
+                  <span key={idx} className={cn("font-mono text-sm min-w-[90px] text-right", (cd.netChange || 0) >= 0 ? "text-indigo-600/70" : "text-red-600/70")}>
                     {formatCurrency(cd.netChange || 0)}
                   </span>
                 ))}
-                <span className={cn("font-mono min-w-[100px] text-right", data.netChange >= 0 ? "text-green-600" : "text-red-600")}>
+                <span className={cn("font-mono min-w-[100px] text-right", data.netChange >= 0 ? "text-indigo-600" : "text-red-600")}>
                   {formatCurrency(data.netChange)}
                 </span>
               </div>
@@ -982,10 +982,10 @@ export const FinancialStatementsPanel = () => {
               {/* Equity */}
               <div className="space-y-2">
                 <h3 className="font-bold text-lg flex items-center gap-2 border-b pb-2">
-                  <TrendingUp className="h-5 w-5 text-green-600" />
+                  <TrendingUp className="h-5 w-5 text-indigo-600" />
                   Equity
                 </h3>
-                {renderAccountSection('Equity', 'equity', ACCOUNT_CATEGORIES.equity.Equity, <DollarSign className="h-4 w-4 text-green-500" />)}
+                {renderAccountSection('Equity', 'equity', ACCOUNT_CATEGORIES.equity.Equity, <DollarSign className="h-4 w-4 text-indigo-500" />)}
                 <div className="flex justify-between items-center py-2 px-3 border-l-2 border-muted ml-6">
                   <span className="text-sm italic">Retained Earnings (Net Income)</span>
                   <div className="flex items-center gap-4">
@@ -994,17 +994,17 @@ export const FinancialStatementsPanel = () => {
                       const compExpenses = getComparisonTypeTotal('expense', idx);
                       const compNetIncome = compIncome - compExpenses;
                       return (
-                        <span key={idx} className={cn("font-mono text-sm min-w-[90px] text-right", compNetIncome >= 0 ? "text-green-600" : "text-red-600")}>
+                        <span key={idx} className={cn("font-mono text-sm min-w-[90px] text-right", compNetIncome >= 0 ? "text-indigo-600" : "text-red-600")}>
                           {formatCurrency(compNetIncome)}
                         </span>
                       );
                     })}
-                    <span className={cn("font-mono text-sm min-w-[100px] text-right", netIncome >= 0 ? "text-green-600" : "text-red-600")}>
+                    <span className={cn("font-mono text-sm min-w-[100px] text-right", netIncome >= 0 ? "text-indigo-600" : "text-red-600")}>
                       {formatCurrency(netIncome)}
                     </span>
                   </div>
                 </div>
-                <div className="flex justify-between items-center py-3 px-3 bg-green-500/10 rounded-lg font-bold">
+                <div className="flex justify-between items-center py-3 px-3 bg-indigo-500/10 rounded-lg font-bold">
                   <span>Total Equity</span>
                   <div className="flex items-center gap-4">
                     {compareConfig.enabled && comparisonPeriods.map((_, idx) => {
@@ -1069,23 +1069,23 @@ export const FinancialStatementsPanel = () => {
               {/* Revenue */}
               <div className="space-y-2">
                 <h3 className="font-bold text-lg flex items-center gap-2 border-b pb-2">
-                  <TrendingUp className="h-5 w-5 text-green-600" />
+                  <TrendingUp className="h-5 w-5 text-indigo-600" />
                   Revenue
                 </h3>
                 {Object.entries(ACCOUNT_CATEGORIES.income).map(([category, prefixes]) => (
                   <div key={category}>
-                    {renderAccountSection(category, 'income', prefixes, <DollarSign className="h-4 w-4 text-green-500" />)}
+                    {renderAccountSection(category, 'income', prefixes, <DollarSign className="h-4 w-4 text-indigo-500" />)}
                   </div>
                 ))}
-                <div className="flex justify-between items-center py-3 px-3 bg-green-500/10 rounded-lg font-bold">
+                <div className="flex justify-between items-center py-3 px-3 bg-indigo-500/10 rounded-lg font-bold">
                   <span>Total Revenue</span>
                   <div className="flex items-center gap-4">
                     {compareConfig.enabled && comparisonPeriods.map((_, idx) => (
-                      <span key={idx} className="font-mono text-sm text-green-600/70 min-w-[90px] text-right">
+                      <span key={idx} className="font-mono text-sm text-indigo-600/70 min-w-[90px] text-right">
                         {formatCurrency(getComparisonTypeTotal('income', idx))}
                       </span>
                     ))}
-                    <span className="font-mono text-green-600 min-w-[100px] text-right">{formatCurrency(totalIncome)}</span>
+                    <span className="font-mono text-indigo-600 min-w-[100px] text-right">{formatCurrency(totalIncome)}</span>
                   </div>
                 </div>
               </div>
@@ -1139,7 +1139,7 @@ export const FinancialStatementsPanel = () => {
               <div className="pt-4 border-t-2">
                 <div className={cn(
                   "flex justify-between items-center py-4 px-4 rounded-lg font-bold text-lg",
-                  netIncome >= 0 ? "bg-green-500/20" : "bg-red-500/20"
+                  netIncome >= 0 ? "bg-indigo-500/20" : "bg-red-500/20"
                 )}>
                   <span>Net Income</span>
                   <div className="flex items-center gap-4">
@@ -1148,12 +1148,12 @@ export const FinancialStatementsPanel = () => {
                       const compExpenses = getComparisonTypeTotal('expense', idx);
                       const compNetIncome = compIncome - compExpenses;
                       return (
-                        <span key={idx} className={cn("font-mono text-sm min-w-[90px] text-right", compNetIncome >= 0 ? "text-green-600/70" : "text-red-600/70")}>
+                        <span key={idx} className={cn("font-mono text-sm min-w-[90px] text-right", compNetIncome >= 0 ? "text-indigo-600/70" : "text-red-600/70")}>
                           {formatCurrency(compNetIncome)}
                         </span>
                       );
                     })}
-                    <span className={cn("font-mono min-w-[100px] text-right", netIncome >= 0 ? "text-green-600" : "text-red-600")}>
+                    <span className={cn("font-mono min-w-[100px] text-right", netIncome >= 0 ? "text-indigo-600" : "text-red-600")}>
                       {formatCurrency(netIncome)}
                     </span>
                   </div>
@@ -1200,28 +1200,28 @@ export const FinancialStatementsPanel = () => {
                     <tr className="border-b hover:bg-muted/50">
                       <td className="py-3 px-2">Share Capital</td>
                       <td className="text-right font-mono">{formatCurrency(0)}</td>
-                      <td className="text-right font-mono text-green-600">{formatCurrency(0)}</td>
+                      <td className="text-right font-mono text-indigo-600">{formatCurrency(0)}</td>
                       <td className="text-right font-mono text-red-600">{formatCurrency(0)}</td>
                       <td className="text-right font-mono font-semibold">{formatCurrency(0)}</td>
                     </tr>
                     <tr className="border-b hover:bg-muted/50">
                       <td className="py-3 px-2">Retained Earnings</td>
                       <td className="text-right font-mono">{formatCurrency(totalEquity)}</td>
-                      <td className="text-right font-mono text-green-600">{formatCurrency(netIncome > 0 ? netIncome : 0)}</td>
+                      <td className="text-right font-mono text-indigo-600">{formatCurrency(netIncome > 0 ? netIncome : 0)}</td>
                       <td className="text-right font-mono text-red-600">{formatCurrency(netIncome < 0 ? Math.abs(netIncome) : 0)}</td>
                       <td className="text-right font-mono font-semibold">{formatCurrency(totalEquity + netIncome)}</td>
                     </tr>
                     <tr className="border-b hover:bg-muted/50">
                       <td className="py-3 px-2">Other Reserves</td>
                       <td className="text-right font-mono">{formatCurrency(0)}</td>
-                      <td className="text-right font-mono text-green-600">{formatCurrency(0)}</td>
+                      <td className="text-right font-mono text-indigo-600">{formatCurrency(0)}</td>
                       <td className="text-right font-mono text-red-600">{formatCurrency(0)}</td>
                       <td className="text-right font-mono font-semibold">{formatCurrency(0)}</td>
                     </tr>
                     <tr className="bg-primary/10 font-bold">
                       <td className="py-3 px-2">Total Equity</td>
                       <td className="text-right font-mono">{formatCurrency(totalEquity)}</td>
-                      <td className="text-right font-mono text-green-600">{formatCurrency(netIncome > 0 ? netIncome : 0)}</td>
+                      <td className="text-right font-mono text-indigo-600">{formatCurrency(netIncome > 0 ? netIncome : 0)}</td>
                       <td className="text-right font-mono text-red-600">{formatCurrency(netIncome < 0 ? Math.abs(netIncome) : 0)}</td>
                       <td className="text-right font-mono">{formatCurrency(totalEquity + netIncome)}</td>
                     </tr>

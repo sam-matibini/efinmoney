@@ -173,7 +173,7 @@ export default function ApiManagementPage() {
                         <CardDescription className="mt-1">{integ.description}</CardDescription>
                       </div>
                       {status.healthy ? (
-                        <Badge className="bg-green-500/15 text-green-500 hover:bg-green-500/20 border-green-500/30 gap-1">
+                        <Badge className="bg-indigo-500/15 text-indigo-500 hover:bg-indigo-500/20 border-indigo-500/30 gap-1">
                           <CheckCircle2 className="h-3 w-3" /> {status.label}
                         </Badge>
                       ) : (
@@ -240,7 +240,7 @@ export default function ApiManagementPage() {
                           <TableCell className="font-mono text-xs">{row.event}</TableCell>
                           <TableCell>
                             {row.status === "ok" ? (
-                              <Badge className="bg-green-500/15 text-green-500 border-green-500/30">processed</Badge>
+                              <Badge className="bg-indigo-500/15 text-indigo-500 border-indigo-500/30">processed</Badge>
                             ) : row.status === "error" ? (
                               <Badge className="bg-red-500/15 text-red-500 border-red-500/30">error</Badge>
                             ) : (
@@ -293,7 +293,7 @@ export default function ApiManagementPage() {
                           )}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Badge className="bg-green-500/15 text-green-500 border-green-500/30">Active</Badge>
+                          <Badge className="bg-indigo-500/15 text-indigo-500 border-indigo-500/30">Active</Badge>
                         </TableCell>
                       </TableRow>
                     ))}

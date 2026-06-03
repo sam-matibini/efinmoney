@@ -30,7 +30,7 @@ type ServiceKey = (typeof SERVICES)[number]["key"];
 const PulseDot = ({ status }: { status: Status }) => {
   const color =
     status === "healthy"
-      ? "bg-emerald-500"
+      ? "bg-indigo-500"
       : status === "warning"
         ? "bg-amber-500"
         : status === "failed"
@@ -256,7 +256,7 @@ const SystemDiagnosticsPage = () => {
                     <div
                       className={cn(
                         "text-sm rounded-md border p-3",
-                        r.status === "healthy" && "border-emerald-500/30 bg-emerald-500/5 text-emerald-700 dark:text-emerald-300",
+                        r.status === "healthy" && "border-indigo-500/30 bg-indigo-500/5 text-indigo-700 dark:text-indigo-300",
                         r.status === "warning" && "border-amber-500/30 bg-amber-500/5 text-amber-700 dark:text-amber-300",
                         r.status === "failed" && "border-red-500/30 bg-red-500/5 text-red-700 dark:text-red-300",
                       )}

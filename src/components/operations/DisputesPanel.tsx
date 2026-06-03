@@ -28,9 +28,9 @@ const statusConfig: Record<string, { color: string; label: string }> = {
   open: { color: 'bg-blue-500/10 text-blue-600', label: 'Open' },
   investigating: { color: 'bg-amber-500/10 text-amber-600', label: 'Investigating' },
   pending_approval: { color: 'bg-purple-500/10 text-purple-600', label: 'Pending Approval' },
-  approved: { color: 'bg-green-500/10 text-green-600', label: 'Approved' },
+  approved: { color: 'bg-indigo-500/10 text-indigo-600', label: 'Approved' },
   rejected: { color: 'bg-red-500/10 text-red-600', label: 'Rejected' },
-  resolved: { color: 'bg-green-500/10 text-green-600', label: 'Resolved' },
+  resolved: { color: 'bg-indigo-500/10 text-indigo-600', label: 'Resolved' },
   escalated: { color: 'bg-orange-500/10 text-orange-600', label: 'Escalated' },
 };
 
@@ -178,7 +178,7 @@ export const DisputesPanel = () => {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-green-500" />
+              <CheckCircle2 className="w-5 h-5 text-indigo-500" />
               <div>
                 <p className="text-2xl font-bold">{disputes.filter(d => d.status === 'resolved').length}</p>
                 <p className="text-xs text-muted-foreground">Resolved</p>

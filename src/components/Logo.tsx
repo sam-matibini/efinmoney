@@ -25,7 +25,7 @@ export const Logo = ({ className = "w-9 h-9" }: { className?: string }) => (
 
 export const Wordmark = ({ className = "" }: { className?: string }) => (
   <span
-    className={`bg-clip-text text-transparent bg-[linear-gradient(110deg,#059669_0%,#10b981_30%,#a7f3d0_50%,#10b981_70%,#059669_100%)] bg-[length:200%_100%] animate-[brandShine_4s_linear_infinite] ${className}`}
+    className={`bg-clip-text text-transparent bg-[linear-gradient(110deg,#4f46e5_0%,#6366f1_30%,#c7d2fe_50%,#6366f1_70%,#4f46e5_100%)] bg-[length:200%_100%] animate-[brandShine_4s_linear_infinite] ${className}`}
     style={{ WebkitBackgroundClip: "text" }}
   >
     eFinMoney

@@ -166,7 +166,7 @@ const KycQueuePage = () => {
                   const tags = extractRiskTags(row.persona_verification_data);
                   const apiDecision = row.persona_decision as string | null;
                   const apiClass =
-                    apiDecision === "approved" ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" :
+                    apiDecision === "approved" ? "bg-indigo-500/10 text-indigo-600 border-indigo-500/20" :
                     apiDecision === "declined" ? "bg-red-500/10 text-red-600 border-red-500/20" :
                     apiDecision === "needs_review" ? "bg-amber-500/10 text-amber-600 border-amber-500/20" :
                     "bg-muted text-muted-foreground";

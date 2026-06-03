@@ -347,7 +347,7 @@ export const CrmCustomersPanel = () => {
                         <Badge 
                           variant="outline"
                           className={
-                            customer.risk_level === 'low' ? 'border-green-500 text-green-600' :
+                            customer.risk_level === 'low' ? 'border-indigo-500 text-indigo-600' :
                             customer.risk_level === 'high' ? 'border-red-500 text-red-600' :
                             'border-amber-500 text-amber-600'
                           }

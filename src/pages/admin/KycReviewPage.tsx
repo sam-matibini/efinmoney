@@ -425,7 +425,7 @@ const KycReviewPage = () => {
                     <div>
                       <div className="text-xs text-muted-foreground">Decision</div>
                       <div className={
-                        kyc.persona_decision === "approved" ? "text-green-600 dark:text-green-400 font-medium capitalize" :
+                        kyc.persona_decision === "approved" ? "text-indigo-600 dark:text-indigo-400 font-medium capitalize" :
                         kyc.persona_decision === "declined" ? "text-red-600 dark:text-red-400 font-medium capitalize" :
                         kyc.persona_decision === "needs_review" ? "text-amber-600 dark:text-amber-400 font-medium capitalize" :
                         "text-muted-foreground capitalize"

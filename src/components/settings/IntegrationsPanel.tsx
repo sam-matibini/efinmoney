@@ -252,7 +252,7 @@ export function IntegrationsPanel() {
   const getStatusBadge = (status: Integration["status"]) => {
     switch (status) {
       case "connected":
-        return <Badge className="bg-green-500/10 text-green-600 border-green-500/20"><CheckCircle2 className="h-3 w-3 mr-1" /> Connected</Badge>;
+        return <Badge className="bg-indigo-500/10 text-indigo-600 border-indigo-500/20"><CheckCircle2 className="h-3 w-3 mr-1" /> Connected</Badge>;
       case "disconnected":
         return <Badge variant="secondary"><XCircle className="h-3 w-3 mr-1" /> Disconnected</Badge>;
       case "error":
@@ -291,7 +291,7 @@ export function IntegrationsPanel() {
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardContent className="pt-6">
-            <div className="text-2xl font-bold text-green-600">
+            <div className="text-2xl font-bold text-indigo-600">
               {integrations.filter(i => i.status === "connected").length}
             </div>
             <p className="text-xs text-muted-foreground">Connected</p>

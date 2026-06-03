@@ -10,9 +10,9 @@ const cardClass =
   "group relative overflow-hidden rounded-2xl bg-card border border-border p-4 transition-all hover:-translate-y-1 hover:shadow-lg";
 
 const cardBg: Record<string, string> = {
-  sent: "bg-gradient-to-br from-emerald-500/5 to-transparent",
+  sent: "bg-gradient-to-br from-indigo-500/5 to-transparent",
   corridors: "bg-gradient-to-br from-primary/5 to-transparent",
-  savings: "bg-gradient-to-br from-teal-500/5 to-transparent",
+  savings: "bg-gradient-to-br from-violet-500/5 to-transparent",
   kyc: "bg-gradient-to-br from-amber-500/10 to-transparent",
 };
 
@@ -126,7 +126,7 @@ const MiniStats = () => {
         </>
       ),
       icon: Send,
-      iconBg: "bg-emerald-500/15 text-primary",
+      iconBg: "bg-indigo-500/15 text-primary",
     },
     {
       key: "corridors",
@@ -162,13 +162,13 @@ const MiniStats = () => {
               initial={{ width: 0 }}
               animate={{ width: `${goalProgress.pct}%` }}
               transition={{ delay: 0.4, duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-              className="h-full rounded-full bg-gradient-to-r from-teal-400 to-emerald-500"
+              className="h-full rounded-full bg-gradient-to-r from-violet-400 to-indigo-500"
             />
           </div>
         </>
       ),
       icon: PiggyBank,
-      iconBg: "bg-teal-500/15 text-teal-600 dark:text-teal-400",
+      iconBg: "bg-violet-500/15 text-violet-600 dark:text-violet-400",
     },
     {
       key: "kyc",

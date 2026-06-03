@@ -7,7 +7,7 @@ import { format } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const statusColors: Record<string, string> = {
-  completed: 'bg-green-500/10 text-green-500',
+  completed: 'bg-indigo-500/10 text-indigo-500',
   pending: 'bg-yellow-500/10 text-yellow-500',
   failed: 'bg-red-500/10 text-red-500',
   cancelled: 'bg-muted text-muted-foreground',

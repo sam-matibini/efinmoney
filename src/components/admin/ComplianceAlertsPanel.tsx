@@ -16,7 +16,7 @@ const severityConfig = {
 const statusColors: Record<string, string> = {
   open: 'bg-red-500/10 text-red-500',
   investigating: 'bg-yellow-500/10 text-yellow-500',
-  resolved: 'bg-green-500/10 text-green-500',
+  resolved: 'bg-indigo-500/10 text-indigo-500',
   dismissed: 'bg-muted text-muted-foreground',
 };
 
@@ -126,7 +126,7 @@ export const ComplianceAlertsPanel = () => {
         <Card>
           <CardContent className="pt-4">
             <div>
-              <p className="text-2xl font-bold text-green-500">{stats?.status.resolved || 0}</p>
+              <p className="text-2xl font-bold text-indigo-500">{stats?.status.resolved || 0}</p>
               <p className="text-sm text-muted-foreground">Resolved</p>
             </div>
           </CardContent>

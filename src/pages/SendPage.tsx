@@ -1310,7 +1310,7 @@ const SendPage = () => {
                                       <motion.div
                                         initial={{ opacity: 0, y: -6 }}
                                         animate={{ opacity: 1, y: 0 }}
-                                        className="flex items-center justify-between gap-3 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-primary dark:text-emerald-300"
+                                        className="flex items-center justify-between gap-3 p-3 rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-primary dark:text-indigo-300"
                                       >
                                         <span className="inline-flex items-center gap-2 text-sm font-medium">
                                           <CheckCircle className="w-4 h-4" /> Contact selected ✓ — {recipientName}
@@ -1318,7 +1318,7 @@ const SendPage = () => {
                                         <button
                                           type="button"
                                           onClick={() => { setPickedBeneficiaryId(null); setRecipientName(""); setRecipientPhone(""); }}
-                                          className="text-primary/80 dark:text-emerald-300/80 hover:opacity-100 opacity-70"
+                                          className="text-primary/80 dark:text-indigo-300/80 hover:opacity-100 opacity-70"
                                           aria-label="Clear selected contact"
                                         >
                                           <X className="w-4 h-4" />
@@ -1519,12 +1519,12 @@ const SendPage = () => {
                                           Funds will be sent via {effectiveMethodLabel}
                                         </p>
                                       </motion.div>
-                                      <motion.div custom={2.5} variants={fieldVariants} initial="hidden" animate="show" className="rounded-xl border border-emerald-500/30 bg-gradient-to-br from-emerald-500/5 via-background to-emerald-500/5 p-4">
+                                      <motion.div custom={2.5} variants={fieldVariants} initial="hidden" animate="show" className="rounded-xl border border-indigo-500/30 bg-gradient-to-br from-indigo-500/5 via-background to-indigo-500/5 p-4">
                                         <div className="flex items-start justify-between gap-3">
                                           <div className="flex-1">
                                             <div className="flex items-center gap-2">
                                               <span className="text-sm font-medium">🟢 Send via PawaPay (Beta)</span>
-                                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-primary font-mono uppercase">Beta</span>
+                                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/20 text-primary font-mono uppercase">Beta</span>
                                             </div>
                                             <p className="text-xs text-muted-foreground mt-1">
                                               Route this mobile money payout through PawaPay's pan-African network instead of the default provider. Supports SN, CM, CI, BF, BJ, KE, UG, TZ, RW, ZM, GH, MW.

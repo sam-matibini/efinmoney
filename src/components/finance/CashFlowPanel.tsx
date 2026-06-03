@@ -135,7 +135,7 @@ export const CashFlowPanel = () => {
       <div className="grid grid-cols-3 gap-4">
         <div>
           <p className="text-sm text-muted-foreground">Cash In</p>
-          <p className="text-lg font-mono text-green-600">+{inflows.toFixed(2)}</p>
+          <p className="text-lg font-mono text-indigo-600">+{inflows.toFixed(2)}</p>
         </div>
         <div>
           <p className="text-sm text-muted-foreground">Cash Out</p>
@@ -143,7 +143,7 @@ export const CashFlowPanel = () => {
         </div>
         <div>
           <p className="text-sm text-muted-foreground">Net</p>
-          <p className={`text-lg font-mono font-semibold ${net >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+          <p className={`text-lg font-mono font-semibold ${net >= 0 ? 'text-indigo-600' : 'text-red-600'}`}>
             {net >= 0 ? '+' : ''}{net.toFixed(2)}
           </p>
         </div>
@@ -192,7 +192,7 @@ export const CashFlowPanel = () => {
                 Operating + Investing + Financing
               </p>
             </div>
-            <p className={`text-2xl font-mono font-bold ${data.netChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+            <p className={`text-2xl font-mono font-bold ${data.netChange >= 0 ? 'text-indigo-600' : 'text-red-600'}`}>
               {data.netChange >= 0 ? '+' : ''}{data.netChange.toFixed(2)}
             </p>
           </div>

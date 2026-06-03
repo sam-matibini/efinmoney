@@ -24,14 +24,14 @@ const EfinCardsSection = () => {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-display font-bold flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-emerald-500" />
+            <Sparkles className="w-4 h-4 text-indigo-500" />
             eFinVISA · Virtual Visa Cards
           </h2>
           <p className="text-xs text-muted-foreground">Instant Visa cards. Spend online or tap to pay with Apple Pay & Google Pay.</p>
         </div>
         <Button
           size="sm"
-          className="bg-emerald-600 hover:bg-emerald-700 text-white"
+          className="bg-indigo-600 hover:bg-indigo-700 text-white"
           onClick={() => {
             if (!tierOk) {
               navigate("/kyc");

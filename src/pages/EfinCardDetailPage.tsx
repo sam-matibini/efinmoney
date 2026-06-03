@@ -121,7 +121,7 @@ const EfinCardDetailPage = () => {
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-xl font-display font-bold">{card.nickname || "eFinVISA"}</h1>
               {tapToPay && card.status === "active" && (
-                <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-400 border border-indigo-500/30">
                   <Wifi className="w-3 h-3 rotate-90" /> Tap to pay
                 </span>
               )}
@@ -196,7 +196,7 @@ const EfinCardDetailPage = () => {
                     });
                   }}
                   disabled={!card.funding_wallet_id || !Number(fundAmount) || fundCard.isPending}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white"
                 >
                   <Plus className="w-4 h-4 mr-1" /> Fund
                 </Button>

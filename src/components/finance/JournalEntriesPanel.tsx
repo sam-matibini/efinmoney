@@ -370,7 +370,7 @@ export const JournalEntriesPanel = () => {
                       </TableCell>
                       <TableCell>
                         {isBalanced ? (
-                          <CheckCircle className="w-4 h-4 text-green-500" />
+                          <CheckCircle className="w-4 h-4 text-indigo-500" />
                         ) : (
                           <XCircle className="w-4 h-4 text-red-500" />
                         )}
@@ -440,7 +440,7 @@ export const JournalEntriesPanel = () => {
                     </TableCell>
                     <TableCell>
                       {Math.abs(journal.total_debit - journal.total_credit) < 0.01 ? (
-                        <CheckCircle className="w-4 h-4 text-green-500" />
+                        <CheckCircle className="w-4 h-4 text-indigo-500" />
                       ) : (
                         <XCircle className="w-4 h-4 text-red-500" />
                       )}

@@ -108,7 +108,7 @@ const ExchangeRates = () => {
                   </div>
                   <span
                     className={`inline-flex items-center gap-0.5 text-[11px] font-semibold ${
-                      r.change >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
+                      r.change >= 0 ? "text-indigo-600 dark:text-indigo-400" : "text-rose-600 dark:text-rose-400"
                     }`}
                   >
                     {r.change >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}

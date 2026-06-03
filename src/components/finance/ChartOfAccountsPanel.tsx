@@ -188,7 +188,7 @@ export const ChartOfAccountsPanel = ({ onViewLedger }: Props) => {
     asset: 'bg-blue-500/10 text-blue-500',
     liability: 'bg-orange-500/10 text-orange-500',
     equity: 'bg-purple-500/10 text-purple-500',
-    income: 'bg-green-500/10 text-green-500',
+    income: 'bg-indigo-500/10 text-indigo-500',
     expense: 'bg-red-500/10 text-red-500',
   };
 
@@ -338,7 +338,7 @@ export const ChartOfAccountsPanel = ({ onViewLedger }: Props) => {
                             onClick={() => toggleActiveMutation.mutate({ id: account.id, is_active: !account.is_active })}
                             disabled={account.is_system}>
                             {account.is_active ? (
-                              <ToggleRight className="w-4 h-4 text-green-500" />
+                              <ToggleRight className="w-4 h-4 text-indigo-500" />
                             ) : (
                               <ToggleLeft className="w-4 h-4 text-muted-foreground" />
                             )}

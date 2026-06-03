@@ -427,7 +427,7 @@ export const BankTransactionImport = ({ bankAccountId, onImportComplete }: BankT
                       <TableRow key={idx} className={!row.isValid ? 'bg-destructive/10' : ''}>
                         <TableCell>
                           {row.isValid ? (
-                            <CheckCircle2 className="h-4 w-4 text-green-500" />
+                            <CheckCircle2 className="h-4 w-4 text-indigo-500" />
                           ) : (
                             <span title={row.error}>
                               <XCircle className="h-4 w-4 text-destructive" />
@@ -440,7 +440,7 @@ export const BankTransactionImport = ({ bankAccountId, onImportComplete }: BankT
                         <TableCell className="text-right font-mono text-red-600">
                           {row.debit?.toFixed(2) || '-'}
                         </TableCell>
-                        <TableCell className="text-right font-mono text-green-600">
+                        <TableCell className="text-right font-mono text-indigo-600">
                           {row.credit?.toFixed(2) || '-'}
                         </TableCell>
                       </TableRow>

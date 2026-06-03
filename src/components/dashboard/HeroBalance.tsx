@@ -196,8 +196,8 @@ const HeroBalance = () => {
             <AreaChart data={sparkData}>
               <defs>
                 <linearGradient id="hero-area" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#10b981" stopOpacity={0.55} />
-                  <stop offset="100%" stopColor="#10b981" stopOpacity={0} />
+                  <stop offset="0%" stopColor="#6366f1" stopOpacity={0.55} />
+                  <stop offset="100%" stopColor="#6366f1" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <Tooltip
@@ -215,7 +215,7 @@ const HeroBalance = () => {
               <Area
                 type="monotone"
                 dataKey="value"
-                stroke="#10b981"
+                stroke="#6366f1"
                 strokeWidth={2.5}
                 fill="url(#hero-area)"
                 isAnimationActive
@@ -250,7 +250,7 @@ const HeroBalance = () => {
             })}
             {walletCount === 0 && <WalletIcon className="w-3 h-3" />}
           </span>
-          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
             <Activity className="w-3 h-3" /> Active
           </span>
         </motion.div>

@@ -137,8 +137,8 @@ export const OperationsKPIsPanel = () => {
       title: 'Transfer Success Rate',
       value: `${transferSuccessRate.toFixed(1)}%`,
       icon: CheckCircle2,
-      color: 'text-green-500',
-      bgColor: 'bg-green-500/10',
+      color: 'text-indigo-500',
+      bgColor: 'bg-indigo-500/10',
       progress: transferSuccessRate,
       subtitle: `${completedTransfers}/${totalTransfers} transfers`,
       trend: transferSuccessRate > 95 ? 'up' : 'down',
@@ -177,8 +177,8 @@ export const OperationsKPIsPanel = () => {
       title: 'KYC Approval Rate',
       value: `${kycApprovalRate.toFixed(1)}%`,
       icon: Target,
-      color: 'text-emerald-500',
-      bgColor: 'bg-emerald-500/10',
+      color: 'text-indigo-500',
+      bgColor: 'bg-indigo-500/10',
       progress: kycApprovalRate,
       subtitle: `${kycApproved}/${kycTotal} customers`,
       trend: kycApprovalRate > 85 ? 'up' : 'down',
@@ -207,8 +207,8 @@ export const OperationsKPIsPanel = () => {
       title: 'Critical Alerts',
       value: criticalAlerts.toString(),
       icon: AlertTriangle,
-      color: criticalAlerts > 0 ? 'text-red-500' : 'text-green-500',
-      bgColor: criticalAlerts > 0 ? 'bg-red-500/10' : 'bg-green-500/10',
+      color: criticalAlerts > 0 ? 'text-red-500' : 'text-indigo-500',
+      bgColor: criticalAlerts > 0 ? 'bg-red-500/10' : 'bg-indigo-500/10',
       progress: criticalAlerts === 0 ? 100 : Math.max(0, 100 - criticalAlerts * 20),
       subtitle: 'Pending attention',
       trend: criticalAlerts === 0 ? 'up' : 'down',
@@ -236,7 +236,7 @@ export const OperationsKPIsPanel = () => {
                   <div className={`p-2 rounded-lg ${kpi.bgColor}`}>
                     <Icon className={`w-5 h-5 ${kpi.color}`} />
                   </div>
-                  <TrendIcon className={`w-4 h-4 ${kpi.trend === 'up' ? 'text-green-500' : 'text-red-500'}`} />
+                  <TrendIcon className={`w-4 h-4 ${kpi.trend === 'up' ? 'text-indigo-500' : 'text-red-500'}`} />
                 </div>
                 <div className="space-y-2">
                   <p className="text-sm text-muted-foreground">{kpi.title}</p>
@@ -264,7 +264,7 @@ export const OperationsKPIsPanel = () => {
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-muted-foreground">Completed</span>
-                <span className="font-bold text-green-600">{completedTransfers}</span>
+                <span className="font-bold text-indigo-600">{completedTransfers}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-muted-foreground">Processing</span>
@@ -290,7 +290,7 @@ export const OperationsKPIsPanel = () => {
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-muted-foreground">KYC Approved</span>
-                <span className="font-bold text-green-600">{kycApproved}</span>
+                <span className="font-bold text-indigo-600">{kycApproved}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-muted-foreground">Pending KYC</span>
@@ -324,7 +324,7 @@ export const OperationsKPIsPanel = () => {
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-muted-foreground">Resolved Disputes</span>
-                <span className="font-bold text-green-600">{resolvedDisputes}</span>
+                <span className="font-bold text-indigo-600">{resolvedDisputes}</span>
               </div>
             </div>
           </CardContent>

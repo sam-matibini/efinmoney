@@ -49,10 +49,10 @@ const PhoneFrame = ({ children, delay = 0, rotate = 0 }: { children: React.React
 );
 
 const WalletScreen = () => (
-  <div className="h-full p-5 flex flex-col bg-gradient-to-b from-emerald-50 to-white">
+  <div className="h-full p-5 flex flex-col bg-gradient-to-b from-indigo-50 to-white">
     <div className="text-xs text-neutral-500 mt-4">Total Balance</div>
     <div className="text-3xl font-black text-neutral-900 mt-1">$10,963.68</div>
-    <div className="text-xs text-emerald-600 mt-1 font-semibold">+2.4% today</div>
+    <div className="text-xs text-indigo-600 mt-1 font-semibold">+2.4% today</div>
     <div className="mt-5 space-y-2">
       {[
         { flag: "🇺🇸", c: "USD", b: "$10,170.05" },
@@ -82,9 +82,9 @@ const SendScreen = () => (
     <div className="text-3xl font-black text-neutral-900 mt-1">$250.00</div>
     <div className="text-xs text-neutral-400 mt-1">USD from Main Wallet</div>
     <div className="mt-4 text-xs text-neutral-500">They receive</div>
-    <div className="text-2xl font-black text-emerald-600 mt-1">₦387,500</div>
+    <div className="text-2xl font-black text-indigo-600 mt-1">₦387,500</div>
     <div className="mt-auto">
-      <div className="rounded-xl bg-emerald-500 text-white text-sm font-bold py-3 text-center">
+      <div className="rounded-xl bg-indigo-500 text-white text-sm font-bold py-3 text-center">
         Send Now
       </div>
     </div>
@@ -101,19 +101,19 @@ const ExchangeScreen = () => (
         <span className="text-lg font-black text-neutral-900">100.00</span>
       </div>
     </div>
-    <div className="my-2 mx-auto w-9 h-9 rounded-full bg-emerald-500 flex items-center justify-center text-white">
+    <div className="my-2 mx-auto w-9 h-9 rounded-full bg-indigo-500 flex items-center justify-center text-white">
       ↓
     </div>
-    <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200">
-      <div className="text-xs text-emerald-700">To</div>
+    <div className="p-3 rounded-xl bg-indigo-50 border border-indigo-200">
+      <div className="text-xs text-indigo-700">To</div>
       <div className="flex items-center justify-between mt-1">
         <span className="text-lg font-bold text-neutral-900">🇨🇦 CAD</span>
-        <span className="text-lg font-black text-emerald-700">136.42</span>
+        <span className="text-lg font-black text-indigo-700">136.42</span>
       </div>
     </div>
     <div className="mt-4 text-xs text-neutral-500">Live rate: 1 USD = 1.3642 CAD</div>
     <div className="mt-auto">
-      <div className="rounded-xl bg-emerald-500 text-white text-sm font-bold py-3 text-center">
+      <div className="rounded-xl bg-indigo-500 text-white text-sm font-bold py-3 text-center">
         Exchange
       </div>
     </div>
@@ -171,10 +171,10 @@ const Landing = () => {
             ))}
           </div>
           <div className="flex items-center gap-3">
-            <Link to="/auth" className="text-sm font-semibold text-neutral-900 hover:text-emerald-600 transition-colors px-3 py-2">
+            <Link to="/auth" className="text-sm font-semibold text-neutral-900 hover:text-indigo-600 transition-colors px-3 py-2">
               Sign in
             </Link>
-            <Link to="/auth" className="text-sm font-bold bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-full transition-all hover:-translate-y-0.5 shadow-sm">
+            <Link to="/auth" className="text-sm font-bold bg-indigo-500 hover:bg-indigo-600 text-white px-5 py-2.5 rounded-full transition-all hover:-translate-y-0.5 shadow-sm">
               Get Started
             </Link>
           </div>
@@ -193,7 +193,7 @@ const Landing = () => {
                 transition={{ delay: 0.1 + i * 0.12, duration: 0.6, ease: "easeOut" }}
                 className="inline-block mr-3"
               >
-                {i >= 3 ? <span className="text-emerald-500">{w}</span> : w}
+                {i >= 3 ? <span className="text-indigo-500">{w}</span> : w}
               </motion.span>
             ))}
           </h1>
@@ -212,7 +212,7 @@ const Landing = () => {
             transition={{ delay: 1.1, duration: 0.6 }}
             className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-3"
           >
-            <Link to="/auth" className="group inline-flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white font-bold px-8 py-4 rounded-full text-base transition-all hover:-translate-y-0.5 shadow-lg shadow-emerald-500/20">
+            <Link to="/auth" className="group inline-flex items-center gap-2 bg-indigo-500 hover:bg-indigo-600 text-white font-bold px-8 py-4 rounded-full text-base transition-all hover:-translate-y-0.5 shadow-lg shadow-indigo-500/20">
               Get Started <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </Link>
             <Link to="/auth" className="inline-flex items-center gap-2 border-2 border-neutral-900 text-neutral-900 hover:bg-neutral-900 hover:text-white font-bold px-8 py-4 rounded-full text-base transition-all">
@@ -265,22 +265,22 @@ const Landing = () => {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-60px" }}
                 transition={{ duration: 0.5, delay: i * 0.12 }}
-                className="group relative p-8 rounded-3xl bg-white border border-neutral-200/80 hover:border-emerald-300/60 hover:-translate-y-1.5 hover:shadow-[0_20px_50px_-20px_rgba(16,185,129,0.25)] transition-all duration-300 overflow-hidden"
+                className="group relative p-8 rounded-3xl bg-white border border-neutral-200/80 hover:border-indigo-300/60 hover:-translate-y-1.5 hover:shadow-[0_20px_50px_-20px_rgba(16,185,129,0.25)] transition-all duration-300 overflow-hidden"
               >
                 {/* subtle corner glow */}
-                <div className="absolute -top-16 -right-16 w-40 h-40 rounded-full bg-emerald-500/5 blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                <div className="absolute -top-16 -right-16 w-40 h-40 rounded-full bg-indigo-500/5 blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 
                 <div className="relative">
                   <div className="relative w-14 h-14 mb-7">
-                    <div className="absolute inset-0 rounded-2xl bg-emerald-500/10 blur-md group-hover:bg-emerald-500/25 transition-colors" />
-                    <div className="relative w-14 h-14 rounded-2xl bg-white flex items-center justify-center ring-1 ring-emerald-100 shadow-sm shadow-emerald-500/5 group-hover:ring-emerald-300 group-hover:shadow-emerald-500/20 transition-all">
-                      <f.icon className="w-6 h-6 text-emerald-600" strokeWidth={2} />
+                    <div className="absolute inset-0 rounded-2xl bg-indigo-500/10 blur-md group-hover:bg-indigo-500/25 transition-colors" />
+                    <div className="relative w-14 h-14 rounded-2xl bg-white flex items-center justify-center ring-1 ring-indigo-100 shadow-sm shadow-indigo-500/5 group-hover:ring-indigo-300 group-hover:shadow-indigo-500/20 transition-all">
+                      <f.icon className="w-6 h-6 text-indigo-600" strokeWidth={2} />
                     </div>
                   </div>
                   <h3 className="text-lg font-bold text-neutral-900 mb-2 tracking-tight">{f.title}</h3>
                   <p className="text-[15px] text-neutral-500 leading-relaxed">{f.desc}</p>
 
-                  <div className="mt-6 h-px w-10 bg-gradient-to-r from-emerald-500 to-transparent group-hover:w-20 transition-all duration-300" />
+                  <div className="mt-6 h-px w-10 bg-gradient-to-r from-indigo-500 to-transparent group-hover:w-20 transition-all duration-300" />
                 </div>
               </motion.div>
             ))}
@@ -310,7 +310,7 @@ const Landing = () => {
                 transition={{ duration: 0.5, delay: i * 0.15 }}
                 className="text-center"
               >
-                <div className="mx-auto w-16 h-16 rounded-full bg-emerald-500 text-white text-2xl font-black flex items-center justify-center mb-6 shadow-lg shadow-emerald-500/30">
+                <div className="mx-auto w-16 h-16 rounded-full bg-indigo-500 text-white text-2xl font-black flex items-center justify-center mb-6 shadow-lg shadow-indigo-500/30">
                   {s.n}
                 </div>
                 <h3 className="text-xl font-black text-neutral-900 mb-3">{s.title}</h3>

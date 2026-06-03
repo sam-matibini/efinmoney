@@ -28,9 +28,9 @@ import { format } from "date-fns";
 
 const statusConfig: Record<string, { icon: typeof Clock; color: string; label: string }> = {
   initiated: { icon: Clock, color: 'bg-blue-500/10 text-blue-600', label: 'Initiated' },
-  funded: { icon: CheckCircle2, color: 'bg-green-500/10 text-green-600', label: 'Funded' },
+  funded: { icon: CheckCircle2, color: 'bg-indigo-500/10 text-indigo-600', label: 'Funded' },
   processing: { icon: RefreshCw, color: 'bg-amber-500/10 text-amber-600', label: 'Processing' },
-  completed: { icon: CheckCircle2, color: 'bg-green-500/10 text-green-600', label: 'Completed' },
+  completed: { icon: CheckCircle2, color: 'bg-indigo-500/10 text-indigo-600', label: 'Completed' },
   failed: { icon: XCircle, color: 'bg-red-500/10 text-red-600', label: 'Failed' },
   reversed: { icon: ArrowRightLeft, color: 'bg-purple-500/10 text-purple-600', label: 'Reversed' },
   expired: { icon: Ban, color: 'bg-muted text-muted-foreground', label: 'Expired' },

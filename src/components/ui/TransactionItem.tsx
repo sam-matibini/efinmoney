@@ -46,7 +46,7 @@ const TransactionItem = forwardRef<HTMLDivElement, TransactionItemProps>(({
       case 'receive':
         return 'bg-primary/20 text-primary';
       case 'exchange':
-        return 'bg-teal-500/20 text-teal-400';
+        return 'bg-violet-500/20 text-violet-400';
       case 'deposit':
         return 'bg-primary/20 text-primary';
     }

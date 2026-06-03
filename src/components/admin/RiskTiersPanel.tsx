@@ -12,7 +12,7 @@ import { format } from "date-fns";
 const tierMeta: Record<string, { label: string; color: string; icon: any }> = {
   tier_1: { label: "Tier 1 · Basic", color: "bg-muted text-muted-foreground", icon: Shield },
   tier_2: { label: "Tier 2 · Verified", color: "bg-blue-500/10 text-blue-500", icon: ShieldCheck },
-  tier_3: { label: "Tier 3 · Enhanced", color: "bg-green-500/10 text-green-500", icon: ShieldAlert },
+  tier_3: { label: "Tier 3 · Enhanced", color: "bg-indigo-500/10 text-indigo-500", icon: ShieldAlert },
 };
 
 interface RiskTierRow {

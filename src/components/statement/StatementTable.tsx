@@ -83,7 +83,7 @@ export const StatementTable = ({ rows, loading, showBalance = true }: Props) => 
               const isFailed = ["failed", "reversed", "expired"].includes(r.status);
               const linkTo = r.transferId ? `/transfers/${r.transferId}` : `/transactions/${r.journalId}`;
               const outClass = isFailed ? "text-muted-foreground line-through" : "text-rose-600 dark:text-rose-400";
-              const inClass = isFailed ? "text-muted-foreground line-through" : "text-emerald-600 dark:text-emerald-400";
+              const inClass = isFailed ? "text-muted-foreground line-through" : "text-indigo-600 dark:text-indigo-400";
 
               return (
                 <motion.div
@@ -104,7 +104,7 @@ export const StatementTable = ({ rows, loading, showBalance = true }: Props) => 
 
                     {/* Description (mobile: icon + text) */}
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center ${isIn ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" : "bg-rose-500/15 text-rose-600 dark:text-rose-400"}`}>
+                      <div className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center ${isIn ? "bg-indigo-500/15 text-indigo-600 dark:text-indigo-400" : "bg-rose-500/15 text-rose-600 dark:text-rose-400"}`}>
                         {isIn ? <ArrowDownLeft className="w-4 h-4" /> : <ArrowUpRight className="w-4 h-4" />}
                       </div>
                       <div className="min-w-0">
