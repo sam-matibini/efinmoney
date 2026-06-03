@@ -347,7 +347,7 @@ const Landing = () => {
                 transition={{ duration: 0.5, delay: i * 0.15 }}
                 className="text-center"
               >
-                <div className="mx-auto w-16 h-16 rounded-full bg-indigo-500 text-white text-2xl font-black flex items-center justify-center mb-6 shadow-lg shadow-indigo-500/30">
+                <div className="mx-auto w-16 h-16 rounded-full bg-[hsl(var(--accent-amber))] text-[hsl(var(--brand-900))] text-2xl font-black flex items-center justify-center mb-6 shadow-cta-amber">
                   {s.n}
                 </div>
                 <h3 className="text-xl font-black text-neutral-900 mb-3">{s.title}</h3>
