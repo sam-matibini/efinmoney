@@ -39,16 +39,26 @@
     --radius: 1rem;
 
     /* Custom tokens */
+    --brand-900: 256 60% 12%;
+    --brand-800: 256 55% 18%;
+    --brand-700: 256 60% 28%;
+    --brand-500: 250 75% 55%;
+    --accent-amber: 41 100% 52%;
+    --accent-amber-glow: 41 100% 60%;
+
     --gradient-primary: linear-gradient(135deg, hsl(244 75% 57%) 0%, hsl(258 80% 60%) 100%);
     --gradient-accent: linear-gradient(135deg, hsl(258 80% 65%) 0%, hsl(244 75% 50%) 100%);
-    --gradient-cta: linear-gradient(135deg, hsl(244 75% 57%) 0%, hsl(280 75% 60%) 100%);
+    --gradient-cta: linear-gradient(135deg, hsl(41 100% 55%) 0%, hsl(36 100% 50%) 100%);
     --gradient-card: linear-gradient(145deg, hsl(0 0% 100%) 0%, hsl(230 30% 98%) 100%);
     --gradient-card-dark: linear-gradient(135deg, hsl(232 45% 12%) 0%, hsl(258 55% 22%) 100%);
     --gradient-hero: linear-gradient(135deg, hsl(244 75% 57%) 0%, hsl(280 70% 55%) 100%);
+    --gradient-hero-deep: linear-gradient(135deg, hsl(256 65% 10%) 0%, hsl(256 60% 18%) 40%, hsl(258 70% 32%) 100%);
 
     --shadow-glow: 0 0 30px -8px hsl(244 75% 57% / 0.40);
     --shadow-card: 0 1px 3px hsl(230 35% 12% / 0.06), 0 1px 2px hsl(230 35% 12% / 0.03);
     --shadow-elevated: 0 10px 30px -10px hsl(244 75% 30% / 0.18), 0 4px 12px -4px hsl(244 75% 30% / 0.08);
+    --shadow-cta-amber: 0 12px 30px -8px hsl(41 100% 52% / 0.55), inset 0 1px 0 0 hsl(41 100% 75% / 0.4);
+    --shadow-card-purple: 0 24px 60px -24px hsl(256 60% 12% / 0.55);
 
     --font-display: 'Space Grotesk', sans-serif;
     --font-body: 'Inter', sans-serif;
