@@ -490,7 +490,7 @@ const Landing = () => {
               },
             ].map((col) => (
               <div key={col.title} className="md:col-span-2">
-                <h4 className="text-xs font-bold uppercase tracking-[0.2em] text-[hsl(var(--accent-amber))] mb-4">
+                <h4 className="text-xs font-bold uppercase tracking-[0.2em] text-[hsl(var(--brand-500))] mb-4">
                   {col.title}
                 </h4>
                 <ul className="space-y-3 text-sm">
