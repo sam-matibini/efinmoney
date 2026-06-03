@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import logo from "@/assets/efin-logo-new.png";
 
-export const Logo = ({ className = "w-16 h-16" }: { className?: string }) => (
+export const Logo = ({ className = "w-24 h-24" }: { className?: string }) => (
   <motion.img
     src={logo}
     alt="eFinMoney"
