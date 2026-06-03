@@ -19,7 +19,7 @@ const FEATURES = [
 const STEPS = [
   { n: 1, title: "Create your account" },
   { n: 2, title: "Add funds via card or bank" },
-  { n: 3, title: "Send money anywhere in Africa", desc: "Mobile money, bank deposit, or wallet — your choice." },
+  { n: 3, title: "Send money anywhere in Africa" },
 ];
 
 const STATS = [
