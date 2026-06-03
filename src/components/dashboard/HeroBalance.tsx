@@ -104,14 +104,10 @@ const HeroBalance = () => {
       initial={{ opacity: 0, y: -16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-      className="relative overflow-hidden rounded-3xl border border-border mb-8 animate-hero-shift"
-      style={{
-        backgroundImage:
-          "linear-gradient(120deg, hsl(var(--background)) 0%, hsl(var(--primary) / 0.08) 50%, hsl(var(--background)) 100%)",
-      }}
+      className="relative overflow-hidden rounded-3xl bg-grid-purple text-white mb-8 shadow-card-purple"
     >
-      <div className="absolute -top-20 -right-20 h-64 w-64 rounded-full bg-primary/10 blur-3xl pointer-events-none" />
-      <div className="absolute -bottom-16 -left-16 h-56 w-56 rounded-full bg-primary/5 blur-3xl pointer-events-none" />
+      <div className="absolute -top-32 left-1/2 -translate-x-1/2 h-72 w-[700px] rounded-full bg-[hsl(var(--brand-500)/0.35)] blur-[120px] pointer-events-none" />
+      <div className="absolute -bottom-20 -right-20 h-64 w-64 rounded-full bg-[hsl(var(--accent-amber)/0.12)] blur-3xl pointer-events-none" />
 
       {/* Floating currency symbols (decorative) */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
