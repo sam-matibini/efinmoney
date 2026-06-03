@@ -176,6 +176,14 @@
       linear-gradient(to bottom, hsl(var(--brand-500) / 0.08) 1px, transparent 1px);
     background-size: auto, 48px 48px, 48px 48px;
   }
+  .bg-grid-amber {
+    background-color: hsl(41 60% 10%);
+    background-image:
+      radial-gradient(ellipse 80% 60% at 50% 0%, hsl(var(--accent-amber) / 0.25), transparent 70%),
+      linear-gradient(to right, hsl(var(--accent-amber) / 0.08) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--accent-amber) / 0.08) 1px, transparent 1px);
+    background-size: auto, 48px 48px, 48px 48px;
+  }
   .bg-grid-purple-soft {
     background-image:
       linear-gradient(to right, hsl(var(--brand-500) / 0.07) 1px, transparent 1px),
