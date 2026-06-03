@@ -16,7 +16,7 @@ const FEATURES = [
   { icon: Globe, title: "50+ Currency Corridors", desc: "Hold USD, CAD, NGN, KES, GHS, ZMW and more in one app." },
 ];
 
-const STEPS = [
+const STEPS: { n: number; title: string; desc?: string }[] = [
   { n: 1, title: "Create your account" },
   { n: 2, title: "Add funds via card or bank" },
   { n: 3, title: "Send money anywhere in Africa" },
