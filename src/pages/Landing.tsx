@@ -18,7 +18,7 @@ const FEATURES = [
 
 const STEPS = [
   { n: 1, title: "Create your account" },
-  { n: 2, title: "Add funds via card or bank", desc: "Top up instantly with your debit card or linked bank." },
+  { n: 2, title: "Add funds via card or bank" },
   { n: 3, title: "Send money anywhere in Africa", desc: "Mobile money, bank deposit, or wallet — your choice." },
 ];
 
