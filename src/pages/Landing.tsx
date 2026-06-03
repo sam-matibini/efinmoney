@@ -346,7 +346,7 @@ const Landing = () => {
                   {s.n}
                 </div>
                 <h3 className="text-xl font-black text-primary mb-3">{s.title}</h3>
-                <p className="text-white/80">{s.desc}</p>
+                {s.desc && <p className="text-white/80">{s.desc}</p>}
               </motion.div>
             ))}
           </div>
