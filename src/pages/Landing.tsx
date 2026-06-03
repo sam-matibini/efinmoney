@@ -309,7 +309,7 @@ const Landing = () => {
                       <f.icon className="w-6 h-6 text-indigo-600" strokeWidth={2} />
                     </div>
                   </div>
-                  <h3 className="text-lg font-bold text-neutral-900 mb-2 tracking-tight">{f.title}</h3>
+                  <h3 className="text-lg font-bold text-primary mb-2 tracking-tight">{f.title}</h3>
                   <p className="text-[15px] text-neutral-500 leading-relaxed">{f.desc}</p>
 
                   <div className="mt-6 h-px w-10 bg-gradient-to-r from-indigo-500 to-transparent group-hover:w-20 transition-all duration-300" />
