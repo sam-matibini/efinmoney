@@ -3673,6 +3673,54 @@ export type Database = {
         }
         Relationships: []
       }
+      stripe_connected_accounts: {
+        Row: {
+          capabilities: Json
+          contact_email: string | null
+          country: string
+          created_at: string
+          dashboard: string
+          display_name: string | null
+          id: string
+          raw: Json | null
+          requirements: Json
+          status: string
+          stripe_account_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          capabilities?: Json
+          contact_email?: string | null
+          country: string
+          created_at?: string
+          dashboard?: string
+          display_name?: string | null
+          id?: string
+          raw?: Json | null
+          requirements?: Json
+          status?: string
+          stripe_account_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          capabilities?: Json
+          contact_email?: string | null
+          country?: string
+          created_at?: string
+          dashboard?: string
+          display_name?: string | null
+          id?: string
+          raw?: Json | null
+          requirements?: Json
+          status?: string
+          stripe_account_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       stripe_payout_recipients: {
         Row: {
           brand: string | null
