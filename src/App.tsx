@@ -212,6 +212,7 @@ const AppRoutes = () => {
           <Route path="/wallet/receive" element={<KycProtectedRoute><ReceivePage /></KycProtectedRoute>} />
           <Route path="/wallet/topup" element={<KycProtectedRoute><TopUpPage /></KycProtectedRoute>} />
           <Route path="/pay-bills" element={<KycProtectedRoute><PayBillsPage /></KycProtectedRoute>} />
+          <Route path="/stripe-connect" element={<KycProtectedRoute><StripeConnectInstantPage /></KycProtectedRoute>} />
           <Route path="/deposit/complete" element={<DepositComplete />} />
           <Route path="/payment-callback" element={<PaymentCallback />} />
           <Route path="/callback" element={<InteracCallback />} />
