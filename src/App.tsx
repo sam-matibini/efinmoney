@@ -65,6 +65,7 @@ import SystemDiagnosticsPage from "./pages/admin/SystemDiagnosticsPage";
 import InteracCallback from "./pages/InteracCallback";
 import InteracHubCallback from "./pages/InteracHubCallback";
 import MorePage from "./pages/MorePage";
+import StripeConnectInstantPage from "./pages/StripeConnectInstantPage";
 
 const queryClient = new QueryClient();
 
