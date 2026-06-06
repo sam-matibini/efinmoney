@@ -1335,6 +1335,90 @@ export type Database = {
           },
         ]
       }
+      crossmint_yellowcard_transfers: {
+        Row: {
+          created_at: string
+          crossmint_checkout_url: string | null
+          crossmint_order_id: string | null
+          crossmint_raw: Json | null
+          destination_amount: number | null
+          destination_country: string
+          destination_currency: string
+          failure_reason: string | null
+          fee_amount: number | null
+          fx_rate: number | null
+          id: string
+          recipient_account_number: string
+          recipient_bank_code: string | null
+          recipient_bank_name: string | null
+          recipient_email: string | null
+          recipient_name: string
+          recipient_phone: string | null
+          source_amount: number
+          source_currency: string
+          status: string
+          stellar_tx_hash: string | null
+          updated_at: string
+          user_id: string
+          yellowcard_payment_id: string | null
+          yellowcard_raw: Json | null
+        }
+        Insert: {
+          created_at?: string
+          crossmint_checkout_url?: string | null
+          crossmint_order_id?: string | null
+          crossmint_raw?: Json | null
+          destination_amount?: number | null
+          destination_country: string
+          destination_currency: string
+          failure_reason?: string | null
+          fee_amount?: number | null
+          fx_rate?: number | null
+          id?: string
+          recipient_account_number: string
+          recipient_bank_code?: string | null
+          recipient_bank_name?: string | null
+          recipient_email?: string | null
+          recipient_name: string
+          recipient_phone?: string | null
+          source_amount: number
+          source_currency: string
+          status?: string
+          stellar_tx_hash?: string | null
+          updated_at?: string
+          user_id: string
+          yellowcard_payment_id?: string | null
+          yellowcard_raw?: Json | null
+        }
+        Update: {
+          created_at?: string
+          crossmint_checkout_url?: string | null
+          crossmint_order_id?: string | null
+          crossmint_raw?: Json | null
+          destination_amount?: number | null
+          destination_country?: string
+          destination_currency?: string
+          failure_reason?: string | null
+          fee_amount?: number | null
+          fx_rate?: number | null
+          id?: string
+          recipient_account_number?: string
+          recipient_bank_code?: string | null
+          recipient_bank_name?: string | null
+          recipient_email?: string | null
+          recipient_name?: string
+          recipient_phone?: string | null
+          source_amount?: number
+          source_currency?: string
+          status?: string
+          stellar_tx_hash?: string | null
+          updated_at?: string
+          user_id?: string
+          yellowcard_payment_id?: string | null
+          yellowcard_raw?: Json | null
+        }
+        Relationships: []
+      }
       crypto_pairs: {
         Row: {
           base_currency: string
@@ -4592,6 +4676,30 @@ export type Database = {
             referencedColumns: ["code"]
           },
         ]
+      }
+      webhook_events: {
+        Row: {
+          created_at: string
+          event_type: string | null
+          id: string
+          payload: Json | null
+          provider: string
+        }
+        Insert: {
+          created_at?: string
+          event_type?: string | null
+          id?: string
+          payload?: Json | null
+          provider: string
+        }
+        Update: {
+          created_at?: string
+          event_type?: string | null
+          id?: string
+          payload?: Json | null
+          provider?: string
+        }
+        Relationships: []
       }
       webhooks_inbox: {
         Row: {

@@ -60,3 +60,9 @@ verify_jwt = false
 
 [functions.crossmint-webhook]
 verify_jwt = false
+
+[functions.yellowcard-webhook]
+verify_jwt = false
+
+[functions.yellowcard-payout]
+verify_jwt = false
