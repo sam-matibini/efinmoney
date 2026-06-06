@@ -1,8 +1,8 @@
-// Creates a Crossmint headless checkout order that funds USDC using the
-// sender's card. Returns checkout URL + client secret for the embedded
-// experience.
+// Creates a Crossmint headless checkout order that funds USDC into the
+// user's Crossmint Smart Wallet. The webhook later sweeps that USDC to the
+// Yellow Card Stellar deposit address.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import * as StellarSdk from "npm:stellar-sdk@12";
+import { getOrCreateCrossmintWallet } from "../_shared/crossmint-wallet.ts";
 
 const STAGING_USDC_TOKEN_LOCATORS = {
   solana: "solana:4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
@@ -13,6 +13,7 @@ const STAGING_USDC_TOKEN_LOCATORS = {
 const PRODUCTION_USDC_TOKEN_LOCATORS = {
   solana: "solana:EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
   base: "base:0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+  stellar: "stellar:CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SMHHQK",
 } as const;
 
 const corsHeaders = {
