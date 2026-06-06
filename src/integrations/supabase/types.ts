@@ -1335,6 +1335,42 @@ export type Database = {
           },
         ]
       }
+      crossmint_wallets: {
+        Row: {
+          address: string
+          chain: string
+          created_at: string
+          env: string
+          id: string
+          locator: string
+          raw: Json | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          address: string
+          chain: string
+          created_at?: string
+          env?: string
+          id?: string
+          locator: string
+          raw?: Json | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          address?: string
+          chain?: string
+          created_at?: string
+          env?: string
+          id?: string
+          locator?: string
+          raw?: Json | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       crossmint_yellowcard_transfers: {
         Row: {
           created_at: string
@@ -1348,12 +1384,14 @@ export type Database = {
           fee_amount: number | null
           fx_rate: number | null
           id: string
+          payout_tx_hash: string | null
           recipient_account_number: string
           recipient_bank_code: string | null
           recipient_bank_name: string | null
           recipient_email: string | null
           recipient_name: string
           recipient_phone: string | null
+          smart_wallet_address: string | null
           source_amount: number
           source_currency: string
           status: string
@@ -1375,12 +1413,14 @@ export type Database = {
           fee_amount?: number | null
           fx_rate?: number | null
           id?: string
+          payout_tx_hash?: string | null
           recipient_account_number: string
           recipient_bank_code?: string | null
           recipient_bank_name?: string | null
           recipient_email?: string | null
           recipient_name: string
           recipient_phone?: string | null
+          smart_wallet_address?: string | null
           source_amount: number
           source_currency: string
           status?: string
@@ -1402,12 +1442,14 @@ export type Database = {
           fee_amount?: number | null
           fx_rate?: number | null
           id?: string
+          payout_tx_hash?: string | null
           recipient_account_number?: string
           recipient_bank_code?: string | null
           recipient_bank_name?: string | null
           recipient_email?: string | null
           recipient_name?: string
           recipient_phone?: string | null
+          smart_wallet_address?: string | null
           source_amount?: number
           source_currency?: string
           status?: string
