@@ -57,3 +57,6 @@ verify_jwt = false
 
 
 
+
+[functions.crossmint-webhook]
+verify_jwt = false
