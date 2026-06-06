@@ -112,20 +112,7 @@ Deno.serve(async (req) => {
     // Treasury wallet address that will receive the USDC.
     // Crossmint's create-order flow expects a supported token locator and a
     // recipient wallet address on the matching chain.
-    const treasury = Deno.env.get("CIRCLE_USDC_DEPOSIT_ADDRESS") ?? "";
-    if (!treasury) {
-      await admin
-        .from("crossmint_yellowcard_transfers")
-        .update({ status: "failed", failure_reason: "Treasury deposit address is not configured." })
-        .eq("id", transfer.id);
-      return json({ error: "Treasury deposit address is not configured" }, 500);
-    }
-
     const orderBody = {
-      recipient: {
-        email: userEmail,
-        walletAddress: treasury,
-      },
       payment: {
         method: "card",
         receiptEmail: userEmail || recipient_email || undefined,
