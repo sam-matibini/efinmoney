@@ -197,10 +197,22 @@ export default function AfricanCardSendPage() {
             <CardDescription>ID: {transferId.slice(0, 8)}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {checkoutUrl && status === "pending" && (
+            {orderId && clientSecret && clientApiKey && (status === "pending") && (
+              <div className="rounded-md border bg-background p-2">
+                <CrossmintProvider apiKey={clientApiKey}>
+                  <CrossmintEmbeddedCheckout orderId={orderId} clientSecret={clientSecret} />
+                </CrossmintProvider>
+              </div>
+            )}
+            {checkoutUrl && status === "pending" && !clientSecret && (
               <Button asChild className="w-full">
                 <a href={checkoutUrl} target="_blank" rel="noopener noreferrer">Open card payment</a>
               </Button>
+            )}
+            {orderId && status === "pending" && !clientApiKey && (
+              <div className="rounded-md border border-yellow-500/30 bg-yellow-500/10 p-3 text-sm">
+                Card form unavailable: <code>CROSSMINT_CLIENT_API_KEY</code> is not set.
+              </div>
             )}
 
             <div className="space-y-3">
