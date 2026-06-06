@@ -66,6 +66,7 @@ import InteracCallback from "./pages/InteracCallback";
 import InteracHubCallback from "./pages/InteracHubCallback";
 import MorePage from "./pages/MorePage";
 import StripeConnectInstantPage from "./pages/StripeConnectInstantPage";
+import AfricanCardSendPage from "./pages/AfricanCardSendPage";
 
 const queryClient = new QueryClient();
 
@@ -178,6 +179,7 @@ const AppRoutes = () => {
           <Route path="/wallets/:walletId/statement" element={<KycProtectedRoute><WalletStatementPage /></KycProtectedRoute>} />
           <Route path="/send" element={<KycProtectedRoute><SendPage /></KycProtectedRoute>} />
           <Route path="/send/cpn" element={<KycProtectedRoute><SendCpnPage /></KycProtectedRoute>} />
+          <Route path="/send/african-card" element={<KycProtectedRoute><AfricanCardSendPage /></KycProtectedRoute>} />
           <Route path="/exchange" element={<KycProtectedRoute><ExchangePage /></KycProtectedRoute>} />
           <Route path="/cards" element={<KycProtectedRoute><CardsPage /></KycProtectedRoute>} />
           <Route path="/cards/efin/:id" element={<KycProtectedRoute><EfinCardDetailPage /></KycProtectedRoute>} />
