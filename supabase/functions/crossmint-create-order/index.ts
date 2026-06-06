@@ -2,6 +2,7 @@
 // sender's card. Returns checkout URL + client secret for the embedded
 // experience.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import * as StellarSdk from "npm:stellar-sdk@12";
 
 const STAGING_USDC_TOKEN_LOCATORS = {
   solana: "solana:4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
@@ -109,16 +110,37 @@ Deno.serve(async (req) => {
         ? PRODUCTION_USDC_TOKEN_LOCATORS[chain as keyof typeof PRODUCTION_USDC_TOKEN_LOCATORS] ?? PRODUCTION_USDC_TOKEN_LOCATORS.base
         : STAGING_USDC_TOKEN_LOCATORS[chain as keyof typeof STAGING_USDC_TOKEN_LOCATORS];
 
-    // Treasury wallet address that will receive the USDC.
-    // Crossmint's create-order flow expects a recipient wallet address on the
-    // same chain as the token locator.
-    const treasury = Deno.env.get("CIRCLE_USDC_DEPOSIT_ADDRESS") ?? "";
+    // Crossmint needs a real recipient wallet address on the same chain as
+    // the purchased token. For Stellar staging we derive the treasury public
+    // key from the configured treasury seed instead of reusing the Circle
+    // deposit address secret, which is not a blockchain wallet address.
+    let treasury = "";
+    if (chain === "stellar") {
+      const treasurySeed = Deno.env.get("STELLAR_TREASURY_SEED") ?? "";
+      if (treasurySeed) {
+        treasury = StellarSdk.Keypair.fromSecret(treasurySeed).publicKey();
+      }
+    } else {
+      treasury = Deno.env.get("CROSSMINT_RECIPIENT_WALLET") ?? "";
+    }
+
     if (!treasury) {
       await admin
         .from("crossmint_yellowcard_transfers")
-        .update({ status: "failed", failure_reason: "Treasury deposit address is not configured." })
+        .update({
+          status: "failed",
+          failure_reason:
+            chain === "stellar"
+              ? "Stellar treasury wallet is not configured."
+              : `Recipient wallet is not configured for ${chain}.`,
+        })
         .eq("id", transfer.id);
-      return json({ error: "Treasury deposit address is not configured" }, 500);
+      return json({
+        error:
+          chain === "stellar"
+            ? "Stellar treasury wallet is not configured"
+            : `Recipient wallet is not configured for ${chain}`,
+      }, 500);
     }
 
     const orderBody = {
