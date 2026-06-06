@@ -98,56 +98,46 @@ Deno.serve(async (req) => {
     }
 
     const apiKey = Deno.env.get("CROSSMINT_API_KEY")!;
-    const env = (Deno.env.get("CROSSMINT_ENV") ?? "staging").toLowerCase();
-    const base =
-      env === "production"
-        ? "https://www.crossmint.com/api"
-        : "https://staging.crossmint.com/api";
+    const env = ((Deno.env.get("CROSSMINT_ENV") ?? "staging").toLowerCase()) as
+      | "staging"
+      | "production";
 
-    const requestedChain = (Deno.env.get("CROSSMINT_USDC_CHAIN") ?? (env === "production" ? "base" : "stellar")).toLowerCase();
+    const requestedChain = (Deno.env.get("CROSSMINT_USDC_CHAIN") ?? "stellar").toLowerCase();
     const chain = requestedChain === "stellar" || requestedChain === "solana" ? requestedChain : "base";
     const tokenLocator =
       env === "production"
         ? PRODUCTION_USDC_TOKEN_LOCATORS[chain as keyof typeof PRODUCTION_USDC_TOKEN_LOCATORS] ?? PRODUCTION_USDC_TOKEN_LOCATORS.base
         : STAGING_USDC_TOKEN_LOCATORS[chain as keyof typeof STAGING_USDC_TOKEN_LOCATORS];
 
-    // Crossmint needs a real recipient wallet address on the same chain as
-    // the purchased token. For Stellar staging we derive the treasury public
-    // key from the configured treasury seed instead of reusing the Circle
-    // deposit address secret, which is not a blockchain wallet address.
-    let treasury = "";
-    if (chain === "stellar") {
-      const treasurySeed = Deno.env.get("STELLAR_TREASURY_SEED") ?? "";
-      if (treasurySeed) {
-        treasury = StellarSdk.Keypair.fromSecret(treasurySeed).publicKey();
-      }
-    } else {
-      treasury = Deno.env.get("CROSSMINT_RECIPIENT_WALLET") ?? "";
-    }
-
-    if (!treasury) {
+    // Provision (or fetch) the user's Crossmint Smart Wallet on the target
+    // chain. USDC purchased through the order is delivered into this wallet,
+    // which is then swept to Yellow Card by the webhook.
+    let smartWallet;
+    try {
+      smartWallet = await getOrCreateCrossmintWallet({
+        admin,
+        apiKey,
+        env,
+        userId,
+        userEmail,
+        chain,
+      });
+    } catch (e) {
       await admin
         .from("crossmint_yellowcard_transfers")
-        .update({
-          status: "failed",
-          failure_reason:
-            chain === "stellar"
-              ? "Stellar treasury wallet is not configured."
-              : `Recipient wallet is not configured for ${chain}.`,
-        })
+        .update({ status: "failed", failure_reason: String(e) })
         .eq("id", transfer.id);
-      return json({
-        error:
-          chain === "stellar"
-            ? "Stellar treasury wallet is not configured"
-            : `Recipient wallet is not configured for ${chain}`,
-      }, 500);
+      console.error("crossmint smart wallet provisioning failed", e);
+      return json({ error: "Could not provision smart wallet", details: String(e) }, 502);
     }
 
+    await admin
+      .from("crossmint_yellowcard_transfers")
+      .update({ smart_wallet_address: smartWallet.address })
+      .eq("id", transfer.id);
+
     const orderBody = {
-      recipient: chain === "stellar"
-        ? { email: userEmail || recipient_email || undefined }
-        : { walletAddress: treasury },
+      recipient: { walletAddress: smartWallet.locator },
       payment: {
         method: "card",
         receiptEmail: userEmail || recipient_email || undefined,
@@ -165,11 +155,17 @@ Deno.serve(async (req) => {
         transfer_id: transfer.id,
         user_id: userId,
         crossmint_chain: chain,
+        smart_wallet: smartWallet.address,
         source_currency: source_currency.toLowerCase(),
         destination_country,
         destination_currency,
       },
     };
+
+    const base =
+      env === "production"
+        ? "https://www.crossmint.com/api"
+        : "https://staging.crossmint.com/api";
 
     const resp = await fetch(`${base}/2022-06-09/orders`, {
       method: "POST",
