@@ -40,28 +40,58 @@ export async function getOrCreateCrossmintWallet(opts: {
 
   // 2. Create on Crossmint. We bind the wallet to the user via linkedUser=email:...
   // so the same user always resolves to the same wallet.
+  //
+  // Signer fallback chain: the project may not have all signer types enabled.
+  // CROSSMINT_SIGNER_TYPE env var can override the preferred type. Otherwise
+  // we try api-key first (best for server-driven sweeps), then fall back to
+  // email (delegated signer tied to the linkedUser), then passkey.
   const base = crossmintBase(env);
-  const body: Record<string, unknown> = {
-    type: "smart",
-    chainType: chain === "stellar" ? "stellar" : "evm",
-    chain,
-    config: { adminSigner: { type: "api-key" } },
+  const preferred = (Deno.env.get("CROSSMINT_SIGNER_TYPE") ?? "").toLowerCase();
+  const signerChain: Array<Record<string, unknown>> = [];
+  const pushUnique = (s: Record<string, unknown>) => {
+    if (!signerChain.find((x) => x.type === s.type)) signerChain.push(s);
   };
-  if (userEmail) body.linkedUser = `email:${userEmail}`;
+  if (preferred === "api-key") pushUnique({ type: "api-key" });
+  if (preferred === "email" && userEmail) pushUnique({ type: "email", email: userEmail });
+  if (preferred === "passkey") pushUnique({ type: "passkey" });
+  // Default fallback order
+  pushUnique({ type: "api-key" });
+  if (userEmail) pushUnique({ type: "email", email: userEmail });
+  pushUnique({ type: "passkey" });
 
-  const resp = await fetch(`${base}/2025-06-09/wallets`, {
-    method: "POST",
-    headers: {
-      "X-API-KEY": apiKey,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
-  const data = await resp.json().catch(() => ({}));
-  if (!resp.ok) {
-    throw new Error(
-      `Crossmint wallet create failed (${resp.status}): ${JSON.stringify(data)}`,
-    );
+  let data: any = null;
+  let lastErr = "";
+  let okResp = false;
+  for (const adminSigner of signerChain) {
+    const body: Record<string, unknown> = {
+      type: "smart",
+      chainType: chain === "stellar" ? "stellar" : "evm",
+      chain,
+      config: { adminSigner },
+    };
+    if (userEmail) body.linkedUser = `email:${userEmail}`;
+
+    const resp = await fetch(`${base}/2025-06-09/wallets`, {
+      method: "POST",
+      headers: { "X-API-KEY": apiKey, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    data = await resp.json().catch(() => ({}));
+    if (resp.ok) {
+      okResp = true;
+      console.log(`Crossmint wallet created with signer=${adminSigner.type}`);
+      break;
+    }
+    lastErr = `signer=${adminSigner.type} status=${resp.status} body=${JSON.stringify(data)}`;
+    console.warn(`Crossmint wallet create failed, trying next signer. ${lastErr}`);
+    // Only fall through on "not enabled" style errors; otherwise stop early.
+    const msg = JSON.stringify(data).toLowerCase();
+    if (!msg.includes("not enabled") && !msg.includes("not allowed") && !msg.includes("disabled") && resp.status !== 400 && resp.status !== 403) {
+      break;
+    }
+  }
+  if (!okResp) {
+    throw new Error(`Crossmint wallet create failed across all signers. Last: ${lastErr}`);
   }
 
   const address: string = data?.address ?? data?.wallet?.address ?? "";
