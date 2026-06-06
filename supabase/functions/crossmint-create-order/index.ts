@@ -1,7 +1,18 @@
-// Creates a Crossmint headless checkout order that funds USDC on Stellar
-// using the sender's card. Returns checkout URL + client secret for the
-// embedded experience.
+// Creates a Crossmint headless checkout order that funds USDC using the
+// sender's card. Returns checkout URL + client secret for the embedded
+// experience.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+
+const STAGING_USDC_TOKEN_LOCATORS = {
+  solana: "solana:4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+  base: "base-sepolia:0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+  stellar: "stellar:CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA",
+} as const;
+
+const PRODUCTION_USDC_TOKEN_LOCATORS = {
+  solana: "solana:EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+  base: "base:0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+} as const;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -91,34 +102,48 @@ Deno.serve(async (req) => {
         ? "https://www.crossmint.com/api"
         : "https://staging.crossmint.com/api";
 
-    // Treasury Stellar address that will receive the USDC
-    const treasury = Deno.env.get("CIRCLE_USDC_DEPOSIT_ADDRESS") ?? "";
+    const requestedChain = (Deno.env.get("CROSSMINT_USDC_CHAIN") ?? "base").toLowerCase();
+    const chain = requestedChain === "stellar" || requestedChain === "solana" ? requestedChain : "base";
+    const tokenLocator =
+      env === "production"
+        ? PRODUCTION_USDC_TOKEN_LOCATORS[chain as keyof typeof PRODUCTION_USDC_TOKEN_LOCATORS] ?? PRODUCTION_USDC_TOKEN_LOCATORS.base
+        : STAGING_USDC_TOKEN_LOCATORS[chain as keyof typeof STAGING_USDC_TOKEN_LOCATORS];
 
-    // Crossmint headless checkout: card -> USDC on Stellar to our treasury.
-    // Amount in source fiat; Crossmint returns USDC equivalent.
+    // Treasury wallet address that will receive the USDC.
+    // Crossmint's create-order flow expects a supported token locator and a
+    // recipient wallet address on the matching chain.
+    const treasury = Deno.env.get("CIRCLE_USDC_DEPOSIT_ADDRESS") ?? "";
+    if (!treasury) {
+      await admin
+        .from("crossmint_yellowcard_transfers")
+        .update({ status: "failed", failure_reason: "Treasury deposit address is not configured." })
+        .eq("id", transfer.id);
+      return json({ error: "Treasury deposit address is not configured" }, 500);
+    }
+
     const orderBody = {
       recipient: {
         email: userEmail,
-        // Receive USDC on Stellar; treasury wallet collects on behalf of user
-        walletAddress: treasury || undefined,
+        walletAddress: treasury,
       },
       payment: {
-        method: "fiat",
-        currency: source_currency.toLowerCase(),
+        method: "card",
+        receiptEmail: userEmail || recipient_email || undefined,
       },
       lineItems: [
         {
-          tokenLocator: `stellar:USDC`,
+          tokenLocator,
           executionParameters: {
             mode: "exact-in",
             amount: String(source_amount),
-            currency: source_currency.toLowerCase(),
           },
         },
       ],
       metadata: {
         transfer_id: transfer.id,
         user_id: userId,
+        crossmint_chain: chain,
+        source_currency: source_currency.toLowerCase(),
         destination_country,
         destination_currency,
       },
@@ -139,7 +164,14 @@ Deno.serve(async (req) => {
         .from("crossmint_yellowcard_transfers")
         .update({ status: "failed", failure_reason: JSON.stringify(orderData), crossmint_raw: orderData })
         .eq("id", transfer.id);
-      console.error("crossmint order failed", resp.status, orderData);
+      console.error("crossmint order failed", resp.status, {
+        env,
+        chain,
+        tokenLocator,
+        apiKeyPrefix: apiKey.slice(0, 12),
+        apiKeyLength: apiKey.length,
+        orderData,
+      });
       return json({ error: "Crossmint order failed", details: orderData }, 502);
     }
 
