@@ -41,6 +41,9 @@ export default function AfricanCardSendPage() {
   const [loading, setLoading] = useState(false);
   const [transferId, setTransferId] = useState<string | null>(params.get("transfer") ?? null);
   const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
+  const [orderId, setOrderId] = useState<string | null>(null);
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [clientApiKey, setClientApiKey] = useState<string | null>(null);
   const [status, setStatus] = useState<Status>("pending");
   const [failure, setFailure] = useState<string | null>(null);
 
