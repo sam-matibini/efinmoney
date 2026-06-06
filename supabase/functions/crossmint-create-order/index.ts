@@ -137,7 +137,7 @@ Deno.serve(async (req) => {
       .eq("id", transfer.id);
 
     const orderBody = {
-      recipient: { walletAddress: smartWallet.locator },
+      recipient: { walletAddress: smartWallet.address },
       payment: {
         method: "card",
         receiptEmail: userEmail || recipient_email || undefined,
