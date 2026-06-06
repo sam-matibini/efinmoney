@@ -216,6 +216,7 @@ Deno.serve(async (req) => {
       order_id: orderId,
       checkout_url: checkoutUrl,
       client_secret: clientSecret,
+      client_api_key: Deno.env.get("CROSSMINT_CLIENT_API_KEY") ?? null,
       env,
     });
   } catch (e) {

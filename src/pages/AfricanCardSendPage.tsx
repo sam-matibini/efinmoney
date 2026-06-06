@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Loader2, ArrowRight, CheckCircle2, Clock, XCircle } from "lucide-react";
 import { toast } from "sonner";
+import { CrossmintProvider, CrossmintEmbeddedCheckout } from "@crossmint/client-sdk-react-ui";
 
 type Status = "pending" | "card_charged" | "usdc_received" | "payout_sent" | "pending_payout" | "success" | "failed" | "cancelled";
 
@@ -40,6 +41,9 @@ export default function AfricanCardSendPage() {
   const [loading, setLoading] = useState(false);
   const [transferId, setTransferId] = useState<string | null>(params.get("transfer") ?? null);
   const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
+  const [orderId, setOrderId] = useState<string | null>(null);
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [clientApiKey, setClientApiKey] = useState<string | null>(null);
   const [status, setStatus] = useState<Status>("pending");
   const [failure, setFailure] = useState<string | null>(null);
 
@@ -96,10 +100,13 @@ export default function AfricanCardSendPage() {
       if (error) throw error;
       setTransferId(data.transfer_id);
       setCheckoutUrl(data.checkout_url);
+      setOrderId(data.order_id ?? null);
+      setClientSecret(data.client_secret ?? null);
+      setClientApiKey(data.client_api_key ?? null);
       if (data.checkout_url) {
         window.open(data.checkout_url, "_blank");
       }
-      toast.success("Transfer created — complete card payment in the Crossmint window.");
+      toast.success("Transfer created — complete card payment below.");
     } catch (err: any) {
       toast.error(err.message ?? "Could not create transfer");
     } finally {
@@ -190,10 +197,30 @@ export default function AfricanCardSendPage() {
             <CardDescription>ID: {transferId.slice(0, 8)}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {checkoutUrl && status === "pending" && (
+            {orderId && clientSecret && clientApiKey && (status === "pending") && (
+              <div className="rounded-md border bg-background p-2">
+                <CrossmintProvider apiKey={clientApiKey}>
+                  <CrossmintEmbeddedCheckout
+                    orderId={orderId}
+                    clientSecret={clientSecret}
+                    payment={{
+                      fiat: { enabled: true, allowedMethods: { card: true, applePay: true, googlePay: true } },
+                      crypto: { enabled: false },
+                      defaultMethod: "fiat",
+                    }}
+                  />
+                </CrossmintProvider>
+              </div>
+            )}
+            {checkoutUrl && status === "pending" && !clientSecret && (
               <Button asChild className="w-full">
                 <a href={checkoutUrl} target="_blank" rel="noopener noreferrer">Open card payment</a>
               </Button>
+            )}
+            {orderId && status === "pending" && !clientApiKey && (
+              <div className="rounded-md border border-yellow-500/30 bg-yellow-500/10 p-3 text-sm">
+                Card form unavailable: <code>CROSSMINT_CLIENT_API_KEY</code> is not set.
+              </div>
             )}
 
             <div className="space-y-3">
