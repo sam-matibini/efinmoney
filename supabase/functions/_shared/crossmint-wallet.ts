@@ -53,11 +53,9 @@ export async function getOrCreateCrossmintWallet(opts: {
   };
   if (preferred === "api-key") pushUnique({ type: "api-key" });
   if (preferred === "email" && userEmail) pushUnique({ type: "email", email: userEmail });
-  if (preferred === "passkey") pushUnique({ type: "passkey" });
-  // Default fallback order
+  // Default fallback order (passkey not supported via server-side API create)
   pushUnique({ type: "api-key" });
   if (userEmail) pushUnique({ type: "email", email: userEmail });
-  pushUnique({ type: "passkey" });
 
   let data: any = null;
   let lastErr = "";
@@ -70,6 +68,10 @@ export async function getOrCreateCrossmintWallet(opts: {
       config: { adminSigner },
     };
     if (userEmail) body.linkedUser = `email:${userEmail}`;
+    // Email signers require `owner` at the request body root.
+    if (adminSigner.type === "email" && userEmail) {
+      body.owner = `email:${userEmail}`;
+    }
 
     const resp = await fetch(`${base}/2025-06-09/wallets`, {
       method: "POST",
