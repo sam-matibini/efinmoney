@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Loader2, ArrowRight, CheckCircle2, Clock, XCircle } from "lucide-react";
 import { toast } from "sonner";
+import { CrossmintProvider, CrossmintEmbeddedCheckout } from "@crossmint/client-sdk-react-ui";
 
 type Status = "pending" | "card_charged" | "usdc_received" | "payout_sent" | "pending_payout" | "success" | "failed" | "cancelled";
 
