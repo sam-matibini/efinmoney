@@ -200,7 +200,15 @@ export default function AfricanCardSendPage() {
             {orderId && clientSecret && clientApiKey && (status === "pending") && (
               <div className="rounded-md border bg-background p-2">
                 <CrossmintProvider apiKey={clientApiKey}>
-                  <CrossmintEmbeddedCheckout orderId={orderId} clientSecret={clientSecret} />
+                  <CrossmintEmbeddedCheckout
+                    orderId={orderId}
+                    clientSecret={clientSecret}
+                    payment={{
+                      fiat: { enabled: true, allowedMethods: { card: true, applePay: true, googlePay: true } },
+                      crypto: { enabled: false },
+                      defaultMethod: "fiat",
+                    }}
+                  />
                 </CrossmintProvider>
               </div>
             )}
