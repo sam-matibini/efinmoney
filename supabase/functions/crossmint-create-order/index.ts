@@ -144,9 +144,9 @@ Deno.serve(async (req) => {
     }
 
     const orderBody = {
-      recipient: {
-        walletAddress: treasury,
-      },
+      recipient: chain === "stellar"
+        ? { email: userEmail || recipient_email || undefined }
+        : { walletAddress: treasury },
       payment: {
         method: "card",
         receiptEmail: userEmail || recipient_email || undefined,
