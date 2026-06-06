@@ -77,6 +77,26 @@ Deno.serve(async (req) => {
           })
           .eq("crossmint_order_id", orderId)
           .then(() => {}, () => {});
+
+        // When USDC has arrived, kick off the Yellow Card payout
+        if (newStatus === "usdc_received") {
+          const { data: t } = await supabase
+            .from("crossmint_yellowcard_transfers")
+            .select("id")
+            .eq("crossmint_order_id", orderId)
+            .maybeSingle();
+          if (t?.id) {
+            const ycUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/yellowcard-payout`;
+            await fetch(ycUrl, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+              },
+              body: JSON.stringify({ transfer_id: t.id }),
+            }).catch((e) => console.error("yc trigger failed", e));
+          }
+        }
       }
     }
 
