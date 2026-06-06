@@ -100,10 +100,13 @@ export default function AfricanCardSendPage() {
       if (error) throw error;
       setTransferId(data.transfer_id);
       setCheckoutUrl(data.checkout_url);
+      setOrderId(data.order_id ?? null);
+      setClientSecret(data.client_secret ?? null);
+      setClientApiKey(data.client_api_key ?? null);
       if (data.checkout_url) {
         window.open(data.checkout_url, "_blank");
       }
-      toast.success("Transfer created — complete card payment in the Crossmint window.");
+      toast.success("Transfer created — complete card payment below.");
     } catch (err: any) {
       toast.error(err.message ?? "Could not create transfer");
     } finally {
