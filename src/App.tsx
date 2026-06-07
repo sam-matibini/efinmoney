@@ -177,6 +177,7 @@ const AppRoutes = () => {
           <Route path="/s/:code" element={<ShortLinkResolver />} />
           <Route path="/privacy" element={<PrivacyPolicyPage />} />
           <Route path="/terms" element={<TermsPage />} />
+          <Route path="/compliance" element={<CompliancePage />} />
           <Route path="/dashboard" element={<KycProtectedRoute><Index /></KycProtectedRoute>} />
           <Route path="/wallets" element={<KycProtectedRoute><WalletsPage /></KycProtectedRoute>} />
           <Route path="/wallets/:walletId/statement" element={<KycProtectedRoute><WalletStatementPage /></KycProtectedRoute>} />
