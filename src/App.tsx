@@ -14,6 +14,7 @@ import Index from "./pages/Index";
 import Landing from "./pages/Landing";
 import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
 import TermsPage from "./pages/TermsPage";
+import CompliancePage from "./pages/CompliancePage";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import FinanceDashboard from "./pages/FinanceDashboard";
