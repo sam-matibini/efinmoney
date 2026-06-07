@@ -19,6 +19,25 @@ const gradients: Record<string, string> = {
 
 const fallbackGradient = "linear-gradient(135deg, #475569 0%, #1e293b 100%)";
 
+const containerVariants = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.09, delayChildren: 0.05 } },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 40 },
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: { type: "spring" as const, stiffness: 260, damping: 22, mass: 0.9 },
+  },
+};
+
+const extractGlowColor = (gradient: string): string => {
+  const match = gradient.match(/#([0-9a-fA-F]{6})/);
+  return match ? `#${match[1]}` : "#6366f1";
+};
+
 const formatBalance = (value: number) =>
   new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
 
@@ -179,7 +198,7 @@ const WalletCarousel = () => {
             </button>
           </CreateWalletModal>
         )}
-      </div>
+      </motion.div>
 
       {/* Dots indicator */}
       {list.length > 1 && (
@@ -215,6 +234,7 @@ const TiltCard = ({ idx, isActive, gradient, children, onClick }: TiltCardProps)
   const y = useMotionValue(0);
   const rotateX = useTransform(y, [-50, 50], [5, -5]);
   const rotateY = useTransform(x, [-50, 50], [-5, 5]);
+  const glow = extractGlowColor(gradient);
 
   const handleMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -225,9 +245,12 @@ const TiltCard = ({ idx, isActive, gradient, children, onClick }: TiltCardProps)
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 30 }}
-      animate={{ opacity: 1, y: 0, scale: isActive ? 1.02 : 1 }}
-      transition={{ delay: idx * 0.08, duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+      variants={itemVariants}
+      whileHover={{
+        scale: 1.02,
+        boxShadow: `0 18px 50px -10px ${glow}99, 0 0 28px ${glow}66`,
+        transition: { type: "spring", stiffness: 300, damping: 20 },
+      }}
       onClick={onClick}
       onMouseMove={handleMove}
       onMouseLeave={reset}
