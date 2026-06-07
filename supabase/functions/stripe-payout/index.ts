@@ -171,7 +171,7 @@ Deno.serve(async (req) => {
       if (!acctId) {
         const acct = await stripe.accounts.create({
           type: "custom",
-          country: "CA",
+          country: corridor.country,
           business_type: "individual",
           capabilities: {
             card_payments: { requested: true },
@@ -182,7 +182,7 @@ Deno.serve(async (req) => {
             last_name: recipientName.split(/\s+/).slice(1).join(" ") || recipientName,
             email: recEmail || undefined,
           },
-          metadata: { sender_id: senderId, transfer_id: transfer.id },
+          metadata: { sender_id: senderId, transfer_id: transfer.id, corridor: corridor.country },
         });
         acctId = acct.id;
       }
