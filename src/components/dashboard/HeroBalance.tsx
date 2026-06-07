@@ -94,6 +94,10 @@ const HeroBalance = () => {
   }, [sparkData]);
 
   const positive = todayChange >= 0;
+  const todayDeltaUsd = useMemo(() => {
+    if (sparkData.length < 2) return 0;
+    return sparkData[sparkData.length - 1].value - sparkData[sparkData.length - 2].value;
+  }, [sparkData]);
   const walletCount = wallets?.length ?? 0;
 
   // Monthly budget not yet wired to a real budget feature — default to 0% (no budget set)
