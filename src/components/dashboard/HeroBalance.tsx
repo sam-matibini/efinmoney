@@ -319,7 +319,7 @@ const BudgetArc = ({ pct }: { pct: number }) => {
   const offset = c - (pct / 100) * c;
   return (
     <svg width="56" height="56" viewBox="0 0 56 56" className="-rotate-90">
-      <circle cx="28" cy="28" r={r} fill="none" stroke="hsl(0 0% 100% / 0.18)" strokeWidth="5" />
+      <circle cx="28" cy="28" r={r} fill="none" className="dark:stroke-white/[0.18] stroke-[hsl(230_25%_91%)]" strokeWidth="5" />
       <motion.circle
         cx="28" cy="28" r={r} fill="none"
         stroke="hsl(var(--accent-amber))"
