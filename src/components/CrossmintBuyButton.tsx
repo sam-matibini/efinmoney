@@ -1,31 +1,36 @@
-import { CrossmintPayButton } from "@crossmint/client-sdk-react-ui";
+import {
+  CrossmintProvider,
+  CrossmintHostedCheckout,
+} from "@crossmint/client-sdk-react-ui";
 
 /**
- * Crossmint embedded checkout button.
+ * Crossmint hosted checkout button.
  *
- * Env vars (set as Vite public env or Lovable Cloud secrets exposed to the client):
- *  - VITE_CROSSMINT_PROJECT_ID
- *  - VITE_CROSSMINT_COLLECTION_ID
- *  - VITE_CROSSMINT_ENV  ("staging" | "production")
+ * Public env vars (safe in client bundle):
+ *  - VITE_CROSSMINT_CLIENT_API_KEY   client-side Crossmint API key (ck_...)
+ *  - VITE_CROSSMINT_COLLECTION_ID    target collection
  *
- * Server-side secrets (NEVER exposed to the client, used in edge functions):
- *  - CROSSMINT_API_KEY
- *  - CROSSMINT_WEBHOOK_SECRET
+ * Server-side secrets (NEVER exposed to the client, stored in Lovable Cloud):
+ *  - CROSSMINT_API_KEY               server-side key (sk_...)
+ *  - CROSSMINT_WEBHOOK_SECRET        webhook signing secret (whsec_...)
  */
 interface CrossmintBuyButtonProps {
-  totalPrice: string; // e.g. "0.001" (in the collection's currency)
-  quantity?: string;
+  totalPrice: string; // e.g. "0.001"
+  quantity?: number;
 }
 
 export function CrossmintBuyButton({
   totalPrice,
-  quantity = "1",
+  quantity = 1,
 }: CrossmintBuyButtonProps) {
-  const projectId = import.meta.env.VITE_CROSSMINT_PROJECT_ID as string | undefined;
-  const collectionId = import.meta.env.VITE_CROSSMINT_COLLECTION_ID as string | undefined;
-  const environment = (import.meta.env.VITE_CROSSMINT_ENV as string | undefined) ?? "staging";
+  const apiKey = import.meta.env.VITE_CROSSMINT_CLIENT_API_KEY as
+    | string
+    | undefined;
+  const collectionId = import.meta.env.VITE_CROSSMINT_COLLECTION_ID as
+    | string
+    | undefined;
 
-  if (!projectId || !collectionId) {
+  if (!apiKey || !collectionId) {
     return (
       <button
         disabled
@@ -37,17 +42,18 @@ export function CrossmintBuyButton({
   }
 
   return (
-    <CrossmintPayButton
-      projectId={projectId}
-      collectionId={collectionId}
-      environment={environment}
-      mintConfig={{
-        type: "erc-721",
-        totalPrice,
-        quantity,
-      }}
-      paymentMethod="fiat"
-    />
+    <CrossmintProvider apiKey={apiKey}>
+      <CrossmintHostedCheckout
+        lineItems={{
+          collectionLocator: `crossmint:${collectionId}`,
+          callData: { totalPrice, quantity },
+        }}
+        payment={{
+          crypto: { enabled: true },
+          fiat: { enabled: true },
+        }}
+      />
+    </CrossmintProvider>
   );
 }
 
