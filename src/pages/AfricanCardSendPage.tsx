@@ -219,6 +219,8 @@ export default function AfricanCardSendPage() {
             </form>
           </CardContent>
         </Card>
+      ) : isDone && transferId ? (
+        <CrossmintSuccessScreen transferId={transferId} />
       ) : (
         <Card>
           <CardHeader>
