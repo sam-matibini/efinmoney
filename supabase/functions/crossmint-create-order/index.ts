@@ -102,12 +102,15 @@ Deno.serve(async (req) => {
       | "staging"
       | "production";
 
-    const requestedChain = (Deno.env.get("CROSSMINT_USDC_CHAIN") ?? "stellar").toLowerCase();
-    const chain = requestedChain === "stellar" || requestedChain === "solana" ? requestedChain : "base";
+    // Crossmint Orders API only accepts Solana + EVM token locators (Stellar is
+    // not supported by the orders endpoint, even though wallets can be Stellar).
+    // Default to Base for production cards.
+    const requestedChain = (Deno.env.get("CROSSMINT_USDC_CHAIN") ?? "base").toLowerCase();
+    const chain = requestedChain === "solana" ? "solana" : "base";
     const tokenLocator =
       env === "production"
         ? PRODUCTION_USDC_TOKEN_LOCATORS[chain as keyof typeof PRODUCTION_USDC_TOKEN_LOCATORS] ?? PRODUCTION_USDC_TOKEN_LOCATORS.base
-        : STAGING_USDC_TOKEN_LOCATORS[chain as keyof typeof STAGING_USDC_TOKEN_LOCATORS];
+        : STAGING_USDC_TOKEN_LOCATORS[chain as keyof typeof STAGING_USDC_TOKEN_LOCATORS] ?? STAGING_USDC_TOKEN_LOCATORS.base;
 
     // Provision (or fetch) the user's Crossmint Smart Wallet on the target
     // chain. USDC purchased through the order is delivered into this wallet,
