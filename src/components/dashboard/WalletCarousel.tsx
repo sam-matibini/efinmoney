@@ -79,8 +79,11 @@ const WalletCarousel = () => {
         </CreateWalletModal>
       </div>
 
-      <div
+      <motion.div
         ref={scrollRef}
+        variants={containerVariants}
+        initial="hidden"
+        animate="show"
         className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4 snap-x snap-mandatory scroll-smooth no-scrollbar"
         style={{ scrollbarWidth: "none" }}
       >
