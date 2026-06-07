@@ -84,15 +84,18 @@ Deno.serve(async (req) => {
     const env = ((Deno.env.get("CROSSMINT_ENV") ?? "staging").toLowerCase()) as
       | "staging"
       | "production";
-    const chain = (Deno.env.get("CROSSMINT_USDC_CHAIN") ?? "stellar").toLowerCase();
+    const chain = (Deno.env.get("CROSSMINT_USDC_CHAIN") ?? "base").toLowerCase();
     const tokenLocator =
       env === "production"
-        ? PRODUCTION_USDC_TOKEN_LOCATORS[chain] ?? PRODUCTION_USDC_TOKEN_LOCATORS.stellar
-        : STAGING_USDC_TOKEN_LOCATORS[chain] ?? STAGING_USDC_TOKEN_LOCATORS.stellar;
+        ? PRODUCTION_USDC_TOKEN_LOCATORS[chain] ?? PRODUCTION_USDC_TOKEN_LOCATORS.base
+        : STAGING_USDC_TOKEN_LOCATORS[chain] ?? STAGING_USDC_TOKEN_LOCATORS.base;
 
-    // Yellow Card deposit address (falls back to our own treasury so funds
-    // are still recoverable while YC onboarding is in flight).
+    // Yellow Card deposit address. We prefer a chain-specific override
+    // (Base by default) and fall back to the generic / Stellar names for
+    // back-compat with any earlier configuration.
     const ycDeposit =
+      Deno.env.get("YELLOWCARD_BASE_DEPOSIT_ADDRESS") ??
+      Deno.env.get("YELLOWCARD_DEPOSIT_ADDRESS") ??
       Deno.env.get("YELLOWCARD_STELLAR_DEPOSIT_ADDRESS") ??
       Deno.env.get("CROSSMINT_RECIPIENT_WALLET") ??
       "";
