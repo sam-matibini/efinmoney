@@ -100,6 +100,16 @@ const TopUpPage = () => {
 
   // Verify FLW return callback
   useEffect(() => {
+    const stripeStatus = params.get("stripe");
+    if (stripeStatus === "success") {
+      setVerifyState({ status: "success", message: "Payment received. Your wallet will be credited within a few seconds." });
+      toast.success("Stripe top-up received");
+      return;
+    }
+    if (stripeStatus === "cancelled") {
+      setVerifyState({ status: "failed", message: "Stripe payment was cancelled" });
+      return;
+    }
     const tx = params.get("transaction_id");
     const ref = params.get("tx_ref");
     const flwStatus = params.get("status");
