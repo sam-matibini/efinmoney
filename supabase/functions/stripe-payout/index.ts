@@ -222,10 +222,10 @@ Deno.serve(async (req) => {
       const payout = await stripe.payouts.create(
         {
           amount: amountCents,
-          currency: "cad",
+          currency: corridor.currency,
           method: "instant",
           destination: externalAccountId!,
-          metadata: { transfer_id: transfer.id, sender_id: senderId },
+          metadata: { transfer_id: transfer.id, sender_id: senderId, corridor: corridor.country },
         },
         { stripeAccount: acctId! },
       );
