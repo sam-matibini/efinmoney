@@ -13,6 +13,7 @@ import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import Index from "./pages/Index";
 import Landing from "./pages/Landing";
 import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
+import TermsPage from "./pages/TermsPage";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import FinanceDashboard from "./pages/FinanceDashboard";
@@ -174,6 +175,7 @@ const AppRoutes = () => {
           <Route path="/" element={<RootRoute />} />
           <Route path="/s/:code" element={<ShortLinkResolver />} />
           <Route path="/privacy" element={<PrivacyPolicyPage />} />
+          <Route path="/terms" element={<TermsPage />} />
           <Route path="/dashboard" element={<KycProtectedRoute><Index /></KycProtectedRoute>} />
           <Route path="/wallets" element={<KycProtectedRoute><WalletsPage /></KycProtectedRoute>} />
           <Route path="/wallets/:walletId/statement" element={<KycProtectedRoute><WalletStatementPage /></KycProtectedRoute>} />
