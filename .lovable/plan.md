@@ -1,62 +1,75 @@
-## Plan: Add Compliance Statement page (AML/CFT + EDD Framework)
+## Goal
 
-Render the uploaded **EDD Compliance Framework** as a first-class public legal page, mirroring the structure of `TermsPage` / `PrivacyPolicyPage`, and reviewed against FINTRAC (PCMLTFA) requirements.
+Polish the dashboard with three motion upgrades:
 
-### 1. Create `src/pages/CompliancePage.tsx`
-Reuse the `PrivacyPolicyPage` layout (sticky header, gradient hero, sticky TOC, card sections, contact footer).
+1. Wallet cards stagger in from below with a spring on page load.
+2. Hovering a wallet card scales it to 1.02 and casts a colored glow matching the card's gradient.
+3. The "Total Portfolio Value" headline counts up smoothly using `react-countup`.
 
-**Header metadata**
-- Title: "AML/CFT Compliance & Enhanced Due Diligence Framework"
-- Effective Date: June 7, 2026 · Version 1.0
-- Badges: "FINTRAC-registered MSB", "PCMLTFA Compliant", "FATF-aligned"
-- Jurisdiction: Manitoba, Canada
+## Scope
 
-**Sections (17, from the PDF, condensed and language-tightened for public disclosure):**
-1. Compliance Governance Structure (Board oversight, CCO, MLRO, Risk Committee, Internal Audit)
-2. AML/CFT Policy Statement (PCMLTFA, FINTRAC, OSFI, PIPEDA, FATF, PCI-DSS)
-3. Customer Risk-Based Approach (Low → Prohibited tiers + scoring factors)
-4. Enhanced Due Diligence (EDD) Procedures (PEPs, MSBs, crypto, high-risk jurisdictions; individual + business requirements incl. 25% UBO threshold)
-5. Sanctions Compliance Program (Canadian Consolidated, UN, OFAC, UK/HMT, EU, internal lists; real-time + ongoing)
-6. Transaction Monitoring Framework (structuring, velocity, mule indicators, device/IP anomalies)
-7. Suspicious Transaction Reporting — STRs, Terrorist Property, LCTRs (≥ CAD 10k), EFTRs (≥ CAD 10k cross-border) per FINTRAC timelines
-8. KYC & Identity Verification Standards (gov ID, NFC, liveness, biometric, ongoing monitoring)
-9. Prohibited Customers & Activities
-10. Record Retention Policy (5-year minimum, encrypted, retrievable)
-11. AML/CFT Training Program (annual + role-based enhanced training)
-12. Independent AML Audit (annual two-year effectiveness review per FINTRAC)
-13. Cybersecurity & Data Protection (MFA, encryption at rest/in transit, SIEM, RBAC, pen-testing, IR; PCI-DSS / ISO 27001 / SOC 2)
-14. Banking & Connectivity Due Diligence (entity, licensing, ownership, AML program, KYC, screening, monitoring, security, vendor, geo, products)
-15. Connectivity Approval Readiness — documentary checklist (rendered as a styled table)
-16. Compliance Technology Stack (KYC, AML monitoring, sanctions, fraud AI, case mgmt, audit; Stripe, Plaid, Interac, EFT/ACH, FINTRAC integrations)
-17. Regulatory Alignment (FATF, FINTRAC MSB, ISO 27001, PCI-DSS, PIPEDA, Open Banking, AML/ATF best practices)
+- `src/components/dashboard/WalletCarousel.tsx` — the wallet cards rendered under the hero on `/` (Index).
+- `src/components/dashboard/HeroBalance.tsx` — the big "Total Portfolio Value" number.
+- Add dependency: `react-countup`.
 
-**FINTRAC compliance review additions** (gaps in source PDF — to be added in the rendered page so it meets current PCMLTFA requirements):
-- Explicit naming of **FINTRAC** as the supervisory authority and reference to the **PCMLTFA & PCMLTFR**.
-- **Two-year effectiveness review** language for Section 12 (per PCMLTFR s.156).
-- **Reporting thresholds**: LCTR / LVCTR / EFTR at **CAD 10,000** (24-hour aggregation rule); STR has **no threshold**, filed "as soon as practicable" after reasonable grounds to suspect.
-- **Travel Rule / "Sunrise" requirement** for EFTs ≥ CAD 1,000 (originator + beneficiary info).
-- **Ministerial Directives & Sanctions** — explicit mention of SEMA, JVCFOA, Criminal Code listed terrorist entities, and UN Act regulations.
-- **PEP/HIO determination** within 30 days for prescribed transactions; **senior management approval** for high-risk PEPs and review of source of wealth/funds.
-- **Beneficial ownership** confirmed at **25% threshold** with reasonable measures to confirm accuracy.
-- **Compliance Officer** designation as required by PCMLTFR; reports to Board.
-- **Whistleblower / confidential reporting** channel.
-- **No tipping-off** disclosure (s.8 PCMLTFA).
+The standalone `WalletCard` component (used on `/wallets`) is out of scope — the user said "the Wallet cards on the dashboard", which is the carousel.
 
-**Contact footer card**
-- Compliance: compliance@efin.money
-- MLRO / STR matters: mlro@efin.money
-- Privacy (PIPEDA): privacy@efin.money
-- General: info@efintax.biz
-- eFintax Advisors Ltd. dba eFinMoney — Winnipeg, Manitoba, Canada — FINTRAC MSB
+## Changes
 
-### 2. Routing — `src/App.tsx`
-Add `<Route path="/compliance" element={<CompliancePage />} />` next to `/terms` and `/privacy`.
+### 1. Stagger-in animation (WalletCarousel)
 
-### 3. Wire references
-- `src/pages/Landing.tsx` footer: add a **Compliance** link to `/compliance` alongside Terms/Privacy.
-- `src/pages/TermsPage.tsx` (Section 4 — FINTRAC MSB Compliance) and `PrivacyPolicyPage.tsx`: add a sentence linking to `/compliance` for the full AML/CFT framework.
+Wrap the mapped cards in a `motion` parent with `variants` + `staggerChildren`, and convert `TiltCard`'s entry animation to use a child variant with a spring:
 
-### Out of scope
-- No design-system, backend, or DB changes.
-- No PDF shipped — content is rendered as JSX text using existing tokens.
-- No changes to existing AML edge functions or admin compliance panels.
+```ts
+const container = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.09, delayChildren: 0.05 } },
+};
+const item = {
+  hidden: { opacity: 0, y: 40 },
+  show: {
+    opacity: 1, y: 0,
+    transition: { type: "spring", stiffness: 260, damping: 22, mass: 0.9 },
+  },
+};
+```
+
+Apply `initial="hidden" animate="show" variants={container}` to the scroll container and `variants={item}` on each `TiltCard`. The existing active-card scale and tilt behavior stays.
+
+### 2. Hover scale + colored glow (WalletCarousel `TiltCard`)
+
+- Add `whileHover={{ scale: 1.02 }}` with a short spring transition.
+- Derive a glow color from the card's gradient (parse the first hex in the `gradient` string, fall back to `#6366f1`) and animate `boxShadow` on hover:
+
+```ts
+whileHover={{
+  scale: 1.02,
+  boxShadow: `0 18px 50px -10px ${glowColor}88, 0 0 24px ${glowColor}55`,
+}}
+```
+
+Keep the existing `shadow-xl` class as the resting shadow; framer-motion's inline `boxShadow` will take over on hover and revert on leave.
+
+### 3. react-countup for Total Portfolio Value
+
+- `bun add react-countup`.
+- In `HeroBalance.tsx`, replace the inline `AnimatedBalance` with `CountUp`:
+
+```tsx
+<CountUp
+  end={totalUsd}
+  duration={1.6}
+  decimals={2}
+  separator=","
+  prefix="$"
+  preserveValue
+/>
+```
+
+`preserveValue` prevents resetting to 0 on re-renders (e.g., when wallets refetch); it will smoothly tween from the previous value to the new one. The hidden-balance toggle and surrounding layout are unchanged.
+
+## Out of scope
+
+- The standalone `WalletCard` component on `/wallets`.
+- Per-wallet AnimatedNumber balances (already animate nicely).
+- Any data, routing, or business logic changes.
