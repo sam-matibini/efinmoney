@@ -109,10 +109,14 @@ const HeroBalance = () => {
       initial={{ opacity: 0, y: -16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-      className="relative overflow-hidden rounded-3xl bg-grid-purple text-white mb-8 shadow-card-purple"
+      className="relative overflow-hidden rounded-3xl text-white mb-8 shadow-card-purple border border-white/10 backdrop-blur-2xl bg-gradient-to-br from-[hsl(250_50%_16%/0.92)] via-[hsl(255_45%_10%/0.88)] to-[hsl(240_55%_7%/0.94)]"
     >
+      {/* Glass highlight sheen */}
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/[0.06] via-transparent to-transparent" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent" />
       <div className="absolute -top-32 left-1/2 -translate-x-1/2 h-72 w-[700px] rounded-full bg-[hsl(var(--brand-500)/0.35)] blur-[120px] pointer-events-none" />
-      <div className="absolute -bottom-20 -right-20 h-64 w-64 rounded-full bg-[hsl(var(--accent-amber)/0.12)] blur-3xl pointer-events-none" />
+      <div className="absolute -bottom-20 -right-20 h-64 w-64 rounded-full bg-[hsl(180_85%_60%/0.10)] blur-3xl pointer-events-none" />
+      <div className="absolute -bottom-24 -left-16 h-72 w-72 rounded-full bg-[hsl(280_85%_65%/0.14)] blur-3xl pointer-events-none" />
 
       {/* Floating currency symbols (decorative) */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
