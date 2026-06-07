@@ -119,10 +119,21 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (transfer.recipient_country !== "CA" || transfer.target_currency !== "CAD") {
-      return new Response(JSON.stringify({ error: "Stripe card-push only supports CAD/CA" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    // Stripe card-push corridor allow-list. CA was the original corridor;
+    // extended here to US/UK/EU-27 where Stripe Visa Direct is available.
+    const EU_27 = ["AT","BE","BG","HR","CY","CZ","DK","EE","FI","FR","DE","GR","HU","IE","IT","LV","LT","LU","MT","NL","PL","PT","RO","SK","SI","ES","SE"];
+    const CORRIDOR: Record<string, { country: string; currency: string }> = {
+      CA: { country: "CA", currency: "cad" },
+      US: { country: "US", currency: "usd" },
+      GB: { country: "GB", currency: "gbp" },
+    };
+    for (const c of EU_27) CORRIDOR[c] = { country: c, currency: "eur" };
+
+    const corridor = CORRIDOR[transfer.recipient_country];
+    if (!corridor || transfer.target_currency.toLowerCase() !== corridor.currency) {
+      return new Response(JSON.stringify({
+        error: `Stripe card-push not supported for ${transfer.recipient_country} → ${transfer.target_currency}`,
+      }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
     if (transfer.payout_method !== "card_push") {
       return new Response(JSON.stringify({ error: `Unsupported payout_method ${transfer.payout_method}` }), {
@@ -160,7 +171,7 @@ Deno.serve(async (req) => {
       if (!acctId) {
         const acct = await stripe.accounts.create({
           type: "custom",
-          country: "CA",
+          country: corridor.country,
           business_type: "individual",
           capabilities: {
             card_payments: { requested: true },
@@ -171,7 +182,7 @@ Deno.serve(async (req) => {
             last_name: recipientName.split(/\s+/).slice(1).join(" ") || recipientName,
             email: recEmail || undefined,
           },
-          metadata: { sender_id: senderId, transfer_id: transfer.id },
+          metadata: { sender_id: senderId, transfer_id: transfer.id, corridor: corridor.country },
         });
         acctId = acct.id;
       }
@@ -211,10 +222,10 @@ Deno.serve(async (req) => {
       const payout = await stripe.payouts.create(
         {
           amount: amountCents,
-          currency: "cad",
+          currency: corridor.currency,
           method: "instant",
           destination: externalAccountId!,
-          metadata: { transfer_id: transfer.id, sender_id: senderId },
+          metadata: { transfer_id: transfer.id, sender_id: senderId, corridor: corridor.country },
         },
         { stripeAccount: acctId! },
       );

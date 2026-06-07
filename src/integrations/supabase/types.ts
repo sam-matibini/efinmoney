@@ -3847,6 +3847,60 @@ export type Database = {
         }
         Relationships: []
       }
+      stripe_payin_sessions: {
+        Row: {
+          amount_minor: number
+          created_at: string
+          credit_amount: number
+          credit_currency: string
+          currency_code: string
+          failure_reason: string | null
+          id: string
+          metadata: Json
+          platform_fee_minor: number
+          status: string
+          stripe_payment_intent_id: string | null
+          stripe_session_id: string | null
+          updated_at: string
+          user_id: string
+          wallet_id: string
+        }
+        Insert: {
+          amount_minor: number
+          created_at?: string
+          credit_amount: number
+          credit_currency: string
+          currency_code: string
+          failure_reason?: string | null
+          id?: string
+          metadata?: Json
+          platform_fee_minor?: number
+          status?: string
+          stripe_payment_intent_id?: string | null
+          stripe_session_id?: string | null
+          updated_at?: string
+          user_id: string
+          wallet_id: string
+        }
+        Update: {
+          amount_minor?: number
+          created_at?: string
+          credit_amount?: number
+          credit_currency?: string
+          currency_code?: string
+          failure_reason?: string | null
+          id?: string
+          metadata?: Json
+          platform_fee_minor?: number
+          status?: string
+          stripe_payment_intent_id?: string | null
+          stripe_session_id?: string | null
+          updated_at?: string
+          user_id?: string
+          wallet_id?: string
+        }
+        Relationships: []
+      }
       stripe_payout_recipients: {
         Row: {
           brand: string | null

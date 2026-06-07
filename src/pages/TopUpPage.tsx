@@ -100,6 +100,16 @@ const TopUpPage = () => {
 
   // Verify FLW return callback
   useEffect(() => {
+    const stripeStatus = params.get("stripe");
+    if (stripeStatus === "success") {
+      setVerifyState({ status: "success", message: "Payment received. Your wallet will be credited within a few seconds." });
+      toast.success("Stripe top-up received");
+      return;
+    }
+    if (stripeStatus === "cancelled") {
+      setVerifyState({ status: "failed", message: "Stripe payment was cancelled" });
+      return;
+    }
     const tx = params.get("transaction_id");
     const ref = params.get("tx_ref");
     const flwStatus = params.get("status");
@@ -236,18 +246,74 @@ const TopUpPage = () => {
 
           {/* Stripe route */}
           {gateway === "stripe" && selectedWallet && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">2. Pay with card</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <CardPaymentForm
-                  defaultWalletId={selectedWallet.wallet_id}
-                  showWalletSelect={false}
-                  onSuccess={() => toast.success("Top-up successful")}
-                />
-              </CardContent>
-            </Card>
+            <>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">2. Pay with saved card</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <CardPaymentForm
+                    defaultWalletId={selectedWallet.wallet_id}
+                    showWalletSelect={false}
+                    onSuccess={() => toast.success("Top-up successful")}
+                  />
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Or pay from any country</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <Label>Amount ({currency})</Label>
+                    <Input
+                      type="number"
+                      inputMode="decimal"
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value)}
+                      placeholder="0.00"
+                      className="h-12 text-lg"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Min: 5 {currency} · Max: 5,000 {currency} · Fee: 1.9% + 0.30 {currency}
+                    </p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-accent/10 border border-accent/20">
+                    <p className="text-xs text-foreground">
+                      Redirects to Stripe Checkout. Pay with Apple Pay, Google Pay, Link, or local methods (iDEAL, Bancontact, SEPA, BACS, cards).
+                    </p>
+                  </div>
+                  <Button
+                    className="w-full"
+                    size="lg"
+                    variant="outline"
+                    disabled={loading || !Number.isFinite(Number(amount)) || Number(amount) < 5}
+                    onClick={async () => {
+                      const amt = Number(amount);
+                      if (!Number.isFinite(amt) || amt < 5) { toast.error("Minimum 5"); return; }
+                      setLoading(true);
+                      try {
+                        const { data, error } = await supabase.functions.invoke(
+                          "stripe-create-checkout-session",
+                          { body: { wallet_id: selectedWallet.wallet_id, amount: amt, currency } },
+                        );
+                        if (error) throw error;
+                        const url = (data as { url?: string; error?: string })?.url;
+                        if (!url) throw new Error((data as { error?: string })?.error || "No checkout URL");
+                        window.location.href = url;
+                      } catch (e) {
+                        toast.error(e instanceof Error ? e.message : "Could not start checkout");
+                      } finally {
+                        setLoading(false);
+                      }
+                    }}
+                  >
+                    {loading ? "Redirecting…" : "Pay with Stripe Checkout"}
+                  </Button>
+                </CardContent>
+              </Card>
+            </>
           )}
 
           {/* Flutterwave route — hosted checkout (Card, Bank Transfer, USSD, Mobile Money) */}
