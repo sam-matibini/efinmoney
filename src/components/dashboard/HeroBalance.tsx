@@ -178,6 +178,29 @@ const HeroBalance = () => {
           )}
           <p className="text-sm text-white/55 mt-2">Total Portfolio Value</p>
 
+          {/* Dynamic Trend Pill */}
+          {!walletsLoading && (
+            <motion.div
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.35, duration: 0.45 }}
+              className="mt-3 flex justify-center"
+            >
+              <span
+                className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-semibold border backdrop-blur-md ${
+                  positive
+                    ? "bg-[hsl(145_75%_45%/0.12)] border-[hsl(145_80%_55%/0.35)] text-[hsl(145_85%_70%)] shadow-[0_0_24px_-4px_hsl(145_85%_55%/0.55)]"
+                    : "bg-destructive/10 border-destructive/30 text-destructive shadow-[0_0_24px_-4px_hsl(var(--destructive)/0.5)]"
+                }`}
+              >
+                {positive ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
+                {positive ? "+" : "−"}${Math.abs(todayDeltaUsd).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                <span className="opacity-80">({positive ? "+" : ""}{todayChange.toFixed(2)}%)</span>
+                <span className="opacity-60 font-normal">today</span>
+              </span>
+            </motion.div>
+          )}
+
           {/* Decorative monthly budget arc */}
           <div className="mt-4 flex items-center justify-center gap-3">
             <BudgetArc pct={monthlyBudgetPct} />
