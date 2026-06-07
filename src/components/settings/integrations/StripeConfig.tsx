@@ -26,6 +26,7 @@ export function StripeConfig({ onBack }: StripeConfigProps) {
 
   const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stripe-webhook`;
   const payoutWebhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stripe-payout-webhook`;
+  const payinWebhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stripe-payin-webhook`;
 
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
@@ -241,7 +242,73 @@ export function StripeConfig({ onBack }: StripeConfigProps) {
         </CardContent>
       </Card>
 
-      {/* Payment Settings */}
+      {/* International pay-in (Stripe Checkout) */}
+      <Card>
+        <CardHeader>
+          <CardTitle>International Pay-In (Stripe Checkout)</CardTitle>
+          <CardDescription>
+            Lets users in any country top up their wallet using cards, Apple Pay, Google Pay, Link, iDEAL, Bancontact, SEPA, BACS, etc. Supported wallet currencies: USD, CAD, EUR, GBP.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label>Pay-In Webhook URL</Label>
+            <div className="flex gap-2">
+              <Input value={payinWebhookUrl} readOnly className="font-mono text-sm" />
+              <Button variant="outline" size="icon" onClick={() => copyToClipboard(payinWebhookUrl, "Pay-in webhook URL")}>
+                <Copy className="h-4 w-4" />
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              In Stripe Dashboard → Developers → Webhooks, add an endpoint pointing here, subscribed to{" "}
+              <code>checkout.session.completed</code> and <code>charge.refunded</code>. Paste the resulting
+              signing secret into the <code>STRIPE_PAYIN_WEBHOOK_SECRET</code> backend secret.
+            </p>
+          </div>
+          <div className="grid gap-2 md:grid-cols-2 text-sm">
+            <div className="p-3 rounded-md border bg-muted/30">
+              <p className="font-medium">Fee</p>
+              <p className="text-muted-foreground">1.9% + 0.30 (per currency)</p>
+            </div>
+            <div className="p-3 rounded-md border bg-muted/30">
+              <p className="font-medium">Limits</p>
+              <p className="text-muted-foreground">5 – 5,000 per transaction</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Cross-border card-push corridors */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Cross-Border Card-Push Corridors</CardTitle>
+          <CardDescription>
+            Countries where instant payouts to recipient debit cards are supported via Stripe Visa Direct.
+            Each corridor requires the card-payout capability to be approved on your platform by Stripe.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-2 md:grid-cols-3">
+            {[
+              { code: "CA", name: "Canada", currency: "CAD", status: "Live" },
+              { code: "US", name: "United States", currency: "USD", status: "Backend ready" },
+              { code: "GB", name: "United Kingdom", currency: "GBP", status: "Backend ready" },
+              { code: "EU", name: "EU-27 (EUR)", currency: "EUR", status: "Backend ready" },
+            ].map((c) => (
+              <div key={c.code} className="p-3 border rounded-lg flex items-center justify-between">
+                <div>
+                  <p className="font-medium">{c.name}</p>
+                  <p className="text-xs text-muted-foreground">{c.currency}</p>
+                </div>
+                <Badge variant={c.status === "Live" ? "default" : "outline"}>{c.status}</Badge>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground mt-4">
+            Africa corridors (NG, KE, GH, UG, TZ, ZM, MW, RW, CD) are routed through PawaPay (mobile money) and Circle CPN (bank, USDC settled), not Stripe.
+          </p>
+        </CardContent>
+      </Card>
       <Card>
         <CardHeader>
           <CardTitle>Payment Settings</CardTitle>
