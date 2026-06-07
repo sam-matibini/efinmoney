@@ -16,7 +16,7 @@ const checkVariants = {
     scale: 1,
     opacity: 1,
     transition: {
-      type: "spring",
+      type: "spring" as const,
       stiffness: 200,
       damping: 15,
       mass: 1.2,
@@ -40,7 +40,7 @@ const itemVariants = {
   visible: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.5, ease: [0.16, 1, 0.3, 1] },
+    transition: { duration: 0.5, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] },
   },
 };
 
