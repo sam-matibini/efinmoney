@@ -1,14 +1,14 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { FloatingLabelInput } from "@/components/ui/FloatingLabelInput";
+import { PremiumContinueButton } from "@/components/ui/PremiumContinueButton";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, ArrowRight, CheckCircle2, Clock, XCircle } from "lucide-react";
+import { ArrowRight, CheckCircle2, Clock, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { CrossmintProvider, CrossmintEmbeddedCheckout } from "@crossmint/client-sdk-react-ui";
 
@@ -127,20 +127,31 @@ export default function AfricanCardSendPage() {
       </div>
 
       {!transferId ? (
-        <Card>
-          <CardHeader>
+        <Card className="overflow-hidden">
+          <CardHeader className="pb-2">
             <CardTitle>Recipient & amount</CardTitle>
             <CardDescription>Currently supports Nigeria (NGN). More corridors coming.</CardDescription>
           </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
+          <CardContent className="pt-4">
+            <form onSubmit={handleSubmit} className="space-y-5">
+              {/* Amount row */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label>You send</Label>
                   <div className="flex gap-2">
-                    <Input type="number" min="1" step="0.01" required value={sourceAmount} onChange={(e) => setSourceAmount(e.target.value)} />
+                    <FloatingLabelInput
+                      label="Amount"
+                      type="number"
+                      min="1"
+                      step="0.01"
+                      required
+                      value={sourceAmount}
+                      onChange={(e) => setSourceAmount(e.target.value)}
+                      className="flex-1"
+                    />
                     <Select value={sourceCurrency} onValueChange={(v: any) => setSourceCurrency(v)}>
-                      <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+                      <SelectTrigger className="w-28 h-14 rounded-xl border-input shadow-card focus:border-primary focus:shadow-[0_0_0_3px_hsl(var(--primary)/0.10),0_0_24px_-6px_hsl(var(--primary)/0.22)] transition-all duration-200">
+                        <SelectValue />
+                      </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="USD">USD</SelectItem>
                         <SelectItem value="CAD">CAD</SelectItem>
@@ -148,45 +159,62 @@ export default function AfricanCardSendPage() {
                     </Select>
                   </div>
                 </div>
-                <div>
-                  <Label>Recipient gets</Label>
-                  <div className="flex items-center h-10 px-3 rounded-md border border-input bg-muted text-sm">NGN (auto-converted)</div>
+                <div className="flex flex-col justify-center">
+                  <div className="relative h-14 rounded-xl border border-input bg-muted/60 px-4 pt-5 pb-1.5 text-sm text-muted-foreground shadow-card">
+                    <span className="absolute left-4 top-2.5 text-[11px] font-medium text-primary">Recipient gets</span>
+                    <span className="block truncate">NGN (auto-converted)</span>
+                  </div>
                 </div>
               </div>
 
-              <div>
-                <Label>Recipient full name</Label>
-                <Input required value={recipientName} onChange={(e) => setRecipientName(e.target.value)} />
-              </div>
+              <FloatingLabelInput
+                label="Recipient full name"
+                required
+                value={recipientName}
+                onChange={(e) => setRecipientName(e.target.value)}
+              />
+
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label>Bank name</Label>
-                  <Input required value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder="e.g. Access Bank" />
-                </div>
-                <div>
-                  <Label>Bank code</Label>
-                  <Input value={bankCode} onChange={(e) => setBankCode(e.target.value)} placeholder="e.g. 044" />
-                </div>
-              </div>
-              <div>
-                <Label>Account number</Label>
-                <Input required value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label>Phone (optional)</Label>
-                  <Input value={phone} onChange={(e) => setPhone(e.target.value)} />
-                </div>
-                <div>
-                  <Label>Email (optional)</Label>
-                  <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-                </div>
+                <FloatingLabelInput
+                  label="Bank name"
+                  required
+                  value={bankName}
+                  onChange={(e) => setBankName(e.target.value)}
+                  placeholder="e.g. Access Bank"
+                />
+                <FloatingLabelInput
+                  label="Bank code"
+                  value={bankCode}
+                  onChange={(e) => setBankCode(e.target.value)}
+                  placeholder="e.g. 044"
+                />
               </div>
 
-              <Button type="submit" disabled={loading} className="w-full">
-                {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ArrowRight className="h-4 w-4 mr-2" />}
+              <FloatingLabelInput
+                label="Account number"
+                required
+                value={accountNumber}
+                onChange={(e) => setAccountNumber(e.target.value)}
+              />
+
+              <div className="grid grid-cols-2 gap-3">
+                <FloatingLabelInput
+                  label="Phone (optional)"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                />
+                <FloatingLabelInput
+                  label="Email (optional)"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+              </div>
+
+              <PremiumContinueButton type="submit" loading={loading}>
+                <ArrowRight className="h-4 w-4" />
                 Continue to card payment
-              </Button>
+              </PremiumContinueButton>
             </form>
           </CardContent>
         </Card>
@@ -232,7 +260,7 @@ export default function AfricanCardSendPage() {
                     {reached ? (
                       <CheckCircle2 className="h-5 w-5 text-primary" />
                     ) : isCurrent ? (
-                      <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                      <Clock className="h-5 w-5 text-primary" />
                     ) : (
                       <Clock className="h-5 w-5 text-muted-foreground" />
                     )}
