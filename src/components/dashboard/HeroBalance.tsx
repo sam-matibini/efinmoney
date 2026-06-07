@@ -113,7 +113,7 @@ const HeroBalance = () => {
     >
       {/* Glass highlight sheen */}
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/[0.06] via-transparent to-transparent" />
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent dark:via-white/25 via-[hsl(258_55%_80%/0.35)] to-transparent" />
       <div className="absolute -top-32 left-1/2 -translate-x-1/2 h-72 w-[700px] rounded-full bg-[hsl(var(--brand-500)/0.35)] blur-[120px] pointer-events-none" />
       <div className="absolute -bottom-20 -right-20 h-64 w-64 rounded-full bg-[hsl(180_85%_60%/0.10)] blur-3xl pointer-events-none" />
       <div className="absolute -bottom-24 -left-16 h-72 w-72 rounded-full bg-[hsl(280_85%_65%/0.14)] blur-3xl pointer-events-none" />
@@ -144,7 +144,7 @@ const HeroBalance = () => {
           transition={{ delay: 0.05, duration: 0.4 }}
           className="flex items-center justify-center gap-2 mb-6"
         >
-          <h1 className="text-lg sm:text-xl font-display font-semibold text-white/85">
+          <h1 className="text-lg sm:text-xl font-display font-semibold dark:text-white/85 text-[hsl(248_40%_22%)]">
             {greeting}, {firstName}
           </h1>
           <span
@@ -165,18 +165,18 @@ const HeroBalance = () => {
           {walletsLoading ? (
             <Skeleton className="h-16 w-72 mx-auto" />
           ) : (
-            <h2 className="text-5xl sm:text-6xl md:text-7xl font-display font-bold tracking-tight text-white inline-flex items-center justify-center gap-3 sm:gap-4">
+            <h2 className="text-5xl sm:text-6xl md:text-7xl font-display font-bold tracking-tight dark:text-white text-[hsl(250_45%_16%)] inline-flex items-center justify-center gap-3 sm:gap-4">
               <span>{hidden ? <span className="tracking-widest">••••••</span> : <AnimatedBalance value={totalUsd} />}</span>
               <button
                 onClick={() => setHidden((v) => !v)}
                 aria-label={hidden ? "Show balance" : "Hide balance"}
-                className="p-2 rounded-full text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+                className="p-2 rounded-full dark:text-white/60 text-[hsl(230_12%_45%)] dark:hover:text-white hover:text-[hsl(250_45%_16%)] dark:hover:bg-white/10 hover:bg-[hsl(244_75%_57%/0.06)] transition-colors"
               >
                 {hidden ? <EyeOff className="w-5 h-5 sm:w-6 sm:h-6" /> : <Eye className="w-5 h-5 sm:w-6 sm:h-6" />}
               </button>
             </h2>
           )}
-          <p className="text-sm text-white/55 mt-2">Total Portfolio Value</p>
+          <p className="text-sm dark:text-white/55 text-[hsl(230_12%_45%)] mt-2">Total Portfolio Value</p>
 
           {/* Dynamic Trend Pill */}
           {!walletsLoading && (
@@ -189,8 +189,8 @@ const HeroBalance = () => {
               <span
                 className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-semibold border backdrop-blur-md ${
                   positive
-                    ? "bg-[hsl(145_75%_45%/0.12)] border-[hsl(145_80%_55%/0.35)] text-[hsl(145_85%_70%)] shadow-[0_0_24px_-4px_hsl(145_85%_55%/0.55)]"
-                    : "bg-destructive/10 border-destructive/30 text-destructive shadow-[0_0_24px_-4px_hsl(var(--destructive)/0.5)]"
+                    ? "dark:bg-[hsl(145_75%_45%/0.12)] bg-[hsl(145_70%_45%/0.10)] dark:border-[hsl(145_80%_55%/0.35)] border-[hsl(145_60%_45%/0.22)] dark:text-[hsl(145_85%_70%)] text-[hsl(145_70%_28%)] dark:shadow-[0_0_24px_-4px_hsl(145_85%_55%/0.55)] shadow-[0_0_20px_-4px_hsl(145_70%_45%/0.18)]"
+                    : "dark:bg-destructive/10 bg-destructive/8 dark:border-destructive/30 border-destructive/20 dark:text-destructive text-[hsl(0_65%_48%)] dark:shadow-[0_0_24px_-4px_hsl(var(--destructive)/0.5)] shadow-[0_0_20px_-4px_hsl(var(--destructive)/0.15)]"
                 }`}
               >
                 {positive ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
@@ -205,8 +205,8 @@ const HeroBalance = () => {
           <div className="mt-4 flex items-center justify-center gap-3">
             <BudgetArc pct={monthlyBudgetPct} />
             <div className="text-left">
-              <p className="text-[11px] uppercase tracking-wider text-white/50">Monthly budget</p>
-              <p className="text-sm font-semibold text-white/75">
+              <p className="text-[11px] uppercase tracking-wider dark:text-white/50 text-[hsl(230_12%_45%)]">Monthly budget</p>
+              <p className="text-sm font-semibold dark:text-white/75 text-[hsl(230_35%_12%)]">
                 {monthlyBudgetSet ? `${monthlyBudgetPct}% used` : "Not set"}
               </p>
             </div>
@@ -283,14 +283,14 @@ const HeroBalance = () => {
           transition={{ delay: 0.7, duration: 0.4 }}
           className="flex flex-wrap items-center justify-center gap-2 mt-4"
         >
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold bg-white/10 text-white/85 backdrop-blur">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold dark:bg-white/10 dark:text-white/85 bg-[hsl(244_60%_55%/0.08)] text-[hsl(244_55%_35%)] backdrop-blur">
             {(wallets || []).slice(0, 6).map((w) => {
               const f = flagForCurrency(w.currency_code);
               return <span key={w.wallet_id} title={w.currency_code}>{f !== "🌍" ? f : (w.flag_emoji || "💰")}</span>;
             })}
             {walletCount === 0 && <WalletIcon className="w-3 h-3" />}
           </span>
-          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-white/10 text-white/85 backdrop-blur">
+          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold dark:bg-white/10 dark:text-white/85 bg-[hsl(244_60%_55%/0.08)] text-[hsl(244_55%_35%)] backdrop-blur">
             <Activity className="w-3 h-3" /> Active
           </span>
         </motion.div>
