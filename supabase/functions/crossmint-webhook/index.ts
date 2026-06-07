@@ -116,7 +116,7 @@ Deno.serve(async (req) => {
         .update({
           status: "pending_payout",
           failure_reason: !ycDeposit
-            ? "YELLOWCARD_STELLAR_DEPOSIT_ADDRESS not configured"
+            ? "YELLOWCARD_BASE_DEPOSIT_ADDRESS not configured"
             : "User smart wallet not found",
         })
         .eq("id", t.id);
