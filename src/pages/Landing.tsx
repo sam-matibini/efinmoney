@@ -483,7 +483,7 @@ const Landing = () => {
                 title: "Legal",
                 links: [
                   { label: "Privacy", href: "/privacy" },
-                  { label: "Terms", href: "#" },
+                  { label: "Terms", href: "/terms" },
                   { label: "Compliance", href: "#" },
                   { label: "Cookies", href: "#" },
                 ],
