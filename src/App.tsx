@@ -14,6 +14,7 @@ import Index from "./pages/Index";
 import Landing from "./pages/Landing";
 import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
 import TermsPage from "./pages/TermsPage";
+import CompliancePage from "./pages/CompliancePage";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import FinanceDashboard from "./pages/FinanceDashboard";
@@ -176,6 +177,7 @@ const AppRoutes = () => {
           <Route path="/s/:code" element={<ShortLinkResolver />} />
           <Route path="/privacy" element={<PrivacyPolicyPage />} />
           <Route path="/terms" element={<TermsPage />} />
+          <Route path="/compliance" element={<CompliancePage />} />
           <Route path="/dashboard" element={<KycProtectedRoute><Index /></KycProtectedRoute>} />
           <Route path="/wallets" element={<KycProtectedRoute><WalletsPage /></KycProtectedRoute>} />
           <Route path="/wallets/:walletId/statement" element={<KycProtectedRoute><WalletStatementPage /></KycProtectedRoute>} />

@@ -1,32 +1,62 @@
-## Plan: Add Terms & Conditions of Service page
+## Plan: Add Compliance Statement page (AML/CFT + EDD Framework)
 
-The app references "Terms of Service" in the Auth screen and Landing footer but has no actual page. I'll add one populated verbatim from the uploaded document.
+Render the uploaded **EDD Compliance Framework** as a first-class public legal page, mirroring the structure of `TermsPage` / `PrivacyPolicyPage`, and reviewed against FINTRAC (PCMLTFA) requirements.
 
-### Changes
+### 1. Create `src/pages/CompliancePage.tsx`
+Reuse the `PrivacyPolicyPage` layout (sticky header, gradient hero, sticky TOC, card sections, contact footer).
 
-1. **Create `src/pages/TermsPage.tsx`**
-   - Reuse the structure/styling of `PrivacyPolicyPage.tsx` (sticky TOC, gradient header, card sections, back link, footer contact card).
-   - Header metadata: Effective Date June 6, 2026; Jurisdiction Manitoba, Canada; Governing Law Manitoba & Canada; "FINTRAC-registered MSB" badge.
-   - Render all 8 Parts / 21 Sections from the document:
-     - Preamble
-     - Part I — General Provisions: 1. Definitions, 2. Eligibility & Account Registration, 3. Description of Services
-     - Part II — Financial Regulatory Compliance: 4. FINTRAC MSB Compliance, 5. AML/ATF, 6. Fraud Prevention & Security
-     - Part III — Transaction Terms: 7. Fees & Charges, 8. Transaction Limits, 9. Chargebacks & Dispute Resolution, 10. FX Risk Disclosures
-     - Part IV — Electronic Communications & Signatures: 11. Electronic Signature Consent, 12. Electronic Communications
-     - Part V — Liability, Warranties, Indemnification: 13. Limitation of Liability, 14. Disclaimer of Warranties, 15. Indemnification
-     - Part VI — Cross-Border Data Transfers & Data Governance: 16. Cross-Border Data Transfers
-     - Part VII — Account Suspension & Termination: 17. Suspension & Termination
-     - Part VIII — Governing Law & Dispute Resolution: 18. Governing Law, 19. Dispute Resolution, 20. Amendments, 21. Miscellaneous
-   - Contact card: legal@, support@, compliance@, security@, disputes@efin.money — eFintax Advisors Ltd dba eFinMoney, Winnipeg, Manitoba.
+**Header metadata**
+- Title: "AML/CFT Compliance & Enhanced Due Diligence Framework"
+- Effective Date: June 7, 2026 · Version 1.0
+- Badges: "FINTRAC-registered MSB", "PCMLTFA Compliant", "FATF-aligned"
+- Jurisdiction: Manitoba, Canada
 
-2. **Register route in `src/App.tsx`**
-   - Add `<Route path="/terms" element={<TermsPage />} />` next to `/privacy`.
+**Sections (17, from the PDF, condensed and language-tightened for public disclosure):**
+1. Compliance Governance Structure (Board oversight, CCO, MLRO, Risk Committee, Internal Audit)
+2. AML/CFT Policy Statement (PCMLTFA, FINTRAC, OSFI, PIPEDA, FATF, PCI-DSS)
+3. Customer Risk-Based Approach (Low → Prohibited tiers + scoring factors)
+4. Enhanced Due Diligence (EDD) Procedures (PEPs, MSBs, crypto, high-risk jurisdictions; individual + business requirements incl. 25% UBO threshold)
+5. Sanctions Compliance Program (Canadian Consolidated, UN, OFAC, UK/HMT, EU, internal lists; real-time + ongoing)
+6. Transaction Monitoring Framework (structuring, velocity, mule indicators, device/IP anomalies)
+7. Suspicious Transaction Reporting — STRs, Terrorist Property, LCTRs (≥ CAD 10k), EFTRs (≥ CAD 10k cross-border) per FINTRAC timelines
+8. KYC & Identity Verification Standards (gov ID, NFC, liveness, biometric, ongoing monitoring)
+9. Prohibited Customers & Activities
+10. Record Retention Policy (5-year minimum, encrypted, retrievable)
+11. AML/CFT Training Program (annual + role-based enhanced training)
+12. Independent AML Audit (annual two-year effectiveness review per FINTRAC)
+13. Cybersecurity & Data Protection (MFA, encryption at rest/in transit, SIEM, RBAC, pen-testing, IR; PCI-DSS / ISO 27001 / SOC 2)
+14. Banking & Connectivity Due Diligence (entity, licensing, ownership, AML program, KYC, screening, monitoring, security, vendor, geo, products)
+15. Connectivity Approval Readiness — documentary checklist (rendered as a styled table)
+16. Compliance Technology Stack (KYC, AML monitoring, sanctions, fraud AI, case mgmt, audit; Stripe, Plaid, Interac, EFT/ACH, FINTRAC integrations)
+17. Regulatory Alignment (FATF, FINTRAC MSB, ISO 27001, PCI-DSS, PIPEDA, Open Banking, AML/ATF best practices)
 
-3. **Wire existing references**
-   - `src/pages/Landing.tsx` line 486: change footer `Terms` href from `"#"` to `/terms`.
-   - `src/pages/Auth.tsx` line 159: turn "Terms of Service" into a `Link` to `/terms` (and "Privacy Policy" to `/privacy` for consistency).
+**FINTRAC compliance review additions** (gaps in source PDF — to be added in the rendered page so it meets current PCMLTFA requirements):
+- Explicit naming of **FINTRAC** as the supervisory authority and reference to the **PCMLTFA & PCMLTFR**.
+- **Two-year effectiveness review** language for Section 12 (per PCMLTFR s.156).
+- **Reporting thresholds**: LCTR / LVCTR / EFTR at **CAD 10,000** (24-hour aggregation rule); STR has **no threshold**, filed "as soon as practicable" after reasonable grounds to suspect.
+- **Travel Rule / "Sunrise" requirement** for EFTs ≥ CAD 1,000 (originator + beneficiary info).
+- **Ministerial Directives & Sanctions** — explicit mention of SEMA, JVCFOA, Criminal Code listed terrorist entities, and UN Act regulations.
+- **PEP/HIO determination** within 30 days for prescribed transactions; **senior management approval** for high-risk PEPs and review of source of wealth/funds.
+- **Beneficial ownership** confirmed at **25% threshold** with reasonable measures to confirm accuracy.
+- **Compliance Officer** designation as required by PCMLTFR; reports to Board.
+- **Whistleblower / confidential reporting** channel.
+- **No tipping-off** disclosure (s.8 PCMLTFA).
+
+**Contact footer card**
+- Compliance: compliance@efin.money
+- MLRO / STR matters: mlro@efin.money
+- Privacy (PIPEDA): privacy@efin.money
+- General: info@efintax.biz
+- eFintax Advisors Ltd. dba eFinMoney — Winnipeg, Manitoba, Canada — FINTRAC MSB
+
+### 2. Routing — `src/App.tsx`
+Add `<Route path="/compliance" element={<CompliancePage />} />` next to `/terms` and `/privacy`.
+
+### 3. Wire references
+- `src/pages/Landing.tsx` footer: add a **Compliance** link to `/compliance` alongside Terms/Privacy.
+- `src/pages/TermsPage.tsx` (Section 4 — FINTRAC MSB Compliance) and `PrivacyPolicyPage.tsx`: add a sentence linking to `/compliance` for the full AML/CFT framework.
 
 ### Out of scope
-- No design-system changes; reuses existing tokens.
-- No backend / DB changes.
-- Document is rendered as React/JSX text — no docx file shipped in the app.
+- No design-system, backend, or DB changes.
+- No PDF shipped — content is rendered as JSX text using existing tokens.
+- No changes to existing AML edge functions or admin compliance panels.
