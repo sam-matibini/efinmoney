@@ -1,78 +1,32 @@
-# PureVPN-Inspired Visual Refresh
+## Plan: Add Terms & Conditions of Service page
 
-Goal: bring the polish, depth and brand confidence of purevpn.com/order to the entire eFinMoney UI — without changing any functionality.
+The app references "Terms of Service" in the Auth screen and Landing footer but has no actual page. I'll add one populated verbatim from the uploaded document.
 
-## What I'm taking from the reference
+### Changes
 
-- Deep purple/indigo gradient background (`#1a0b3d → #2d1670 → #4527a0`) with a faint grid + dot-map texture
-- Bright **amber/yellow CTA** as the only warm accent (used sparingly for the primary action)
-- Heavy display headlines, generous tracking, white-on-purple
-- Floating "product screenshot" hero card with soft glow
-- Pill-shaped buttons, soft inner-glow on the primary CTA
-- Trust strip (press logos) sitting on the hero
-- Clean white content sections below the dark hero, with purple accents
+1. **Create `src/pages/TermsPage.tsx`**
+   - Reuse the structure/styling of `PrivacyPolicyPage.tsx` (sticky TOC, gradient header, card sections, back link, footer contact card).
+   - Header metadata: Effective Date June 6, 2026; Jurisdiction Manitoba, Canada; Governing Law Manitoba & Canada; "FINTRAC-registered MSB" badge.
+   - Render all 8 Parts / 21 Sections from the document:
+     - Preamble
+     - Part I — General Provisions: 1. Definitions, 2. Eligibility & Account Registration, 3. Description of Services
+     - Part II — Financial Regulatory Compliance: 4. FINTRAC MSB Compliance, 5. AML/ATF, 6. Fraud Prevention & Security
+     - Part III — Transaction Terms: 7. Fees & Charges, 8. Transaction Limits, 9. Chargebacks & Dispute Resolution, 10. FX Risk Disclosures
+     - Part IV — Electronic Communications & Signatures: 11. Electronic Signature Consent, 12. Electronic Communications
+     - Part V — Liability, Warranties, Indemnification: 13. Limitation of Liability, 14. Disclaimer of Warranties, 15. Indemnification
+     - Part VI — Cross-Border Data Transfers & Data Governance: 16. Cross-Border Data Transfers
+     - Part VII — Account Suspension & Termination: 17. Suspension & Termination
+     - Part VIII — Governing Law & Dispute Resolution: 18. Governing Law, 19. Dispute Resolution, 20. Amendments, 21. Miscellaneous
+   - Contact card: legal@, support@, compliance@, security@, disputes@efin.money — eFintax Advisors Ltd dba eFinMoney, Winnipeg, Manitoba.
 
-## Scope
+2. **Register route in `src/App.tsx`**
+   - Add `<Route path="/terms" element={<TermsPage />} />` next to `/privacy`.
 
-### 1. Design tokens (`src/index.css` + `tailwind.config.ts`)
-- Refine the purple/indigo scale so we have: `--brand-900` (hero bg), `--brand-700`, `--primary` (CTA purple), `--primary-glow`
-- Add `--accent-amber` (`#FFB400`) + `--accent-amber-glow` for primary CTAs only
-- Add `--gradient-hero-deep` and a reusable `bg-grid-purple` utility (CSS background grid + radial fade)
-- Tighten shadow tokens (`--shadow-cta-amber`, `--shadow-card-purple`)
-- Keep light-mode app clean; the deep-purple treatment is reserved for hero/landing surfaces
+3. **Wire existing references**
+   - `src/pages/Landing.tsx` line 486: change footer `Terms` href from `"#"` to `/terms`.
+   - `src/pages/Auth.tsx` line 159: turn "Terms of Service" into a `Link` to `/terms` (and "Privacy Policy" to `/privacy` for consistency).
 
-### 2. Landing page (`src/pages/Landing.tsx`)
-- Replace current emerald-tinted hero with PureVPN-style deep-purple hero:
-  - Grid + dot-world-map background
-  - Large 2-line display headline ("Move money. Anywhere in Africa. Instantly.")
-  - Subheadline + amber primary CTA + ghost secondary
-  - Floating dashboard+phone mockup on the right (reuse existing PhoneFrame, restyle frame to match)
-  - Press/trust strip beneath
-- Keep existing sections (features, steps, stats, testimonials) but restyle:
-  - Feature cards: white on light bg with purple icon chips
-  - "How it works" steps: numbered amber circles on purple gradient band
-  - Stats band: full-width deep-purple with grid texture
-  - Footer CTA: amber button on purple
-
-### 3. App dashboard hero (`src/components/dashboard/HeroBalance.tsx`)
-- Wrap the balance card in the new deep-purple gradient + grid texture so the logged-in `/` matches the brand
-- Sparkline + chips re-coloured to indigo/violet/amber
-- Primary action ("Send") becomes the amber pill CTA
-
-### 4. Global polish (touches only, no functional change)
-- `Header.tsx`: tighten spacing, add subtle purple gradient on scroll
-- `MobileNav.tsx`: active tab pill uses primary purple with amber dot indicator
-- `QuickActions`, `WalletCarousel`, `MiniStats`: align gradients with new brand scale (remove any leftover greens already swept)
-- Buttons: introduce `variant="cta"` (amber) in `button.tsx` for top-level conversion actions only
-- Cards: standardise `rounded-2xl`, `shadow-card-purple`, hover lift
-
-### 5. Page-level consistency pass
-- `Auth.tsx`, `KYCPage`, `SendPage`, `ExchangePage`, `WalletsPage`, `CardsPage`, `MorePage`, `SettingsDashboard`: ensure they all sit on `bg-background`, use `PageHeader`, and any hero strips reuse the new `bg-grid-purple` utility
-- No layout or content rewrites — just token + class swaps where colors/shadows look off
-
-## Out of scope
-- No backend, data, route, or copy changes
-- No new pages, no new features
-- Logo stays as-is (already indigo gradient)
-
-## Technical notes
-- All colors via HSL semantic tokens — zero hex in component files
-- Grid background = single CSS utility class (`.bg-grid-purple`) defined once in `index.css`
-- Amber CTA exposed as a `Button` variant so future pages stay consistent
-- Framer-motion entrances kept; only tokens change
-
-## File checklist
-```
-src/index.css                              tokens + .bg-grid-purple utility
-tailwind.config.ts                         expose brand-{700,900}, amber
-src/components/ui/button.tsx               + variant "cta" (amber)
-src/pages/Landing.tsx                      hero + sections restyle
-src/components/dashboard/HeroBalance.tsx   deep-purple hero treatment
-src/components/dashboard/QuickActions.tsx  color pass
-src/components/dashboard/WalletCarousel.tsx gradient pass
-src/components/dashboard/MiniStats.tsx     gradient pass
-src/components/layout/Header.tsx           subtle polish
-src/components/layout/MobileNav.tsx        active-pill polish
-```
-
-Ready to switch to build mode and ship it.
+### Out of scope
+- No design-system changes; reuses existing tokens.
+- No backend / DB changes.
+- Document is rendered as React/JSX text — no docx file shipped in the app.
