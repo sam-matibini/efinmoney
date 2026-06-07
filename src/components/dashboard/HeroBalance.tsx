@@ -8,6 +8,7 @@ import { useFxRates } from "@/hooks/useFxRates";
 import { Skeleton } from "@/components/ui/skeleton";
 import { flagForCurrency } from "@/lib/flags";
 import AnimatedNumber from "@/components/ui/AnimatedNumber";
+import CountUp from "react-countup";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { getGreeting } from "@/lib/greeting";
@@ -256,14 +257,17 @@ const HeroBalance = () => {
 };
 
 const AnimatedBalance = ({ value }: { value: number }) => {
-  // Lightweight inline count-up using a ref-less rAF
-  const formatted = `$${value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  return <motion.span
-    key={value}
-    initial={{ opacity: 0, y: 6 }}
-    animate={{ opacity: 1, y: 0 }}
-    transition={{ duration: 0.5 }}
-  >{formatted}</motion.span>;
+  return (
+    <CountUp
+      end={value}
+      duration={1.6}
+      decimals={2}
+      separator=","
+      prefix="$"
+      preserveValue
+      useEasing
+    />
+  );
 };
 
 const BudgetArc = ({ pct }: { pct: number }) => {
