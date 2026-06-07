@@ -109,7 +109,7 @@ const HeroBalance = () => {
       initial={{ opacity: 0, y: -16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-      className="relative overflow-hidden rounded-3xl text-white mb-8 shadow-card-purple border border-white/10 backdrop-blur-2xl bg-gradient-to-br from-[hsl(250_50%_16%)] via-[hsl(255_45%_10%)] to-[hsl(240_55%_7%)]"
+      className="relative overflow-hidden rounded-3xl mb-8 border backdrop-blur-xl dark:backdrop-blur-2xl bg-white/70 dark:bg-gradient-to-br dark:from-[hsl(250_50%_16%)] dark:via-[hsl(255_45%_10%)] dark:to-[hsl(240_55%_7%)] dark:border-white/10 border-[hsl(258_55%_85%/0.45)] dark:shadow-card-purple shadow-[0_8px_32px_-12px_hsl(244_30%_50%/0.12)] dark:text-white text-[hsl(248_42%_18%)]"
     >
       {/* Glass highlight sheen */}
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/[0.06] via-transparent to-transparent" />
