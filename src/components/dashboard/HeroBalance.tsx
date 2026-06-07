@@ -213,44 +213,67 @@ const HeroBalance = () => {
           </div>
         </motion.div>
 
-        {/* Sparkline area chart */}
+        {/* Sparkline area chart with animated draw-in */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.5, duration: 0.5 }}
-          className="h-20 sm:h-24 mt-4 -mx-2"
+          className="relative h-24 sm:h-28 mt-6 -mx-2"
         >
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={sparkData}>
-              <defs>
-                <linearGradient id="hero-area" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="hsl(250 85% 70%)" stopOpacity={0.55} />
-                  <stop offset="100%" stopColor="hsl(250 85% 70%)" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <Tooltip
-                cursor={{ stroke: "hsl(var(--primary))", strokeOpacity: 0.2 }}
-                contentStyle={{
-                  background: "hsl(var(--popover))",
-                  border: "1px solid hsl(var(--border))",
-                  borderRadius: 12,
-                  fontSize: 12,
-                  padding: "6px 10px",
-                }}
-                labelStyle={{ color: "hsl(var(--muted-foreground))" }}
-                formatter={(v: number) => [`$${v.toLocaleString("en-US", { maximumFractionDigits: 2 })}`, "Balance"]}
-              />
-              <Area
-                type="monotone"
-                dataKey="value"
-                stroke="hsl(250 85% 70%)"
-                strokeWidth={2.5}
-                fill="url(#hero-area)"
-                isAnimationActive
-                animationDuration={1400}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
+          {/* Left-to-right reveal mask */}
+          <motion.div
+            initial={{ clipPath: "inset(0 100% 0 0)" }}
+            animate={{ clipPath: "inset(0 0% 0 0)" }}
+            transition={{ duration: 1.6, ease: [0.22, 1, 0.36, 1], delay: 0.6 }}
+            className="absolute inset-0"
+          >
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={sparkData} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="hero-stroke" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%" stopColor="hsl(265 95% 72%)" />
+                    <stop offset="50%" stopColor="hsl(280 95% 70%)" />
+                    <stop offset="100%" stopColor="hsl(185 95% 60%)" />
+                  </linearGradient>
+                  <linearGradient id="hero-area" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="hsl(270 90% 70%)" stopOpacity={0.55} />
+                    <stop offset="55%" stopColor="hsl(230 85% 60%)" stopOpacity={0.18} />
+                    <stop offset="100%" stopColor="hsl(190 90% 60%)" stopOpacity={0} />
+                  </linearGradient>
+                  <filter id="hero-glow" x="-20%" y="-50%" width="140%" height="200%">
+                    <feGaussianBlur stdDeviation="3" result="blur" />
+                    <feMerge>
+                      <feMergeNode in="blur" />
+                      <feMergeNode in="SourceGraphic" />
+                    </feMerge>
+                  </filter>
+                </defs>
+                <Tooltip
+                  cursor={{ stroke: "hsl(var(--primary))", strokeOpacity: 0.25 }}
+                  contentStyle={{
+                    background: "hsl(var(--popover))",
+                    border: "1px solid hsl(var(--border))",
+                    borderRadius: 12,
+                    fontSize: 12,
+                    padding: "6px 10px",
+                  }}
+                  labelStyle={{ color: "hsl(var(--muted-foreground))" }}
+                  formatter={(v: number) => [`$${v.toLocaleString("en-US", { maximumFractionDigits: 2 })}`, "Balance"]}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="value"
+                  stroke="url(#hero-stroke)"
+                  strokeWidth={2.75}
+                  fill="url(#hero-area)"
+                  filter="url(#hero-glow)"
+                  isAnimationActive={false}
+                  dot={false}
+                  activeDot={{ r: 4, fill: "hsl(280 95% 75%)", stroke: "white", strokeWidth: 1.5 }}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </motion.div>
         </motion.div>
 
         {/* Pill badges */}
@@ -260,17 +283,6 @@ const HeroBalance = () => {
           transition={{ delay: 0.7, duration: 0.4 }}
           className="flex flex-wrap items-center justify-center gap-2 mt-4"
         >
-          <span
-            className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold ${
-              positive
-                ? "bg-[hsl(var(--accent-amber)/0.18)] text-[hsl(var(--accent-amber))]"
-                : "bg-destructive/15 text-destructive"
-            }`}
-          >
-            {positive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-            {positive ? "+" : ""}
-            {todayChange.toFixed(2)}% today
-          </span>
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold bg-white/10 text-white/85 backdrop-blur">
             {(wallets || []).slice(0, 6).map((w) => {
               const f = flagForCurrency(w.currency_code);
