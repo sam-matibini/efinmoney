@@ -766,7 +766,12 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
               >
                 {createTransfer.isPending || cardSubmitting
                   ? "Processing..."
-                  : `Send C$${parsedAmount.toFixed(2)} via ${method === "eft" ? "Bank Transfer" : method === "interac" ? "Interac e-Transfer" : "Visa Direct"}`}
+                  : `Send C$${parsedAmount.toFixed(2)} via ${
+                      method === "eft" ? "Bank Transfer"
+                        : method === "interac" ? "Interac e-Transfer"
+                        : method === "stripe_connect" ? "Stripe Connect"
+                        : "Visa Direct"
+                    }`}
               </Button>
             </div>
 
@@ -781,7 +786,12 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
                   {" "}<strong>Total {funding === "card" ? "charged to card" : "from wallet"}: C${totalCharged.toFixed(2)}</strong>
                 </p>
                 <p>
-                  Delivery: {method === "eft" ? "Bank Transfer (EFT)" : method === "interac" ? "Interac e-Transfer (email)" : "Instant to debit card (Visa Direct)"}
+                  Delivery: {
+                    method === "eft" ? "Bank Transfer (EFT)"
+                      : method === "interac" ? "Interac e-Transfer (email)"
+                      : method === "stripe_connect" ? "Stripe Connect — instant payout to your connected account"
+                      : "Instant to debit card (Visa Direct)"
+                  }
                 </p>
               </div>
             </div>
