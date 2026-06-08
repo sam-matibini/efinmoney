@@ -123,7 +123,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut({ scope: 'local' });
+    } catch (e) {
+      console.warn('signOut error, forcing local clear', e);
+    }
+    try {
+      Object.keys(localStorage)
+        .filter((k) => k.startsWith('sb-') && k.endsWith('-auth-token'))
+        .forEach((k) => localStorage.removeItem(k));
+    } catch {}
+    setSession(null);
+    setUser(null);
+    window.location.assign('/auth');
   };
 
   return (
