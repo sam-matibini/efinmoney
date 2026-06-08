@@ -77,8 +77,21 @@ const RecipientCardInner = forwardRef<RecipientCardHandle, { onValidityChange: (
     const [num, setNum] = useState(false);
     const [exp, setExp] = useState(false);
     const [cvc, setCvc] = useState(false);
+    const [numReady, setNumReady] = useState(false);
 
     useEffect(() => { onValidityChange(num && exp && cvc); }, [num, exp, cvc, onValidityChange]);
+
+    // Once the card number iframe is ready, focus it briefly to confirm it's
+    // interactive. If focus() throws, surface a console warning so we can spot
+    // dead iframes during QA.
+    useEffect(() => {
+      if (!numReady || !elements) return;
+      const el = elements.getElement(CardNumberElement);
+      if (!el) return;
+      try { el.focus(); el.blur(); } catch (e) {
+        console.warn("[RecipientCard] CardNumberElement not focusable:", e);
+      }
+    }, [numReady, elements]);
 
     useImperativeHandle(ref, () => ({
       isComplete: () => num && exp && cvc,
@@ -91,9 +104,16 @@ const RecipientCardInner = forwardRef<RecipientCardHandle, { onValidityChange: (
     }), [stripe, elements, num, exp, cvc]);
 
     return (
-      <div className="space-y-4 p-4 rounded-lg border border-border bg-muted/30">
+      <div className="space-y-4 p-4 rounded-lg border border-primary/30 bg-primary/5">
         <div className="flex items-center gap-2 text-sm font-medium">
           <Zap className="w-4 h-4" /> Recipient's debit card (where funds land instantly)
+        </div>
+        <div className="p-2 rounded bg-muted/40 text-[11px] text-muted-foreground flex items-start gap-2">
+          <Info className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+          <span>
+            Visa Direct / Mastercard Send pushes funds directly to this debit card.
+            <strong> You (the sender) must enter it</strong> — the recipient does not get a separate page to fill in.
+          </span>
         </div>
         <div className="space-y-2">
           <Label>Card Number</Label>
@@ -101,6 +121,7 @@ const RecipientCardInner = forwardRef<RecipientCardHandle, { onValidityChange: (
             <CardNumberElement
               options={{ style: elementStyle, showIcon: true, placeholder: "Recipient debit card" }}
               onChange={(e) => setNum(e.complete)}
+              onReady={() => setNumReady(true)}
               className="w-full"
             />
           </div>
@@ -120,7 +141,7 @@ const RecipientCardInner = forwardRef<RecipientCardHandle, { onValidityChange: (
           </div>
         </div>
         <p className="text-[11px] text-muted-foreground">
-          Visa Direct / Mastercard Send instant payout. Canadian debit cards only.
+          Canadian debit cards only (Visa Debit, Debit Mastercard, Interac).
         </p>
       </div>
     );
@@ -128,17 +149,25 @@ const RecipientCardInner = forwardRef<RecipientCardHandle, { onValidityChange: (
 );
 RecipientCardInner.displayName = "RecipientCardInner";
 
+
 const RecipientCardSection = forwardRef<RecipientCardHandle, { onValidityChange: (v: boolean) => void; elementStyle: any }>(
   (props, ref) => {
-    // Use a SEPARATE Stripe instance from the page-level one. Two <Elements>
-    // groups sharing the same Stripe instance can race and leave the second
-    // group's iframes inert (visible but not focusable). A second loadStripe()
-    // call gives the recipient card its own isolated Elements context.
-    const [stripeP] = useState<Promise<Stripe | null>>(() => getStripeSecondary());
+    // Use a SEPARATE Stripe instance from the page-level one so two
+    // CardNumberElements (sender + recipient) can coexist. If the secondary
+    // fails to load, fall back to the primary instance so the form is at
+    // least degraded-working rather than dead.
+    const [stripeP, setStripeP] = useState<Promise<Stripe | null>>(() => getStripeSecondary());
     const [ready, setReady] = useState<boolean | null>(null);
     useEffect(() => {
       let alive = true;
-      stripeP.then((s) => { if (alive) setReady(!!s); });
+      stripeP.then((s) => {
+        if (!alive) return;
+        if (s) { setReady(true); return; }
+        console.warn("[RecipientCard] secondary Stripe instance failed; falling back to primary");
+        const fallback = getStripe();
+        setStripeP(fallback);
+        fallback.then((s2) => { if (alive) setReady(!!s2); });
+      });
       return () => { alive = false; };
     }, [stripeP]);
 
@@ -157,7 +186,7 @@ const RecipientCardSection = forwardRef<RecipientCardHandle, { onValidityChange:
       );
     }
     return (
-      <Elements stripe={stripeP}>
+      <Elements stripe={stripeP} key="recipient-card-elements">
         <RecipientCardInner {...props} ref={ref} />
       </Elements>
     );
@@ -174,7 +203,7 @@ const CanadaSendFlow = () => {
     return () => { ok = false; };
   }, [stripeP]);
   return (
-    <Elements stripe={stripeP}>
+    <Elements stripe={stripeP} key="sender-card-elements">
       <CanadaSendFlowInner stripeReady={stripeReady} />
     </Elements>
   );
@@ -786,7 +815,7 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
             {funding === "card" && stripeReady === true && (
               <div className="space-y-4 p-4 rounded-lg border border-border bg-muted/30">
                 <div className="flex items-center gap-2 text-sm font-medium">
-                  <CreditCard className="w-4 h-4" /> Your card details
+                  <CreditCard className="w-4 h-4" /> Your card (funds this transfer)
                 </div>
                 <div className="space-y-2">
                   <Label>Card Number</Label>
