@@ -23,7 +23,7 @@ Deno.serve(async (req) => {
 
   try {
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) return json({ error: "Unauthorized" }, 401);
+    if (!authHeader?.startsWith("Bearer ")) return json({ error: "Unauthorized", hint: "Sign in and try again" }, 401);
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -32,7 +32,7 @@ Deno.serve(async (req) => {
     );
     const token = authHeader.replace("Bearer ", "");
     const { data: userData, error: authErr } = await supabase.auth.getUser(token);
-    if (authErr || !userData?.user) return json({ error: "Unauthorized" }, 401);
+    if (authErr || !userData?.user) return json({ error: "Unauthorized", hint: "Sign in and try again" }, 401);
     const userId = userData.user.id;
 
     const admin = createClient(
