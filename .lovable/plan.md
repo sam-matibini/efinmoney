@@ -1,38 +1,49 @@
-## Goal
+# Fix the spinning UI (permission denied for table transfers)
 
-Keep Option A: collect **two cards** in the Canada send flow (sender's funding card + recipient's debit card for Visa Direct), make both sections clearly labeled, and fix the inactive recipient debit card fields.
+## Root cause
 
-## Scope
+Migration `20260608043959` was meant to hide sensitive columns from the client by doing:
 
-Frontend only — `src/components/send/CanadaSendFlow.tsx` and (if needed) `src/lib/stripe.ts`. No backend, payout routing, or fee logic changes.
+```sql
+REVOKE SELECT ON public.<table> FROM authenticated;
+GRANT  SELECT (col1, col2, …) ON public.<table> TO authenticated;
+```
 
-## Changes
+That works only when the client lists columns explicitly. Our hooks use PostgREST's `.select('*')` (e.g. `useTransfers`, `useProfile`, `useKyc`, etc.), which needs **table-level** SELECT. Every read on the 5 affected tables now fails with `42501`. The dashboard, transfers list, KYC guard and others spin forever because their queries never resolve.
 
-### 1. Clarify sender vs recipient card labels
-- **Sender card section** (Step 2 "Pay with card" panel): retitle the panel to **"Your card (funds this transfer)"** with a one-line helper: *"We charge C$[total] from this card."* This removes confusion with the recipient block.
-- **Recipient card section** (only shown when delivery = "Instant to Card"): keep current title **"Recipient's debit card (where funds land instantly)"** but move it visually so it sits clearly under the "Instant to Card" recipient block with an info note: *"Visa Direct / Mastercard Send pushes funds directly to this debit card. You (the sender) must enter it — the recipient does not get a separate page to fill in."*
-- Show the recipient card block **only** when `method === "card_push"` (already the case) and never duplicate it elsewhere.
+Verified in DB:
+- `pg_class.relacl` for `public.transfers` shows `authenticated=awdDxtm` (no `r`).
+- Console: `permission denied for table transfers` repeating every few seconds.
 
-### 2. Fix inactive recipient debit card fields
-Root cause confirmed: two `<Elements>` groups were sharing one Stripe instance, leaving the second group's iframes inert. The previous fix introduced `getStripeSecondary()` but the inputs are still reported inactive. Apply these adjustments:
+## Fix
 
-- **Force a stable key on the nested `<Elements>`** so it remounts cleanly when `method` toggles to `card_push`, instead of being mounted while hidden and never receiving focus wiring.
-- **Lazy-mount `RecipientCardSection`**: only render it after the user actually selects "Instant to Card" (it already is gated by `method === "card_push"`, but ensure no stale parent re-render is hiding it via CSS). Remove any wrapping container that has `pointer-events:none`, `opacity:0`, or `display:none` between mounts.
-- **Verify `getStripeSecondary()`** in `src/lib/stripe.ts` actually resolves with the same publishable key as `getStripe()` and isn't returning `null` silently. If `ready === false` for the secondary, fall back to a single shared instance and warn in console — better degraded than dead.
-- After mount, programmatically focus the recipient `CardNumberElement` once to confirm iframes are interactive; if `.focus()` throws, surface a clear error banner instead of a silent dead field.
+Add a new migration that **restores table-level SELECT for `authenticated`** on the 5 tables. Sensitive data stays protected by the existing RLS policies (rows already scoped to `auth.uid()` / admin role). True column-level secrecy will be handled in a follow-up via dedicated views, not column grants.
 
-### 3. Validation flow unchanged
-- Sender card validity (`cardNumComplete && cardExpComplete && cardCvcComplete`) gates Step 2 only when funding=card.
-- Recipient card validity (`recipientCardComplete`) gates Step 2 only when delivery=card_push.
-- Both can be required simultaneously (card-funded → card_push delivery).
+### Migration (new file)
 
-### 4. QA checklist before finishing
-1. Select "Instant to Card" delivery + "Pay from wallet" funding → only **recipient** card fields render and accept input.
-2. Select "Instant to Card" delivery + "Pay with card" funding → **both** sender and recipient card sections render, each accepts input independently, and labels make the distinction obvious.
-3. Select "Bank (EFT)" + "Pay with card" → only **sender** card fields render.
-4. No new console errors from Stripe Elements ("Cannot have two CardNumberElement…" etc.).
-5. Submitting tokenizes the correct card(s) and the transfer succeeds end-to-end on test keys.
+```sql
+-- Restore table-level SELECT broken by 20260608043959.
+-- RLS still scopes rows to the owner / admins; sensitive columns will be
+-- moved behind views in a follow-up.
+GRANT SELECT ON public.plaid_items                    TO authenticated;
+GRANT SELECT ON public.transfers                      TO authenticated;
+GRANT SELECT ON public.kyc_verifications              TO authenticated;
+GRANT SELECT ON public.profiles                       TO authenticated;
+GRANT SELECT ON public.crossmint_yellowcard_transfers TO authenticated;
+```
 
-## Out of scope
-- Backend payout logic, fee schedule, Stripe Connect onboarding.
-- Replacing recipient card collection with a hosted recipient page (that's Option B, rejected).
+No other code changes needed — once SELECT is restored, every existing query starts working again and the spinners clear.
+
+## Follow-up (not in this fix)
+
+To actually hide `access_token`, `interac_security_answer`, `internal_notes`, `stellar_seed_encrypted`, `crossmint_raw`, `yellowcard_raw`, etc. without breaking `select('*')`:
+1. Create `*_safe` views that exclude sensitive columns, grant SELECT on the views to `authenticated`.
+2. Move hooks to read from the views.
+3. Keep base tables service-role only for those fields.
+
+I'll also update `@security-memory` to record that column-grant masking is incompatible with the app's `select('*')` pattern and that view-based masking is the correct approach.
+
+## Files touched
+
+- `supabase/migrations/<new-timestamp>_restore-table-select.sql` (new)
+- `mem://security/...` security memory note (rationale update)
