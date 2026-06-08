@@ -21,16 +21,49 @@ interface StripeConfigProps {
   onBack: () => void;
 }
 
+interface ModeInfo {
+  mode: "live" | "test";
+  keyPrefix: string;
+  publishableKeyMasked: string | null;
+  publishableKeyPrefix: string;
+  accountId: string;
+  country: string;
+  defaultCurrency: string;
+  chargesEnabled: boolean;
+  payoutsEnabled: boolean;
+  detailsSubmitted: boolean;
+  businessType?: string;
+  email?: string;
+  capabilities: Record<string, string>;
+}
+
 export function StripeConfig({ onBack }: StripeConfigProps) {
   const [showSecretKey, setShowSecretKey] = useState(false);
   const [showWebhookSecret, setShowWebhookSecret] = useState(false);
   const [status, setStatus] = useState<Record<string, boolean> | null>(null);
+  const [mode, setMode] = useState<ModeInfo | null>(null);
+  const [modeError, setModeError] = useState<string | null>(null);
+  const [modeLoading, setModeLoading] = useState(false);
+
+  const checkMode = async () => {
+    setModeLoading(true);
+    setModeError(null);
+    const { data, error } = await supabase.functions.invoke("stripe-mode-check");
+    if (error || (data as any)?.error) {
+      setModeError(error?.message || (data as any)?.error || "Failed to check mode");
+      setMode(null);
+    } else {
+      setMode(data as ModeInfo);
+    }
+    setModeLoading(false);
+  };
 
   useEffect(() => {
     supabase.functions
       .invoke("stripe-config-status")
       .then(({ data }) => data && setStatus(data as Record<string, boolean>))
       .catch(() => {});
+    checkMode();
   }, []);
 
   const StatusRow = ({ label, ok }: { label: string; ok?: boolean }) => (
