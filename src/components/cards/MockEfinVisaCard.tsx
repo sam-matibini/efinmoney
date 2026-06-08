@@ -125,7 +125,7 @@ const MockEfinVisaCard = () => {
                 <div className="min-w-0">
                   <div className="text-[9px] tracking-[0.18em] opacity-70">CARDHOLDER</div>
                   <div className="text-sm font-semibold tracking-wide truncate max-w-[12rem]">
-                    CARD PENDING
+                    Samson Matibini
                   </div>
                 </div>
                 <div>
