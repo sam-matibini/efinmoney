@@ -103,6 +103,22 @@ export function StripeConfig({ onBack }: StripeConfigProps) {
         </CardContent>
       </Card>
 
+      {/* Backend Secrets Status */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Backend Secrets Status</CardTitle>
+          <CardDescription>Which Stripe credentials are configured in Lovable Cloud</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-2 md:grid-cols-2">
+          <StatusRow label="Secret key (STRIPE_SECRET_KEY)" ok={status?.hasSecretKey} />
+          <StatusRow label="Publishable key (STRIPE_PUBLISHABLE_KEY)" ok={status?.hasPublishableKey} />
+          <StatusRow label="Pay-in webhook (STRIPE_PAYIN_WEBHOOK_SECRET)" ok={status?.hasPayinWebhookSecret} />
+          <StatusRow label="Payout webhook (STRIPE_PAYOUT_WEBHOOK_SECRET)" ok={status?.hasPayoutWebhookSecret} />
+          <StatusRow label="Issuing webhook (STRIPE_ISSUING_WEBHOOK_SECRET)" ok={status?.hasIssuingWebhookSecret} />
+          <StatusRow label="General webhook (STRIPE_WEBHOOK_SECRET)" ok={status?.hasGeneralWebhookSecret} />
+        </CardContent>
+      </Card>
+
       {/* API Credentials */}
       <Card>
         <CardHeader>
