@@ -234,7 +234,7 @@ Deno.serve(async (req) => {
       single_use: body.controls?.single_use ?? (purpose === "single_use"),
     });
 
-    return json({ card, sandbox: !stripeCardId });
+    return json({ card, sandbox: false });
   } catch (e: any) {
     console.error("create-card error:", e);
     return json({ error: e?.message || "Failed to create card" }, 500);
