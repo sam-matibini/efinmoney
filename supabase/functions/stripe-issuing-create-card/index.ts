@@ -14,6 +14,16 @@ interface CreateCardInput {
   funding_wallet_id?: string;
   card_type?: "virtual" | "physical";
   tap_to_pay?: boolean;
+  shipping?: {
+    name?: string;
+    line1?: string;
+    line2?: string;
+    city?: string;
+    state?: string;
+    postal_code?: string;
+    country?: string;
+    service?: "standard" | "express" | "priority";
+  };
   controls?: {
     per_authorization_limit?: number;
     daily_limit?: number;
@@ -177,14 +187,41 @@ Deno.serve(async (req) => {
       return json({ error: "Cardholder is not linked to Stripe." }, 500);
     }
     try {
-      const card = await stripe.issuing.cards.create({
+      const cardParams: any = {
         cardholder: cardholder.stripe_cardholder_id,
         currency: currency.toLowerCase(),
         type: cardType,
         status: "active",
         spending_controls: Object.keys(stripeControls).length ? stripeControls : undefined,
         metadata: { tap_to_pay: tapToPay ? "true" : "false" },
-      });
+      };
+      if (cardType === "physical") {
+        const ship = body.shipping || {};
+        const shipName = ship.name || profile.full_name;
+        const shipLine1 = ship.line1 || (profile as any).street_address;
+        const shipCity = ship.city || profile.city;
+        const shipState = ship.state || profile.state_province || "ON";
+        const shipPostal = ship.postal_code || profile.postal_code;
+        const shipCountry = (ship.country || addressCountry).toUpperCase().slice(0, 2);
+        if (!shipName || !shipLine1 || !shipCity || !shipPostal) {
+          return json({ error: "Shipping address incomplete for physical card." }, 400);
+        }
+        cardParams.shipping = {
+          name: shipName,
+          service: ship.service || "standard",
+          address: {
+            line1: shipLine1,
+            line2: ship.line2 || undefined,
+            city: shipCity,
+            state: shipState,
+            postal_code: shipPostal,
+            country: shipCountry,
+          },
+        };
+        // Physical cards stay inactive until the user activates on receipt
+        cardParams.status = "inactive";
+      }
+      const card = await stripe.issuing.cards.create(cardParams);
       stripeCardId = card.id;
       last4 = card.last4;
       expMonth = card.exp_month;
