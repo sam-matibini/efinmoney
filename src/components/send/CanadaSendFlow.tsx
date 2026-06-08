@@ -833,6 +833,11 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
                 Funds are being pushed to {recipientName}'s debit card via Visa Direct and typically arrive within seconds.
               </p>
             )}
+            {method === "stripe_connect" && (
+              <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
+                Funds were transferred to your Stripe connected account <span className="font-mono">{connectAcct?.stripe_account_id}</span> and an instant payout was triggered to your external debit card / bank.
+              </p>
+            )}
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               {lastTransferId && (
                 <Button asChild>
