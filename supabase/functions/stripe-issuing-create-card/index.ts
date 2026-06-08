@@ -247,12 +247,12 @@ Deno.serve(async (req) => {
         currency,
         card_type: cardType,
         purpose,
-        status: "active",
+        status: cardType === "physical" ? "pending" : "active",
         nickname: body.nickname || null,
         funding_wallet_id: body.funding_wallet_id || null,
         exp_month: expMonth,
         exp_year: expYear,
-        metadata: { sandbox: false, tap_to_pay: tapToPay },
+        metadata: { sandbox: false, tap_to_pay: tapToPay, shipping: cardType === "physical" ? (body.shipping || null) : null },
       })
       .select()
       .single();
