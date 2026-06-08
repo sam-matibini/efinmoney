@@ -1,48 +1,35 @@
-## Card-funded transfer is already wired — here's the test
+## Path B — $1 live card top-up test
 
-No code changes. We'll run the end-to-end flow in the live preview using Stripe **test card numbers**, then verify the edge function logs and DB rows.
+This will charge a **real $1 CAD** to a real card on the live Stripe account `acct_1T7dSIEJgSLwPPaN`. No refund will be issued automatically — you'd refund from the Stripe dashboard if desired.
 
-## Flow under test
+## What you do first (in the preview)
 
-```
-SendPage → "Pay with card" → stripe-charge-saved-card (PaymentIntent on platform acct)
-        → success → INSERT transfers (funding_source='card', bypasses wallet check)
-        → execute-transfer (prefunded=true) → Flutterwave/PawaPay/Stripe Connect payout
-```
+1. Sign in as the cardholder you want to test (e.g. **Samson** — `smatibini.sm@gmail.com`, who already has a CAD Visa `••4001` on file as `pm_1TWkPA…`). If you'd rather use a fresh card, sign in as anyone, go to `/cards` → Link a card, complete the Stripe SetupIntent. Tell me when done.
+2. Confirm: "go" once you're signed in.
 
-The "Stripe Connect" leg is the **payout** side (`stripe-connect-instant-payout` / Visa Direct), not the charge side. Funding the sender always hits the platform Stripe account.
+## What I do in build mode
 
-## Prereqs to confirm before testing
+1. Verify auth: hit a tiny authed endpoint with the preview session to confirm `auth.uid()` matches the cardholder.
+2. `POST /stripe-charge-saved-card` with:
+   ```json
+   { "payment_method_id": "<your pm_…>", "amount": 1, "currency": "CAD", "purpose": "test_card_funding" }
+   ```
+3. Read the response → expect `success: true`, `payment_intent_id: pi_…`, `ledger_journal_id`, `wallet_id`.
+4. Verify in DB:
+   - `ledger_entries` for that `external_reference=pi_…`: one Dr to Stripe Settlement (CAD), one Cr to Customer Wallet Liability (CAD), both $1.
+   - New CAD wallet balance = previous + $1 via `get_wallet_balance`.
+   - `notifications` row "Top-up successful".
+5. Pull `stripe-charge-saved-card` edge logs and surface the PaymentIntent id.
+6. Report a one-row pass/fail with all IDs so you can find the charge in Stripe and refund if you want.
 
-- A saved card exists on `/cards` (Linked Cards section). If none, link one first using Stripe test card `4242 4242 4242 4242`, any future expiry, any CVC, any postal code.
-- `STRIPE_SECRET_KEY` is set (it is — confirmed in secrets).
-- Sender is signed in and KYC tier allows the chosen corridor.
+## Out of scope for this run
 
-## Test cases
+- Decline cases — can't safely test in live mode without a card known to fail.
+- Full `/send` end-to-end (would also trigger a real cross-border payout). If you want that, we'd need to wire a "dry-run" mode into `execute-transfer` first, or accept a real $5 CAD → KES test.
 
-| # | Card (test) | Expected |
-|---|---|---|
-| 1 | `4242 4242 4242 4242` | charge succeeds, transfer created with `funding_source='card'`, payout queued |
-| 2 | `4000 0000 0000 9995` | decline `insufficient_funds`, friendly toast, **no** transfer row created |
-| 3 | `4000 0000 0000 0002` | generic `card_declined`, no transfer row |
-| 4 | `4000 0025 0000 3155` | 3DS challenge — should surface authentication_required (current flow rejects; expected) |
+## Confirm to proceed
 
-## Verification after each run
-
-1. **Toast** — success or specific friendly decline message.
-2. **`transfers` table** — for case 1: row with `funding_source='card'`, `provider_charge_id` (or `payment_intent_id` in metadata) populated, `status` progressing `pending → processing → completed`.
-3. **`stripe-charge-saved-card` logs** — PaymentIntent id + status.
-4. **`execute-transfer` logs** — `prefunded: true` honored, payout provider response.
-5. **`ledger_entries`** — on completion, debit clearing account / credit recipient float; no debit to sender wallet (since funded by card).
-
-## What I'll do in build mode
-
-1. Hit `/send` in the preview, pick a Canadian → corridor recipient, choose **Pay with card**, run case 1.
-2. Pull `stripe-charge-saved-card` and `execute-transfer` logs.
-3. Query the `transfers` and `ledger_entries` rows for the new transfer id.
-4. Repeat for case 2 (decline) and confirm no transfer row is written.
-5. Report a pass/fail table with the IDs.
-
-## Open question
-
-Should I run this as **your logged-in preview session** (uses whatever recipient/corridor is convenient) or do you want a specific corridor + amount + recipient name to target? Default: smallest valid amount, Canada → Kenya (PawaPay), $5 CAD.
+Reply with:
+- which user you're signed in as,
+- which `pm_…` to charge (or "use Samson's `pm_1TWkPAEJgSLwPPaN3QtRpH1q`"),
+- "go".
