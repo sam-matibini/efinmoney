@@ -19,6 +19,7 @@ import { SalesInvoicesPanel } from "@/components/finance/SalesInvoicesPanel";
 import { PurchaseBillsPanel } from "@/components/finance/PurchaseBillsPanel";
 import { ReportsCentrePanel } from "@/components/finance/ReportsCentrePanel";
 import { SalesTaxPanel } from "@/components/finance/SalesTaxPanel";
+import { TreasuryPanel } from "@/components/finance/treasury/TreasuryPanel";
 
 const FinanceDashboard = () => {
   const [accountingTab, setAccountingTab] = useState("coa");
@@ -48,6 +49,7 @@ const FinanceDashboard = () => {
               <TabsList className="inline-flex w-auto min-w-full lg:min-w-0">
               <TabsTrigger value="accounting">Accounting</TabsTrigger>
               <TabsTrigger value="banking">Banking</TabsTrigger>
+              <TabsTrigger value="treasury">Treasury</TabsTrigger>
               <TabsTrigger value="reports">Reports</TabsTrigger>
               <TabsTrigger value="sales-tax">Sales Tax</TabsTrigger>
               <TabsTrigger value="vendors">Vendors</TabsTrigger>
@@ -102,6 +104,10 @@ const FinanceDashboard = () => {
                   <ReconciliationPanel />
                 </TabsContent>
               </Tabs>
+            </TabsContent>
+
+            <TabsContent value="treasury" className="space-y-4">
+              <TreasuryPanel />
             </TabsContent>
 
             <TabsContent value="reports" className="space-y-4">
