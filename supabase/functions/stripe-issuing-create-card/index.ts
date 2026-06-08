@@ -95,33 +95,33 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
-    const stripe = stripeKey ? new Stripe(stripeKey, { apiVersion: "2024-06-20" as any }) : null;
-    let issuingEnabled = !!stripe;
+    if (!stripeKey) {
+      return json({ error: "Stripe Issuing not configured (STRIPE_SECRET_KEY missing)." }, 500);
+    }
+    const stripe = new Stripe(stripeKey, { apiVersion: "2024-06-20" as any });
 
     if (!cardholder) {
       let stripeCardholderId: string | null = null;
-      if (stripe) {
-        try {
-          const ch = await stripe.issuing.cardholders.create({
-            type: "individual",
-            name: profile.full_name,
-            email: profile.email || claimData.claims.email,
-            phone_number: profile.phone_number || undefined,
-            billing: {
-              address: {
-                line1: (profile as any).street_address,
-                city: profile.city,
-                state: profile.state_province || "ON",
-                postal_code: profile.postal_code,
-                country: addressCountry,
-              },
+      try {
+        const ch = await stripe.issuing.cardholders.create({
+          type: "individual",
+          name: profile.full_name,
+          email: profile.email || claimData.claims.email,
+          phone_number: profile.phone_number || undefined,
+          billing: {
+            address: {
+              line1: (profile as any).street_address,
+              city: profile.city,
+              state: profile.state_province || "ON",
+              postal_code: profile.postal_code,
+              country: addressCountry,
             },
-          }, { idempotencyKey: `cardholder:${userId}` });
-          stripeCardholderId = ch.id;
-        } catch (e: any) {
-          console.warn("Stripe Issuing cardholder create failed, falling back to sandbox:", e?.message);
-          issuingEnabled = false;
-        }
+          },
+        }, { idempotencyKey: `cardholder:${userId}` });
+        stripeCardholderId = ch.id;
+      } catch (e: any) {
+        console.error("Stripe Issuing cardholder create failed:", e?.message);
+        return json({ error: `Stripe Issuing cardholder error: ${e?.message || "unknown"}` }, 400);
       }
       const { data: newCh, error: chErr } = await admin
         .from("cardholders")
