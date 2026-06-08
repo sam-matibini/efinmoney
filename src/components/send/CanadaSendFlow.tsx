@@ -201,6 +201,14 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
   const noCadWallet = cadWallets.length === 0;
   // Auto-switch to card funding if user has no CAD wallet
   useEffect(() => { if (noCadWallet && funding === "wallet") setFunding("card"); }, [noCadWallet, funding]);
+
+  // Auto-fill recipient = self when paying to your own connected account
+  useEffect(() => {
+    if (method === "stripe_connect") {
+      if (profile?.full_name && !recipientName) setRecipientName(profile.full_name);
+      if (profile?.email && !recipientEmail) setRecipientEmail(profile.email);
+    }
+  }, [method, profile?.full_name, profile?.email]);
   // Any wallet to satisfy the NOT NULL FK on transfers.sender_wallet_id when paying by card
   const fallbackWallet = (wallets || [])[0];
 
