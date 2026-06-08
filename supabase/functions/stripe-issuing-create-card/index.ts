@@ -173,32 +173,30 @@ Deno.serve(async (req) => {
 
     const tapToPay = body.tap_to_pay !== false; // default ON
 
-    if (stripe && issuingEnabled && cardholder.stripe_cardholder_id) {
-      try {
-        const card = await stripe.issuing.cards.create({
-          cardholder: cardholder.stripe_cardholder_id,
-          currency: currency.toLowerCase(),
-          type: cardType,
-          status: "active",
-          spending_controls: Object.keys(stripeControls).length ? stripeControls : undefined,
-          metadata: { tap_to_pay: tapToPay ? "true" : "false" },
-        });
-        stripeCardId = card.id;
-        last4 = card.last4;
-        expMonth = card.exp_month;
-        expYear = card.exp_year;
-      } catch (e: any) {
-        console.warn("Stripe Issuing card create failed, sandbox fallback:", e?.message);
-        issuingEnabled = false;
-      }
+    if (!cardholder.stripe_cardholder_id) {
+      return json({ error: "Cardholder is not linked to Stripe." }, 500);
     }
-
-    if (!stripeCardId) {
-      // Sandbox fallback so UI works before Stripe Issuing is enabled
-      last4 = String(Math.floor(1000 + Math.random() * 9000));
-      const now = new Date();
-      expMonth = now.getMonth() + 1;
-      expYear = now.getFullYear() + 4;
+    try {
+      const card = await stripe.issuing.cards.create({
+        cardholder: cardholder.stripe_cardholder_id,
+        currency: currency.toLowerCase(),
+        type: cardType,
+        status: "active",
+        spending_controls: Object.keys(stripeControls).length ? stripeControls : undefined,
+        metadata: { tap_to_pay: tapToPay ? "true" : "false" },
+      });
+      stripeCardId = card.id;
+      last4 = card.last4;
+      expMonth = card.exp_month;
+      expYear = card.exp_year;
+    } catch (e: any) {
+      console.error("Stripe Issuing card create failed:", e?.message);
+      const msg = e?.message || "Stripe Issuing card create failed";
+      const code = e?.raw?.code || e?.code;
+      const friendly = code === "balance_insufficient"
+        ? "Your Stripe Issuing balance is insufficient. Top up the Issuing balance in your Stripe Dashboard, then retry."
+        : msg;
+      return json({ error: friendly, stripe_code: code }, 400);
     }
 
     const { data: card, error: cardErr } = await admin
