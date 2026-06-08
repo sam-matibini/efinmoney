@@ -185,6 +185,17 @@ export const useIssuedCardMutations = () => {
       purpose?: IssuedCardPurpose;
       funding_wallet_id?: string;
       tap_to_pay?: boolean;
+      card_type?: "virtual" | "physical";
+      shipping?: {
+        name?: string;
+        line1?: string;
+        line2?: string;
+        city?: string;
+        state?: string;
+        postal_code?: string;
+        country?: string;
+        service?: "standard" | "express" | "priority";
+      };
       controls?: Partial<CardControls>;
     }) => {
       const { data, error } = await supabase.functions.invoke("stripe-issuing-create-card", { body: input });
