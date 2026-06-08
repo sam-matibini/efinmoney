@@ -12,8 +12,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Eye, EyeOff, Copy, ExternalLink, RefreshCw, CheckCircle2 } from "lucide-react";
-import { useState } from "react";
+import { Eye, EyeOff, Copy, ExternalLink, RefreshCw, CheckCircle2, XCircle } from "lucide-react";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 interface StripeConfigProps {
@@ -23,6 +24,29 @@ interface StripeConfigProps {
 export function StripeConfig({ onBack }: StripeConfigProps) {
   const [showSecretKey, setShowSecretKey] = useState(false);
   const [showWebhookSecret, setShowWebhookSecret] = useState(false);
+  const [status, setStatus] = useState<Record<string, boolean> | null>(null);
+
+  useEffect(() => {
+    supabase.functions
+      .invoke("stripe-config-status")
+      .then(({ data }) => data && setStatus(data as Record<string, boolean>))
+      .catch(() => {});
+  }, []);
+
+  const StatusRow = ({ label, ok }: { label: string; ok?: boolean }) => (
+    <div className="flex items-center justify-between p-2 rounded border text-sm">
+      <span>{label}</span>
+      {ok ? (
+        <span className="flex items-center gap-1 text-emerald-600">
+          <CheckCircle2 className="h-4 w-4" /> Configured
+        </span>
+      ) : (
+        <span className="flex items-center gap-1 text-muted-foreground">
+          <XCircle className="h-4 w-4" /> Missing
+        </span>
+      )}
+    </div>
+  );
 
   const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stripe-webhook`;
   const payoutWebhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stripe-payout-webhook`;
