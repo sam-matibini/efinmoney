@@ -54,13 +54,13 @@ function useStripeElementStyle() {
 const elementWrapperClass =
   "flex h-10 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-within:outline-none focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2";
 
-type DeliveryMethod = "interac" | "eft" | "card_push";
+type DeliveryMethod = "interac" | "eft" | "card_push" | "stripe_connect";
 type FundingSource = "wallet" | "card";
 
 // Feature flag: flip to false instantly if Paysafe Interac e-Transfer is unavailable.
 const INTERAC_ETRANSFER_ENABLED = true;
 
-const DELIVERY_FEES: Record<DeliveryMethod, number> = { interac: 0.5, eft: 0, card_push: 1.0 };
+const DELIVERY_FEES: Record<DeliveryMethod, number> = { interac: 0.5, eft: 0, card_push: 1.0, stripe_connect: 1.0 };
 const CARD_PROCESSING_FEE = 1.5;
 
 // Recipient card section runs in its OWN <Elements> provider so it can host
