@@ -815,7 +815,7 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
             {funding === "card" && stripeReady === true && (
               <div className="space-y-4 p-4 rounded-lg border border-border bg-muted/30">
                 <div className="flex items-center gap-2 text-sm font-medium">
-                  <CreditCard className="w-4 h-4" /> Your card details
+                  <CreditCard className="w-4 h-4" /> Your card (funds this transfer)
                 </div>
                 <div className="space-y-2">
                   <Label>Card Number</Label>
