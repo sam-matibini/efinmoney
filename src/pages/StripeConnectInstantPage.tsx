@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { toast } from "sonner";
 import { Loader2, CheckCircle2, Zap, RefreshCw } from "lucide-react";
 import BackToDashboard from "@/components/layout/BackToDashboard";
+import { getConnectReadiness } from "@/hooks/useStripeConnectedAccount";
 
 export default function StripeConnectInstantPage() {
   const { user } = useAuth();
@@ -17,6 +18,7 @@ export default function StripeConnectInstantPage() {
   const [account, setAccount] = useState<any>(null);
   const [connect, setConnect] = useState<any>(null);
   const [onboarded, setOnboarded] = useState(false);
+  const connectState = getConnectReadiness(account);
 
   const refreshStatus = async (silent = false) => {
     setRefreshing(true);
@@ -25,7 +27,7 @@ export default function StripeConnectInstantPage() {
       if (error) throw new Error(error.message);
       if (data?.account) {
         setAccount(data.account);
-        if (!silent) toast.success(data.is_active ? "Account is active" : "Still pending — finish onboarding");
+        if (!silent) toast.success(data.is_active ? "Account is active" : data?.message || "Still pending — finish onboarding");
       } else if (data?.exists === false && !silent) {
         toast.info("No connected account yet");
       }
@@ -148,7 +150,7 @@ export default function StripeConnectInstantPage() {
                     Connected Account
                   </CardTitle>
                   <CardDescription>
-                    <span className="font-mono text-xs">{account.stripe_account_id}</span> · {account.country?.toUpperCase()} · {account.status}
+                    <span className="font-mono text-xs">{account.stripe_account_id}</span> · {account.country?.toUpperCase()} · {connectState.status}
                   </CardDescription>
                 </div>
                 <Button size="sm" variant="outline" onClick={() => refreshStatus(false)} disabled={refreshing}>
@@ -158,7 +160,7 @@ export default function StripeConnectInstantPage() {
               </div>
             </CardHeader>
             <CardContent>
-              {onboarded || account.status === "active" ? (
+              {onboarded || connectState.ready ? (
                 <p className="text-sm text-emerald-500">Onboarding complete. You're ready to receive instant transfers.</p>
               ) : connect ? (
                 <ConnectComponentsProvider connectInstance={connect}>
@@ -174,6 +176,16 @@ export default function StripeConnectInstantPage() {
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Loader2 className="w-4 h-4 animate-spin" /> Loading onboarding…
                 </div>
+              )}
+              {connectState.message && !connectState.ready && (
+                <p className="mt-3 text-sm text-amber-600 dark:text-amber-400">{connectState.message}</p>
+              )}
+              {!connectState.ready && connectState.pendingItems.length > 0 && (
+                <ul className="mt-3 list-disc pl-5 text-xs text-muted-foreground space-y-1">
+                  {connectState.pendingItems.slice(0, 5).map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
               )}
             </CardContent>
           </Card>
