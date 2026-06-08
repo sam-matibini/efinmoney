@@ -198,7 +198,7 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
   const [refreshingConnect, setRefreshingConnect] = useState(false);
 
   // Self-heal: if a connected account row exists but isn't 'active', auto-refresh once from Stripe.
-  const didAutoRefresh = React.useRef(false);
+  const didAutoRefresh = useRef(false);
   useEffect(() => {
     if (didAutoRefresh.current) return;
     if (connectAcct && !connectReady) {
