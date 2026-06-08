@@ -1,34 +1,23 @@
-# Refresh Elicate + Verify Transfer Completion
+## Schedule `elicate-reconcile` every 2 minutes
 
-## Goal
-Confirm the Elicate (Zambia mobile money payout) integration is live and that a transfer initiated through the app flows all the way to `completed` (or surfaces a clean failure with ledger reversal).
+Set up a `pg_cron` job that calls the `elicate-reconcile` edge function every 2 minutes so any stuck ZMW transfer self-heals if Elicate misses a webhook delivery.
 
-## Step 1 — Refresh Elicate health
-- Call `test-integrations` edge function with `{ service: "elicate" }` to re-check:
-  - Mode (live vs sandbox) resolved from `ELICATE_ENV` / `ELICATE_LIVE_*` secrets
-  - Endpoint reachability + auth (Bearer secret accepted)
-- Report: mode, endpoint host, HTTP status, healthy/failed.
+### Steps
 
-## Step 2 — Inspect recent Elicate activity
-- `supabase--read_query`: last 10 ZMW transfers (`target_currency = 'ZMW'`) with `status`, `provider_reference`, `failure_reason`, `created_at`, `completed_at`.
-- `supabase--edge_function_logs` for `elicate-payout` and `elicate-webhook` (last events) to see real upstream responses and webhook deliveries.
+1. Ensure `pg_cron` and `pg_net` extensions are enabled in the `extensions` schema (no-op if already present).
+2. Unschedule any existing `elicate-reconcile-every-2min` job (idempotent re-run safety).
+3. Create a cron job `elicate-reconcile-every-2min` on schedule `*/2 * * * *` that issues a `net.http_post` to:
+   - `https://hgmskcvaeadnyovbroup.supabase.co/functions/v1/elicate-reconcile`
+   - Headers: `Content-Type: application/json`, `Authorization: Bearer <anon key>`
+   - Body: `{}` (function defaults to reconciling all processing ZMW transfers)
 
-## Step 3 — End-to-end test transfer
-- Pick (or create) a ZMW wallet with funded balance for the current preview user.
-- Invoke the existing send flow via `elicate-payout` against a known test MSISDN (MTN sandbox number, e.g. `0966000001`) with a small amount (e.g. ZMW 5).
-- Poll the `transfers` row until `status` ∈ {`completed`, `failed`}:
-  - On `processing`: wait for `elicate-webhook` callback (verify signature with `ELICATE_LIVE_WEBHOOK_SECRET`).
-  - On `failed`: confirm ledger reversal entry was written (`reference_type = 'transfer_reversal'`).
-  - On `completed`: confirm `notify_transfer_completed_receipt` fired (receipt email queued) and notifications row created.
+### Verification
 
-## Step 4 — Report
-Single summary covering: Elicate health, raw provider response, final transfer status, ledger integrity (debits = credits, reversal if failed), webhook receipt.
+- Query `cron.job` to confirm the row exists.
+- After ~2 minutes, query `cron.job_run_details` for the latest run and check `status = 'succeeded'`.
+- Check `elicate-reconcile` edge function logs for periodic invocations.
 
-## Out of scope
-- No code changes unless Step 1–3 surface a defect; if they do, I'll come back with a follow-up plan before editing.
-- Not touching Treasury / Stripe flows.
+### Notes
 
-## Technical notes
-- Functions touched (read-only): `test-integrations`, `elicate-payout`, `elicate-webhook`.
-- Tables read: `transfers`, `ledger_entries`, `wallets`, `notifications`.
-- Auth: test runs against the currently-previewed user; `elicate-payout` requires `x-internal-secret = SUPABASE_SERVICE_ROLE_KEY`, so the call is issued from the edge environment, not the browser.
+- Webhook (`elicate-webhook`) remains the primary path; reconciler is the safety net.
+- Function is idempotent: it only acts on transfers still in `processing` status with `target_currency = 'ZMW'`.
