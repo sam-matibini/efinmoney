@@ -115,17 +115,37 @@ export default function CanadaTransferPage() {
         },
       });
       if (error) throw error;
+
+      // Soft-failure path (function returned 200 with fallback:true)
+      if (data?.fallback || data?.success === false) {
+        const msg = data?.error || "Transfer failed";
+        toast.error(msg);
+        setLastResult({ state: "failed", error: msg, error_code: data?.error_code, reference: data?.transfer?.reference });
+        return;
+      }
       if (data?.error) throw new Error(data.error);
-      setLastResult(data);
-      toast.success(`Transfer ${data.reference} initiated (Stripe: ${data.stripe_status})`);
-      setAmount("");
-      setDescription("");
+
+      const stripeStatus = data?.stripe_status;
+      setLastResult({
+        state: stripeStatus === "requires_action" ? "requires_action" : "success",
+        reference: data.reference,
+        stripe_status: stripeStatus,
+        hosted_mandate_url: data?.hosted_mandate_url || null,
+      });
+      if (stripeStatus === "requires_action") {
+        toast.message(`Transfer ${data.reference} created — verify your bank to complete the PAD.`);
+      } else {
+        toast.success(`Transfer ${data.reference} initiated (Stripe: ${stripeStatus})`);
+        setAmount("");
+        setDescription("");
+      }
     } catch (e: any) {
       toast.error(e.message || "Transfer failed");
     } finally {
       setSubmitting(false);
     }
   };
+
 
   const selectedAcct = accounts.find((a) => a.id === selectedAccount) as PlaidAccountRow | undefined;
   const missingEft = selectedAcct && (!selectedAcct.institution_number || !selectedAcct.account_number);
