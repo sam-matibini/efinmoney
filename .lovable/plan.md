@@ -1,18 +1,26 @@
-# Save Stripe Pay-In Webhook Secret
+Add a one-click check that confirms whether the configured Stripe key is in Live or Test mode.
 
-## 1. Request the secret
-Use the secrets tool to securely store `STRIPE_PAYIN_WEBHOOK_SECRET` (the `whsec_...` value from the Stripe Dashboard webhook you just created pointing at `/functions/v1/stripe-payin-webhook`).
+## What to build
 
-This is the only secret needed — `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET` (Checkout/general), `STRIPE_PAYOUT_WEBHOOK_SECRET`, and `STRIPE_ISSUING_WEBHOOK_SECRET` are already configured.
+1. **New edge function `stripe-mode-check`** (admin-only)
+   - Calls Stripe `GET /v1/account` with `STRIPE_SECRET_KEY`
+   - Returns: `{ mode: "live" | "test", accountId, country, chargesEnabled, payoutsEnabled, capabilities }`
+   - Derives mode from `sk_live_` vs `sk_test_` prefix and cross-checks with the `livemode` flag on the response
+   - Requires authenticated admin (reuses `has_role` check pattern from other admin functions)
 
-## 2. Update Stripe settings panel
-In `src/components/settings/integrations/StripeConfig.tsx`, enhance the "International Pay-In (Stripe Checkout)" card:
-- Add a small status row showing which Stripe secrets are configured (✓ Secret key, ✓ Publishable key, ✓ Pay-in webhook secret, ✓ Payout webhook secret, ✓ Issuing webhook secret).
-- The status is read from a tiny edge function (or inline fetch) that returns `{ hasPayinWebhook: boolean, ... }` based on `Deno.env` presence — never expose values.
-- Add a "Test webhook" hint linking to Stripe Dashboard → Webhooks → Send test event for `checkout.session.completed`.
+2. **UI: extend `StripeConfig.tsx`**
+   - Add a "Mode & Account" card above "Backend Secrets Status"
+   - Shows a prominent badge: green "LIVE MODE" or amber "TEST MODE"
+   - Shows real account ID, country, charges/payouts enabled, and key capabilities (card_payments, transfers, card_issuing)
+   - "Re-check" button to re-invoke
+   - Replace the hardcoded `acct_1234567890` / fake "Last Sync" / fake API version block with real values from this call
+   - Replace the hardcoded `pk_live_51ABC...xyz` / `sk_live_51ABC...xyz` placeholder inputs with masked real values (first 8 chars + `…` + last 4) returned from the function (publishable only; never return the secret key value itself — just its prefix `sk_live` / `sk_test`)
 
-## 3. Verify end-to-end
-- Confirm `supabase/functions/stripe-payin-webhook/index.ts` reads `STRIPE_PAYIN_WEBHOOK_SECRET` (already wired from the earlier step).
-- After the secret is saved, the function will auto-redeploy and start verifying signatures.
+## Scope guardrails
+- No DB changes
+- No changes to other Stripe functions
+- Diagnostic is read-only; no writes to Stripe
 
-No DB migrations, no new pages.
+## Files touched
+- `supabase/functions/stripe-mode-check/index.ts` (new)
+- `src/components/settings/integrations/StripeConfig.tsx` (edit: add card, wire invoke, replace hardcoded values)
