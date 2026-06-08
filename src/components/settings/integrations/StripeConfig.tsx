@@ -21,16 +21,49 @@ interface StripeConfigProps {
   onBack: () => void;
 }
 
+interface ModeInfo {
+  mode: "live" | "test";
+  keyPrefix: string;
+  publishableKeyMasked: string | null;
+  publishableKeyPrefix: string;
+  accountId: string;
+  country: string;
+  defaultCurrency: string;
+  chargesEnabled: boolean;
+  payoutsEnabled: boolean;
+  detailsSubmitted: boolean;
+  businessType?: string;
+  email?: string;
+  capabilities: Record<string, string>;
+}
+
 export function StripeConfig({ onBack }: StripeConfigProps) {
   const [showSecretKey, setShowSecretKey] = useState(false);
   const [showWebhookSecret, setShowWebhookSecret] = useState(false);
   const [status, setStatus] = useState<Record<string, boolean> | null>(null);
+  const [mode, setMode] = useState<ModeInfo | null>(null);
+  const [modeError, setModeError] = useState<string | null>(null);
+  const [modeLoading, setModeLoading] = useState(false);
+
+  const checkMode = async () => {
+    setModeLoading(true);
+    setModeError(null);
+    const { data, error } = await supabase.functions.invoke("stripe-mode-check");
+    if (error || (data as any)?.error) {
+      setModeError(error?.message || (data as any)?.error || "Failed to check mode");
+      setMode(null);
+    } else {
+      setMode(data as ModeInfo);
+    }
+    setModeLoading(false);
+  };
 
   useEffect(() => {
     supabase.functions
       .invoke("stripe-config-status")
       .then(({ data }) => data && setStatus(data as Record<string, boolean>))
       .catch(() => {});
+    checkMode();
   }, []);
 
   const StatusRow = ({ label, ok }: { label: string; ok?: boolean }) => (
@@ -67,36 +100,105 @@ export function StripeConfig({ onBack }: StripeConfigProps) {
         <Button variant="outline" onClick={onBack}>Back to Integrations</Button>
       </div>
 
-      {/* Connection Status */}
+      {/* Mode & Account (live diagnostic) */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            Connection Status
-            <Badge className="bg-indigo-500/10 text-indigo-600 border-indigo-500/20">
-              <CheckCircle2 className="h-3 w-3 mr-1" /> Connected
-            </Badge>
+          <CardTitle className="flex items-center gap-2 flex-wrap">
+            Mode & Account
+            {mode && (
+              <Badge
+                className={
+                  mode.mode === "live"
+                    ? "bg-emerald-500/15 text-emerald-600 border-emerald-500/30"
+                    : "bg-amber-500/15 text-amber-600 border-amber-500/30"
+                }
+              >
+                <CheckCircle2 className="h-3 w-3 mr-1" />
+                {mode.mode === "live" ? "LIVE MODE" : "TEST MODE"}
+              </Badge>
+            )}
+            {modeError && (
+              <Badge className="bg-red-500/15 text-red-600 border-red-500/30">
+                <XCircle className="h-3 w-3 mr-1" /> Error
+              </Badge>
+            )}
           </CardTitle>
+          <CardDescription>
+            Live diagnostic — reads <code>STRIPE_SECRET_KEY</code> and calls Stripe's <code>/v1/account</code> to confirm the configured environment and account.
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="p-4 bg-muted rounded-lg">
-              <p className="text-sm text-muted-foreground">Account ID</p>
-              <p className="font-mono text-sm">acct_1234567890</p>
+          {modeError && (
+            <div className="p-3 rounded border border-red-500/30 bg-red-500/5 text-sm text-red-600">
+              {modeError}
             </div>
-            <div className="p-4 bg-muted rounded-lg">
-              <p className="text-sm text-muted-foreground">Last Sync</p>
-              <p className="text-sm">2 minutes ago</p>
-            </div>
-            <div className="p-4 bg-muted rounded-lg">
-              <p className="text-sm text-muted-foreground">API Version</p>
-              <p className="font-mono text-sm">2024-12-18</p>
-            </div>
-          </div>
+          )}
+          {mode && (
+            <>
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="p-4 bg-muted rounded-lg">
+                  <p className="text-sm text-muted-foreground">Account ID</p>
+                  <p className="font-mono text-sm break-all">{mode.accountId}</p>
+                </div>
+                <div className="p-4 bg-muted rounded-lg">
+                  <p className="text-sm text-muted-foreground">Country / Currency</p>
+                  <p className="text-sm">{mode.country?.toUpperCase()} · {mode.defaultCurrency?.toUpperCase()}</p>
+                </div>
+                <div className="p-4 bg-muted rounded-lg">
+                  <p className="text-sm text-muted-foreground">Account Email</p>
+                  <p className="text-sm truncate">{mode.email || "—"}</p>
+                </div>
+                <div className="p-4 bg-muted rounded-lg">
+                  <p className="text-sm text-muted-foreground">Charges</p>
+                  <p className="text-sm">{mode.chargesEnabled ? "Enabled" : "Disabled"}</p>
+                </div>
+                <div className="p-4 bg-muted rounded-lg">
+                  <p className="text-sm text-muted-foreground">Payouts</p>
+                  <p className="text-sm">{mode.payoutsEnabled ? "Enabled" : "Disabled"}</p>
+                </div>
+                <div className="p-4 bg-muted rounded-lg">
+                  <p className="text-sm text-muted-foreground">Onboarding</p>
+                  <p className="text-sm">{mode.detailsSubmitted ? "Complete" : "Incomplete"}</p>
+                </div>
+              </div>
+              {Object.keys(mode.capabilities ?? {}).length > 0 && (
+                <div>
+                  <p className="text-sm text-muted-foreground mb-2">Capabilities</p>
+                  <div className="flex flex-wrap gap-2">
+                    {Object.entries(mode.capabilities).map(([k, v]) => (
+                      <Badge
+                        key={k}
+                        variant="outline"
+                        className={
+                          v === "active"
+                            ? "border-emerald-500/40 text-emerald-600"
+                            : "border-muted-foreground/30 text-muted-foreground"
+                        }
+                      >
+                        {k}: {v}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
           <div className="flex gap-2">
-            <Button variant="outline" size="sm">
-              <RefreshCw className="h-4 w-4 mr-2" /> Sync Now
+            <Button variant="outline" size="sm" onClick={checkMode} disabled={modeLoading}>
+              <RefreshCw className={`h-4 w-4 mr-2 ${modeLoading ? "animate-spin" : ""}`} /> Re-check
             </Button>
-            <Button variant="outline" size="sm">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                window.open(
+                  mode?.mode === "test"
+                    ? "https://dashboard.stripe.com/test"
+                    : "https://dashboard.stripe.com/",
+                  "_blank",
+                )
+              }
+            >
               <ExternalLink className="h-4 w-4 mr-2" /> Open Stripe Dashboard
             </Button>
           </div>
