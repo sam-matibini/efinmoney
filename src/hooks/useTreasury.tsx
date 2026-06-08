@@ -46,6 +46,12 @@ export type TreasuryReceived = {
   created_at: string;
 };
 
+export type TreasuryCapability = {
+  accountId: string | null;
+  status: string;
+  enabled: boolean;
+} | null;
+
 export function useTreasury() {
   const qc = useQueryClient();
 
@@ -59,6 +65,10 @@ export function useTreasury() {
         transfers: TreasuryTransfer[];
         received: TreasuryReceived[];
         staff: boolean;
+        capabilities: {
+          platform_treasury: TreasuryCapability;
+          user_treasury: TreasuryCapability;
+        };
       };
     },
   });
