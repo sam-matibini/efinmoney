@@ -193,8 +193,24 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
 
   const { data: wallets } = useWallets();
   const createTransfer = useCreateTransfer();
-  const { data: connectAcct } = useStripeConnectedAccount();
+  const { data: connectAcct, refresh: refreshConnect } = useStripeConnectedAccount();
   const connectReady = isConnectReady(connectAcct);
+  const [refreshingConnect, setRefreshingConnect] = useState(false);
+
+  // Self-heal: if a connected account row exists but isn't 'active', auto-refresh once from Stripe.
+  const didAutoRefresh = React.useRef(false);
+  useEffect(() => {
+    if (didAutoRefresh.current) return;
+    if (connectAcct && !connectReady) {
+      didAutoRefresh.current = true;
+      refreshConnect();
+    }
+  }, [connectAcct, connectReady, refreshConnect]);
+
+  const handleManualRefresh = async () => {
+    setRefreshingConnect(true);
+    try { await refreshConnect(); } finally { setRefreshingConnect(false); }
+  };
 
   const cadWallets = (wallets || []).filter((w) => w.currency_code === "CAD");
   const selectedWallet = cadWallets.find((w) => w.wallet_id === walletId) || cadWallets[0];
