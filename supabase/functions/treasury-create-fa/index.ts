@@ -1,4 +1,4 @@
-import { corsHeaders, json, requireUser, admin, isStaff, stripe } from "../_shared/treasury.ts";
+import { corsHeaders, json, requireUser, admin, isStaff, stripe, getTreasuryCapability } from "../_shared/treasury.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -38,6 +38,24 @@ Deno.serve(async (req) => {
       .eq(ownerKind === "user" ? "user_id" : "owner_kind", ownerKind === "user" ? targetUserId : "platform")
       .maybeSingle();
     if (existing) return json({ financial_account: existing, alreadyExists: true });
+
+    const capability = await getTreasuryCapability(connectedAccountId);
+    if (!capability.enabled) {
+      const waitingApproval = capability.status === "pending";
+      const error = ownerKind === "platform"
+        ? waitingApproval
+          ? "Stripe Treasury is pending approval on the platform account. Wait for the treasury capability to become active before provisioning Financial Accounts."
+          : "Stripe Treasury is not enabled on this account. Treasury access and an active treasury capability are required before provisioning Financial Accounts."
+        : waitingApproval
+          ? "Stripe Treasury is pending approval for this connected account. Wait for the treasury capability to become active before provisioning a Financial Account."
+          : "Stripe Treasury is not enabled for this connected account. Request the treasury capability during Connect onboarding and wait for it to become active before provisioning a Financial Account.";
+
+      return json({
+        error,
+        code: "treasury_not_enabled",
+        treasury_status: capability.status,
+      }, 400);
+    }
 
     // Create FA on Stripe
     const fa = await stripe.treasury.financialAccounts.create(

@@ -45,3 +45,24 @@ export async function isStaff(sb: SupabaseClient, userId: string) {
   const roles = (data ?? []).map((r: any) => r.role);
   return roles.includes("admin") || roles.includes("finance");
 }
+
+export async function getTreasuryCapability(accountId?: string | null) {
+  try {
+    const accountsApi: any = stripe.accounts;
+    const account = accountId ? await accountsApi.retrieve(accountId) : await accountsApi.retrieve();
+    const status = account?.capabilities?.treasury ?? "inactive";
+
+    return {
+      accountId: account?.id ?? accountId ?? null,
+      status,
+      enabled: status === "active",
+    };
+  } catch (error) {
+    console.error("treasury capability check failed", error);
+    return {
+      accountId: accountId ?? null,
+      status: "unknown",
+      enabled: false,
+    };
+  }
+}
