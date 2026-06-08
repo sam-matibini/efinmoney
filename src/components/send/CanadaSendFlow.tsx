@@ -446,7 +446,7 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
 
             <div className="space-y-2">
               <Label>Delivery Method (how recipient receives)</Label>
-              <div className={`grid ${INTERAC_ETRANSFER_ENABLED ? "grid-cols-3" : "grid-cols-2"} gap-2`}>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 <Button
                   type="button"
                   variant={method === "eft" ? "default" : "outline"}
@@ -482,7 +482,27 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
                   <span className="text-xs">Instant to Card</span>
                   <span className="text-[10px] opacity-70">C$1.00 · seconds</span>
                 </Button>
+                <Button
+                  type="button"
+                  variant={method === "stripe_connect" ? "default" : "outline"}
+                  className="relative flex flex-col items-center gap-1 h-auto py-3"
+                  onClick={() => setMethod("stripe_connect")}
+                  disabled={!connectReady}
+                  title={connectReady ? "Send to your Stripe connected account" : "Finish setup at /stripe-connect first"}
+                >
+                  <span className="absolute top-1 right-1 text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400">
+                    TEST
+                  </span>
+                  <Building2 className="w-5 h-5" />
+                  <span className="text-xs">Stripe Connect</span>
+                  <span className="text-[10px] opacity-70">C$1.00 · instant</span>
+                </Button>
               </div>
+              {!connectReady && (
+                <p className="text-[11px] text-muted-foreground">
+                  Stripe Connect option is disabled — <Link to="/stripe-connect" className="underline">finish onboarding</Link> to enable instant payouts to your own connected account.
+                </p>
+              )}
             </div>
 
             <div className="p-4 rounded-xl bg-muted">
