@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, Snowflake, Unlock, Trash2, Plus, Eye, EyeOff, Wifi, Smartphone } from "lucide-react";
 import VirtualCardVisual from "@/components/cards/VirtualCardVisual";
+import StripeIssuingReveal from "@/components/cards/StripeIssuingReveal";
 import {
   useIssuedCard,
   useCardControls,
