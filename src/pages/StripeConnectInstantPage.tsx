@@ -146,7 +146,7 @@ export default function StripeConnectInstantPage() {
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <CardTitle className="flex items-center gap-2">
-                    <CheckCircle2 className={`w-5 h-5 ${account.status === "active" ? "text-emerald-500" : "text-amber-500"}`} />
+                    <CheckCircle2 className={`w-5 h-5 ${connectState.ready ? "text-emerald-500" : "text-amber-500"}`} />
                     Connected Account
                   </CardTitle>
                   <CardDescription>
