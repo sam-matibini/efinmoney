@@ -43,6 +43,37 @@ Deno.serve(async (req) => {
     if (r2.ok) {
       acct = await r2.json();
       usedV2 = true;
+
+      const hasRecipientTransfers = acct?.configuration?.recipient?.capabilities?.stripe_balance?.stripe_transfers;
+      if (!hasRecipientTransfers) {
+        const patchRes = await fetch(`https://api.stripe.com/v2/core/accounts/${row.stripe_account_id}`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${stripeKey}`,
+            "Content-Type": "application/json",
+            "Stripe-Version": "2025-03-31.preview",
+          },
+          body: JSON.stringify({
+            configuration: {
+              recipient: {
+                capabilities: {
+                  stripe_balance: {
+                    stripe_transfers: { requested: true },
+                  },
+                },
+              },
+            },
+            include: ["configuration.recipient", "requirements", "identity"],
+          }),
+        });
+
+        if (patchRes.ok) {
+          acct = await patchRes.json();
+        } else {
+          const patchError = await patchRes.json().catch(() => ({}));
+          console.error("Stripe recipient capability patch failed", patchError);
+        }
+      }
     } else {
       // Fallback to v1
       const r1 = await fetch(`https://api.stripe.com/v1/accounts/${row.stripe_account_id}`, {
@@ -57,22 +88,23 @@ Deno.serve(async (req) => {
 
     // Derive readiness
     let isActive = false;
+    let statusMessage: string | null = null;
+    let pendingItems: string[] = [];
+    const statusOf = (c: any) => (typeof c === "string" ? c : c?.status);
+    const humanize = (value: string) => value.replace(/[._]+/g, " ").replace(/_/g, " ").trim();
     if (usedV2) {
       const recipCaps = acct?.configuration?.recipient?.capabilities ?? {};
-      const merchCaps = acct?.configuration?.merchant?.capabilities ?? {};
       const payouts = recipCaps?.payouts;
       const transfers = recipCaps?.transfers;
-      const cardPayments = merchCaps?.card_payments;
-      const statusOf = (c: any) => (typeof c === "string" ? c : c?.status);
+      const stripeBalanceTransfers = recipCaps?.stripe_balance?.stripe_transfers;
       isActive =
         statusOf(payouts) === "active" ||
         statusOf(transfers) === "active" ||
-        statusOf(cardPayments) === "active";
+        statusOf(stripeBalanceTransfers) === "active";
     } else {
       const caps = acct?.capabilities ?? {};
       isActive =
         caps.transfers === "active" ||
-        caps.card_payments === "active" ||
         acct?.payouts_enabled === true ||
         acct?.charges_enabled === true;
     }
@@ -80,6 +112,21 @@ Deno.serve(async (req) => {
     const newStatus = isActive ? "active" : "pending";
     const capabilities = usedV2 ? (acct.configuration ?? {}) : (acct.capabilities ?? {});
     const requirements = acct.requirements ?? {};
+    pendingItems = Array.from(new Set([
+      ...(requirements?.currently_due || []),
+      ...(requirements?.past_due || []),
+      ...(requirements?.pending_verification || []),
+    ].filter((item: unknown): item is string => typeof item === "string" && item.length > 0).map(humanize)));
+
+    if (!isActive) {
+      if (typeof requirements?.disabled_reason === "string" && requirements.disabled_reason.trim().length > 0) {
+        statusMessage = `Stripe still blocks payouts: ${humanize(requirements.disabled_reason)}.`;
+      } else if (pendingItems.length > 0) {
+        statusMessage = `Stripe still needs: ${pendingItems.slice(0, 3).join(", ")}${pendingItems.length > 3 ? "…" : ""}.`;
+      } else {
+        statusMessage = "Stripe has not enabled payout transfers on this connected account yet.";
+      }
+    }
 
     const { data: updated, error: upErr } = await supabase
       .from("stripe_connected_accounts")
@@ -98,7 +145,7 @@ Deno.serve(async (req) => {
       return json({ error: upErr.message }, 500);
     }
 
-    return json({ account: updated, is_active: isActive });
+    return json({ account: updated, is_active: isActive, message: statusMessage, pending_items: pendingItems, requirements });
   } catch (e) {
     console.error("refresh-status fatal", e);
     return json({ error: e instanceof Error ? e.message : "Unknown" }, 500);

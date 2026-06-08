@@ -14,7 +14,7 @@ import { downloadTransferReceipt } from "@/lib/receipt";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { CheckCircle, Landmark, AlertCircle, Info, CreditCard, Wallet, Zap, Check, Building2 } from "lucide-react";
-import { useStripeConnectedAccount, isConnectReady } from "@/hooks/useStripeConnectedAccount";
+import { useStripeConnectedAccount, isConnectReady, getConnectReadiness } from "@/hooks/useStripeConnectedAccount";
 import { tokenizeDebitCard } from "@/lib/stripePayouts";
 import { getStripe } from "@/lib/stripe";
 import type { Stripe } from "@stripe/stripe-js";
@@ -195,6 +195,7 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
   const createTransfer = useCreateTransfer();
   const { data: connectAcct, refresh: refreshConnect } = useStripeConnectedAccount();
   const connectReady = isConnectReady(connectAcct);
+  const connectState = getConnectReadiness(connectAcct);
   const [refreshingConnect, setRefreshingConnect] = useState(false);
 
   // Self-heal: if a connected account row exists but isn't 'active', auto-refresh once from Stripe.
@@ -247,7 +248,7 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
       || (securityQuestion.trim().length >= 4 && securityAnswer.trim().length >= 3);
 
   const recipientValid = method === "stripe_connect"
-    ? !!connectReady
+    ? !!connectAcct
     : method === "card_push"
       ? recipientName.trim().length > 1 && recipientCardComplete
       : method === "interac"
@@ -268,6 +269,21 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
   const handleSubmit = async () => {
     if (funding === "wallet" && !selectedWallet) return;
     try {
+      if (method === "stripe_connect") {
+        setRefreshingConnect(true);
+        const latest = (await refreshConnect()) ?? connectAcct ?? null;
+        setRefreshingConnect(false);
+        const latestState = getConnectReadiness(latest);
+        if (!latestState.hasAccount) {
+          toast.error("No connected account found. Open /stripe-connect first.");
+          return;
+        }
+        if (!latestState.ready) {
+          toast.error(latestState.message || "Your connected account is not ready for payouts yet.");
+          return;
+        }
+      }
+
       // Tokenize sender card if card-funded
       let tokenized: { token: string; last4: string; brand: string } | null = null;
       if (funding === "card") {
@@ -503,8 +519,8 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
                   variant={method === "stripe_connect" ? "default" : "outline"}
                   className="relative flex flex-col items-center gap-1 h-auto py-3"
                   onClick={() => setMethod("stripe_connect")}
-                  disabled={!connectReady}
-                  title={connectReady ? "Send to your Stripe connected account" : "Finish setup at /stripe-connect first"}
+                  disabled={!connectState.hasAccount}
+                  title={connectState.hasAccount ? "Send to your Stripe connected account" : "Finish setup at /stripe-connect first"}
                 >
                   <span className="absolute top-1 right-1 text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400">
                     TEST
@@ -514,9 +530,9 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
                   <span className="text-[10px] opacity-70">C$1.00 · instant</span>
                 </Button>
               </div>
-              {!connectReady && (
+              {(!connectReady || !connectState.hasAccount) && (
                 <p className="text-[11px] text-muted-foreground">
-                  Stripe Connect option is disabled.{" "}
+                  {connectState.hasAccount ? "Stripe Connect needs one more status sync before sending." : "Stripe Connect option is disabled."}{" "}
                   {connectAcct ? (
                     <>
                       Just finished onboarding?{" "}
@@ -529,6 +545,9 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
                     <><Link to="/stripe-connect" className="underline">Finish onboarding</Link> to enable instant payouts to your own connected account.</>
                   )}
                 </p>
+              )}
+              {connectState.hasAccount && connectState.message && (
+                <p className="text-[11px] text-amber-600 dark:text-amber-400">{connectState.message}</p>
               )}
             </div>
 
@@ -572,8 +591,9 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
                       Recipient: <strong>{recipientName || profile?.full_name || profile?.email || "You"}</strong>
                     </p>
                     <p>
-                      Account: <span className="font-mono">{connectAcct?.stripe_account_id}</span> · {connectAcct?.country?.toUpperCase()} · status: {connectAcct?.status}
+                      Account: <span className="font-mono">{connectAcct?.stripe_account_id}</span> · {connectAcct?.country?.toUpperCase()} · status: {connectState.status}
                     </p>
+                    {connectState.message && <p>{connectState.message}</p>}
                     <p>
                       Funds land on your connected account's Stripe balance, then an <strong>instant payout</strong> is fired to your external debit card / bank. If instant isn't available yet, we fall back to a standard payout automatically.
                     </p>

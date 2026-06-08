@@ -58,6 +58,13 @@ Deno.serve(async (req) => {
       display_name: displayName,
       contact_email: contactEmail,
       configuration: {
+        recipient: {
+          capabilities: {
+            stripe_balance: {
+              stripe_transfers: { requested: true },
+            },
+          },
+        },
         merchant: { capabilities: { card_payments: { requested: true } } },
         customer: { capabilities: { automatic_indirect_tax: { requested: true } } },
       },

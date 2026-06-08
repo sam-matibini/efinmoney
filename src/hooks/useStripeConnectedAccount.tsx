@@ -11,6 +11,90 @@ export interface StripeConnectedAccount {
   status: string;
   capabilities: Record<string, any> | null;
   requirements: Record<string, any> | null;
+  raw?: Record<string, any> | null;
+}
+
+export interface StripeConnectReadiness {
+  hasAccount: boolean;
+  ready: boolean;
+  status: string;
+  message: string | null;
+  pendingItems: string[];
+}
+
+function statusOf(value: any): string | null {
+  if (!value) return null;
+  if (typeof value === "string") return value.toLowerCase();
+  if (typeof value?.status === "string") return value.status.toLowerCase();
+  return null;
+}
+
+function humanizeKey(value: string): string {
+  return value.replace(/[._]+/g, " ").replace(/_/g, " ").trim();
+}
+
+export function getConnectReadiness(acct: StripeConnectedAccount | null | undefined): StripeConnectReadiness {
+  if (!acct?.stripe_account_id) {
+    return {
+      hasAccount: false,
+      ready: false,
+      status: "missing",
+      message: "No connected account found yet. Open /stripe-connect first.",
+      pendingItems: [],
+    };
+  }
+
+  const caps = (acct.capabilities || {}) as any;
+  const recipCaps = caps?.recipient?.capabilities ?? caps?.configuration?.recipient?.capabilities ?? {};
+  const candidateStatuses = [
+    recipCaps?.payouts,
+    recipCaps?.transfers,
+    caps?.payouts,
+    caps?.transfers,
+    caps?.stripe_balance?.payouts,
+    caps?.stripe_balance?.transfers,
+    caps?.payouts_enabled === true ? "active" : null,
+  ]
+    .map(statusOf)
+    .filter(Boolean) as string[];
+
+  const requirements = (acct.requirements || acct.raw?.requirements || {}) as any;
+  const pendingItems = Array.from(
+    new Set(
+      [
+        ...(requirements?.currently_due || []),
+        ...(requirements?.past_due || []),
+        ...(requirements?.pending_verification || []),
+      ]
+        .filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+        .map(humanizeKey),
+    ),
+  );
+
+  const ready = acct.status === "active" || candidateStatuses.includes("active");
+  const disabledReason = requirements?.disabled_reason ? humanizeKey(String(requirements.disabled_reason)) : null;
+  const status = ready ? "active" : acct.status || candidateStatuses[0] || "pending";
+
+  let message: string | null = null;
+  if (!ready) {
+    if (disabledReason) {
+      message = `Stripe still blocks payouts: ${disabledReason}.`;
+    } else if (pendingItems.length > 0) {
+      message = `Stripe still needs: ${pendingItems.slice(0, 3).join(", ")}${pendingItems.length > 3 ? "…" : ""}.`;
+    } else if (candidateStatuses.length > 0) {
+      message = `Stripe still reports this account as ${candidateStatuses[0]}.`;
+    } else {
+      message = "Your connected account is not ready for payouts yet. Refresh status or finish onboarding.";
+    }
+  }
+
+  return {
+    hasAccount: true,
+    ready,
+    status,
+    message,
+    pendingItems,
+  };
 }
 
 export const useStripeConnectedAccount = () => {
@@ -55,22 +139,5 @@ export const useStripeConnectedAccount = () => {
 };
 
 export function isConnectReady(acct: StripeConnectedAccount | null | undefined): boolean {
-  if (!acct?.stripe_account_id) return false;
-  if (acct.status !== "active") return false;
-  const caps = (acct.capabilities || {}) as any;
-  // v2 shape: { recipient: { capabilities: { payouts: 'active' | { status } } } }
-  const recipCaps = caps?.recipient?.capabilities ?? {};
-  const merchCaps = caps?.merchant?.capabilities ?? {};
-  const candidates = [
-    recipCaps?.payouts,
-    recipCaps?.transfers,
-    merchCaps?.card_payments,
-    caps?.payouts,
-    caps?.transfers,
-    caps?.card_payments,
-  ];
-  const statusOf = (c: any) => (typeof c === "string" ? c : c?.status);
-  if (candidates.some((c) => statusOf(c) === "active")) return true;
-  // best-effort: if status='active' but caps shape unknown, allow attempt
-  return candidates.every((c) => c === undefined);
+  return getConnectReadiness(acct).ready;
 }
