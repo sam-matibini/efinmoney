@@ -516,7 +516,18 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
               </div>
               {!connectReady && (
                 <p className="text-[11px] text-muted-foreground">
-                  Stripe Connect option is disabled — <Link to="/stripe-connect" className="underline">finish onboarding</Link> to enable instant payouts to your own connected account.
+                  Stripe Connect option is disabled.{" "}
+                  {connectAcct ? (
+                    <>
+                      Just finished onboarding?{" "}
+                      <button type="button" onClick={handleManualRefresh} disabled={refreshingConnect} className="underline">
+                        {refreshingConnect ? "Refreshing…" : "Refresh status"}
+                      </button>
+                      {" "}or <Link to="/stripe-connect" className="underline">open setup</Link>.
+                    </>
+                  ) : (
+                    <><Link to="/stripe-connect" className="underline">Finish onboarding</Link> to enable instant payouts to your own connected account.</>
+                  )}
                 </p>
               )}
             </div>
