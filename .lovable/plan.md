@@ -1,30 +1,48 @@
-## You can already do this — here's how
+## Card-funded transfer is already wired — here's the test
 
-The eFinVISA tile on `/cards` is a static design preview. Real, fundable virtual Visa cards are issued through the Stripe Issuing flow we already shipped. Nothing new needs to be built.
+No code changes. We'll run the end-to-end flow in the live preview using Stripe **test card numbers**, then verify the edge function logs and DB rows.
 
-## What to do in the app
+## Flow under test
 
-1. **`/cards` → "New Card"** — opens `IssueVirtualCardModal`.
-2. **Card type:** Virtual (default). Pick currency (USD or CAD).
-3. **Spending controls:** set per-auth / daily / monthly limits and allowed categories.
-4. **Load funds now (optional):** pick a wallet + amount in the same modal. On create, the UI calls `stripe-issuing-fund-card` automatically so the card lands already topped-up.
-5. **Submit** — `stripe-issuing-create-card` mints the card at Stripe and writes it to `issued_cards`.
-6. **Top up later:** open the card on `/cards/:id` → "Add Funds" → choose wallet + amount → ledger debits your wallet, credits Stripe Issuing float (account `1208`), and Stripe loads the card balance.
-7. **Reveal PAN/CVV:** "Reveal Details" on the card detail page — uses Stripe's ephemeral-key reveal we wired in `StripeIssuingReveal`.
+```
+SendPage → "Pay with card" → stripe-charge-saved-card (PaymentIntent on platform acct)
+        → success → INSERT transfers (funding_source='card', bypasses wallet check)
+        → execute-transfer (prefunded=true) → Flutterwave/PawaPay/Stripe Connect payout
+```
 
-## Prerequisites (must be true for issuance to succeed)
+The "Stripe Connect" leg is the **payout** side (`stripe-connect-instant-payout` / Visa Direct), not the charge side. Funding the sender always hits the platform Stripe account.
 
-- KYC at **tier_3** (ID + address approved).
-- Profile billing address complete.
-- Stripe Issuing balance > $0 on the connected account in the chosen currency. The modal now surfaces this via `stripe-issuing-balance`; if it shows $0 you need to top up the Issuing float at Stripe first.
+## Prereqs to confirm before testing
 
-## About "receive funds into the credit card"
+- A saved card exists on `/cards` (Linked Cards section). If none, link one first using Stripe test card `4242 4242 4242 4242`, any future expiry, any CVC, any postal code.
+- `STRIPE_SECRET_KEY` is set (it is — confirmed in secrets).
+- Sender is signed in and KYC tier allows the chosen corridor.
 
-Stripe Issuing cards are **spend cards**, not bank accounts — they have no IBAN/routing number and can't accept inbound transfers, P2P, or payroll. The only way money moves *onto* the card is the wallet → card top-up above. To receive money, use a wallet (`/wallets`) or the eFinMoney P2P / Send flows; then sweep into the card when you want to spend.
+## Test cases
 
-## If something is missing
+| # | Card (test) | Expected |
+|---|---|---|
+| 1 | `4242 4242 4242 4242` | charge succeeds, transfer created with `funding_source='card'`, payout queued |
+| 2 | `4000 0000 0000 9995` | decline `insufficient_funds`, friendly toast, **no** transfer row created |
+| 3 | `4000 0000 0000 0002` | generic `card_declined`, no transfer row |
+| 4 | `4000 0025 0000 3155` | 3DS challenge — should surface authentication_required (current flow rejects; expected) |
 
-Tell me which of these you want and I'll switch to build mode:
-- Auto-sweep rule (e.g. "keep card topped up to $200 from USD wallet")
-- One-click "Move all" between wallet ↔ card
-- Inbound funding shortcut on the card detail page that just opens the wallet top-up flow with the card preselected as destination
+## Verification after each run
+
+1. **Toast** — success or specific friendly decline message.
+2. **`transfers` table** — for case 1: row with `funding_source='card'`, `provider_charge_id` (or `payment_intent_id` in metadata) populated, `status` progressing `pending → processing → completed`.
+3. **`stripe-charge-saved-card` logs** — PaymentIntent id + status.
+4. **`execute-transfer` logs** — `prefunded: true` honored, payout provider response.
+5. **`ledger_entries`** — on completion, debit clearing account / credit recipient float; no debit to sender wallet (since funded by card).
+
+## What I'll do in build mode
+
+1. Hit `/send` in the preview, pick a Canadian → corridor recipient, choose **Pay with card**, run case 1.
+2. Pull `stripe-charge-saved-card` and `execute-transfer` logs.
+3. Query the `transfers` and `ledger_entries` rows for the new transfer id.
+4. Repeat for case 2 (decline) and confirm no transfer row is written.
+5. Report a pass/fail table with the IDs.
+
+## Open question
+
+Should I run this as **your logged-in preview session** (uses whatever recipient/corridor is convenient) or do you want a specific corridor + amount + recipient name to target? Default: smallest valid amount, Canada → Kenya (PawaPay), $5 CAD.
