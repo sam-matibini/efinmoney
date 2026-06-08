@@ -36,8 +36,7 @@ const EfinCardDetailPage = () => {
   const { updateCard, fundCard } = useIssuedCardMutations();
 
   const [fundAmount, setFundAmount] = useState("");
-  const [reveal, setReveal] = useState<{ pan?: string; cvv?: string; sandbox?: boolean } | null>(null);
-  const [revealing, setRevealing] = useState(false);
+  const [showReveal, setShowReveal] = useState(false);
 
   if (isLoading) {
     return (
