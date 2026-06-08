@@ -16,7 +16,7 @@ import { toast } from "sonner";
 import { CheckCircle, Landmark, AlertCircle, Info, CreditCard, Wallet, Zap, Check, Building2 } from "lucide-react";
 import { useStripeConnectedAccount, isConnectReady, getConnectReadiness } from "@/hooks/useStripeConnectedAccount";
 import { tokenizeDebitCard } from "@/lib/stripePayouts";
-import { getStripe } from "@/lib/stripe";
+import { getStripe, getStripeSecondary } from "@/lib/stripe";
 import type { Stripe } from "@stripe/stripe-js";
 import {
   Elements,
@@ -130,7 +130,32 @@ RecipientCardInner.displayName = "RecipientCardInner";
 
 const RecipientCardSection = forwardRef<RecipientCardHandle, { onValidityChange: (v: boolean) => void; elementStyle: any }>(
   (props, ref) => {
-    const [stripeP] = useState<Promise<Stripe | null>>(() => getStripe());
+    // Use a SEPARATE Stripe instance from the page-level one. Two <Elements>
+    // groups sharing the same Stripe instance can race and leave the second
+    // group's iframes inert (visible but not focusable). A second loadStripe()
+    // call gives the recipient card its own isolated Elements context.
+    const [stripeP] = useState<Promise<Stripe | null>>(() => getStripeSecondary());
+    const [ready, setReady] = useState<boolean | null>(null);
+    useEffect(() => {
+      let alive = true;
+      stripeP.then((s) => { if (alive) setReady(!!s); });
+      return () => { alive = false; };
+    }, [stripeP]);
+
+    if (ready === false) {
+      return (
+        <div className="p-4 rounded-lg border border-destructive/40 bg-destructive/10 text-sm text-destructive">
+          Recipient card form unavailable — Stripe failed to load. Please refresh.
+        </div>
+      );
+    }
+    if (ready === null) {
+      return (
+        <div className="p-4 rounded-lg border border-border bg-muted/30 text-sm text-muted-foreground">
+          Loading recipient card form…
+        </div>
+      );
+    }
     return (
       <Elements stripe={stripeP}>
         <RecipientCardInner {...props} ref={ref} />
