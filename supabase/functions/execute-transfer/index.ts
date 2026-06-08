@@ -388,7 +388,12 @@ Deno.serve(async (req) => {
         payoutResult = await res.json();
       } else if (isCanada) {
         const isCardPush = transfer.payout_method === "card_push";
-        const fnName = isCardPush ? "stripe-payout" : "paysafe-payout";
+        const isStripeConnect = transfer.payout_method === "stripe_connect";
+        const fnName = isStripeConnect
+          ? "stripe-connect-instant-payout"
+          : isCardPush
+            ? "stripe-payout"
+            : "paysafe-payout";
         const fnBody: Record<string, unknown> = { transfer_id };
         if (isCardPush) {
           fnBody.card_token = payload.recipient_card_token;

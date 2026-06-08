@@ -13,7 +13,8 @@ import { useProfile } from "@/hooks/useProfile";
 import { downloadTransferReceipt } from "@/lib/receipt";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { CheckCircle, Landmark, AlertCircle, Info, CreditCard, Wallet, Zap, Check } from "lucide-react";
+import { CheckCircle, Landmark, AlertCircle, Info, CreditCard, Wallet, Zap, Check, Building2 } from "lucide-react";
+import { useStripeConnectedAccount, isConnectReady } from "@/hooks/useStripeConnectedAccount";
 import { tokenizeDebitCard } from "@/lib/stripePayouts";
 import { getStripe } from "@/lib/stripe";
 import type { Stripe } from "@stripe/stripe-js";
@@ -53,13 +54,13 @@ function useStripeElementStyle() {
 const elementWrapperClass =
   "flex h-10 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-within:outline-none focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2";
 
-type DeliveryMethod = "interac" | "eft" | "card_push";
+type DeliveryMethod = "interac" | "eft" | "card_push" | "stripe_connect";
 type FundingSource = "wallet" | "card";
 
 // Feature flag: flip to false instantly if Paysafe Interac e-Transfer is unavailable.
 const INTERAC_ETRANSFER_ENABLED = true;
 
-const DELIVERY_FEES: Record<DeliveryMethod, number> = { interac: 0.5, eft: 0, card_push: 1.0 };
+const DELIVERY_FEES: Record<DeliveryMethod, number> = { interac: 0.5, eft: 0, card_push: 1.0, stripe_connect: 1.0 };
 const CARD_PROCESSING_FEE = 1.5;
 
 // Recipient card section runs in its OWN <Elements> provider so it can host
@@ -192,12 +193,22 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
 
   const { data: wallets } = useWallets();
   const createTransfer = useCreateTransfer();
+  const { data: connectAcct } = useStripeConnectedAccount();
+  const connectReady = isConnectReady(connectAcct);
 
   const cadWallets = (wallets || []).filter((w) => w.currency_code === "CAD");
   const selectedWallet = cadWallets.find((w) => w.wallet_id === walletId) || cadWallets[0];
   const noCadWallet = cadWallets.length === 0;
   // Auto-switch to card funding if user has no CAD wallet
   useEffect(() => { if (noCadWallet && funding === "wallet") setFunding("card"); }, [noCadWallet, funding]);
+
+  // Auto-fill recipient = self when paying to your own connected account
+  useEffect(() => {
+    if (method === "stripe_connect") {
+      if (profile?.full_name && !recipientName) setRecipientName(profile.full_name);
+      if (profile?.email && !recipientEmail) setRecipientEmail(profile.email);
+    }
+  }, [method, profile?.full_name, profile?.email]);
   // Any wallet to satisfy the NOT NULL FK on transfers.sender_wallet_id when paying by card
   const fallbackWallet = (wallets || [])[0];
 
@@ -219,16 +230,18 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
     : (!securityQuestion && !securityAnswer)
       || (securityQuestion.trim().length >= 4 && securityAnswer.trim().length >= 3);
 
-  const recipientValid = method === "card_push"
-    ? recipientName.trim().length > 1 && recipientCardComplete
-    : method === "interac"
-      ? recipientName.trim().length > 1
-          && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail)
-          && interacQAValid
-      : recipientName.trim().length > 1
-          && /^\d{3}$/.test(institutionNumber)
-          && /^\d{5}$/.test(transitNumber)
-          && accountNumber.trim().length >= 4;
+  const recipientValid = method === "stripe_connect"
+    ? !!connectReady
+    : method === "card_push"
+      ? recipientName.trim().length > 1 && recipientCardComplete
+      : method === "interac"
+        ? recipientName.trim().length > 1
+            && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail)
+            && interacQAValid
+        : recipientName.trim().length > 1
+            && /^\d{3}$/.test(institutionNumber)
+            && /^\d{5}$/.test(transitNumber)
+            && accountNumber.trim().length >= 4;
 
   const cardFieldsValid = funding === "wallet"
     ? true
@@ -287,7 +300,9 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
           ? `${institutionNumber}-${transitNumber}-${accountNumber}`
           : method === "card_push"
             ? (recipientEmail || `card-${recipientTok?.last4 || "xxxx"}`)
-            : recipientEmail,
+            : method === "stripe_connect"
+              ? (connectAcct?.stripe_account_id || recipientEmail || "stripe_connect")
+              : recipientEmail,
         recipient_country: "CA",
         transfer_type: "domestic_canada",
         payout_method: method,
@@ -431,7 +446,7 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
 
             <div className="space-y-2">
               <Label>Delivery Method (how recipient receives)</Label>
-              <div className={`grid ${INTERAC_ETRANSFER_ENABLED ? "grid-cols-3" : "grid-cols-2"} gap-2`}>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 <Button
                   type="button"
                   variant={method === "eft" ? "default" : "outline"}
@@ -467,7 +482,27 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
                   <span className="text-xs">Instant to Card</span>
                   <span className="text-[10px] opacity-70">C$1.00 · seconds</span>
                 </Button>
+                <Button
+                  type="button"
+                  variant={method === "stripe_connect" ? "default" : "outline"}
+                  className="relative flex flex-col items-center gap-1 h-auto py-3"
+                  onClick={() => setMethod("stripe_connect")}
+                  disabled={!connectReady}
+                  title={connectReady ? "Send to your Stripe connected account" : "Finish setup at /stripe-connect first"}
+                >
+                  <span className="absolute top-1 right-1 text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400">
+                    TEST
+                  </span>
+                  <Building2 className="w-5 h-5" />
+                  <span className="text-xs">Stripe Connect</span>
+                  <span className="text-[10px] opacity-70">C$1.00 · instant</span>
+                </Button>
               </div>
+              {!connectReady && (
+                <p className="text-[11px] text-muted-foreground">
+                  Stripe Connect option is disabled — <Link to="/stripe-connect" className="underline">finish onboarding</Link> to enable instant payouts to your own connected account.
+                </p>
+              )}
             </div>
 
             <div className="p-4 rounded-xl bg-muted">
@@ -493,10 +528,31 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
           <CardContent className="space-y-6">
             {/* Recipient details */}
             <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>Recipient Full Name</Label>
-                <Input value={recipientName} onChange={(e) => setRecipientName(e.target.value)} placeholder="Jane Doe" />
-              </div>
+              {method !== "stripe_connect" && (
+                <div className="space-y-2">
+                  <Label>Recipient Full Name</Label>
+                  <Input value={recipientName} onChange={(e) => setRecipientName(e.target.value)} placeholder="Jane Doe" />
+                </div>
+              )}
+
+              {method === "stripe_connect" && (
+                <div className="p-4 rounded-lg border border-emerald-500/30 bg-emerald-500/5 space-y-2">
+                  <div className="flex items-center gap-2 text-sm font-medium text-emerald-700 dark:text-emerald-400">
+                    <Building2 className="w-4 h-4" /> Sending to your Stripe Connected Account
+                  </div>
+                  <div className="text-xs text-muted-foreground space-y-1">
+                    <p>
+                      Recipient: <strong>{recipientName || profile?.full_name || profile?.email || "You"}</strong>
+                    </p>
+                    <p>
+                      Account: <span className="font-mono">{connectAcct?.stripe_account_id}</span> · {connectAcct?.country?.toUpperCase()} · status: {connectAcct?.status}
+                    </p>
+                    <p>
+                      Funds land on your connected account's Stripe balance, then an <strong>instant payout</strong> is fired to your external debit card / bank. If instant isn't available yet, we fall back to a standard payout automatically.
+                    </p>
+                  </div>
+                </div>
+              )}
 
 
               {method === "eft" && (
@@ -710,7 +766,12 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
               >
                 {createTransfer.isPending || cardSubmitting
                   ? "Processing..."
-                  : `Send C$${parsedAmount.toFixed(2)} via ${method === "eft" ? "Bank Transfer" : method === "interac" ? "Interac e-Transfer" : "Visa Direct"}`}
+                  : `Send C$${parsedAmount.toFixed(2)} via ${
+                      method === "eft" ? "Bank Transfer"
+                        : method === "interac" ? "Interac e-Transfer"
+                        : method === "stripe_connect" ? "Stripe Connect"
+                        : "Visa Direct"
+                    }`}
               </Button>
             </div>
 
@@ -725,7 +786,12 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
                   {" "}<strong>Total {funding === "card" ? "charged to card" : "from wallet"}: C${totalCharged.toFixed(2)}</strong>
                 </p>
                 <p>
-                  Delivery: {method === "eft" ? "Bank Transfer (EFT)" : method === "interac" ? "Interac e-Transfer (email)" : "Instant to debit card (Visa Direct)"}
+                  Delivery: {
+                    method === "eft" ? "Bank Transfer (EFT)"
+                      : method === "interac" ? "Interac e-Transfer (email)"
+                      : method === "stripe_connect" ? "Stripe Connect — instant payout to your connected account"
+                      : "Instant to debit card (Visa Direct)"
+                  }
                 </p>
               </div>
             </div>
@@ -765,6 +831,11 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
             {method === "card_push" && (
               <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
                 Funds are being pushed to {recipientName}'s debit card via Visa Direct and typically arrive within seconds.
+              </p>
+            )}
+            {method === "stripe_connect" && (
+              <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
+                Funds were transferred to your Stripe connected account <span className="font-mono">{connectAcct?.stripe_account_id}</span> and an instant payout was triggered to your external debit card / bank.
               </p>
             )}
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
