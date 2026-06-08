@@ -48,6 +48,25 @@ export function getStripe(): Promise<Stripe | null> {
   return stripePromise;
 }
 
+// A second, independently-loaded Stripe instance. Stripe Elements only allows
+// one CardNumberElement per Elements group, so when the page needs to mount
+// TWO separate card forms (e.g. sender funding card + recipient debit card for
+// Visa Direct), each <Elements> provider must wrap its own Stripe instance.
+let stripePromiseSecondary: Promise<Stripe | null> | null = null;
+export function getStripeSecondary(): Promise<Stripe | null> {
+  if (!stripePromiseSecondary) {
+    stripePromiseSecondary = (async () => {
+      const key = await fetchKeyDirect();
+      if (!key) {
+        console.error("Stripe publishable key not available:", lastError);
+        return null;
+      }
+      return loadStripe(key);
+    })();
+  }
+  return stripePromiseSecondary;
+}
+
 export function getStripeLoadError(): string | null {
   return lastError;
 }
