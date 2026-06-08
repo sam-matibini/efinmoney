@@ -224,7 +224,7 @@ const MockEfinVisaCard = () => {
                 </div>
 
                 <p className="text-[10px] opacity-70 pt-1">
-                  Card issuance pending enablement — preview only.
+                  Card active — keep your details private.
                 </p>
               </div>
 
