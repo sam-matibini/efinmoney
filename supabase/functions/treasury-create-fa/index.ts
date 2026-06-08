@@ -85,6 +85,14 @@ Deno.serve(async (req) => {
     return json({ financial_account: inserted });
   } catch (e: any) {
     console.error("treasury-create-fa", e);
-    return json({ error: e?.message ?? "Internal error" }, 500);
+    const msg: string = e?.message ?? "Internal error";
+    // Stripe Treasury is invite-only. Surface a clear, actionable message.
+    if (/treasury\/financial_accounts/i.test(msg) || /onboarded to Treasury/i.test(msg)) {
+      return json({
+        error: "Stripe Treasury is not enabled on this account. Treasury is invite-only — apply at https://stripe.com/docs/treasury/access and wait for approval before provisioning Financial Accounts.",
+        code: "treasury_not_enabled",
+      }, 400);
+    }
+    return json({ error: msg }, 500);
   }
 });
