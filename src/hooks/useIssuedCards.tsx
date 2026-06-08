@@ -157,6 +157,19 @@ export const useCardFundingEvents = (cardId: string | undefined) => {
   });
 };
 
+export const useIssuingBalance = () => {
+  return useQuery({
+    queryKey: ["issuing-balance"],
+    staleTime: 30_000,
+    queryFn: async (): Promise<{ available: Record<string, number> }> => {
+      const { data, error } = await supabase.functions.invoke("stripe-issuing-balance", { body: {} });
+      if (error) throw new Error(error.message);
+      if ((data as any)?.error) throw new Error((data as any).error);
+      return data as { available: Record<string, number> };
+    },
+  });
+};
+
 export const useIssuedCardMutations = () => {
   const qc = useQueryClient();
   const { user } = useAuth();
