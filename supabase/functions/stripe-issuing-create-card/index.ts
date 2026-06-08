@@ -215,7 +215,7 @@ Deno.serve(async (req) => {
         funding_wallet_id: body.funding_wallet_id || null,
         exp_month: expMonth,
         exp_year: expYear,
-        metadata: { sandbox: !stripeCardId, tap_to_pay: tapToPay },
+        metadata: { sandbox: false, tap_to_pay: tapToPay },
       })
       .select()
       .single();
