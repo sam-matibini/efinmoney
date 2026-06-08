@@ -69,7 +69,12 @@ const TopUpModal = ({ children, open: openProp, onOpenChange, defaultWalletId, t
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {children && <DialogTrigger asChild>{children}</DialogTrigger>}
-      <DialogContent className="max-w-md max-h-[85vh] flex flex-col p-0">
+      <DialogContent
+        className="max-w-md max-h-[85vh] flex flex-col p-0"
+        onInteractOutside={(e) => e.preventDefault()}
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onFocusOutside={(e) => e.preventDefault()}
+      >
         <DialogHeader className="px-6 pt-6 pb-2">
           <DialogTitle className="flex items-center gap-2">
             <CreditCard className="w-5 h-5" /> {title}
