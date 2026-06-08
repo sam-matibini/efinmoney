@@ -95,33 +95,33 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
-    const stripe = stripeKey ? new Stripe(stripeKey, { apiVersion: "2024-06-20" as any }) : null;
-    let issuingEnabled = !!stripe;
+    if (!stripeKey) {
+      return json({ error: "Stripe Issuing not configured (STRIPE_SECRET_KEY missing)." }, 500);
+    }
+    const stripe = new Stripe(stripeKey, { apiVersion: "2024-06-20" as any });
 
     if (!cardholder) {
       let stripeCardholderId: string | null = null;
-      if (stripe) {
-        try {
-          const ch = await stripe.issuing.cardholders.create({
-            type: "individual",
-            name: profile.full_name,
-            email: profile.email || claimData.claims.email,
-            phone_number: profile.phone_number || undefined,
-            billing: {
-              address: {
-                line1: (profile as any).street_address,
-                city: profile.city,
-                state: profile.state_province || "ON",
-                postal_code: profile.postal_code,
-                country: addressCountry,
-              },
+      try {
+        const ch = await stripe.issuing.cardholders.create({
+          type: "individual",
+          name: profile.full_name,
+          email: profile.email || claimData.claims.email,
+          phone_number: profile.phone_number || undefined,
+          billing: {
+            address: {
+              line1: (profile as any).street_address,
+              city: profile.city,
+              state: profile.state_province || "ON",
+              postal_code: profile.postal_code,
+              country: addressCountry,
             },
-          }, { idempotencyKey: `cardholder:${userId}` });
-          stripeCardholderId = ch.id;
-        } catch (e: any) {
-          console.warn("Stripe Issuing cardholder create failed, falling back to sandbox:", e?.message);
-          issuingEnabled = false;
-        }
+          },
+        }, { idempotencyKey: `cardholder:${userId}` });
+        stripeCardholderId = ch.id;
+      } catch (e: any) {
+        console.error("Stripe Issuing cardholder create failed:", e?.message);
+        return json({ error: `Stripe Issuing cardholder error: ${e?.message || "unknown"}` }, 400);
       }
       const { data: newCh, error: chErr } = await admin
         .from("cardholders")
@@ -173,32 +173,30 @@ Deno.serve(async (req) => {
 
     const tapToPay = body.tap_to_pay !== false; // default ON
 
-    if (stripe && issuingEnabled && cardholder.stripe_cardholder_id) {
-      try {
-        const card = await stripe.issuing.cards.create({
-          cardholder: cardholder.stripe_cardholder_id,
-          currency: currency.toLowerCase(),
-          type: cardType,
-          status: "active",
-          spending_controls: Object.keys(stripeControls).length ? stripeControls : undefined,
-          metadata: { tap_to_pay: tapToPay ? "true" : "false" },
-        });
-        stripeCardId = card.id;
-        last4 = card.last4;
-        expMonth = card.exp_month;
-        expYear = card.exp_year;
-      } catch (e: any) {
-        console.warn("Stripe Issuing card create failed, sandbox fallback:", e?.message);
-        issuingEnabled = false;
-      }
+    if (!cardholder.stripe_cardholder_id) {
+      return json({ error: "Cardholder is not linked to Stripe." }, 500);
     }
-
-    if (!stripeCardId) {
-      // Sandbox fallback so UI works before Stripe Issuing is enabled
-      last4 = String(Math.floor(1000 + Math.random() * 9000));
-      const now = new Date();
-      expMonth = now.getMonth() + 1;
-      expYear = now.getFullYear() + 4;
+    try {
+      const card = await stripe.issuing.cards.create({
+        cardholder: cardholder.stripe_cardholder_id,
+        currency: currency.toLowerCase(),
+        type: cardType,
+        status: "active",
+        spending_controls: Object.keys(stripeControls).length ? stripeControls : undefined,
+        metadata: { tap_to_pay: tapToPay ? "true" : "false" },
+      });
+      stripeCardId = card.id;
+      last4 = card.last4;
+      expMonth = card.exp_month;
+      expYear = card.exp_year;
+    } catch (e: any) {
+      console.error("Stripe Issuing card create failed:", e?.message);
+      const msg = e?.message || "Stripe Issuing card create failed";
+      const code = e?.raw?.code || e?.code;
+      const friendly = code === "balance_insufficient"
+        ? "Your Stripe Issuing balance is insufficient. Top up the Issuing balance in your Stripe Dashboard, then retry."
+        : msg;
+      return json({ error: friendly, stripe_code: code }, 400);
     }
 
     const { data: card, error: cardErr } = await admin
@@ -217,7 +215,7 @@ Deno.serve(async (req) => {
         funding_wallet_id: body.funding_wallet_id || null,
         exp_month: expMonth,
         exp_year: expYear,
-        metadata: { sandbox: !stripeCardId, tap_to_pay: tapToPay },
+        metadata: { sandbox: false, tap_to_pay: tapToPay },
       })
       .select()
       .single();
@@ -236,7 +234,7 @@ Deno.serve(async (req) => {
       single_use: body.controls?.single_use ?? (purpose === "single_use"),
     });
 
-    return json({ card, sandbox: !stripeCardId });
+    return json({ card, sandbox: false });
   } catch (e: any) {
     console.error("create-card error:", e);
     return json({ error: e?.message || "Failed to create card" }, 500);

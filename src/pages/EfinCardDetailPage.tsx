@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, Snowflake, Unlock, Trash2, Plus, Eye, EyeOff, Wifi, Smartphone } from "lucide-react";
 import VirtualCardVisual from "@/components/cards/VirtualCardVisual";
+import StripeIssuingReveal from "@/components/cards/StripeIssuingReveal";
 import {
   useIssuedCard,
   useCardControls,
@@ -35,8 +36,7 @@ const EfinCardDetailPage = () => {
   const { updateCard, fundCard } = useIssuedCardMutations();
 
   const [fundAmount, setFundAmount] = useState("");
-  const [reveal, setReveal] = useState<{ pan?: string; cvv?: string; sandbox?: boolean } | null>(null);
-  const [revealing, setRevealing] = useState(false);
+  const [showReveal, setShowReveal] = useState(false);
 
   if (isLoading) {
     return (
@@ -71,25 +71,7 @@ const EfinCardDetailPage = () => {
     );
   };
 
-  const handleReveal = async () => {
-    setRevealing(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("stripe-issuing-card-details", { body: { card_id: card.id } });
-      if (error) throw error;
-      if ((data as any)?.sandbox) {
-        setReveal({ sandbox: true });
-        toast.info("Sandbox card — real details available once Stripe Issuing is enabled.");
-      } else {
-        // Real flow would mount Stripe Elements with ephemeralKeySecret here.
-        setReveal({ pan: "•••• •••• •••• " + card.last4, cvv: "•••" });
-        toast.info("Open the Stripe Issuing Elements widget here (ephemeral key returned)");
-      }
-    } catch (e: any) {
-      toast.error(e.message || "Could not reveal card");
-    } finally {
-      setRevealing(false);
-    }
-  };
+  const handleReveal = () => setShowReveal((s) => !s);
 
   return (
     <div className="min-h-screen bg-background pb-24 md:pb-6">
@@ -129,9 +111,9 @@ const EfinCardDetailPage = () => {
             <p className="text-sm text-muted-foreground">{card.currency} · {card.purpose} · {card.status}</p>
 
             <div className="flex flex-wrap gap-2 mt-3">
-              <Button size="sm" variant="outline" onClick={handleReveal} disabled={revealing}>
-                {reveal ? <EyeOff className="w-4 h-4 mr-2" /> : <Eye className="w-4 h-4 mr-2" />}
-                {revealing ? "Loading…" : "Reveal details"}
+              <Button size="sm" variant="outline" onClick={handleReveal} disabled={(card.metadata as any)?.sandbox}>
+                {showReveal ? <EyeOff className="w-4 h-4 mr-2" /> : <Eye className="w-4 h-4 mr-2" />}
+                {showReveal ? "Hide details" : "Reveal details"}
               </Button>
               {card.status === "active" ? (
                 <Button size="sm" variant="outline" onClick={() => updateCard.mutate({ card_id: card.id, action: "freeze" })}>
@@ -162,15 +144,13 @@ const EfinCardDetailPage = () => {
               </div>
             )}
 
-            {reveal && (
-              <div className="mt-3 p-3 rounded-lg bg-muted text-sm font-mono">
-                {reveal.sandbox ? <span className="text-muted-foreground">Sandbox — real PAN requires Stripe Issuing.</span> : (
-                  <>
-                    <div>PAN: {reveal.pan}</div>
-                    <div>CVV: {reveal.cvv}</div>
-                  </>
-                )}
+            {showReveal && !((card.metadata as any)?.sandbox) && (
+              <div className="mt-3">
+                <StripeIssuingReveal cardId={card.id} last4={card.last4} />
               </div>
+            )}
+            {(card.metadata as any)?.sandbox && (
+              <p className="text-[11px] text-amber-500 mt-2">Legacy sandbox card — reveal disabled.</p>
             )}
           </div>
         </div>
