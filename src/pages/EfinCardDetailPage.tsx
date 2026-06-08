@@ -144,15 +144,13 @@ const EfinCardDetailPage = () => {
               </div>
             )}
 
-            {reveal && (
-              <div className="mt-3 p-3 rounded-lg bg-muted text-sm font-mono">
-                {reveal.sandbox ? <span className="text-muted-foreground">Sandbox — real PAN requires Stripe Issuing.</span> : (
-                  <>
-                    <div>PAN: {reveal.pan}</div>
-                    <div>CVV: {reveal.cvv}</div>
-                  </>
-                )}
+            {showReveal && !((card.metadata as any)?.sandbox) && (
+              <div className="mt-3">
+                <StripeIssuingReveal cardId={card.id} last4={card.last4} />
               </div>
+            )}
+            {(card.metadata as any)?.sandbox && (
+              <p className="text-[11px] text-amber-500 mt-2">Legacy sandbox card — reveal disabled.</p>
             )}
           </div>
         </div>
