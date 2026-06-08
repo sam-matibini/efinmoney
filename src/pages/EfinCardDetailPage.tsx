@@ -71,25 +71,7 @@ const EfinCardDetailPage = () => {
     );
   };
 
-  const handleReveal = async () => {
-    setRevealing(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("stripe-issuing-card-details", { body: { card_id: card.id } });
-      if (error) throw error;
-      if ((data as any)?.sandbox) {
-        setReveal({ sandbox: true });
-        toast.info("Sandbox card — real details available once Stripe Issuing is enabled.");
-      } else {
-        // Real flow would mount Stripe Elements with ephemeralKeySecret here.
-        setReveal({ pan: "•••• •••• •••• " + card.last4, cvv: "•••" });
-        toast.info("Open the Stripe Issuing Elements widget here (ephemeral key returned)");
-      }
-    } catch (e: any) {
-      toast.error(e.message || "Could not reveal card");
-    } finally {
-      setRevealing(false);
-    }
-  };
+  const handleReveal = () => setShowReveal((s) => !s);
 
   return (
     <div className="min-h-screen bg-background pb-24 md:pb-6">
