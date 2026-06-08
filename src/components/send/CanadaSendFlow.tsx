@@ -149,19 +149,6 @@ const RecipientCardInner = forwardRef<RecipientCardHandle, { onValidityChange: (
 );
 RecipientCardInner.displayName = "RecipientCardInner";
 
-const RecipientCardSection = forwardRef<RecipientCardHandle, { onValidityChange: (v: boolean) => void; elementStyle: any }>(
-  (props, ref) => {
-    // Use a SEPARATE Stripe instance from the page-level one. Two <Elements>
-    // groups sharing the same Stripe instance can race and leave the second
-    // group's iframes inert (visible but not focusable). A second loadStripe()
-    // call gives the recipient card its own isolated Elements context.
-    const [stripeP] = useState<Promise<Stripe | null>>(() => getStripeSecondary());
-    const [ready, setReady] = useState<boolean | null>(null);
-    useEffect(() => {
-      let alive = true;
-      stripeP.then((s) => { if (alive) setReady(!!s); });
-      return () => { alive = false; };
-    }, [stripeP]);
 
 const RecipientCardSection = forwardRef<RecipientCardHandle, { onValidityChange: (v: boolean) => void; elementStyle: any }>(
   (props, ref) => {
