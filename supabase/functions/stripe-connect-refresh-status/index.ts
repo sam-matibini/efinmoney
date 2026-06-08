@@ -43,6 +43,37 @@ Deno.serve(async (req) => {
     if (r2.ok) {
       acct = await r2.json();
       usedV2 = true;
+
+      const hasRecipientTransfers = acct?.configuration?.recipient?.capabilities?.stripe_balance?.stripe_transfers;
+      if (!hasRecipientTransfers) {
+        const patchRes = await fetch(`https://api.stripe.com/v2/core/accounts/${row.stripe_account_id}`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${stripeKey}`,
+            "Content-Type": "application/json",
+            "Stripe-Version": "2025-03-31.preview",
+          },
+          body: JSON.stringify({
+            configuration: {
+              recipient: {
+                capabilities: {
+                  stripe_balance: {
+                    stripe_transfers: { requested: true },
+                  },
+                },
+              },
+            },
+            include: ["configuration.recipient", "requirements", "identity"],
+          }),
+        });
+
+        if (patchRes.ok) {
+          acct = await patchRes.json();
+        } else {
+          const patchError = await patchRes.json().catch(() => ({}));
+          console.error("Stripe recipient capability patch failed", patchError);
+        }
+      }
     } else {
       // Fallback to v1
       const r1 = await fetch(`https://api.stripe.com/v1/accounts/${row.stripe_account_id}`, {
