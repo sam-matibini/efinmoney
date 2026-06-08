@@ -86,6 +86,7 @@ Deno.serve(async (req) => {
     }
 
     if (stripeError) {
+      const stripeCode: string | undefined = pi?.error?.code;
       await supabase.from("intra_ca_transfers").update({
         status: "failed",
         failure_reason: stripeError,
@@ -93,9 +94,14 @@ Deno.serve(async (req) => {
         stripe_status: pi?.status ?? null,
       }).eq("id", transfer.id);
 
-      const friendly = /failed verification in the past/i.test(stripeError)
-        ? "This bank account can't be used for PAD because it previously failed verification with Stripe. Please link a different bank account, or contact Stripe support."
-        : stripeError;
+      let friendly = stripeError;
+      let error_code = "stripe_error";
+      if (stripeCode === "payment_method_bank_account_blocked" || /failed verification in the past/i.test(stripeError)) {
+        friendly = "This bank account is permanently blocked by Stripe and cannot be used for PAD. Please link a different Canadian bank.";
+        error_code = "bank_account_blocked";
+      } else if (/EFT numbers/i.test(stripeError)) {
+        error_code = "missing_eft";
+      }
 
       // Return 200 so the client toast surfaces a readable message instead of
       // a generic "non-2xx" error, and the page does not blank-screen.
@@ -103,7 +109,9 @@ Deno.serve(async (req) => {
         success: false,
         fallback: true,
         error: friendly,
+        error_code,
         stripe_error: stripeError,
+        plaid_account_id,
         transfer,
       }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
