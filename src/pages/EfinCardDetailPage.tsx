@@ -111,9 +111,9 @@ const EfinCardDetailPage = () => {
             <p className="text-sm text-muted-foreground">{card.currency} · {card.purpose} · {card.status}</p>
 
             <div className="flex flex-wrap gap-2 mt-3">
-              <Button size="sm" variant="outline" onClick={handleReveal} disabled={revealing}>
-                {reveal ? <EyeOff className="w-4 h-4 mr-2" /> : <Eye className="w-4 h-4 mr-2" />}
-                {revealing ? "Loading…" : "Reveal details"}
+              <Button size="sm" variant="outline" onClick={handleReveal} disabled={(card.metadata as any)?.sandbox}>
+                {showReveal ? <EyeOff className="w-4 h-4 mr-2" /> : <Eye className="w-4 h-4 mr-2" />}
+                {showReveal ? "Hide details" : "Reveal details"}
               </Button>
               {card.status === "active" ? (
                 <Button size="sm" variant="outline" onClick={() => updateCard.mutate({ card_id: card.id, action: "freeze" })}>
