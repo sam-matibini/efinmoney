@@ -4509,6 +4509,217 @@ export type Database = {
           },
         ]
       }
+      treasury_financial_accounts: {
+        Row: {
+          aba_routing: string | null
+          account_number_last4: string | null
+          balance_available: number
+          balance_pending: number
+          connected_account_id: string | null
+          created_at: string
+          currency: string
+          features: Json
+          id: string
+          metadata: Json
+          owner_kind: string
+          status: string
+          stripe_fa_id: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          aba_routing?: string | null
+          account_number_last4?: string | null
+          balance_available?: number
+          balance_pending?: number
+          connected_account_id?: string | null
+          created_at?: string
+          currency?: string
+          features?: Json
+          id?: string
+          metadata?: Json
+          owner_kind: string
+          status?: string
+          stripe_fa_id: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          aba_routing?: string | null
+          account_number_last4?: string | null
+          balance_available?: number
+          balance_pending?: number
+          connected_account_id?: string | null
+          created_at?: string
+          currency?: string
+          features?: Json
+          id?: string
+          metadata?: Json
+          owner_kind?: string
+          status?: string
+          stripe_fa_id?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      treasury_received_entries: {
+        Row: {
+          amount: number
+          counterparty: Json
+          created_at: string
+          currency: string
+          description: string | null
+          fa_id: string
+          id: string
+          journal_id: string | null
+          kind: string
+          network: string | null
+          status: string
+          stripe_id: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          amount: number
+          counterparty?: Json
+          created_at?: string
+          currency?: string
+          description?: string | null
+          fa_id: string
+          id?: string
+          journal_id?: string | null
+          kind: string
+          network?: string | null
+          status?: string
+          stripe_id: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          amount?: number
+          counterparty?: Json
+          created_at?: string
+          currency?: string
+          description?: string | null
+          fa_id?: string
+          id?: string
+          journal_id?: string | null
+          kind?: string
+          network?: string | null
+          status?: string
+          stripe_id?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "treasury_received_entries_fa_id_fkey"
+            columns: ["fa_id"]
+            isOneToOne: false
+            referencedRelation: "treasury_financial_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      treasury_transfers: {
+        Row: {
+          amount: number
+          counterparty: Json
+          created_at: string
+          currency: string
+          description: string | null
+          direction: string
+          fa_id: string
+          failure_reason: string | null
+          id: string
+          journal_id: string | null
+          kind: string
+          metadata: Json
+          network: string | null
+          status: string
+          stripe_id: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          amount: number
+          counterparty?: Json
+          created_at?: string
+          currency?: string
+          description?: string | null
+          direction: string
+          fa_id: string
+          failure_reason?: string | null
+          id?: string
+          journal_id?: string | null
+          kind: string
+          metadata?: Json
+          network?: string | null
+          status?: string
+          stripe_id: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          amount?: number
+          counterparty?: Json
+          created_at?: string
+          currency?: string
+          description?: string | null
+          direction?: string
+          fa_id?: string
+          failure_reason?: string | null
+          id?: string
+          journal_id?: string | null
+          kind?: string
+          metadata?: Json
+          network?: string | null
+          status?: string
+          stripe_id?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "treasury_transfers_fa_id_fkey"
+            columns: ["fa_id"]
+            isOneToOne: false
+            referencedRelation: "treasury_financial_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      treasury_webhook_events: {
+        Row: {
+          created_at: string
+          error: string | null
+          event_type: string
+          id: string
+          payload: Json
+          processed_at: string | null
+          stripe_event_id: string
+        }
+        Insert: {
+          created_at?: string
+          error?: string | null
+          event_type: string
+          id?: string
+          payload: Json
+          processed_at?: string | null
+          stripe_event_id: string
+        }
+        Update: {
+          created_at?: string
+          error?: string | null
+          event_type?: string
+          id?: string
+          payload?: Json
+          processed_at?: string | null
+          stripe_event_id?: string
+        }
+        Relationships: []
+      }
       user_risk_tiers: {
         Row: {
           created_at: string
