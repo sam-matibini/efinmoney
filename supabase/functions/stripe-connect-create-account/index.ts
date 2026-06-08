@@ -38,16 +38,16 @@ Deno.serve(async (req) => {
     const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "0.0.0.0";
 
     // Stripe v2 Accounts API — JSON body
+    // NOTE: Do NOT send identity.attestations.terms_of_service — for
+    // dashboard:"full" accounts Stripe owns ToS collection and rejects
+    // platform-on-behalf acceptance with `tos_acceptance_on_behalf_not_allowed`.
+    // The account holder accepts ToS themselves during Stripe-hosted onboarding.
     const payload = {
       identity: {
-        attestations: {
-          terms_of_service: {
-            account: { date: new Date().toISOString(), ip },
-          },
-        },
         country,
         business_details: { phone },
       },
+
       dashboard: "full",
       defaults: {
         responsibilities: {
