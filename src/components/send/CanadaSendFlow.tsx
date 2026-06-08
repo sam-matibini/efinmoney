@@ -193,6 +193,8 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
 
   const { data: wallets } = useWallets();
   const createTransfer = useCreateTransfer();
+  const { data: connectAcct } = useStripeConnectedAccount();
+  const connectReady = isConnectReady(connectAcct);
 
   const cadWallets = (wallets || []).filter((w) => w.currency_code === "CAD");
   const selectedWallet = cadWallets.find((w) => w.wallet_id === walletId) || cadWallets[0];
