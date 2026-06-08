@@ -3,10 +3,11 @@ import { useTreasury, type TreasuryFA } from "@/hooks/useTreasury";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/hooks/use-toast";
-import { Building2, Plus, Eye, ArrowDownToLine, ArrowUpFromLine, Send, CreditCard } from "lucide-react";
+import { Building2, Plus, Eye, ArrowDownToLine, ArrowUpFromLine, Send, AlertCircle } from "lucide-react";
 import { InboundTransferDialog } from "./InboundTransferDialog";
 import { OutboundTransferDialog } from "./OutboundTransferDialog";
 import { OutboundPaymentDialog } from "./OutboundPaymentDialog";
@@ -32,6 +33,44 @@ export function TreasuryPanel() {
   const data = list.data!;
   const fas = data.financial_accounts ?? [];
   const isStaff = data.staff;
+  const platformCapability = data.capabilities?.platform_treasury;
+  const userCapability = data.capabilities?.user_treasury;
+
+  const capabilityLabel = (status?: string | null) => {
+    switch (status) {
+      case "active":
+        return "Ready";
+      case "pending":
+        return "Pending approval";
+      case "missing_connected_account":
+        return "Connect setup required";
+      case "inactive":
+        return "Not enabled";
+      case "unknown":
+        return "Status unavailable";
+      default:
+        return status ?? "Unavailable";
+    }
+  };
+
+  const capabilityMessage = (kind: "platform" | "user") => {
+    const capability = kind === "platform" ? platformCapability : userCapability;
+    if (capability?.enabled) return null;
+    if (capability?.status === "pending") {
+      return kind === "platform"
+        ? "Treasury is pending approval on the platform account. Financial account creation will unlock after approval."
+        : "Treasury is pending approval for your connected account. Financial account creation will unlock after approval.";
+    }
+    if (capability?.status === "missing_connected_account") {
+      return "Complete Connect onboarding first to provision your own financial account.";
+    }
+    if (capability?.status === "unknown") {
+      return "Treasury status could not be verified right now. Try again shortly.";
+    }
+    return kind === "platform"
+      ? "Treasury is not enabled on the platform account yet."
+      : "Treasury is not enabled for your connected account yet.";
+  };
 
   async function handleReveal(fa: TreasuryFA) {
     try {
@@ -43,6 +82,16 @@ export function TreasuryPanel() {
   }
 
   async function handleCreate(kind: "platform" | "user") {
+    const capability = kind === "platform" ? platformCapability : userCapability;
+    if (!capability?.enabled) {
+      toast({
+        title: "Treasury unavailable",
+        description: capabilityMessage(kind) ?? "Treasury is not enabled for this account.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       await createFa.mutateAsync({ owner_kind: kind });
       toast({ title: "Financial account created" });
@@ -59,15 +108,33 @@ export function TreasuryPanel() {
           <p className="text-sm text-muted-foreground">USD financial accounts with ACH and wire</p>
         </div>
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={() => handleCreate("user")} disabled={createFa.isPending}>
+          <Button size="sm" variant="outline" onClick={() => handleCreate("user")} disabled={createFa.isPending || !userCapability?.enabled}>
             <Plus className="h-4 w-4 mr-1" /> My USD account
           </Button>
           {isStaff && (
-            <Button size="sm" onClick={() => handleCreate("platform")} disabled={createFa.isPending}>
+            <Button size="sm" onClick={() => handleCreate("platform")} disabled={createFa.isPending || !platformCapability?.enabled}>
               <Plus className="h-4 w-4 mr-1" /> Platform account
             </Button>
           )}
         </div>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2">
+        {isStaff && platformCapability && !platformCapability.enabled && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Platform Treasury: {capabilityLabel(platformCapability.status)}</AlertTitle>
+            <AlertDescription>{capabilityMessage("platform")}</AlertDescription>
+          </Alert>
+        )}
+
+        {userCapability && !userCapability.enabled && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>My Treasury: {capabilityLabel(userCapability.status)}</AlertTitle>
+            <AlertDescription>{capabilityMessage("user")}</AlertDescription>
+          </Alert>
+        )}
       </div>
 
       <Tabs defaultValue="accounts">
