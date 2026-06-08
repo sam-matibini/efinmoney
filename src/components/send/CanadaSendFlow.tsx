@@ -300,7 +300,9 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
           ? `${institutionNumber}-${transitNumber}-${accountNumber}`
           : method === "card_push"
             ? (recipientEmail || `card-${recipientTok?.last4 || "xxxx"}`)
-            : recipientEmail,
+            : method === "stripe_connect"
+              ? (connectAcct?.stripe_account_id || recipientEmail || "stripe_connect")
+              : recipientEmail,
         recipient_country: "CA",
         transfer_type: "domestic_canada",
         payout_method: method,
