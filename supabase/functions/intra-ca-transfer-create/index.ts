@@ -92,8 +92,22 @@ Deno.serve(async (req) => {
         stripe_payment_intent_id: pi?.id ?? null,
         stripe_status: pi?.status ?? null,
       }).eq("id", transfer.id);
-      return new Response(JSON.stringify({ error: stripeError, transfer }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+      const friendly = /failed verification in the past/i.test(stripeError)
+        ? "This bank account can't be used for PAD because it previously failed verification with Stripe. Please link a different bank account, or contact Stripe support."
+        : stripeError;
+
+      // Return 200 so the client toast surfaces a readable message instead of
+      // a generic "non-2xx" error, and the page does not blank-screen.
+      return new Response(JSON.stringify({
+        success: false,
+        fallback: true,
+        error: friendly,
+        stripe_error: stripeError,
+        transfer,
+      }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
+
 
     // Post ledger entries (debit cash-in-transit, credit customer wallet liability)
     const { data: liabAcc } = await supabase.from("ledger_accounts").select("id").like("code", "21%").eq("currency_code", "CAD").limit(1).single();
