@@ -163,6 +163,27 @@ const RecipientCardSection = forwardRef<RecipientCardHandle, { onValidityChange:
       return () => { alive = false; };
     }, [stripeP]);
 
+const RecipientCardSection = forwardRef<RecipientCardHandle, { onValidityChange: (v: boolean) => void; elementStyle: any }>(
+  (props, ref) => {
+    // Use a SEPARATE Stripe instance from the page-level one so two
+    // CardNumberElements (sender + recipient) can coexist. If the secondary
+    // fails to load, fall back to the primary instance so the form is at
+    // least degraded-working rather than dead.
+    const [stripeP, setStripeP] = useState<Promise<Stripe | null>>(() => getStripeSecondary());
+    const [ready, setReady] = useState<boolean | null>(null);
+    useEffect(() => {
+      let alive = true;
+      stripeP.then((s) => {
+        if (!alive) return;
+        if (s) { setReady(true); return; }
+        console.warn("[RecipientCard] secondary Stripe instance failed; falling back to primary");
+        const fallback = getStripe();
+        setStripeP(fallback);
+        fallback.then((s2) => { if (alive) setReady(!!s2); });
+      });
+      return () => { alive = false; };
+    }, [stripeP]);
+
     if (ready === false) {
       return (
         <div className="p-4 rounded-lg border border-destructive/40 bg-destructive/10 text-sm text-destructive">
@@ -178,7 +199,7 @@ const RecipientCardSection = forwardRef<RecipientCardHandle, { onValidityChange:
       );
     }
     return (
-      <Elements stripe={stripeP}>
+      <Elements stripe={stripeP} key="recipient-card-elements">
         <RecipientCardInner {...props} ref={ref} />
       </Elements>
     );
@@ -195,7 +216,7 @@ const CanadaSendFlow = () => {
     return () => { ok = false; };
   }, [stripeP]);
   return (
-    <Elements stripe={stripeP}>
+    <Elements stripe={stripeP} key="sender-card-elements">
       <CanadaSendFlowInner stripeReady={stripeReady} />
     </Elements>
   );
