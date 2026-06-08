@@ -73,6 +73,17 @@ function InnerForm({ onSuccess, onCancel, ctaLabel }: Props) {
   }, [profile?.full_name]);
 
 
+  const extractFnError = async (err: any, fallback: string) => {
+    try {
+      const res: Response | undefined = err?.context?.response ?? err?.context;
+      if (res && typeof res.json === "function") {
+        const j = await res.clone().json();
+        return j?.error || j?.details?.error?.message || j?.message || err?.message || fallback;
+      }
+    } catch {}
+    return err?.message || fallback;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!stripe || !elements) return toast.error("Stripe not ready");
@@ -80,13 +91,20 @@ function InnerForm({ onSuccess, onCancel, ctaLabel }: Props) {
     const card = elements.getElement(CardElement);
     if (!card) return toast.error("Card field not ready");
 
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      toast.error("Your session has expired. Please sign in again.");
+      return;
+    }
+
     setSaving(true);
     try {
       const { data: setup, error: setupErr } = await supabase.functions.invoke("stripe-save-card", {
         body: {},
       });
       if (setupErr || !setup?.clientSecret) {
-        throw new Error(setupErr?.message || setup?.error || "Failed to start card setup");
+        const msg = setupErr ? await extractFnError(setupErr, "Failed to start card setup") : (setup?.error || "Failed to start card setup");
+        throw new Error(msg);
       }
 
       const { error: confirmErr, setupIntent } = await stripe.confirmCardSetup(setup.clientSecret, {
@@ -101,7 +119,8 @@ function InnerForm({ onSuccess, onCancel, ctaLabel }: Props) {
         body: { setup_intent_id: setupIntent.id },
       });
       if (saveErr || !saved?.success) {
-        throw new Error(saveErr?.message || saved?.error || "Failed to save card");
+        const msg = saveErr ? await extractFnError(saveErr, "Failed to save card") : (saved?.error || "Failed to save card");
+        throw new Error(msg);
       }
 
       await qc.invalidateQueries({ queryKey: ["saved-cards", user?.id] });
@@ -113,6 +132,7 @@ function InnerForm({ onSuccess, onCancel, ctaLabel }: Props) {
       setSaving(false);
     }
   };
+
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
