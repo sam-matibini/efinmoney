@@ -1,35 +1,33 @@
-## Path B — $1 live card top-up test
+# Fix: Unable to log out
 
-This will charge a **real $1 CAD** to a real card on the live Stripe account `acct_1T7dSIEJgSLwPPaN`. No refund will be issued automatically — you'd refund from the Stripe dashboard if desired.
+## Diagnosis
 
-## What you do first (in the preview)
+Auth logs show the user's `POST /logout` calls returning **403 `session_not_found`** for session `20cc3adc-…` (Sam Matibini). The server-side session has already been invalidated (refresh-token rotation/expiry), but the browser still holds a stale local session. Supabase's default `signOut()` uses **global scope** — it calls the server, the server 403s, the JS client throws, and **local storage is never cleared**, so the UI stays "logged in" and clicking Log out appears to do nothing (logs show the same session id retried over and over).
 
-1. Sign in as the cardholder you want to test (e.g. **Samson** — `smatibini.sm@gmail.com`, who already has a CAD Visa `••4001` on file as `pm_1TWkPA…`). If you'd rather use a fresh card, sign in as anyone, go to `/cards` → Link a card, complete the Stripe SetupIntent. Tell me when done.
-2. Confirm: "go" once you're signed in.
+`useAuth.signOut()` currently:
+```ts
+const signOut = async () => { await supabase.auth.signOut(); };
+```
+No error handling, no local fallback, no redirect.
 
-## What I do in build mode
+## Fix
 
-1. Verify auth: hit a tiny authed endpoint with the preview session to confirm `auth.uid()` matches the cardholder.
-2. `POST /stripe-charge-saved-card` with:
-   ```json
-   { "payment_method_id": "<your pm_…>", "amount": 1, "currency": "CAD", "purpose": "test_card_funding" }
-   ```
-3. Read the response → expect `success: true`, `payment_intent_id: pi_…`, `ledger_journal_id`, `wallet_id`.
-4. Verify in DB:
-   - `ledger_entries` for that `external_reference=pi_…`: one Dr to Stripe Settlement (CAD), one Cr to Customer Wallet Liability (CAD), both $1.
-   - New CAD wallet balance = previous + $1 via `get_wallet_balance`.
-   - `notifications` row "Top-up successful".
-5. Pull `stripe-charge-saved-card` edge logs and surface the PaymentIntent id.
-6. Report a one-row pass/fail with all IDs so you can find the charge in Stripe and refund if you want.
+1. **`src/hooks/useAuth.tsx`** — make `signOut` resilient:
+   - Try `supabase.auth.signOut({ scope: 'local' })` first (clears local tokens, no server round-trip required) — this is what fixes the stuck state.
+   - Wrap in try/catch; on any error, force-clear by calling `setSession(null)` / `setUser(null)` and removing the `sb-*-auth-token` keys from `localStorage`.
+   - After sign-out, `window.location.assign('/auth')` so the app fully resets (avoids stale React Query caches keyed by the old user).
 
-## Out of scope for this run
+2. **`src/pages/MorePage.tsx`** and **`src/components/layout/Header.tsx`** — keep using `signOut` from `useAuth`; no change needed beyond awaiting it (already does).
 
-- Decline cases — can't safely test in live mode without a card known to fail.
-- Full `/send` end-to-end (would also trigger a real cross-border payout). If you want that, we'd need to wire a "dry-run" mode into `execute-transfer` first, or accept a real $5 CAD → KES test.
+3. **`src/contexts/AdminAuthContext.tsx`** — apply the same `{ scope: 'local' }` + try/catch pattern in admin `signOut` so admins aren't stuck if their server session expires.
 
-## Confirm to proceed
+## Out of scope
 
-Reply with:
-- which user you're signed in as,
-- which `pm_…` to charge (or "use Samson's `pm_1TWkPAEJgSLwPPaN3QtRpH1q`"),
-- "go".
+- No changes to session lifetime, refresh-token rotation, or auth providers.
+- No UI redesign of the More page or Header.
+
+## Verification
+
+- Reproduce: in preview, click **Log out** on `/more` — user should land on `/auth` and `useAuth().user` should be `null`.
+- Auth logs should stop showing repeated 403s for the same session id.
+- Admin portal: sign in at `/admin/login`, sign out — same clean behavior.
