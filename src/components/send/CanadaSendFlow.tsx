@@ -528,10 +528,31 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
           <CardContent className="space-y-6">
             {/* Recipient details */}
             <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>Recipient Full Name</Label>
-                <Input value={recipientName} onChange={(e) => setRecipientName(e.target.value)} placeholder="Jane Doe" />
-              </div>
+              {method !== "stripe_connect" && (
+                <div className="space-y-2">
+                  <Label>Recipient Full Name</Label>
+                  <Input value={recipientName} onChange={(e) => setRecipientName(e.target.value)} placeholder="Jane Doe" />
+                </div>
+              )}
+
+              {method === "stripe_connect" && (
+                <div className="p-4 rounded-lg border border-emerald-500/30 bg-emerald-500/5 space-y-2">
+                  <div className="flex items-center gap-2 text-sm font-medium text-emerald-700 dark:text-emerald-400">
+                    <Building2 className="w-4 h-4" /> Sending to your Stripe Connected Account
+                  </div>
+                  <div className="text-xs text-muted-foreground space-y-1">
+                    <p>
+                      Recipient: <strong>{recipientName || profile?.full_name || profile?.email || "You"}</strong>
+                    </p>
+                    <p>
+                      Account: <span className="font-mono">{connectAcct?.stripe_account_id}</span> · {connectAcct?.country?.toUpperCase()} · status: {connectAcct?.status}
+                    </p>
+                    <p>
+                      Funds land on your connected account's Stripe balance, then an <strong>instant payout</strong> is fired to your external debit card / bank. If instant isn't available yet, we fall back to a standard payout automatically.
+                    </p>
+                  </div>
+                </div>
+              )}
 
 
               {method === "eft" && (
