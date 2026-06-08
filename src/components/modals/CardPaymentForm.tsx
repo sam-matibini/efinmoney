@@ -267,12 +267,11 @@ function InnerForm({
         <div className="space-y-2">
           <Label className="text-xs">Amount ({currency})</Label>
           <Input
-            type="number"
+            type="text"
             inputMode="decimal"
-            step="0.01"
-            min="1"
+            pattern="[0-9]*\.?[0-9]*"
             value={amount}
-            onChange={(event) => setAmount(event.target.value)}
+            onChange={(event) => setAmount(event.target.value.replace(/[^0-9.]/g, ""))}
             placeholder="0.00"
             disabled={lockAmount}
             className="h-12 text-lg"
