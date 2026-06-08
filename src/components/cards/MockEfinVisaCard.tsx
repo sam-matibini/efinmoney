@@ -60,8 +60,8 @@ const MockEfinVisaCard = () => {
             Tap the card to flip. Use Reveal to view full details.
           </p>
         </div>
-        <Badge variant="secondary" className="gap-1 border-amber-500/30 bg-amber-500/10 text-amber-300">
-          <Clock className="w-3 h-3" /> Issuing pending enablement
+        <Badge variant="secondary" className="gap-1 border-emerald-500/30 bg-emerald-500/10 text-emerald-300">
+          <CheckCircle2 className="w-3 h-3" /> Active
         </Badge>
       </div>
 
