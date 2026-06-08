@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Wifi, Eye, EyeOff, Copy, Sparkles, Clock } from "lucide-react";
+import { Wifi, Eye, EyeOff, Copy, Sparkles, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -60,8 +60,8 @@ const MockEfinVisaCard = () => {
             Tap the card to flip. Use Reveal to view full details.
           </p>
         </div>
-        <Badge variant="secondary" className="gap-1 border-amber-500/30 bg-amber-500/10 text-amber-300">
-          <Clock className="w-3 h-3" /> Issuing pending enablement
+        <Badge variant="secondary" className="gap-1 border-emerald-500/30 bg-emerald-500/10 text-emerald-300">
+          <CheckCircle2 className="w-3 h-3" /> Active
         </Badge>
       </div>
 
@@ -224,7 +224,7 @@ const MockEfinVisaCard = () => {
                 </div>
 
                 <p className="text-[10px] opacity-70 pt-1">
-                  Card issuance pending enablement — preview only.
+                  Card active — keep your details private.
                 </p>
               </div>
 
