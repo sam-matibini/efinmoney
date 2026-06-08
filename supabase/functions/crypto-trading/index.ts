@@ -163,13 +163,17 @@ async function fetchCryptoPrices(): Promise<Record<string, number>> {
     return validPrices;
   } catch (error) {
     console.error('Failed to fetch crypto prices:', error);
-    
-    if (priceCache.timestamp > 0 && now - priceCache.timestamp < 300000) {
-      console.warn('Using stale cached prices due to API failure');
+
+    // Always serve cached prices when available — even if older than 5 min —
+    // rather than 503'ing the whole endpoint and blank-screening the UI.
+    if (priceCache.timestamp > 0 && Object.keys(priceCache.prices).length > 0) {
+      console.warn('Using stale cached prices due to API failure (age ms):', now - priceCache.timestamp);
       return priceCache.prices;
     }
-    
-    throw new Error('Unable to fetch current crypto prices. Trading is temporarily unavailable.');
+
+    // No cache yet — return empty map. Callers must guard for missing prices
+    // (list endpoints will show 0/unavailable; buy/sell paths will refuse the trade).
+    return {};
   }
 }
 
