@@ -66,7 +66,19 @@ export function useTreasury() {
   const createFa = useMutation({
     mutationFn: async (vars: { owner_kind: "platform" | "user"; user_id?: string }) => {
       const { data, error } = await supabase.functions.invoke("treasury-create-fa", { body: vars });
-      if (error) throw error;
+      if (error) {
+        // Parse JSON body from FunctionsHttpError so the real message surfaces (e.g. treasury_not_enabled)
+        try {
+          const ctx: any = (error as any).context;
+          if (ctx?.json) {
+            const body = await ctx.json();
+            throw new Error(body?.error ?? error.message);
+          }
+        } catch (inner: any) {
+          if (inner instanceof Error && inner.message) throw inner;
+        }
+        throw error;
+      }
       if ((data as any)?.error) throw new Error((data as any).error);
       return data;
     },
