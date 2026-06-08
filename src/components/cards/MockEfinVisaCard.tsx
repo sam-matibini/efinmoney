@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Wifi, Eye, EyeOff, Copy, Sparkles, Clock } from "lucide-react";
+import { Wifi, Eye, EyeOff, Copy, Sparkles, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
