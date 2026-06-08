@@ -141,23 +141,32 @@ export default function StripeConnectInstantPage() {
         ) : (
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-                Connected Account
-              </CardTitle>
-              <CardDescription>
-                <span className="font-mono text-xs">{account.stripe_account_id}</span> · {account.country?.toUpperCase()} · {account.status}
-              </CardDescription>
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <CheckCircle2 className={`w-5 h-5 ${account.status === "active" ? "text-emerald-500" : "text-amber-500"}`} />
+                    Connected Account
+                  </CardTitle>
+                  <CardDescription>
+                    <span className="font-mono text-xs">{account.stripe_account_id}</span> · {account.country?.toUpperCase()} · {account.status}
+                  </CardDescription>
+                </div>
+                <Button size="sm" variant="outline" onClick={() => refreshStatus(false)} disabled={refreshing}>
+                  <RefreshCw className={`w-3.5 h-3.5 mr-1 ${refreshing ? "animate-spin" : ""}`} />
+                  Refresh
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
-              {onboarded ? (
+              {onboarded || account.status === "active" ? (
                 <p className="text-sm text-emerald-500">Onboarding complete. You're ready to receive instant transfers.</p>
               ) : connect ? (
                 <ConnectComponentsProvider connectInstance={connect}>
                   <ConnectAccountOnboarding
-                    onExit={() => {
+                    onExit={async () => {
                       setOnboarded(true);
-                      toast.success("Onboarding finished");
+                      toast.success("Onboarding finished — syncing status…");
+                      await refreshStatus(true);
                     }}
                   />
                 </ConnectComponentsProvider>
