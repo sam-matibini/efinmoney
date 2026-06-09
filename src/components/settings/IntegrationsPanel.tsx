@@ -179,13 +179,14 @@ const integrations: Integration[] = [
   {
     id: "sumsub",
     name: "Sumsub",
-    description: "All-in-one verification platform",
+    description: "Enhanced due diligence — admin-launched ID + AML checks",
     category: "compliance",
     icon: <Globe className="h-6 w-6" />,
-    status: "disconnected",
-    enabled: false,
-    apiKeyConfigured: false,
-    environment: "sandbox"
+    status: "connected",
+    enabled: true,
+    lastSync: "Live",
+    apiKeyConfigured: true,
+    environment: (import.meta.env.VITE_SUMSUB_ENV as "sandbox" | "production") || "sandbox"
   }
 ];
 
