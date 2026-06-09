@@ -492,6 +492,8 @@ const KycReviewPage = () => {
               </Card>
             )}
 
+            <SumsubCard userId={kyc.user_id} canManage={hasPermission("approve_kyc")} />
+
             <Card>
               <CardHeader><CardTitle className="text-base">Internal notes</CardTitle></CardHeader>
               <CardContent>
