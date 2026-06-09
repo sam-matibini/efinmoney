@@ -3940,6 +3940,84 @@ export type Database = {
         }
         Relationships: []
       }
+      sumsub_verifications: {
+        Row: {
+          applicant_id: string
+          client_comment: string | null
+          created_at: string
+          id: string
+          level_name: string
+          moderation_comment: string | null
+          raw_payload: Json | null
+          requested_by_admin_id: string | null
+          review_answer: string | null
+          review_reject_type: string | null
+          review_status: string | null
+          risk_labels: Json | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          applicant_id: string
+          client_comment?: string | null
+          created_at?: string
+          id?: string
+          level_name: string
+          moderation_comment?: string | null
+          raw_payload?: Json | null
+          requested_by_admin_id?: string | null
+          review_answer?: string | null
+          review_reject_type?: string | null
+          review_status?: string | null
+          risk_labels?: Json | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          applicant_id?: string
+          client_comment?: string | null
+          created_at?: string
+          id?: string
+          level_name?: string
+          moderation_comment?: string | null
+          raw_payload?: Json | null
+          requested_by_admin_id?: string | null
+          review_answer?: string | null
+          review_reject_type?: string | null
+          review_status?: string | null
+          risk_labels?: Json | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      sumsub_webhook_logs: {
+        Row: {
+          applicant_id: string | null
+          created_at: string
+          event_type: string | null
+          id: string
+          payload: Json
+          signature_valid: boolean
+        }
+        Insert: {
+          applicant_id?: string | null
+          created_at?: string
+          event_type?: string | null
+          id?: string
+          payload: Json
+          signature_valid?: boolean
+        }
+        Update: {
+          applicant_id?: string | null
+          created_at?: string
+          event_type?: string | null
+          id?: string
+          payload?: Json
+          signature_valid?: boolean
+        }
+        Relationships: []
+      }
       tax_filings: {
         Row: {
           adjustments: number

@@ -18,6 +18,7 @@ import { ArrowLeft, AlertTriangle, Clock, FileText, ShieldAlert, ZoomIn, ZoomOut
 import { format, formatDistanceToNow } from "date-fns";
 import { extractRiskTags } from "@/lib/personaTags";
 import { KycRiskTagChip } from "@/components/admin/KycRiskTagChip";
+import SumsubCard from "@/components/admin/SumsubCard";
 
 const REJECTION_REASONS = [
   "Document is blurry or unreadable",
@@ -490,6 +491,8 @@ const KycReviewPage = () => {
                 </CardContent>
               </Card>
             )}
+
+            <SumsubCard userId={kyc.user_id} canManage={hasPermission("approve_kyc")} />
 
             <Card>
               <CardHeader><CardTitle className="text-base">Internal notes</CardTitle></CardHeader>

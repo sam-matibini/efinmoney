@@ -72,3 +72,6 @@ verify_jwt = false
 
 [functions.treasury-webhook]
 verify_jwt = false
+
+[functions.sumsub-webhook]
+verify_jwt = false
