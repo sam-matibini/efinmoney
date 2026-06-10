@@ -6,6 +6,9 @@ import { Logo, Wordmark } from "@/components/Logo";
 import africaHero from "@/assets/landing-africa-hero.jpg";
 import africaBand from "@/assets/landing-africa-band.jpg";
 import b2bPhone from "@/assets/landing-b2b-phone.jpg";
+import tourismKenya from "@/assets/landing-tourism-kenya.jpg";
+import tourismVicFalls from "@/assets/landing-tourism-victoria-falls.jpg";
+import tourismZanzibar from "@/assets/landing-tourism-zanzibar.jpg";
 
 const NAV_LINKS = [
   { label: "Features", href: "#features" },
@@ -357,6 +360,64 @@ const Landing = () => {
               ))}
             </ul>
           </motion.div>
+        </div>
+      </section>
+
+      {/* ============ TOURISM POWERS TRANSFERS ============ */}
+      <section className="relative bg-[hsl(var(--accent))]/30 py-20 md:py-24 overflow-hidden">
+        <div className="absolute -top-32 -left-32 w-[500px] h-[500px] rounded-full bg-[hsl(var(--accent-amber)/0.08)] blur-3xl pointer-events-none" />
+        <div className="max-w-7xl mx-auto px-6">
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-80px" }}
+            transition={{ duration: 0.6 }}
+            className="text-center max-w-2xl mx-auto mb-12"
+          >
+            <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-semibold uppercase tracking-[0.18em] text-[hsl(var(--brand-700))] bg-white">
+              <span className="w-1.5 h-1.5 rounded-full bg-[hsl(var(--accent-amber))]" />
+              Tourism & remittances
+            </span>
+            <h2 className="mt-4 text-4xl md:text-5xl font-black tracking-tight text-[hsl(var(--brand-900))]">
+              Wherever travel takes you, money follows.
+            </h2>
+            <p className="mt-4 text-[15px] md:text-base text-neutral-600 leading-relaxed">
+              Millions of travellers, families and businesses send money into Kenya,
+              Zambia, Zimbabwe and beyond every year — funding safaris, hotel
+              bookings, tour operators and loved ones back home. eFinMoney makes
+              those flows instant, affordable and fully traceable.
+            </p>
+          </motion.div>
+
+          <div className="grid md:grid-cols-3 gap-5">
+            {[
+              { img: tourismKenya, label: "🇰🇪 Maasai Mara · Kenya", alt: "Maasai Mara safari, Kenya" },
+              { img: tourismVicFalls, label: "🇿🇲 🇿🇼 Victoria Falls", alt: "Victoria Falls on the Zambia-Zimbabwe border" },
+              { img: tourismZanzibar, label: "🇹🇿 Zanzibar Coast", alt: "Zanzibar coastline with dhow boat" },
+            ].map((t, i) => (
+              <motion.div
+                key={t.label}
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-60px" }}
+                transition={{ duration: 0.55, delay: i * 0.1 }}
+                className="relative rounded-3xl overflow-hidden shadow-card-purple ring-1 ring-[hsl(var(--brand-900))]/10 group"
+              >
+                <img
+                  src={t.img}
+                  alt={t.alt}
+                  loading="lazy"
+                  width={1280}
+                  height={960}
+                  className="w-full h-[280px] object-cover transition-transform duration-700 group-hover:scale-105"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-[hsl(var(--brand-900))]/70 via-transparent to-transparent" />
+                <span className="absolute bottom-4 left-4 text-[12px] font-bold px-3 py-1.5 rounded-full bg-white/95 text-[hsl(var(--brand-900))] backdrop-blur shadow-sm">
+                  {t.label}
+                </span>
+              </motion.div>
+            ))}
+          </div>
         </div>
       </section>
 
