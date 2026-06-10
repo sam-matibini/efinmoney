@@ -1,5 +1,6 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import heroVideo from "@/assets/hero-background.mp4.asset.json";
+import { supabase } from "@/integrations/supabase/client";
 
 const CORRIDORS = [
   { from: "Canada", to: "Nigeria", flag: "🇳🇬" },
@@ -9,32 +10,49 @@ const CORRIDORS = [
   { from: "Canada", to: "Zimbabwe", flag: "🇿🇼" },
 ];
 
-const DEFAULT_VIDEO_SRC = heroVideo.url;
-
 interface GlobalCorridorsProps {
   videoSrc?: string;
 }
 
-export default function GlobalCorridors({
-  videoSrc = DEFAULT_VIDEO_SRC,
-}: GlobalCorridorsProps) {
+export default function GlobalCorridors({ videoSrc }: GlobalCorridorsProps) {
+  const [resolvedSrc, setResolvedSrc] = useState<string | undefined>(videoSrc);
+
+  useEffect(() => {
+    if (videoSrc) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .storage
+        .from("assets")
+        .createSignedUrl("hero-background.mp4", 60 * 60 * 24);
+      if (!cancelled && data?.signedUrl) setResolvedSrc(data.signedUrl);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [videoSrc]);
+
   return (
     <section
       className="relative w-full overflow-hidden flex flex-col items-center justify-center"
       style={{ minHeight: 600, backgroundColor: "#050210" }}
     >
       {/* Video background */}
-      <video
-        autoPlay
-        loop
-        muted
-        playsInline
-        preload="metadata"
-        aria-hidden="true"
-        className="absolute inset-0 w-full h-full object-cover pointer-events-none z-0"
-      >
-        <source src={videoSrc} type="video/mp4" />
-      </video>
+      {resolvedSrc && (
+        <video
+          key={resolvedSrc}
+          autoPlay
+          loop
+          muted
+          playsInline
+          preload="metadata"
+          aria-hidden="true"
+          className="absolute inset-0 w-full h-full object-cover pointer-events-none z-0"
+        >
+          <source src={resolvedSrc} type="video/mp4" />
+        </video>
+      )}
+
 
       {/* Dark overlay for legibility */}
       <div
