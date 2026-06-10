@@ -302,6 +302,9 @@ const Landing = () => {
         <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-white to-transparent pointer-events-none" />
       </section>
 
+      {/* ============ LIVE MARKETS TICKER ============ */}
+      <MarketTicker />
+
 
       {/* ============ BUILT FOR AFRICA ============ */}
       <section className="relative bg-white py-20 md:py-24">
