@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, useInView } from "framer-motion";
 import { Link } from "react-router-dom";
-import { ArrowRight, Globe, Shield, Zap, Wallet, Send, BarChart3, Star } from "lucide-react";
+import { ArrowRight, Globe, Shield, Zap, Wallet, Send, BarChart3, Star, Building2, Layers, Check } from "lucide-react";
 import { Logo, Wordmark } from "@/components/Logo";
+import africaHero from "@/assets/landing-africa-hero.jpg";
+import africaBand from "@/assets/landing-africa-band.jpg";
+import b2bPhone from "@/assets/landing-b2b-phone.jpg";
 
 const NAV_LINKS = [
   { label: "Features", href: "#features" },
