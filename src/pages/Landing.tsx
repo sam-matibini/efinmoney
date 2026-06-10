@@ -291,13 +291,31 @@ const Landing = () => {
             </motion.div>
           </div>
 
-          {/* RIGHT: live FX calculator (above phones on lg) */}
-          <div className="relative flex flex-col items-center lg:items-end gap-8">
-            <FxCalculator />
-            <div className="hidden md:flex items-end justify-center gap-3 lg:gap-5">
-              <div className="hidden lg:block"><PhoneFrame delay={0.5} rotate={-6}><WalletScreen /></PhoneFrame></div>
-              <div className="hidden md:block"><PhoneFrame delay={0.7} rotate={6}><ExchangeScreen /></PhoneFrame></div>
-            </div>
+          {/* RIGHT: lifestyle photo with floating FX calculator */}
+          <div className="relative w-full max-w-[540px] mx-auto lg:ml-auto lg:mr-0">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.7, delay: 0.3, ease: "easeOut" }}
+              className="relative"
+            >
+              <img
+                src={heroUsers}
+                alt="An African family in Lagos and a Black Canadian professional couple in Toronto reviewing a money transfer together on their phones"
+                width={1280}
+                height={960}
+                className="w-full h-[380px] sm:h-[440px] lg:h-[520px] object-cover rounded-3xl ring-1 ring-white/10 shadow-2xl"
+              />
+              <div className="absolute inset-0 rounded-3xl bg-gradient-to-tr from-[hsl(248_60%_6%)]/75 via-[hsl(248_60%_8%)]/20 to-transparent pointer-events-none" />
+            </motion.div>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.6, ease: "easeOut" }}
+              className="absolute -bottom-6 right-2 sm:right-4 lg:-right-4"
+            >
+              <FxCalculator />
+            </motion.div>
           </div>
         </div>
 
