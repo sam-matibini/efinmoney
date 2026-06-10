@@ -1,0 +1,1 @@
+CREATE POLICY "Public read hero-background.mp4" ON storage.objects FOR SELECT TO anon, authenticated USING (bucket_id = 'assets' AND name = 'hero-background.mp4');
