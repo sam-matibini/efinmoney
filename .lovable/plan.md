@@ -1,39 +1,38 @@
-## FX Calculator upgrade
+## Compact FX Calculator + lifestyle imagery in hero
 
-**1. Bidirectional editable amounts**
-- Both "You send" and "Recipient gets" become typeable inputs.
-- Track `lastEdited: "send" | "receive"` in state. Recompute the *other* side on every change:
-  - send edited → `receive = send × rate × (1 − fee)`
-  - receive edited → `send = receive / (rate × (1 − fee))`
-- Rate refresh (every 60s) recomputes using `lastEdited` as source of truth so the user's typed value never gets clobbered.
+**Goal:** shrink the calculator and pair it with a generated image of a Black African family and Canadian/USA professionals reviewing the calculator — without disturbing the `"Send money across borders, instantly."` headline on the left.
 
-**2. Searchable world-currency picker**
-- Replace native `<select>` with a shadcn `Popover` + `Command` (cmdk) combobox — same pattern already used elsewhere in the app.
-- Source = full ISO 4217 list (~160 currencies). Add `src/lib/worldCurrencies.ts` exporting `{ code, name, country, cc }[]` (static, no network).
-- Each row: flag (flagcdn.com) + code + currency name + country. Search matches code, name, or country (e.g. "naira", "nigeria", "ngn").
-- Used for both Send and Recipient fields (same full list on both sides — no artificial cap).
-- Rate availability: if a pair has no rate in `market-rates`, fall back via USD pivot (already implemented). If still missing, show "Rate unavailable — try another currency" inline instead of a broken number.
+### 1. Shrink the calculator (`src/components/landing/FxCalculator.tsx`)
+- Outer max width: `max-w-md` → `max-w-sm` (and `max-w-[340px]` on lg).
+- Padding `p-5 sm:p-6` → `p-4`.
+- Amount input font: `text-2xl sm:text-3xl` → `text-xl sm:text-2xl`.
+- Currency picker height `h-11` → `h-9`, badges padding tightened.
+- CTAs `h-12` → `h-10`, font `text-sm` → `text-[13px]`.
+- Comparison strip: tighter spacing (`p-3.5` → `p-3`, `mt-4` → `mt-3`).
+- Swap button `w-9 h-9` → `w-8 h-8`.
+- Section label/timestamp text reduced by 1 step.
+- No logic changes — bidirectional editing, searchable picker, intent handoff all preserved.
 
-**3. "Real with eFinMoney" comparison strip** (replaces the current flat fee line)
-- Below the two inputs, add a compact comparison card:
+### 2. New hero lifestyle image
+- Generate `src/assets/landing-hero-users.jpg` via `imagegen` (premium, ~1280×960):
+  > "Editorial photo collage: a warm, smiling Black African family at a wooden kitchen table in Lagos looking together at a smartphone, beside a young Black Canadian professional couple in a bright Toronto loft also looking at a phone, soft natural light, shallow depth of field, candid, premium fintech lifestyle, no on-screen UI, no text"
+- The image depicts users *deciding/simulating a transfer* (looking at phones) — the calculator floats over it.
 
-```text
-   You save vs. banks      ≈ C$ 38.20  (2.9%)
-   ─────────────────────────────────────────
-   eFinMoney   1 EUR = 1,554.19 NGN   fee 0.5%   ✓ Mid-market
-   Typical bank 1 EUR = 1,509.40 NGN  fee 3.5%   hidden margin
-```
-
-- Bank baseline = `rate × (1 − 0.035)` (configurable constant `BANK_MARGIN = 0.035`). Savings = `eFinReceive − bankReceive`, expressed in the send currency and as a %.
-- Small badges: "Mid-market rate", "No hidden fees", "Locked for 60s after sign-in".
-- Keeps the existing live-rate dot + "Updated Xs ago" header.
-
-**4. Polish**
-- Keep CTAs ("Sign up & send" / "Sign in" / "Continue" when logged in) and existing intent→ `sessionStorage` handoff to `/send` or `/exchange`.
-- Format numbers with grouping; cap to 2 decimals for fiat ≥1, 4 for <1.
-- Disable CTA + show "Rate unavailable" when no rate can be resolved.
+### 3. Hero right column layout (`src/pages/Landing.tsx`, ~lines 294-301)
+- Replace the current right column with a single relative stage:
+  ```
+  <div className="relative w-full max-w-[520px] lg:ml-auto">
+    <img src={heroUsers} alt="Families in Africa and professionals in Canada deciding to transfer money with eFinMoney" className="w-full h-[420px] lg:h-[480px] object-cover rounded-3xl ring-1 ring-white/10 shadow-2xl" />
+    <div className="absolute inset-0 bg-gradient-to-tr from-[hsl(248_60%_8%)]/70 via-transparent to-transparent rounded-3xl" />
+    <div className="absolute -bottom-6 -right-4 lg:-right-8 w-[300px] sm:w-[330px]">
+      <FxCalculator />
+    </div>
+  </div>
+  ```
+- Phone mockups (`WalletScreen`, `ExchangeScreen`) removed from hero (calculator + photo replace them). They remain defined in the file for any other use.
+- Left copy column (headline `"Send money across borders, instantly."`, sub-copy, CTA, press strip) is **untouched**.
 
 ### Files
-- **New:** `src/lib/worldCurrencies.ts` — static ISO 4217 list with country + flag code.
-- **Edit:** `src/components/landing/FxCalculator.tsx` — bidirectional inputs, searchable combobox, savings strip.
-- No edge-function, DB, or routing changes.
+- **Edit:** `src/components/landing/FxCalculator.tsx` — sizing only.
+- **Edit:** `src/pages/Landing.tsx` — replace right-column block; add `heroUsers` import.
+- **New asset:** `src/assets/landing-hero-users.jpg` (generated).

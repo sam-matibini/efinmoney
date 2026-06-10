@@ -159,9 +159,9 @@ const FxCalculator = () => {
   const rateUnavailable = !isLoading && !midRate;
 
   return (
-    <div className="relative w-full max-w-md mx-auto lg:mx-0">
-      <div className="absolute -inset-1 rounded-[28px] bg-gradient-to-br from-[hsl(var(--accent-amber)/0.35)] via-[hsl(var(--brand-500)/0.25)] to-transparent blur-2xl pointer-events-none" />
-      <div className="relative rounded-3xl bg-[hsl(248_60%_8%)]/95 backdrop-blur-xl ring-1 ring-white/15 shadow-2xl p-5 sm:p-6">
+    <div className="relative w-full max-w-[340px] mx-auto lg:mx-0">
+      <div className="absolute -inset-1 rounded-[24px] bg-gradient-to-br from-[hsl(var(--accent-amber)/0.35)] via-[hsl(var(--brand-500)/0.25)] to-transparent blur-2xl pointer-events-none" />
+      <div className="relative rounded-2xl bg-[hsl(248_60%_8%)]/95 backdrop-blur-xl ring-1 ring-white/15 shadow-2xl p-4">
         <div className="flex items-center justify-between mb-4">
           <div className="text-xs font-bold uppercase tracking-[0.18em] text-white/70">Live FX calculator</div>
           <div className="inline-flex items-center gap-1.5 text-[10px] font-semibold text-white/60">
