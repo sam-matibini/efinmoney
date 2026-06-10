@@ -310,15 +310,15 @@ const AmountRow = ({
   loading?: boolean;
   highlight?: boolean;
 }) => (
-  <div className={`rounded-2xl px-4 py-3 ring-1 ${highlight ? "bg-white/[0.08] ring-white/15" : "bg-white/[0.06] ring-white/10"}`}>
-    <div className="text-[10.5px] uppercase tracking-[0.18em] font-semibold text-white/55 mb-1.5">{label}</div>
-    <div className="flex items-center gap-3">
+  <div className={`rounded-xl px-3 py-2.5 ring-1 ${highlight ? "bg-white/[0.08] ring-white/15" : "bg-white/[0.06] ring-white/10"}`}>
+    <div className="text-[9.5px] uppercase tracking-[0.18em] font-semibold text-white/55 mb-1">{label}</div>
+    <div className="flex items-center gap-2">
       <input
         inputMode="decimal"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={loading ? "…" : "0.00"}
-        className="flex-1 min-w-0 bg-transparent border-0 outline-none text-2xl sm:text-3xl font-black text-white tabular-nums placeholder:text-white/30"
+        className="flex-1 min-w-0 bg-transparent border-0 outline-none text-xl sm:text-2xl font-black text-white tabular-nums placeholder:text-white/30"
       />
       <CurrencyPicker value={currency} onChange={onCurrencyChange} />
     </div>
