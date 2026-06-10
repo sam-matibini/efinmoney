@@ -1,63 +1,34 @@
+# Landing Page — Africa-First Refresh
 
-# Sumsub KYC — Admin-Only Enhanced Due Diligence
+Goal: Make the landing page more market-attractive and B2B-ready, while keeping the current deep purple + amber color scheme intact.
 
-Add Sumsub as an admin-triggered EDD tool that runs alongside Persona. Compliance officers launch a Sumsub check on any customer from `/admin/kyc`; results are stored and surfaced in the existing review UI. No user-facing onboarding changes.
+## Changes
 
-## What gets built
+### 1. African imagery (hero backdrop + new "Africa-first" band)
+- Generate one wide cinematic African hero image (savanna + Victoria Falls + acacia silhouette + warm Lagos/Nairobi skyline blend) and place it as a low-opacity backdrop layer behind the existing purple grid hero. Color scheme stays — image sits at ~25% opacity blended with the existing purple/amber overlays.
+- Add a new "Built for Africa" section directly under the hero with a single professional African landscape image on the left and a short B2B value paragraph on the right (corridors, mobile money rails, multi-currency settlement). Image is purely decorative; no color-scheme change.
 
-### 1. Secrets (requested after plan approval)
-- `SUMSUB_APP_TOKEN`
-- `SUMSUB_SECRET_KEY`
-- `SUMSUB_LEVEL_NAME` (the verification level configured in Sumsub dashboard)
-- `SUMSUB_ENV` (`sandbox` or `production`)
+### 2. Expand currencies on the phone mockups
+Update `WalletScreen` to show 6 currencies instead of 3:
+- USD, CAD, NGN, KES (Kenya), GHS (Ghana), ZMW (Zambia)
+Update `SendScreen` corridor copy to cycle examples and use realistic mock balances. Update `ExchangeScreen` to keep USD→CAD (already shown) but add small "corridors" chips under it: NGN · KES · GHS · ZMW.
 
-### 2. Database (one migration)
-New table `sumsub_verifications`:
-- `user_id` (target customer)
-- `applicant_id` (Sumsub ID)
-- `level_name`, `review_status`, `review_answer` (GREEN/RED/YELLOW)
-- `review_reject_type`, `moderation_comment`, `client_comment`
-- `risk_labels` jsonb, `raw_payload` jsonb
-- `requested_by_admin_id`, timestamps
-- RLS: admins/compliance officers only; service role full access
-- GRANTs to `authenticated` + `service_role`
+### 3. B2B professional phone hero image
+- Generate one premium real-photo style image: a navy iPhone on a dark walnut desk next to a leather notebook and espresso, with the eFinMoney logo/wordmark on screen (matching the user's uploaded Cover_2 reference).
+- Add a new "Built for Business" band between Features and How-it-works:
+  - Left: the generated professional phone photo
+  - Right: B2B copy — "Treasury, payouts, FX and reconciliation for African-facing businesses." + 3 bullet points (Bulk payouts, Multi-entity wallets, API & reporting) + "Talk to sales" CTA (amber pill, existing style).
 
-New table `sumsub_webhook_logs` (raw events for audit) with admin read + service write.
-
-### 3. Edge functions
-- `sumsub-create-applicant` — admin-invoked. Creates Sumsub applicant for target user, stores applicant_id, returns a short-lived **WebSDK access token** scoped to that applicant + level. Admin-role check via `is_kyc_reviewer()`.
-- `sumsub-refresh-token` — regenerates the access token when iframe expires.
-- `sumsub-get-applicant-status` — pulls latest decision on demand and upserts to `sumsub_verifications`.
-- `sumsub-webhook` (`verify_jwt = false`) — verifies HMAC-SHA256 signature against `SUMSUB_SECRET_KEY`, logs to `sumsub_webhook_logs`, updates `sumsub_verifications`, posts an admin notification on RED reviews.
-
-### 4. Admin UI (`/admin/kyc/[userId]` review page)
-- New "Enhanced Due Diligence (Sumsub)" card next to existing Persona block.
-- Button: **Launch Sumsub Check** → calls `sumsub-create-applicant`, opens a modal embedding `@sumsub/websdk-react` with the returned token.
-- Status panel: review answer (GREEN/RED/YELLOW), reject reasons, risk labels, last updated, link to Sumsub dashboard, **Refresh status** button.
-- Risk labels render as chips next to existing Persona risk tags.
-
-### 5. Integrations panel
-- Flip Sumsub from "Disconnected" to "Connected" once `SUMSUB_APP_TOKEN` is present (read from secrets list).
-
-## What is NOT built
-- No user-facing `/onboarding/identity` change — Persona + Interac remain primary.
-- No auto-trigger on signup; admin must launch each check.
-- No replacement of in-house AML/PEP engine; Sumsub findings supplement it.
-
-## Technical notes
-- WebSDK loaded via `@sumsub/websdk-react` (browser-side only).
-- Webhook signature: `X-Payload-Digest` + `X-Payload-Digest-Alg` headers, HMAC over raw body using `SUMSUB_SECRET_KEY`.
-- All Sumsub REST calls signed with `X-App-Token` + `X-App-Access-Sig` + `X-App-Access-Ts` (HMAC-SHA256 of `ts+method+path+body`).
-- Base URL: `https://api.sumsub.com` (prod) / sandbox uses same host with sandbox token.
+### 4. Hero copy tweak (small)
+Change pill text to "Africa-first. Global rails." and tagline subline to mention "Canada, USA, Nigeria, Kenya, Ghana, Zambia and 50+ corridors."
 
 ## Files touched
-- `supabase/functions/sumsub-create-applicant/index.ts` (new)
-- `supabase/functions/sumsub-refresh-token/index.ts` (new)
-- `supabase/functions/sumsub-get-applicant-status/index.ts` (new)
-- `supabase/functions/sumsub-webhook/index.ts` (new)
-- One migration: `sumsub_verifications`, `sumsub_webhook_logs`
-- `src/pages/admin/KycReview.tsx` (or equivalent) — add Sumsub card + modal
-- `src/components/admin/SumsubLaunchModal.tsx` (new)
-- `src/pages/settings/Integrations.tsx` — flip status badge
-- `package.json` — add `@sumsub/websdk-react`
-- Memory file `mem://features/sumsub-edd` + index update
+- `src/pages/Landing.tsx` — phone mockup data, new sections, hero backdrop layer, copy tweaks
+- `src/assets/landing-africa-hero.jpg` (new, generated, then externalized via lovable-assets)
+- `src/assets/landing-africa-band.jpg` (new, generated + externalized)
+- `src/assets/landing-b2b-phone.jpg` (new, generated + externalized)
+
+## Out of scope
+- No color token changes (purple/amber preserved)
+- No nav, footer, or routing changes
+- No backend changes
