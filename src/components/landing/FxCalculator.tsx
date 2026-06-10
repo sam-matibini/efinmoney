@@ -13,13 +13,15 @@ type MarketResponse = { fiat: FiatRow[]; crypto: unknown[]; fetched_at: string }
 
 const PAYOUT_CCYS = new Set(["NGN", "KES", "GHS", "ZMW", "UGX", "TZS", "RWF", "ZAR", "XOF", "XAF"]);
 
-// Indicative landing-page benchmarks (public pricing snapshots — not backend pricing).
-const EFIN_FX_MARGIN = 0.008;   // 0.8% FX markup — undercuts both
+// Indicative landing-page benchmarks — anonymized for public display.
+// Named values are configured by staff in Admin → Settings → Pricing & Fees.
+const EFIN_FX_MARGIN = 0.008;   // 0.8% FX markup
 const EFIN_FLAT_FEE_USD = 0.99;
-const REMITLY_MARGIN = 0.022;   // ~2.2% economy FX margin
-const REMITLY_FLAT_FEE_USD = 3.99;
-const LEMFI_MARGIN = 0.018;     // ~1.8% FX margin, zero advertised fee
-const LEMFI_FLAT_FEE_USD = 0;
+// Conservative (worst-case) market benchmark — keeps savings claim credible.
+const BENCHMARK_A_MARGIN = 0.022;
+const BENCHMARK_A_FLAT_FEE_USD = 3.99;
+const BENCHMARK_B_MARGIN = 0.018;
+const BENCHMARK_B_FLAT_FEE_USD = 0;
 
 const Flag = ({ code, size = 20 }: { code: string; size?: number }) => {
   const cc = WORLD_CURRENCY_MAP[code]?.cc;
@@ -169,13 +171,14 @@ const FxCalculator = () => {
 
   // Per-provider effective rate display (post-margin)
   const efinDisplayRate = midRate ? midRate * (1 - EFIN_FX_MARGIN) : null;
-  const remitlyDisplayRate = midRate ? midRate * (1 - REMITLY_MARGIN) : null;
-  const lemfiDisplayRate = midRate ? midRate * (1 - LEMFI_MARGIN) : null;
+  // Use the worse (more expensive) of the two benchmarks for the public "typical market rate" row
+  const marketMargin = Math.max(BENCHMARK_A_MARGIN, BENCHMARK_B_MARGIN);
+  const marketDisplayRate = midRate ? midRate * (1 - marketMargin) : null;
 
-  // Savings vs the BETTER of the two competitors (worst case for our claim, most credible)
-  const remitlyRecv = quoteRecipient(sendNumeric, REMITLY_MARGIN, REMITLY_FLAT_FEE_USD);
-  const lemfiRecv = quoteRecipient(sendNumeric, LEMFI_MARGIN, LEMFI_FLAT_FEE_USD);
-  const bestCompetitorRecv = Math.max(remitlyRecv, lemfiRecv);
+  // Savings vs the BETTER of the two benchmarks (most conservative claim)
+  const benchARecv = quoteRecipient(sendNumeric, BENCHMARK_A_MARGIN, BENCHMARK_A_FLAT_FEE_USD);
+  const benchBRecv = quoteRecipient(sendNumeric, BENCHMARK_B_MARGIN, BENCHMARK_B_FLAT_FEE_USD);
+  const bestCompetitorRecv = Math.max(benchARecv, benchBRecv);
   const savingsInTo = recvNumeric - bestCompetitorRecv;
   const savingsInSend = midRate && midRate > 0 ? savingsInTo / midRate : 0;
   const savingsPct = bestCompetitorRecv > 0 ? (savingsInTo / bestCompetitorRecv) * 100 : 0;
@@ -245,7 +248,7 @@ const FxCalculator = () => {
               <div className="flex items-center justify-between mb-2">
                 <div className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[hsl(var(--accent-amber))]">
                   <Sparkles className="w-3.5 h-3.5" />
-                  You save with eFinMoney
+                  You save vs. typical market rate
                 </div>
                 <div className="text-right">
                   <div className="text-base font-black text-white tabular-nums leading-none">
@@ -265,14 +268,9 @@ const FxCalculator = () => {
                   good
                 />
                 <Row
-                  label="Remitly"
-                  rate={remitlyDisplayRate ? `1 ${from} = ${fmt(remitlyDisplayRate)} ${to}` : "—"}
-                  fee="~2.2% + $3.99"
-                />
-                <Row
-                  label="LEMFI"
-                  rate={lemfiDisplayRate ? `1 ${from} = ${fmt(lemfiDisplayRate)} ${to}` : "—"}
-                  fee="~1.8% spread"
+                  label="Typical market rate"
+                  rate={marketDisplayRate ? `1 ${from} = ${fmt(marketDisplayRate)} ${to}` : "—"}
+                  fee="~2.2% + fees"
                 />
               </div>
 
@@ -308,8 +306,9 @@ const FxCalculator = () => {
         </div>
 
         <p className="mt-2 text-[9.5px] leading-relaxed text-white/45">
-          Indicative mid-market rate · 0.8% FX + $0.99 fee. Benchmarked against Remitly & LEMFI public pricing. Rate locks for 60 s after sign in.
+          Indicative mid-market rate · 0.8% FX + $0.99 fee. Benchmarked against typical international money-transfer providers. Rate locks for 60 s after sign in.
         </p>
+
 
       </div>
     </div>

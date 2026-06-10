@@ -102,6 +102,53 @@ export const PricingSettingsPanel = () => {
 
   return (
     <div className="space-y-6">
+      {/* Competitor Benchmark — internal only */}
+      <Card className="border-amber-500/30">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <TrendingUp className="h-5 w-5 text-amber-500" />
+            Competitor Benchmark
+            <Badge variant="outline" className="ml-2 text-[10px]">Internal — staff only</Badge>
+          </CardTitle>
+          <CardDescription>
+            These values feed the "Typical market rate" comparison on the public calculator.
+            Names are visible to staff only and never rendered on the landing page.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Remitly — FX margin (%)</Label>
+              <Input type="number" defaultValue="2.20" step="0.01" />
+            </div>
+            <div className="space-y-2">
+              <Label>Remitly — Flat fee (USD)</Label>
+              <Input type="number" defaultValue="3.99" step="0.01" />
+            </div>
+            <div className="space-y-2">
+              <Label>LEMFI — FX margin (%)</Label>
+              <Input type="number" defaultValue="1.80" step="0.01" />
+            </div>
+            <div className="space-y-2">
+              <Label>LEMFI — Flat fee (USD)</Label>
+              <Input type="number" defaultValue="0.00" step="0.01" />
+            </div>
+          </div>
+          <div className="rounded-md border bg-muted/40 p-3 text-sm">
+            <div className="font-medium">Pricing target</div>
+            <div className="text-muted-foreground">
+              Intrinsically match <span className="font-semibold text-foreground">Remitly economy tier</span>.
+              Current eFinMoney pricing: <span className="font-semibold text-foreground">0.80% FX + $0.99 flat</span>.
+            </div>
+          </div>
+          <Button>
+            <Save className="h-4 w-4 mr-2" />
+            Save Benchmarks
+          </Button>
+        </CardContent>
+      </Card>
+
+
       {/* Transfer Fees */}
       <Card>
         <CardHeader>
