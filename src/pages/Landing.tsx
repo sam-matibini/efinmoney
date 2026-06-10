@@ -14,6 +14,7 @@ import featureInstant from "@/assets/landing-feature-instant.jpg";
 import featureCorridors from "@/assets/landing-feature-corridors.jpg";
 import MarketTicker from "@/components/landing/MarketTicker";
 import FxCalculator from "@/components/landing/FxCalculator";
+import heroUsers from "@/assets/landing-hero-users.jpg";
 
 const NAV_LINKS = [
   { label: "Features", href: "#features" },
