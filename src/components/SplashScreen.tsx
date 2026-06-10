@@ -46,7 +46,7 @@ const SplashScreen = () => {
         position: "fixed",
         inset: 0,
         zIndex: 9999,
-        background: "hsl(var(--background))",
+        background: "#000",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",

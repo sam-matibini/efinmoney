@@ -65,7 +65,7 @@ const LoadingSpinner = ({ size = 120, className, style }: LoadingSpinnerProps) =
           playsInline
           width={size}
           height={size}
-          style={{ width: size, height: size, background: "transparent" }}
+          style={{ width: size, height: size, background: "transparent", mixBlendMode: "screen" }}
         />
       )}
     </div>
