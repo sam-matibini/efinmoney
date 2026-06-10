@@ -284,10 +284,6 @@ const FxCalculator = () => {
           )}
         </div>
 
-            </>
-          )}
-        </div>
-
         <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
           <button
             type="button"
@@ -310,8 +306,9 @@ const FxCalculator = () => {
         </div>
 
         <p className="mt-2 text-[9.5px] leading-relaxed text-white/45">
-          Indicative mid-market rate · 0.8% FX + $0.99 fee. Benchmarked against Remitly & LEMFI public pricing. Rate locks for 60 s after sign in.
+          Indicative mid-market rate · 0.8% FX + $0.99 fee. Benchmarked against typical international money-transfer providers. Rate locks for 60 s after sign in.
         </p>
+
 
       </div>
     </div>
