@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,8 +8,14 @@ import { toast } from "sonner";
 import { Eye, EyeOff, ArrowRight, ArrowLeft } from "lucide-react";
 import { Logo, Wordmark } from "@/components/Logo";
 
+const isSafeRedirect = (path: string | null): path is string =>
+  !!path && path.startsWith("/") && !path.startsWith("//");
+
 const Auth = () => {
-  const [isSignUp, setIsSignUp] = useState(false);
+  const [params] = useSearchParams();
+  const modeParam = params.get("mode");
+  const redirectTo = params.get("redirect");
+  const [isSignUp, setIsSignUp] = useState(modeParam === "signup");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
@@ -31,6 +37,10 @@ const Auth = () => {
         if (error) toast.error(error.message);
         else {
           toast.success("Account created — let's verify your identity.");
+          // Identity is required before transfers; preserve the deep-link for after KYC.
+          if (isSafeRedirect(redirectTo)) {
+            try { sessionStorage.setItem("efm_post_kyc_redirect", redirectTo); } catch { /* noop */ }
+          }
           navigate("/onboarding/identity");
         }
       } else {
@@ -38,7 +48,7 @@ const Auth = () => {
         if (error) toast.error(error.message);
         else {
           toast.success("Welcome back!");
-          navigate("/");
+          navigate(isSafeRedirect(redirectTo) ? redirectTo : "/");
         }
       }
     } finally {
