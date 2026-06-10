@@ -31,6 +31,14 @@ const decimalsForInverse = (inv: number) => {
   return 8;
 };
 
+// Indicative spreads in basis points (1 bp = 0.01%). Used to derive bid/ask from mid.
+const MAJOR_FIAT = new Set(["USD", "EUR", "GBP", "CAD", "AUD", "JPY", "CHF"]);
+const getSpreadBps = (it: Item): number => {
+  if (it.kind === "crypto") return 30;
+  const isMajor = MAJOR_FIAT.has(it.from) && MAJOR_FIAT.has(it.to);
+  return isMajor ? 10 : 40;
+};
+
 
 const Flag = ({ code, alt }: { code: string; alt: string }) => (
   <img
@@ -133,6 +141,33 @@ const MarketTicker = () => {
                 })}
               </span>
             </span>
+            {(() => {
+              const spread = getSpreadBps(it) / 10000;
+              const bid = it.price * (1 - spread / 2);
+              const ask = it.price * (1 + spread / 2);
+              return (
+                <span
+                  className="inline-flex items-center gap-1 text-xs tabular-nums text-white/45"
+                  title="Indicative bid / ask derived from live mid"
+                >
+                  <span className="text-sky-300/70 font-semibold">Bid</span>
+                  <span className="text-white/70">
+                    {bid.toLocaleString("en-US", {
+                      minimumFractionDigits: dec,
+                      maximumFractionDigits: dec,
+                    })}
+                  </span>
+                  <span className="text-white/25">/</span>
+                  <span className="text-fuchsia-300/70 font-semibold">Ask</span>
+                  <span className="text-white/70">
+                    {ask.toLocaleString("en-US", {
+                      minimumFractionDigits: dec,
+                      maximumFractionDigits: dec,
+                    })}
+                  </span>
+                </span>
+              );
+            })()}
             <span
               className={`inline-flex items-center gap-0.5 text-xs font-semibold tabular-nums ${
                 up ? "text-emerald-400" : "text-rose-400"
@@ -163,6 +198,9 @@ const MarketTicker = () => {
         </span>
         <span className="text-[10px] uppercase tracking-[0.18em] font-semibold text-white/70">
           Live markets
+        </span>
+        <span className="hidden md:inline text-[9px] uppercase tracking-[0.14em] text-white/35 ml-1">
+          · Indicative
         </span>
       </div>
 
