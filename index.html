@@ -43,17 +43,15 @@
         transition: opacity 350ms ease-out;
       }
       #initial-splash.is-hiding { opacity: 0; pointer-events: none; }
-      #initial-splash .ring {
-        width: 72px;
-        height: 72px;
-        border-radius: 50%;
-        border: 4px solid rgba(255, 255, 255, 0.12);
-        border-top-color: #FFD700;
-        animation: splash-spin 0.9s linear infinite;
+      #initial-splash video {
+        width: 140px;
+        height: 140px;
+        background: transparent;
       }
-      @keyframes splash-spin { to { transform: rotate(360deg); } }
     </style>
-    <div id="initial-splash"><div class="ring"></div></div>
+    <div id="initial-splash">
+      <video src="/spinner.webm" autoplay loop muted playsinline width="140" height="140"></video>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
