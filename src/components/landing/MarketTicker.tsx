@@ -24,22 +24,6 @@ const decimalsFor = (price: number) => {
   return 6;
 };
 
-const decimalsForInverse = (inv: number) => {
-  if (inv >= 100) return 2;
-  if (inv >= 1) return 4;
-  if (inv >= 0.01) return 6;
-  return 8;
-};
-
-// Indicative spreads in basis points (1 bp = 0.01%). Used to derive bid/ask from mid.
-const MAJOR_FIAT = new Set(["USD", "EUR", "GBP", "CAD", "AUD", "JPY", "CHF"]);
-const getSpreadBps = (it: Item): number => {
-  if (it.kind === "crypto") return 30;
-  const isMajor = MAJOR_FIAT.has(it.from) && MAJOR_FIAT.has(it.to);
-  return isMajor ? 10 : 40;
-};
-
-
 const Flag = ({ code, alt }: { code: string; alt: string }) => (
   <img
     src={`https://flagcdn.com/20x15/${code}.png`}
@@ -85,7 +69,6 @@ const MarketTicker = () => {
       price: c.price,
       delta: c.change24h,
     }));
-    // interleave
     const out: Item[] = [];
     const max = Math.max(fiat.length, crypto.length);
     for (let i = 0; i < max; i++) {
@@ -96,18 +79,16 @@ const MarketTicker = () => {
   }, [data]);
 
   const row = (keyPrefix: string) => (
-    <div className="flex shrink-0 items-center gap-8 px-4">
-      {items.map((it) => {
+    <div className="flex shrink-0 items-center gap-10 px-5">
+      {items.map((it, idx) => {
         const up = it.delta >= 0;
         const dec = decimalsFor(it.price);
-        const inverse = it.price > 0 ? 1 / it.price : 0;
-        const invDec = decimalsForInverse(inverse);
-        const inverseLabel =
-          it.kind === "fiat" ? `${it.to}/${it.from}` : `USD/${it.symbol}`;
+        const pairLabel =
+          it.kind === "fiat" ? `${it.from} → ${it.to}` : `${it.symbol} → USD`;
         return (
           <div
             key={`${keyPrefix}-${it.key}`}
-            className="flex items-center gap-2.5 text-sm whitespace-nowrap"
+            className="flex items-center gap-3 text-sm whitespace-nowrap"
           >
             {it.kind === "fiat" ? (
               <span className="inline-flex items-center gap-1">
@@ -119,58 +100,17 @@ const MarketTicker = () => {
                 {CRYPTO_GLYPH[it.symbol] ?? "◆"}
               </span>
             )}
-            <span className="font-semibold text-white/90 tracking-tight">
-              {it.kind === "fiat" ? `${it.from}/${it.to}` : `${it.symbol}/USD`}
+            <span className="font-bold text-white tracking-tight">
+              {pairLabel}
             </span>
-            <span className="tabular-nums text-white/70">
+            <span className="tabular-nums font-semibold text-white/95">
               {it.price.toLocaleString("en-US", {
                 minimumFractionDigits: dec,
                 maximumFractionDigits: dec,
               })}
             </span>
             <span
-              className="inline-flex items-center gap-1 text-xs tabular-nums text-white/45"
-              title={`Inverse rate ${inverseLabel}`}
-            >
-              <span className="text-white/30">⇌</span>
-              <span className="font-medium text-white/55">{inverseLabel}</span>
-              <span>
-                {inverse.toLocaleString("en-US", {
-                  minimumFractionDigits: invDec,
-                  maximumFractionDigits: invDec,
-                })}
-              </span>
-            </span>
-            {(() => {
-              const spread = getSpreadBps(it) / 10000;
-              const bid = it.price * (1 - spread / 2);
-              const ask = it.price * (1 + spread / 2);
-              return (
-                <span
-                  className="inline-flex items-center gap-1.5 text-sm tabular-nums rounded-full bg-white/[0.06] ring-1 ring-white/10 px-2 py-0.5"
-                  title="Indicative bid / ask derived from live mid"
-                >
-                  <span className="text-sky-300 font-bold text-[10px] uppercase tracking-wider">Bid</span>
-                  <span className="text-white/90 font-semibold">
-                    {bid.toLocaleString("en-US", {
-                      minimumFractionDigits: dec,
-                      maximumFractionDigits: dec,
-                    })}
-                  </span>
-                  <span className="text-white/25">/</span>
-                  <span className="text-fuchsia-300 font-bold text-[10px] uppercase tracking-wider">Ask</span>
-                  <span className="text-white/90 font-semibold">
-                    {ask.toLocaleString("en-US", {
-                      minimumFractionDigits: dec,
-                      maximumFractionDigits: dec,
-                    })}
-                  </span>
-                </span>
-              );
-            })()}
-
-            <span
-              className={`inline-flex items-center gap-0.5 text-xs font-semibold tabular-nums ${
+              className={`inline-flex items-center gap-0.5 text-xs font-bold tabular-nums ${
                 up ? "text-emerald-400" : "text-rose-400"
               }`}
             >
@@ -178,46 +118,40 @@ const MarketTicker = () => {
               {up ? "+" : ""}
               {it.delta.toFixed(2)}%
             </span>
-            <span className="text-white/15">•</span>
+            {idx < items.length - 1 && <span className="text-white/15 select-none">|</span>}
           </div>
         );
       })}
-
     </div>
   );
 
   return (
     <div
       aria-label="Live markets"
-      className="relative w-full overflow-hidden border-y border-white/10 bg-[hsl(248_55%_8%)]/95 backdrop-blur-md"
+      className="relative w-full overflow-hidden border-y border-white/10 bg-[hsl(248_55%_6%)]"
     >
-      {/* live dot */}
-      <div className="absolute left-3 top-1/2 -translate-y-1/2 z-20 hidden sm:flex items-center gap-1.5 pr-3 mr-3 border-r border-white/10 bg-[hsl(248_55%_8%)]/95">
+      {/* subtle top highlight */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+
+      {/* live badge */}
+      <div className="absolute left-3 top-1/2 -translate-y-1/2 z-20 hidden sm:flex items-center gap-1.5 pr-3 mr-3 border-r border-white/10 bg-[hsl(248_55%_6%)]">
         <span className="relative flex h-2 w-2">
           <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" />
           <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
         </span>
-        <span className="text-[10px] uppercase tracking-[0.18em] font-semibold text-white/70">
+        <span className="text-[10px] uppercase tracking-[0.18em] font-bold text-white/80">
           Live markets
         </span>
-        <span className="hidden md:inline text-[9px] uppercase tracking-[0.14em] text-white/35 ml-1">
-          · Indicative
-        </span>
-        <span className="hidden lg:inline-flex items-center gap-1 ml-2 rounded-full bg-white/[0.06] ring-1 ring-white/15 px-2 py-0.5 text-[10px] uppercase tracking-wider font-bold">
-          <span className="text-sky-300">Bid</span>
-          <span className="text-white/30">/</span>
-          <span className="text-fuchsia-300">Ask</span>
+        <span className="hidden md:inline text-[9px] uppercase tracking-[0.14em] text-white/40 ml-1">
+          · 24h
         </span>
       </div>
 
-
-
-
       {/* edge fades */}
-      <div className="pointer-events-none absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-[hsl(248_55%_8%)] to-transparent z-10" />
-      <div className="pointer-events-none absolute inset-y-0 right-0 w-24 bg-gradient-to-l from-[hsl(248_55%_8%)] to-transparent z-10" />
+      <div className="pointer-events-none absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-[hsl(248_55%_6%)] to-transparent z-10" />
+      <div className="pointer-events-none absolute inset-y-0 right-0 w-24 bg-gradient-to-l from-[hsl(248_55%_6%)] to-transparent z-10" />
 
-      <div className="flex py-3 group min-h-[44px]">
+      <div className="flex py-3.5 group min-h-[44px]">
         {items.length === 0 ? (
           <div className="px-6 text-xs text-white/60">
             {isLoading ? "Loading live markets…" : "Markets temporarily unavailable"}
