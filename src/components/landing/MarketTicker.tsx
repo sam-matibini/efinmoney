@@ -147,19 +147,19 @@ const MarketTicker = () => {
               const ask = it.price * (1 + spread / 2);
               return (
                 <span
-                  className="inline-flex items-center gap-1 text-xs tabular-nums text-white/45"
+                  className="inline-flex items-center gap-1.5 text-sm tabular-nums rounded-full bg-white/[0.06] ring-1 ring-white/10 px-2 py-0.5"
                   title="Indicative bid / ask derived from live mid"
                 >
-                  <span className="text-sky-300/70 font-semibold">Bid</span>
-                  <span className="text-white/70">
+                  <span className="text-sky-300 font-bold text-[10px] uppercase tracking-wider">Bid</span>
+                  <span className="text-white/90 font-semibold">
                     {bid.toLocaleString("en-US", {
                       minimumFractionDigits: dec,
                       maximumFractionDigits: dec,
                     })}
                   </span>
                   <span className="text-white/25">/</span>
-                  <span className="text-fuchsia-300/70 font-semibold">Ask</span>
-                  <span className="text-white/70">
+                  <span className="text-fuchsia-300 font-bold text-[10px] uppercase tracking-wider">Ask</span>
+                  <span className="text-white/90 font-semibold">
                     {ask.toLocaleString("en-US", {
                       minimumFractionDigits: dec,
                       maximumFractionDigits: dec,
@@ -168,6 +168,7 @@ const MarketTicker = () => {
                 </span>
               );
             })()}
+
             <span
               className={`inline-flex items-center gap-0.5 text-xs font-semibold tabular-nums ${
                 up ? "text-emerald-400" : "text-rose-400"
@@ -202,7 +203,15 @@ const MarketTicker = () => {
         <span className="hidden md:inline text-[9px] uppercase tracking-[0.14em] text-white/35 ml-1">
           · Indicative
         </span>
+        <span className="hidden lg:inline-flex items-center gap-1 ml-2 rounded-full bg-white/[0.06] ring-1 ring-white/15 px-2 py-0.5 text-[10px] uppercase tracking-wider font-bold">
+          <span className="text-sky-300">Bid</span>
+          <span className="text-white/30">/</span>
+          <span className="text-fuchsia-300">Ask</span>
+        </span>
       </div>
+
+
+
 
       {/* edge fades */}
       <div className="pointer-events-none absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-[hsl(248_55%_8%)] to-transparent z-10" />
