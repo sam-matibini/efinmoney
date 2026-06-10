@@ -333,7 +333,7 @@ const CurrencyPicker = ({ value, onChange }: { value: string; onChange: (v: stri
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="inline-flex items-center gap-2 pl-2 pr-2.5 h-11 rounded-xl bg-white/10 hover:bg-white/15 ring-1 ring-white/15 text-white text-sm font-bold transition"
+          className="inline-flex items-center gap-1.5 pl-1.5 pr-2 h-9 rounded-lg bg-white/10 hover:bg-white/15 ring-1 ring-white/15 text-white text-[12px] font-bold transition"
         >
           <Flag code={value} />
           <span>{value}</span>
