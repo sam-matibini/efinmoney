@@ -9,6 +9,10 @@ import b2bPhone from "@/assets/landing-b2b-phone.jpg";
 import tourismKenya from "@/assets/landing-tourism-kenya.jpg";
 import tourismVicFalls from "@/assets/landing-tourism-victoria-falls.jpg";
 import tourismZanzibar from "@/assets/landing-tourism-zanzibar.jpg";
+import featureSecurity from "@/assets/landing-feature-security.jpg";
+import featureInstant from "@/assets/landing-feature-instant.jpg";
+import featureCorridors from "@/assets/landing-feature-corridors.jpg";
+import MarketTicker from "@/components/landing/MarketTicker";
 
 const NAV_LINKS = [
   { label: "Features", href: "#features" },
