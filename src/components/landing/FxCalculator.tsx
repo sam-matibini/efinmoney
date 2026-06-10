@@ -159,14 +159,14 @@ const FxCalculator = () => {
   const rateUnavailable = !isLoading && !midRate;
 
   return (
-    <div className="relative w-full max-w-md mx-auto lg:mx-0">
-      <div className="absolute -inset-1 rounded-[28px] bg-gradient-to-br from-[hsl(var(--accent-amber)/0.35)] via-[hsl(var(--brand-500)/0.25)] to-transparent blur-2xl pointer-events-none" />
-      <div className="relative rounded-3xl bg-[hsl(248_60%_8%)]/95 backdrop-blur-xl ring-1 ring-white/15 shadow-2xl p-5 sm:p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div className="text-xs font-bold uppercase tracking-[0.18em] text-white/70">Live FX calculator</div>
-          <div className="inline-flex items-center gap-1.5 text-[10px] font-semibold text-white/60">
+    <div className="relative w-full max-w-[340px] mx-auto lg:mx-0">
+      <div className="absolute -inset-1 rounded-[24px] bg-gradient-to-br from-[hsl(var(--accent-amber)/0.35)] via-[hsl(var(--brand-500)/0.25)] to-transparent blur-2xl pointer-events-none" />
+      <div className="relative rounded-2xl bg-[hsl(248_60%_8%)]/95 backdrop-blur-xl ring-1 ring-white/15 shadow-2xl p-4">
+        <div className="flex items-center justify-between mb-2.5">
+          <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/70">Live FX calculator</div>
+          <div className="inline-flex items-center gap-1.5 text-[9.5px] font-semibold text-white/60">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            {isLoading ? "Loading…" : `Updated ${secondsAgo}s ago`}
+            {isLoading ? "Loading…" : `${secondsAgo}s ago`}
           </div>
         </div>
 
@@ -179,14 +179,14 @@ const FxCalculator = () => {
           loading={isLoading}
         />
 
-        <div className="my-2 flex justify-center">
+        <div className="my-1.5 flex justify-center">
           <button
             type="button"
             onClick={swap}
-            className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 ring-1 ring-white/20 text-white grid place-items-center transition"
+            className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 ring-1 ring-white/20 text-white grid place-items-center transition"
             aria-label="Swap currencies"
           >
-            <ArrowDownUp className="w-4 h-4" />
+            <ArrowDownUp className="w-3.5 h-3.5" />
           </button>
         </div>
 
@@ -201,7 +201,7 @@ const FxCalculator = () => {
         />
 
         {/* Comparison strip */}
-        <div className="mt-4 rounded-2xl bg-gradient-to-br from-[hsl(var(--accent-amber)/0.12)] to-white/[0.03] ring-1 ring-[hsl(var(--accent-amber)/0.25)] p-3.5">
+        <div className="mt-3 rounded-xl bg-gradient-to-br from-[hsl(var(--accent-amber)/0.12)] to-white/[0.03] ring-1 ring-[hsl(var(--accent-amber)/0.25)] p-2.5">
           {rateUnavailable ? (
             <div className="text-[12px] text-white/70">Rate unavailable for this pair — try another currency.</div>
           ) : (
@@ -244,29 +244,29 @@ const FxCalculator = () => {
           )}
         </div>
 
-        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+        <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
           <button
             type="button"
             onClick={() => goNext(user ? "direct" : "signup")}
             disabled={rateUnavailable || sendNumeric <= 0}
-            className="group inline-flex items-center justify-center gap-2 h-12 rounded-full bg-[hsl(var(--accent-amber))] hover:brightness-110 text-[hsl(var(--brand-900))] font-bold text-sm shadow-cta-amber transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="group inline-flex items-center justify-center gap-1.5 h-10 rounded-full bg-[hsl(var(--accent-amber))] hover:brightness-110 text-[hsl(var(--brand-900))] font-bold text-[13px] shadow-cta-amber transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {user ? "Continue" : "Sign up & send"}
-            <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+            <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
           </button>
           {!user && (
             <button
               type="button"
               onClick={() => goNext("signin")}
-              className="inline-flex items-center justify-center h-12 rounded-full bg-white/10 hover:bg-white/15 ring-1 ring-white/20 text-white font-bold text-sm transition"
+              className="inline-flex items-center justify-center h-10 rounded-full bg-white/10 hover:bg-white/15 ring-1 ring-white/20 text-white font-bold text-[13px] transition"
             >
               Sign in
             </button>
           )}
         </div>
 
-        <p className="mt-3 text-[10.5px] leading-relaxed text-white/45">
-          Indicative mid-market rate. Final tradable rate is locked at quote (60 s) after sign in.
+        <p className="mt-2 text-[9.5px] leading-relaxed text-white/45">
+          Indicative mid-market rate. Locked at quote (60 s) after sign in.
         </p>
       </div>
     </div>
@@ -310,15 +310,15 @@ const AmountRow = ({
   loading?: boolean;
   highlight?: boolean;
 }) => (
-  <div className={`rounded-2xl px-4 py-3 ring-1 ${highlight ? "bg-white/[0.08] ring-white/15" : "bg-white/[0.06] ring-white/10"}`}>
-    <div className="text-[10.5px] uppercase tracking-[0.18em] font-semibold text-white/55 mb-1.5">{label}</div>
-    <div className="flex items-center gap-3">
+  <div className={`rounded-xl px-3 py-2.5 ring-1 ${highlight ? "bg-white/[0.08] ring-white/15" : "bg-white/[0.06] ring-white/10"}`}>
+    <div className="text-[9.5px] uppercase tracking-[0.18em] font-semibold text-white/55 mb-1">{label}</div>
+    <div className="flex items-center gap-2">
       <input
         inputMode="decimal"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={loading ? "…" : "0.00"}
-        className="flex-1 min-w-0 bg-transparent border-0 outline-none text-2xl sm:text-3xl font-black text-white tabular-nums placeholder:text-white/30"
+        className="flex-1 min-w-0 bg-transparent border-0 outline-none text-xl sm:text-2xl font-black text-white tabular-nums placeholder:text-white/30"
       />
       <CurrencyPicker value={currency} onChange={onCurrencyChange} />
     </div>
@@ -333,7 +333,7 @@ const CurrencyPicker = ({ value, onChange }: { value: string; onChange: (v: stri
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="inline-flex items-center gap-2 pl-2 pr-2.5 h-11 rounded-xl bg-white/10 hover:bg-white/15 ring-1 ring-white/15 text-white text-sm font-bold transition"
+          className="inline-flex items-center gap-1.5 pl-1.5 pr-2 h-9 rounded-lg bg-white/10 hover:bg-white/15 ring-1 ring-white/15 text-white text-[12px] font-bold transition"
         >
           <Flag code={value} />
           <span>{value}</span>
