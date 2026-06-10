@@ -18,11 +18,17 @@ const SplashScreen = () => {
       }, wait);
     };
 
+    // Remove the static HTML splash now that React has mounted.
+    const staticSplash = document.getElementById("initial-splash");
+    if (staticSplash) {
+      staticSplash.classList.add("is-hiding");
+      window.setTimeout(() => staticSplash.remove(), 400);
+    }
+
     if (document.readyState === "complete") {
       hide();
     } else {
       window.addEventListener("load", hide, { once: true });
-      // Safety fallback in case `load` never fires
       const fallback = window.setTimeout(hide, 3000);
       return () => {
         window.removeEventListener("load", hide);
