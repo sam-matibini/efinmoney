@@ -1,54 +1,36 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { ArrowDownUp, ArrowRight, Loader2 } from "lucide-react";
+import { ArrowDownUp, ArrowRight, Check, ChevronDown, Loader2, Search, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { WORLD_CURRENCIES, WORLD_CURRENCY_MAP } from "@/lib/worldCurrencies";
 
 type FiatRow = { from: string; to: string; price: number; change24h: number };
 type MarketResponse = { fiat: FiatRow[]; crypto: unknown[]; fetched_at: string };
 
-const SEND_CCYS = ["CAD", "USD", "GBP", "EUR"] as const;
-const RECEIVE_CCYS = [
-  "NGN", "KES", "GHS", "ZMW", "UGX", "TZS", "RWF", "ZAR",
-  "XOF", "XAF", "USD", "CAD", "EUR", "GBP",
-] as const;
-
 const PAYOUT_CCYS = new Set(["NGN", "KES", "GHS", "ZMW", "UGX", "TZS", "RWF", "ZAR", "XOF", "XAF"]);
 
-const CCY_TO_CC: Record<string, string> = {
-  USD: "us", CAD: "ca", GBP: "gb", EUR: "eu",
-  NGN: "ng", KES: "ke", GHS: "gh", ZMW: "zm", UGX: "ug", TZS: "tz",
-  RWF: "rw", ZAR: "za", XOF: "sn", XAF: "cm",
-};
+const FEE_RATE = 0.005; // eFinMoney
+const BANK_MARGIN = 0.035; // typical bank/PayPal hidden FX margin baseline
 
-const FEE_RATE = 0.005; // mirrors fx-engine
-
-const formatMoney = (n: number, ccy: string) => {
-  const decimals = n >= 1000 ? 2 : n >= 1 ? 2 : 4;
-  return new Intl.NumberFormat("en-US", {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  }).format(n) + " " + ccy;
-};
-
-const Flag = ({ ccy }: { ccy: string }) => {
-  const cc = CCY_TO_CC[ccy];
-  if (!cc) return <span className="inline-block w-5 h-[15px] rounded-[2px] bg-white/20" />;
+const Flag = ({ code, size = 20 }: { code: string; size?: number }) => {
+  const cc = WORLD_CURRENCY_MAP[code]?.cc;
+  if (!cc) return <span className="inline-block rounded-[2px] bg-white/20" style={{ width: size, height: size * 0.75 }} />;
   return (
     <img
-      src={`https://flagcdn.com/20x15/${cc}.png`}
-      srcSet={`https://flagcdn.com/40x30/${cc}.png 2x`}
-      width={20}
-      height={15}
-      alt={ccy}
+      src={`https://flagcdn.com/${size * 2}x${size * 1.5}/${cc}.png`}
+      width={size}
+      height={size * 0.75}
+      alt={code}
       loading="lazy"
-      className="inline-block rounded-[2px] ring-1 ring-white/15"
+      className="inline-block rounded-[2px] ring-1 ring-white/15 object-cover"
     />
   );
 };
 
-/** Build USD-pivot map: ccy → USD multiplier (i.e., 1 ccy = x USD). */
 const buildUsdMap = (rows: FiatRow[]): Map<string, number> => {
   const m = new Map<string, number>();
   m.set("USD", 1);
@@ -56,17 +38,25 @@ const buildUsdMap = (rows: FiatRow[]): Map<string, number> => {
     if (r.to === "USD" && !m.has(r.from)) m.set(r.from, Number(r.price));
     if (r.from === "USD" && !m.has(r.to) && Number(r.price) > 0) m.set(r.to, 1 / Number(r.price));
   }
-  // second pass for any chained pairs (e.g. CAD→NGN) using already-known USD anchors
   for (const r of rows) {
-    if (!m.has(r.to) && m.has(r.from) && Number(r.price) > 0) {
-      // 1 from = price to  →  1 to = (1/price) from = (1/price)*usd(from)
-      m.set(r.to, m.get(r.from)! / Number(r.price));
-    }
-    if (!m.has(r.from) && m.has(r.to) && Number(r.price) > 0) {
-      m.set(r.from, m.get(r.to)! * Number(r.price));
-    }
+    if (!m.has(r.to) && m.has(r.from) && Number(r.price) > 0) m.set(r.to, m.get(r.from)! / Number(r.price));
+    if (!m.has(r.from) && m.has(r.to) && Number(r.price) > 0) m.set(r.from, m.get(r.to)! * Number(r.price));
   }
   return m;
+};
+
+const fmt = (n: number) => {
+  if (!isFinite(n)) return "—";
+  const decimals = Math.abs(n) >= 1000 ? 2 : Math.abs(n) >= 1 ? 2 : 4;
+  return new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  }).format(n);
+};
+
+const parseAmount = (s: string): number => {
+  const n = Number(String(s).replace(/,/g, ""));
+  return isFinite(n) ? n : 0;
 };
 
 const FxCalculator = () => {
@@ -74,8 +64,10 @@ const FxCalculator = () => {
   const { user } = useAuth();
   const [from, setFrom] = useState<string>("CAD");
   const [to, setTo] = useState<string>("NGN");
-  const [amount, setAmount] = useState<string>("1000");
-  const [tick, setTick] = useState(0);
+  const [sendAmt, setSendAmt] = useState<string>("1000");
+  const [recvAmt, setRecvAmt] = useState<string>("");
+  const [lastEdited, setLastEdited] = useState<"send" | "receive">("send");
+  const [, setTick] = useState(0);
   const fetchedAtRef = useRef<number>(Date.now());
 
   const { data, isLoading } = useQuery({
@@ -90,7 +82,6 @@ const FxCalculator = () => {
     staleTime: 30_000,
   });
 
-  // "updated Xs ago" tick
   useEffect(() => {
     const id = setInterval(() => setTick((t) => t + 1), 1000);
     return () => clearInterval(id);
@@ -98,7 +89,7 @@ const FxCalculator = () => {
 
   const usdMap = useMemo(() => buildUsdMap(data?.fiat ?? []), [data]);
 
-  const rate = useMemo(() => {
+  const midRate = useMemo<number | null>(() => {
     if (from === to) return 1;
     const fUsd = usdMap.get(from);
     const tUsd = usdMap.get(to);
@@ -106,59 +97,86 @@ const FxCalculator = () => {
     return fUsd / tUsd;
   }, [from, to, usdMap]);
 
-  const numericAmount = Number(amount.replace(/,/g, "")) || 0;
-  const receive = rate ? numericAmount * rate * (1 - FEE_RATE) : 0;
-  const secondsAgo = Math.max(0, Math.floor((Date.now() - fetchedAtRef.current) / 1000));
-  // tick is referenced to keep secondsAgo fresh
-  void tick;
+  const effectiveRate = midRate ? midRate * (1 - FEE_RATE) : null;
+  const bankRate = midRate ? midRate * (1 - BANK_MARGIN) : null;
+
+  // Recompute the non-edited side whenever rate / inputs / pair change
+  useEffect(() => {
+    if (!effectiveRate) return;
+    if (lastEdited === "send") {
+      const s = parseAmount(sendAmt);
+      setRecvAmt(s > 0 ? fmt(s * effectiveRate) : "");
+    } else {
+      const r = parseAmount(recvAmt);
+      setSendAmt(r > 0 ? fmt(r / effectiveRate) : "");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [effectiveRate, from, to]);
+
+  const onSendChange = (v: string) => {
+    const clean = v.replace(/[^0-9.,]/g, "");
+    setSendAmt(clean);
+    setLastEdited("send");
+    if (!effectiveRate) return;
+    const s = parseAmount(clean);
+    setRecvAmt(s > 0 ? fmt(s * effectiveRate) : "");
+  };
+  const onRecvChange = (v: string) => {
+    const clean = v.replace(/[^0-9.,]/g, "");
+    setRecvAmt(clean);
+    setLastEdited("receive");
+    if (!effectiveRate) return;
+    const r = parseAmount(clean);
+    setSendAmt(r > 0 ? fmt(r / effectiveRate) : "");
+  };
 
   const swap = () => {
     setFrom(to);
     setTo(from);
   };
 
+  const secondsAgo = Math.max(0, Math.floor((Date.now() - fetchedAtRef.current) / 1000));
+
+  const sendNumeric = parseAmount(sendAmt);
+  const recvNumeric = parseAmount(recvAmt);
+  const bankReceive = bankRate ? sendNumeric * bankRate : 0;
+  const savings = recvNumeric - bankReceive; // in `to` currency
+  // Convert savings back to send currency for headline
+  const savingsInSend = midRate && midRate > 0 ? savings / midRate : 0;
+  const savingsPct = bankReceive > 0 ? ((recvNumeric - bankReceive) / bankReceive) * 100 : 0;
+
   const goNext = (mode: "signup" | "signin" | "direct") => {
     const target = PAYOUT_CCYS.has(to) ? "/send" : "/exchange";
-    const qs = `?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&amount=${encodeURIComponent(String(numericAmount))}`;
+    const qs = `?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&amount=${encodeURIComponent(String(sendNumeric))}`;
     const dest = target + qs;
-    // remember intent so post-auth destination pages can prefill
     try {
-      sessionStorage.setItem(
-        "efm_fx_intent",
-        JSON.stringify({ from, to, amount: numericAmount, at: Date.now() }),
-      );
+      sessionStorage.setItem("efm_fx_intent", JSON.stringify({ from, to, amount: sendNumeric, at: Date.now() }));
     } catch { /* ignore */ }
-    if (user || mode === "direct") {
-      navigate(dest);
-      return;
-    }
-    const authPath = `/auth?mode=${mode}&redirect=${encodeURIComponent(dest)}`;
-    navigate(authPath);
+    if (user || mode === "direct") return navigate(dest);
+    navigate(`/auth?mode=${mode}&redirect=${encodeURIComponent(dest)}`);
   };
+
+  const rateUnavailable = !isLoading && !midRate;
 
   return (
     <div className="relative w-full max-w-md mx-auto lg:mx-0">
       <div className="absolute -inset-1 rounded-[28px] bg-gradient-to-br from-[hsl(var(--accent-amber)/0.35)] via-[hsl(var(--brand-500)/0.25)] to-transparent blur-2xl pointer-events-none" />
       <div className="relative rounded-3xl bg-[hsl(248_60%_8%)]/95 backdrop-blur-xl ring-1 ring-white/15 shadow-2xl p-5 sm:p-6">
         <div className="flex items-center justify-between mb-4">
-          <div className="text-xs font-bold uppercase tracking-[0.18em] text-white/70">
-            Live FX calculator
-          </div>
+          <div className="text-xs font-bold uppercase tracking-[0.18em] text-white/70">Live FX calculator</div>
           <div className="inline-flex items-center gap-1.5 text-[10px] font-semibold text-white/60">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
             {isLoading ? "Loading…" : `Updated ${secondsAgo}s ago`}
           </div>
         </div>
 
-        {/* You send */}
-        <CurrencyRow
+        <AmountRow
           label="You send"
-          amount={amount}
-          editable
-          onAmountChange={setAmount}
+          value={sendAmt}
+          onChange={onSendChange}
           currency={from}
           onCurrencyChange={setFrom}
-          options={SEND_CCYS as unknown as string[]}
+          loading={isLoading}
         />
 
         <div className="my-2 flex justify-center">
@@ -172,33 +190,65 @@ const FxCalculator = () => {
           </button>
         </div>
 
-        {/* Recipient gets */}
-        <CurrencyRow
+        <AmountRow
           label="Recipient gets"
-          amount={isLoading ? "…" : rate ? formatNumber(receive) : "—"}
-          editable={false}
+          value={recvAmt}
+          onChange={onRecvChange}
           currency={to}
           onCurrencyChange={setTo}
-          options={RECEIVE_CCYS as unknown as string[]}
+          loading={isLoading}
+          highlight
         />
 
-        {/* Rate strip */}
-        <div className="mt-4 rounded-xl bg-white/5 ring-1 ring-white/10 px-3.5 py-2.5 text-[11.5px] text-white/75 flex flex-wrap items-center gap-x-3 gap-y-1">
-          <span className="font-semibold text-white">
-            1 {from} = {rate ? formatMoney(rate, to).replace(" " + to, "") : "—"} {to}
-          </span>
-          <span className="text-white/40">·</span>
-          <span>Fee {(FEE_RATE * 100).toFixed(1)}%</span>
-          <span className="text-white/40">·</span>
-          <span>Mid-market</span>
+        {/* Comparison strip */}
+        <div className="mt-4 rounded-2xl bg-gradient-to-br from-[hsl(var(--accent-amber)/0.12)] to-white/[0.03] ring-1 ring-[hsl(var(--accent-amber)/0.25)] p-3.5">
+          {rateUnavailable ? (
+            <div className="text-[12px] text-white/70">Rate unavailable for this pair — try another currency.</div>
+          ) : (
+            <>
+              <div className="flex items-center justify-between mb-2">
+                <div className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[hsl(var(--accent-amber))]">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  You save with eFinMoney
+                </div>
+                <div className="text-right">
+                  <div className="text-base font-black text-white tabular-nums leading-none">
+                    {savingsInSend > 0 ? `+${fmt(savingsInSend)} ${from}` : "—"}
+                  </div>
+                  {savingsPct > 0 && (
+                    <div className="text-[10px] font-bold text-emerald-400 tabular-nums">+{savingsPct.toFixed(1)}%</div>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-1.5 text-[11.5px]">
+                <Row
+                  label="eFinMoney"
+                  rate={midRate ? `1 ${from} = ${fmt(midRate)} ${to}` : "—"}
+                  fee="0.5% fee"
+                  good
+                />
+                <Row
+                  label="Typical bank"
+                  rate={bankRate ? `1 ${from} = ${fmt(bankRate)} ${to}` : "—"}
+                  fee="~3.5% hidden margin"
+                />
+              </div>
+
+              <div className="mt-2.5 flex flex-wrap gap-1.5">
+                <Badge>Mid-market rate</Badge>
+                <Badge>No hidden fees</Badge>
+                <Badge>60s rate lock</Badge>
+              </div>
+            </>
+          )}
         </div>
 
-        {/* CTAs */}
         <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
           <button
             type="button"
             onClick={() => goNext(user ? "direct" : "signup")}
-            disabled={!rate || numericAmount <= 0}
+            disabled={rateUnavailable || sendNumeric <= 0}
             className="group inline-flex items-center justify-center gap-2 h-12 rounded-full bg-[hsl(var(--accent-amber))] hover:brightness-110 text-[hsl(var(--brand-900))] font-bold text-sm shadow-cta-amber transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {user ? "Continue" : "Sign up & send"}
@@ -223,60 +273,112 @@ const FxCalculator = () => {
   );
 };
 
-const formatNumber = (n: number) => {
-  const decimals = n >= 1000 ? 2 : n >= 1 ? 2 : 4;
-  return new Intl.NumberFormat("en-US", {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  }).format(n);
-};
-
-const CurrencyRow = ({
-  label, amount, editable, onAmountChange, currency, onCurrencyChange, options,
-}: {
-  label: string;
-  amount: string;
-  editable: boolean;
-  onAmountChange?: (v: string) => void;
-  currency: string;
-  onCurrencyChange: (v: string) => void;
-  options: string[];
-}) => (
-  <div className="rounded-2xl bg-white/[0.06] ring-1 ring-white/10 px-4 py-3">
-    <div className="text-[10.5px] uppercase tracking-[0.18em] font-semibold text-white/55 mb-1.5">
-      {label}
-    </div>
-    <div className="flex items-center gap-3">
-      {editable ? (
-        <input
-          inputMode="decimal"
-          value={amount}
-          onChange={(e) => onAmountChange?.(e.target.value.replace(/[^0-9.,]/g, ""))}
-          className="flex-1 min-w-0 bg-transparent border-0 outline-none text-2xl sm:text-3xl font-black text-white tabular-nums placeholder:text-white/30"
-          placeholder="0.00"
-        />
-      ) : (
-        <div className="flex-1 min-w-0 text-2xl sm:text-3xl font-black text-white tabular-nums truncate">
-          {amount === "…" ? <Loader2 className="w-5 h-5 animate-spin text-white/60" /> : amount}
-        </div>
-      )}
-      <div className="relative">
-        <select
-          value={currency}
-          onChange={(e) => onCurrencyChange(e.target.value)}
-          className="appearance-none pl-9 pr-7 h-11 rounded-xl bg-white/10 hover:bg-white/15 ring-1 ring-white/15 text-white text-sm font-bold cursor-pointer focus:outline-none focus:ring-2 focus:ring-[hsl(var(--accent-amber))]"
-        >
-          {options.map((o) => (
-            <option key={o} value={o} className="bg-[hsl(248_60%_10%)]">{o}</option>
-          ))}
-        </select>
-        <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2">
-          <Flag ccy={currency} />
+const Row = ({ label, rate, fee, good }: { label: string; rate: string; fee: string; good?: boolean }) => (
+  <div className="flex items-center justify-between gap-2">
+    <div className="flex items-center gap-1.5 min-w-0">
+      {good ? (
+        <span className="w-4 h-4 rounded-full bg-emerald-500/20 text-emerald-400 grid place-items-center shrink-0">
+          <Check className="w-2.5 h-2.5" strokeWidth={3} />
         </span>
-        <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-white/60 text-xs">▾</span>
-      </div>
+      ) : (
+        <span className="w-4 h-4 shrink-0" />
+      )}
+      <span className={good ? "font-bold text-white" : "text-white/60"}>{label}</span>
+    </div>
+    <div className="text-right">
+      <div className={`tabular-nums ${good ? "text-white font-semibold" : "text-white/70"}`}>{rate}</div>
+      <div className={`text-[10px] ${good ? "text-emerald-400 font-semibold" : "text-white/50"}`}>{fee}</div>
     </div>
   </div>
 );
+
+const Badge = ({ children }: { children: React.ReactNode }) => (
+  <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-white/75 bg-white/8 ring-1 ring-white/15 rounded-full px-2 py-0.5">
+    <Check className="w-2.5 h-2.5 text-emerald-400" strokeWidth={3} />
+    {children}
+  </span>
+);
+
+const AmountRow = ({
+  label, value, onChange, currency, onCurrencyChange, loading, highlight,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  currency: string;
+  onCurrencyChange: (v: string) => void;
+  loading?: boolean;
+  highlight?: boolean;
+}) => (
+  <div className={`rounded-2xl px-4 py-3 ring-1 ${highlight ? "bg-white/[0.08] ring-white/15" : "bg-white/[0.06] ring-white/10"}`}>
+    <div className="text-[10.5px] uppercase tracking-[0.18em] font-semibold text-white/55 mb-1.5">{label}</div>
+    <div className="flex items-center gap-3">
+      <input
+        inputMode="decimal"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={loading ? "…" : "0.00"}
+        className="flex-1 min-w-0 bg-transparent border-0 outline-none text-2xl sm:text-3xl font-black text-white tabular-nums placeholder:text-white/30"
+      />
+      <CurrencyPicker value={currency} onChange={onCurrencyChange} />
+    </div>
+  </div>
+);
+
+const CurrencyPicker = ({ value, onChange }: { value: string; onChange: (v: string) => void }) => {
+  const [open, setOpen] = useState(false);
+  const cur = WORLD_CURRENCY_MAP[value];
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex items-center gap-2 pl-2 pr-2.5 h-11 rounded-xl bg-white/10 hover:bg-white/15 ring-1 ring-white/15 text-white text-sm font-bold transition"
+        >
+          <Flag code={value} />
+          <span>{value}</span>
+          <ChevronDown className="w-3.5 h-3.5 opacity-70" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="end"
+        sideOffset={8}
+        className="w-[280px] p-0 bg-[hsl(248_60%_10%)] border-white/15 text-white"
+      >
+        <Command className="bg-transparent">
+          <div className="flex items-center gap-2 px-3 border-b border-white/10">
+            <Search className="w-4 h-4 text-white/50" />
+            <CommandInput
+              placeholder="Search currency or country…"
+              className="bg-transparent text-white placeholder:text-white/40 h-10"
+            />
+          </div>
+          <CommandList className="max-h-72">
+            <CommandEmpty className="py-6 text-center text-sm text-white/50">No match.</CommandEmpty>
+            <CommandGroup>
+              {WORLD_CURRENCIES.map((c) => (
+                <CommandItem
+                  key={c.code}
+                  value={`${c.code} ${c.name} ${c.country}`}
+                  onSelect={() => {
+                    onChange(c.code);
+                    setOpen(false);
+                  }}
+                  className="flex items-center gap-2.5 cursor-pointer text-white aria-selected:bg-white/10"
+                >
+                  <Flag code={c.code} />
+                  <span className="font-bold w-12 tabular-nums">{c.code}</span>
+                  <span className="flex-1 min-w-0 truncate text-white/80">{c.name}</span>
+                  <span className="text-[10px] text-white/50 truncate max-w-[80px]">{c.country}</span>
+                  {value === c.code && <Check className="w-4 h-4 text-emerald-400" />}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+};
 
 export default FxCalculator;
