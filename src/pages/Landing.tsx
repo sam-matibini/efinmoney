@@ -55,20 +55,23 @@ const PhoneFrame = ({ children, delay = 0, rotate = 0 }: { children: React.React
 const WalletScreen = () => (
   <div className="h-full p-5 flex flex-col bg-gradient-to-b from-indigo-50 to-white">
     <div className="text-xs text-neutral-500 mt-4">Total Balance</div>
-    <div className="text-3xl font-black text-neutral-900 mt-1">$10,963.68</div>
-    <div className="text-xs text-indigo-600 mt-1 font-semibold">+2.4% today</div>
-    <div className="mt-5 space-y-2">
+    <div className="text-2xl font-black text-neutral-900 mt-1">$10,963.68</div>
+    <div className="text-[10px] text-indigo-600 mt-1 font-semibold">+2.4% today</div>
+    <div className="mt-3 space-y-1.5">
       {[
-        { flag: "🇺🇸", c: "USD", b: "$10,170.05" },
-        { flag: "🇨🇦", c: "CAD", b: "C$407.99" },
+        { flag: "🇺🇸", c: "USD", b: "$10,170" },
+        { flag: "🇨🇦", c: "CAD", b: "C$407" },
         { flag: "🇳🇬", c: "NGN", b: "₦789,980" },
+        { flag: "🇰🇪", c: "KES", b: "KSh 88,450" },
+        { flag: "🇬🇭", c: "GHS", b: "₵5,210" },
+        { flag: "🇿🇲", c: "ZMW", b: "ZK 8,900" },
       ].map((w) => (
-        <div key={w.c} className="flex items-center justify-between p-3 rounded-xl bg-neutral-50">
-          <div className="flex items-center gap-2">
-            <span className="text-xl">{w.flag}</span>
-            <span className="text-sm font-bold text-neutral-900">{w.c}</span>
+        <div key={w.c} className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-neutral-50">
+          <div className="flex items-center gap-1.5">
+            <span className="text-base">{w.flag}</span>
+            <span className="text-[11px] font-bold text-neutral-900">{w.c}</span>
           </div>
-          <span className="text-sm font-semibold text-neutral-700">{w.b}</span>
+          <span className="text-[11px] font-semibold text-neutral-700">{w.b}</span>
         </div>
       ))}
     </div>
