@@ -1,38 +1,48 @@
-# Landing — Tourism & Africa Travel Band
+# Landing page: feature photos + live markets ticker
 
-Add a new "Tourism powers transfers" band on the landing page below the existing "Built for the African continent" section, showcasing iconic African destinations to reinforce the tourism → remittance story.
+## 1. Real photos on the 3 feature cards
+Add a photographic header image to each card in the "Built for the way you move money" section.
 
-## Changes
+Generate 3 new assets (photoreal, on-brand, dark/purple-friendly):
+- `src/assets/landing-feature-security.jpg` — vault door / biometric fingerprint on glass / server room with subtle purple lighting → **Bank-Grade Security**
+- `src/assets/landing-feature-instant.jpg` — phone showing a "Transfer sent" confirmation with motion-blur light streaks → **Instant Transfers**
+- `src/assets/landing-feature-corridors.jpg` — world map / globe with glowing route arcs between Canada, USA, Nigeria, Kenya, Ghana, Zambia → **50+ Currency Corridors**
 
-### New section: "Tourism powers transfers"
-Placed between the existing **Built for Africa** section and the **Features** section.
+Card structure update in `src/pages/Landing.tsx`:
+- Image sits at the top of the card (h-32 / h-36), `object-cover`, rounded top corners, subtle gradient overlay so existing icon chip floats over it
+- Existing icon chip moves to bottom-left of the image (overlap) so the current visual language is preserved
+- Title + description stay below, unchanged copy
+- No color scheme changes — keep existing purple/amber tokens, shadows, and white card surface
 
-Layout: 3-column image grid on top, short copy block below (centered).
+## 2. Rolling live markets ticker
+Add a horizontally-scrolling marquee strip showing live-style market data with flags.
 
-Images (generated, then imported as ES6):
-1. `landing-tourism-kenya.jpg` — Kenyan safari at golden hour: elephants and giraffes on the Maasai Mara plains with acacia trees, Mount Kilimanjaro faint on the horizon. Photoreal.
-2. `landing-tourism-victoria-falls.jpg` — Victoria Falls cascading over the Zambia/Zimbabwe border with rainbow in the mist, lush green cliffs. Photoreal aerial-ish wide shot.
-3. `landing-tourism-zanzibar.jpg` — A second supporting destination (Zanzibar turquoise coastline with dhow boat) to balance the grid visually. (Optional — keeps the 3-up rhythm consistent.)
+Placement: directly under the hero (above the wallet/exchange phone mockups), full-width, sticky band feel with subtle purple gradient border top/bottom.
 
-Each image:
-- Rounded card, `shadow-card-purple`, ring border
-- Caption overlay (bottom-left chip): "🇰🇪 Maasai Mara · Kenya", "🇿🇲🇿🇼 Victoria Falls", "🇹🇿 Zanzibar"
-- Subtle gradient overlay so caption stays legible
+Contents (mixed fiat + crypto, ~16 items, looped seamlessly):
+- Fiat pairs with country flag pairs: 🇺🇸→🇨🇦 USD/CAD, 🇺🇸→🇳🇬 USD/NGN, 🇺🇸→🇰🇪 USD/KES, 🇺🇸→🇬🇭 USD/GHS, 🇺🇸→🇿🇲 USD/ZMW, 🇨🇦→🇳🇬 CAD/NGN, 🇬🇧→🇺🇸 GBP/USD, 🇪🇺→🇺🇸 EUR/USD
+- Crypto with coin glyph: ₿ BTC/USD, Ξ ETH/USD, ◎ SOL/USD, ✕ XRP/USD, ★ XLM/USD, ⓤ USDC/USD
+- Each item: flag(s) / symbol · ticker · price · green/red delta % with tiny up/down arrow
 
-Copy block:
-- Eyebrow chip: "Tourism & remittances"
-- H2: "Wherever travel takes you, money follows."
-- Sub: One short paragraph explaining that millions of travellers, families and businesses send money into Kenya, Zambia, Zimbabwe and beyond every year — eFinMoney makes those flows instant and affordable.
+Data source:
+- Use existing `useFxRates()` hook for live fiat rates already in the project
+- Crypto values come from a small static seed array (prices are illustrative; matches the existing "mock for landing only" pattern — no new API/edge function in scope)
+- Deltas: derived deterministically from the rate (small +/- % so it looks live without being random on each render)
 
-### Color scheme
-Unchanged — uses existing purple/amber tokens (`--brand-900`, `--accent-amber`, `--accent`).
-
-## Files touched
-- `src/pages/Landing.tsx` — insert new section, add 2–3 image imports
-- `src/assets/landing-tourism-kenya.jpg` (new)
-- `src/assets/landing-tourism-victoria-falls.jpg` (new)
-- `src/assets/landing-tourism-zanzibar.jpg` (new, optional 3rd tile)
+Implementation:
+- New component `src/components/landing/MarketTicker.tsx`
+- Two duplicated rows inside a flex container, animated via Tailwind keyframes (`animate-[marquee_40s_linear_infinite]`) — pause-on-hover
+- Tailwind keyframe added inline in the component (style tag) to avoid touching `tailwind.config.ts`
+- Mounted once in `Landing.tsx` between hero and the next section
 
 ## Out of scope
-- No color, nav, footer, or routing changes
-- No backend/data changes
+- No color scheme changes
+- No new routes, no backend changes, no new edge functions
+- No changes to the existing African/tourism/B2B sections already on the page
+
+## Files touched
+- `src/pages/Landing.tsx` (edit — add ticker import + restructure 3 feature cards)
+- `src/components/landing/MarketTicker.tsx` (new)
+- `src/assets/landing-feature-security.jpg` (new)
+- `src/assets/landing-feature-instant.jpg` (new)
+- `src/assets/landing-feature-corridors.jpg` (new)
