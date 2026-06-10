@@ -296,6 +296,70 @@ const Landing = () => {
       </section>
 
 
+      {/* ============ BUILT FOR AFRICA ============ */}
+      <section className="relative bg-white py-20 md:py-24">
+        <div className="max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-12 items-center">
+          <motion.div
+            initial={{ opacity: 0, x: -30 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true, margin: "-80px" }}
+            transition={{ duration: 0.6 }}
+            className="relative rounded-3xl overflow-hidden shadow-card-purple ring-1 ring-[hsl(var(--brand-900))]/10"
+          >
+            <img
+              src={africaBand}
+              alt="Modern Africa — Lagos, Nairobi, Cape Town and Accra"
+              loading="lazy"
+              width={1280}
+              height={896}
+              className="w-full h-[420px] object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-tr from-[hsl(var(--brand-900))]/40 via-transparent to-[hsl(var(--accent-amber))]/10" />
+            <div className="absolute bottom-4 left-4 flex flex-wrap gap-2">
+              {["🇳🇬 Nigeria","🇰🇪 Kenya","🇬🇭 Ghana","🇿🇲 Zambia","🇨🇦 Canada","🇺🇸 USA"].map((c) => (
+                <span key={c} className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-white/90 text-[hsl(var(--brand-900))] backdrop-blur">
+                  {c}
+                </span>
+              ))}
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, x: 30 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true, margin: "-80px" }}
+            transition={{ duration: 0.6, delay: 0.1 }}
+          >
+            <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-semibold uppercase tracking-[0.18em] text-[hsl(var(--brand-700))] bg-[hsl(var(--accent))]">
+              <span className="w-1.5 h-1.5 rounded-full bg-[hsl(var(--accent-amber))]" />
+              Africa-first marketplace
+            </span>
+            <h2 className="mt-4 text-4xl md:text-5xl font-black tracking-tight text-[hsl(var(--brand-900))]">
+              Built for the African continent.
+            </h2>
+            <p className="mt-5 text-[15px] md:text-base text-neutral-600 leading-relaxed max-w-xl">
+              From Lagos to Nairobi, Accra to Lusaka — eFinMoney is engineered for the
+              way Africa moves money. Direct mobile-money payouts via MTN, Airtel,
+              M-Pesa and Vodafone, paired with bank rails into Canada and the USA.
+            </p>
+            <ul className="mt-7 space-y-3">
+              {[
+                "12+ African mobile-money corridors, live",
+                "Multi-currency wallets: NGN, KES, GHS, ZMW, USD, CAD",
+                "Compliant payouts with full audit trail and receipts",
+              ].map((t) => (
+                <li key={t} className="flex items-start gap-3 text-sm text-neutral-700">
+                  <span className="mt-0.5 w-5 h-5 rounded-full bg-[hsl(var(--accent-amber))]/15 text-[hsl(var(--brand-700))] flex items-center justify-center flex-shrink-0">
+                    <Check className="w-3 h-3" strokeWidth={3} />
+                  </span>
+                  <span>{t}</span>
+                </li>
+              ))}
+            </ul>
+          </motion.div>
+        </div>
+      </section>
+
       {/* ============ FEATURES ============ */}
       <section id="features" className="bg-grid-purple py-24">
         <div className="max-w-7xl mx-auto px-6">
