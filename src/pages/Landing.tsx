@@ -118,7 +118,12 @@ const ExchangeScreen = () => (
         <span className="text-lg font-black text-indigo-700">136.42</span>
       </div>
     </div>
-    <div className="mt-4 text-xs text-neutral-500">Live rate: 1 USD = 1.3642 CAD</div>
+    <div className="mt-3 text-[10px] text-neutral-500">Live rate: 1 USD = 1.3642 CAD</div>
+    <div className="mt-2 flex flex-wrap gap-1">
+      {["NGN", "KES", "GHS", "ZMW"].map((c) => (
+        <span key={c} className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700">{c}</span>
+      ))}
+    </div>
     <div className="mt-auto">
       <div className="rounded-xl bg-indigo-500 text-white text-sm font-bold py-3 text-center">
         Exchange
