@@ -208,6 +208,9 @@ const MarketTicker = () => {
           <span className="text-white/30">/</span>
           <span className="text-fuchsia-300">Ask</span>
         </span>
+      </div>
+
+
 
 
       {/* edge fades */}
