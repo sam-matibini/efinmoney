@@ -13,6 +13,7 @@ import featureSecurity from "@/assets/landing-feature-security.jpg";
 import featureInstant from "@/assets/landing-feature-instant.jpg";
 import featureCorridors from "@/assets/landing-feature-corridors.jpg";
 import MarketTicker from "@/components/landing/MarketTicker";
+import FxCalculator from "@/components/landing/FxCalculator";
 
 const NAV_LINKS = [
   { label: "Features", href: "#features" },
@@ -290,11 +291,13 @@ const Landing = () => {
             </motion.div>
           </div>
 
-          {/* RIGHT: phone mockups */}
-          <div className="relative flex items-end justify-center gap-3 lg:gap-5">
-            <div className="hidden md:block"><PhoneFrame delay={0.3} rotate={-6}><WalletScreen /></PhoneFrame></div>
-            <PhoneFrame delay={0.5}><SendScreen /></PhoneFrame>
-            <div className="hidden lg:block"><PhoneFrame delay={0.7} rotate={6}><ExchangeScreen /></PhoneFrame></div>
+          {/* RIGHT: live FX calculator (above phones on lg) */}
+          <div className="relative flex flex-col items-center lg:items-end gap-8">
+            <FxCalculator />
+            <div className="hidden md:flex items-end justify-center gap-3 lg:gap-5">
+              <div className="hidden lg:block"><PhoneFrame delay={0.5} rotate={-6}><WalletScreen /></PhoneFrame></div>
+              <div className="hidden md:block"><PhoneFrame delay={0.7} rotate={6}><ExchangeScreen /></PhoneFrame></div>
+            </div>
           </div>
         </div>
 

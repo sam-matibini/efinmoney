@@ -1,49 +1,80 @@
-Rebuild the landing marquee so each pair shows one clear, honest piece of information instead of a wall of chips.
+## FX Spot Calculator on Landing Page
 
-## What's wrong today
+A new conversion widget under the hero that lets any visitor pick "You send" and "They receive" currencies, type an amount, and see a live spot rate + estimated payout. The same widget doubles as a shortcut into the authenticated transfer/exchange flow.
 
-1. **Unreadable** — ticker background (`hsl(248_55%_8%)/95` + backdrop-blur) doesn't hold against the bright hero gradient, so white numbers wash out. Only the colored "Bid / Ask / -0.07%" labels survive.
-2. **Cluttered** — every pair renders: flags · pair · mid · ⇌ inverse pair · inverse rate · Bid · bid value · / · Ask · ask value · 24h % · bullet. That's ~12 chips per item, all at small sizes.
-3. **Dishonest** — bid/ask is just `mid × (1 ± spread/2)` with hardcoded basis-point spreads. It's not a real market quote. Removing it is the right call.
-4. **Inverse rate** adds little for a marketing banner and is already shown on the Exchange page.
+### 1. New component: `src/components/landing/FxCalculator.tsx`
 
-## New design — one row, one purpose per pair
+Visual: a single dark card (matches landing aesthetic) with two stacked currency rows, a swap button between them, a rate strip, and a primary CTA.
 
-Each item, left to right:
-
-```
-[flag flag]  CAD → NGN   1,178.42   ▲ +0.42%
-```
-
-- **Flags** (fiat) or **glyph** (crypto) — same as today.
-- **Pair label** — bold, `text-white`, `text-sm`. Uses arrow `→` instead of slash so it reads as "from CAD to NGN".
-- **Rate** — `tabular-nums`, `text-white/95`, `font-semibold`, `text-sm`. Smart decimals (existing `decimalsFor`).
-- **24h delta** — kept, with up/down arrow. `text-emerald-400` / `text-rose-400`, `font-semibold`.
-- Separator: a thin vertical divider `|` instead of a bullet, `text-white/15`.
-
-Removed: inverse rate chip, bid/ask chip, "Indicative" caveat (no longer applies).
-
-## Readability fixes
-
-- Banner background: switch from `bg-[hsl(248_55%_8%)]/95 backdrop-blur-md` to **solid** `bg-[hsl(248_55%_6%)]` with a top + bottom hairline border. No blur. Guarantees contrast on any hero.
-- Add a subtle inner gradient overlay (top 1px highlight) for polish.
-- Increase vertical padding from `py-3` to `py-3.5` and item gap from `gap-8` to `gap-10` for breathing room.
-- Edge fade gradients updated to match the new solid color.
-
-## Left badge
-
-Keep the "● LIVE MARKETS" pill. Drop the "· Indicative" suffix and the "Bid / Ask" header chip (both obsolete). Add a small "24h" label after "LIVE MARKETS" so users know what the % refers to:
-
-```
-● LIVE MARKETS · 24h
+```text
+┌──────────────────────────────────────────────┐
+│ Live FX calculator           ● Live · 30s    │
+│ ┌──────────────────────────────────────────┐ │
+│ │ You send         [1,000.00]   [🇨🇦 CAD▾] │ │
+│ └──────────────────────────────────────────┘ │
+│                  ⇅  (swap)                   │
+│ ┌──────────────────────────────────────────┐ │
+│ │ Recipient gets   [720,500.00] [🇳🇬 NGN▾] │ │
+│ └──────────────────────────────────────────┘ │
+│ 1 CAD = 720.50 NGN · fee 0.5% · updated 12s  │
+│ [ Sign up & send ]   [ Sign in ]             │
+└──────────────────────────────────────────────┘
 ```
 
-## Files
+Behavior:
+- Source list = our supported "send" currencies (CAD, USD, GBP, EUR).
+- Destination list = our payout corridors (NGN, KES, GHS, ZMW, UGX, TZS, RWF, ZAR, XOF, XAF, plus USD/CAD for wallet-to-wallet).
+- Pulls rates from the existing public `market-rates` edge function (already used by `MarketTicker`, no auth, returns 60s cached data). Computes cross-rates via USD when a direct pair isn't returned (e.g. `CAD→NGN = (USD→NGN) / (USD→CAD)`).
+- Debounced amount input (250 ms) recalculates `receive = amount × rate × (1 − 0.005 fee)`. Fee mirrors the 0.5% used by `fx-engine`.
+- Rate strip shows mid rate, fee %, and "updated Xs ago".
+- Swap button flips currencies and recalculates.
+- Default geo-aware pair: CAD → NGN (matches the existing CAD→NGN row in `market-rates`).
 
-- `src/components/landing/MarketTicker.tsx` — only file touched. Remove `MAJOR_FIAT`, `getSpreadBps`, `decimalsForInverse`, the inverse chip, the bid/ask block, and the header chip. Simplify the row JSX and tune the container styling.
+### 2. CTA wiring (sign in / sign up shortcut)
 
-## Out of scope
+Two buttons under the calculator:
 
-- No data/edge-function changes.
-- No new currencies or pairs.
-- Inverse rates and bid/ask remain available on the Exchange page where they actually mean something.
+- **Primary — "Sign up & send"**:
+  - If `useAuth()` user is null → `navigate("/auth?mode=signup&redirect=" + encodeURIComponent(targetUrl))`.
+  - If logged in → go straight to `targetUrl`.
+- **Secondary — "Sign in"** (only when logged out): `navigate("/auth?mode=signin&redirect=…")`.
+
+`targetUrl` is decided by the currency pair:
+- Same-account swap (both are wallet currencies the user holds, e.g. CAD↔USD) → `/exchange?from=CAD&to=USD&amount=1000` (ExchangePage reads the params, calls `fx-engine` `quote` for the real tradable rate, and pre-fills).
+- Cross-border payout (destination is an African corridor) → `/send?from=CAD&to=NGN&amount=1000` (SendPage / CanadaSendFlow reads the params and jumps to the amount step with the live tradable quote from `fx-engine`).
+
+Routing rule lives in a small helper inside `FxCalculator.tsx`:
+```ts
+const PAYOUT_CCYS = new Set(["NGN","KES","GHS","ZMW","UGX","TZS","RWF","ZAR","XOF","XAF"]);
+const target = PAYOUT_CCYS.has(to) ? "/send" : "/exchange";
+```
+
+### 3. Light edits to existing pages to honor the deep-link params
+
+- `src/pages/ExchangePage.tsx` — on mount, read `from`, `to`, `amount` from `useSearchParams()` and seed the existing exchange form / call `fx-engine` quote.
+- `src/pages/SendPage.tsx` (and/or `src/components/send/CanadaSendFlow.tsx`) — same: read params and start the wizard at the amount/quote step with values prefilled.
+- `src/pages/Auth.tsx` — already supports redirect via `?redirect=`; verify it (one-line check). If missing, add: after successful sign-in/sign-up, `navigate(params.get("redirect") ?? "/")`.
+
+### 4. Landing page integration
+
+`src/pages/Landing.tsx` — import `FxCalculator` and render it in the hero section (right under the headline / next to the phone mockups) so it's the first interactive element above the fold. No other landing changes.
+
+### 5. Tradable vs indicative rate disclosure
+
+The landing widget uses the public market mid (no auth). The card footer reads:
+> "Indicative mid-market rate. Final tradable rate is locked at quote (60 s) after sign in."
+
+Once the user lands in `/send` or `/exchange`, the page calls `fx-engine` `quote` which returns the real `effective_rate`, markup, fee, and a 60 s rate lock — that's the tradable number.
+
+### Files touched
+
+- **new** `src/components/landing/FxCalculator.tsx`
+- **edit** `src/pages/Landing.tsx` (mount the calculator in hero)
+- **edit** `src/pages/ExchangePage.tsx` (read URL params → seed form)
+- **edit** `src/pages/SendPage.tsx` (read URL params → seed wizard)
+- **edit** `src/pages/Auth.tsx` (confirm/add `?redirect=` support)
+
+### Out of scope
+
+- No DB or edge-function changes — `market-rates` and `fx-engine` already cover both the public quote and the authenticated tradable quote.
+- No new currencies; uses the corridors already wired into `market-rates` and `fx_rates`.
