@@ -224,7 +224,7 @@ const Landing = () => {
               className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/15 backdrop-blur text-xs font-semibold text-white/90 mb-6"
             >
               <span className="w-1.5 h-1.5 rounded-full bg-[hsl(var(--accent-amber))] animate-pulse" />
-              Secure. Fast. Global. That's eFinMoney.
+              Africa-first. Global rails. That's eFinMoney.
             </motion.div>
 
             <h1 className="text-5xl sm:text-6xl md:text-7xl font-black tracking-tight leading-[1.02] text-white">
