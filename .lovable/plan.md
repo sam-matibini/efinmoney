@@ -1,48 +1,51 @@
-# Landing page: feature photos + live markets ticker
+# Real FX & crypto rates in the rolling banner
 
-## 1. Real photos on the 3 feature cards
-Add a photographic header image to each card in the "Built for the way you move money" section.
+## What's wrong today
+- Fiat pairs use a small hard-coded `FALLBACK_RATES` table if `useFxRates()` is missing a pair.
+- Crypto pairs are entirely hard-coded (`BTC 71240.50` etc.).
+- The "% delta" is a deterministic `sin()` of the price — fake, not a real 24h change.
+- Flag emojis show as plain text on Windows (the user's screenshot shows "USCA", "USNG", "USKE"… — that's the regional-indicator letter pair rendering as ASCII).
 
-Generate 3 new assets (photoreal, on-brand, dark/purple-friendly):
-- `src/assets/landing-feature-security.jpg` — vault door / biometric fingerprint on glass / server room with subtle purple lighting → **Bank-Grade Security**
-- `src/assets/landing-feature-instant.jpg` — phone showing a "Transfer sent" confirmation with motion-blur light streaks → **Instant Transfers**
-- `src/assets/landing-feature-corridors.jpg` — world map / globe with glowing route arcs between Canada, USA, Nigeria, Kenya, Ghana, Zambia → **50+ Currency Corridors**
+## What I'll build
 
-Card structure update in `src/pages/Landing.tsx`:
-- Image sits at the top of the card (h-32 / h-36), `object-cover`, rounded top corners, subtle gradient overlay so existing icon chip floats over it
-- Existing icon chip moves to bottom-left of the image (overlap) so the current visual language is preserved
-- Title + description stay below, unchanged copy
-- No color scheme changes — keep existing purple/amber tokens, shadows, and white card surface
+### 1. New public edge function `market-rates`
+`supabase/functions/market-rates/index.ts` (`verify_jwt = false`, anon-readable, 60s in-memory cache, CORS on).
 
-## 2. Rolling live markets ticker
-Add a horizontally-scrolling marquee strip showing live-style market data with flags.
+Returns:
+```json
+{
+  "fiat":   [{ "from":"USD", "to":"CAD", "price":1.3712, "change24h":0.12 }, ...],
+  "crypto": [{ "symbol":"BTC", "price":71240.5, "change24h":2.41 }, ...],
+  "fetched_at": "..."
+}
+```
 
-Placement: directly under the hero (above the wallet/exchange phone mockups), full-width, sticky band feel with subtle purple gradient border top/bottom.
+**Fiat source** — read from existing `fx_rates` table for the 8 pairs the ticker uses (USD→CAD/NGN/KES/GHS/ZMW, CAD→NGN, GBP→USD, EUR→USD). For the 24h change, pull the most-recent row plus the row closest to 24h ago for the same pair and compute `(latest − prior) / prior * 100`. If no 24h-old row exists, return `change24h: 0`. No new ingestion — `refresh-fx-rates` already populates this table from OpenExchangeRates.
 
-Contents (mixed fiat + crypto, ~16 items, looped seamlessly):
-- Fiat pairs with country flag pairs: 🇺🇸→🇨🇦 USD/CAD, 🇺🇸→🇳🇬 USD/NGN, 🇺🇸→🇰🇪 USD/KES, 🇺🇸→🇬🇭 USD/GHS, 🇺🇸→🇿🇲 USD/ZMW, 🇨🇦→🇳🇬 CAD/NGN, 🇬🇧→🇺🇸 GBP/USD, 🇪🇺→🇺🇸 EUR/USD
-- Crypto with coin glyph: ₿ BTC/USD, Ξ ETH/USD, ◎ SOL/USD, ✕ XRP/USD, ★ XLM/USD, ⓤ USDC/USD
-- Each item: flag(s) / symbol · ticker · price · green/red delta % with tiny up/down arrow
+**Crypto source** — single CoinGecko call:
+```
+https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana,ripple,stellar,usd-coin&vs_currencies=usd&include_24hr_change=true
+```
+Public, keyless, rate-limited (~30 req/min) — the 60s server cache makes that a non-issue. If the call fails, the function returns `crypto: []` and the client just hides those rows; no fake numbers.
 
-Data source:
-- Use existing `useFxRates()` hook for live fiat rates already in the project
-- Crypto values come from a small static seed array (prices are illustrative; matches the existing "mock for landing only" pattern — no new API/edge function in scope)
-- Deltas: derived deterministically from the rate (small +/- % so it looks live without being random on each render)
+### 2. Update `src/components/landing/MarketTicker.tsx`
+- Drop `useFxRates` import, `FALLBACK_RATES`, hard-coded `CRYPTO` array, and `deterministicDelta`.
+- Add `useQuery(['market-rates'], () => supabase.functions.invoke('market-rates'))` with `refetchInterval: 60_000`.
+- Build the ticker items from the response. While loading or on error, render an "Updating live markets…" skeleton row so the marquee never disappears.
+- Keep the same visual structure (label · price · delta with arrow · pause-on-hover marquee).
 
-Implementation:
-- New component `src/components/landing/MarketTicker.tsx`
-- Two duplicated rows inside a flex container, animated via Tailwind keyframes (`animate-[marquee_40s_linear_infinite]`) — pause-on-hover
-- Tailwind keyframe added inline in the component (style tag) to avoid touching `tailwind.config.ts`
-- Mounted once in `Landing.tsx` between hero and the next section
+### 3. Fix the flag rendering bug (small, related)
+Replace emoji flags with `<img>` from `https://flagcdn.com/20x15/{cc}.png` (a free CDN that ships real PNG flags). One `<img>` per country (or two side-by-side for fiat pairs), `width={20} height={15}`, `loading="lazy"`, rounded-sm. Crypto rows keep their unicode coin glyph (₿ Ξ ◎ ✕ ★ ⓤ) since those render reliably across platforms.
+
+### 4. Config
+- Append `[functions.market-rates] verify_jwt = false` to `supabase/config.toml`.
 
 ## Out of scope
-- No color scheme changes
-- No new routes, no backend changes, no new edge functions
-- No changes to the existing African/tourism/B2B sections already on the page
+- No DB schema changes, no new ingestion jobs, no changes to `refresh-fx-rates`.
+- No new copy, no color/layout changes elsewhere on the landing page.
+- No paid CoinGecko Pro key — the free public endpoint is fine behind the 60s server cache.
 
 ## Files touched
-- `src/pages/Landing.tsx` (edit — add ticker import + restructure 3 feature cards)
-- `src/components/landing/MarketTicker.tsx` (new)
-- `src/assets/landing-feature-security.jpg` (new)
-- `src/assets/landing-feature-instant.jpg` (new)
-- `src/assets/landing-feature-corridors.jpg` (new)
+- `supabase/functions/market-rates/index.ts` (new)
+- `supabase/config.toml` (edit — add function entry)
+- `src/components/landing/MarketTicker.tsx` (edit — switch to real data + flag PNGs)

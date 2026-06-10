@@ -75,3 +75,6 @@ verify_jwt = false
 
 [functions.sumsub-webhook]
 verify_jwt = false
+
+[functions.market-rates]
+verify_jwt = false
