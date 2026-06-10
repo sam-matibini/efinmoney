@@ -69,6 +69,7 @@ import InteracHubCallback from "./pages/InteracHubCallback";
 import MorePage from "./pages/MorePage";
 import StripeConnectInstantPage from "./pages/StripeConnectInstantPage";
 import AfricanCardSendPage from "./pages/AfricanCardSendPage";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 const queryClient = new QueryClient();
 
