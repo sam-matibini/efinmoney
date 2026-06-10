@@ -1,67 +1,46 @@
-## Calculator in the middle, family on either side
+## Goal
 
-Right now the hero shows one split-scene photo on the left with the calculator floating on top-right. The user wants the calculator centered, with the **sending Canada/USA couple on one side** and the **receiving African grandma + kids on the other** — visually flowing money through the calculator.
+1. Remove all public mentions of "Remitly" and "LEMFI" from the landing FX calculator — show them as anonymous "Typical market rate" benchmarks instead.
+2. Keep the actual benchmark numbers (intrinsically matching Remitly's economy tier) but only surface the named "Remitly benchmark" inside the Admin → Pricing & Fees tab, where staff can see and edit it.
 
-### 1. Split the single hero image into two
-Generate two new images (replace/retire the current `landing-hero-users.jpg`):
+## Changes
 
-- **`src/assets/landing-senders.jpg`** (portrait, 768×1024):
-  > "Editorial photo of a warm young Black Canadian/American professional couple in a bright modern Toronto loft, smiling together while looking at a smartphone, clearly the senders of a family transfer. Soft natural daylight, shallow depth of field, candid, premium fintech lifestyle, no on-screen UI text, no logos."
+### 1. `src/components/landing/FxCalculator.tsx` (public landing — anonymized)
 
-- **`src/assets/landing-receivers.jpg`** (portrait, 768×1024):
-  > "Editorial photo of a warm, smiling Black African grandmother in Lagos at her sunlit doorway joyfully receiving money on her smartphone (soft glow notification on phone screen, no readable text), her small grandchild hugging her side. Soft natural light, shallow depth of field, candid, premium fintech lifestyle, no on-screen UI text, no logos."
+- Replace the two competitor rows with a single consolidated row labelled **"Typical market rate"** (uses the worse — i.e. more expensive — of the two existing benchmarks so the savings claim stays conservative and credible).
+  - Row layout stays the same (rate + small fee/spread note like `~2.2% + fee`).
+- Savings calculation continues to use `bestCompetitorRecv = Math.max(remitlyRecv, lemfiRecv)` internally — only the label changes.
+- "You save with eFinMoney" headline → **"You save vs. typical market rate"**.
+- Footnote text updated to:
+  *"Indicative mid-market rate · 0.8% FX + $0.99 fee. Benchmarked against typical international money-transfer providers. Rate locks for 60 s after sign in."*
+- No competitor brand names anywhere in JSX, badges, alt text, or comments visible to end users. Internal constant names renamed to neutral `BENCHMARK_A_*` / `BENCHMARK_B_*` to avoid the brand strings leaking via source maps.
 
-### 2. Restructure the hero right column (`src/pages/Landing.tsx`)
-Replace the single-image + floating-calculator block with a **3-zone composition where the calculator is the centerpiece**:
+### 2. `src/components/settings/PricingSettingsPanel.tsx` (admin-only — named benchmark)
 
-```
-Desktop (lg+):
-  [ senders photo ]   [ FX CALCULATOR ]   [ receivers photo ]
-        ↘ arrow/gradient money-flow ↘   ↘ arrow ↘
+Add a new card **"Competitor Benchmark (internal)"** above the existing "Transfer Fee Structure" card. Admin-only context (this panel already lives under `/settings` → Pricing & Fees, gated by the admin dashboard route).
 
-Mobile:
-  [ senders photo ]
-  [ FX CALCULATOR ]
-  [ receivers photo ]
-```
+Card contents (read/edit form, plain inputs — no DB wiring in this pass, stored values will live alongside other pricing inputs already in this panel which are also UI-only):
 
-Structure:
-```tsx
-<div className="relative w-full max-w-[640px] lg:ml-auto">
-  {/* Soft amber glow behind calculator */}
-  <div className="hidden lg:block absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[420px] h-[420px] bg-[hsl(var(--accent-amber)/0.25)] blur-3xl rounded-full pointer-events-none" />
-
-  <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr] gap-3 lg:gap-2 items-center">
-    {/* Senders — left on desktop, top on mobile */}
-    <div className="relative">
-      <img src={senders} alt="Family in Canada sending money home" className="w-full h-[180px] lg:h-[360px] object-cover rounded-2xl ring-1 ring-white/10 shadow-xl" loading="lazy" />
-      <span className="absolute top-2 left-2 text-[10px] font-bold uppercase tracking-wider bg-white/15 backdrop-blur ring-1 ring-white/20 text-white rounded-full px-2 py-0.5">Sending · Canada</span>
-    </div>
-
-    {/* Calculator — middle */}
-    <div className="relative z-10 lg:-mx-4">
-      <FxCalculator />
-    </div>
-
-    {/* Receivers — right on desktop, bottom on mobile */}
-    <div className="relative">
-      <img src={receivers} alt="Grandmother in Africa receiving money" className="w-full h-[180px] lg:h-[360px] object-cover rounded-2xl ring-1 ring-white/10 shadow-xl" loading="lazy" />
-      <span className="absolute top-2 right-2 text-[10px] font-bold uppercase tracking-wider bg-white/15 backdrop-blur ring-1 ring-white/20 text-white rounded-full px-2 py-0.5">Receiving · Africa</span>
-    </div>
-  </div>
-</div>
+```text
+Competitor Benchmark (internal — not shown on landing page)
+┌────────────────────────────────────────────────────────┐
+│ Remitly  FX margin: [2.20] %     Flat fee: [3.99] USD │
+│ LEMFI    FX margin: [1.80] %     Flat fee: [0.00] USD │
+│ eFinMoney target:  match Remitly economy tier          │
+│ Current eFinMoney: 0.80% FX + $0.99 flat               │
+└────────────────────────────────────────────────────────┘
+[ Save Benchmarks ]
 ```
 
-- Calculator stays at its current compact size (`max-w-[340px]`); on `lg+` it slightly overlaps both photos via `lg:-mx-4` and `z-10` so it visually sits *in front of* and *between* them, like money flowing left → calculator → right.
-- Amber radial glow behind the calculator anchors the center.
-- Small badges ("Sending · Canada" / "Receiving · Africa") make the visual story explicit without competing with the headline.
-- Left copy column (`"Send money across borders, instantly."`, sub-copy, CTAs, press strip) — **untouched**.
+Short helper text under the card title explains: *"These values feed the 'Typical market rate' comparison on the public calculator. Names are visible to staff only and never rendered on the landing page."*
 
-### 3. Cleanup
-- Old `src/assets/landing-hero-users.jpg` is no longer used after this change. Delete it to keep the repo clean.
+### Out of scope
 
-### Files
-- **New:** `src/assets/landing-senders.jpg`, `src/assets/landing-receivers.jpg`
-- **Edit:** `src/pages/Landing.tsx` (swap image import + right-column markup)
-- **Delete:** `src/assets/landing-hero-users.jpg`
-- **No changes:** `FxCalculator.tsx`, `worldCurrencies.ts`, left hero copy column.
+- No database schema changes. (`pricing_config` already exists; wiring the benchmark values to it can be a follow-up.)
+- No change to `FxCalculator` math, currency picker, or hero layout.
+- No change to images, hero copy, or `Landing.tsx`.
+
+## Files touched
+
+- Edit: `src/components/landing/FxCalculator.tsx`
+- Edit: `src/components/settings/PricingSettingsPanel.tsx`

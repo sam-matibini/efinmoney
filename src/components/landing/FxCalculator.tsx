@@ -13,13 +13,15 @@ type MarketResponse = { fiat: FiatRow[]; crypto: unknown[]; fetched_at: string }
 
 const PAYOUT_CCYS = new Set(["NGN", "KES", "GHS", "ZMW", "UGX", "TZS", "RWF", "ZAR", "XOF", "XAF"]);
 
-// Indicative landing-page benchmarks (public pricing snapshots — not backend pricing).
-const EFIN_FX_MARGIN = 0.008;   // 0.8% FX markup — undercuts both
+// Indicative landing-page benchmarks — anonymized for public display.
+// Named values are configured by staff in Admin → Settings → Pricing & Fees.
+const EFIN_FX_MARGIN = 0.008;   // 0.8% FX markup
 const EFIN_FLAT_FEE_USD = 0.99;
-const REMITLY_MARGIN = 0.022;   // ~2.2% economy FX margin
-const REMITLY_FLAT_FEE_USD = 3.99;
-const LEMFI_MARGIN = 0.018;     // ~1.8% FX margin, zero advertised fee
-const LEMFI_FLAT_FEE_USD = 0;
+// Conservative (worst-case) market benchmark — keeps savings claim credible.
+const BENCHMARK_A_MARGIN = 0.022;
+const BENCHMARK_A_FLAT_FEE_USD = 3.99;
+const BENCHMARK_B_MARGIN = 0.018;
+const BENCHMARK_B_FLAT_FEE_USD = 0;
 
 const Flag = ({ code, size = 20 }: { code: string; size?: number }) => {
   const cc = WORLD_CURRENCY_MAP[code]?.cc;
