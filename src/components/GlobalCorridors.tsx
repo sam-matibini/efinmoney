@@ -35,7 +35,7 @@ export default function GlobalCorridors({ videoSrc }: GlobalCorridorsProps) {
   return (
     <section
       className="relative w-full overflow-hidden flex flex-col items-center justify-center"
-      style={{ minHeight: 600, backgroundColor: "#050210" }}
+      style={{ minHeight: "90vh", backgroundColor: "#050210" }}
     >
       {/* Video background */}
       {resolvedSrc && (
@@ -53,51 +53,80 @@ export default function GlobalCorridors({ videoSrc }: GlobalCorridorsProps) {
         </video>
       )}
 
-
-      {/* Dark overlay for legibility */}
+      {/* Cinematic vignette + edge blend with neighbouring sections */}
       <div
         aria-hidden="true"
-        className="absolute inset-0 z-0 bg-gradient-to-b from-[#050210]/70 via-[#050210]/45 to-[#050210]/80"
+        className="absolute inset-0 z-0"
+        style={{
+          background:
+            "radial-gradient(ellipse at center, rgba(5,2,16,0.25) 0%, rgba(5,2,16,0.65) 60%, rgba(5,2,16,0.92) 100%)",
+        }}
+      />
+      <div
+        aria-hidden="true"
+        className="absolute inset-x-0 top-0 h-32 z-0"
+        style={{ background: "linear-gradient(to bottom, #050210, transparent)" }}
+      />
+      <div
+        aria-hidden="true"
+        className="absolute inset-x-0 bottom-0 h-32 z-0"
+        style={{ background: "linear-gradient(to top, #050210, transparent)" }}
       />
 
       {/* Content */}
-      <div className="relative z-10 text-center px-6 py-20 max-w-[860px] w-full">
-        <p className="text-[13px] font-bold uppercase tracking-[0.18em] text-[#FFD700] mb-4">
-          Live Transfer Routes
-        </p>
+      <div className="relative z-10 text-center px-6 py-24 max-w-[920px] w-full">
+        <div className="inline-flex items-center gap-2 mb-6 px-4 py-1.5 rounded-full border border-[#FFD700]/30 bg-[#FFD700]/5 backdrop-blur-sm">
+          <span className="relative flex h-2 w-2">
+            <span className="absolute inline-flex h-full w-full rounded-full bg-[#FFD700] opacity-75 animate-ping" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-[#FFD700]" />
+          </span>
+          <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-[#FFD700] m-0">
+            Live Transfer Routes
+          </p>
+        </div>
 
         <h2
-          className="font-extrabold text-white m-0 mb-5"
-          style={{ fontSize: "clamp(28px, 5vw, 52px)", lineHeight: 1.1 }}
+          className="font-extrabold text-white m-0 mb-6 tracking-tight"
+          style={{ fontSize: "clamp(32px, 5.5vw, 64px)", lineHeight: 1.05 }}
         >
           Send money across borders,{" "}
-          <span style={{ color: "#FFD700" }}>instantly.</span>
+          <span
+            style={{
+              background: "linear-gradient(135deg, #FFD700 0%, #FFA500 100%)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              backgroundClip: "text",
+            }}
+          >
+            instantly.
+          </span>
         </h2>
 
         <p
-          className="mx-auto mb-12 text-white/65"
+          className="mx-auto mb-12 text-white/70"
           style={{
-            fontSize: "clamp(15px, 2vw, 18px)",
-            maxWidth: 560,
-            lineHeight: 1.6,
+            fontSize: "clamp(15px, 1.6vw, 19px)",
+            maxWidth: 580,
+            lineHeight: 1.65,
           }}
         >
           Real-time transfers from Canada to 5 African corridors — with the best
           rates on the continent.
         </p>
 
-        <div className="flex flex-wrap gap-3 justify-center mb-12">
+        <div className="flex flex-wrap gap-2.5 justify-center mb-12 max-w-2xl mx-auto">
           {CORRIDORS.map((c) => (
             <div
               key={c.to}
-              className="flex items-center gap-2 rounded-full px-[18px] py-2 border backdrop-blur-md"
+              className="flex items-center gap-2 rounded-full px-4 py-2 border transition-all hover:border-[#FFD700]/50 hover:bg-white/10"
               style={{
-                background: "rgba(255,255,255,0.07)",
-                borderColor: "rgba(255,215,0,0.25)",
+                background: "rgba(255,255,255,0.04)",
+                borderColor: "rgba(255,215,0,0.18)",
+                backdropFilter: "blur(8px)",
               }}
             >
-              <span className="text-lg" aria-hidden="true">{c.flag}</span>
-              <span className="text-sm font-semibold text-white/90 whitespace-nowrap">
+              <span className="text-base" aria-hidden="true">{c.flag}</span>
+              <span className="text-[13px] font-semibold text-white/85 whitespace-nowrap">
                 {c.from} → {c.to}
               </span>
             </div>
@@ -106,11 +135,12 @@ export default function GlobalCorridors({ videoSrc }: GlobalCorridorsProps) {
 
         <Link
           to="/auth"
-          className="inline-block font-bold text-base px-9 py-[14px] rounded-full transition-opacity hover:opacity-90"
+          className="inline-block font-bold text-base px-9 py-[14px] rounded-full transition-all hover:scale-105 hover:shadow-[0_10px_40px_rgba(255,215,0,0.4)]"
           style={{
-            background: "#FFD700",
+            background: "linear-gradient(135deg, #FFD700 0%, #FFA500 100%)",
             color: "#1A0A3C",
             letterSpacing: "0.02em",
+            boxShadow: "0 8px 30px rgba(255,215,0,0.25)",
           }}
         >
           Get eFinMoney →
