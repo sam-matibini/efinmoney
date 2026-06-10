@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { Copy, ExternalLink, Loader2, Sparkles } from "lucide-react";
+import { Copy, ExternalLink, Sparkles } from "lucide-react";
+import LoadingSpinner from "@/components/LoadingSpinner";
 import {
   Dialog,
   DialogContent,
@@ -87,7 +88,7 @@ const StellarWalletModal = ({ open, onOpenChange }: Props) => {
 
         {loading || !address ? (
           <div className="flex flex-col items-center justify-center py-12 gap-3">
-            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <LoadingSpinner size={32} />
             <p className="text-sm text-muted-foreground">
               Generating your blockchain wallet…
             </p>

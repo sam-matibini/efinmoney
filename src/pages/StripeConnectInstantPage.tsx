@@ -6,7 +6,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Loader2, CheckCircle2, Zap, RefreshCw } from "lucide-react";
+import { CheckCircle2, Zap, RefreshCw } from "lucide-react";
+import LoadingSpinner from "@/components/LoadingSpinner";
 import BackToDashboard from "@/components/layout/BackToDashboard";
 import { getConnectReadiness } from "@/hooks/useStripeConnectedAccount";
 
@@ -103,7 +104,7 @@ export default function StripeConnectInstantPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="w-6 h-6 animate-spin text-primary" />
+        <LoadingSpinner size={24} />
       </div>
     );
   }
@@ -133,7 +134,7 @@ export default function StripeConnectInstantPage() {
             <CardContent>
               <Button onClick={handleCreate} disabled={creating}>
                 {creating ? (
-                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating…</>
+                  <><LoadingSpinner size={16} className="mr-2" /> Creating…</>
                 ) : (
                   "Create Connected Account"
                 )}
@@ -174,7 +175,7 @@ export default function StripeConnectInstantPage() {
                 </ConnectComponentsProvider>
               ) : (
                 <div className="flex items-center gap-2 text-muted-foreground">
-                  <Loader2 className="w-4 h-4 animate-spin" /> Loading onboarding…
+                  <LoadingSpinner size={16} /> Loading onboarding…
                 </div>
               )}
               {connectState.message && !connectState.ready && (

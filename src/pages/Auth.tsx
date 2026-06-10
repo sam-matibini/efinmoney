@@ -144,7 +144,7 @@ const Auth = () => {
               className="w-full h-12 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2 transition-all hover:-translate-y-0.5 shadow-lg shadow-primary/20"
             >
               {isLoading ? (
-                <div className="w-5 h-5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+                <LoadingSpinner size={20} />
               ) : (
                 <>
                   {isSignUp ? "Create account" : "Sign in"}

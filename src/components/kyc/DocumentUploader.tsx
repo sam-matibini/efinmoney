@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from "react";
-import { Upload, FileText, X, Loader2, CheckCircle2 } from "lucide-react";
+import { Upload, FileText, X, CheckCircle2 } from "lucide-react";
+import LoadingSpinner from "@/components/LoadingSpinner";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -124,7 +125,7 @@ const DocumentUploader = ({
         />
         {busy ? (
           <div className="flex flex-col items-center gap-2 py-4">
-            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <LoadingSpinner size={32} />
             <p className="text-sm text-muted-foreground">Uploading...</p>
           </div>
         ) : hasUpload ? (

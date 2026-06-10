@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { CheckCircle2, XCircle, Loader2, Clock } from "lucide-react";
+import { CheckCircle2, XCircle, Clock } from "lucide-react";
+import LoadingSpinner from "@/components/LoadingSpinner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
@@ -154,7 +155,7 @@ const PaymentCallback = () => {
           {phase === "verifying" && (
             <>
               <div className="mx-auto h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
-                <Loader2 className="h-8 w-8 text-primary animate-spin" />
+                <LoadingSpinner size={32} />
               </div>
               <h1 className="text-xl font-display font-bold">Verifying payment…</h1>
               <p className="text-sm text-muted-foreground">Hold on while we confirm your transaction with Flutterwave.</p>
@@ -164,7 +165,7 @@ const PaymentCallback = () => {
           {phase === "pending" && (
             <>
               <div className="mx-auto h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
-                <Loader2 className="h-8 w-8 text-primary animate-spin" />
+                <LoadingSpinner size={32} />
               </div>
               <h1 className="text-xl font-display font-bold">Processing payment…</h1>
               <p className="text-sm text-muted-foreground">

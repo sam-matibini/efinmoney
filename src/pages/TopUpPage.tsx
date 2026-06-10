@@ -193,7 +193,7 @@ const TopUpPage = () => {
               <CardContent className="pt-6 flex items-center gap-3">
                 {verifyState.status === "success" ? <CheckCircle2 className="w-6 h-6 text-primary" /> :
                  verifyState.status === "failed" ? <XCircle className="w-6 h-6 text-destructive" /> :
-                 <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />}
+                 <LoadingSpinner size={24} />}
                 <p>{verifyState.message}</p>
               </CardContent>
             </Card>

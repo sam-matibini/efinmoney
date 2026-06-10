@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Copy, Check, Building2, Landmark, CreditCard, Globe, Loader2 } from "lucide-react";
+import { Copy, Check, Building2, Landmark, CreditCard, Globe } from "lucide-react";
+import LoadingSpinner from "@/components/LoadingSpinner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
@@ -173,7 +174,7 @@ const FlutterwaveDepositForm = ({ walletCurrency }: { walletCurrency: string }) 
         />
       </div>
       <Button onClick={handlePay} disabled={loading || amountNum <= 0} size="lg" className="w-full">
-        {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Redirecting…</> : `Continue to Flutterwave`}
+        {loading ? <><LoadingSpinner size={16} className="mr-2" /> Redirecting…</> : `Continue to Flutterwave`}
       </Button>
     </div>
   );

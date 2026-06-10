@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Loader2, Send, ExternalLink } from "lucide-react";
+import { Send, ExternalLink } from "lucide-react";
+import LoadingSpinner from "@/components/LoadingSpinner";
 import {
   Dialog,
   DialogContent,
@@ -161,7 +162,7 @@ const SendStellarModal = ({ open, onOpenChange, availableBalance, onSent }: Prop
           <Button onClick={handleSubmit} disabled={submitting}>
             {submitting ? (
               <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                <LoadingSpinner size={16} className="mr-2" />
                 Submitting…
               </>
             ) : (

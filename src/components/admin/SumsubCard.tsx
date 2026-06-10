@@ -3,7 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
-import { ShieldCheck, RefreshCw, ExternalLink, Loader2 } from "lucide-react";
+import { ShieldCheck, RefreshCw, ExternalLink } from "lucide-react";
+import LoadingSpinner from "@/components/LoadingSpinner";
 import { toast } from "sonner";
 import SumsubLaunchModal from "./SumsubLaunchModal";
 
@@ -74,7 +75,7 @@ export default function SumsubCard({ userId, canManage }: { userId: string; canM
       <CardContent className="space-y-3">
         {loading ? (
           <div className="text-sm text-muted-foreground flex items-center gap-2">
-            <Loader2 className="w-3 h-3 animate-spin" /> Loading…
+            <LoadingSpinner size={12} /> Loading…
           </div>
         ) : rows.length === 0 ? (
           <div className="text-sm text-muted-foreground">

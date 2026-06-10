@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, ShieldAlert } from "lucide-react";
+import { ShieldAlert } from "lucide-react";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 export default function InteracHubCallback() {
   const [params] = useSearchParams();
@@ -59,7 +60,7 @@ export default function InteracHubCallback() {
           </>
         ) : (
           <>
-            <Loader2 className="w-10 h-10 text-primary mx-auto animate-spin" />
+            <LoadingSpinner size={40} className="mx-auto" />
             <h1 className="text-lg font-semibold text-foreground">Verifying with Interac…</h1>
             <p className="text-sm text-muted-foreground">Hold on while we finalize your identity check.</p>
           </>

@@ -14,7 +14,7 @@ import {
   TrendingUp,
   TrendingDown,
   RefreshCw,
-  Loader2,
+  
   CheckCircle,
   Info,
 } from "lucide-react";
@@ -407,7 +407,7 @@ export const CryptoTradingPanel = () => {
               >
                 {tradeMutation.isPending ? (
                   <>
-                    <Loader2 className="w-5 h-5 mr-2 animate-spin" /> Processing...
+                    <LoadingSpinner size={20} className="mr-2" /> Processing...
                   </>
                 ) : (
                   <>

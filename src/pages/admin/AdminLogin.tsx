@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { ShieldCheck, Loader2 } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 const AdminLogin = () => {
   const { signIn, user, admin, loading } = useAdminAuth();
@@ -53,7 +54,7 @@ const AdminLogin = () => {
               <Input id="password" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
             </div>
             <Button type="submit" className="w-full" disabled={submitting}>
-              {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              {submitting && <LoadingSpinner size={16} className="mr-2" />}
               Sign in
             </Button>
             <p className="text-xs text-muted-foreground text-center">

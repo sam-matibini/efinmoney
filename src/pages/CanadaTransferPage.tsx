@@ -7,7 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Building2, ArrowRight, CheckCircle2, AlertCircle, Info } from "lucide-react";
+import { Building2, ArrowRight, CheckCircle2, AlertCircle, Info } from "lucide-react";
+import LoadingSpinner from "@/components/LoadingSpinner";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -197,7 +198,7 @@ export default function CanadaTransferPage() {
               </div>
             ))}
             <Button onClick={fetchLinkToken} disabled={linking} variant="outline" className="w-full">
-              {linking ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Building2 className="w-4 h-4 mr-2" />}
+              {linking ? <LoadingSpinner size={16} className="mr-2" /> : <Building2 className="w-4 h-4 mr-2" />}
               {accounts.length > 0 ? "Link another bank" : "Link your Canadian bank"}
             </Button>
           </CardContent>
@@ -270,7 +271,7 @@ export default function CanadaTransferPage() {
             </Alert>
 
             <Button onClick={handleSubmit} disabled={submitting || !selectedAccount || !selectedWallet || !amount} className="w-full" size="lg">
-              {submitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+              {submitting ? <LoadingSpinner size={16} className="mr-2" /> : null}
               {submitting ? "Processing PAD…" : `Transfer $${amount || "0.00"} CAD`}
             </Button>
 
@@ -321,7 +322,7 @@ export default function CanadaTransferPage() {
                       onClick={fetchLinkToken}
                       disabled={linking}
                     >
-                      {linking ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Building2 className="w-4 h-4 mr-2" />}
+                      {linking ? <LoadingSpinner size={16} className="mr-2" /> : <Building2 className="w-4 h-4 mr-2" />}
                       Link a different bank
                     </Button>
                   )}

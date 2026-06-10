@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
-import LogoLoader from "@/components/ui/LogoLoader";
+import LoadingSpinner from "@/components/LoadingSpinner";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface Props {
@@ -50,12 +50,11 @@ export const InteracVerification = ({ className, label = "Verify with Interac" }
             transition={{ duration: 0.25 }}
             className="rounded-xl border border-indigo-500/30 bg-indigo-500/5 py-5 px-3"
           >
-            <LogoLoader
-              size="md"
-              label="Connecting to Interac"
-              subLabel="You'll be redirected to your bank to verify securely."
-              slowAfterMs={6000}
-            />
+            <div className="flex flex-col items-center gap-3">
+              <LoadingSpinner size={96} />
+              <p className="text-sm font-medium text-foreground">Connecting to Interac…</p>
+              <p className="text-xs text-muted-foreground">You'll be redirected to your bank to verify securely.</p>
+            </div>
           </motion.div>
         ) : (
           <motion.div

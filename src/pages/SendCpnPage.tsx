@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowRight, Globe, Loader2, ShieldCheck, Zap } from "lucide-react";
+import { ArrowRight, Globe, ShieldCheck, Zap } from "lucide-react";
+import LoadingSpinner from "@/components/LoadingSpinner";
 import Header from "@/components/layout/Header";
 import MobileNav from "@/components/layout/MobileNav";
 import BackToDashboard from "@/components/layout/BackToDashboard";
@@ -199,7 +200,7 @@ const SendCpnPage = () => {
               </div>
 
               <Button onClick={getQuote} disabled={!canQuote || quoting} variant="outline">
-                {quoting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ArrowRight className="h-4 w-4 mr-2" />}
+                {quoting ? <LoadingSpinner size={16} className="mr-2" /> : <ArrowRight className="h-4 w-4 mr-2" />}
                 Get quote
               </Button>
 
@@ -243,7 +244,7 @@ const SendCpnPage = () => {
                   </div>
                 </div>
                 <Button onClick={submit} disabled={submitting} className="w-full">
-                  {submitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ArrowRight className="h-4 w-4 mr-2" />}
+                  {submitting ? <LoadingSpinner size={16} className="mr-2" /> : <ArrowRight className="h-4 w-4 mr-2" />}
                   Send {parsedAmount.toFixed(2)} {quote.source_currency}
                 </Button>
               </CardContent>

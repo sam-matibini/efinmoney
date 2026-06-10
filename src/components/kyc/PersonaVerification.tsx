@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import Persona from "persona";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Loader2, ShieldCheck } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
+import LoadingSpinner from "@/components/LoadingSpinner";
 import { toast } from "sonner";
 
 interface Props {
@@ -145,7 +146,7 @@ export const PersonaVerification = ({ userId, onComplete, onError, className, la
 
   return (
     <Button size="lg" className={className} onClick={startVerification} disabled={loading}>
-      {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <ShieldCheck className="w-4 h-4 mr-2" />}
+      {loading ? <LoadingSpinner size={16} className="mr-2" /> : <ShieldCheck className="w-4 h-4 mr-2" />}
       {loading ? "Initializing…" : label}
     </Button>
   );

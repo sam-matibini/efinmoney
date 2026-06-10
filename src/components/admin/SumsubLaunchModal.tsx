@@ -3,7 +3,7 @@ import SumsubWebSdk from "@sumsub/websdk-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 interface Props {
   open: boolean;
@@ -57,7 +57,7 @@ export default function SumsubLaunchModal({ open, onOpenChange, userId, onComple
         </DialogHeader>
         {loading || !token ? (
           <div className="flex items-center justify-center py-16 text-muted-foreground">
-            <Loader2 className="w-5 h-5 animate-spin mr-2" /> Initialising Sumsub…
+            <LoadingSpinner size={20} className="mr-2" /> Initialising Sumsub…
           </div>
         ) : (
           <SumsubWebSdk
