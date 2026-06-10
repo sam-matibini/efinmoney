@@ -102,37 +102,59 @@ const FxCalculator = () => {
     return fUsd / tUsd;
   }, [from, to, usdMap]);
 
-  const effectiveRate = midRate ? midRate * (1 - FEE_RATE) : null;
-  const bankRate = midRate ? midRate * (1 - BANK_MARGIN) : null;
+  // Convert a USD-denominated flat fee into the sender's currency
+  const flatFeeInFrom = (usdFee: number): number => {
+    if (!usdFee) return 0;
+    const fUsd = usdMap.get(from);
+    if (!fUsd || fUsd <= 0) return 0;
+    return usdFee / fUsd; // fUsd = USD per 1 FROM, so usd / fUsd = FROM amount
+  };
+
+  // Provider quote: returns recipient amount in `to` currency for a given send amount in `from`
+  const quoteRecipient = (sendInFrom: number, margin: number, flatUsd: number): number => {
+    if (!midRate) return 0;
+    const fee = flatFeeInFrom(flatUsd);
+    const net = Math.max(0, sendInFrom - fee);
+    return net * midRate * (1 - margin);
+  };
+  // Inverse: how much sender pays in `from` to deliver `recvInTo`
+  const quoteSend = (recvInTo: number, margin: number, flatUsd: number): number => {
+    if (!midRate) return 0;
+    const net = recvInTo / (midRate * (1 - margin));
+    return net + flatFeeInFrom(flatUsd);
+  };
+
+  const efinRecipient = (s: number) => quoteRecipient(s, EFIN_FX_MARGIN, EFIN_FLAT_FEE_USD);
+  const efinSend = (r: number) => quoteSend(r, EFIN_FX_MARGIN, EFIN_FLAT_FEE_USD);
 
   // Recompute the non-edited side whenever rate / inputs / pair change
   useEffect(() => {
-    if (!effectiveRate) return;
+    if (!midRate) return;
     if (lastEdited === "send") {
       const s = parseAmount(sendAmt);
-      setRecvAmt(s > 0 ? fmt(s * effectiveRate) : "");
+      setRecvAmt(s > 0 ? fmt(efinRecipient(s)) : "");
     } else {
       const r = parseAmount(recvAmt);
-      setSendAmt(r > 0 ? fmt(r / effectiveRate) : "");
+      setSendAmt(r > 0 ? fmt(efinSend(r)) : "");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [effectiveRate, from, to]);
+  }, [midRate, from, to]);
 
   const onSendChange = (v: string) => {
     const clean = v.replace(/[^0-9.,]/g, "");
     setSendAmt(clean);
     setLastEdited("send");
-    if (!effectiveRate) return;
+    if (!midRate) return;
     const s = parseAmount(clean);
-    setRecvAmt(s > 0 ? fmt(s * effectiveRate) : "");
+    setRecvAmt(s > 0 ? fmt(efinRecipient(s)) : "");
   };
   const onRecvChange = (v: string) => {
     const clean = v.replace(/[^0-9.,]/g, "");
     setRecvAmt(clean);
     setLastEdited("receive");
-    if (!effectiveRate) return;
+    if (!midRate) return;
     const r = parseAmount(clean);
-    setSendAmt(r > 0 ? fmt(r / effectiveRate) : "");
+    setSendAmt(r > 0 ? fmt(efinSend(r)) : "");
   };
 
   const swap = () => {
@@ -144,11 +166,20 @@ const FxCalculator = () => {
 
   const sendNumeric = parseAmount(sendAmt);
   const recvNumeric = parseAmount(recvAmt);
-  const bankReceive = bankRate ? sendNumeric * bankRate : 0;
-  const savings = recvNumeric - bankReceive; // in `to` currency
-  // Convert savings back to send currency for headline
-  const savingsInSend = midRate && midRate > 0 ? savings / midRate : 0;
-  const savingsPct = bankReceive > 0 ? ((recvNumeric - bankReceive) / bankReceive) * 100 : 0;
+
+  // Per-provider effective rate display (post-margin)
+  const efinDisplayRate = midRate ? midRate * (1 - EFIN_FX_MARGIN) : null;
+  const remitlyDisplayRate = midRate ? midRate * (1 - REMITLY_MARGIN) : null;
+  const lemfiDisplayRate = midRate ? midRate * (1 - LEMFI_MARGIN) : null;
+
+  // Savings vs the BETTER of the two competitors (worst case for our claim, most credible)
+  const remitlyRecv = quoteRecipient(sendNumeric, REMITLY_MARGIN, REMITLY_FLAT_FEE_USD);
+  const lemfiRecv = quoteRecipient(sendNumeric, LEMFI_MARGIN, LEMFI_FLAT_FEE_USD);
+  const bestCompetitorRecv = Math.max(remitlyRecv, lemfiRecv);
+  const savingsInTo = recvNumeric - bestCompetitorRecv;
+  const savingsInSend = midRate && midRate > 0 ? savingsInTo / midRate : 0;
+  const savingsPct = bestCompetitorRecv > 0 ? (savingsInTo / bestCompetitorRecv) * 100 : 0;
+
 
   const goNext = (mode: "signup" | "signin" | "direct") => {
     const target = PAYOUT_CCYS.has(to) ? "/send" : "/exchange";
