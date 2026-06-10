@@ -1,34 +1,38 @@
-# Landing Page — Africa-First Refresh
+# Landing — Tourism & Africa Travel Band
 
-Goal: Make the landing page more market-attractive and B2B-ready, while keeping the current deep purple + amber color scheme intact.
+Add a new "Tourism powers transfers" band on the landing page below the existing "Built for the African continent" section, showcasing iconic African destinations to reinforce the tourism → remittance story.
 
 ## Changes
 
-### 1. African imagery (hero backdrop + new "Africa-first" band)
-- Generate one wide cinematic African hero image (savanna + Victoria Falls + acacia silhouette + warm Lagos/Nairobi skyline blend) and place it as a low-opacity backdrop layer behind the existing purple grid hero. Color scheme stays — image sits at ~25% opacity blended with the existing purple/amber overlays.
-- Add a new "Built for Africa" section directly under the hero with a single professional African landscape image on the left and a short B2B value paragraph on the right (corridors, mobile money rails, multi-currency settlement). Image is purely decorative; no color-scheme change.
+### New section: "Tourism powers transfers"
+Placed between the existing **Built for Africa** section and the **Features** section.
 
-### 2. Expand currencies on the phone mockups
-Update `WalletScreen` to show 6 currencies instead of 3:
-- USD, CAD, NGN, KES (Kenya), GHS (Ghana), ZMW (Zambia)
-Update `SendScreen` corridor copy to cycle examples and use realistic mock balances. Update `ExchangeScreen` to keep USD→CAD (already shown) but add small "corridors" chips under it: NGN · KES · GHS · ZMW.
+Layout: 3-column image grid on top, short copy block below (centered).
 
-### 3. B2B professional phone hero image
-- Generate one premium real-photo style image: a navy iPhone on a dark walnut desk next to a leather notebook and espresso, with the eFinMoney logo/wordmark on screen (matching the user's uploaded Cover_2 reference).
-- Add a new "Built for Business" band between Features and How-it-works:
-  - Left: the generated professional phone photo
-  - Right: B2B copy — "Treasury, payouts, FX and reconciliation for African-facing businesses." + 3 bullet points (Bulk payouts, Multi-entity wallets, API & reporting) + "Talk to sales" CTA (amber pill, existing style).
+Images (generated, then imported as ES6):
+1. `landing-tourism-kenya.jpg` — Kenyan safari at golden hour: elephants and giraffes on the Maasai Mara plains with acacia trees, Mount Kilimanjaro faint on the horizon. Photoreal.
+2. `landing-tourism-victoria-falls.jpg` — Victoria Falls cascading over the Zambia/Zimbabwe border with rainbow in the mist, lush green cliffs. Photoreal aerial-ish wide shot.
+3. `landing-tourism-zanzibar.jpg` — A second supporting destination (Zanzibar turquoise coastline with dhow boat) to balance the grid visually. (Optional — keeps the 3-up rhythm consistent.)
 
-### 4. Hero copy tweak (small)
-Change pill text to "Africa-first. Global rails." and tagline subline to mention "Canada, USA, Nigeria, Kenya, Ghana, Zambia and 50+ corridors."
+Each image:
+- Rounded card, `shadow-card-purple`, ring border
+- Caption overlay (bottom-left chip): "🇰🇪 Maasai Mara · Kenya", "🇿🇲🇿🇼 Victoria Falls", "🇹🇿 Zanzibar"
+- Subtle gradient overlay so caption stays legible
+
+Copy block:
+- Eyebrow chip: "Tourism & remittances"
+- H2: "Wherever travel takes you, money follows."
+- Sub: One short paragraph explaining that millions of travellers, families and businesses send money into Kenya, Zambia, Zimbabwe and beyond every year — eFinMoney makes those flows instant and affordable.
+
+### Color scheme
+Unchanged — uses existing purple/amber tokens (`--brand-900`, `--accent-amber`, `--accent`).
 
 ## Files touched
-- `src/pages/Landing.tsx` — phone mockup data, new sections, hero backdrop layer, copy tweaks
-- `src/assets/landing-africa-hero.jpg` (new, generated, then externalized via lovable-assets)
-- `src/assets/landing-africa-band.jpg` (new, generated + externalized)
-- `src/assets/landing-b2b-phone.jpg` (new, generated + externalized)
+- `src/pages/Landing.tsx` — insert new section, add 2–3 image imports
+- `src/assets/landing-tourism-kenya.jpg` (new)
+- `src/assets/landing-tourism-victoria-falls.jpg` (new)
+- `src/assets/landing-tourism-zanzibar.jpg` (new, optional 3rd tile)
 
 ## Out of scope
-- No color token changes (purple/amber preserved)
-- No nav, footer, or routing changes
-- No backend changes
+- No color, nav, footer, or routing changes
+- No backend/data changes
