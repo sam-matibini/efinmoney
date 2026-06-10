@@ -31,6 +31,14 @@ const decimalsForInverse = (inv: number) => {
   return 8;
 };
 
+// Indicative spreads in basis points (1 bp = 0.01%). Used to derive bid/ask from mid.
+const MAJOR_FIAT = new Set(["USD", "EUR", "GBP", "CAD", "AUD", "JPY", "CHF"]);
+const getSpreadBps = (it: Item): number => {
+  if (it.kind === "crypto") return 30;
+  const isMajor = MAJOR_FIAT.has(it.from) && MAJOR_FIAT.has(it.to);
+  return isMajor ? 10 : 40;
+};
+
 
 const Flag = ({ code, alt }: { code: string; alt: string }) => (
   <img
