@@ -118,20 +118,22 @@ export default function GlobalCorridors({ videoSrc }: GlobalCorridorsProps) {
           {CORRIDORS.map((c) => (
             <div
               key={c.to}
-              className="flex items-center gap-2 rounded-full px-4 py-2 border transition-all hover:border-[#FFD700]/50 hover:bg-white/10"
+              className="flex items-center gap-2 rounded-full px-4 py-2 border transition-all hover:border-[#FFD700]/70 hover:bg-white/20"
               style={{
-                background: "rgba(255,255,255,0.04)",
-                borderColor: "rgba(255,215,0,0.18)",
+                background: "rgba(255,255,255,0.15)",
+                borderColor: "rgba(255,215,0,0.4)",
                 backdropFilter: "blur(8px)",
+                boxShadow: "0 2px 12px rgba(0,0,0,0.3)",
               }}
             >
-              <span className="text-base" aria-hidden="true">{c.flag}</span>
-              <span className="text-[13px] font-semibold text-white/85 whitespace-nowrap">
+              <span className="text-base drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]" aria-hidden="true">{c.flag}</span>
+              <span className="text-[13px] font-semibold text-white whitespace-nowrap">
                 {c.from} → {c.to}
               </span>
             </div>
           ))}
         </div>
+
 
         <Link
           to="/auth"
