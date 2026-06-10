@@ -162,11 +162,11 @@ const FxCalculator = () => {
     <div className="relative w-full max-w-[340px] mx-auto lg:mx-0">
       <div className="absolute -inset-1 rounded-[24px] bg-gradient-to-br from-[hsl(var(--accent-amber)/0.35)] via-[hsl(var(--brand-500)/0.25)] to-transparent blur-2xl pointer-events-none" />
       <div className="relative rounded-2xl bg-[hsl(248_60%_8%)]/95 backdrop-blur-xl ring-1 ring-white/15 shadow-2xl p-4">
-        <div className="flex items-center justify-between mb-4">
-          <div className="text-xs font-bold uppercase tracking-[0.18em] text-white/70">Live FX calculator</div>
-          <div className="inline-flex items-center gap-1.5 text-[10px] font-semibold text-white/60">
+        <div className="flex items-center justify-between mb-2.5">
+          <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/70">Live FX calculator</div>
+          <div className="inline-flex items-center gap-1.5 text-[9.5px] font-semibold text-white/60">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            {isLoading ? "Loading…" : `Updated ${secondsAgo}s ago`}
+            {isLoading ? "Loading…" : `${secondsAgo}s ago`}
           </div>
         </div>
 
@@ -179,14 +179,14 @@ const FxCalculator = () => {
           loading={isLoading}
         />
 
-        <div className="my-2 flex justify-center">
+        <div className="my-1.5 flex justify-center">
           <button
             type="button"
             onClick={swap}
-            className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 ring-1 ring-white/20 text-white grid place-items-center transition"
+            className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 ring-1 ring-white/20 text-white grid place-items-center transition"
             aria-label="Swap currencies"
           >
-            <ArrowDownUp className="w-4 h-4" />
+            <ArrowDownUp className="w-3.5 h-3.5" />
           </button>
         </div>
 
@@ -201,7 +201,7 @@ const FxCalculator = () => {
         />
 
         {/* Comparison strip */}
-        <div className="mt-4 rounded-2xl bg-gradient-to-br from-[hsl(var(--accent-amber)/0.12)] to-white/[0.03] ring-1 ring-[hsl(var(--accent-amber)/0.25)] p-3.5">
+        <div className="mt-3 rounded-xl bg-gradient-to-br from-[hsl(var(--accent-amber)/0.12)] to-white/[0.03] ring-1 ring-[hsl(var(--accent-amber)/0.25)] p-2.5">
           {rateUnavailable ? (
             <div className="text-[12px] text-white/70">Rate unavailable for this pair — try another currency.</div>
           ) : (
