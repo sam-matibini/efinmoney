@@ -200,7 +200,7 @@ const FxCalculator = () => {
   return (
     <div className="relative w-full max-w-[340px] mx-auto lg:mx-0">
       <div className="absolute -inset-1 rounded-[24px] bg-gradient-to-br from-[hsl(var(--accent-amber)/0.35)] via-[hsl(var(--brand-500)/0.25)] to-transparent blur-2xl pointer-events-none" />
-      <div className="relative rounded-2xl bg-[hsl(248_60%_8%)]/95 backdrop-blur-xl ring-1 ring-white/15 shadow-2xl p-4">
+      <div className="relative rounded-2xl bg-[hsl(248_60%_8%)]/80 backdrop-blur-xl ring-1 ring-white/15 shadow-2xl p-4">
         <div className="flex items-center justify-between mb-2.5">
           <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/70">Live FX calculator</div>
           <div className="inline-flex items-center gap-1.5 text-[9.5px] font-semibold text-white/60">

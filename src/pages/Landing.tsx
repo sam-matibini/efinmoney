@@ -213,11 +213,11 @@ const Landing = () => {
           src={africaHero}
           alt=""
           aria-hidden
-          className="absolute inset-0 w-full h-full object-cover opacity-25 mix-blend-screen pointer-events-none"
+          className="absolute inset-0 w-full h-full object-cover opacity-40 mix-blend-screen pointer-events-none"
           width={1920}
           height={1080}
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-[hsl(var(--brand-900))]/60 via-[hsl(var(--brand-900))]/40 to-[hsl(var(--brand-900))]/80 pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[hsl(var(--brand-900))]/40 via-[hsl(var(--brand-900))]/20 to-[hsl(var(--brand-900))]/60 pointer-events-none" />
         {/* radial vignette + soft amber spotlight */}
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-[900px] h-[600px] rounded-full bg-[hsl(var(--brand-500)/0.45)] blur-[140px]" />
