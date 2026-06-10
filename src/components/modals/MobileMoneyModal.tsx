@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
-import { Check, ChevronsUpDown, LoaderCircle, Smartphone, Wallet, CreditCard, Landmark, AlertCircle, ArrowRight } from "lucide-react";
+import { Check, ChevronsUpDown, Smartphone, Wallet, CreditCard, Landmark, AlertCircle, ArrowRight } from "lucide-react";
+import LoadingSpinner from "@/components/LoadingSpinner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
