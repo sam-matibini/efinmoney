@@ -3,7 +3,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { CreditCard, Loader2 } from "lucide-react";
+import { CreditCard } from "lucide-react";
+import LoadingSpinner from "@/components/LoadingSpinner";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -102,7 +103,7 @@ const TopUpModal = ({ children, open: openProp, onOpenChange, defaultWalletId, t
                 </p>
               </div>
               <Button className="w-full" size="lg" onClick={handleProceed} disabled={loading}>
-                {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Redirecting…</> : "Proceed to Payment"}
+                {loading ? <><LoadingSpinner size={16} className="mr-2" /> Redirecting…</> : "Proceed to Payment"}
               </Button>
             </div>
           ) : (

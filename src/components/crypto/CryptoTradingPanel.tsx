@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import LoadingSpinner from "@/components/LoadingSpinner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +15,7 @@ import {
   TrendingUp,
   TrendingDown,
   RefreshCw,
-  Loader2,
+  
   CheckCircle,
   Info,
 } from "lucide-react";
@@ -407,7 +408,7 @@ export const CryptoTradingPanel = () => {
               >
                 {tradeMutation.isPending ? (
                   <>
-                    <Loader2 className="w-5 h-5 mr-2 animate-spin" /> Processing...
+                    <LoadingSpinner size={20} className="mr-2" /> Processing...
                   </>
                 ) : (
                   <>

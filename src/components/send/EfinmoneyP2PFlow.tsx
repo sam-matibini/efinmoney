@@ -7,7 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Search, CheckCircle2, AlertCircle, ArrowRight, User, Loader2 } from "lucide-react";
+import { Search, CheckCircle2, AlertCircle, ArrowRight, User } from "lucide-react";
+import LoadingSpinner from "@/components/LoadingSpinner";
 import { useWallets } from "@/hooks/useWallets";
 import { useFxRates } from "@/hooks/useFxRates";
 import { fetchFxRate } from "@/lib/flutterwave";
@@ -192,7 +193,7 @@ const EfinmoneyP2PFlow = () => {
               />
             </div>
             <Button onClick={handleSearch} disabled={searching || query.trim().length < 3}>
-              {searching ? <Loader2 className="w-4 h-4 animate-spin" /> : "Find"}
+              {searching ? <LoadingSpinner size={16} /> : "Find"}
             </Button>
           </div>
 
@@ -319,7 +320,7 @@ const EfinmoneyP2PFlow = () => {
                 className="w-full h-12 gradient-primary text-primary-foreground font-medium"
               >
                 {sending ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <LoadingSpinner size={16} />
                 ) : (
                   <>Send {fmt(parsedAmount)} {fromCurrency} <ArrowRight className="w-4 h-4 ml-2" /></>
                 )}

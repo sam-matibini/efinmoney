@@ -8,7 +8,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Loader2, Lock, ShieldCheck } from "lucide-react";
+import { Lock, ShieldCheck } from "lucide-react";
+import LoadingSpinner from "@/components/LoadingSpinner";
 import { useProfile } from "@/hooks/useProfile";
 
 interface Props {
@@ -156,7 +157,7 @@ function InnerForm({ onSuccess, onCancel, ctaLabel }: Props) {
           <span>Card details</span>
           {!cardReady && (
             <span className="inline-flex items-center gap-1.5">
-              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…
+              <LoadingSpinner size={14} /> Loading…
             </span>
           )}
         </div>
@@ -173,7 +174,7 @@ function InnerForm({ onSuccess, onCancel, ctaLabel }: Props) {
         )}
         <Button type="submit" className="flex-1" disabled={!stripe || !cardReady || saving}>
           {saving ? (
-            <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving…</>
+            <><LoadingSpinner size={16} className="mr-2" /> Saving…</>
           ) : (
             ctaLabel ?? "Save Card"
           )}
@@ -195,7 +196,7 @@ export default function SaveCardForm(props: Props) {
   if (!stripeReady) {
     return (
       <div className="flex items-center justify-center py-6 text-muted-foreground">
-        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading secure form…
+        <LoadingSpinner size={16} className="mr-2" /> Loading secure form…
       </div>
     );
   }

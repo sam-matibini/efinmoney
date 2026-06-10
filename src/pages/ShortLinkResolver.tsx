@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Logo } from "@/components/Logo";
-import { Loader2, AlertTriangle } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 const ShortLinkResolver = () => {
   const { code } = useParams<{ code: string }>();
@@ -66,7 +67,7 @@ const ShortLinkResolver = () => {
     <div className="min-h-screen flex items-center justify-center bg-background">
       <div className="flex flex-col items-center gap-3 text-muted-foreground">
         <Logo className="w-10 h-10" />
-        <Loader2 className="w-5 h-5 animate-spin" />
+        <LoadingSpinner size={20} />
         <span className="text-sm">Opening link…</span>
       </div>
     </div>

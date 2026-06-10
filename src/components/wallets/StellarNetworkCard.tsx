@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Copy, ExternalLink, Loader2, Plus, RefreshCw, Send, Sparkles } from "lucide-react";
+import { Copy, ExternalLink, Plus, RefreshCw, Send, Sparkles } from "lucide-react";
+import LoadingSpinner from "@/components/LoadingSpinner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -75,7 +76,7 @@ const StellarNetworkCard = () => {
             <div className="text-right">
               <p className="text-xs text-muted-foreground">XLM Balance</p>
               {balanceLoading || isLoading ? (
-                <Loader2 className="w-5 h-5 animate-spin text-primary inline-block mt-1" />
+                <LoadingSpinner size={20} className="inline-block mt-1" />
               ) : (
                 <p className="text-2xl font-display font-bold tabular-nums">
                   {Number(balance).toLocaleString("en-US", {
@@ -91,7 +92,7 @@ const StellarNetworkCard = () => {
 
           {isLoading || !publicKey ? (
             <div className="flex items-center gap-3 p-4 rounded-lg bg-muted/50">
-              <Loader2 className="w-4 h-4 animate-spin text-primary" />
+              <LoadingSpinner size={16} />
               <span className="text-sm text-muted-foreground">
                 {generating
                   ? "Generating your Stellar account & funding with 10,000 test XLM…"
@@ -142,7 +143,7 @@ const StellarNetworkCard = () => {
                         disabled={!funded || enablingUsdc}
                       >
                         {enablingUsdc ? (
-                          <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                          <LoadingSpinner size={14} className="mr-1.5" />
                         ) : (
                           <Plus className="w-3.5 h-3.5 mr-1.5" />
                         )}

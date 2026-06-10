@@ -69,6 +69,7 @@ import InteracHubCallback from "./pages/InteracHubCallback";
 import MorePage from "./pages/MorePage";
 import StripeConnectInstantPage from "./pages/StripeConnectInstantPage";
 import AfricanCardSendPage from "./pages/AfricanCardSendPage";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 const queryClient = new QueryClient();
 
@@ -78,7 +79,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        <LoadingSpinner size={120} />
       </div>
     );
   }
@@ -103,7 +104,7 @@ const RoleProtectedRoute = ({
   if (loading || rolesLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        <LoadingSpinner size={120} />
       </div>
     );
   }
@@ -126,7 +127,7 @@ const PublicRoute = ({ children }: { children: React.ReactNode }) => {
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        <LoadingSpinner size={120} />
       </div>
     );
   }
@@ -149,7 +150,7 @@ const RootRoute = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+        <LoadingSpinner size={120} />
       </div>
     );
   }

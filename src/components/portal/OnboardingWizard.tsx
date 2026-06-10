@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import LoadingSpinner from "@/components/LoadingSpinner";
 import { useCustomerPortal } from "@/hooks/useCustomerPortal";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,7 +24,7 @@ import {
   ArrowLeft,
   Upload,
   File,
-  Loader2,
+  
   PartyPopper,
   Shield
 } from "lucide-react";
@@ -223,7 +224,7 @@ export const OnboardingWizard = () => {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <LoadingSpinner size={32} />
       </div>
     );
   }
@@ -542,7 +543,7 @@ export const OnboardingWizard = () => {
                   }
                 >
                   {updateStepMutation.isPending || uploadDocMutation.isPending ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    <LoadingSpinner size={16} className="mr-2" />
                   ) : null}
                   {currentStepIndex === sortedSteps.length - 1 ? 'Complete' : 'Continue'}
                   <ArrowRight className="w-4 h-4 ml-2" />

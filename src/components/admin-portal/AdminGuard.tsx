@@ -1,7 +1,7 @@
 import { ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
-import { Loader2 } from "lucide-react";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 const AdminGuard = ({ children }: { children: ReactNode }) => {
   const { user, admin, loading } = useAdminAuth();
@@ -10,7 +10,7 @@ const AdminGuard = ({ children }: { children: ReactNode }) => {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+        <LoadingSpinner size={24} />
       </div>
     );
   }

@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { CheckCircle2, Loader2, Circle, Share2, ArrowLeft, AlertCircle, Download, XCircle, Copy, Smartphone } from "lucide-react";
+import { CheckCircle2, Circle, Share2, ArrowLeft, AlertCircle, Download, XCircle, Copy, Smartphone } from "lucide-react";
+import LoadingSpinner from "@/components/LoadingSpinner";
 import { downloadTransferReceipt } from "@/lib/receipt";
 import Header from "@/components/layout/Header";
 import MobileNav from "@/components/layout/MobileNav";
@@ -233,7 +234,7 @@ const TransferTrackingPage = () => {
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
                         <Button variant="destructive" size="sm" className="gap-2" disabled={cancelTransfer.isPending}>
-                          {cancelTransfer.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
+                          {cancelTransfer.isPending ? <LoadingSpinner size={16} /> : <XCircle className="w-4 h-4" />}
                           Cancel
                         </Button>
                       </AlertDialogTrigger>
@@ -307,7 +308,7 @@ const TransferTrackingPage = () => {
                         )}
                         {step.state === "current" && (
                           <div className="relative">
-                            <Loader2 className="w-6 h-6 text-primary animate-spin" />
+                            <LoadingSpinner size={24} />
                             <span className="absolute inset-0 rounded-full bg-primary/30 animate-ping" />
                           </div>
                         )}

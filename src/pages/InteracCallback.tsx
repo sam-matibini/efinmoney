@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import LogoLoader from "@/components/ui/LogoLoader";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 /**
  * Public callback route for Interac OIDC redirect.
@@ -59,7 +59,7 @@ const InteracCallback = () => {
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center">
-      <LogoLoader size="lg" label="Finalizing verification" subLabel="Securing your Interac identity check…" />
+      <LoadingSpinner size={128} />
     </div>
   );
 };

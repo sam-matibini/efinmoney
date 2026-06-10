@@ -4,9 +4,11 @@ import { useUserRoles } from "@/hooks/useUserRoles";
 import { useProfile } from "@/hooks/useProfile";
 import { ReactNode } from "react";
 
+import LoadingSpinner from "@/components/LoadingSpinner";
+
 const Spinner = () => (
   <div className="min-h-screen bg-background flex items-center justify-center">
-    <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+    <LoadingSpinner size={120} />
   </div>
 );
 

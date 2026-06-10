@@ -18,7 +18,8 @@ import { getStripe } from "@/lib/stripe";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { CheckCircle2, CreditCard, Loader2, Lock } from "lucide-react";
+import { CheckCircle2, CreditCard, Lock } from "lucide-react";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 interface Props {
   defaultWalletId?: string;
@@ -321,7 +322,7 @@ function InnerForm({
         <div className="sticky bottom-0 -mx-1 px-1 pt-3 pb-1 bg-background/95 backdrop-blur-sm space-y-2 border-t border-border/40">
           <Button type="submit" size="lg" className="w-full" disabled={!canSubmit}>
             {processing ? (
-              <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing…</>
+              <><LoadingSpinner size={16} className="mr-2" /> Processing…</>
             ) : (
               ctaLabel ?? `Pay ${symbol}${amountNum.toFixed(2)} ${currency}`
             )}
@@ -337,7 +338,7 @@ function InnerForm({
         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 rounded-md bg-background/85 backdrop-blur-sm animate-fade-in">
           <div className="relative">
             <div className="absolute inset-0 rounded-full bg-primary/20 blur-xl animate-pulse" />
-            <Loader2 className="relative h-12 w-12 animate-spin text-primary" />
+            <LoadingSpinner size={48} className="relative" />
           </div>
           <div className="text-center space-y-1 px-6">
             <h4 className="text-base font-display font-semibold text-foreground">
@@ -378,7 +379,7 @@ export default function CardPaymentForm(props: Props) {
   if (!stripeReady) {
     return (
       <div className="flex items-center justify-center py-6 text-muted-foreground">
-        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading secure form…
+        <LoadingSpinner size={16} className="mr-2" /> Loading secure form…
       </div>
     );
   }

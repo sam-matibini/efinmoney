@@ -24,6 +24,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useWallets } from "@/hooks/useWallets";
+import LoadingSpinner from "@/components/LoadingSpinner";
 import { useFxRates } from "@/hooks/useFxRates";
 import { useCreateTransfer } from "@/hooks/useTransfers";
 import { useFundingSources } from "@/hooks/useFundingSources";
@@ -1428,7 +1429,7 @@ const SendPage = () => {
                                           />
                                           {ngnResolving && (
                                             <p className="text-sm text-muted-foreground inline-flex items-center gap-2">
-                                              <span className="h-3 w-3 rounded-full border-2 border-primary/40 border-t-primary animate-spin" />
+                                              <LoadingSpinner size={12} />
                                               Verifying account…
                                             </p>
                                           )}
@@ -1620,7 +1621,7 @@ const SendPage = () => {
                                       <Button className="flex-1" onClick={handleConfirm} disabled={confirming}>
                                         {confirming ? (
                                           <span className="inline-flex items-center gap-2">
-                                            <span className="h-4 w-4 rounded-full border-2 border-primary-foreground/40 border-t-primary-foreground animate-spin" />
+                                            <LoadingSpinner size={16} />
                                             Processing...
                                           </span>
                                         ) : fundingSource === 'card' ? 'Pay with Card' : 'Confirm Transfer'}
