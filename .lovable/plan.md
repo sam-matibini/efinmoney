@@ -1,43 +1,67 @@
-## Update FX Calculator fees + add receiving grandma to hero image
+## Calculator in the middle, family on either side
 
-### 1. Benchmark fees to Remitly / LEMFI (`src/components/landing/FxCalculator.tsx`)
-Replace the current flat constants:
+Right now the hero shows one split-scene photo on the left with the calculator floating on top-right. The user wants the calculator centered, with the **sending Canada/USA couple on one side** and the **receiving African grandma + kids on the other** — visually flowing money through the calculator.
+
+### 1. Split the single hero image into two
+Generate two new images (replace/retire the current `landing-hero-users.jpg`):
+
+- **`src/assets/landing-senders.jpg`** (portrait, 768×1024):
+  > "Editorial photo of a warm young Black Canadian/American professional couple in a bright modern Toronto loft, smiling together while looking at a smartphone, clearly the senders of a family transfer. Soft natural daylight, shallow depth of field, candid, premium fintech lifestyle, no on-screen UI text, no logos."
+
+- **`src/assets/landing-receivers.jpg`** (portrait, 768×1024):
+  > "Editorial photo of a warm, smiling Black African grandmother in Lagos at her sunlit doorway joyfully receiving money on her smartphone (soft glow notification on phone screen, no readable text), her small grandchild hugging her side. Soft natural light, shallow depth of field, candid, premium fintech lifestyle, no on-screen UI text, no logos."
+
+### 2. Restructure the hero right column (`src/pages/Landing.tsx`)
+Replace the single-image + floating-calculator block with a **3-zone composition where the calculator is the centerpiece**:
+
 ```
-FEE_RATE = 0.005    // eFinMoney
-BANK_MARGIN = 0.035 // baseline
+Desktop (lg+):
+  [ senders photo ]   [ FX CALCULATOR ]   [ receivers photo ]
+        ↘ arrow/gradient money-flow ↘   ↘ arrow ↘
+
+Mobile:
+  [ senders photo ]
+  [ FX CALCULATOR ]
+  [ receivers photo ]
 ```
-with a benchmarked model that mirrors how Remitly and LEMFI actually price:
 
-- `EFIN_FX_MARGIN = 0.008` (0.8% FX markup on mid-market — undercuts both)
-- `EFIN_FLAT_FEE_USD = 0.99` (small flat fee, converted into `from` currency via `usdMap`)
-- `REMITLY_MARGIN = 0.022` (~2.2% typical economy FX margin)
-- `REMITLY_FLAT_FEE_USD = 3.99`
-- `LEMFI_MARGIN = 0.018` (~1.8% FX margin)
-- `LEMFI_FLAT_FEE_USD = 0` (LEMFI advertises zero fee, monetizes on spread)
+Structure:
+```tsx
+<div className="relative w-full max-w-[640px] lg:ml-auto">
+  {/* Soft amber glow behind calculator */}
+  <div className="hidden lg:block absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[420px] h-[420px] bg-[hsl(var(--accent-amber)/0.25)] blur-3xl rounded-full pointer-events-none" />
 
-Recompute:
-- `effectiveRate = midRate * (1 - EFIN_FX_MARGIN)` and subtract flat fee from `sendAmt` before multiplying for the *recipient gets* number.
-- Build a `compareRow(name, margin, flatUsd)` helper that returns `{ rate, recipientGets, totalCostInSend }`.
-- Comparison strip becomes **3 rows**: eFinMoney (good), Remitly, LEMFI — each showing `1 FROM = X TO` and the per-provider effective fee (margin % + flat fee shown like "0.8% + $0.99").
-- "You save with eFinMoney" headline = `bestCompetitorRecipientGets` vs eFinMoney recipient gets, converted back to send currency, plus % saved vs the cheaper of Remitly/LEMFI.
-- Keep bidirectional editing: when user edits *recipient gets*, invert `(recv / effectiveRate) + flatFeeInFrom` to get `sendAmt`.
-- Update the small footnote: "Indicative mid-market rate. 0.8% FX margin + $0.99 fee. Benchmarked against Remitly & LEMFI public pricing."
-- Replace the "Typical bank" `Row` with the new 3-row comparison; tweak the `Row` component to accept an optional `subFee` line so "0.8% + $0.99" fits cleanly.
+  <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr] gap-3 lg:gap-2 items-center">
+    {/* Senders — left on desktop, top on mobile */}
+    <div className="relative">
+      <img src={senders} alt="Family in Canada sending money home" className="w-full h-[180px] lg:h-[360px] object-cover rounded-2xl ring-1 ring-white/10 shadow-xl" loading="lazy" />
+      <span className="absolute top-2 left-2 text-[10px] font-bold uppercase tracking-wider bg-white/15 backdrop-blur ring-1 ring-white/20 text-white rounded-full px-2 py-0.5">Sending · Canada</span>
+    </div>
 
-No backend / pricing-config changes — these are landing-page indicative benchmarks only, matching the existing "indicative" disclaimer.
+    {/* Calculator — middle */}
+    <div className="relative z-10 lg:-mx-4">
+      <FxCalculator />
+    </div>
 
-### 2. Regenerate hero image with a receiving grandma
-Re-generate `src/assets/landing-hero-users.jpg` (premium, 1280×960, same path so `Landing.tsx` import is unchanged):
+    {/* Receivers — right on desktop, bottom on mobile */}
+    <div className="relative">
+      <img src={receivers} alt="Grandmother in Africa receiving money" className="w-full h-[180px] lg:h-[360px] object-cover rounded-2xl ring-1 ring-white/10 shadow-xl" loading="lazy" />
+      <span className="absolute top-2 right-2 text-[10px] font-bold uppercase tracking-wider bg-white/15 backdrop-blur ring-1 ring-white/20 text-white rounded-full px-2 py-0.5">Receiving · Africa</span>
+    </div>
+  </div>
+</div>
+```
 
-> "Editorial split-scene photo: LEFT — a warm, smiling Black African grandmother in Lagos at her doorway joyfully receiving money on her smartphone (mobile money notification visible as soft glow, no readable text), a small grandchild beside her. RIGHT — the same family's adult children: a young Black Canadian professional couple in a bright Toronto loft looking together at a phone, clearly the senders. Soft natural light, shallow depth of field, candid, premium fintech lifestyle, emotional connection between the two scenes, no on-screen UI text, no logos."
+- Calculator stays at its current compact size (`max-w-[340px]`); on `lg+` it slightly overlaps both photos via `lg:-mx-4` and `z-10` so it visually sits *in front of* and *between* them, like money flowing left → calculator → right.
+- Amber radial glow behind the calculator anchors the center.
+- Small badges ("Sending · Canada" / "Receiving · Africa") make the visual story explicit without competing with the headline.
+- Left copy column (`"Send money across borders, instantly."`, sub-copy, CTAs, press strip) — **untouched**.
 
-This keeps the existing Canada-side family and adds the receiving grandma — visually telling the full send → receive story behind the calculator.
-
-### 3. Untouched
-- `src/pages/Landing.tsx` layout (headline, copy, image position, calculator float) — no edits.
-- `src/lib/worldCurrencies.ts` — no edits.
-- Bidirectional input, searchable currency picker, sign-in/sign-up handoff — preserved.
+### 3. Cleanup
+- Old `src/assets/landing-hero-users.jpg` is no longer used after this change. Delete it to keep the repo clean.
 
 ### Files
-- **Edit:** `src/components/landing/FxCalculator.tsx` (fee model + 3-row comparison + footnote)
-- **Replace asset:** `src/assets/landing-hero-users.jpg` (regenerate via imagegen)
+- **New:** `src/assets/landing-senders.jpg`, `src/assets/landing-receivers.jpg`
+- **Edit:** `src/pages/Landing.tsx` (swap image import + right-column markup)
+- **Delete:** `src/assets/landing-hero-users.jpg`
+- **No changes:** `FxCalculator.tsx`, `worldCurrencies.ts`, left hero copy column.
