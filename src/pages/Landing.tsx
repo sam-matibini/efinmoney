@@ -14,7 +14,8 @@ import featureInstant from "@/assets/landing-feature-instant.jpg";
 import featureCorridors from "@/assets/landing-feature-corridors.jpg";
 import MarketTicker from "@/components/landing/MarketTicker";
 import FxCalculator from "@/components/landing/FxCalculator";
-import heroUsers from "@/assets/landing-hero-users.jpg";
+import senders from "@/assets/landing-senders.jpg";
+import receivers from "@/assets/landing-receivers.jpg";
 
 const NAV_LINKS = [
   { label: "Features", href: "#features" },
@@ -292,32 +293,61 @@ const Landing = () => {
             </motion.div>
           </div>
 
-          {/* RIGHT: lifestyle photo with floating FX calculator */}
-          <div className="relative w-full max-w-[540px] mx-auto lg:ml-auto lg:mr-0">
+          {/* RIGHT: calculator centered with sender on one side and receiver on the other */}
+          <div className="relative w-full max-w-[680px] mx-auto lg:ml-auto lg:mr-0">
+            {/* Soft amber glow anchoring the calculator */}
+            <div className="hidden lg:block absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[440px] h-[440px] bg-[hsl(var(--accent-amber)/0.22)] blur-3xl rounded-full pointer-events-none" />
+
             <motion.div
               initial={{ opacity: 0, scale: 0.96 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.7, delay: 0.3, ease: "easeOut" }}
-              className="relative"
+              className="relative grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr] gap-3 lg:gap-2 items-center"
             >
-              <img
-                src={heroUsers}
-                alt="An African family in Lagos and a Black Canadian professional couple in Toronto reviewing a money transfer together on their phones"
-                width={1280}
-                height={960}
-                className="w-full h-[380px] sm:h-[440px] lg:h-[520px] object-cover rounded-3xl ring-1 ring-white/10 shadow-2xl"
-              />
-              <div className="absolute inset-0 rounded-3xl bg-gradient-to-tr from-[hsl(248_60%_6%)]/75 via-[hsl(248_60%_8%)]/20 to-transparent pointer-events-none" />
-            </motion.div>
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.6, ease: "easeOut" }}
-              className="absolute -bottom-6 right-2 sm:right-4 lg:-right-4"
-            >
-              <FxCalculator />
+              {/* Sender — left on desktop, top on mobile */}
+              <div className="relative">
+                <img
+                  src={senders}
+                  alt="Black Canadian professional couple in Toronto sending money home on their smartphone"
+                  width={768}
+                  height={1024}
+                  loading="lazy"
+                  className="w-full h-[200px] lg:h-[380px] object-cover rounded-2xl ring-1 ring-white/10 shadow-xl"
+                />
+                <span className="absolute top-2 left-2 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider bg-black/45 backdrop-blur ring-1 ring-white/20 text-white rounded-full px-2 py-0.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                  Sending · Canada
+                </span>
+              </div>
+
+              {/* Calculator — centerpiece */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.5, ease: "easeOut" }}
+                className="relative z-10 lg:-mx-6 my-1 lg:my-0"
+              >
+                <FxCalculator />
+              </motion.div>
+
+              {/* Receiver — right on desktop, bottom on mobile */}
+              <div className="relative">
+                <img
+                  src={receivers}
+                  alt="Smiling Black African grandmother with grandchild receiving money on her smartphone at her doorway"
+                  width={768}
+                  height={1024}
+                  loading="lazy"
+                  className="w-full h-[200px] lg:h-[380px] object-cover rounded-2xl ring-1 ring-white/10 shadow-xl"
+                />
+                <span className="absolute top-2 right-2 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider bg-black/45 backdrop-blur ring-1 ring-white/20 text-white rounded-full px-2 py-0.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[hsl(var(--accent-amber))]" />
+                  Receiving · Africa
+                </span>
+              </div>
             </motion.div>
           </div>
+
         </div>
 
         {/* bottom fade into white sections */}
