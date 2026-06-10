@@ -615,6 +615,9 @@ const Landing = () => {
         </div>
       </section>
 
+      {/* ============ GLOBAL CORRIDORS ============ */}
+      <GlobalCorridors />
+
       {/* ============ HOW IT WORKS ============ */}
       <section id="how" className="bg-grid-purple py-24">
         <div className="max-w-7xl mx-auto px-6">
