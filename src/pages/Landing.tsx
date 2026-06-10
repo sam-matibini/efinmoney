@@ -14,6 +14,7 @@ import featureInstant from "@/assets/landing-feature-instant.jpg";
 import featureCorridors from "@/assets/landing-feature-corridors.jpg";
 import MarketTicker from "@/components/landing/MarketTicker";
 import FxCalculator from "@/components/landing/FxCalculator";
+import GlobalCorridors from "@/components/GlobalCorridors";
 import senders from "@/assets/landing-senders.jpg";
 import receivers from "@/assets/landing-receivers.jpg";
 
@@ -613,6 +614,9 @@ const Landing = () => {
           </motion.div>
         </div>
       </section>
+
+      {/* ============ GLOBAL CORRIDORS ============ */}
+      <GlobalCorridors />
 
       {/* ============ HOW IT WORKS ============ */}
       <section id="how" className="bg-grid-purple py-24">
