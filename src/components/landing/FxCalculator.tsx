@@ -260,16 +260,22 @@ const FxCalculator = () => {
               <div className="space-y-1.5 text-[11.5px]">
                 <Row
                   label="eFinMoney"
-                  rate={midRate ? `1 ${from} = ${fmt(midRate)} ${to}` : "—"}
-                  fee="0.5% fee"
+                  rate={efinDisplayRate ? `1 ${from} = ${fmt(efinDisplayRate)} ${to}` : "—"}
+                  fee="0.8% + $0.99"
                   good
                 />
                 <Row
-                  label="Typical bank"
-                  rate={bankRate ? `1 ${from} = ${fmt(bankRate)} ${to}` : "—"}
-                  fee="~3.5% hidden margin"
+                  label="Remitly"
+                  rate={remitlyDisplayRate ? `1 ${from} = ${fmt(remitlyDisplayRate)} ${to}` : "—"}
+                  fee="~2.2% + $3.99"
+                />
+                <Row
+                  label="LEMFI"
+                  rate={lemfiDisplayRate ? `1 ${from} = ${fmt(lemfiDisplayRate)} ${to}` : "—"}
+                  fee="~1.8% spread"
                 />
               </div>
+
 
               <div className="mt-2.5 flex flex-wrap gap-1.5">
                 <Badge>Mid-market rate</Badge>
