@@ -247,7 +247,7 @@ const Landing = () => {
               transition={{ delay: 0.85, duration: 0.55 }}
               className="mt-7 max-w-xl text-base md:text-lg text-white/70 mx-auto lg:mx-0"
             >
-              Multi-currency wallets, FX trading, crypto, and mobile money transfers to Africa — settled in minutes, not days.
+              Multi-currency wallets, FX, crypto and mobile money across Canada, USA, Nigeria, Kenya, Ghana, Zambia and 50+ corridors — settled in minutes, not days.
             </motion.p>
 
             <motion.div
