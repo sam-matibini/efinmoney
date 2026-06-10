@@ -348,8 +348,6 @@ const Landing = () => {
 
         </div>
 
-        {/* bottom fade into white sections */}
-        <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-white to-transparent pointer-events-none" />
       </section>
 
       {/* ============ LIVE MARKETS TICKER ============ */}
