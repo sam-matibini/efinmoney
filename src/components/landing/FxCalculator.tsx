@@ -171,13 +171,14 @@ const FxCalculator = () => {
 
   // Per-provider effective rate display (post-margin)
   const efinDisplayRate = midRate ? midRate * (1 - EFIN_FX_MARGIN) : null;
-  const remitlyDisplayRate = midRate ? midRate * (1 - REMITLY_MARGIN) : null;
-  const lemfiDisplayRate = midRate ? midRate * (1 - LEMFI_MARGIN) : null;
+  // Use the worse (more expensive) of the two benchmarks for the public "typical market rate" row
+  const marketMargin = Math.max(BENCHMARK_A_MARGIN, BENCHMARK_B_MARGIN);
+  const marketDisplayRate = midRate ? midRate * (1 - marketMargin) : null;
 
-  // Savings vs the BETTER of the two competitors (worst case for our claim, most credible)
-  const remitlyRecv = quoteRecipient(sendNumeric, REMITLY_MARGIN, REMITLY_FLAT_FEE_USD);
-  const lemfiRecv = quoteRecipient(sendNumeric, LEMFI_MARGIN, LEMFI_FLAT_FEE_USD);
-  const bestCompetitorRecv = Math.max(remitlyRecv, lemfiRecv);
+  // Savings vs the BETTER of the two benchmarks (most conservative claim)
+  const benchARecv = quoteRecipient(sendNumeric, BENCHMARK_A_MARGIN, BENCHMARK_A_FLAT_FEE_USD);
+  const benchBRecv = quoteRecipient(sendNumeric, BENCHMARK_B_MARGIN, BENCHMARK_B_FLAT_FEE_USD);
+  const bestCompetitorRecv = Math.max(benchARecv, benchBRecv);
   const savingsInTo = recvNumeric - bestCompetitorRecv;
   const savingsInSend = midRate && midRate > 0 ? savingsInTo / midRate : 0;
   const savingsPct = bestCompetitorRecv > 0 ? (savingsInTo / bestCompetitorRecv) * 100 : 0;
@@ -247,7 +248,7 @@ const FxCalculator = () => {
               <div className="flex items-center justify-between mb-2">
                 <div className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[hsl(var(--accent-amber))]">
                   <Sparkles className="w-3.5 h-3.5" />
-                  You save with eFinMoney
+                  You save vs. typical market rate
                 </div>
                 <div className="text-right">
                   <div className="text-base font-black text-white tabular-nums leading-none">
@@ -267,14 +268,9 @@ const FxCalculator = () => {
                   good
                 />
                 <Row
-                  label="Remitly"
-                  rate={remitlyDisplayRate ? `1 ${from} = ${fmt(remitlyDisplayRate)} ${to}` : "—"}
-                  fee="~2.2% + $3.99"
-                />
-                <Row
-                  label="LEMFI"
-                  rate={lemfiDisplayRate ? `1 ${from} = ${fmt(lemfiDisplayRate)} ${to}` : "—"}
-                  fee="~1.8% spread"
+                  label="Typical market rate"
+                  rate={marketDisplayRate ? `1 ${from} = ${fmt(marketDisplayRate)} ${to}` : "—"}
+                  fee="~2.2% + fees"
                 />
               </div>
 
@@ -284,6 +280,10 @@ const FxCalculator = () => {
                 <Badge>No hidden fees</Badge>
                 <Badge>60s rate lock</Badge>
               </div>
+            </>
+          )}
+        </div>
+
             </>
           )}
         </div>
