@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Eye, EyeOff, ArrowRight, ArrowLeft } from "lucide-react";
 import { Logo, Wordmark } from "@/components/Logo";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 const isSafeRedirect = (path: string | null): path is string =>
   !!path && path.startsWith("/") && !path.startsWith("//");

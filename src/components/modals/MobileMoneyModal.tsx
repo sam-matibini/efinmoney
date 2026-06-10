@@ -561,7 +561,7 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
             disabled={createTransfer.isPending || isLoading || (fundingSource === 'card' && savedCards.length === 0)}
           >
             {createTransfer.isPending || isLoading ? (
-              <><LoaderCircle className="mr-2 h-4 w-4 animate-spin" />Processing…</>
+              <><LoadingSpinner size={16} className="mr-2" />Processing…</>
             ) : fundingSource === 'wallet' ? (
               "Send from wallet"
             ) : fundingSource === 'card' ? (
