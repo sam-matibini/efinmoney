@@ -1,38 +1,43 @@
-## Compact FX Calculator + lifestyle imagery in hero
+## Update FX Calculator fees + add receiving grandma to hero image
 
-**Goal:** shrink the calculator and pair it with a generated image of a Black African family and Canadian/USA professionals reviewing the calculator — without disturbing the `"Send money across borders, instantly."` headline on the left.
+### 1. Benchmark fees to Remitly / LEMFI (`src/components/landing/FxCalculator.tsx`)
+Replace the current flat constants:
+```
+FEE_RATE = 0.005    // eFinMoney
+BANK_MARGIN = 0.035 // baseline
+```
+with a benchmarked model that mirrors how Remitly and LEMFI actually price:
 
-### 1. Shrink the calculator (`src/components/landing/FxCalculator.tsx`)
-- Outer max width: `max-w-md` → `max-w-sm` (and `max-w-[340px]` on lg).
-- Padding `p-5 sm:p-6` → `p-4`.
-- Amount input font: `text-2xl sm:text-3xl` → `text-xl sm:text-2xl`.
-- Currency picker height `h-11` → `h-9`, badges padding tightened.
-- CTAs `h-12` → `h-10`, font `text-sm` → `text-[13px]`.
-- Comparison strip: tighter spacing (`p-3.5` → `p-3`, `mt-4` → `mt-3`).
-- Swap button `w-9 h-9` → `w-8 h-8`.
-- Section label/timestamp text reduced by 1 step.
-- No logic changes — bidirectional editing, searchable picker, intent handoff all preserved.
+- `EFIN_FX_MARGIN = 0.008` (0.8% FX markup on mid-market — undercuts both)
+- `EFIN_FLAT_FEE_USD = 0.99` (small flat fee, converted into `from` currency via `usdMap`)
+- `REMITLY_MARGIN = 0.022` (~2.2% typical economy FX margin)
+- `REMITLY_FLAT_FEE_USD = 3.99`
+- `LEMFI_MARGIN = 0.018` (~1.8% FX margin)
+- `LEMFI_FLAT_FEE_USD = 0` (LEMFI advertises zero fee, monetizes on spread)
 
-### 2. New hero lifestyle image
-- Generate `src/assets/landing-hero-users.jpg` via `imagegen` (premium, ~1280×960):
-  > "Editorial photo collage: a warm, smiling Black African family at a wooden kitchen table in Lagos looking together at a smartphone, beside a young Black Canadian professional couple in a bright Toronto loft also looking at a phone, soft natural light, shallow depth of field, candid, premium fintech lifestyle, no on-screen UI, no text"
-- The image depicts users *deciding/simulating a transfer* (looking at phones) — the calculator floats over it.
+Recompute:
+- `effectiveRate = midRate * (1 - EFIN_FX_MARGIN)` and subtract flat fee from `sendAmt` before multiplying for the *recipient gets* number.
+- Build a `compareRow(name, margin, flatUsd)` helper that returns `{ rate, recipientGets, totalCostInSend }`.
+- Comparison strip becomes **3 rows**: eFinMoney (good), Remitly, LEMFI — each showing `1 FROM = X TO` and the per-provider effective fee (margin % + flat fee shown like "0.8% + $0.99").
+- "You save with eFinMoney" headline = `bestCompetitorRecipientGets` vs eFinMoney recipient gets, converted back to send currency, plus % saved vs the cheaper of Remitly/LEMFI.
+- Keep bidirectional editing: when user edits *recipient gets*, invert `(recv / effectiveRate) + flatFeeInFrom` to get `sendAmt`.
+- Update the small footnote: "Indicative mid-market rate. 0.8% FX margin + $0.99 fee. Benchmarked against Remitly & LEMFI public pricing."
+- Replace the "Typical bank" `Row` with the new 3-row comparison; tweak the `Row` component to accept an optional `subFee` line so "0.8% + $0.99" fits cleanly.
 
-### 3. Hero right column layout (`src/pages/Landing.tsx`, ~lines 294-301)
-- Replace the current right column with a single relative stage:
-  ```
-  <div className="relative w-full max-w-[520px] lg:ml-auto">
-    <img src={heroUsers} alt="Families in Africa and professionals in Canada deciding to transfer money with eFinMoney" className="w-full h-[420px] lg:h-[480px] object-cover rounded-3xl ring-1 ring-white/10 shadow-2xl" />
-    <div className="absolute inset-0 bg-gradient-to-tr from-[hsl(248_60%_8%)]/70 via-transparent to-transparent rounded-3xl" />
-    <div className="absolute -bottom-6 -right-4 lg:-right-8 w-[300px] sm:w-[330px]">
-      <FxCalculator />
-    </div>
-  </div>
-  ```
-- Phone mockups (`WalletScreen`, `ExchangeScreen`) removed from hero (calculator + photo replace them). They remain defined in the file for any other use.
-- Left copy column (headline `"Send money across borders, instantly."`, sub-copy, CTA, press strip) is **untouched**.
+No backend / pricing-config changes — these are landing-page indicative benchmarks only, matching the existing "indicative" disclaimer.
+
+### 2. Regenerate hero image with a receiving grandma
+Re-generate `src/assets/landing-hero-users.jpg` (premium, 1280×960, same path so `Landing.tsx` import is unchanged):
+
+> "Editorial split-scene photo: LEFT — a warm, smiling Black African grandmother in Lagos at her doorway joyfully receiving money on her smartphone (mobile money notification visible as soft glow, no readable text), a small grandchild beside her. RIGHT — the same family's adult children: a young Black Canadian professional couple in a bright Toronto loft looking together at a phone, clearly the senders. Soft natural light, shallow depth of field, candid, premium fintech lifestyle, emotional connection between the two scenes, no on-screen UI text, no logos."
+
+This keeps the existing Canada-side family and adds the receiving grandma — visually telling the full send → receive story behind the calculator.
+
+### 3. Untouched
+- `src/pages/Landing.tsx` layout (headline, copy, image position, calculator float) — no edits.
+- `src/lib/worldCurrencies.ts` — no edits.
+- Bidirectional input, searchable currency picker, sign-in/sign-up handoff — preserved.
 
 ### Files
-- **Edit:** `src/components/landing/FxCalculator.tsx` — sizing only.
-- **Edit:** `src/pages/Landing.tsx` — replace right-column block; add `heroUsers` import.
-- **New asset:** `src/assets/landing-hero-users.jpg` (generated).
+- **Edit:** `src/components/landing/FxCalculator.tsx` (fee model + 3-row comparison + footnote)
+- **Replace asset:** `src/assets/landing-hero-users.jpg` (regenerate via imagegen)
