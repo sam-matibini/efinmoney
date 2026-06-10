@@ -141,6 +141,33 @@ const MarketTicker = () => {
                 })}
               </span>
             </span>
+            {(() => {
+              const spread = getSpreadBps(it) / 10000;
+              const bid = it.price * (1 - spread / 2);
+              const ask = it.price * (1 + spread / 2);
+              return (
+                <span
+                  className="inline-flex items-center gap-1 text-xs tabular-nums text-white/45"
+                  title="Indicative bid / ask derived from live mid"
+                >
+                  <span className="text-sky-300/70 font-semibold">Bid</span>
+                  <span className="text-white/70">
+                    {bid.toLocaleString("en-US", {
+                      minimumFractionDigits: dec,
+                      maximumFractionDigits: dec,
+                    })}
+                  </span>
+                  <span className="text-white/25">/</span>
+                  <span className="text-fuchsia-300/70 font-semibold">Ask</span>
+                  <span className="text-white/70">
+                    {ask.toLocaleString("en-US", {
+                      minimumFractionDigits: dec,
+                      maximumFractionDigits: dec,
+                    })}
+                  </span>
+                </span>
+              );
+            })()}
             <span
               className={`inline-flex items-center gap-0.5 text-xs font-semibold tabular-nums ${
                 up ? "text-emerald-400" : "text-rose-400"
