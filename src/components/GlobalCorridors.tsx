@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import heroVideo from "@/assets/hero-background.mp4.asset.json";
 
 const CORRIDORS = [
   { from: "Canada", to: "Nigeria", flag: "🇳🇬" },
@@ -8,8 +9,7 @@ const CORRIDORS = [
   { from: "Canada", to: "Zimbabwe", flag: "🇿🇼" },
 ];
 
-const DEFAULT_VIDEO_SRC =
-  "https://hgmskcvaeadnyovbroup.supabase.co/storage/v1/object/public/assets/hero-background.mp4";
+const DEFAULT_VIDEO_SRC = heroVideo.url;
 
 interface GlobalCorridorsProps {
   videoSrc?: string;
