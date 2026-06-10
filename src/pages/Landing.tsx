@@ -405,6 +405,80 @@ const Landing = () => {
         </div>
       </section>
 
+      {/* ============ BUILT FOR BUSINESS (B2B) ============ */}
+      <section className="relative bg-white py-20 md:py-24 overflow-hidden">
+        <div className="absolute -top-32 right-0 w-[600px] h-[600px] rounded-full bg-[hsl(var(--primary)/0.06)] blur-3xl pointer-events-none" />
+        <div className="max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-12 items-center">
+          <motion.div
+            initial={{ opacity: 0, x: -30 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true, margin: "-80px" }}
+            transition={{ duration: 0.6 }}
+            className="order-2 lg:order-1"
+          >
+            <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-semibold uppercase tracking-[0.18em] text-[hsl(var(--brand-700))] bg-[hsl(var(--accent))]">
+              <Building2 className="w-3 h-3" />
+              eFinMoney for Business
+            </span>
+            <h2 className="mt-4 text-4xl md:text-5xl font-black tracking-tight text-[hsl(var(--brand-900))]">
+              Treasury, payouts and FX, in one professional platform.
+            </h2>
+            <p className="mt-5 text-[15px] md:text-base text-neutral-600 leading-relaxed max-w-xl">
+              Move funds, run multi-entity wallets, reconcile in real time and
+              pay suppliers across Africa, North America and beyond — with the
+              controls and reporting your finance team expects.
+            </p>
+            <ul className="mt-7 grid sm:grid-cols-2 gap-3">
+              {[
+                { icon: Send, t: "Bulk payouts & approvals" },
+                { icon: Layers, t: "Multi-entity wallets" },
+                { icon: BarChart3, t: "Real-time reporting" },
+                { icon: Shield, t: "SOC 2 · MSB licensed" },
+              ].map((it) => (
+                <li key={it.t} className="flex items-center gap-3 p-3 rounded-xl border border-neutral-200/80 bg-white">
+                  <span className="w-9 h-9 rounded-lg bg-[hsl(var(--accent))] text-[hsl(var(--brand-700))] flex items-center justify-center flex-shrink-0">
+                    <it.icon className="w-4 h-4" />
+                  </span>
+                  <span className="text-sm font-semibold text-[hsl(var(--brand-900))]">{it.t}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-8 flex flex-wrap gap-3">
+              <Link
+                to="/auth"
+                className="inline-flex items-center gap-2 bg-[hsl(var(--accent-amber))] hover:brightness-110 text-[hsl(var(--brand-900))] font-bold px-6 py-3 rounded-full text-sm transition-all hover:-translate-y-0.5 shadow-cta-amber"
+              >
+                Talk to sales <ArrowRight className="w-4 h-4" />
+              </Link>
+              <Link
+                to="/auth"
+                className="inline-flex items-center gap-2 bg-[hsl(var(--brand-900))] text-white font-bold px-6 py-3 rounded-full text-sm transition-all hover:-translate-y-0.5"
+              >
+                Open a business account
+              </Link>
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, x: 30 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true, margin: "-80px" }}
+            transition={{ duration: 0.6, delay: 0.1 }}
+            className="relative order-1 lg:order-2 rounded-3xl overflow-hidden shadow-card-purple ring-1 ring-[hsl(var(--brand-900))]/10"
+          >
+            <img
+              src={b2bPhone}
+              alt="eFinMoney for Business — premium fintech dashboard on a professional desk"
+              loading="lazy"
+              width={1280}
+              height={960}
+              className="w-full h-[460px] object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-tr from-[hsl(var(--brand-900))]/30 via-transparent to-transparent" />
+          </motion.div>
+        </div>
+      </section>
+
       {/* ============ HOW IT WORKS ============ */}
       <section id="how" className="bg-grid-purple py-24">
         <div className="max-w-7xl mx-auto px-6">
