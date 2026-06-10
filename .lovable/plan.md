@@ -1,51 +1,21 @@
-# Real FX & crypto rates in the rolling banner
+## Goal
+Show the inverse (reciprocal) spot rate next to the existing price and 24h % change on the live markets ticker.
 
-## What's wrong today
-- Fiat pairs use a small hard-coded `FALLBACK_RATES` table if `useFxRates()` is missing a pair.
-- Crypto pairs are entirely hard-coded (`BTC 71240.50` etc.).
-- The "% delta" is a deterministic `sin()` of the price — fake, not a real 24h change.
-- Flag emojis show as plain text on Windows (the user's screenshot shows "USCA", "USNG", "USKE"… — that's the regional-indicator letter pair rendering as ASCII).
+## Change
+Single file: `src/components/landing/MarketTicker.tsx`
 
-## What I'll build
+For each item, render an additional inverse-rate chip immediately before the % delta:
 
-### 1. New public edge function `market-rates`
-`supabase/functions/market-rates/index.ts` (`verify_jwt = false`, anon-readable, 60s in-memory cache, CORS on).
+- Fiat: `USD/NGN 1,650.20  ·  NGN/USD 0.000606  ·  +0.42%`
+- Crypto: `BTC/USD 71,240.50  ·  USD/BTC 0.00001404  ·  +1.23%`
 
-Returns:
-```json
-{
-  "fiat":   [{ "from":"USD", "to":"CAD", "price":1.3712, "change24h":0.12 }, ...],
-  "crypto": [{ "symbol":"BTC", "price":71240.5, "change24h":2.41 }, ...],
-  "fetched_at": "..."
-}
-```
-
-**Fiat source** — read from existing `fx_rates` table for the 8 pairs the ticker uses (USD→CAD/NGN/KES/GHS/ZMW, CAD→NGN, GBP→USD, EUR→USD). For the 24h change, pull the most-recent row plus the row closest to 24h ago for the same pair and compute `(latest − prior) / prior * 100`. If no 24h-old row exists, return `change24h: 0`. No new ingestion — `refresh-fx-rates` already populates this table from OpenExchangeRates.
-
-**Crypto source** — single CoinGecko call:
-```
-https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana,ripple,stellar,usd-coin&vs_currencies=usd&include_24hr_change=true
-```
-Public, keyless, rate-limited (~30 req/min) — the 60s server cache makes that a non-issue. If the call fails, the function returns `crypto: []` and the client just hides those rows; no fake numbers.
-
-### 2. Update `src/components/landing/MarketTicker.tsx`
-- Drop `useFxRates` import, `FALLBACK_RATES`, hard-coded `CRYPTO` array, and `deterministicDelta`.
-- Add `useQuery(['market-rates'], () => supabase.functions.invoke('market-rates'))` with `refetchInterval: 60_000`.
-- Build the ticker items from the response. While loading or on error, render an "Updating live markets…" skeleton row so the marquee never disappears.
-- Keep the same visual structure (label · price · delta with arrow · pause-on-hover marquee).
-
-### 3. Fix the flag rendering bug (small, related)
-Replace emoji flags with `<img>` from `https://flagcdn.com/20x15/{cc}.png` (a free CDN that ships real PNG flags). One `<img>` per country (or two side-by-side for fiat pairs), `width={20} height={15}`, `loading="lazy"`, rounded-sm. Crypto rows keep their unicode coin glyph (₿ Ξ ◎ ✕ ★ ⓤ) since those render reliably across platforms.
-
-### 4. Config
-- Append `[functions.market-rates] verify_jwt = false` to `supabase/config.toml`.
+Implementation details:
+- Add an `inverse = 1 / price` computation per item.
+- Helper `decimalsForInverse(inv)` to pick sensible precision (small numbers need 6–8 dp).
+- Render the inverse with a subtler style: smaller text, lower opacity, and an arrow/swap glyph (`⇌`) before the inverse pair label so it reads as a derived rate, not a separate quote.
+- No changes to the edge function — inverse is derived client-side from the same mid price already returned by `market-rates`.
+- No changes to layout/marquee/flags; only the per-item inner row gets one extra span group.
 
 ## Out of scope
-- No DB schema changes, no new ingestion jobs, no changes to `refresh-fx-rates`.
-- No new copy, no color/layout changes elsewhere on the landing page.
-- No paid CoinGecko Pro key — the free public endpoint is fine behind the 60s server cache.
-
-## Files touched
-- `supabase/functions/market-rates/index.ts` (new)
-- `supabase/config.toml` (edit — add function entry)
-- `src/components/landing/MarketTicker.tsx` (edit — switch to real data + flag PNGs)
+- No bid/ask spread (we don't have that data source).
+- No new pairs, no new API calls, no copy changes elsewhere.

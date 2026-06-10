@@ -24,6 +24,14 @@ const decimalsFor = (price: number) => {
   return 6;
 };
 
+const decimalsForInverse = (inv: number) => {
+  if (inv >= 100) return 2;
+  if (inv >= 1) return 4;
+  if (inv >= 0.01) return 6;
+  return 8;
+};
+
+
 const Flag = ({ code, alt }: { code: string; alt: string }) => (
   <img
     src={`https://flagcdn.com/20x15/${code}.png`}
@@ -84,6 +92,10 @@ const MarketTicker = () => {
       {items.map((it) => {
         const up = it.delta >= 0;
         const dec = decimalsFor(it.price);
+        const inverse = it.price > 0 ? 1 / it.price : 0;
+        const invDec = decimalsForInverse(inverse);
+        const inverseLabel =
+          it.kind === "fiat" ? `${it.to}/${it.from}` : `USD/${it.symbol}`;
         return (
           <div
             key={`${keyPrefix}-${it.key}`}
@@ -109,6 +121,19 @@ const MarketTicker = () => {
               })}
             </span>
             <span
+              className="inline-flex items-center gap-1 text-xs tabular-nums text-white/45"
+              title={`Inverse rate ${inverseLabel}`}
+            >
+              <span className="text-white/30">⇌</span>
+              <span className="font-medium text-white/55">{inverseLabel}</span>
+              <span>
+                {inverse.toLocaleString("en-US", {
+                  minimumFractionDigits: invDec,
+                  maximumFractionDigits: invDec,
+                })}
+              </span>
+            </span>
+            <span
               className={`inline-flex items-center gap-0.5 text-xs font-semibold tabular-nums ${
                 up ? "text-emerald-400" : "text-rose-400"
               }`}
@@ -121,6 +146,7 @@ const MarketTicker = () => {
           </div>
         );
       })}
+
     </div>
   );
 
