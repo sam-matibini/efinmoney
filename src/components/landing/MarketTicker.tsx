@@ -199,6 +199,9 @@ const MarketTicker = () => {
         <span className="text-[10px] uppercase tracking-[0.18em] font-semibold text-white/70">
           Live markets
         </span>
+        <span className="hidden md:inline text-[9px] uppercase tracking-[0.14em] text-white/35 ml-1">
+          · Indicative
+        </span>
       </div>
 
       {/* edge fades */}
