@@ -9,6 +9,10 @@ import b2bPhone from "@/assets/landing-b2b-phone.jpg";
 import tourismKenya from "@/assets/landing-tourism-kenya.jpg";
 import tourismVicFalls from "@/assets/landing-tourism-victoria-falls.jpg";
 import tourismZanzibar from "@/assets/landing-tourism-zanzibar.jpg";
+import featureSecurity from "@/assets/landing-feature-security.jpg";
+import featureInstant from "@/assets/landing-feature-instant.jpg";
+import featureCorridors from "@/assets/landing-feature-corridors.jpg";
+import MarketTicker from "@/components/landing/MarketTicker";
 
 const NAV_LINKS = [
   { label: "Features", href: "#features" },
@@ -17,9 +21,9 @@ const NAV_LINKS = [
 ];
 
 const FEATURES = [
-  { icon: Shield, title: "Bank-Grade Security", desc: "Your funds are protected with 256-bit encryption and multi-factor authentication." },
-  { icon: Zap, title: "Instant Transfers", desc: "Send money to Kenya, Nigeria, Uganda in minutes — not days." },
-  { icon: Globe, title: "50+ Currency Corridors", desc: "Hold USD, CAD, NGN, KES, GHS, ZMW and more in one app." },
+  { icon: Shield, title: "Bank-Grade Security", desc: "Your funds are protected with 256-bit encryption and multi-factor authentication.", image: featureSecurity },
+  { icon: Zap, title: "Instant Transfers", desc: "Send money to Kenya, Nigeria, Uganda in minutes — not days.", image: featureInstant },
+  { icon: Globe, title: "50+ Currency Corridors", desc: "Hold USD, CAD, NGN, KES, GHS, ZMW and more in one app.", image: featureCorridors },
 ];
 
 const STEPS: { n: number; title: string; desc?: string }[] = [
@@ -298,6 +302,9 @@ const Landing = () => {
         <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-white to-transparent pointer-events-none" />
       </section>
 
+      {/* ============ LIVE MARKETS TICKER ============ */}
+      <MarketTicker />
+
 
       {/* ============ BUILT FOR AFRICA ============ */}
       <section className="relative bg-white py-20 md:py-24">
@@ -443,18 +450,33 @@ const Landing = () => {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-60px" }}
                 transition={{ duration: 0.5, delay: i * 0.12 }}
-                className="group relative p-8 rounded-3xl bg-white border border-neutral-200/80 hover:border-indigo-300/60 hover:-translate-y-1.5 hover:shadow-[0_20px_50px_-20px_rgba(16,185,129,0.25)] transition-all duration-300 overflow-hidden"
+                className="group relative rounded-3xl bg-white border border-neutral-200/80 hover:border-indigo-300/60 hover:-translate-y-1.5 hover:shadow-[0_20px_50px_-20px_rgba(16,185,129,0.25)] transition-all duration-300 overflow-hidden"
               >
-                {/* subtle corner glow */}
-                <div className="absolute -top-16 -right-16 w-40 h-40 rounded-full bg-indigo-500/5 blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-
-                <div className="relative">
-                  <div className="relative w-14 h-14 mb-7">
-                    <div className="absolute inset-0 rounded-2xl bg-indigo-500/10 blur-md group-hover:bg-indigo-500/25 transition-colors" />
-                    <div className="relative w-14 h-14 rounded-2xl bg-white flex items-center justify-center ring-1 ring-indigo-100 shadow-sm shadow-indigo-500/5 group-hover:ring-indigo-300 group-hover:shadow-indigo-500/20 transition-all">
+                {/* photo header */}
+                <div className="relative h-44 overflow-hidden">
+                  <img
+                    src={f.image}
+                    alt={f.title}
+                    width={1024}
+                    height={640}
+                    loading="lazy"
+                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-white via-white/20 to-transparent" />
+                  <div className="absolute inset-0 bg-gradient-to-br from-indigo-900/30 via-transparent to-transparent" />
+                  {/* floating icon chip */}
+                  <div className="absolute left-6 -bottom-7 w-14 h-14">
+                    <div className="absolute inset-0 rounded-2xl bg-indigo-500/25 blur-md group-hover:bg-indigo-500/40 transition-colors" />
+                    <div className="relative w-14 h-14 rounded-2xl bg-white flex items-center justify-center ring-1 ring-indigo-100 shadow-md shadow-indigo-500/10 group-hover:ring-indigo-300 group-hover:shadow-indigo-500/30 transition-all">
                       <f.icon className="w-6 h-6 text-indigo-600" strokeWidth={2} />
                     </div>
                   </div>
+                </div>
+
+                {/* subtle corner glow */}
+                <div className="absolute -top-16 -right-16 w-40 h-40 rounded-full bg-indigo-500/5 blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+                <div className="relative px-8 pt-12 pb-8">
                   <h3 className="text-lg font-bold text-primary mb-2 tracking-tight">{f.title}</h3>
                   <p className="text-[15px] text-neutral-500 leading-relaxed">{f.desc}</p>
 
