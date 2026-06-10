@@ -244,29 +244,29 @@ const FxCalculator = () => {
           )}
         </div>
 
-        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+        <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
           <button
             type="button"
             onClick={() => goNext(user ? "direct" : "signup")}
             disabled={rateUnavailable || sendNumeric <= 0}
-            className="group inline-flex items-center justify-center gap-2 h-12 rounded-full bg-[hsl(var(--accent-amber))] hover:brightness-110 text-[hsl(var(--brand-900))] font-bold text-sm shadow-cta-amber transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="group inline-flex items-center justify-center gap-1.5 h-10 rounded-full bg-[hsl(var(--accent-amber))] hover:brightness-110 text-[hsl(var(--brand-900))] font-bold text-[13px] shadow-cta-amber transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {user ? "Continue" : "Sign up & send"}
-            <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+            <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
           </button>
           {!user && (
             <button
               type="button"
               onClick={() => goNext("signin")}
-              className="inline-flex items-center justify-center h-12 rounded-full bg-white/10 hover:bg-white/15 ring-1 ring-white/20 text-white font-bold text-sm transition"
+              className="inline-flex items-center justify-center h-10 rounded-full bg-white/10 hover:bg-white/15 ring-1 ring-white/20 text-white font-bold text-[13px] transition"
             >
               Sign in
             </button>
           )}
         </div>
 
-        <p className="mt-3 text-[10.5px] leading-relaxed text-white/45">
-          Indicative mid-market rate. Final tradable rate is locked at quote (60 s) after sign in.
+        <p className="mt-2 text-[9.5px] leading-relaxed text-white/45">
+          Indicative mid-market rate. Locked at quote (60 s) after sign in.
         </p>
       </div>
     </div>
