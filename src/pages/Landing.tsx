@@ -16,6 +16,7 @@ import MarketTicker from "@/components/landing/MarketTicker";
 import FxCalculator from "@/components/landing/FxCalculator";
 import senders from "@/assets/landing-senders.jpg";
 import receivers from "@/assets/landing-receivers.jpg";
+import heroVideo from "@/assets/hero-background.mp4.asset.json";
 
 const NAV_LINKS = [
   { label: "Features", href: "#features" },
@@ -206,25 +207,22 @@ const Landing = () => {
         </nav>
       </header>
 
-      {/* ============ HERO (deep purple, PureVPN-style) ============ */}
-      <section className="relative overflow-hidden bg-grid-purple text-white">
-        {/* African landscape backdrop (subtle, color-scheme preserved) */}
-        <img
-          src={africaHero}
-          alt=""
+      {/* ============ HERO (fullscreen looping video background) ============ */}
+      <section className="relative overflow-hidden text-white" style={{ backgroundColor: "#050210" }}>
+        {/* Fullscreen looping hero video — vignette/fade baked in, no extra overlay */}
+        <video
+          autoPlay
+          loop
+          muted
+          playsInline
           aria-hidden
-          className="absolute inset-0 w-full h-full object-cover opacity-40 mix-blend-screen pointer-events-none"
-          width={1920}
-          height={1080}
-        />
-        <div className="absolute inset-0 bg-gradient-to-b from-[hsl(var(--brand-900))]/40 via-[hsl(var(--brand-900))]/20 to-[hsl(var(--brand-900))]/60 pointer-events-none" />
-        {/* radial vignette + soft amber spotlight */}
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-[900px] h-[600px] rounded-full bg-[hsl(var(--brand-500)/0.45)] blur-[140px]" />
-          <div className="absolute bottom-0 right-0 w-[500px] h-[400px] rounded-full bg-[hsl(var(--accent-amber)/0.10)] blur-[120px]" />
-        </div>
+          className="object-cover pointer-events-none"
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", zIndex: 0 }}
+        >
+          <source src={heroVideo.url} type="video/mp4" />
+        </video>
 
-        <div className="relative max-w-7xl mx-auto px-6 pt-32 pb-16 md:pt-40 md:pb-24 grid lg:grid-cols-2 gap-12 items-center">
+        <div className="relative max-w-7xl mx-auto px-6 pt-32 pb-16 md:pt-40 md:pb-24 grid lg:grid-cols-2 gap-12 items-center" style={{ zIndex: 1 }}>
           {/* LEFT: copy */}
           <div className="text-center lg:text-left">
             <motion.div
