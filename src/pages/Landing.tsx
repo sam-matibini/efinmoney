@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, useInView } from "framer-motion";
 import { Link } from "react-router-dom";
-import { ArrowRight, Globe, Shield, Zap, Wallet, Send, BarChart3, Star } from "lucide-react";
+import { ArrowRight, Globe, Shield, Zap, Wallet, Send, BarChart3, Star, Building2, Layers, Check } from "lucide-react";
 import { Logo, Wordmark } from "@/components/Logo";
+import africaHero from "@/assets/landing-africa-hero.jpg";
+import africaBand from "@/assets/landing-africa-band.jpg";
+import b2bPhone from "@/assets/landing-b2b-phone.jpg";
 
 const NAV_LINKS = [
   { label: "Features", href: "#features" },
@@ -52,20 +55,23 @@ const PhoneFrame = ({ children, delay = 0, rotate = 0 }: { children: React.React
 const WalletScreen = () => (
   <div className="h-full p-5 flex flex-col bg-gradient-to-b from-indigo-50 to-white">
     <div className="text-xs text-neutral-500 mt-4">Total Balance</div>
-    <div className="text-3xl font-black text-neutral-900 mt-1">$10,963.68</div>
-    <div className="text-xs text-indigo-600 mt-1 font-semibold">+2.4% today</div>
-    <div className="mt-5 space-y-2">
+    <div className="text-2xl font-black text-neutral-900 mt-1">$10,963.68</div>
+    <div className="text-[10px] text-indigo-600 mt-1 font-semibold">+2.4% today</div>
+    <div className="mt-3 space-y-1.5">
       {[
-        { flag: "🇺🇸", c: "USD", b: "$10,170.05" },
-        { flag: "🇨🇦", c: "CAD", b: "C$407.99" },
+        { flag: "🇺🇸", c: "USD", b: "$10,170" },
+        { flag: "🇨🇦", c: "CAD", b: "C$407" },
         { flag: "🇳🇬", c: "NGN", b: "₦789,980" },
+        { flag: "🇰🇪", c: "KES", b: "KSh 88,450" },
+        { flag: "🇬🇭", c: "GHS", b: "₵5,210" },
+        { flag: "🇿🇲", c: "ZMW", b: "ZK 8,900" },
       ].map((w) => (
-        <div key={w.c} className="flex items-center justify-between p-3 rounded-xl bg-neutral-50">
-          <div className="flex items-center gap-2">
-            <span className="text-xl">{w.flag}</span>
-            <span className="text-sm font-bold text-neutral-900">{w.c}</span>
+        <div key={w.c} className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-neutral-50">
+          <div className="flex items-center gap-1.5">
+            <span className="text-base">{w.flag}</span>
+            <span className="text-[11px] font-bold text-neutral-900">{w.c}</span>
           </div>
-          <span className="text-sm font-semibold text-neutral-700">{w.b}</span>
+          <span className="text-[11px] font-semibold text-neutral-700">{w.b}</span>
         </div>
       ))}
     </div>
@@ -112,7 +118,12 @@ const ExchangeScreen = () => (
         <span className="text-lg font-black text-indigo-700">136.42</span>
       </div>
     </div>
-    <div className="mt-4 text-xs text-neutral-500">Live rate: 1 USD = 1.3642 CAD</div>
+    <div className="mt-3 text-[10px] text-neutral-500">Live rate: 1 USD = 1.3642 CAD</div>
+    <div className="mt-2 flex flex-wrap gap-1">
+      {["NGN", "KES", "GHS", "ZMW"].map((c) => (
+        <span key={c} className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700">{c}</span>
+      ))}
+    </div>
     <div className="mt-auto">
       <div className="rounded-xl bg-indigo-500 text-white text-sm font-bold py-3 text-center">
         Exchange
@@ -187,6 +198,16 @@ const Landing = () => {
 
       {/* ============ HERO (deep purple, PureVPN-style) ============ */}
       <section className="relative overflow-hidden bg-grid-purple text-white">
+        {/* African landscape backdrop (subtle, color-scheme preserved) */}
+        <img
+          src={africaHero}
+          alt=""
+          aria-hidden
+          className="absolute inset-0 w-full h-full object-cover opacity-25 mix-blend-screen pointer-events-none"
+          width={1920}
+          height={1080}
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-[hsl(var(--brand-900))]/60 via-[hsl(var(--brand-900))]/40 to-[hsl(var(--brand-900))]/80 pointer-events-none" />
         {/* radial vignette + soft amber spotlight */}
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-[900px] h-[600px] rounded-full bg-[hsl(var(--brand-500)/0.45)] blur-[140px]" />
@@ -203,7 +224,7 @@ const Landing = () => {
               className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/15 backdrop-blur text-xs font-semibold text-white/90 mb-6"
             >
               <span className="w-1.5 h-1.5 rounded-full bg-[hsl(var(--accent-amber))] animate-pulse" />
-              Secure. Fast. Global. That's eFinMoney.
+              Africa-first. Global rails. That's eFinMoney.
             </motion.div>
 
             <h1 className="text-5xl sm:text-6xl md:text-7xl font-black tracking-tight leading-[1.02] text-white">
@@ -226,7 +247,7 @@ const Landing = () => {
               transition={{ delay: 0.85, duration: 0.55 }}
               className="mt-7 max-w-xl text-base md:text-lg text-white/70 mx-auto lg:mx-0"
             >
-              Multi-currency wallets, FX trading, crypto, and mobile money transfers to Africa — settled in minutes, not days.
+              Multi-currency wallets, FX, crypto and mobile money across Canada, USA, Nigeria, Kenya, Ghana, Zambia and 50+ corridors — settled in minutes, not days.
             </motion.p>
 
             <motion.div
@@ -275,6 +296,70 @@ const Landing = () => {
       </section>
 
 
+      {/* ============ BUILT FOR AFRICA ============ */}
+      <section className="relative bg-white py-20 md:py-24">
+        <div className="max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-12 items-center">
+          <motion.div
+            initial={{ opacity: 0, x: -30 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true, margin: "-80px" }}
+            transition={{ duration: 0.6 }}
+            className="relative rounded-3xl overflow-hidden shadow-card-purple ring-1 ring-[hsl(var(--brand-900))]/10"
+          >
+            <img
+              src={africaBand}
+              alt="Modern Africa — Lagos, Nairobi, Cape Town and Accra"
+              loading="lazy"
+              width={1280}
+              height={896}
+              className="w-full h-[420px] object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-tr from-[hsl(var(--brand-900))]/40 via-transparent to-[hsl(var(--accent-amber))]/10" />
+            <div className="absolute bottom-4 left-4 flex flex-wrap gap-2">
+              {["🇳🇬 Nigeria","🇰🇪 Kenya","🇬🇭 Ghana","🇿🇲 Zambia","🇨🇦 Canada","🇺🇸 USA"].map((c) => (
+                <span key={c} className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-white/90 text-[hsl(var(--brand-900))] backdrop-blur">
+                  {c}
+                </span>
+              ))}
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, x: 30 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true, margin: "-80px" }}
+            transition={{ duration: 0.6, delay: 0.1 }}
+          >
+            <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-semibold uppercase tracking-[0.18em] text-[hsl(var(--brand-700))] bg-[hsl(var(--accent))]">
+              <span className="w-1.5 h-1.5 rounded-full bg-[hsl(var(--accent-amber))]" />
+              Africa-first marketplace
+            </span>
+            <h2 className="mt-4 text-4xl md:text-5xl font-black tracking-tight text-[hsl(var(--brand-900))]">
+              Built for the African continent.
+            </h2>
+            <p className="mt-5 text-[15px] md:text-base text-neutral-600 leading-relaxed max-w-xl">
+              From Lagos to Nairobi, Accra to Lusaka — eFinMoney is engineered for the
+              way Africa moves money. Direct mobile-money payouts via MTN, Airtel,
+              M-Pesa and Vodafone, paired with bank rails into Canada and the USA.
+            </p>
+            <ul className="mt-7 space-y-3">
+              {[
+                "12+ African mobile-money corridors, live",
+                "Multi-currency wallets: NGN, KES, GHS, ZMW, USD, CAD",
+                "Compliant payouts with full audit trail and receipts",
+              ].map((t) => (
+                <li key={t} className="flex items-start gap-3 text-sm text-neutral-700">
+                  <span className="mt-0.5 w-5 h-5 rounded-full bg-[hsl(var(--accent-amber))]/15 text-[hsl(var(--brand-700))] flex items-center justify-center flex-shrink-0">
+                    <Check className="w-3 h-3" strokeWidth={3} />
+                  </span>
+                  <span>{t}</span>
+                </li>
+              ))}
+            </ul>
+          </motion.div>
+        </div>
+      </section>
+
       {/* ============ FEATURES ============ */}
       <section id="features" className="bg-grid-purple py-24">
         <div className="max-w-7xl mx-auto px-6">
@@ -317,6 +402,80 @@ const Landing = () => {
               </motion.div>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* ============ BUILT FOR BUSINESS (B2B) ============ */}
+      <section className="relative bg-white py-20 md:py-24 overflow-hidden">
+        <div className="absolute -top-32 right-0 w-[600px] h-[600px] rounded-full bg-[hsl(var(--primary)/0.06)] blur-3xl pointer-events-none" />
+        <div className="max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-12 items-center">
+          <motion.div
+            initial={{ opacity: 0, x: -30 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true, margin: "-80px" }}
+            transition={{ duration: 0.6 }}
+            className="order-2 lg:order-1"
+          >
+            <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-semibold uppercase tracking-[0.18em] text-[hsl(var(--brand-700))] bg-[hsl(var(--accent))]">
+              <Building2 className="w-3 h-3" />
+              eFinMoney for Business
+            </span>
+            <h2 className="mt-4 text-4xl md:text-5xl font-black tracking-tight text-[hsl(var(--brand-900))]">
+              Treasury, payouts and FX, in one professional platform.
+            </h2>
+            <p className="mt-5 text-[15px] md:text-base text-neutral-600 leading-relaxed max-w-xl">
+              Move funds, run multi-entity wallets, reconcile in real time and
+              pay suppliers across Africa, North America and beyond — with the
+              controls and reporting your finance team expects.
+            </p>
+            <ul className="mt-7 grid sm:grid-cols-2 gap-3">
+              {[
+                { icon: Send, t: "Bulk payouts & approvals" },
+                { icon: Layers, t: "Multi-entity wallets" },
+                { icon: BarChart3, t: "Real-time reporting" },
+                { icon: Shield, t: "SOC 2 · MSB licensed" },
+              ].map((it) => (
+                <li key={it.t} className="flex items-center gap-3 p-3 rounded-xl border border-neutral-200/80 bg-white">
+                  <span className="w-9 h-9 rounded-lg bg-[hsl(var(--accent))] text-[hsl(var(--brand-700))] flex items-center justify-center flex-shrink-0">
+                    <it.icon className="w-4 h-4" />
+                  </span>
+                  <span className="text-sm font-semibold text-[hsl(var(--brand-900))]">{it.t}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-8 flex flex-wrap gap-3">
+              <Link
+                to="/auth"
+                className="inline-flex items-center gap-2 bg-[hsl(var(--accent-amber))] hover:brightness-110 text-[hsl(var(--brand-900))] font-bold px-6 py-3 rounded-full text-sm transition-all hover:-translate-y-0.5 shadow-cta-amber"
+              >
+                Talk to sales <ArrowRight className="w-4 h-4" />
+              </Link>
+              <Link
+                to="/auth"
+                className="inline-flex items-center gap-2 bg-[hsl(var(--brand-900))] text-white font-bold px-6 py-3 rounded-full text-sm transition-all hover:-translate-y-0.5"
+              >
+                Open a business account
+              </Link>
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, x: 30 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true, margin: "-80px" }}
+            transition={{ duration: 0.6, delay: 0.1 }}
+            className="relative order-1 lg:order-2 rounded-3xl overflow-hidden shadow-card-purple ring-1 ring-[hsl(var(--brand-900))]/10"
+          >
+            <img
+              src={b2bPhone}
+              alt="eFinMoney for Business — premium fintech dashboard on a professional desk"
+              loading="lazy"
+              width={1280}
+              height={960}
+              className="w-full h-[460px] object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-tr from-[hsl(var(--brand-900))]/30 via-transparent to-transparent" />
+          </motion.div>
         </div>
       </section>
 
