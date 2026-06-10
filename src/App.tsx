@@ -70,6 +70,7 @@ import MorePage from "./pages/MorePage";
 import StripeConnectInstantPage from "./pages/StripeConnectInstantPage";
 import AfricanCardSendPage from "./pages/AfricanCardSendPage";
 import LoadingSpinner from "@/components/LoadingSpinner";
+import SplashScreen from "@/components/SplashScreen";
 
 const queryClient = new QueryClient();
 
@@ -243,6 +244,7 @@ const App = () => (
     <ThemeProvider>
       <AuthProvider>
         <TooltipProvider>
+          <SplashScreen />
           <Toaster />
           <Sonner />
           <BrowserRouter>
