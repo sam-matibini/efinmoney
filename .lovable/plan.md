@@ -1,46 +1,75 @@
-## Goal
 
-1. Remove all public mentions of "Remitly" and "LEMFI" from the landing FX calculator — show them as anonymous "Typical market rate" benchmarks instead.
-2. Keep the actual benchmark numbers (intrinsically matching Remitly's economy tier) but only surface the named "Remitly benchmark" inside the Admin → Pricing & Fees tab, where staff can see and edit it.
+# Lovable → Self-hosted Migration Export
 
-## Changes
+Goal: hand you everything exportable from this project so you can rebuild on your own Postgres/Supabase/infra. Nothing will be deleted.
 
-### 1. `src/components/landing/FxCalculator.tsx` (public landing — anonymized)
+## Important constraints (read first)
 
-- Replace the two competitor rows with a single consolidated row labelled **"Typical market rate"** (uses the worse — i.e. more expensive — of the two existing benchmarks so the savings claim stays conservative and credible).
-  - Row layout stays the same (rate + small fee/spread note like `~2.2% + fee`).
-- Savings calculation continues to use `bestCompetitorRecv = Math.max(remitlyRecv, lemfiRecv)` internally — only the label changes.
-- "You save with eFinMoney" headline → **"You save vs. typical market rate"**.
-- Footnote text updated to:
-  *"Indicative mid-market rate · 0.8% FX + $0.99 fee. Benchmarked against typical international money-transfer providers. Rate locks for 60 s after sign in."*
-- No competitor brand names anywhere in JSX, badges, alt text, or comments visible to end users. Internal constant names renamed to neutral `BENCHMARK_A_*` / `BENCHMARK_B_*` to avoid the brand strings leaking via source maps.
+These are Lovable Cloud platform limits — not something I can work around in code:
 
-### 2. `src/components/settings/PricingSettingsPanel.tsx` (admin-only — named benchmark)
+- **No raw Postgres connection string, no DB password, no `SUPABASE_SERVICE_ROLE_KEY`** are exposed to users or to me.
+- **No `pg_dump` / full DB dump** (SQL, Parquet, JSON, DuckDB, Excel — all disabled). Only per-table **CSV** is supported.
+- **No bulk storage-bucket download** tool. Files must be fetched individually via signed URLs, or via Lovable support for a bulk migration.
+- **Secret values are not retrievable**, only names. You'll rotate/recreate each one in your new environment.
 
-Add a new card **"Competitor Benchmark (internal)"** above the existing "Transfer Fee Structure" card. Admin-only context (this panel already lives under `/settings` → Pricing & Fees, gated by the admin dashboard route).
+For the full DB dump and bulk bucket contents, the supported path is **contact Lovable support**.
 
-Card contents (read/edit form, plain inputs — no DB wiring in this pass, stored values will live alongside other pricing inputs already in this panel which are also UI-only):
+## Deliverables
 
-```text
-Competitor Benchmark (internal — not shown on landing page)
-┌────────────────────────────────────────────────────────┐
-│ Remitly  FX margin: [2.20] %     Flat fee: [3.99] USD │
-│ LEMFI    FX margin: [1.80] %     Flat fee: [0.00] USD │
-│ eFinMoney target:  match Remitly economy tier          │
-│ Current eFinMoney: 0.80% FX + $0.99 flat               │
-└────────────────────────────────────────────────────────┘
-[ Save Benchmarks ]
+### 1. `MIGRATION.md` (repo root)
+Human-readable migration playbook containing:
+- Platform constraints + how to request a full dump from support.
+- **Schema source of truth:** pointer to existing `DATABASE_SCHEMA.sql`.
+- **Database extensions in use:** `pg_trgm`, `pgcrypto`, `pg_net` (with what each is used for, so you enable them on the target).
+- **All 3 storage buckets** (`assets`, `kyc-documents`, `customer-documents`) — all private — with the SQL to recreate them and notes on bulk download.
+- **Auth providers** currently enabled (read live via Cloud config at write time).
+- **All ~94 edge functions**, grouped by domain (Stripe, Circle, Crossmint, Yellow Card, PawaPay, Paysafe, Flutterwave, Elicate, M-Pesa, Plaid, Persona, Sumsub, Interac, Stellar, Treasury, KYC/admin, FX, receipts/email, internal). Each entry lists:
+  - function name
+  - `verify_jwt` setting (from `supabase/config.toml`)
+  - required env vars (extracted from `Deno.env.get(...)` calls in source)
+  - webhook URL (for functions registered with third parties)
+- **All configured secret names** (~75) grouped by provider, with notes on which need to be re-issued vs. simply copied (e.g. publishable keys).
+- **Database functions & triggers** inventory (already retrievable via SQL) so you can recreate `handle_new_user`, ledger swap, AML invoker, etc.
+- **Step-by-step migration order**: provision Postgres → enable extensions → run `DATABASE_SCHEMA.sql` → recreate roles + grants → restore data (CSV import) → recreate buckets + upload files → deploy edge functions → set secrets → wire webhooks → switch DNS.
+
+### 2. `migration-export/functions-and-secrets.json` (repo)
+Machine-readable map your migration scripts can consume:
+```json
+{
+  "extensions": ["pg_trgm", "pgcrypto", "pg_net"],
+  "buckets": [{ "name": "assets", "public": false }, ...],
+  "secrets": ["STRIPE_SECRET_KEY", "CIRCLE_API_KEY", ...],
+  "functions": [
+    {
+      "name": "stripe-webhook",
+      "verify_jwt": false,
+      "env": ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"],
+      "webhook_url": "https://hgmskcvaeadnyovbroup.supabase.co/functions/v1/stripe-webhook"
+    },
+    ...
+  ]
+}
 ```
+Built by scanning `supabase/functions/**/index.ts` for `Deno.env.get(...)` and cross-referencing `supabase/config.toml`.
 
-Short helper text under the card title explains: *"These values feed the 'Typical market rate' comparison on the public calculator. Names are visible to staff only and never rendered on the landing page."*
+### 3. `src/pages/admin/DataExportPage.tsx` + route `/admin/data-export`
+A small admin-only page (gated by existing `AdminGuard` / super_admin role) that:
+- Lists every `public.*` table from the live schema.
+- Lets you click **"Download CSV"** per table (uses Supabase JS to page through rows and stream to a CSV blob, respecting RLS — which is why super_admin is required).
+- Has **"Download all tables (ZIP)"** that loops through every table and bundles the CSVs client-side via `jszip`.
+- Shows a banner clarifying this is row-data only; storage files and the schema itself still need the documented separate steps.
 
-### Out of scope
+This gives you a self-serve way to grab your data without filing a support ticket, within the CSV-only constraint.
 
-- No database schema changes. (`pricing_config` already exists; wiring the benchmark values to it can be a follow-up.)
-- No change to `FxCalculator` math, currency picker, or hero layout.
-- No change to images, hero copy, or `Landing.tsx`.
+## Out of scope
 
-## Files touched
+- Cannot generate a `pg_dump` file or hand over a Postgres connection string — platform doesn't allow it.
+- Cannot bulk-download storage buckets in one click; the page above is data-only. For files, signed-URL loops or support are the routes.
+- Won't touch or delete any existing data, secrets, functions, or buckets.
 
-- Edit: `src/components/landing/FxCalculator.tsx`
-- Edit: `src/components/settings/PricingSettingsPanel.tsx`
+## Technical notes
+
+- The JSON file is generated by a one-shot Node/Bun script I'll run during the build; it's checked in as the artifact, not regenerated at runtime.
+- The CSV export page uses the existing authenticated `supabase` client; no new secrets, no edge function needed.
+- `jszip` will be added as a dependency for the bulk-ZIP button.
+- No schema changes, no migrations, no destructive SQL.
