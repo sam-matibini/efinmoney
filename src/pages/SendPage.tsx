@@ -11,7 +11,6 @@ import AddCardModal from "@/components/modals/AddCardModal";
 import TopUpModal from "@/components/modals/TopUpModal";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useBeneficiaries, recordTransferRecipient, type Beneficiary } from "@/hooks/useBeneficiaries";
-import { downloadTransferReceipt } from "@/lib/receipt";
 import { useAuth } from "@/hooks/useAuth";
 
 import Header from "@/components/layout/Header";
@@ -39,9 +38,11 @@ import { ArrowRight, CheckCircle, Users, Clock, Shield, Wallet, Landmark, Credit
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import CanadaSendFlow from "@/components/send/CanadaSendFlow";
 import EfinmoneyP2PFlow from "@/components/send/EfinmoneyP2PFlow";
+import TransactionPinDialog from "@/components/send/TransactionPinDialog";
+import HeroGlobe from "@/components/send/HeroGlobe";
+import FxTicker from "@/components/send/FxTicker";
+import TransferSuccess from "@/components/send/TransferSuccess";
 import AnimatedNumber from "@/components/ui/AnimatedNumber";
-import AnimatedCheck from "@/components/ui/AnimatedCheck";
-import ParticleBurst from "@/components/ui/ParticleBurst";
 import CountryPicker from "@/components/ui/CountryPicker";
 import { findCountryById, findCountryByCode, COUNTRIES } from "@/lib/countries";
 import {
@@ -95,6 +96,7 @@ const SendPage = () => {
   const [selectedNetworkId, setSelectedNetworkId] = useState<string | null>(null);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [pinOpen, setPinOpen] = useState(false);
   const [usdRate, setUsdRate] = useState<number | null>(null);
   // NGN bank payout state
   const [ngnBanks, setNgnBanks] = useState<Array<{ code: string; name: string }>>([]);
@@ -459,6 +461,17 @@ const SendPage = () => {
   };
 
 
+  // Require the transaction PIN before any money actually moves.
+  const requestConfirm = () => {
+    if (confirming) return;
+    setPinOpen(true);
+  };
+
+  const handlePinVerified = () => {
+    setPinOpen(false);
+    void handleConfirm();
+  };
+
   const handleConfirm = async () => {
     if (confirming) return;
     setConfirming(true);
@@ -797,8 +810,6 @@ const SendPage = () => {
     exit: (dir: number) => ({ x: dir > 0 ? -60 : 60, opacity: 0 }),
   };
 
-  const successWords = "Transfer Sent!".split("");
-
   return (
     <div className="min-h-screen bg-background pb-24 md:pb-8">
       <Header />
@@ -910,6 +921,19 @@ const SendPage = () => {
                       transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
                     >
                       <TabsContent value="international" forceMount className="mt-0 space-y-6">
+                        {/* Animated hero + live FX ticker (hidden on the success screen) */}
+                        {step < 4 && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 12 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+                            className="space-y-3"
+                          >
+                            <HeroGlobe />
+                            <FxTicker />
+                          </motion.div>
+                        )}
+
                         {/* Progress Steps — staggered entry + active pulse */}
                         <div className="flex items-center justify-center gap-2">
                           {[1, 2, 3].map((s, idx) => {
@@ -1618,13 +1642,18 @@ const SendPage = () => {
                                     )}
                                     <div className="flex gap-3">
                                       <Button variant="outline" className="flex-1" onClick={() => goToStep(2)} disabled={confirming}>Back</Button>
-                                      <Button className="flex-1" onClick={handleConfirm} disabled={confirming}>
+                                      <Button className="flex-1" onClick={requestConfirm} disabled={confirming}>
                                         {confirming ? (
                                           <span className="inline-flex items-center gap-2">
                                             <LoadingSpinner size={16} />
                                             Processing...
                                           </span>
-                                        ) : fundingSource === 'card' ? 'Pay with Card' : 'Confirm Transfer'}
+                                        ) : (
+                                          <span className="inline-flex items-center gap-2">
+                                            <Shield className="w-4 h-4" />
+                                            {fundingSource === 'card' ? 'Pay with Card' : 'Confirm Transfer'}
+                                          </span>
+                                        )}
                                       </Button>
                                     </div>
                                     <Button
@@ -1650,56 +1679,14 @@ const SendPage = () => {
                                 exit="exit"
                                 transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
                               >
-                                <Card>
-                                  <CardContent className="py-12 text-center">
-                                    <div className="relative w-24 h-24 mx-auto mb-6">
-                                      <ParticleBurst count={20} />
-                                      <div className="relative flex items-center justify-center">
-                                        <AnimatedCheck size={88} />
-                                      </div>
-                                    </div>
-                                    <h3 className="text-2xl font-display font-bold mb-2 inline-flex">
-                                      {successWords.map((ch, i) => (
-                                        <motion.span
-                                          key={i}
-                                          initial={{ opacity: 0, y: 14 }}
-                                          animate={{ opacity: 1, y: 0 }}
-                                          transition={{ delay: 0.6 + i * 0.04, type: "spring", stiffness: 380, damping: 18 }}
-                                          className="inline-block"
-                                          style={{ whiteSpace: ch === ' ' ? 'pre' : undefined }}
-                                        >
-                                          {ch}
-                                        </motion.span>
-                                      ))}
-                                    </h3>
-                                    <motion.p
-                                      initial={{ opacity: 0, y: 8 }}
-                                      animate={{ opacity: 1, y: 0 }}
-                                      transition={{ delay: 1.1, duration: 0.35 }}
-                                      className="text-muted-foreground mb-6"
-                                    >
-                                      {sourceSymbol}{parsedAmount.toFixed(2)} is on its way to {recipientName}
-                                    </motion.p>
-                                    <motion.div
-                                      initial={{ opacity: 0, y: 16 }}
-                                      animate={{ opacity: 1, y: 0 }}
-                                      transition={{ delay: 1.3, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-                                      className="flex flex-col sm:flex-row gap-3 justify-center"
-                                    >
-                                      {lastTransferId && (
-                                        <Button asChild>
-                                          <Link to={`/transfers/${lastTransferId}`}>Track your transfer</Link>
-                                        </Button>
-                                      )}
-                                      {lastTransferId && (
-                                        <Button variant="outline" onClick={() => downloadTransferReceipt(lastTransferId)}>
-                                          Download Receipt
-                                        </Button>
-                                      )}
-                                      <Button variant="outline" onClick={resetForm}>Send Another</Button>
-                                    </motion.div>
-                                  </CardContent>
-                                </Card>
+                                <TransferSuccess
+                                  transferId={lastTransferId}
+                                  amount={parsedAmount}
+                                  currency={sourceCurrency}
+                                  recipientName={recipientName}
+                                  targetFlag={targetCountry.flag}
+                                  onSendAnother={resetForm}
+                                />
                               </motion.div>
                             )}
                           </AnimatePresence>
@@ -1744,6 +1731,13 @@ const SendPage = () => {
         open={pickerOpen}
         onOpenChange={setPickerOpen}
         onSelect={applyBeneficiary}
+      />
+
+      <TransactionPinDialog
+        open={pinOpen}
+        onOpenChange={setPinOpen}
+        onVerified={handlePinVerified}
+        amountLabel={`${sourceSymbol}${parsedAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${sourceCurrency}`}
       />
 
       <AlertDialog open={savePromptOpen} onOpenChange={setSavePromptOpen}>

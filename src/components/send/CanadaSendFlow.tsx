@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { CheckCircle, Landmark, AlertCircle, Info, CreditCard, Wallet, Zap, Check, Building2 } from "lucide-react";
 import { useStripeConnectedAccount, isConnectReady, getConnectReadiness } from "@/hooks/useStripeConnectedAccount";
 import { tokenizeDebitCard } from "@/lib/stripePayouts";
+import { usePinGate } from "@/components/send/usePinGate";
 import { getStripe, getStripeSecondary } from "@/lib/stripe";
 import type { Stripe } from "@stripe/stripe-js";
 import {
@@ -212,6 +213,7 @@ const CanadaSendFlow = () => {
 const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) => {
   const stripe = useStripe();
   const elements = useElements();
+  const { requirePin, pinGate } = usePinGate();
   const elementStyle = useStripeElementStyle();
   const { data: profile } = useProfile();
 
@@ -862,7 +864,7 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
               <Button variant="outline" className="flex-1" onClick={() => setStep(1)}>Back</Button>
               <Button
                 className="flex-1"
-                onClick={handleSubmit}
+                onClick={() => requirePin(handleSubmit, `C$${parsedAmount.toFixed(2)}`)}
                 disabled={!isStep2Valid || createTransfer.isPending || cardSubmitting}
               >
                 {createTransfer.isPending || cardSubmitting
@@ -955,6 +957,7 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
           </CardContent>
         </Card>
       )}
+      {pinGate}
     </div>
   );
 };

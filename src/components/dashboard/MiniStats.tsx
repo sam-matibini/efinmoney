@@ -1,5 +1,5 @@
-import { motion } from "framer-motion";
-import { useMemo } from "react";
+import { motion, useMotionValue, useSpring, useTransform, useMotionTemplate } from "framer-motion";
+import { useMemo, useState } from "react";
 import { Send, Globe, PiggyBank, ShieldCheck } from "lucide-react";
 import { useTransfers } from "@/hooks/useTransfers";
 import { useProfile } from "@/hooks/useProfile";
@@ -205,13 +205,7 @@ const MiniStats = () => {
   return (
     <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
       {stats.map((s, i) => (
-        <motion.div
-          key={s.key}
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: i * 0.08, duration: 0.4 }}
-          className={`${cardClass} ${cardBg[s.key] || ""}`}
-        >
+        <StatCard key={s.key} index={i} className={`${cardClass} ${cardBg[s.key] || ""}`}>
           <div className="flex items-start justify-between mb-3">
             <p className="text-xs font-medium text-muted-foreground">{s.label}</p>
             <div
@@ -221,9 +215,47 @@ const MiniStats = () => {
             </div>
           </div>
           {s.content}
-        </motion.div>
+        </StatCard>
       ))}
     </section>
+  );
+};
+
+const StatCard = ({ index, className, children }: { index: number; className: string; children: React.ReactNode }) => {
+  const px = useMotionValue(0);
+  const py = useMotionValue(0);
+  const [hovering, setHovering] = useState(false);
+  const rotateX = useSpring(useTransform(py, [-0.5, 0.5], [6, -6]), { stiffness: 160, damping: 14 });
+  const rotateY = useSpring(useTransform(px, [-0.5, 0.5], [-6, 6]), { stiffness: 160, damping: 14 });
+  const spotX = useTransform(px, (v) => `${(v + 0.5) * 100}%`);
+  const spotY = useTransform(py, (v) => `${(v + 0.5) * 100}%`);
+  const spotlight = useMotionTemplate`radial-gradient(220px circle at ${spotX} ${spotY}, hsl(265 92% 70% / 0.16), transparent 65%)`;
+
+  const onMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    px.set((e.clientX - r.left) / r.width - 0.5);
+    py.set((e.clientY - r.top) / r.height - 0.5);
+  };
+  const onLeave = () => { px.set(0); py.set(0); setHovering(false); };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.08, duration: 0.4 }}
+      onMouseMove={onMove}
+      onMouseEnter={() => setHovering(true)}
+      onMouseLeave={onLeave}
+      style={{ rotateX, rotateY, transformPerspective: 900 }}
+      className={className}
+    >
+      <motion.div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 z-0 transition-opacity duration-300"
+        style={{ background: spotlight, opacity: hovering ? 1 : 0 }}
+      />
+      <div className="relative z-10">{children}</div>
+    </motion.div>
   );
 };
 

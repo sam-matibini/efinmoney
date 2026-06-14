@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
+import { usePinGate } from "@/components/send/usePinGate";
 import { toast } from "sonner";
 
 interface Props {
@@ -25,6 +26,7 @@ interface Props {
 const STELLAR_ADDR_RE = /^G[A-Z2-7]{55}$/;
 
 const SendStellarModal = ({ open, onOpenChange, availableBalance, onSent }: Props) => {
+  const { requirePin, pinGate } = usePinGate();
   const [destination, setDestination] = useState("");
   const [amount, setAmount] = useState("");
   const [memo, setMemo] = useState("");
@@ -159,7 +161,7 @@ const SendStellarModal = ({ open, onOpenChange, availableBalance, onSent }: Prop
           >
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={submitting}>
+          <Button onClick={() => requirePin(handleSubmit, amount ? `${amount} XLM` : undefined)} disabled={submitting}>
             {submitting ? (
               <>
                 <LoadingSpinner size={16} className="mr-2" />
@@ -174,6 +176,7 @@ const SendStellarModal = ({ open, onOpenChange, availableBalance, onSent }: Prop
           </Button>
         </DialogFooter>
       </DialogContent>
+      {pinGate}
     </Dialog>
   );
 };

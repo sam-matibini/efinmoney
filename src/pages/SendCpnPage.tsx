@@ -14,10 +14,12 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useWallets } from "@/hooks/useWallets";
 import { getCpnQuote, initiateCpnPayout, listEnabledCorridors, type CpnQuote, type CpnCorridor } from "@/lib/circle";
+import { usePinGate } from "@/components/send/usePinGate";
 import { toast } from "sonner";
 
 const SendCpnPage = () => {
   const navigate = useNavigate();
+  const { requirePin, pinGate } = usePinGate();
   const { data: wallets } = useWallets();
 
   const [corridors, setCorridors] = useState<CpnCorridor[]>([]);
@@ -243,7 +245,7 @@ const SendCpnPage = () => {
                     <Input value={bankName} onChange={(e) => setBankName(e.target.value)} />
                   </div>
                 </div>
-                <Button onClick={submit} disabled={submitting} className="w-full">
+                <Button onClick={() => requirePin(submit, `${parsedAmount.toFixed(2)} ${quote.source_currency}`)} disabled={submitting} className="w-full">
                   {submitting ? <LoadingSpinner size={16} className="mr-2" /> : <ArrowRight className="h-4 w-4 mr-2" />}
                   Send {parsedAmount.toFixed(2)} {quote.source_currency}
                 </Button>
@@ -253,6 +255,7 @@ const SendCpnPage = () => {
         </motion.div>
       </main>
       <MobileNav />
+      {pinGate}
     </div>
   );
 };

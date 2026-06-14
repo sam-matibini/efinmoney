@@ -1,5 +1,6 @@
 import Header from "@/components/layout/Header";
 import MobileNav from "@/components/layout/MobileNav";
+import WealthPulseBanner from "@/components/dashboard/WealthPulseBanner";
 import HeroBalance from "@/components/dashboard/HeroBalance";
 import WalletCarousel from "@/components/dashboard/WalletCarousel";
 import QuickActions from "@/components/dashboard/QuickActions";
@@ -15,7 +16,8 @@ const Index = () => {
       <Header />
 
       <main className="container px-4 py-4 sm:py-6">
-        
+
+        <WealthPulseBanner />
         <HeroBalance />
         <WalletCarousel />
         <QuickActions />

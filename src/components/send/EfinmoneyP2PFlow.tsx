@@ -17,6 +17,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import AnimatedCheck from "@/components/ui/AnimatedCheck";
+import { usePinGate } from "@/components/send/usePinGate";
 
 interface Recipient {
   user_id: string;
@@ -33,6 +34,7 @@ const fmt = (n: number) =>
 const EfinmoneyP2PFlow = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { requirePin, pinGate } = usePinGate();
   const { data: wallets } = useWallets();
   const { data: fxRates } = useFxRates();
 
@@ -315,7 +317,7 @@ const EfinmoneyP2PFlow = () => {
               )}
 
               <Button
-                onClick={handleSend}
+                onClick={() => requirePin(handleSend, `${fmt(parsedAmount)} ${fromCurrency}`)}
                 disabled={sending || !rateOk || parsedAmount <= 0 || !!insufficient}
                 className="w-full h-12 gradient-primary text-primary-foreground font-medium"
               >
@@ -332,6 +334,7 @@ const EfinmoneyP2PFlow = () => {
           </Card>
         </motion.div>
       )}
+      {pinGate}
     </div>
   );
 };

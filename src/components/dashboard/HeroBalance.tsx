@@ -1,4 +1,4 @@
-import { motion } from "framer-motion";
+import { motion, useMotionValue, useSpring, useTransform, useMotionTemplate } from "framer-motion";
 import { useMemo, useState, useEffect } from "react";
 import { AreaChart, Area, ResponsiveContainer, Tooltip } from "recharts";
 import { TrendingUp, TrendingDown, Wallet as WalletIcon, Activity, Eye, EyeOff } from "lucide-react";
@@ -104,13 +104,40 @@ const HeroBalance = () => {
   const monthlyBudgetPct = 0;
   const monthlyBudgetSet = false;
 
+  // ── Interactive cursor-follow 3D tilt + spotlight ──────────────────────
+  const px = useMotionValue(0); // -0.5 .. 0.5
+  const py = useMotionValue(0);
+  const [hovering, setHovering] = useState(false);
+  const rotateX = useSpring(useTransform(py, [-0.5, 0.5], [5, -5]), { stiffness: 140, damping: 14 });
+  const rotateY = useSpring(useTransform(px, [-0.5, 0.5], [-5, 5]), { stiffness: 140, damping: 14 });
+  const spotX = useTransform(px, (v) => `${(v + 0.5) * 100}%`);
+  const spotY = useTransform(py, (v) => `${(v + 0.5) * 100}%`);
+  const spotlight = useMotionTemplate`radial-gradient(480px circle at ${spotX} ${spotY}, hsl(265 92% 72% / 0.20), transparent 62%)`;
+
+  const handleMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    px.set((e.clientX - r.left) / r.width - 0.5);
+    py.set((e.clientY - r.top) / r.height - 0.5);
+  };
+  const handleLeave = () => { px.set(0); py.set(0); setHovering(false); };
+
   return (
     <motion.section
       initial={{ opacity: 0, y: -16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+      onMouseMove={handleMove}
+      onMouseEnter={() => setHovering(true)}
+      onMouseLeave={handleLeave}
+      style={{ rotateX, rotateY, transformPerspective: 1200 }}
       className="relative overflow-hidden rounded-3xl mb-8 border backdrop-blur-xl dark:backdrop-blur-2xl bg-white/70 dark:bg-gradient-to-br dark:from-[hsl(250_50%_16%)] dark:via-[hsl(255_45%_10%)] dark:to-[hsl(240_55%_7%)] dark:border-white/10 border-[hsl(258_55%_85%/0.45)] dark:shadow-card-purple shadow-[0_8px_32px_-12px_hsl(244_30%_50%/0.12)] dark:text-white text-[hsl(248_42%_18%)]"
     >
+      {/* Cursor-follow spotlight */}
+      <motion.div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 z-0 transition-opacity duration-300"
+        style={{ background: spotlight, opacity: hovering ? 1 : 0 }}
+      />
       {/* Glass highlight sheen */}
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/[0.06] via-transparent to-transparent" />
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent dark:via-white/25 via-[hsl(258_55%_80%/0.35)] to-transparent" />

@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { CheckCircle2, Circle, Share2, ArrowLeft, AlertCircle, Download, XCircle, Copy, Smartphone } from "lucide-react";
+import { CheckCircle2, Circle, Share2, ArrowLeft, AlertCircle, Download, XCircle, Copy, Smartphone, RefreshCw } from "lucide-react";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { downloadTransferReceipt } from "@/lib/receipt";
 import Header from "@/components/layout/Header";
@@ -124,8 +124,34 @@ const TransferTrackingPage = () => {
   const [transfer, setTransfer] = useState<Transfer | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [verifying, setVerifying] = useState(false);
   const cancelTransfer = useCancelTransfer();
   const canCancel = transfer && ["initiated", "funded", "processing"].includes(transfer.status);
+  const isPending = transfer && ["initiated", "funded", "processing"].includes(transfer.status);
+
+  // Ask Flutterwave directly for the real status and update the row.
+  const verifyStatus = useCallback(async (silent = false) => {
+    if (!id) return;
+    if (!silent) setVerifying(true);
+    try {
+      const { data } = await supabase.functions.invoke("flw-verify-transfer", { body: { transfer_id: id } });
+      if (data?.changed && data?.status) {
+        const { data: fresh } = await supabase.from("transfers").select("*").eq("id", id).maybeSingle();
+        if (fresh) setTransfer(fresh as Transfer);
+        if (!silent) {
+          data.status === "completed"
+            ? toast.success("Delivered! Your transfer is complete.")
+            : toast.info(`Transfer status: ${data.status}`);
+        }
+      } else if (!silent) {
+        toast.info("Still processing — we'll keep checking.");
+      }
+    } catch {
+      if (!silent) toast.error("Couldn't refresh status. Please try again.");
+    } finally {
+      if (!silent) setVerifying(false);
+    }
+  }, [id]);
 
   const handleCancel = async () => {
     if (!transfer) return;
@@ -174,6 +200,22 @@ const TransferTrackingPage = () => {
       supabase.removeChannel(channel);
     };
   }, [id, user]);
+
+  // While the transfer is still pending, actively poll Flutterwave for the real
+  // status (in case the webhook never fires). Backs off after a few minutes.
+  const pollCount = useRef(0);
+  useEffect(() => {
+    if (!isPending) return;
+    pollCount.current = 0;
+    // immediate silent check on load
+    void verifyStatus(true);
+    const interval = setInterval(() => {
+      pollCount.current += 1;
+      if (pollCount.current > 20) { clearInterval(interval); return; }
+      void verifyStatus(true);
+    }, 9000);
+    return () => clearInterval(interval);
+  }, [isPending, verifyStatus]);
 
   const handleShare = async () => {
     const { shortenUrl } = await import("@/lib/shortLink");
@@ -224,6 +266,11 @@ const TransferTrackingPage = () => {
                   </Badge>
                 </div>
                 <div className="flex gap-2">
+                  {isPending && (
+                    <Button variant="outline" size="sm" onClick={() => verifyStatus(false)} disabled={verifying} className="gap-2">
+                      <RefreshCw className={`w-4 h-4 ${verifying ? "animate-spin" : ""}`} /> Refresh
+                    </Button>
+                  )}
                   <Button variant="outline" size="sm" onClick={() => downloadTransferReceipt(transfer.id)} className="gap-2">
                     <Download className="w-4 h-4" /> Receipt
                   </Button>

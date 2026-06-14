@@ -12,6 +12,20 @@ dist
 dist-ssr
 *.local
 
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Exported data snapshot (PII / large)
+database-export/
+
+# Migration working files (contain DB credentials / dumps / secrets)
+migration-export/
+
+# Supabase CLI local scratch
+supabase/.temp/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

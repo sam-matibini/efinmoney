@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Building2, ArrowRight, CheckCircle2, AlertCircle, Info } from "lucide-react";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { toast } from "sonner";
+import { usePinGate } from "@/components/send/usePinGate";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useWallets } from "@/hooks/useWallets";
@@ -29,6 +30,7 @@ interface PlaidAccountRow {
 
 export default function CanadaTransferPage() {
   const { user } = useAuth();
+  const { requirePin, pinGate } = usePinGate();
   const { data: wallets } = useWallets();
   const qc = useQueryClient();
   const [linkToken, setLinkToken] = useState<string | null>(null);
@@ -270,7 +272,7 @@ export default function CanadaTransferPage() {
               </AlertDescription>
             </Alert>
 
-            <Button onClick={handleSubmit} disabled={submitting || !selectedAccount || !selectedWallet || !amount} className="w-full" size="lg">
+            <Button onClick={() => requirePin(handleSubmit, `$${amount || "0.00"} CAD`)} disabled={submitting || !selectedAccount || !selectedWallet || !amount} className="w-full" size="lg">
               {submitting ? <LoadingSpinner size={16} className="mr-2" /> : null}
               {submitting ? "Processing PAD…" : `Transfer $${amount || "0.00"} CAD`}
             </Button>
@@ -332,6 +334,7 @@ export default function CanadaTransferPage() {
           </CardContent>
         </Card>
       </main>
+      {pinGate}
     </div>
   );
 }
