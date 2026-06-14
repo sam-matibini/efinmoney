@@ -225,7 +225,7 @@ const AdminLayout = ({ children }: { children: ReactNode }) => {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => window.open("/dashboard", "_blank", "noopener,noreferrer")}
+              onClick={() => navigate("/")}
               className="hidden sm:inline-flex gap-2"
             >
               <ExternalLink className="w-4 h-4" /> User portal
@@ -281,7 +281,7 @@ const AdminLayout = ({ children }: { children: ReactNode }) => {
                   {admin && <div className="mt-1"><RoleBadge role={admin.role} /></div>}
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => window.open("/dashboard", "_blank", "noopener,noreferrer")}>
+                <DropdownMenuItem onClick={() => navigate("/")}>
                   <ExternalLink className="w-4 h-4 mr-2" /> Open user portal
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigate("/admin/settings")}>
