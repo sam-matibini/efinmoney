@@ -225,7 +225,7 @@ const AdminLayout = ({ children }: { children: ReactNode }) => {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => window.open("/dashboard", "_blank", "noopener,noreferrer")}
+              onClick={() => navigate("/")}
               className="hidden sm:inline-flex gap-2"
             >
               <ExternalLink className="w-4 h-4" /> User portal
