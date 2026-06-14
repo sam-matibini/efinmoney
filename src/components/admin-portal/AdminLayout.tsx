@@ -281,7 +281,7 @@ const AdminLayout = ({ children }: { children: ReactNode }) => {
                   {admin && <div className="mt-1"><RoleBadge role={admin.role} /></div>}
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => window.open("/dashboard", "_blank", "noopener,noreferrer")}>
+                <DropdownMenuItem onClick={() => navigate("/")}>
                   <ExternalLink className="w-4 h-4 mr-2" /> Open user portal
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigate("/admin/settings")}>
