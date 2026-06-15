@@ -1,75 +1,31 @@
+## Problem
 
-# Lovable → Self-hosted Migration Export
+The preview is blank because `src/index.css` fails to compile. Vite reports:
 
-Goal: hand you everything exportable from this project so you can rebuild on your own Postgres/Supabase/infra. Nothing will be deleted.
+> [vite:css] @import must precede all other statements (besides @charset or empty @layer)
 
-## Important constraints (read first)
+Lines 1-5 currently are:
 
-These are Lovable Cloud platform limits — not something I can work around in code:
+```css
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-- **No raw Postgres connection string, no DB password, no `SUPABASE_SERVICE_ROLE_KEY`** are exposed to users or to me.
-- **No `pg_dump` / full DB dump** (SQL, Parquet, JSON, DuckDB, Excel — all disabled). Only per-table **CSV** is supported.
-- **No bulk storage-bucket download** tool. Files must be fetched individually via signed URLs, or via Lovable support for a bulk migration.
-- **Secret values are not retrievable**, only names. You'll rotate/recreate each one in your new environment.
-
-For the full DB dump and bulk bucket contents, the supported path is **contact Lovable support**.
-
-## Deliverables
-
-### 1. `MIGRATION.md` (repo root)
-Human-readable migration playbook containing:
-- Platform constraints + how to request a full dump from support.
-- **Schema source of truth:** pointer to existing `DATABASE_SCHEMA.sql`.
-- **Database extensions in use:** `pg_trgm`, `pgcrypto`, `pg_net` (with what each is used for, so you enable them on the target).
-- **All 3 storage buckets** (`assets`, `kyc-documents`, `customer-documents`) — all private — with the SQL to recreate them and notes on bulk download.
-- **Auth providers** currently enabled (read live via Cloud config at write time).
-- **All ~94 edge functions**, grouped by domain (Stripe, Circle, Crossmint, Yellow Card, PawaPay, Paysafe, Flutterwave, Elicate, M-Pesa, Plaid, Persona, Sumsub, Interac, Stellar, Treasury, KYC/admin, FX, receipts/email, internal). Each entry lists:
-  - function name
-  - `verify_jwt` setting (from `supabase/config.toml`)
-  - required env vars (extracted from `Deno.env.get(...)` calls in source)
-  - webhook URL (for functions registered with third parties)
-- **All configured secret names** (~75) grouped by provider, with notes on which need to be re-issued vs. simply copied (e.g. publishable keys).
-- **Database functions & triggers** inventory (already retrievable via SQL) so you can recreate `handle_new_user`, ledger swap, AML invoker, etc.
-- **Step-by-step migration order**: provision Postgres → enable extensions → run `DATABASE_SCHEMA.sql` → recreate roles + grants → restore data (CSV import) → recreate buckets + upload files → deploy edge functions → set secrets → wire webhooks → switch DNS.
-
-### 2. `migration-export/functions-and-secrets.json` (repo)
-Machine-readable map your migration scripts can consume:
-```json
-{
-  "extensions": ["pg_trgm", "pgcrypto", "pg_net"],
-  "buckets": [{ "name": "assets", "public": false }, ...],
-  "secrets": ["STRIPE_SECRET_KEY", "CIRCLE_API_KEY", ...],
-  "functions": [
-    {
-      "name": "stripe-webhook",
-      "verify_jwt": false,
-      "env": ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"],
-      "webhook_url": "https://hgmskcvaeadnyovbroup.supabase.co/functions/v1/stripe-webhook"
-    },
-    ...
-  ]
-}
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk...');
 ```
-Built by scanning `supabase/functions/**/index.ts` for `Deno.env.get(...)` and cross-referencing `supabase/config.toml`.
 
-### 3. `src/pages/admin/DataExportPage.tsx` + route `/admin/data-export`
-A small admin-only page (gated by existing `AdminGuard` / super_admin role) that:
-- Lists every `public.*` table from the live schema.
-- Lets you click **"Download CSV"** per table (uses Supabase JS to page through rows and stream to a CSV blob, respecting RLS — which is why super_admin is required).
-- Has **"Download all tables (ZIP)"** that loops through every table and bundles the CSVs client-side via `jszip`.
-- Shows a banner clarifying this is row-data only; storage files and the schema itself still need the documented separate steps.
+The `@import` sits after the `@tailwind` directives, which violates the CSS spec, so the stylesheet fails to load and the app renders nothing.
 
-This gives you a self-serve way to grab your data without filing a support ticket, within the CSV-only constraint.
+## Fix
 
-## Out of scope
+Reorder the top of `src/index.css` so the Google Fonts `@import` is the first statement:
 
-- Cannot generate a `pg_dump` file or hand over a Postgres connection string — platform doesn't allow it.
-- Cannot bulk-download storage buckets in one click; the page above is data-only. For files, signed-URL loops or support are the routes.
-- Won't touch or delete any existing data, secrets, functions, or buckets.
+```css
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap');
 
-## Technical notes
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+```
 
-- The JSON file is generated by a one-shot Node/Bun script I'll run during the build; it's checked in as the artifact, not regenerated at runtime.
-- The CSV export page uses the existing authenticated `supabase` client; no new secrets, no edge function needed.
-- `jszip` will be added as a dependency for the bulk-ZIP button.
-- No schema changes, no migrations, no destructive SQL.
+No other changes. After saving, the dev server will recompile and the preview will render normally.
