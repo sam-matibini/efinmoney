@@ -179,6 +179,24 @@ const PaymentLinksPage = () => {
                       <Button size="sm" variant="outline" onClick={() => copyLink(r.short_url)}>
                         <Copy className="w-3.5 h-3.5 mr-1" /> Copy
                       </Button>
+                      {r.status === "claimed" && (
+                        <Button asChild size="sm" variant="outline" onClick={async (e) => {
+                          e.preventDefault();
+                          const { data } = await supabase
+                            .from("ledger_entries")
+                            .select("journal_id")
+                            .ilike("description", `Payment Link release [${r.short_code}]%`)
+                            .limit(1)
+                            .maybeSingle();
+                          if ((data as any)?.journal_id) {
+                            window.location.href = `/transactions/${(data as any).journal_id}`;
+                          } else {
+                            toast.error("Release entry not found");
+                          }
+                        }}>
+                          <a><CheckCircle className="w-3.5 h-3.5 mr-1" /> View payment</a>
+                        </Button>
+                      )}
                       {r.status === "pending" && (
                         <Button size="sm" variant="outline" onClick={() => revoke(r)}>
                           <X className="w-3.5 h-3.5 mr-1" /> Revoke
@@ -191,6 +209,7 @@ const PaymentLinksPage = () => {
             </ul>
           </CardContent></Card>
         )}
+
       </main>
       <MobileNav />
     </div>
