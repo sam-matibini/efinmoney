@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 
+export type BeneficiaryCategory = "person" | "supplier" | "employee" | "contractor" | "payee" | "other";
+
 export interface Beneficiary {
   id: string;
   user_id: string;
@@ -19,6 +21,16 @@ export interface Beneficiary {
   last_sent_at: string | null;
   created_at: string;
   updated_at: string;
+  // Payee directory extension
+  category: BeneficiaryCategory;
+  email: string | null;
+  eft_institution: string | null;
+  eft_transit: string | null;
+  eft_account: string | null;
+  eft_account_holder: string | null;
+  interac_email: string | null;
+  notes: string | null;
+  tags: string[];
 }
 
 export const initialsOf = (name: string) =>
