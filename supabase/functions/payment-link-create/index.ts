@@ -118,7 +118,7 @@ Deno.serve(async (req) => {
       credit_amount: 0,
       description: `Payment Link escrow [${shortCode}]`,
       reference_type: "payment_link",
-      reference_id: shortCode,
+      reference_id: journalId,
       created_by: userId,
     },
     {
