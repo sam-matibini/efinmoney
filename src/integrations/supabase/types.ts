@@ -619,16 +619,25 @@ export type Database = {
           avatar_initials: string | null
           bank_account: string | null
           bank_name: string | null
+          category: string
           country_code: string | null
           created_at: string
           currency_code: string | null
+          eft_account: string | null
+          eft_account_holder: string | null
+          eft_institution: string | null
+          eft_transit: string | null
+          email: string | null
           id: string
+          interac_email: string | null
           last_sent_at: string | null
           name: string
           network: string | null
           nickname: string | null
+          notes: string | null
           payout_method: string | null
           phone: string | null
+          tags: string[]
           transfer_count: number
           updated_at: string
           user_id: string
@@ -637,16 +646,25 @@ export type Database = {
           avatar_initials?: string | null
           bank_account?: string | null
           bank_name?: string | null
+          category?: string
           country_code?: string | null
           created_at?: string
           currency_code?: string | null
+          eft_account?: string | null
+          eft_account_holder?: string | null
+          eft_institution?: string | null
+          eft_transit?: string | null
+          email?: string | null
           id?: string
+          interac_email?: string | null
           last_sent_at?: string | null
           name: string
           network?: string | null
           nickname?: string | null
+          notes?: string | null
           payout_method?: string | null
           phone?: string | null
+          tags?: string[]
           transfer_count?: number
           updated_at?: string
           user_id: string
@@ -655,16 +673,25 @@ export type Database = {
           avatar_initials?: string | null
           bank_account?: string | null
           bank_name?: string | null
+          category?: string
           country_code?: string | null
           created_at?: string
           currency_code?: string | null
+          eft_account?: string | null
+          eft_account_holder?: string | null
+          eft_institution?: string | null
+          eft_transit?: string | null
+          email?: string | null
           id?: string
+          interac_email?: string | null
           last_sent_at?: string | null
           name?: string
           network?: string | null
           nickname?: string | null
+          notes?: string | null
           payout_method?: string | null
           phone?: string | null
+          tags?: string[]
           transfer_count?: number
           updated_at?: string
           user_id?: string
@@ -3159,6 +3186,7 @@ export type Database = {
       payment_link_payouts: {
         Row: {
           amount: number
+          auto_claim: boolean
           claimed_at: string | null
           claimed_ip: string | null
           claimed_method:
@@ -3171,6 +3199,8 @@ export type Database = {
           expires_at: string
           failure_reason: string | null
           id: string
+          preset_method: string | null
+          preset_payload: Json | null
           recipient_name: string | null
           recipient_note: string | null
           release_journal_id: string | null
@@ -3187,6 +3217,7 @@ export type Database = {
         }
         Insert: {
           amount: number
+          auto_claim?: boolean
           claimed_at?: string | null
           claimed_ip?: string | null
           claimed_method?:
@@ -3199,6 +3230,8 @@ export type Database = {
           expires_at?: string
           failure_reason?: string | null
           id?: string
+          preset_method?: string | null
+          preset_payload?: Json | null
           recipient_name?: string | null
           recipient_note?: string | null
           release_journal_id?: string | null
@@ -3215,6 +3248,7 @@ export type Database = {
         }
         Update: {
           amount?: number
+          auto_claim?: boolean
           claimed_at?: string | null
           claimed_ip?: string | null
           claimed_method?:
@@ -3227,6 +3261,8 @@ export type Database = {
           expires_at?: string
           failure_reason?: string | null
           id?: string
+          preset_method?: string | null
+          preset_payload?: Json | null
           recipient_name?: string | null
           recipient_note?: string | null
           release_journal_id?: string | null
