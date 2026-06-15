@@ -334,6 +334,36 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
 
   const handleSubmit = async () => {
     if (funding === "wallet" && !selectedWallet) return;
+
+    // Payment Link branch — escrow funds and generate a claim link.
+    if (method === "paylink") {
+      if (!selectedWallet) { toast.error("Select a CAD wallet"); return; }
+      setPaylinkSubmitting(true);
+      try {
+        const { data, error } = await supabase.functions.invoke("payment-link-create", {
+          body: {
+            amount: parsedAmount,
+            currency: "CAD",
+            sender_wallet_id: selectedWallet.wallet_id,
+            recipient_name: recipientName || null,
+            recipient_note: message || null,
+            source: "send",
+            base_url: window.location.origin,
+          },
+        });
+        if (error) throw error;
+        if (!data?.success) throw new Error(data?.error || "Could not create payment link");
+        setPaylinkResult({ url: data.url, code: data.code, expires_at: data.expires_at });
+        setStep(3);
+        toast.success("Payment link created");
+      } catch (e: any) {
+        toast.error(e?.message || "Could not create payment link");
+      } finally {
+        setPaylinkSubmitting(false);
+      }
+      return;
+    }
+
     try {
       if (method === "stripe_connect") {
         setRefreshingConnect(true);
