@@ -368,10 +368,10 @@ const ClaimPaymentLinkPage = () => {
     })();
   }, [code]);
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading…</div>;
+  if (loading) return <div className="min-h-screen flex items-center justify-center text-white bg-stripes-purple">Loading…</div>;
   if (err || !link) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6">
+      <div className="min-h-screen flex items-center justify-center p-6 bg-stripes-purple">
         <Card className="max-w-md w-full"><CardContent className="py-10 text-center space-y-3">
           <AlertCircle className="w-10 h-10 mx-auto text-destructive" />
           <h2 className="text-xl font-display font-bold">Link unavailable</h2>
@@ -384,7 +384,7 @@ const ClaimPaymentLinkPage = () => {
 
   if (link.status !== "pending") {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6">
+      <div className="min-h-screen flex items-center justify-center p-6 bg-stripes-purple">
         <Card className="max-w-md w-full"><CardContent className="py-10 text-center space-y-3">
           <Clock className="w-10 h-10 mx-auto text-muted-foreground" />
           <h2 className="text-xl font-display font-bold capitalize">Link {link.status}</h2>
@@ -397,7 +397,7 @@ const ClaimPaymentLinkPage = () => {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 bg-gradient-to-br from-background to-muted/30">
+    <div className="min-h-screen flex items-center justify-center p-6 bg-stripes-purple">
       <Elements stripe={stripeP}>
         <ClaimInner link={link} code={code!} />
       </Elements>
