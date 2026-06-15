@@ -495,6 +495,7 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
     setMethod("eft");
     setFunding("wallet");
     setLastTransferId(null);
+    setPaylinkResult(null);
     setSecurity(null);
     elements?.getElement(CardNumberElement)?.clear();
     elements?.getElement(CardExpiryElement)?.clear();
