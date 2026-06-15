@@ -50,6 +50,7 @@ import OnboardingEnhanced from "./pages/onboarding/Enhanced";
 
 import OnboardingRejected from "./pages/onboarding/Rejected";
 import ShortLinkResolver from "./pages/ShortLinkResolver";
+import ClaimPaymentLinkPage from "./pages/ClaimPaymentLinkPage";
 import { AdminAuthProvider } from "@/contexts/AdminAuthContext";
 import AdminGuard from "@/components/admin-portal/AdminGuard";
 import AdminLogin from "./pages/admin/AdminLogin";
@@ -179,6 +180,7 @@ const AppRoutes = () => {
         <Routes location={location}>
           <Route path="/" element={<RootRoute />} />
           <Route path="/s/:code" element={<ShortLinkResolver />} />
+          <Route path="/claim/:code" element={<ClaimPaymentLinkPage />} />
           <Route path="/privacy" element={<PrivacyPolicyPage />} />
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/compliance" element={<CompliancePage />} />

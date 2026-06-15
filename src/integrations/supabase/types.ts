@@ -3156,6 +3156,93 @@ export type Database = {
         }
         Relationships: []
       }
+      payment_link_payouts: {
+        Row: {
+          amount: number
+          claimed_at: string | null
+          claimed_ip: string | null
+          claimed_method:
+            | Database["public"]["Enums"]["payment_link_claim_method"]
+            | null
+          claimed_payload: Json | null
+          created_at: string
+          currency: string
+          escrow_journal_id: string | null
+          expires_at: string
+          failure_reason: string | null
+          id: string
+          recipient_name: string | null
+          recipient_note: string | null
+          release_journal_id: string | null
+          reversal_journal_id: string | null
+          sender_id: string
+          sender_wallet_id: string | null
+          short_code: string
+          short_url: string | null
+          source: Database["public"]["Enums"]["payment_link_source"]
+          source_ref: string | null
+          status: Database["public"]["Enums"]["payment_link_status"]
+          transfer_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          claimed_at?: string | null
+          claimed_ip?: string | null
+          claimed_method?:
+            | Database["public"]["Enums"]["payment_link_claim_method"]
+            | null
+          claimed_payload?: Json | null
+          created_at?: string
+          currency: string
+          escrow_journal_id?: string | null
+          expires_at?: string
+          failure_reason?: string | null
+          id?: string
+          recipient_name?: string | null
+          recipient_note?: string | null
+          release_journal_id?: string | null
+          reversal_journal_id?: string | null
+          sender_id: string
+          sender_wallet_id?: string | null
+          short_code: string
+          short_url?: string | null
+          source?: Database["public"]["Enums"]["payment_link_source"]
+          source_ref?: string | null
+          status?: Database["public"]["Enums"]["payment_link_status"]
+          transfer_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          claimed_at?: string | null
+          claimed_ip?: string | null
+          claimed_method?:
+            | Database["public"]["Enums"]["payment_link_claim_method"]
+            | null
+          claimed_payload?: Json | null
+          created_at?: string
+          currency?: string
+          escrow_journal_id?: string | null
+          expires_at?: string
+          failure_reason?: string | null
+          id?: string
+          recipient_name?: string | null
+          recipient_note?: string | null
+          release_journal_id?: string | null
+          reversal_journal_id?: string | null
+          sender_id?: string
+          sender_wallet_id?: string | null
+          short_code?: string
+          short_url?: string | null
+          source?: Database["public"]["Enums"]["payment_link_source"]
+          source_ref?: string | null
+          status?: Database["public"]["Enums"]["payment_link_status"]
+          transfer_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       paysafe_webhook_logs: {
         Row: {
           account_id: string | null
@@ -5507,6 +5594,14 @@ export type Database = {
         | "approved"
         | "rejected"
         | "expired"
+      payment_link_claim_method: "interac" | "card_push" | "eft"
+      payment_link_source: "send" | "invoice"
+      payment_link_status:
+        | "pending"
+        | "claimed"
+        | "expired"
+        | "revoked"
+        | "failed"
       reconciliation_status:
         | "pending"
         | "matched"
@@ -5755,6 +5850,15 @@ export const Constants = {
         "approved",
         "rejected",
         "expired",
+      ],
+      payment_link_claim_method: ["interac", "card_push", "eft"],
+      payment_link_source: ["send", "invoice"],
+      payment_link_status: [
+        "pending",
+        "claimed",
+        "expired",
+        "revoked",
+        "failed",
       ],
       reconciliation_status: [
         "pending",
