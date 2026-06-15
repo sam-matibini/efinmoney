@@ -34,6 +34,7 @@
         "@radix-ui/react-toggle": "^1.1.9",
         "@radix-ui/react-toggle-group": "^1.1.10",
         "@radix-ui/react-tooltip": "^1.2.7",
+        "@remotion/player": "^4.0.476",
         "@sentry/react": "^10.51.0",
         "@stripe/connect-js": "^3.4.5",
         "@stripe/react-connect-js": "^3.4.3",
@@ -68,6 +69,7 @@
         "react-resizable-panels": "^2.1.9",
         "react-router-dom": "^6.30.1",
         "recharts": "^2.15.4",
+        "remotion": "^4.0.476",
         "sonner": "^1.7.4",
         "tailwind-merge": "^2.6.0",
         "tailwindcss-animate": "^1.0.7",
@@ -934,6 +936,8 @@
     "@react-native/virtualized-lists": ["@react-native/virtualized-lists@0.74.81", "https://europe-west1-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/@react-native/virtualized-lists/-/virtualized-lists-0.74.81.tgz", { "dependencies": { "invariant": "^2.2.4", "nullthrows": "^1.1.1" }, "peerDependencies": { "@types/react": "^18.2.6", "react": "*", "react-native": "*" }, "optionalPeers": ["@types/react"] }, "sha512-5jF9S10Ug2Wl+L/0+O8WmbC726sMMX8jk/1JrvDDK+0DRLMobfjLc1L26fONlVBF7lE5ctqvKZ9TlKdhPTNOZg=="],
 
     "@remix-run/router": ["@remix-run/router@1.23.0", "", {}, "sha512-O3rHJzAQKamUz1fvE0Qaw0xSFqsA/yafi2iqeE0pvdFtCO1viYx8QL6f3Ln/aCCTLxs68SLf0KPM9eSeM8yBnA=="],
+
+    "@remotion/player": ["@remotion/player@4.0.477", "https://europe-west4-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/@remotion/player/-/player-4.0.477.tgz", { "dependencies": { "remotion": "4.0.477" }, "peerDependencies": { "react": ">=16.8.0", "react-dom": ">=16.8.0" } }, "sha512-x0aWSsbXQIlW2V5R6hVksHsyw4CBWN0ctbc0b8Aq5kbAg901vZmDXMekNXyMicqPyzwPRfTeDfpPyGq5RwvOSA=="],
 
     "@reown/appkit": ["@reown/appkit@1.7.8", "https://europe-west1-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/@reown/appkit/-/appkit-1.7.8.tgz", { "dependencies": { "@reown/appkit-common": "1.7.8", "@reown/appkit-controllers": "1.7.8", "@reown/appkit-pay": "1.7.8", "@reown/appkit-polyfills": "1.7.8", "@reown/appkit-scaffold-ui": "1.7.8", "@reown/appkit-ui": "1.7.8", "@reown/appkit-utils": "1.7.8", "@reown/appkit-wallet": "1.7.8", "@walletconnect/types": "2.21.0", "@walletconnect/universal-provider": "2.21.0", "bs58": "6.0.0", "valtio": "1.13.2", "viem": ">=2.29.0" } }, "sha512-51kTleozhA618T1UvMghkhKfaPcc9JlKwLJ5uV+riHyvSoWPKPRIa5A6M1Wano5puNyW0s3fwywhyqTHSilkaA=="],
 
@@ -2482,6 +2486,8 @@
     "regjsgen": ["regjsgen@0.8.0", "https://europe-west1-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/regjsgen/-/regjsgen-0.8.0.tgz", {}, "sha512-RvwtGe3d7LvWiDQXeQw8p5asZUmfU1G/l6WbUXeHta7Y2PEIvBTwH6E2EfmYUK8pxcxEdEmaomqyp0vZZ7C+3Q=="],
 
     "regjsparser": ["regjsparser@0.13.1", "https://europe-west1-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/regjsparser/-/regjsparser-0.13.1.tgz", { "dependencies": { "jsesc": "~3.1.0" }, "bin": { "regjsparser": "bin/parser" } }, "sha512-dLsljMd9sqwRkby8zhO1gSg3PnJIBFid8f4CQj/sXx+7cKx+E7u0PKhZ+U4wmhx7EfmtvnA318oVaIkAB1lRJw=="],
+
+    "remotion": ["remotion@4.0.477", "https://europe-west4-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/remotion/-/remotion-4.0.477.tgz", { "peerDependencies": { "react": ">=16.8.0", "react-dom": ">=16.8.0" } }, "sha512-mxQ8MHmx9YUpxyTSm8hLZW/LGvOzk9b19i02DT9MKKFv+H6ZXkd/1Cn+a908fZWCqM4RRCIy3poXB8KsHiPdow=="],
 
     "require-directory": ["require-directory@2.1.1", "https://europe-west1-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/require-directory/-/require-directory-2.1.1.tgz", {}, "sha512-fGxEI7+wsG9xrvdjsrlmL22OMTTiHRwAMroiEeMgq8gzoLC/PQr7RsRDSTLUg/bZAZtF+TVIkHc6/4RIKrui+Q=="],
 
