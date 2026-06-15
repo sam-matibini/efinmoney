@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import AdyenCheckout from "@adyen/adyen-web";
+import { AdyenCheckout, Dropin, Card as AdyenCard } from "@adyen/adyen-web";
 import "@adyen/adyen-web/dist/adyen.css";
 
 interface Props {
