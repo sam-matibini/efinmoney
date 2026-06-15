@@ -305,16 +305,18 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
 
   const recipientValid = method === "stripe_connect"
     ? !!connectAcct
-    : method === "card_push"
-      ? recipientName.trim().length > 1 && recipientCardComplete
-      : method === "interac"
-        ? recipientName.trim().length > 1
-            && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail)
-            && interacQAValid
-        : recipientName.trim().length > 1
-            && /^\d{3}$/.test(institutionNumber)
-            && /^\d{5}$/.test(transitNumber)
-            && accountNumber.trim().length >= 4;
+    : method === "paylink"
+      ? true  // recipient details optional for paylink (sender just generates a link)
+      : method === "card_push"
+        ? recipientName.trim().length > 1 && recipientCardComplete
+        : method === "interac"
+          ? recipientName.trim().length > 1
+              && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail)
+              && interacQAValid
+          : recipientName.trim().length > 1
+              && /^\d{3}$/.test(institutionNumber)
+              && /^\d{5}$/.test(transitNumber)
+              && accountNumber.trim().length >= 4;
 
   const cardFieldsValid = funding === "wallet"
     ? true
