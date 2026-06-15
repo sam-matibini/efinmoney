@@ -121,7 +121,58 @@ const TransactionDetailPage = () => {
             </div>
           ) : (
             <>
+              {plLink && (() => {
+                const status = plLink.status as string;
+                const isPaid = status === "claimed";
+                const isPending = status === "pending";
+                const isClosed = status === "expired" || status === "revoked";
+                const tone = isPaid
+                  ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300"
+                  : isPending
+                  ? "bg-amber-500/10 border-amber-500/30 text-amber-700 dark:text-amber-300"
+                  : "bg-muted border-border text-muted-foreground";
+                const Icon = isPaid ? CheckCircle2 : isPending ? Clock : XCircle;
+                const label = isPaid
+                  ? `Paid · claimed via ${plLink.claimed_method?.toUpperCase() || "—"}`
+                  : isPending
+                  ? "Awaiting claim"
+                  : status === "expired" ? "Expired · funds returned" : "Revoked · funds returned";
+                const when = isPaid && plLink.claimed_at
+                  ? formatDistanceToNow(new Date(plLink.claimed_at), { addSuffix: true })
+                  : isPending && plLink.expires_at
+                  ? `expires ${formatDistanceToNow(new Date(plLink.expires_at), { addSuffix: true })}`
+                  : "";
+                return (
+                  <div className={`mb-4 rounded-xl border px-4 py-3 flex items-center justify-between gap-3 flex-wrap ${tone}`}>
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <Icon className="w-5 h-5 shrink-0" />
+                      <div className="min-w-0">
+                        <div className="font-semibold text-sm">{label}</div>
+                        <div className="text-xs opacity-80 truncate">
+                          Payment link <span className="font-mono">{plCode}</span>
+                          {plLink.recipient_name ? ` · ${plLink.recipient_name}` : ""}
+                          {when ? ` · ${when}` : ""}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {isPaid && plCounterJournalId && (
+                        <Button asChild size="sm" variant="outline">
+                          <Link to={`/transactions/${plCounterJournalId}`}>
+                            {plKind === "escrow" ? "View payout entry" : "View escrow entry"}
+                            <ExternalLink className="w-3 h-3 ml-1" />
+                          </Link>
+                        </Button>
+                      )}
+                      <Button asChild size="sm" variant="outline">
+                        <Link to="/payment-links">All links</Link>
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })()}
               <div className="rounded-xl border border-border overflow-hidden">
+
                 <table className="w-full text-sm">
                   <thead className="bg-muted/40 text-xs uppercase text-muted-foreground">
                     <tr>
