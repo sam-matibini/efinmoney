@@ -50,18 +50,43 @@ const ClaimInner = ({ link, code }: { link: Resolved; code: string }) => {
   const [cardNumComplete, setCardNumComplete] = useState(false);
   const [cardExpComplete, setCardExpComplete] = useState(false);
   const [cardCvcComplete, setCardCvcComplete] = useState(false);
+  // KYC fields for Visa Direct (Stripe Custom account requirements)
+  const [dobDay, setDobDay] = useState("");
+  const [dobMonth, setDobMonth] = useState("");
+  const [dobYear, setDobYear] = useState("");
+  const [phone, setPhone] = useState("");
+  const [addrLine1, setAddrLine1] = useState("");
+  const [addrCity, setAddrCity] = useState("");
+  const [addrState, setAddrState] = useState("");
+  const [addrPostal, setAddrPostal] = useState("");
+  const [tosAccepted, setTosAccepted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState<{ method: Rail } | null>(null);
 
   const cardComplete = cardNumComplete && cardExpComplete && cardCvcComplete;
 
+  const kycValid = useMemo(() => {
+    const d = parseInt(dobDay, 10), m = parseInt(dobMonth, 10), y = parseInt(dobYear, 10);
+    if (!d || !m || !y || d < 1 || d > 31 || m < 1 || m > 12 || y < 1900) return false;
+    const dob = new Date(y, m - 1, d);
+    const age = (Date.now() - dob.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
+    if (age < 18 || age > 120) return false;
+    if (!/^\+?\d[\d\s\-()]{7,16}$/.test(phone)) return false;
+    if (addrLine1.trim().length < 3) return false;
+    if (addrCity.trim().length < 2) return false;
+    if (!/^(AB|BC|MB|NB|NL|NS|NT|NU|ON|PE|QC|SK|YT)$/.test(addrState)) return false;
+    if (!/^[A-Za-z]\d[A-Za-z] ?\d[A-Za-z]\d$/.test(addrPostal.trim())) return false;
+    if (!tosAccepted) return false;
+    return true;
+  }, [dobDay, dobMonth, dobYear, phone, addrLine1, addrCity, addrState, addrPostal, tosAccepted]);
+
   const isValid = useMemo(() => {
     if (name.trim().length < 2) return false;
     if (rail === "interac") return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
     if (rail === "eft") return /^\d{3}$/.test(inst) && /^\d{5}$/.test(transit) && acct.length >= 4;
-    if (rail === "card_push") return cardComplete && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    if (rail === "card_push") return cardComplete && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && kycValid;
     return false;
-  }, [rail, name, email, inst, transit, acct, cardComplete]);
+  }, [rail, name, email, inst, transit, acct, cardComplete, kycValid]);
 
   const handleSubmit = async () => {
     if (!link || !code) return;
