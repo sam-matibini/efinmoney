@@ -975,7 +975,47 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
         </Card>
       )}
 
-      {step === 3 && (
+      {step === 3 && method === "paylink" && paylinkResult && (
+        <Card>
+          <CardContent className="py-10 text-center space-y-5">
+            <motion.div
+              initial={{ scale: 0 }} animate={{ scale: 1 }}
+              className="w-20 h-20 mx-auto rounded-full bg-primary/15 flex items-center justify-center"
+            >
+              <Link2 className="w-10 h-10 text-primary" />
+            </motion.div>
+            <div>
+              <h3 className="text-2xl font-display font-bold mb-1">Payment link ready</h3>
+              <p className="text-sm text-muted-foreground">
+                C${parsedAmount.toFixed(2)} is held in escrow. Share the link below.
+              </p>
+            </div>
+            <div className="p-3 rounded-lg border border-border bg-muted/40 text-left">
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">Claim link</p>
+              <code className="block text-sm break-all">{paylinkResult.url}</code>
+              <p className="text-[11px] text-muted-foreground mt-2">
+                Expires {new Date(paylinkResult.expires_at).toLocaleString()} · single use
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2 justify-center">
+              <Button onClick={async () => { await navigator.clipboard.writeText(paylinkResult.url); toast.success("Link copied"); }}>
+                <Copy className="w-4 h-4 mr-2" /> Copy link
+              </Button>
+              {typeof navigator !== "undefined" && (navigator as any).share && (
+                <Button variant="outline" onClick={() => (navigator as any).share({ title: "Payment for you", text: `${recipientName || "Hey"}, claim your C$${parsedAmount.toFixed(2)} here:`, url: paylinkResult.url })}>
+                  <Share2 className="w-4 h-4 mr-2" /> Share
+                </Button>
+              )}
+              <Button variant="outline" asChild>
+                <a href={`mailto:${recipientEmail || ""}?subject=${encodeURIComponent("You've got a payment")}&body=${encodeURIComponent(`Claim your C$${parsedAmount.toFixed(2)} here: ${paylinkResult.url}`)}`}>Email it</a>
+              </Button>
+              <Button variant="outline" onClick={reset}>Done</Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {step === 3 && method !== "paylink" && (
         <Card>
           <CardContent className="py-12 text-center">
             <motion.div
