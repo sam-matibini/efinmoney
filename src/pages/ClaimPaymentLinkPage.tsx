@@ -100,7 +100,23 @@ const ClaimInner = ({ link, code }: { link: Resolved; code: string }) => {
         const cardEl = elements.getElement(CardNumberElement);
         if (!cardEl) throw new Error("Card form not ready");
         const tok = await tokenizeDebitCard(stripe, cardEl, { name: name.trim(), currency: "cad" });
-        payload = { card_token: tok.token, card_last4: tok.last4, card_brand: tok.brand };
+        payload = {
+          card_token: tok.token,
+          card_last4: tok.last4,
+          card_brand: tok.brand,
+          kyc: {
+            dob: { day: parseInt(dobDay, 10), month: parseInt(dobMonth, 10), year: parseInt(dobYear, 10) },
+            phone: phone.trim(),
+            address: {
+              line1: addrLine1.trim(),
+              city: addrCity.trim(),
+              state: addrState.trim().toUpperCase(),
+              postal_code: addrPostal.trim().toUpperCase().replace(/\s+/g, ""),
+              country: "CA",
+            },
+          },
+          tos: { accepted: true },
+        };
       }
 
       const res = await fetch(`${FUNCTIONS_BASE}/payment-link-claim`, {
