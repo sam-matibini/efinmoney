@@ -255,6 +255,80 @@ const ClaimInner = ({ link, code }: { link: Resolved; code: string }) => {
             <p className="text-[11px] text-muted-foreground">
               Canadian debit cards only (Visa Debit, Debit Mastercard, Interac). Funds arrive in seconds via Visa Direct.
             </p>
+
+            <div className="pt-3 border-t space-y-3">
+              <p className="text-sm font-medium">Verify it's you</p>
+              <p className="text-[11px] text-muted-foreground -mt-2">
+                Required by our payments partner to send funds to your card.
+              </p>
+
+              <div className="space-y-2">
+                <Label>Date of birth</Label>
+                <div className="grid grid-cols-3 gap-2">
+                  <Input inputMode="numeric" maxLength={2} placeholder="DD" value={dobDay}
+                    onChange={(e) => setDobDay(e.target.value.replace(/\D/g, ""))} />
+                  <Input inputMode="numeric" maxLength={2} placeholder="MM" value={dobMonth}
+                    onChange={(e) => setDobMonth(e.target.value.replace(/\D/g, ""))} />
+                  <Input inputMode="numeric" maxLength={4} placeholder="YYYY" value={dobYear}
+                    onChange={(e) => setDobYear(e.target.value.replace(/\D/g, ""))} />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Phone number</Label>
+                <Input type="tel" placeholder="+1 416 555 0100" value={phone}
+                  onChange={(e) => setPhone(e.target.value)} />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Street address</Label>
+                <Input placeholder="123 Main St" value={addrLine1}
+                  onChange={(e) => setAddrLine1(e.target.value)} />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label>City</Label>
+                  <Input placeholder="Toronto" value={addrCity}
+                    onChange={(e) => setAddrCity(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Province</Label>
+                  <select
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    value={addrState}
+                    onChange={(e) => setAddrState(e.target.value)}
+                  >
+                    <option value="">Select…</option>
+                    {["AB","BC","MB","NB","NL","NS","NT","NU","ON","PE","QC","SK","YT"].map(p => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Postal code</Label>
+                <Input placeholder="M5H 1A1" value={addrPostal}
+                  onChange={(e) => setAddrPostal(e.target.value.toUpperCase())} />
+              </div>
+
+              <label className="flex items-start gap-2 text-xs text-muted-foreground cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="mt-0.5"
+                  checked={tosAccepted}
+                  onChange={(e) => setTosAccepted(e.target.checked)}
+                />
+                <span>
+                  I agree to{" "}
+                  <a href="https://stripe.com/legal/connect-account" target="_blank" rel="noreferrer" className="underline">
+                    Stripe's Connected Account Agreement
+                  </a>{" "}
+                  and the eFinMoney Terms.
+                </span>
+              </label>
+            </div>
           </div>
         )}
 
