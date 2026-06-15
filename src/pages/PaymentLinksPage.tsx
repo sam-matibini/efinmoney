@@ -126,7 +126,7 @@ const PaymentLinksPage = () => {
             <TabsList>
               <TabsTrigger value="all">All ({counts.all})</TabsTrigger>
               <TabsTrigger value="pending">Pending ({counts.pending})</TabsTrigger>
-              <TabsTrigger value="claimed">Claimed ({counts.claimed})</TabsTrigger>
+              <TabsTrigger value="claimed">Paid ({counts.claimed})</TabsTrigger>
               <TabsTrigger value="expired">Expired ({counts.expired})</TabsTrigger>
             </TabsList>
           </Tabs>
