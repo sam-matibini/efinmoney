@@ -106,6 +106,24 @@ Deno.serve(async (req) => {
       await rollback(admin, claimed.id);
       return json({ error: "Card payouts are only available for CAD links" }, 400);
     }
+    const k = payload?.kyc;
+    const tosOk = payload?.tos?.accepted === true;
+    const dobOk =
+      k?.dob &&
+      Number.isInteger(k.dob.day) && k.dob.day >= 1 && k.dob.day <= 31 &&
+      Number.isInteger(k.dob.month) && k.dob.month >= 1 && k.dob.month <= 12 &&
+      Number.isInteger(k.dob.year) && k.dob.year >= 1900 && k.dob.year <= new Date().getFullYear() - 18;
+    const addrOk =
+      k?.address &&
+      typeof k.address.line1 === "string" && k.address.line1.trim().length >= 3 &&
+      typeof k.address.city === "string" && k.address.city.trim().length >= 2 &&
+      /^(AB|BC|MB|NB|NL|NS|NT|NU|ON|PE|QC|SK|YT)$/.test(String(k.address.state || "")) &&
+      /^[A-Z]\d[A-Z]\d[A-Z]\d$/.test(String(k.address.postal_code || "").toUpperCase().replace(/\s+/g, ""));
+    const phoneOk = typeof k?.phone === "string" && /^\+?\d[\d\s\-()]{7,16}$/.test(k.phone);
+    if (!tosOk || !dobOk || !addrOk || !phoneOk) {
+      await rollback(admin, claimed.id);
+      return json({ error: "Identity verification fields are incomplete or invalid" }, 400);
+    }
   }
 
   // === Card push: execute Stripe Visa Direct payout BEFORE posting release ledger ===
