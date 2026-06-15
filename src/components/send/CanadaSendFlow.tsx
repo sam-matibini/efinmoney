@@ -927,6 +927,7 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
               </div>
             )}
             </div>
+            )}
 
 
 
