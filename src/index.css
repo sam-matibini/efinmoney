@@ -191,6 +191,17 @@
     background-size: 40px 40px;
   }
 
+  .bg-stripes-purple {
+    background-color: hsl(var(--brand-900));
+    background-image: repeating-linear-gradient(
+      135deg,
+      hsl(var(--brand-700) / 0.55) 0 14px,
+      hsl(var(--brand-900)) 14px 28px,
+      hsl(var(--brand-500) / 0.35) 28px 42px,
+      hsl(var(--brand-900)) 42px 56px
+    );
+  }
+
   .text-gradient {
     @apply bg-clip-text text-transparent;
     background: var(--gradient-primary);
