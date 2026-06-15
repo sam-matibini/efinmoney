@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { AdyenCheckout, Dropin } from "@adyen/adyen-web";
 import "@adyen/adyen-web/styles/adyen.css";
 
+
 interface Props {
   sessionId: string;
   sessionData: string;
