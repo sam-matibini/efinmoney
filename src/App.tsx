@@ -51,6 +51,7 @@ import OnboardingEnhanced from "./pages/onboarding/Enhanced";
 import OnboardingRejected from "./pages/onboarding/Rejected";
 import ShortLinkResolver from "./pages/ShortLinkResolver";
 import ClaimPaymentLinkPage from "./pages/ClaimPaymentLinkPage";
+import PaymentLinksPage from "./pages/PaymentLinksPage";
 import { AdminAuthProvider } from "@/contexts/AdminAuthContext";
 import AdminGuard from "@/components/admin-portal/AdminGuard";
 import AdminLogin from "./pages/admin/AdminLogin";
@@ -222,6 +223,8 @@ const AppRoutes = () => {
           <Route path="/transfers/:id" element={<KycProtectedRoute><TransferTrackingPage /></KycProtectedRoute>} />
           <Route path="/transactions/:journalId" element={<KycProtectedRoute><TransactionDetailPage /></KycProtectedRoute>} />
           <Route path="/contacts" element={<KycProtectedRoute><ContactsPage /></KycProtectedRoute>} />
+          <Route path="/payees" element={<KycProtectedRoute><ContactsPage /></KycProtectedRoute>} />
+          <Route path="/payment-links" element={<KycProtectedRoute><PaymentLinksPage /></KycProtectedRoute>} />
           <Route path="/transfers/canada" element={<KycProtectedRoute><CanadaTransferPage /></KycProtectedRoute>} />
           <Route path="/wallet/receive" element={<KycProtectedRoute><ReceivePage /></KycProtectedRoute>} />
           <Route path="/wallet/topup" element={<KycProtectedRoute><TopUpPage /></KycProtectedRoute>} />

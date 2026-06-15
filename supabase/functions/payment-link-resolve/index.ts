@@ -27,7 +27,7 @@ Deno.serve(async (req) => {
 
   const { data: row, error } = await admin
     .from("payment_link_payouts")
-    .select("id, amount, currency, recipient_name, recipient_note, status, expires_at, sender_id, source")
+    .select("id, amount, currency, recipient_name, recipient_note, status, expires_at, sender_id, source, preset_method, preset_payload, auto_claim, claimed_method, claimed_at")
     .eq("short_code", code)
     .maybeSingle();
   if (error) return json({ error: error.message }, 500);
@@ -46,6 +46,21 @@ Deno.serve(async (req) => {
     .eq("user_id", row.sender_id)
     .maybeSingle();
 
+  // Build a masked preset summary (never expose full account number)
+  let presetSummary: { method: string; label: string } | null = null;
+  if (row.preset_method && row.preset_payload) {
+    if (row.preset_method === "eft") {
+      const acct = String(row.preset_payload.account_number ?? "");
+      const last4 = acct.slice(-4);
+      const holder = String(row.preset_payload.account_holder ?? "").trim();
+      presetSummary = { method: "eft", label: `${holder ? holder + " — " : ""}Bank account ••• ${last4}` };
+    } else if (row.preset_method === "interac") {
+      const email = String(row.preset_payload.email ?? "");
+      const masked = email.replace(/^(.).+(@.+)$/, "$1•••$2");
+      presetSummary = { method: "interac", label: `Interac → ${masked}` };
+    }
+  }
+
   return json({
     code,
     amount: row.amount,
@@ -56,5 +71,9 @@ Deno.serve(async (req) => {
     expires_at: row.expires_at,
     sender_name: senderProfile?.full_name || "An eFinMoney user",
     sender_avatar: senderProfile?.avatar_url || null,
+    preset: presetSummary,
+    auto_claim: row.auto_claim === true,
+    claimed_method: row.claimed_method,
+    claimed_at: row.claimed_at,
   });
 });

@@ -30,13 +30,13 @@ Deno.serve(async (req) => {
   try { body = await req.json(); } catch { return json({ error: "Invalid JSON" }, 400); }
 
   const code: string = String(body?.code ?? "");
-  const method: "interac" | "card_push" | "eft" = body?.method;
+  let method: "interac" | "card_push" | "eft" = body?.method;
   const recipientName: string = String(body?.recipient_name ?? "").trim();
-  const recipientEmail: string = String(body?.recipient_email ?? "").trim();
-  const payload: any = body?.payload ?? {};
+  const recipientEmailRaw: string = String(body?.recipient_email ?? "").trim();
+  let payload: any = body?.payload ?? {};
+  const usePreset: boolean = body?.use_preset === true || body?.method === "preset";
 
   if (!/^[A-Z0-9]{4,16}$/i.test(code)) return json({ error: "Invalid code" }, 400);
-  if (!["interac", "card_push", "eft"].includes(method)) return json({ error: "Invalid method" }, 400);
   if (recipientName.length < 2) return json({ error: "Recipient name required" }, 400);
 
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
@@ -48,6 +48,37 @@ Deno.serve(async (req) => {
     p_window_seconds: 60,
   });
   if (rl === false) return json({ error: "Too many attempts" }, 429);
+
+  // Pre-load the row (read-only) so we can apply preset payout details when present.
+  const { data: existing } = await admin
+    .from("payment_link_payouts")
+    .select("id,status,preset_method,preset_payload,currency")
+    .eq("short_code", code)
+    .maybeSingle();
+  if (!existing) return json({ error: "Link not found" }, 404);
+  if (existing.status !== "pending") return json({ error: "Link is not available to claim" }, 409);
+
+  // If sender preloaded payout details, force-use them and override client-supplied method/payload.
+  if (existing.preset_method && existing.preset_payload) {
+    if (existing.preset_method === "eft") {
+      method = "eft";
+      payload = {
+        institution_number: existing.preset_payload.institution_number,
+        transit_number: existing.preset_payload.transit_number,
+        account_number: existing.preset_payload.account_number,
+      };
+    } else if (existing.preset_method === "interac") {
+      method = "interac";
+    }
+  }
+
+  if (!["interac", "card_push", "eft"].includes(method)) return json({ error: "Invalid method" }, 400);
+
+  // For Interac, fall back to preset email if claimant didn't supply one.
+  const recipientEmail =
+    method === "interac" && !recipientEmailRaw && existing.preset_method === "interac"
+      ? String(existing.preset_payload?.email ?? "")
+      : recipientEmailRaw;
 
   // Atomic claim: only flip if still pending
   const { data: claimed, error: claimErr } = await admin
@@ -61,6 +92,7 @@ Deno.serve(async (req) => {
         recipient_name: recipientName,
         recipient_email: recipientEmail || null,
         method,
+        via_preset: !!existing.preset_method,
         ...(method === "eft"
           ? {
               institution_number: String(payload.institution_number ?? ""),

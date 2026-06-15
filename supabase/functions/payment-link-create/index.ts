@@ -36,10 +36,40 @@ Deno.serve(async (req) => {
   const recipientNote: string | null = body?.recipient_note ?? null;
   const source: "send" | "invoice" = body?.source === "invoice" ? "invoice" : "send";
   const sourceRef: string | null = body?.source_ref ?? null;
+  const presetMethodRaw: string | null = body?.preset_method ?? null;
+  const presetPayloadRaw: any = body?.preset_payload ?? null;
+  const autoClaim: boolean = body?.auto_claim === true;
 
   if (!Number.isFinite(amount) || amount <= 0) return json({ error: "amount must be > 0" }, 400);
   if (!/^[A-Z]{3}$/.test(currency)) return json({ error: "invalid currency" }, 400);
   if (!senderWalletId) return json({ error: "sender_wallet_id required" }, 400);
+
+  // Validate preset payout details (when sender pre-loads them)
+  let presetMethod: "eft" | "interac" | null = null;
+  let presetPayload: any = null;
+  if (presetMethodRaw) {
+    if (!["eft", "interac"].includes(presetMethodRaw)) {
+      return json({ error: "preset_method must be 'eft' or 'interac'" }, 400);
+    }
+    if (presetMethodRaw === "eft") {
+      const inst = String(presetPayloadRaw?.institution_number ?? "");
+      const trans = String(presetPayloadRaw?.transit_number ?? "");
+      const acct = String(presetPayloadRaw?.account_number ?? "");
+      const holder = String(presetPayloadRaw?.account_holder ?? "").trim();
+      if (!/^\d{3}$/.test(inst) || !/^\d{5}$/.test(trans) || !/^\d{7,12}$/.test(acct) || holder.length < 2) {
+        return json({ error: "Valid Canadian EFT details required (institution, transit, account, holder)" }, 400);
+      }
+      presetMethod = "eft";
+      presetPayload = { institution_number: inst, transit_number: trans, account_number: acct, account_holder: holder };
+    } else {
+      const email = String(presetPayloadRaw?.email ?? "").trim();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return json({ error: "Valid Interac email required" }, 400);
+      }
+      presetMethod = "interac";
+      presetPayload = { email };
+    }
+  }
 
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
 
@@ -156,6 +186,9 @@ Deno.serve(async (req) => {
       short_url: shortUrl,
       escrow_journal_id: journalId,
       expires_at: expiresAt,
+      preset_method: presetMethod,
+      preset_payload: presetPayload,
+      auto_claim: autoClaim && !!presetMethod,
     })
     .select()
     .single();
