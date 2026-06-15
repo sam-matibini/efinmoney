@@ -161,7 +161,6 @@ Deno.serve(async (req) => {
         tos_acceptance: {
           date: Math.floor(Date.now() / 1000),
           ip,
-          service_agreement: "recipient",
         },
         metadata: { payment_link_code: code, sender_id: claimed.sender_id },
       });

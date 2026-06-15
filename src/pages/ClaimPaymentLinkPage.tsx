@@ -321,9 +321,9 @@ const ClaimInner = ({ link, code }: { link: Resolved; code: string }) => {
                   onChange={(e) => setTosAccepted(e.target.checked)}
                 />
                 <span>
-                  I agree to{" "}
-                  <a href="https://stripe.com/legal/connect-account" target="_blank" rel="noreferrer" className="underline">
-                    Stripe's Connected Account Agreement
+                  I agree to the{" "}
+                  <a href="https://stripe.com/legal/ssa" target="_blank" rel="noreferrer" className="underline">
+                    Stripe Services Agreement
                   </a>{" "}
                   and the eFinMoney Terms.
                 </span>
