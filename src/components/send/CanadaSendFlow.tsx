@@ -284,6 +284,12 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
       if (profile?.email && !recipientEmail) setRecipientEmail(profile.email);
     }
   }, [method, profile?.full_name, profile?.email]);
+
+  // Paylink only supports wallet funding (escrow). Switch funding back to wallet when picked.
+  useEffect(() => {
+    if (method === "paylink" && funding !== "wallet") setFunding("wallet");
+  }, [method, funding]);
+
   // Any wallet to satisfy the NOT NULL FK on transfers.sender_wallet_id when paying by card
   const fallbackWallet = (wallets || [])[0];
 
