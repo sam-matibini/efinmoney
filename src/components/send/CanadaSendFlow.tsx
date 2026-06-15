@@ -625,6 +625,17 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
                   <span className="text-xs">Stripe Connect</span>
                   <span className="text-[10px] opacity-70">C$1.00 · instant</span>
                 </Button>
+                <Button
+                  type="button"
+                  variant={method === "paylink" ? "default" : "outline"}
+                  className="flex flex-col items-center gap-1 h-auto py-3"
+                  onClick={() => setMethod("paylink")}
+                  title="Generate a one-time link the recipient opens to choose how they get paid"
+                >
+                  <Link2 className="w-5 h-5" />
+                  <span className="text-xs">Payment Link</span>
+                  <span className="text-[10px] opacity-70">Free · 7-day expiry</span>
+                </Button>
               </div>
               {(!connectReady || !connectState.hasAccount) && (
                 <p className="text-[11px] text-muted-foreground">
