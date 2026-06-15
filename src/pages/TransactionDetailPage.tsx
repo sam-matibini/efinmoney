@@ -1,12 +1,13 @@
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Copy, Receipt } from "lucide-react";
+import { ArrowLeft, Copy, Receipt, CheckCircle2, Clock, XCircle, ExternalLink } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import Header from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import { cleanIncomingTransactionLabel } from "@/lib/incomingTransactions";
 
 const TransactionDetailPage = () => {
@@ -37,11 +38,45 @@ const TransactionDetailPage = () => {
     ? cleanIncomingTransactionLabel(first.description, first.reference_type).toUpperCase()
     : "TRANSACTION";
 
+  // Detect Payment Link escrow/release journals: description format "Payment Link escrow [CODE]" or "Payment Link release [CODE]"
+  const plMatch = first?.description?.match(/Payment Link (escrow|release) \[([A-Z0-9]+)\]/i);
+  const plKind = plMatch?.[1]?.toLowerCase() as "escrow" | "release" | undefined;
+  const plCode = plMatch?.[2];
+
+  const { data: plLink } = useQuery({
+    queryKey: ["payment-link-banner", plCode],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("payment_link_payouts" as any)
+        .select("short_code, short_url, status, claimed_method, claimed_at, expires_at, recipient_name, amount, currency")
+        .eq("short_code", plCode!)
+        .maybeSingle();
+      return data as any;
+    },
+    enabled: !!plCode,
+  });
+
+  const { data: plCounterJournalId } = useQuery({
+    queryKey: ["payment-link-counter-journal", plCode, plKind],
+    queryFn: async () => {
+      const counter = plKind === "escrow" ? "release" : "escrow";
+      const { data } = await supabase
+        .from("ledger_entries")
+        .select("journal_id")
+        .ilike("description", `Payment Link ${counter} [${plCode}]%`)
+        .limit(1)
+        .maybeSingle();
+      return (data as any)?.journal_id as string | undefined;
+    },
+    enabled: !!plCode && !!plKind && plLink?.status === "claimed",
+  });
+
   const copyRef = () => {
     if (!journalId) return;
     navigator.clipboard.writeText(journalId);
     toast.success("Reference copied");
   };
+
 
   return (
     <div className="min-h-screen bg-background">
