@@ -64,7 +64,7 @@ export const useCreateBeneficiary = () => {
   return useMutation({
     mutationFn: async (input: Partial<Beneficiary> & { name: string }) => {
       if (!user) throw new Error("Not authenticated");
-      const payload = {
+      const payload: any = {
         user_id: user.id,
         name: input.name,
         phone: input.phone ?? null,
@@ -76,6 +76,15 @@ export const useCreateBeneficiary = () => {
         currency_code: input.currency_code ?? null,
         nickname: input.nickname ?? null,
         avatar_initials: input.avatar_initials ?? initialsOf(input.name),
+        category: input.category ?? "person",
+        email: input.email ?? null,
+        eft_institution: input.eft_institution ?? null,
+        eft_transit: input.eft_transit ?? null,
+        eft_account: input.eft_account ?? null,
+        eft_account_holder: input.eft_account_holder ?? null,
+        interac_email: input.interac_email ?? null,
+        notes: input.notes ?? null,
+        tags: input.tags ?? [],
       };
       const { data, error } = await supabase
         .from("beneficiaries" as any)
