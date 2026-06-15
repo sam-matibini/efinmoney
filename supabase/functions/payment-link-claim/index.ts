@@ -1,10 +1,19 @@
-// Recipient claims a payment link: chooses Interac / Card Push / EFT and we
-// hand off to the underlying payout rail. Releases escrow on success.
+// Recipient claims a payment link: chooses Interac / Debit card (Visa Direct) / EFT
+// and we hand off to the underlying payout rail. Releases escrow on success.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import Stripe from "https://esm.sh/stripe@13.9.0?target=deno";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const STRIPE_SECRET_KEY = Deno.env.get("STRIPE_SECRET_KEY") || "";
+
+const stripe = STRIPE_SECRET_KEY
+  ? new Stripe(STRIPE_SECRET_KEY, {
+      apiVersion: "2023-10-16",
+      httpClient: Stripe.createFetchHttpClient(),
+    })
+  : null;
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -85,18 +94,67 @@ Deno.serve(async (req) => {
       return json({ error: "Valid Canadian bank account required" }, 400);
     }
   } else if (method === "card_push") {
-    if (!payload.card_token) {
+    if (!payload.card_token || typeof payload.card_token !== "string") {
       await rollback(admin, claimed.id);
       return json({ error: "Card token required" }, 400);
     }
+    if (!stripe) {
+      await rollback(admin, claimed.id);
+      return json({ error: "Card payouts are not configured" }, 500);
+    }
+    if (String(claimed.currency).toUpperCase() !== "CAD") {
+      await rollback(admin, claimed.id);
+      return json({ error: "Card payouts are only available for CAD links" }, 400);
+    }
   }
 
-  // Find COA accounts for release journal: DR 2199 / CR settlement (1108 same-currency or 2130 card payable)
+  // === Card push: execute Stripe Visa Direct payout BEFORE posting release ledger ===
+  let stripePayoutId: string | null = null;
+  if (method === "card_push") {
+    try {
+      const acct = await stripe!.accounts.create({
+        type: "custom",
+        country: "CA",
+        business_type: "individual",
+        capabilities: {
+          card_payments: { requested: true },
+          transfers: { requested: true },
+        },
+        individual: {
+          first_name: recipientName.split(/\s+/)[0] || "Recipient",
+          last_name: recipientName.split(/\s+/).slice(1).join(" ") || recipientName,
+          email: recipientEmail || undefined,
+        },
+        metadata: { payment_link_code: code, sender_id: claimed.sender_id },
+      });
+      const ext = await stripe!.accounts.createExternalAccount(acct.id, {
+        external_account: payload.card_token,
+        default_for_currency: true,
+      } as any);
+      const payout = await stripe!.payouts.create(
+        {
+          amount: Math.round(Number(claimed.amount) * 100),
+          currency: "cad",
+          method: "instant",
+          destination: (ext as any).id,
+          metadata: { payment_link_code: code, sender_id: claimed.sender_id },
+        },
+        { stripeAccount: acct.id },
+      );
+      stripePayoutId = payout.id;
+    } catch (err: any) {
+      console.error("Stripe card-push failed for payment link", code, err?.message, err?.raw);
+      await rollback(admin, claimed.id);
+      const msg = err?.raw?.message || err?.message || "Card payout failed";
+      return json({ error: msg }, 502);
+    }
+  }
+
+  // Find COA accounts for release journal: DR 2199 / CR settlement (1108)
   const { data: pendingAcc } = await admin
     .from("ledger_accounts").select("id")
     .eq("code", "2199").eq("currency_code", claimed.currency).maybeSingle();
 
-  // settlement: use 1108 for card/interac/eft as a generic settlement clearing — fall back to 1108 USD if missing
   const { data: settleAcc } = await admin
     .from("ledger_accounts").select("id")
     .eq("code", "1108").eq("currency_code", claimed.currency).maybeSingle();
@@ -121,7 +179,7 @@ Deno.serve(async (req) => {
       credit_amount: 0,
       description: `Payment Link release [${code}] via ${method}`,
       reference_type: "payment_link",
-      reference_id: code,
+      reference_id: releaseJournalId,
       created_by: claimed.sender_id,
     },
     {
@@ -133,7 +191,7 @@ Deno.serve(async (req) => {
       credit_amount: claimed.amount,
       description: `Payment Link release [${code}] via ${method}`,
       reference_type: "payment_link",
-      reference_id: code,
+      reference_id: releaseJournalId,
       created_by: claimed.sender_id,
     },
   ]);
@@ -151,7 +209,9 @@ Deno.serve(async (req) => {
       recipient_name: recipientName,
       recipient_account: method === "eft"
         ? `${payload.institution_number}-${payload.transit_number}-${String(payload.account_number).slice(-4)}`
-        : (recipientEmail || "card"),
+        : method === "card_push"
+          ? `card-${payload.card_last4 || "xxxx"}`
+          : (recipientEmail || "card"),
       recipient_country: "CA",
       transfer_type: "domestic_canada",
       payout_method: method,
@@ -162,8 +222,8 @@ Deno.serve(async (req) => {
       target_amount: claimed.amount,
       exchange_rate: 1,
       fee_amount: 0,
-      status: "completed",
-      provider_reference: `PLINK-${code}`,
+      status: method === "card_push" ? "processing" : "completed",
+      provider_reference: stripePayoutId || `PLINK-${code}`,
     })
     .select()
     .single();
@@ -173,6 +233,13 @@ Deno.serve(async (req) => {
     .update({
       release_journal_id: releaseJournalId,
       transfer_id: transfer?.id ?? null,
+      claimed_payload: {
+        ...(claimed.claimed_payload ?? {}),
+        recipient_name: recipientName,
+        recipient_email: recipientEmail || null,
+        method,
+        ...(method === "card_push" ? { stripe_payout_id: stripePayoutId } : {}),
+      },
     })
     .eq("id", claimed.id);
 
@@ -182,6 +249,7 @@ Deno.serve(async (req) => {
     currency: claimed.currency,
     method,
     transfer_id: transfer?.id ?? null,
+    stripe_payout_id: stripePayoutId,
   });
 });
 
