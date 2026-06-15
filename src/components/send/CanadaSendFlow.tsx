@@ -935,17 +935,19 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
               <Button variant="outline" className="flex-1" onClick={() => setStep(1)}>Back</Button>
               <Button
                 className="flex-1"
-                onClick={() => requirePin(handleSubmit, `C$${parsedAmount.toFixed(2)}`)}
-                disabled={!isStep2Valid || createTransfer.isPending || cardSubmitting}
+                onClick={() => method === "paylink" ? handleSubmit() : requirePin(handleSubmit, `C$${parsedAmount.toFixed(2)}`)}
+                disabled={!isStep2Valid || createTransfer.isPending || cardSubmitting || paylinkSubmitting}
               >
-                {createTransfer.isPending || cardSubmitting
+                {(createTransfer.isPending || cardSubmitting || paylinkSubmitting)
                   ? "Processing..."
-                  : `Send C$${parsedAmount.toFixed(2)} via ${
-                      method === "eft" ? "Bank Transfer"
-                        : method === "interac" ? "Interac e-Transfer"
-                        : method === "stripe_connect" ? "Stripe Connect"
-                        : "Visa Direct"
-                    }`}
+                  : method === "paylink"
+                    ? `Create C$${parsedAmount.toFixed(2)} Payment Link`
+                    : `Send C$${parsedAmount.toFixed(2)} via ${
+                        method === "eft" ? "Bank Transfer"
+                          : method === "interac" ? "Interac e-Transfer"
+                          : method === "stripe_connect" ? "Stripe Connect"
+                          : "Visa Direct"
+                      }`}
               </Button>
             </div>
 
