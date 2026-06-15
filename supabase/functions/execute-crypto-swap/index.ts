@@ -9,6 +9,7 @@ import {
   HORIZON_URL,
   NETWORK_PASSPHRASE,
   EXPLORER_BASE,
+  IS_MAINNET,
   usdcAsset,
 } from "../_shared/stellar-network.ts";
 
@@ -206,8 +207,14 @@ Deno.serve(async (req) => {
       txHash = submit.hash;
     } catch (err: any) {
       const data = err?.response?.data ?? err?.data;
-      txError = data?.title ?? data?.extras?.result_codes?.operations?.join(",") ?? err?.message ?? "submit failed";
-      console.error("Treasury USDC send failed:", JSON.stringify(data ?? err));
+      const status = err?.response?.status ?? err?.status;
+      const isAccountMissing =
+        status === 404 || data?.status === 404 || err?.name === "NotFoundError" ||
+        /not.?found/i.test(String(data?.title ?? ""));
+      txError = isAccountMissing
+        ? `Treasury Stellar account ${StellarSdk.Keypair.fromSecret(TREASURY_SEED).publicKey()} is not funded on ${IS_MAINNET ? "mainnet" : "testnet"}. Fund it (and add a USDC trustline) before swapping.`
+        : data?.title ?? data?.extras?.result_codes?.operations?.join(",") ?? err?.message ?? "submit failed";
+      console.error("Treasury USDC send failed:", JSON.stringify(data ?? { name: err?.name, message: err?.message }));
       // Reverse the ledger
       const reversal = entries.map((e) => ({
         ...e, journal_id: crypto.randomUUID(),
