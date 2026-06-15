@@ -1,31 +1,10 @@
-## Problem
+## Issue
 
-The preview is blank because `src/index.css` fails to compile. Vite reports:
-
-> [vite:css] @import must precede all other statements (besides @charset or empty @layer)
-
-Lines 1-5 currently are:
-
-```css
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk...');
-```
-
-The `@import` sits after the `@tailwind` directives, which violates the CSS spec, so the stylesheet fails to load and the app renders nothing.
+The preview shows "live preview lost connection." A direct request to the dev server at `http://localhost:8080/` returns HTTP `000` (no response), meaning the Vite dev server is wedged / not serving. The CSS issue from the previous turn is already fixed (the Google Fonts `@import` is at the top of `src/index.css`), so this is a stuck process, not a source error.
 
 ## Fix
 
-Reorder the top of `src/index.css` so the Google Fonts `@import` is the first statement:
+1. Restart the Vite dev server in the sandbox (no project file changes).
+2. Verify the server responds (`GET /` returns 200) and that the preview renders without the lost-connection banner.
 
-```css
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap');
-
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-```
-
-No other changes. After saving, the dev server will recompile and the preview will render normally.
+No code changes are required.
