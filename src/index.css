@@ -355,3 +355,13 @@
     animation: bubble-drift 6s ease-in-out infinite;
   }
 }
+
+@media print {
+  body { background: white !important; }
+  header, nav, .no-print { display: none !important; }
+  .bg-card, .bg-background { background: white !important; box-shadow: none !important; }
+  .border { border-color: #ddd !important; }
+  * { color: #111 !important; }
+  table { page-break-inside: avoid; }
+  a { text-decoration: none !important; }
+}
