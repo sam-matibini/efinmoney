@@ -1,32 +1,38 @@
-## What's actually happening
+## Change
 
-The ledger is already correct. When a link is claimed, the edge function posts a **second** journal `DR 2199 / CR 1108 (Payment Link release [CODE] via <method>)` and updates `payment_link_payouts.status = 'claimed'`. Both your test links (`TPWJGF7`, `BJBNADV`) already show `status='claimed'`.
+Replace the heavy purple-stripes background on `ClaimPaymentLinkPage` with a soft, Plaid-style backdrop: near-white base with translucent flowing wave curves in teal/violet, similar to the reference image. Applies to all four states (loading, unavailable, claimed/expired, active claim).
 
-The confusion is on the **Transaction Details** screen: it only shows the original escrow journal (DR 2101 / CR 2199), with no indication the escrow has been released. So a paid link still looks "pending" from that view.
+## Implementation
 
-No schema or status changes needed — the data is right. We just need to surface it.
+1. **`src/index.css`** — replace the `.bg-stripes-purple` utility (added in the previous turn) with a new `.bg-payout-waves`:
+   ```css
+   .bg-payout-waves {
+     background-color: hsl(0 0% 100%);
+     background-image:
+       radial-gradient(ellipse 70% 50% at 18% 12%, hsl(170 80% 70% / 0.18), transparent 65%),
+       radial-gradient(ellipse 60% 45% at 82% 8%, hsl(258 85% 75% / 0.20), transparent 70%),
+       radial-gradient(ellipse 90% 60% at 50% 100%, hsl(220 90% 80% / 0.15), transparent 70%),
+       repeating-radial-gradient(
+         circle at 50% -20%,
+         hsl(220 70% 75% / 0.07) 0 2px,
+         transparent 2px 22px
+       );
+   }
+   .dark .bg-payout-waves {
+     background-color: hsl(var(--background));
+     background-image:
+       radial-gradient(ellipse 70% 50% at 18% 12%, hsl(170 80% 50% / 0.22), transparent 65%),
+       radial-gradient(ellipse 60% 45% at 82% 8%, hsl(258 85% 60% / 0.25), transparent 70%),
+       radial-gradient(ellipse 90% 60% at 50% 100%, hsl(220 90% 60% / 0.18), transparent 70%),
+       repeating-radial-gradient(
+         circle at 50% -20%,
+         hsl(220 70% 70% / 0.08) 0 2px,
+         transparent 2px 22px
+       );
+   }
+   ```
+   The repeating-radial-gradient creates the thin concentric "wave lines" arcing from the top, layered over soft teal/violet/blue glows — mirroring the Plaid hero look.
 
-## Changes
+2. **`src/pages/ClaimPaymentLinkPage.tsx`** — swap the four `bg-stripes-purple` wrappers to `bg-payout-waves`. No structural changes; the white claim card stays as the focal element on the soft wave backdrop.
 
-### 1. `src/pages/TransactionDetailPage.tsx` — payment-link status banner
-When the journal's first entry description matches `Payment Link escrow [CODE]`:
-- Parse `CODE` from the description.
-- Fetch the matching `payment_link_payouts` row (`status`, `claimed_at`, `claimed_method`, `recipient_name`, `short_code`).
-- Render a status banner above the debit/credit table:
-  - **Pending** → amber "Awaiting claim · expires in X" + Copy link / View link buttons (link to `/payment-links`).
-  - **Claimed** → green "Paid · claimed via Interac/EFT/Card · {timeago}" with a "View release entry" link that fetches the release journal (`ledger_entries` where `description ilike 'Payment Link release [CODE]%'`) and routes to `/transactions/<release_journal_id>`.
-  - **Expired / Revoked** → muted badge "Funds returned to wallet".
-- On the **release** journal (description `Payment Link release [CODE]`) show a "Paid out · originally escrowed on {date}" banner with a link back to the escrow journal.
-
-### 2. `src/pages/PaymentLinksPage.tsx` — minor polish
-- Rename the "Claimed" label/tab to **"Paid"** (status value stays `claimed` in DB).
-- For paid rows, add a "View transaction" link that opens the release journal in `/transactions/<id>`.
-- Auto-expire stale `pending` rows on load (best-effort UPDATE) so old pending links flip to `expired` in the list.
-
-### 3. `src/components/dashboard/RecentTransactions.tsx` (small)
-For entries whose description starts with `Payment Link escrow [...]`, append a small badge: green "Paid" if the corresponding link is claimed, amber "Pending" otherwise. (One bulk lookup by short codes, no per-row queries.)
-
-### 4. Memory update
-Append to `mem://features/payment-link-payouts`: "Escrow journal stays as DR 2101/CR 2199; claim posts a separate release journal DR 2199/CR 1108. TransactionDetailPage shows a Paid/Pending banner sourced from `payment_link_payouts.status` keyed by the `[CODE]` in the description."
-
-No DB migration. No edge-function changes. Pure UI surfacing of existing data.
+No edge function / data changes.

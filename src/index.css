@@ -191,15 +191,29 @@
     background-size: 40px 40px;
   }
 
-  .bg-stripes-purple {
-    background-color: hsl(var(--brand-900));
-    background-image: repeating-linear-gradient(
-      135deg,
-      hsl(var(--brand-700) / 0.55) 0 14px,
-      hsl(var(--brand-900)) 14px 28px,
-      hsl(var(--brand-500) / 0.35) 28px 42px,
-      hsl(var(--brand-900)) 42px 56px
-    );
+  .bg-payout-waves {
+    background-color: hsl(0 0% 100%);
+    background-image:
+      radial-gradient(ellipse 70% 50% at 18% 12%, hsl(170 80% 70% / 0.18), transparent 65%),
+      radial-gradient(ellipse 60% 45% at 82% 8%, hsl(258 85% 75% / 0.20), transparent 70%),
+      radial-gradient(ellipse 90% 60% at 50% 100%, hsl(220 90% 80% / 0.15), transparent 70%),
+      repeating-radial-gradient(
+        circle at 50% -20%,
+        hsl(220 70% 75% / 0.07) 0 2px,
+        transparent 2px 22px
+      );
+  }
+  .dark .bg-payout-waves {
+    background-color: hsl(var(--background));
+    background-image:
+      radial-gradient(ellipse 70% 50% at 18% 12%, hsl(170 80% 50% / 0.22), transparent 65%),
+      radial-gradient(ellipse 60% 45% at 82% 8%, hsl(258 85% 60% / 0.25), transparent 70%),
+      radial-gradient(ellipse 90% 60% at 50% 100%, hsl(220 90% 60% / 0.18), transparent 70%),
+      repeating-radial-gradient(
+        circle at 50% -20%,
+        hsl(220 70% 70% / 0.08) 0 2px,
+        transparent 2px 22px
+      );
   }
 
   .text-gradient {
