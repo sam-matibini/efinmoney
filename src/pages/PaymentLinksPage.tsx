@@ -170,7 +170,7 @@ const PaymentLinksPage = () => {
                       <p className="text-[11px] text-muted-foreground">
                         Created {formatDistanceToNow(new Date(r.created_at), { addSuffix: true })}
                         {r.status === "claimed" && r.claimed_at
-                          ? ` · Claimed ${formatDistanceToNow(new Date(r.claimed_at), { addSuffix: true })} via ${r.claimed_method || "—"}`
+                          ? ` · Paid ${formatDistanceToNow(new Date(r.claimed_at), { addSuffix: true })} via ${r.claimed_method || "—"}`
                           : ` · Expires ${formatDistanceToNow(new Date(r.expires_at), { addSuffix: true })}`}
                       </p>
                       <code className="text-[11px] block break-all text-muted-foreground">{r.short_url}</code>
