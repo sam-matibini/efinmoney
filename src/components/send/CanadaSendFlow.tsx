@@ -683,9 +683,25 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
             <div className="space-y-4">
               {method !== "stripe_connect" && (
                 <div className="space-y-2">
-                  <Label>Recipient Full Name</Label>
-                  <Input value={recipientName} onChange={(e) => setRecipientName(e.target.value)} placeholder="Jane Doe" />
+                  <Label>Recipient Full Name {method === "paylink" && <span className="text-xs text-muted-foreground">(optional)</span>}</Label>
+                  <Input value={recipientName} onChange={(e) => setRecipientName(e.target.value)} placeholder={method === "paylink" ? "Anyone with the link" : "Jane Doe"} />
                 </div>
+              )}
+
+              {method === "paylink" && (
+                <>
+                  <div className="space-y-2">
+                    <Label>Note for recipient (optional)</Label>
+                    <Textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Thanks for lunch 🍕" rows={2} />
+                  </div>
+                  <div className="p-3 rounded-lg bg-primary/5 border border-primary/30 text-xs text-foreground flex items-start gap-2">
+                    <Link2 className="w-4 h-4 mt-0.5 text-primary shrink-0" />
+                    <div className="space-y-1">
+                      <p><strong>How it works:</strong> we hold C${parsedAmount.toFixed(2)} from your CAD wallet, then send you a one-time link. The recipient opens it, picks Interac / EFT / debit card, and the funds are released.</p>
+                      <p>The link expires in 7 days. You can revoke it anytime before it's claimed and the funds return to your wallet.</p>
+                    </div>
+                  </div>
+                </>
               )}
 
               {method === "stripe_connect" && (
