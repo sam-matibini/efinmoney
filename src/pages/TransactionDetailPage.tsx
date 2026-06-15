@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
 import { cleanIncomingTransactionLabel } from "@/lib/incomingTransactions";
+import TransactionShareBar from "@/components/transactions/TransactionShareBar";
 
 const TransactionDetailPage = () => {
   const { journalId } = useParams<{ journalId: string }>();
@@ -84,7 +85,7 @@ const TransactionDetailPage = () => {
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
         <button
           onClick={() => navigate(-1)}
-          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors"
+          className="no-print flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" /> Back
         </button>
@@ -105,7 +106,7 @@ const TransactionDetailPage = () => {
                 </p>
               )}
             </div>
-            <Button variant="outline" size="sm" onClick={copyRef}>
+            <Button variant="outline" size="sm" onClick={copyRef} className="no-print">
               <Copy className="w-3.5 h-3.5 mr-1.5" /> Copy ref
             </Button>
           </div>
@@ -121,6 +122,17 @@ const TransactionDetailPage = () => {
             </div>
           ) : (
             <>
+              <TransactionShareBar
+                entries={entries as any}
+                journalId={journalId!}
+                referenceLabel={referenceLabel}
+                firstDate={first?.created_at}
+                statusLine={plLink ? (plLink.status === "claimed"
+                  ? `Paid · claimed via ${plLink.claimed_method?.toUpperCase() || "—"}`
+                  : plLink.status === "pending" ? "Awaiting claim"
+                  : plLink.status === "expired" ? "Expired · funds returned"
+                  : plLink.status === "revoked" ? "Revoked · funds returned" : undefined) : undefined}
+              />
               {plLink && (() => {
                 const status = plLink.status as string;
                 const isPaid = status === "claimed";
