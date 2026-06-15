@@ -1,13 +1,15 @@
 ---
 name: Payment Link Payouts
-description: Sender-generated claim links (/claim/:code) for sending CAD without recipient details upfront; funds escrowed in 2199 Payouts Pending Claim
+description: Send + Invoices payment links with escrow, claim by Interac/EFT/Debit card (Visa Direct)
 type: feature
 ---
+Payment links: created in /send + invoices, funds escrowed at 2199 on creation, single-use, 7-day expiry.
 
-Payment Link is the 5th delivery method on /send?mode=canada (CanadaSendFlow.tsx). Sender picks amount + optional recipient name/note; on confirm, edge fn `payment-link-create` escrows funds DR wallet liability (21xx) / CR `2199 Payouts Pending Claim` and returns a 7-day single-use link `<origin>/claim/<code>`.
+Claim methods:
+- Interac e-Transfer (Paysafe)
+- EFT (Paysafe)
+- Debit card via Stripe Visa Direct (CAD only)
 
-Recipient opens `/claim/:code` (public route, ClaimPaymentLinkPage), picks Interac / EFT / Card Push (card_push placeholder for v1), submits → `payment-link-claim` releases escrow DR 2199 / CR 1108 settlement, creates a completed transfer row, marks the link claimed.
+**Debit card claim requires inline KYC** on ClaimPaymentLinkPage: full name, email, DOB, phone, address (line1/city/province/postal), and ToS acceptance. The edge function `payment-link-claim` seeds a Stripe Custom Connect account with these fields + `tos_acceptance` (recipient service agreement) and polls up to 6s for the `transfers` capability to activate before calling `payouts.create({ method: "instant" })`. Without these fields, Stripe returns "requirements need to be collected" and the payout fails.
 
-`payment-link-revoke` reverses escrow if still pending. `payment-link-resolve` is the public lookup powering the claim page.
-
-Table: `payment_link_payouts` (RLS: sender + admin). COA accounts `2199` exist for CAD/USD/EUR/GBP.
+Ledger release on success: DR 2199 / CR 1108. Rollback restores escrow on any failure.

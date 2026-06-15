@@ -1,34 +1,61 @@
-# Fix Claim Error + Enable Debit Card Receipt
 
-## 1. Fix the ledger UUID error
+## Goal
+Fix the "Cannot create payouts: this account has requirements that need to be collected" error when a recipient claims a Payment Link by Debit card. Stripe's Custom Connect account currently has zero KYC info, so the `transfers` capability stays inactive and `payouts.create` fails.
 
-`supabase/functions/payment-link-claim/index.ts` passes the 7-char short code (`"BJBNADV"`) into `ledger_entries.reference_id`, which is a UUID column — same bug pattern as `payment-link-create`.
+## Approach
+Collect the minimum information Stripe needs on the existing claim form and pass it to `payment-link-claim` to seed the Custom account at creation time, plus `tos_acceptance`. No redirect, single page UX preserved.
 
-**Fix:** use the new `releaseJournalId` UUID as `reference_id` on both release ledger lines, and keep the short code only in the `description` (already there) and on the `payment_link_payouts` row.
+## UX changes — `src/pages/ClaimPaymentLinkPage.tsx`
+When **Debit card** tile is selected, add a "Verify it's you" section above the card fields:
+- Date of birth (Day / Month / Year — three small selects)
+- Phone number (CA format)
+- Street address line 1
+- City
+- Province (select: ON, QC, BC, AB, …)
+- Postal code (uppercased, A1A 1A1 pattern)
+- Checkbox: "I agree to Stripe's Services Agreement and the eFinMoney Terms" (must be checked)
 
-## 2. Activate "Debit card" claim
+`isValid` for `card_push` becomes: name ≥ 2, email valid, all KYC fields filled, postal code matches `^[A-Z]\d[A-Z] ?\d[A-Z]\d$`, DOB ≥ 18 years old, ToS checked, Stripe card element complete.
 
-Reuse the existing **Stripe Card Push Payouts (Visa Direct)** integration (see `mem://features/stripe-card-push-payouts`) to deliver funds to a recipient's Canadian debit card.
+On submit, send the new fields under `payload.kyc`:
+```ts
+payload: {
+  card_token, card_last4, card_brand,
+  kyc: { dob: { day, month, year }, phone, address: { line1, city, state, postal_code, country: "CA" } },
+  tos: { accepted: true }
+}
+```
 
-### Claim page (`src/pages/ClaimPaymentLinkPage.tsx`)
-- Enable the **Debit card** tile (remove `disabled`).
-- When selected, render a Stripe **CardElement** (already used in `SaveCardForm.tsx` / `CardPaymentForm.tsx`) inside an `Elements` provider to collect card details and tokenize client-side.
-- Also collect: cardholder name (reuses "Your full name"), email (for receipt), postal code (from Stripe element).
-- On submit: create a Stripe **PaymentMethod** (`stripe.createPaymentMethod({ type: 'card' })`), then POST to `payment-link-claim` with `method: "card_push"` and `payload: { payment_method_id, card_last4, card_brand }`.
-- `isValid` for `card_push` becomes: name ≥ 2 chars, valid email, Stripe element complete.
+## Edge function changes — `supabase/functions/payment-link-claim/index.ts`
+1. **Validate** the new payload with zod (or manual checks) when `method === "card_push"`. On failure: rollback + 400.
+2. **Seed Custom account** with the collected data:
+   ```ts
+   stripe.accounts.create({
+     type: "custom",
+     country: "CA",
+     business_type: "individual",
+     capabilities: { transfers: { requested: true } }, // card_payments not needed for OCT
+     individual: {
+       first_name, last_name, email,
+       phone: kyc.phone,
+       dob: { day, month, year },
+       address: { line1, city, state, postal_code, country: "CA" }
+     },
+     business_profile: { mcc: "6012", product_description: "Personal payment received via eFinMoney payment link", url: "https://efin.money" },
+     tos_acceptance: { date: Math.floor(Date.now()/1000), ip: claimedIp, service_agreement: "recipient" },
+     metadata: { payment_link_code: code, sender_id: claimed.sender_id }
+   })
+   ```
+3. **Wait briefly for capability activation** — after `createExternalAccount`, retrieve the account and poll up to ~6 s for `capabilities.transfers === "active"`. If still inactive, retrieve `requirements.currently_due` and return a clean, human-readable error listing the missing fields; rollback escrow so funds stay safe.
+4. **Payout call** unchanged: `stripe.payouts.create({ amount, currency:"cad", method:"instant", destination: ext.id }, { stripeAccount: acct.id })`.
+5. **Error mapping**: if Stripe returns a card-validation error (`card_declined`, `invalid_card_type`, non-CA debit), rollback and surface a friendly message ("This card can't receive instant payouts. Please try a different Canadian Visa Debit or Debit Mastercard.").
 
-### Edge function (`supabase/functions/payment-link-claim/index.ts`)
-- Accept `payment_method_id` in payload (instead of the placeholder `card_token` check).
-- After atomic claim + ledger release, when `method === "card_push"`:
-  1. Call Stripe `payouts.create` via the existing card-push helper pattern (mirrors `stripe-card-push-payout` edge function): create a destination from the PaymentMethod and push the CAD amount.
-  2. On Stripe failure → `rollback()` (already defined) + revert ledger by posting a reversing journal, return 502 with provider message.
-  3. On success → store `provider_reference: pi.id` on the `transfers` row and `claimed_payload.stripe_payout_id`.
-- Keep Interac/EFT branches as-is (they remain "settled to clearing" placeholders for now).
+## Why this works
+Stripe activates the `transfers` capability synchronously for CA individuals once DOB + address + phone + ToS are present and the card is a CA debit. Once active, the OCT payout succeeds in seconds. No webhook wait, no second page, no extra secrets.
 
-### Secrets
-Uses the existing `STRIPE_SECRET_KEY` already configured for Visa Direct — no new secrets.
+## Files touched
+- `src/pages/ClaimPaymentLinkPage.tsx` — KYC form section, payload extension, validation rules
+- `supabase/functions/payment-link-claim/index.ts` — accept KYC, seed account, poll capability, map errors
+- `mem://features/payment-link-payouts.md` — note the inline-KYC requirement for card_push
 
-## Out of scope
-- No DB migration (schema already supports `card_push`).
-- No changes to sender-side `CanadaSendFlow.tsx`.
-- No new tables, routes, or admin UI.
+No DB migration, no new secrets.

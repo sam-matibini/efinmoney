@@ -106,31 +106,90 @@ Deno.serve(async (req) => {
       await rollback(admin, claimed.id);
       return json({ error: "Card payouts are only available for CAD links" }, 400);
     }
+    const k = payload?.kyc;
+    const tosOk = payload?.tos?.accepted === true;
+    const dobOk =
+      k?.dob &&
+      Number.isInteger(k.dob.day) && k.dob.day >= 1 && k.dob.day <= 31 &&
+      Number.isInteger(k.dob.month) && k.dob.month >= 1 && k.dob.month <= 12 &&
+      Number.isInteger(k.dob.year) && k.dob.year >= 1900 && k.dob.year <= new Date().getFullYear() - 18;
+    const addrOk =
+      k?.address &&
+      typeof k.address.line1 === "string" && k.address.line1.trim().length >= 3 &&
+      typeof k.address.city === "string" && k.address.city.trim().length >= 2 &&
+      /^(AB|BC|MB|NB|NL|NS|NT|NU|ON|PE|QC|SK|YT)$/.test(String(k.address.state || "")) &&
+      /^[A-Z]\d[A-Z]\d[A-Z]\d$/.test(String(k.address.postal_code || "").toUpperCase().replace(/\s+/g, ""));
+    const phoneOk = typeof k?.phone === "string" && /^\+?\d[\d\s\-()]{7,16}$/.test(k.phone);
+    if (!tosOk || !dobOk || !addrOk || !phoneOk) {
+      await rollback(admin, claimed.id);
+      return json({ error: "Identity verification fields are incomplete or invalid" }, 400);
+    }
   }
 
   // === Card push: execute Stripe Visa Direct payout BEFORE posting release ledger ===
   let stripePayoutId: string | null = null;
   if (method === "card_push") {
     try {
+      const k = payload.kyc;
+      const cleanPostal = String(k.address.postal_code).toUpperCase().replace(/\s+/g, "");
       const acct = await stripe!.accounts.create({
         type: "custom",
         country: "CA",
         business_type: "individual",
         capabilities: {
-          card_payments: { requested: true },
           transfers: { requested: true },
         },
         individual: {
           first_name: recipientName.split(/\s+/)[0] || "Recipient",
           last_name: recipientName.split(/\s+/).slice(1).join(" ") || recipientName,
           email: recipientEmail || undefined,
+          phone: String(k.phone),
+          dob: { day: k.dob.day, month: k.dob.month, year: k.dob.year },
+          address: {
+            line1: String(k.address.line1),
+            city: String(k.address.city),
+            state: String(k.address.state).toUpperCase(),
+            postal_code: cleanPostal,
+            country: "CA",
+          },
+        },
+        business_profile: {
+          mcc: "6012",
+          product_description: "Personal payment received via eFinMoney payment link",
+          url: "https://efin.money",
+        },
+        tos_acceptance: {
+          date: Math.floor(Date.now() / 1000),
+          ip,
+          service_agreement: "recipient",
         },
         metadata: { payment_link_code: code, sender_id: claimed.sender_id },
       });
+
       const ext = await stripe!.accounts.createExternalAccount(acct.id, {
         external_account: payload.card_token,
         default_for_currency: true,
       } as any);
+
+      // Wait briefly for the `transfers` capability to flip to active.
+      let capActive = false;
+      for (let i = 0; i < 6; i++) {
+        const fresh = await stripe!.accounts.retrieve(acct.id);
+        if ((fresh.capabilities as any)?.transfers === "active") { capActive = true; break; }
+        await new Promise(r => setTimeout(r, 1000));
+      }
+      if (!capActive) {
+        const fresh = await stripe!.accounts.retrieve(acct.id);
+        const due = (fresh.requirements as any)?.currently_due || [];
+        console.error("Stripe transfers capability not active", acct.id, due);
+        await rollback(admin, claimed.id);
+        return json({
+          error: due.length
+            ? `Card payouts could not be enabled. Missing: ${due.join(", ")}. Please try a different debit card.`
+            : "Card payouts could not be enabled for this card. Please try a different Canadian debit card.",
+        }, 400);
+      }
+
       const payout = await stripe!.payouts.create(
         {
           amount: Math.round(Number(claimed.amount) * 100),
@@ -145,10 +204,20 @@ Deno.serve(async (req) => {
     } catch (err: any) {
       console.error("Stripe card-push failed for payment link", code, err?.message, err?.raw);
       await rollback(admin, claimed.id);
-      const msg = err?.raw?.message || err?.message || "Card payout failed";
+      const raw = err?.raw?.message || err?.message || "";
+      let msg = raw || "Card payout failed";
+      const lower = raw.toLowerCase();
+      if (lower.includes("card_declined") || lower.includes("declined")) {
+        msg = "This card was declined. Please try a different Canadian debit card.";
+      } else if (lower.includes("invalid_card_type") || lower.includes("not a debit") || lower.includes("ineligible")) {
+        msg = "This card can't receive instant payouts. Please use a Canadian Visa Debit or Debit Mastercard.";
+      } else if (lower.includes("requirements")) {
+        msg = "Card payouts couldn't be enabled with the details provided. Please double-check your name, address and date of birth.";
+      }
       return json({ error: msg }, 502);
     }
   }
+
 
   // Find COA accounts for release journal: DR 2199 / CR settlement (1108)
   const { data: pendingAcc } = await admin
