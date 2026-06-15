@@ -51,6 +51,7 @@ import OnboardingEnhanced from "./pages/onboarding/Enhanced";
 import OnboardingRejected from "./pages/onboarding/Rejected";
 import ShortLinkResolver from "./pages/ShortLinkResolver";
 import ClaimPaymentLinkPage from "./pages/ClaimPaymentLinkPage";
+import PaymentLinksPage from "./pages/PaymentLinksPage";
 import { AdminAuthProvider } from "@/contexts/AdminAuthContext";
 import AdminGuard from "@/components/admin-portal/AdminGuard";
 import AdminLogin from "./pages/admin/AdminLogin";
