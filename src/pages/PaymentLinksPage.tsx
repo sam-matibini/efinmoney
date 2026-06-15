@@ -34,11 +34,12 @@ type Row = {
 
 const STATUS_STYLES: Record<Row["status"], { icon: any; cls: string; label: string }> = {
   pending: { icon: Clock, cls: "bg-amber-500/15 text-amber-700 dark:text-amber-400", label: "Pending" },
-  claimed: { icon: CheckCircle, cls: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400", label: "Claimed" },
+  claimed: { icon: CheckCircle, cls: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400", label: "Paid" },
   expired: { icon: AlertCircle, cls: "bg-muted text-muted-foreground", label: "Expired" },
   revoked: { icon: X, cls: "bg-muted text-muted-foreground", label: "Revoked" },
   failed: { icon: AlertCircle, cls: "bg-destructive/15 text-destructive", label: "Failed" },
 };
+
 
 const PaymentLinksPage = () => {
   const { user } = useAuth();
@@ -49,6 +50,13 @@ const PaymentLinksPage = () => {
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ["payment-link-payouts", user?.id],
     queryFn: async () => {
+      // Best-effort auto-expire stale pending rows for this user
+      await supabase
+        .from("payment_link_payouts" as any)
+        .update({ status: "expired" })
+        .eq("sender_id", user!.id)
+        .eq("status", "pending")
+        .lt("expires_at", new Date().toISOString());
       const { data, error } = await supabase
         .from("payment_link_payouts" as any)
         .select("id,short_code,short_url,amount,currency,status,recipient_name,recipient_note,expires_at,created_at,claimed_at,claimed_method,preset_method")
@@ -60,6 +68,7 @@ const PaymentLinksPage = () => {
     },
     enabled: !!user,
   });
+
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -117,7 +126,7 @@ const PaymentLinksPage = () => {
             <TabsList>
               <TabsTrigger value="all">All ({counts.all})</TabsTrigger>
               <TabsTrigger value="pending">Pending ({counts.pending})</TabsTrigger>
-              <TabsTrigger value="claimed">Claimed ({counts.claimed})</TabsTrigger>
+              <TabsTrigger value="claimed">Paid ({counts.claimed})</TabsTrigger>
               <TabsTrigger value="expired">Expired ({counts.expired})</TabsTrigger>
             </TabsList>
           </Tabs>
@@ -161,7 +170,7 @@ const PaymentLinksPage = () => {
                       <p className="text-[11px] text-muted-foreground">
                         Created {formatDistanceToNow(new Date(r.created_at), { addSuffix: true })}
                         {r.status === "claimed" && r.claimed_at
-                          ? ` · Claimed ${formatDistanceToNow(new Date(r.claimed_at), { addSuffix: true })} via ${r.claimed_method || "—"}`
+                          ? ` · Paid ${formatDistanceToNow(new Date(r.claimed_at), { addSuffix: true })} via ${r.claimed_method || "—"}`
                           : ` · Expires ${formatDistanceToNow(new Date(r.expires_at), { addSuffix: true })}`}
                       </p>
                       <code className="text-[11px] block break-all text-muted-foreground">{r.short_url}</code>
@@ -170,6 +179,24 @@ const PaymentLinksPage = () => {
                       <Button size="sm" variant="outline" onClick={() => copyLink(r.short_url)}>
                         <Copy className="w-3.5 h-3.5 mr-1" /> Copy
                       </Button>
+                      {r.status === "claimed" && (
+                        <Button asChild size="sm" variant="outline" onClick={async (e) => {
+                          e.preventDefault();
+                          const { data } = await supabase
+                            .from("ledger_entries")
+                            .select("journal_id")
+                            .ilike("description", `Payment Link release [${r.short_code}]%`)
+                            .limit(1)
+                            .maybeSingle();
+                          if ((data as any)?.journal_id) {
+                            window.location.href = `/transactions/${(data as any).journal_id}`;
+                          } else {
+                            toast.error("Release entry not found");
+                          }
+                        }}>
+                          <a><CheckCircle className="w-3.5 h-3.5 mr-1" /> View payment</a>
+                        </Button>
+                      )}
                       {r.status === "pending" && (
                         <Button size="sm" variant="outline" onClick={() => revoke(r)}>
                           <X className="w-3.5 h-3.5 mr-1" /> Revoke
@@ -182,6 +209,7 @@ const PaymentLinksPage = () => {
             </ul>
           </CardContent></Card>
         )}
+
       </main>
       <MobileNav />
     </div>
