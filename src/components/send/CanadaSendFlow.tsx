@@ -246,6 +246,8 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
 
   const [lastTransferId, setLastTransferId] = useState<string | null>(null);
   const [security, setSecurity] = useState<{ question: string; answer: string } | null>(null);
+  const [paylinkResult, setPaylinkResult] = useState<{ url: string; code: string; expires_at: string } | null>(null);
+  const [paylinkSubmitting, setPaylinkSubmitting] = useState(false);
 
   const { data: wallets } = useWallets();
   const createTransfer = useCreateTransfer();
