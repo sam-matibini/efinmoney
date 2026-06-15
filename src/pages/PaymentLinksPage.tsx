@@ -34,11 +34,12 @@ type Row = {
 
 const STATUS_STYLES: Record<Row["status"], { icon: any; cls: string; label: string }> = {
   pending: { icon: Clock, cls: "bg-amber-500/15 text-amber-700 dark:text-amber-400", label: "Pending" },
-  claimed: { icon: CheckCircle, cls: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400", label: "Claimed" },
+  claimed: { icon: CheckCircle, cls: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400", label: "Paid" },
   expired: { icon: AlertCircle, cls: "bg-muted text-muted-foreground", label: "Expired" },
   revoked: { icon: X, cls: "bg-muted text-muted-foreground", label: "Revoked" },
   failed: { icon: AlertCircle, cls: "bg-destructive/15 text-destructive", label: "Failed" },
 };
+
 
 const PaymentLinksPage = () => {
   const { user } = useAuth();
