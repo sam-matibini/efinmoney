@@ -68,6 +68,193 @@ export type Database = {
         }
         Relationships: []
       }
+      adyen_pay_by_link: {
+        Row: {
+          amount_minor: number
+          created_at: string
+          currency: string
+          customer_email: string | null
+          description: string | null
+          expires_at: string | null
+          id: string
+          link_id: string | null
+          owner_user_id: string
+          psp_reference: string | null
+          purpose: string
+          raw: Json | null
+          reference: string
+          sales_invoice_id: string | null
+          short_code: string | null
+          status: string
+          updated_at: string
+          url: string | null
+        }
+        Insert: {
+          amount_minor: number
+          created_at?: string
+          currency: string
+          customer_email?: string | null
+          description?: string | null
+          expires_at?: string | null
+          id?: string
+          link_id?: string | null
+          owner_user_id: string
+          psp_reference?: string | null
+          purpose: string
+          raw?: Json | null
+          reference: string
+          sales_invoice_id?: string | null
+          short_code?: string | null
+          status?: string
+          updated_at?: string
+          url?: string | null
+        }
+        Update: {
+          amount_minor?: number
+          created_at?: string
+          currency?: string
+          customer_email?: string | null
+          description?: string | null
+          expires_at?: string | null
+          id?: string
+          link_id?: string | null
+          owner_user_id?: string
+          psp_reference?: string | null
+          purpose?: string
+          raw?: Json | null
+          reference?: string
+          sales_invoice_id?: string | null
+          short_code?: string | null
+          status?: string
+          updated_at?: string
+          url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "adyen_pay_by_link_sales_invoice_id_fkey"
+            columns: ["sales_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "sales_invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      adyen_payment_sessions: {
+        Row: {
+          amount_minor: number
+          created_at: string
+          currency: string
+          id: string
+          last_event: Json | null
+          payment_method: string | null
+          psp_reference: string | null
+          purpose: string
+          raw_session: Json | null
+          reference: string
+          related_invoice_id: string | null
+          related_transfer_id: string | null
+          return_url: string | null
+          status: string
+          target_currency: string | null
+          target_wallet_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount_minor: number
+          created_at?: string
+          currency: string
+          id?: string
+          last_event?: Json | null
+          payment_method?: string | null
+          psp_reference?: string | null
+          purpose: string
+          raw_session?: Json | null
+          reference: string
+          related_invoice_id?: string | null
+          related_transfer_id?: string | null
+          return_url?: string | null
+          status?: string
+          target_currency?: string | null
+          target_wallet_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount_minor?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          last_event?: Json | null
+          payment_method?: string | null
+          psp_reference?: string | null
+          purpose?: string
+          raw_session?: Json | null
+          reference?: string
+          related_invoice_id?: string | null
+          related_transfer_id?: string | null
+          return_url?: string | null
+          status?: string
+          target_currency?: string | null
+          target_wallet_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "adyen_payment_sessions_target_wallet_id_fkey"
+            columns: ["target_wallet_id"]
+            isOneToOne: false
+            referencedRelation: "wallets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      adyen_webhook_events: {
+        Row: {
+          amount_minor: number | null
+          created_at: string
+          currency: string | null
+          event_code: string
+          hmac_valid: boolean
+          id: string
+          merchant_reference: string | null
+          payment_method: string | null
+          processed_at: string | null
+          psp_reference: string | null
+          raw: Json
+          success: boolean | null
+        }
+        Insert: {
+          amount_minor?: number | null
+          created_at?: string
+          currency?: string | null
+          event_code: string
+          hmac_valid?: boolean
+          id?: string
+          merchant_reference?: string | null
+          payment_method?: string | null
+          processed_at?: string | null
+          psp_reference?: string | null
+          raw: Json
+          success?: boolean | null
+        }
+        Update: {
+          amount_minor?: number | null
+          created_at?: string
+          currency?: string | null
+          event_code?: string
+          hmac_valid?: boolean
+          id?: string
+          merchant_reference?: string | null
+          payment_method?: string | null
+          processed_at?: string | null
+          psp_reference?: string | null
+          raw?: Json
+          success?: boolean | null
+        }
+        Relationships: []
+      }
       aml_matches: {
         Row: {
           created_at: string

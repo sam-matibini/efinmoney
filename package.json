@@ -11,6 +11,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@adyen/adyen-web": "^6.39.0",
     "@crossmint/client-sdk-react-ui": "^4.2.9",
     "@hookform/resolvers": "^3.10.0",
     "@radix-ui/react-accordion": "^1.2.11",

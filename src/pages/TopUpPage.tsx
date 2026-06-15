@@ -17,6 +17,7 @@ import { CheckCircle2, XCircle, CreditCard, Smartphone, Building2, Globe } from 
 import { useWallets } from "@/hooks/useWallets";
 import { useAuth } from "@/hooks/useAuth";
 import CardPaymentForm from "@/components/modals/CardPaymentForm";
+import AdyenTopUpCard from "@/components/payments/AdyenTopUpCard";
 import { validateMinAmount, friendlyFlwError, minAmount, type FlwMethod } from "@/lib/flutterwave";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { MM_COUNTRIES } from "@/lib/mobileMoneyNetworks";
@@ -348,6 +349,11 @@ const TopUpPage = () => {
                 </Button>
               </CardContent>
             </Card>
+          )}
+
+          {/* Adyen route — available for all currencies as alternative */}
+          {selectedWallet && gateway !== "unsupported" && (
+            <AdyenTopUpCard walletId={selectedWallet.wallet_id} walletCurrency={currency} />
           )}
         </motion.div>
       </main>
