@@ -9,6 +9,7 @@ import {
   HORIZON_URL,
   NETWORK_PASSPHRASE,
   EXPLORER_BASE,
+  IS_MAINNET,
   usdcAsset,
 } from "../_shared/stellar-network.ts";
 
