@@ -186,6 +186,9 @@ Deno.serve(async (req) => {
       short_url: shortUrl,
       escrow_journal_id: journalId,
       expires_at: expiresAt,
+      preset_method: presetMethod,
+      preset_payload: presetPayload,
+      auto_claim: autoClaim && !!presetMethod,
     })
     .select()
     .single();
