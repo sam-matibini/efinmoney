@@ -810,7 +810,8 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
               )}
             </div>
 
-            {/* Funding source */}
+            {/* Funding source — hidden for paylink (always wallet escrow) */}
+            {method !== "paylink" && (
             <div className="space-y-3 pt-2 border-t border-border">
               <Label>How are you paying?</Label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
