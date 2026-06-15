@@ -28,6 +28,10 @@ type Resolved = {
   status: "pending" | "claimed" | "expired" | "revoked" | "failed";
   expires_at: string;
   sender_name: string;
+  preset?: { method: string; label: string } | null;
+  auto_claim?: boolean;
+  claimed_method?: string | null;
+  claimed_at?: string | null;
 };
 
 type Rail = "interac" | "card_push" | "eft";
