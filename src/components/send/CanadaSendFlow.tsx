@@ -574,7 +574,7 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
 
             <div className="space-y-2">
               <Label>Delivery Method (how recipient receives)</Label>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
                 <Button
                   type="button"
                   variant={method === "eft" ? "default" : "outline"}
