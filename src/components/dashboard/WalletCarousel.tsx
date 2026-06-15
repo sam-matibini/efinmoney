@@ -1,8 +1,9 @@
 import { motion, useMotionValue, useTransform } from "framer-motion";
 import { useRef, useState, useEffect } from "react";
-import { Plus, Send, Download, ArrowUpRight } from "lucide-react";
+import { Plus, Send, Download, ArrowUpRight, CreditCard } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useWallets } from "@/hooks/useWallets";
+import { useWalletCards } from "@/hooks/useWalletCards";
 import { Skeleton } from "@/components/ui/skeleton";
 import CreateWalletModal from "@/components/modals/CreateWalletModal";
 import AnimatedNumber from "@/components/ui/AnimatedNumber";
@@ -43,6 +44,7 @@ const formatBalance = (value: number) =>
 
 const WalletCarousel = () => {
   const { data: wallets, isLoading } = useWallets();
+  const { linkedCardCount } = useWalletCards();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [activeIndex, setActiveIndex] = useState(0);
   const navigate = useNavigate();
@@ -148,6 +150,12 @@ const WalletCarousel = () => {
                   {w.is_default && (
                     <span className="text-[10px] uppercase tracking-wider bg-white/20 px-2 py-0.5 rounded-full mr-12">
                       Default
+                    </span>
+                  )}
+                  {(linkedCardCount[w.wallet_id] ?? 0) > 0 && (
+                    <span className="flex items-center gap-1 text-[10px] uppercase tracking-wider bg-white/20 px-2 py-0.5 rounded-full">
+                      <CreditCard className="w-2.5 h-2.5" />
+                      {linkedCardCount[w.wallet_id]}
                     </span>
                   )}
                 </div>

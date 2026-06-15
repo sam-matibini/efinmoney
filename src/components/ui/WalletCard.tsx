@@ -1,4 +1,4 @@
-import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
+import { motion, useMotionValue, useSpring, useTransform, AnimatePresence } from "framer-motion";
 import { useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
@@ -13,7 +13,13 @@ import {
   Trash2,
   Sparkles,
   FileText,
+  CreditCard,
+  ChevronDown,
+  CheckCircle2,
+  XCircle,
+  PauseCircle,
 } from "lucide-react";
+import type { WalletLinkedCard } from "@/hooks/useWalletCards";
 import SendMoneyModal from "@/components/modals/SendMoneyModal";
 import TopUpModal from "@/components/modals/TopUpModal";
 import ReceiveMoneyModal from "@/components/modals/ReceiveMoneyModal";
@@ -37,6 +43,7 @@ interface WalletCardProps {
   isMain?: boolean;
   isDefault?: boolean;
   status?: "active" | "frozen" | "suspended" | "closed";
+  linkedCards?: WalletLinkedCard[];
   onSetDefault?: (walletId: string) => void;
   onToggleFreeze?: (walletId: string, freeze: boolean) => void;
   onEdit?: (wallet: { walletId: string; currency: string; balance: number; symbol: string; flag: string }) => void;
@@ -94,6 +101,7 @@ const WalletCard = ({
   isMain = false,
   isDefault = false,
   status = "active",
+  linkedCards = [],
   onSetDefault,
   onToggleFreeze,
   onEdit,
@@ -103,6 +111,7 @@ const WalletCard = ({
   const [topUpOpen, setTopUpOpen] = useState(false);
   const [receiveOpen, setReceiveOpen] = useState(false);
   const [stellarOpen, setStellarOpen] = useState(false);
+  const [showLinkedCards, setShowLinkedCards] = useState(false);
   const navigate = useNavigate();
 
   const isFrozen = status === "frozen";
@@ -321,8 +330,51 @@ const WalletCard = ({
           )}
         </div>
 
+        {/* Linked cards area */}
+        {linkedCards.length > 0 && (
+          <div className="relative z-10 mb-2" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setShowLinkedCards((v) => !v)}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/15 text-white border border-white/15 hover:bg-white/25 transition text-[10px] uppercase tracking-wider"
+            >
+              <CreditCard className="w-3 h-3" />
+              {linkedCards.length} {linkedCards.length === 1 ? "card" : "cards"}
+              <ChevronDown
+                className={`w-3 h-3 transition-transform ${showLinkedCards ? "rotate-180" : ""}`}
+              />
+            </button>
+
+            <AnimatePresence>
+              {showLinkedCards && (
+                <motion.div
+                  initial={{ opacity: 0, y: -4, height: 0 }}
+                  animate={{ opacity: 1, y: 0, height: "auto" }}
+                  exit={{ opacity: 0, y: -4, height: 0 }}
+                  className="mt-1.5 space-y-1"
+                >
+                  {linkedCards.map((card) => (
+                    <div
+                      key={card.id}
+                      className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-white/10 backdrop-blur-sm text-[11px] text-white/90"
+                    >
+                      <StatusDot status={card.status} />
+                      <span className="font-medium uppercase tracking-wider">{card.brand}</span>
+                      {card.lastFour !== "••••" && (
+                        <span className="font-mono opacity-70">•••• {card.lastFour}</span>
+                      )}
+                      <span className="ml-auto text-[9px] uppercase tracking-wider opacity-60">
+                        {card.cardType}
+                      </span>
+                    </div>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
+
         {/* Spacer for toolbar */}
-        <div className="h-12" />
+        <div className={linkedCards.length > 0 && showLinkedCards ? "h-4" : "h-12"} />
       </div>
 
       {/* Frosted-glass action toolbar pinned to bottom edge */}
@@ -391,6 +443,21 @@ const WalletCard = ({
 
       {showStellarBadge && <StellarWalletModal open={stellarOpen} onOpenChange={setStellarOpen} />}
     </motion.div>
+  );
+};
+
+const StatusDot = ({ status }: { status: string }) => {
+  const colors: Record<string, string> = {
+    active: "bg-emerald-400",
+    frozen: "bg-amber-400",
+    cancelled: "bg-red-400",
+    pending: "bg-sky-400",
+  };
+  return (
+    <span
+      className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${colors[status] ?? "bg-gray-400"}`}
+      title={status}
+    />
   );
 };
 
