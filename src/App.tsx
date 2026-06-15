@@ -180,6 +180,7 @@ const AppRoutes = () => {
         <Routes location={location}>
           <Route path="/" element={<RootRoute />} />
           <Route path="/s/:code" element={<ShortLinkResolver />} />
+          <Route path="/claim/:code" element={<ClaimPaymentLinkPage />} />
           <Route path="/privacy" element={<PrivacyPolicyPage />} />
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/compliance" element={<CompliancePage />} />
