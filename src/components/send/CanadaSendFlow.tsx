@@ -866,7 +866,9 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
                 </button>
               </div>
             </div>
+            )}
 
+            {method !== "paylink" && (
             <div ref={cardPanelRef}>
             {funding === "card" && stripeReady === false && (
               <div className="p-4 rounded-lg border border-destructive/40 bg-destructive/10 text-sm text-destructive">
