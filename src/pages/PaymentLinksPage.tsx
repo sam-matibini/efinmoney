@@ -50,6 +50,13 @@ const PaymentLinksPage = () => {
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ["payment-link-payouts", user?.id],
     queryFn: async () => {
+      // Best-effort auto-expire stale pending rows for this user
+      await supabase
+        .from("payment_link_payouts" as any)
+        .update({ status: "expired" })
+        .eq("sender_id", user!.id)
+        .eq("status", "pending")
+        .lt("expires_at", new Date().toISOString());
       const { data, error } = await supabase
         .from("payment_link_payouts" as any)
         .select("id,short_code,short_url,amount,currency,status,recipient_name,recipient_note,expires_at,created_at,claimed_at,claimed_method,preset_method")
@@ -61,6 +68,7 @@ const PaymentLinksPage = () => {
     },
     enabled: !!user,
   });
+
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
