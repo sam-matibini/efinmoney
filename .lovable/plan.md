@@ -1,66 +1,73 @@
-## Adyen Integration Plan (Test/Sandbox)
 
-Adds Adyen as a card & APM acquirer covering Visa, Mastercard, Amex, Alipay, and Interac Card, plus Pay by Link. Settles to user wallets via the existing double-entry ledger with auto-FX into the user's default currency.
+## Payment Link as a delivery method
 
-### 1. Secrets (you add via secure form)
-- `ADYEN_API_KEY` — server API key (test)
-- `ADYEN_MERCHANT_ACCOUNT` — test merchant account code
-- `ADYEN_CLIENT_KEY` — public client key for Drop-in
-- `ADYEN_HMAC_KEY` — webhook HMAC signature key
-- `ADYEN_ENV` = `test`
-- `ADYEN_LIVE_URL_PREFIX` (optional, ignored in test)
+Today /send debits the sender and pushes funds to a known destination (Interac email, EFT bank, debit card, Stripe Connect). For "Payment Link", the sender doesn't need the recipient's details upfront — they generate a one-time link, the recipient opens it, chooses how they want to be paid, and we disburse on their behalf.
 
-### 2. Database (one migration)
-New tables (all RLS-protected, with GRANTs):
-- `adyen_payment_sessions` — id, user_id, purpose (`wallet_topup`|`transfer_funding`|`invoice`|`admin_link`), reference, psp_reference, amount_minor, currency, target_wallet_id, target_currency, status (`pending`/`authorised`/`settled`/`refused`/`refunded`/`cancelled`), payment_method, raw_session jsonb, return_url, created_at/updated_at
-- `adyen_pay_by_link` — id, owner_user_id, link_id, url, reference, amount_minor, currency, purpose, sales_invoice_id (nullable FK), expires_at, status, created_at
-- `adyen_webhook_events` — id, event_code, psp_reference, merchant_reference, success, raw jsonb, hmac_valid, processed_at
+### How it works (sender flow)
 
-Wallet credits go through existing ledger pattern (liability 21xx credited, asset 11xx Adyen settlement clearing account debited). Adds COA account `1108 — Adyen Settlement Clearing` per currency.
+1. On `/send?mode=canada` (and Cross-border Send), add a 5th delivery tile: **Payment Link**.
+2. Sender enters amount + optional recipient name/note. No bank/email/card needed.
+3. On confirm:
+   - Funds are **escrowed**: DR sender wallet (`2101 USD/2102 CAD…`) / CR `2199 Payouts Pending Claim` (new COA line).
+   - A `payment_link_payouts` row is created (`status=pending`, 7‑day expiry, single‑use).
+   - A short link `efin.money/s/<code>` is generated via existing `create_short_link` RPC, pointing to `/claim/<code>`.
+   - Sender sees the link in the success screen with copy / share / email / SMS actions and a "Revoke" button.
+4. Sender can revoke any unclaimed link from `/transactions` → returns funds (reverse escrow journal).
 
-### 3. Edge functions
-- `adyen-create-session` — Drop-in `/sessions` call; validates auth, amount, target wallet ownership; rate-limited; returns session data + clientKey.
-- `adyen-create-paylink` — `/paymentLinks` for invoices/admin; admin scope required for `admin_link`; saves to `adyen_pay_by_link`; returns shortened `efin.money/s/<code>` link.
-- `adyen-webhook` — verifies HMAC, idempotent on `pspReference`+`eventCode`, handles `AUTHORISATION`, `CAPTURE`, `REFUND`, `CANCELLATION`, `CHARGEBACK`. On success: credits ledger, runs FX swap into user's default wallet if currencies differ, updates session/invoice, sends notification + receipt.
-- `adyen-payment-details` — for redirect/3DS return.
+### How it works (recipient flow at `/claim/<code>`)
 
-All functions use `verify_jwt=false` only where Adyen calls back; user-facing ones validate `auth.uid()`.
+- Public page (no login required) shows: sender name, amount, currency, expiry countdown.
+- Recipient picks one Canadian rail:
+  - **Interac e‑Transfer** — email + security Q/A
+  - **Debit card** — Stripe card‑push tokenization widget
+  - **EFT bank** — institution / transit / account
+- Light verification: name + email + basic anti‑abuse (rate limit, IP, optional SMS OTP if amount ≥ C$500).
+- On submit → edge function `claim-payment-link` runs the existing payout path for the chosen rail and posts the release journal: DR `2199 Payouts Pending Claim` / CR `1108 Adyen Settlement` or the rail's settlement account, mirroring current Paysafe/Stripe flows. The original `transfers` row gets the resolved recipient details, `delivery_method`, and `status=completed`.
+- Recipient sees confirmation + receipt link.
 
-### 4. Frontend
-- `src/lib/adyen.ts` — wrapper to invoke edge functions, mount Drop-in.
-- `AdyenDropIn` component (using `@adyen/adyen-web`) — handles card (Visa/MC/Amex), Alipay, Interac Card via configured payment methods response.
-- **Wallet top-up**: new "Card / Alipay / Interac" option on `/wallets` Top Up sheet → opens Drop-in modal → on success shows pending state, ledger update arrives via webhook + realtime.
-- **Send / Exchange funding**: add Adyen as a `funding_source` choice alongside wallet; on submit, creates session for `source_amount + fee`, then queues transfer to execute after webhook settlement.
-- **Sales invoices**: "Generate Pay Link" button on invoice detail → calls `adyen-create-paylink`, displays + copies short URL, attaches to invoice.
-- **Admin**: `/admin/payments/adyen` — list links & sessions, create ad-hoc link, view webhook log.
+### Invoices
 
-### 5. Settings
-`/settings → Payments → Adyen` panel:
-- Shows test mode badge, enabled methods toggles (Visa, MC, Amex, Alipay, Interac), supported currencies, link expiry default.
-- Stored in `integration_settings` (`provider='adyen'`).
+In `sales_invoices`, add **"Pay by Link"** as a *receive* mode (today pay‑by‑link goes through Adyen for pay‑ins — unchanged). For **refunds/disbursements from an invoice**, add a "Send as Payment Link" action that calls the same create flow above with `source='invoice'` and links the row back to `sales_invoices.id`.
 
-### 6. FX & ledger flow on settlement
-1. Webhook authorised+captured → insert ledger journal:
-   - DR `1108 Adyen Settlement Clearing` (settlement currency)
-   - CR user wallet liability (settlement currency)
-2. If settlement currency ≠ user default wallet currency → call existing `execute_fx_swap` with markup from `pricing_config`.
-3. Mark `adyen_payment_sessions.status='settled'`, notify user, trigger receipt PDF.
+### Database
 
-### 7. Security
-- HMAC verification mandatory; reject on mismatch.
-- All session creation rate-limited via `check_rate_limit` (10/min per user).
-- Amount bounds enforced against user's KYC tier limits.
-- Idempotency on `pspReference` to prevent double-credit.
-- No card data ever touches our servers (Drop-in tokenises client-side).
+Migration adds:
+- `public.payment_link_payouts`
+  - `id`, `sender_id`, `source` (`send` | `invoice`), `source_ref` (uuid), `amount`, `currency`,
+    `recipient_name`, `recipient_note`, `short_code` (unique), `status`
+    (`pending` | `claimed` | `expired` | `revoked` | `failed`),
+    `expires_at` (default `now() + 7 days`), `escrow_journal_id`, `release_journal_id`,
+    `claimed_method` (`interac` | `card_push` | `eft`), `claimed_payload` (jsonb — masked),
+    `claimed_at`, `claimed_ip`, `transfer_id`, `created_at`, `updated_at`.
+- GRANTs to `authenticated` + `service_role`. No `anon` grants — claims go through an edge function using the short code (not table reads).
+- RLS: sender can `SELECT`/`UPDATE` (revoke only) own rows; admins full.
+- COA: add `2199 Payouts Pending Claim` for CAD + USD + EUR + GBP.
+- Trigger: auto‑expire job via `expires_at` checked at claim‑time + a scheduled function that flips stale rows to `expired` and reverses escrow.
 
-### 8. Out of scope (this phase)
-- Payouts via Adyen (we already use Stripe/Paysafe/PawaPay/Circle).
-- Recurring tokenisation / saved cards (can add later via `storePaymentMethod`).
-- Live mode credentials (test only now; live = secret swap + `ADYEN_ENV=live`).
+### Edge functions
 
-### Deliverables checklist
-- [ ] Migration with 3 tables + COA accounts + GRANTs + RLS
-- [ ] 4 edge functions
-- [ ] `@adyen/adyen-web` dependency + Drop-in component
-- [ ] Top-up, Send funding, Invoice paylink, Admin link UIs
-- [ ] Settings panel + memory file `mem://features/adyen-payments`
+- `payment-link-create` — validates KYC tier limits, posts escrow journal, calls `create_short_link`, returns `{ url, code, expires_at }`.
+- `payment-link-resolve` — public (no JWT): returns sender display name, amount, currency, status, expiry for the claim page.
+- `payment-link-claim` — public: validates code, rate‑limits per IP, runs chosen rail (reuses `paysafe-payout`, `stripe-card-push`, etc.), posts release journal, completes `transfers` row.
+- `payment-link-revoke` — sender‑auth: reverses escrow if still `pending`.
+- `payment-link-expire-cron` — scheduled hourly; flips stale rows + reverses escrow.
+
+### Frontend
+
+- `src/components/send/CanadaSendFlow.tsx`: add `paylink` delivery tile, conditional form (just amount + note), success view with copy/share/QR/revoke.
+- `src/components/send/CrossBorderSendFlow.tsx` (existing cross‑border send): same tile added.
+- `src/pages/ClaimPaymentLinkPage.tsx`: new public route `/claim/:code`, rail picker (re‑uses Interac/EFT/Stripe card push forms already in `CanadaSendFlow`).
+- `src/pages/TransactionsPage.tsx`: show paylinks with status badge + revoke action.
+- `src/pages/admin/AdminPaymentLinksPage.tsx`: admin view at `/admin/payments/links` (force‑expire, audit).
+- `src/pages/SalesInvoicesPage.tsx`: "Send as Payment Link" action on refund/disbursement.
+
+### Security & limits
+
+- Auth: create/revoke require user JWT; claim uses short code + DB‑backed rate limit (10/min/IP) + optional SMS OTP when amount ≥ C$500.
+- Tier limits enforced via existing `user_risk_tiers`.
+- Idempotency: `short_code` unique; claim is single‑shot via `UPDATE … WHERE status='pending' RETURNING`.
+- Logs: every create/claim/revoke writes to `audit_logs` and triggers in‑app + email notifications.
+
+### Out of scope
+
+- Multi‑use / split links, custom expiry, non‑CAD rails (USD/EUR claim rails will arrive when those payout providers do), recurring/standing links.
