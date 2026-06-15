@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
-import { AdyenCheckout, Dropin, Card as AdyenCard } from "@adyen/adyen-web";
-import "@adyen/adyen-web/dist/adyen.css";
+import { AdyenCheckout, Dropin } from "@adyen/adyen-web";
+import "@adyen/adyen-web/styles/adyen.css";
 
 interface Props {
   sessionId: string;
@@ -41,11 +41,8 @@ export default function AdyenDropIn({
           onError: (err: any) => onError?.(err),
         });
         if (cancelled) return;
-        const dropin = checkout.create("dropin", {
+        const dropin = new Dropin(checkout, {
           openFirstPaymentMethod: true,
-          paymentMethodsConfiguration: {
-            card: { hasHolderName: true, holderNameRequired: true, brands: ["mc", "visa", "amex"] },
-          },
         });
         dropin.mount(containerRef.current);
         dropinRef.current = dropin;
