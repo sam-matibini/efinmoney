@@ -30,13 +30,13 @@ Deno.serve(async (req) => {
   try { body = await req.json(); } catch { return json({ error: "Invalid JSON" }, 400); }
 
   const code: string = String(body?.code ?? "");
-  const method: "interac" | "card_push" | "eft" = body?.method;
+  let method: "interac" | "card_push" | "eft" = body?.method;
   const recipientName: string = String(body?.recipient_name ?? "").trim();
-  const recipientEmail: string = String(body?.recipient_email ?? "").trim();
-  const payload: any = body?.payload ?? {};
+  const recipientEmailRaw: string = String(body?.recipient_email ?? "").trim();
+  let payload: any = body?.payload ?? {};
+  const usePreset: boolean = body?.use_preset === true || body?.method === "preset";
 
   if (!/^[A-Z0-9]{4,16}$/i.test(code)) return json({ error: "Invalid code" }, 400);
-  if (!["interac", "card_push", "eft"].includes(method)) return json({ error: "Invalid method" }, 400);
   if (recipientName.length < 2) return json({ error: "Recipient name required" }, 400);
 
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
