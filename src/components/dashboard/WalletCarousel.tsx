@@ -139,23 +139,25 @@ const WalletCarousel = () => {
               <div className="absolute -bottom-10 -left-10 h-32 w-32 rounded-full bg-white/5 blur-xl" />
 
               <div className="relative h-full p-5 flex flex-col justify-between">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-3xl drop-shadow-sm">{flag}</span>
-                    <div>
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-3xl drop-shadow-sm shrink-0">{flag}</span>
+                    <div className="min-w-0">
                       <p className="font-display font-semibold text-sm">{w.currency_code}</p>
-                      <p className="text-[10px] uppercase tracking-wider text-white/60">{w.currency_name}</p>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <p className="text-[10px] uppercase tracking-wider text-white/60">{w.currency_name}</p>
+                        {(linkedCardCount[w.wallet_id] ?? 0) > 0 && (
+                          <span className="flex items-center gap-0.5 text-[9px] uppercase tracking-wider bg-white/20 px-1.5 py-0.5 rounded-full leading-none">
+                            <CreditCard className="w-2 h-2" />
+                            {linkedCardCount[w.wallet_id]}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                   {w.is_default && (
                     <span className="text-[10px] uppercase tracking-wider bg-white/20 px-2 py-0.5 rounded-full mr-12">
                       Default
-                    </span>
-                  )}
-                  {(linkedCardCount[w.wallet_id] ?? 0) > 0 && (
-                    <span className="flex items-center gap-1 text-[10px] uppercase tracking-wider bg-white/20 px-2 py-0.5 rounded-full">
-                      <CreditCard className="w-2.5 h-2.5" />
-                      {linkedCardCount[w.wallet_id]}
                     </span>
                   )}
                 </div>

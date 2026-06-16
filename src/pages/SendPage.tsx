@@ -23,6 +23,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useWallets } from "@/hooks/useWallets";
+import { useWalletCards } from "@/hooks/useWalletCards";
+import { useCards } from "@/hooks/useCards";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { useFxRates } from "@/hooks/useFxRates";
 import { useCreateTransfer } from "@/hooks/useTransfers";
@@ -123,6 +125,8 @@ const SendPage = () => {
   const { data: beneficiaries } = useBeneficiaries();
 
   const { data: wallets } = useWallets();
+  const { linkedCardCount } = useWalletCards();
+  const { data: internalCards = [] } = useCards();
   const { data: fxRates } = useFxRates();
   const { data: linkedBankSources = [] } = useFundingSources('bank');
   const { data: cardSources = [] } = useFundingSources('card');
@@ -1042,11 +1046,22 @@ const SendPage = () => {
                                         <Select value={selectedWalletId || selectedWallet?.wallet_id} onValueChange={setSelectedWalletId}>
                                           <SelectTrigger><SelectValue placeholder="Select wallet" /></SelectTrigger>
                                           <SelectContent>
-                                            {wallets?.map((w) => (
-                                              <SelectItem key={w.wallet_id} value={w.wallet_id}>
-                                                {w.flag_emoji} {w.currency_code} — {w.symbol}{Number(w.balance).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                              </SelectItem>
-                                            ))}
+                                            {wallets?.map((w) => {
+                                              const cardCount = linkedCardCount[w.wallet_id] ?? 0;
+                                              return (
+                                                <SelectItem key={w.wallet_id} value={w.wallet_id}>
+                                                  <span className="flex items-center gap-2">
+                                                    {w.flag_emoji} {w.currency_code} — {w.symbol}{Number(w.balance).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                    {cardCount > 0 && (
+                                                      <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground ml-auto">
+                                                        <CreditCard className="w-3 h-3" />
+                                                        {cardCount}
+                                                      </span>
+                                                    )}
+                                                  </span>
+                                                </SelectItem>
+                                              );
+                                            })}
                                           </SelectContent>
                                         </Select>
                                       </motion.div>
@@ -1093,57 +1108,123 @@ const SendPage = () => {
                                     {fundingSource === 'card' && (
                                       <motion.div custom={1} variants={fieldVariants} initial="hidden" animate="show" className="space-y-3">
                                         <div className="flex items-center justify-between">
-                                          <Label>Pay with saved card</Label>
+                                          <Label>Pay with card</Label>
                                           <Button type="button" variant="ghost" size="sm" className="h-auto py-1 px-2 text-xs" onClick={() => setAddCardOpen(true)}>
                                             <CreditCard className="w-3.5 h-3.5 mr-1" />Add new card
                                           </Button>
                                         </div>
-                                        {savedCards.length === 0 ? (
-                                          <div className="p-4 rounded-xl border border-dashed border-border bg-muted/40 space-y-3">
-                                            <div className="flex items-start gap-2">
-                                              <AlertCircle className="w-4 h-4 mt-0.5 text-muted-foreground shrink-0" />
-                                              <p className="text-sm text-muted-foreground">No saved cards yet. Add one securely via Stripe to pay instantly.</p>
+
+                                        {(() => {
+                                          const allCards: {
+                                            key: string;
+                                            isSaved: boolean;
+                                            brand: string | null;
+                                            lastFour: string | null;
+                                            currencyCode: string | null;
+                                            linkedWalletId: string | null;
+                                            stripePaymentMethodId: string | null;
+                                          }[] = [
+                                            ...savedCards.map(c => ({
+                                              key: `saved:${c.id}`,
+                                              isSaved: true,
+                                              brand: c.card_brand,
+                                              lastFour: c.last_four,
+                                              currencyCode: c.currency_code,
+                                              linkedWalletId: null,
+                                              stripePaymentMethodId: c.stripe_payment_method_id,
+                                            })),
+                                            ...internalCards.map(c => ({
+                                              key: `internal:${c.id}`,
+                                              isSaved: false,
+                                              brand: c.card_network,
+                                              lastFour: c.last_four,
+                                              currencyCode: null,
+                                              linkedWalletId: c.wallet_id,
+                                              stripePaymentMethodId: null,
+                                            })),
+                                          ];
+
+                                          if (allCards.length === 0) {
+                                            return (
+                                              <div className="p-4 rounded-xl border border-dashed border-border bg-muted/40 space-y-3">
+                                                <div className="flex items-start gap-2">
+                                                  <AlertCircle className="w-4 h-4 mt-0.5 text-muted-foreground shrink-0" />
+                                                  <p className="text-sm text-muted-foreground">No cards yet. Add one securely via Stripe to pay instantly.</p>
+                                                </div>
+                                                <Button type="button" size="sm" className="w-full" onClick={() => setAddCardOpen(true)}>
+                                                  <CreditCard className="w-4 h-4 mr-2" />Add a card
+                                                </Button>
+                                              </div>
+                                            );
+                                          }
+
+                                          return (
+                                            <div className="space-y-2">
+                                              {allCards.map((card) => {
+                                                if (card.isSaved) {
+                                                  const c = savedCards.find(x => x.stripe_payment_method_id === card.stripePaymentMethodId)!;
+                                                  const id = card.stripePaymentMethodId!;
+                                                  const checked = (selectedSavedCardId ?? savedCards.find(x => x.is_default)?.stripe_payment_method_id ?? savedCards[0].stripe_payment_method_id) === id;
+                                                  return (
+                                                    <button
+                                                      key={card.key}
+                                                      type="button"
+                                                      onClick={() => setSelectedSavedCardId(checked ? "" : id)}
+                                                      className={`w-full text-left flex items-center gap-3 p-3 rounded-xl border-2 transition ${checked ? 'border-primary bg-primary/5 shadow-sm' : 'border-border hover:bg-muted/40'}`}
+                                                    >
+                                                      <div className={`w-12 h-8 rounded-md bg-gradient-to-br ${cardBrandClass(c.card_brand)} flex items-center justify-center text-white text-[10px] font-bold uppercase tracking-wider shrink-0`}>
+                                                        {cardBrandLabel(c.card_brand).slice(0, 4)}
+                                                      </div>
+                                                      <div className="flex-1 min-w-0">
+                                                        <p className="text-sm font-medium">
+                                                          {cardBrandLabel(c.card_brand)} •••• {c.last_four}
+                                                          {c.is_default && <span className="ml-2 text-[10px] uppercase tracking-wider text-primary">Default</span>}
+                                                        </p>
+                                                        <p className="text-xs text-muted-foreground">
+                                                          Exp: {String(c.exp_month ?? '').padStart(2, '0')}/{String(c.exp_year ?? '').slice(-2)}
+                                                          {c.currency_code ? ` • ${c.currency_code}` : ''}
+                                                        </p>
+                                                      </div>
+                                                      {checked && <CheckCircle className="w-5 h-5 text-primary shrink-0" />}
+                                                    </button>
+                                                  );
+                                                }
+
+                                                const c = internalCards.find(x => x.id === card.key.replace('internal:', ''))!;
+                                                const linkedWallet = wallets?.find(w => w.wallet_id === c.wallet_id);
+                                                const isExternal = c.funding_source === 'external';
+                                                return (
+                                                  <button
+                                                    key={card.key}
+                                                    type="button"
+                                                    onClick={() => {
+                                                      if (linkedWallet) {
+                                                        setFundingSource('wallet');
+                                                        setSelectedWalletId(linkedWallet.wallet_id);
+                                                      }
+                                                    }}
+                                                    className="w-full text-left flex items-center gap-3 p-3 rounded-xl border-2 border-border hover:bg-muted/40 hover:border-primary/40 transition"
+                                                  >
+                                                    <div className={`w-12 h-8 rounded-md bg-gradient-to-br ${cardBrandClass(c.card_network)} flex items-center justify-center text-white text-[10px] font-bold uppercase tracking-wider shrink-0`}>
+                                                      {c.card_network === 'mastercard' ? 'MC' : 'VISA'}
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                      <p className="text-sm font-medium">
+                                                        {isExternal ? '' : 'Wallet '}Card •••• {c.last_four}
+                                                      </p>
+                                                      <p className="text-xs text-muted-foreground">
+                                                        {isExternal ? 'Linked card' : linkedWallet ? `Linked to ${linkedWallet.currency_code} wallet` : 'Wallet card'}
+                                                      </p>
+                                                    </div>
+                                                    {linkedWallet && (
+                                                      <span className="text-xs font-medium text-primary shrink-0">Use {linkedWallet.currency_code} →</span>
+                                                    )}
+                                                  </button>
+                                                );
+                                              })}
                                             </div>
-                                            <Button type="button" size="sm" className="w-full" onClick={() => setAddCardOpen(true)}>
-                                              <CreditCard className="w-4 h-4 mr-2" />Add a card
-                                            </Button>
-                                          </div>
-                                        ) : (
-                                          <div className="space-y-2">
-                                            {savedCards.map((c) => {
-                                              const id = c.stripe_payment_method_id;
-                                              const checked = (selectedSavedCardId ?? savedCards.find(x => x.is_default)?.stripe_payment_method_id ?? savedCards[0].stripe_payment_method_id) === id;
-                                              return (
-                                                <button
-                                                  key={c.id}
-                                                  type="button"
-                                                  onClick={() => setSelectedSavedCardId(checked ? "" : id)}
-                                                  className={`w-full text-left flex items-center gap-3 p-3 rounded-xl border-2 transition ${checked ? 'border-primary bg-primary/5 shadow-sm' : 'border-border hover:bg-muted/40'}`}
-                                                >
-                                                  <div className={`w-12 h-8 rounded-md bg-gradient-to-br ${cardBrandClass(c.card_brand)} flex items-center justify-center text-white text-[10px] font-bold uppercase tracking-wider shrink-0`}>
-                                                    {cardBrandLabel(c.card_brand).slice(0, 4)}
-                                                  </div>
-                                                  <div className="flex-1 min-w-0">
-                                                    <p className="text-sm font-medium">
-                                                      {cardBrandLabel(c.card_brand)} •••• {c.last_four}
-                                                      {c.is_default && <span className="ml-2 text-[10px] uppercase tracking-wider text-primary">Default</span>}
-                                                    </p>
-                                                    <p className="text-xs text-muted-foreground">
-                                                      Exp: {String(c.exp_month ?? '').padStart(2, '0')}/{String(c.exp_year ?? '').slice(-2)}
-                                                      {c.currency_code ? ` • ${c.currency_code}` : ''}
-                                                    </p>
-                                                  </div>
-                                                  {checked && <CheckCircle className="w-5 h-5 text-primary shrink-0" />}
-                                                </button>
-                                              );
-                                            })}
-                                            <p className="text-xs text-muted-foreground pt-1">
-                                              {activeSavedCard && !activeSavedCard.currency_code
-                                                ? "Detecting card currency…"
-                                                : `Card will be charged in ${sourceCurrency}.`}
-                                            </p>
-                                          </div>
-                                        )}
+                                          );
+                                        })()}
 
                                         <Alert className="bg-accent/10 border-accent/30">
                                           <AlertCircle className="h-4 w-4 text-accent" />

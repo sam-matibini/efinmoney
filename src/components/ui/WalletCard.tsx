@@ -15,9 +15,6 @@ import {
   FileText,
   CreditCard,
   ChevronDown,
-  CheckCircle2,
-  XCircle,
-  PauseCircle,
 } from "lucide-react";
 import type { WalletLinkedCard } from "@/hooks/useWalletCards";
 import SendMoneyModal from "@/components/modals/SendMoneyModal";
