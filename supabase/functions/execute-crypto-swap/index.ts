@@ -9,6 +9,9 @@ import {
   HORIZON_URL,
   NETWORK_PASSPHRASE,
   EXPLORER_BASE,
+  IS_MAINNET,
+  USDC_ASSET_CODE,
+  USDC_ISSUER,
   usdcAsset,
 } from "../_shared/stellar-network.ts";
 
@@ -24,6 +27,42 @@ const BodySchema = z.object({
 });
 
 const FEE_BPS = 50; // 0.50% spread
+
+async function validateTreasuryReady(seed: string) {
+  const publicKey = StellarSdk.Keypair.fromSecret(seed).publicKey();
+  const server = new StellarSdk.Horizon.Server(HORIZON_URL);
+
+  try {
+    const account = await server.loadAccount(publicKey);
+    const hasUsdcTrustline = account.balances.some((balance: any) => (
+      balance.asset_code === USDC_ASSET_CODE && balance.asset_issuer === USDC_ISSUER
+    ));
+
+    if (!hasUsdcTrustline) {
+      return {
+        ok: false as const,
+        error: `Treasury Stellar account ${publicKey} is funded on ${IS_MAINNET ? "mainnet" : "testnet"} but missing a USDC trustline. Add the trustline before swapping.`,
+      };
+    }
+
+    return { ok: true as const };
+  } catch (err: any) {
+    const data = err?.response?.data ?? err?.data;
+    const status = err?.response?.status ?? err?.status;
+    const isAccountMissing =
+      status === 404 || data?.status === 404 || err?.name === "NotFoundError" ||
+      /not.?found/i.test(String(data?.title ?? ""));
+
+    if (isAccountMissing) {
+      return {
+        ok: false as const,
+        error: `Treasury Stellar account ${publicKey} is not funded on ${IS_MAINNET ? "mainnet" : "testnet"}. Fund it (and add a USDC trustline) before swapping.`,
+      };
+    }
+
+    throw err;
+  }
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -137,6 +176,14 @@ Deno.serve(async (req) => {
       }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    const treasuryReady = await validateTreasuryReady(TREASURY_SEED);
+    if (!treasuryReady.ok) {
+      return new Response(JSON.stringify({
+        success: false,
+        error: treasuryReady.error,
+      }), { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     // 5. Resolve ledger accounts
     const { data: fiatLiab } = await admin
       .from("ledger_accounts").select("id").like("code", "21%")
@@ -206,8 +253,14 @@ Deno.serve(async (req) => {
       txHash = submit.hash;
     } catch (err: any) {
       const data = err?.response?.data ?? err?.data;
-      txError = data?.title ?? data?.extras?.result_codes?.operations?.join(",") ?? err?.message ?? "submit failed";
-      console.error("Treasury USDC send failed:", JSON.stringify(data ?? err));
+      const status = err?.response?.status ?? err?.status;
+      const isAccountMissing =
+        status === 404 || data?.status === 404 || err?.name === "NotFoundError" ||
+        /not.?found/i.test(String(data?.title ?? ""));
+      txError = isAccountMissing
+        ? `Treasury Stellar account ${StellarSdk.Keypair.fromSecret(TREASURY_SEED).publicKey()} is not funded on ${IS_MAINNET ? "mainnet" : "testnet"}. Fund it (and add a USDC trustline) before swapping.`
+        : data?.title ?? data?.extras?.result_codes?.operations?.join(",") ?? err?.message ?? "submit failed";
+      console.error("Treasury USDC send failed:", JSON.stringify(data ?? { name: err?.name, message: err?.message }));
       // Reverse the ledger
       const reversal = entries.map((e) => ({
         ...e, journal_id: crypto.randomUUID(),
@@ -217,7 +270,10 @@ Deno.serve(async (req) => {
       await admin.from("ledger_entries").insert(reversal);
       return new Response(JSON.stringify({
         success: false, error: `On-chain payment failed: ${txError}`,
-      }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }), {
+        status: isAccountMissing ? 503 : 502,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // 8. Record fx_transactions

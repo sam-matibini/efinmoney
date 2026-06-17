@@ -4,68 +4,113 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useCreateBeneficiary, useUpdateBeneficiary, type Beneficiary } from "@/hooks/useBeneficiaries";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { useCreateBeneficiary, useUpdateBeneficiary, type Beneficiary, type BeneficiaryCategory } from "@/hooks/useBeneficiaries";
 import { toast } from "sonner";
 import CountryPicker from "@/components/ui/CountryPicker";
-import { COUNTRIES, findCountryById, findCountryByCode, type CountryInfo } from "@/lib/countries";
+import { COUNTRIES, findCountryById, findCountryByCode } from "@/lib/countries";
+import { ChevronDown, ChevronUp } from "lucide-react";
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   editing?: Beneficiary | null;
   onSaved?: (b: Beneficiary) => void;
+  defaultCategory?: BeneficiaryCategory;
 }
 
-const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved }: Props) => {
+const CATEGORIES: { value: BeneficiaryCategory; label: string }[] = [
+  { value: "person", label: "Person" },
+  { value: "supplier", label: "Supplier" },
+  { value: "employee", label: "Employee" },
+  { value: "contractor", label: "Contractor" },
+  { value: "payee", label: "Payee / Vendor" },
+  { value: "other", label: "Other" },
+];
+
+const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCategory }: Props) => {
   const create = useCreateBeneficiary();
   const update = useUpdateBeneficiary();
+  const [category, setCategory] = useState<BeneficiaryCategory>("person");
   const [name, setName] = useState("");
   const [nickname, setNickname] = useState("");
-  const [countryId, setCountryId] = useState<string>("Kenya");
-  const [method, setMethod] = useState<"mobile" | "bank">("mobile");
+  const [email, setEmail] = useState("");
+  const [countryId, setCountryId] = useState<string>("Canada");
+  const [method, setMethod] = useState<"mobile" | "bank" | "eft" | "interac" | "none">("none");
   const [phone, setPhone] = useState("");
   const [bankName, setBankName] = useState("");
   const [bankAccount, setBankAccount] = useState("");
+  // Canadian EFT
+  const [eftInst, setEftInst] = useState("");
+  const [eftTransit, setEftTransit] = useState("");
+  const [eftAcct, setEftAcct] = useState("");
+  const [eftHolder, setEftHolder] = useState("");
+  // Interac
+  const [interacEmail, setInteracEmail] = useState("");
+  const [notes, setNotes] = useState("");
+  const [tags, setTags] = useState("");
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   useEffect(() => {
-    if (open) {
-      setName(editing?.name || "");
-      setNickname(editing?.nickname || "");
-      // Try to resolve a unique country id; fall back to first match by currency code.
-      const fromCode = editing?.country_code ? findCountryByCode(editing.country_code) : undefined;
-      setCountryId(fromCode?.id || "Kenya");
-      setMethod(editing?.bank_account ? "bank" : "mobile");
-      setPhone(editing?.phone || "");
-      setBankName(editing?.bank_name || "");
-      setBankAccount(editing?.bank_account || "");
-    }
-  }, [open, editing]);
+    if (!open) return;
+    setCategory((editing?.category as BeneficiaryCategory) || defaultCategory || "person");
+    setName(editing?.name || "");
+    setNickname(editing?.nickname || "");
+    setEmail(editing?.email || "");
+    const fromCode = editing?.country_code ? findCountryByCode(editing.country_code) : undefined;
+    setCountryId(fromCode?.id || "Canada");
+    setMethod(
+      editing?.eft_account ? "eft" :
+      editing?.interac_email ? "interac" :
+      editing?.bank_account ? "bank" :
+      editing?.phone ? "mobile" : "none"
+    );
+    setPhone(editing?.phone || "");
+    setBankName(editing?.bank_name || "");
+    setBankAccount(editing?.bank_account || "");
+    setEftInst(editing?.eft_institution || "");
+    setEftTransit(editing?.eft_transit || "");
+    setEftAcct(editing?.eft_account || "");
+    setEftHolder(editing?.eft_account_holder || "");
+    setInteracEmail(editing?.interac_email || "");
+    setNotes(editing?.notes || "");
+    setTags((editing?.tags || []).join(", "));
+    setShowAdvanced(!!editing?.notes || !!editing?.tags?.length);
+  }, [open, editing, defaultCategory]);
 
   const country = findCountryById(countryId) || COUNTRIES[0];
 
   const handleSave = async () => {
-    if (!name.trim()) {
-      toast.error("Please enter a name");
-      return;
+    if (!name.trim()) { toast.error("Please enter a name"); return; }
+    if (method === "eft") {
+      if (!/^\d{3}$/.test(eftInst) || !/^\d{5}$/.test(eftTransit) || !/^\d{7,12}$/.test(eftAcct)) {
+        toast.error("EFT requires 3-digit institution, 5-digit transit, and 7-12 digit account");
+        return;
+      }
     }
-    if (method === "mobile" && !phone.trim()) {
-      toast.error("Please enter a phone number");
-      return;
-    }
-    if (method === "bank" && (!bankName.trim() || !bankAccount.trim())) {
-      toast.error("Please enter bank details");
-      return;
+    if (method === "interac" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(interacEmail)) {
+      toast.error("Interac requires a valid email"); return;
     }
 
-    const payload = {
+    const payload: any = {
       name: name.trim(),
       nickname: nickname.trim() || null,
+      email: email.trim() || null,
       country_code: country.code,
       currency_code: country.code,
-      payout_method: method === "mobile" ? country.payout : "bank",
+      payout_method: method === "mobile" ? country.payout : method === "bank" ? "bank" : method === "eft" ? "eft" : method === "interac" ? "interac" : null,
       phone: method === "mobile" ? phone.trim() : null,
       bank_name: method === "bank" ? bankName.trim() : null,
       bank_account: method === "bank" ? bankAccount.trim() : null,
+      eft_institution: method === "eft" ? eftInst : null,
+      eft_transit: method === "eft" ? eftTransit : null,
+      eft_account: method === "eft" ? eftAcct : null,
+      eft_account_holder: method === "eft" ? (eftHolder.trim() || name.trim()) : null,
+      interac_email: method === "interac" ? interacEmail.trim() : null,
+      category,
+      notes: notes.trim() || null,
+      tags: tags.split(",").map(t => t.trim()).filter(Boolean),
     };
 
     try {
@@ -73,11 +118,11 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved }: Props) =>
       const saved = isEdit
         ? await update.mutateAsync({ id: editing!.id, ...payload })
         : await create.mutateAsync(payload);
-      toast.success(isEdit ? "Contact updated" : "Contact saved");
+      toast.success(isEdit ? "Saved" : "Payee added");
       onSaved?.(saved);
       onOpenChange(false);
     } catch (e: any) {
-      toast.error(e?.message || "Failed to save contact");
+      toast.error(e?.message || "Failed to save");
     }
   };
 
@@ -85,35 +130,62 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved }: Props) =>
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{editing?.id ? "Edit Contact" : "Add Contact"}</DialogTitle>
+          <DialogTitle>{editing?.id ? "Edit Payee" : "Add Payee"}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
-          <div className="space-y-2">
-            <Label>Full Name</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Recipient's full name" />
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label>Category</Label>
+              <Select value={category} onValueChange={(v) => setCategory(v as BeneficiaryCategory)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {CATEGORIES.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Country</Label>
+              <CountryPicker value={countryId} onChange={(c) => setCountryId(c.id)} />
+            </div>
           </div>
+
           <div className="space-y-2">
-            <Label>Nickname (optional)</Label>
-            <Input value={nickname} onChange={(e) => setNickname(e.target.value)} placeholder="e.g. Mum" />
+            <Label>Full Name / Business Name</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Jane Doe or Acme Inc." />
           </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label>Nickname (optional)</Label>
+              <Input value={nickname} onChange={(e) => setNickname(e.target.value)} placeholder="e.g. Landlord" />
+            </div>
+            <div className="space-y-2">
+              <Label>Email (optional)</Label>
+              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="payee@example.com" />
+            </div>
+          </div>
+
           <div className="space-y-2">
-            <Label>Country</Label>
-            <CountryPicker value={countryId} onChange={(c) => setCountryId(c.id)} />
+            <Label>Default payout method</Label>
+            <Tabs value={method} onValueChange={(v) => setMethod(v as any)}>
+              <TabsList className="grid grid-cols-5 w-full">
+                <TabsTrigger value="none">None</TabsTrigger>
+                <TabsTrigger value="eft">EFT 🇨🇦</TabsTrigger>
+                <TabsTrigger value="interac">Interac</TabsTrigger>
+                <TabsTrigger value="mobile">Mobile</TabsTrigger>
+                <TabsTrigger value="bank">Bank</TabsTrigger>
+              </TabsList>
+            </Tabs>
           </div>
-          <Tabs value={method} onValueChange={(v) => setMethod(v as any)}>
-            <TabsList className="grid grid-cols-2 w-full">
-              <TabsTrigger value="mobile">Mobile Money</TabsTrigger>
-              <TabsTrigger value="bank">Bank</TabsTrigger>
-            </TabsList>
-          </Tabs>
-          {method === "mobile" ? (
+
+          {method === "mobile" && (
             <div className="space-y-2">
               <Label>Phone Number</Label>
               <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+254..." />
             </div>
-          ) : (
+          )}
+          {method === "bank" && (
             <>
               <div className="space-y-2">
                 <Label>Bank Name</Label>
@@ -125,11 +197,48 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved }: Props) =>
               </div>
             </>
           )}
+          {method === "eft" && (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2"><Label>Institution # (3)</Label>
+                  <Input inputMode="numeric" maxLength={3} value={eftInst} onChange={(e) => setEftInst(e.target.value.replace(/\D/g, ""))} placeholder="001" /></div>
+                <div className="space-y-2"><Label>Transit # (5)</Label>
+                  <Input inputMode="numeric" maxLength={5} value={eftTransit} onChange={(e) => setEftTransit(e.target.value.replace(/\D/g, ""))} placeholder="12345" /></div>
+              </div>
+              <div className="space-y-2"><Label>Account #</Label>
+                <Input inputMode="numeric" value={eftAcct} onChange={(e) => setEftAcct(e.target.value.replace(/\D/g, ""))} placeholder="1234567" /></div>
+              <div className="space-y-2"><Label>Account holder (as on bank)</Label>
+                <Input value={eftHolder} onChange={(e) => setEftHolder(e.target.value)} placeholder={name || "Jane Doe"} /></div>
+            </>
+          )}
+          {method === "interac" && (
+            <div className="space-y-2">
+              <Label>Interac Email</Label>
+              <Input type="email" value={interacEmail} onChange={(e) => setInteracEmail(e.target.value)} placeholder="payee@example.com" />
+            </div>
+          )}
+
+          <button type="button" onClick={() => setShowAdvanced(s => !s)} className="text-xs text-muted-foreground flex items-center gap-1 hover:text-foreground">
+            {showAdvanced ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+            Notes & tags
+          </button>
+          {showAdvanced && (
+            <>
+              <div className="space-y-2">
+                <Label>Tags (comma-separated)</Label>
+                <Input value={tags} onChange={(e) => setTags(e.target.value)} placeholder="rent, monthly" />
+              </div>
+              <div className="space-y-2">
+                <Label>Notes</Label>
+                <Textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Internal notes…" />
+              </div>
+            </>
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button onClick={handleSave} disabled={isPending}>
-            {isPending ? "Saving..." : editing?.id ? "Save Changes" : "Add Contact"}
+            {isPending ? "Saving..." : editing?.id ? "Save Changes" : "Add Payee"}
           </Button>
         </DialogFooter>
       </DialogContent>

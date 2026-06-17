@@ -28,7 +28,10 @@ const KYCGuard = ({ children }: { children: ReactNode }) => {
   const { data: profile, isLoading: profileLoading } = useProfile();
   const location = useLocation();
 
-  if (isLoading || rolesLoading || profileLoading) return <Spinner />;
+  // Wait for profile + roles (cheap, reliable queries). Don't block the entire
+  // app on the KYC query — if it errors or is slow, we still let v2 framework
+  // users through; route-level access never depended on KYC for them.
+  if (rolesLoading || profileLoading) return <Spinner />;
 
   // Staff roles bypass KYC entirely
   const isStaff = roles?.some((r) => ["admin", "finance", "compliance"].includes(r));
@@ -37,6 +40,9 @@ const KYCGuard = ({ children }: { children: ReactNode }) => {
   // New 3-tier framework: never block app access at the route level.
   // Limit enforcement happens at action time via tierLimits helpers.
   if ((profile?.kyc_framework_version ?? 2) >= 2) return <>{children}</>;
+
+  // Legacy v1: we still need the KYC record to decide routing.
+  if (isLoading) return <Spinner />;
 
   // ---- Legacy v1 flow ----
   if (!kyc) return <Navigate to="/onboarding/welcome" replace />;

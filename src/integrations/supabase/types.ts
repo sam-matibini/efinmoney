@@ -68,6 +68,193 @@ export type Database = {
         }
         Relationships: []
       }
+      adyen_pay_by_link: {
+        Row: {
+          amount_minor: number
+          created_at: string
+          currency: string
+          customer_email: string | null
+          description: string | null
+          expires_at: string | null
+          id: string
+          link_id: string | null
+          owner_user_id: string
+          psp_reference: string | null
+          purpose: string
+          raw: Json | null
+          reference: string
+          sales_invoice_id: string | null
+          short_code: string | null
+          status: string
+          updated_at: string
+          url: string | null
+        }
+        Insert: {
+          amount_minor: number
+          created_at?: string
+          currency: string
+          customer_email?: string | null
+          description?: string | null
+          expires_at?: string | null
+          id?: string
+          link_id?: string | null
+          owner_user_id: string
+          psp_reference?: string | null
+          purpose: string
+          raw?: Json | null
+          reference: string
+          sales_invoice_id?: string | null
+          short_code?: string | null
+          status?: string
+          updated_at?: string
+          url?: string | null
+        }
+        Update: {
+          amount_minor?: number
+          created_at?: string
+          currency?: string
+          customer_email?: string | null
+          description?: string | null
+          expires_at?: string | null
+          id?: string
+          link_id?: string | null
+          owner_user_id?: string
+          psp_reference?: string | null
+          purpose?: string
+          raw?: Json | null
+          reference?: string
+          sales_invoice_id?: string | null
+          short_code?: string | null
+          status?: string
+          updated_at?: string
+          url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "adyen_pay_by_link_sales_invoice_id_fkey"
+            columns: ["sales_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "sales_invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      adyen_payment_sessions: {
+        Row: {
+          amount_minor: number
+          created_at: string
+          currency: string
+          id: string
+          last_event: Json | null
+          payment_method: string | null
+          psp_reference: string | null
+          purpose: string
+          raw_session: Json | null
+          reference: string
+          related_invoice_id: string | null
+          related_transfer_id: string | null
+          return_url: string | null
+          status: string
+          target_currency: string | null
+          target_wallet_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount_minor: number
+          created_at?: string
+          currency: string
+          id?: string
+          last_event?: Json | null
+          payment_method?: string | null
+          psp_reference?: string | null
+          purpose: string
+          raw_session?: Json | null
+          reference: string
+          related_invoice_id?: string | null
+          related_transfer_id?: string | null
+          return_url?: string | null
+          status?: string
+          target_currency?: string | null
+          target_wallet_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount_minor?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          last_event?: Json | null
+          payment_method?: string | null
+          psp_reference?: string | null
+          purpose?: string
+          raw_session?: Json | null
+          reference?: string
+          related_invoice_id?: string | null
+          related_transfer_id?: string | null
+          return_url?: string | null
+          status?: string
+          target_currency?: string | null
+          target_wallet_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "adyen_payment_sessions_target_wallet_id_fkey"
+            columns: ["target_wallet_id"]
+            isOneToOne: false
+            referencedRelation: "wallets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      adyen_webhook_events: {
+        Row: {
+          amount_minor: number | null
+          created_at: string
+          currency: string | null
+          event_code: string
+          hmac_valid: boolean
+          id: string
+          merchant_reference: string | null
+          payment_method: string | null
+          processed_at: string | null
+          psp_reference: string | null
+          raw: Json
+          success: boolean | null
+        }
+        Insert: {
+          amount_minor?: number | null
+          created_at?: string
+          currency?: string | null
+          event_code: string
+          hmac_valid?: boolean
+          id?: string
+          merchant_reference?: string | null
+          payment_method?: string | null
+          processed_at?: string | null
+          psp_reference?: string | null
+          raw: Json
+          success?: boolean | null
+        }
+        Update: {
+          amount_minor?: number | null
+          created_at?: string
+          currency?: string | null
+          event_code?: string
+          hmac_valid?: boolean
+          id?: string
+          merchant_reference?: string | null
+          payment_method?: string | null
+          processed_at?: string | null
+          psp_reference?: string | null
+          raw?: Json
+          success?: boolean | null
+        }
+        Relationships: []
+      }
       aml_matches: {
         Row: {
           created_at: string
@@ -432,16 +619,25 @@ export type Database = {
           avatar_initials: string | null
           bank_account: string | null
           bank_name: string | null
+          category: string
           country_code: string | null
           created_at: string
           currency_code: string | null
+          eft_account: string | null
+          eft_account_holder: string | null
+          eft_institution: string | null
+          eft_transit: string | null
+          email: string | null
           id: string
+          interac_email: string | null
           last_sent_at: string | null
           name: string
           network: string | null
           nickname: string | null
+          notes: string | null
           payout_method: string | null
           phone: string | null
+          tags: string[]
           transfer_count: number
           updated_at: string
           user_id: string
@@ -450,16 +646,25 @@ export type Database = {
           avatar_initials?: string | null
           bank_account?: string | null
           bank_name?: string | null
+          category?: string
           country_code?: string | null
           created_at?: string
           currency_code?: string | null
+          eft_account?: string | null
+          eft_account_holder?: string | null
+          eft_institution?: string | null
+          eft_transit?: string | null
+          email?: string | null
           id?: string
+          interac_email?: string | null
           last_sent_at?: string | null
           name: string
           network?: string | null
           nickname?: string | null
+          notes?: string | null
           payout_method?: string | null
           phone?: string | null
+          tags?: string[]
           transfer_count?: number
           updated_at?: string
           user_id: string
@@ -468,16 +673,25 @@ export type Database = {
           avatar_initials?: string | null
           bank_account?: string | null
           bank_name?: string | null
+          category?: string
           country_code?: string | null
           created_at?: string
           currency_code?: string | null
+          eft_account?: string | null
+          eft_account_holder?: string | null
+          eft_institution?: string | null
+          eft_transit?: string | null
+          email?: string | null
           id?: string
+          interac_email?: string | null
           last_sent_at?: string | null
           name?: string
           network?: string | null
           nickname?: string | null
+          notes?: string | null
           payout_method?: string | null
           phone?: string | null
+          tags?: string[]
           transfer_count?: number
           updated_at?: string
           user_id?: string
@@ -2969,6 +3183,102 @@ export type Database = {
         }
         Relationships: []
       }
+      payment_link_payouts: {
+        Row: {
+          amount: number
+          auto_claim: boolean
+          claimed_at: string | null
+          claimed_ip: string | null
+          claimed_method:
+            | Database["public"]["Enums"]["payment_link_claim_method"]
+            | null
+          claimed_payload: Json | null
+          created_at: string
+          currency: string
+          escrow_journal_id: string | null
+          expires_at: string
+          failure_reason: string | null
+          id: string
+          preset_method: string | null
+          preset_payload: Json | null
+          recipient_name: string | null
+          recipient_note: string | null
+          release_journal_id: string | null
+          reversal_journal_id: string | null
+          sender_id: string
+          sender_wallet_id: string | null
+          short_code: string
+          short_url: string | null
+          source: Database["public"]["Enums"]["payment_link_source"]
+          source_ref: string | null
+          status: Database["public"]["Enums"]["payment_link_status"]
+          transfer_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          auto_claim?: boolean
+          claimed_at?: string | null
+          claimed_ip?: string | null
+          claimed_method?:
+            | Database["public"]["Enums"]["payment_link_claim_method"]
+            | null
+          claimed_payload?: Json | null
+          created_at?: string
+          currency: string
+          escrow_journal_id?: string | null
+          expires_at?: string
+          failure_reason?: string | null
+          id?: string
+          preset_method?: string | null
+          preset_payload?: Json | null
+          recipient_name?: string | null
+          recipient_note?: string | null
+          release_journal_id?: string | null
+          reversal_journal_id?: string | null
+          sender_id: string
+          sender_wallet_id?: string | null
+          short_code: string
+          short_url?: string | null
+          source?: Database["public"]["Enums"]["payment_link_source"]
+          source_ref?: string | null
+          status?: Database["public"]["Enums"]["payment_link_status"]
+          transfer_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          auto_claim?: boolean
+          claimed_at?: string | null
+          claimed_ip?: string | null
+          claimed_method?:
+            | Database["public"]["Enums"]["payment_link_claim_method"]
+            | null
+          claimed_payload?: Json | null
+          created_at?: string
+          currency?: string
+          escrow_journal_id?: string | null
+          expires_at?: string
+          failure_reason?: string | null
+          id?: string
+          preset_method?: string | null
+          preset_payload?: Json | null
+          recipient_name?: string | null
+          recipient_note?: string | null
+          release_journal_id?: string | null
+          reversal_journal_id?: string | null
+          sender_id?: string
+          sender_wallet_id?: string | null
+          short_code?: string
+          short_url?: string | null
+          source?: Database["public"]["Enums"]["payment_link_source"]
+          source_ref?: string | null
+          status?: Database["public"]["Enums"]["payment_link_status"]
+          transfer_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       paysafe_webhook_logs: {
         Row: {
           account_id: string | null
@@ -5320,6 +5630,14 @@ export type Database = {
         | "approved"
         | "rejected"
         | "expired"
+      payment_link_claim_method: "interac" | "card_push" | "eft"
+      payment_link_source: "send" | "invoice"
+      payment_link_status:
+        | "pending"
+        | "claimed"
+        | "expired"
+        | "revoked"
+        | "failed"
       reconciliation_status:
         | "pending"
         | "matched"
@@ -5568,6 +5886,15 @@ export const Constants = {
         "approved",
         "rejected",
         "expired",
+      ],
+      payment_link_claim_method: ["interac", "card_push", "eft"],
+      payment_link_source: ["send", "invoice"],
+      payment_link_status: [
+        "pending",
+        "claimed",
+        "expired",
+        "revoked",
+        "failed",
       ],
       reconciliation_status: [
         "pending",

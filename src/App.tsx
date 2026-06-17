@@ -51,6 +51,8 @@ import OnboardingEnhanced from "./pages/onboarding/Enhanced";
 
 import OnboardingRejected from "./pages/onboarding/Rejected";
 import ShortLinkResolver from "./pages/ShortLinkResolver";
+import ClaimPaymentLinkPage from "./pages/ClaimPaymentLinkPage";
+import PaymentLinksPage from "./pages/PaymentLinksPage";
 import { AdminAuthProvider } from "@/contexts/AdminAuthContext";
 import AdminGuard from "@/components/admin-portal/AdminGuard";
 import AdminLogin from "./pages/admin/AdminLogin";
@@ -58,6 +60,7 @@ import AdminDashboardPage from "./pages/admin/AdminDashboardPage";
 import KycQueuePage from "./pages/admin/KycQueuePage";
 import KycReviewPage from "./pages/admin/KycReviewPage";
 import AdminPlaceholderPage from "./pages/admin/AdminPlaceholderPage";
+import AdminAdyenLinksPage from "./pages/admin/AdminAdyenLinksPage";
 import RiskTiersPage from "./pages/admin/RiskTiersPage";
 import AuditLogPage from "./pages/admin/AuditLogPage";
 import ApiManagementPage from "./pages/admin/ApiManagementPage";
@@ -182,6 +185,7 @@ const AppRoutes = () => {
         <Routes location={location}>
           <Route path="/" element={<RootRoute />} />
           <Route path="/s/:code" element={<ShortLinkResolver />} />
+          <Route path="/claim/:code" element={<ClaimPaymentLinkPage />} />
           <Route path="/privacy" element={<PrivacyPolicyPage />} />
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/compliance" element={<CompliancePage />} />
@@ -213,6 +217,7 @@ const AppRoutes = () => {
           <Route path="/admin/staff" element={<AdminAuthProvider><AdminGuard><StaffPage /></AdminGuard></AdminAuthProvider>} />
           <Route path="/admin/staff/:id" element={<AdminAuthProvider><AdminGuard><StaffDetailPage /></AdminGuard></AdminAuthProvider>} />
           <Route path="/admin/onboarding" element={<AdminAuthProvider><AdminGuard><StaffOnboardingPage /></AdminGuard></AdminAuthProvider>} />
+          <Route path="/admin/payments/adyen" element={<AdminAuthProvider><AdminGuard><AdminAdyenLinksPage /></AdminGuard></AdminAuthProvider>} />
           <Route path="/settings" element={<RoleProtectedRoute allowedRoles={['admin']}><SettingsDashboard /></RoleProtectedRoute>} />
           <Route path="/operations" element={<RoleProtectedRoute allowedRoles={['admin', 'compliance', 'finance']}><OperationsDashboard /></RoleProtectedRoute>} />
           <Route path="/auth" element={<PublicRoute><Auth /></PublicRoute>} />
@@ -226,6 +231,8 @@ const AppRoutes = () => {
           <Route path="/transfers/:id" element={<KycProtectedRoute><TransferTrackingPage /></KycProtectedRoute>} />
           <Route path="/transactions/:journalId" element={<KycProtectedRoute><TransactionDetailPage /></KycProtectedRoute>} />
           <Route path="/contacts" element={<KycProtectedRoute><ContactsPage /></KycProtectedRoute>} />
+          <Route path="/payees" element={<KycProtectedRoute><ContactsPage /></KycProtectedRoute>} />
+          <Route path="/payment-links" element={<KycProtectedRoute><PaymentLinksPage /></KycProtectedRoute>} />
           <Route path="/transfers/canada" element={<KycProtectedRoute><CanadaTransferPage /></KycProtectedRoute>} />
           <Route path="/wallet/receive" element={<KycProtectedRoute><ReceivePage /></KycProtectedRoute>} />
           <Route path="/wallet/topup" element={<KycProtectedRoute><TopUpPage /></KycProtectedRoute>} />
