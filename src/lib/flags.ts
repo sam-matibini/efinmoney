@@ -37,3 +37,16 @@ export const flagForCountryName = (name?: string | null): string => {
   const code = COUNTRY_NAME_TO_CODE[name];
   return code ? flagForCountry(code) : "🌍";
 };
+
+/** Normalize recipient_country (ISO-2 or full name) → lowercase ISO-2 for flagcdn.com. */
+export const normalizeCountryCode = (value?: string | null): string | null => {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (trimmed.length === 2) return trimmed.toLowerCase();
+  const exact = COUNTRY_NAME_TO_CODE[trimmed];
+  if (exact) return exact.toLowerCase();
+  const fuzzy = Object.entries(COUNTRY_NAME_TO_CODE).find(
+    ([name]) => name.toLowerCase() === trimmed.toLowerCase(),
+  );
+  return fuzzy ? fuzzy[1].toLowerCase() : null;
+};

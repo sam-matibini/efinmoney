@@ -2,10 +2,11 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Eye, EyeOff, ArrowRight, ArrowLeft } from "lucide-react";
+import { Eye, EyeOff, ArrowRight, ArrowLeft, MailCheck } from "lucide-react";
 import { Logo, Wordmark } from "@/components/Logo";
 import LoadingSpinner from "@/components/LoadingSpinner";
 
@@ -22,6 +23,8 @@ const Auth = () => {
   const [fullName, setFullName] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [signedUpEmail, setSignedUpEmail] = useState<string | null>(null);
+  const [resending, setResending] = useState(false);
   const { signIn, signUp } = useAuth();
   const navigate = useNavigate();
 
@@ -37,12 +40,12 @@ const Auth = () => {
         const { error } = await signUp(email, password, fullName);
         if (error) toast.error(error.message);
         else {
-          toast.success("Account created — let's verify your identity.");
           // Identity is required before transfers; preserve the deep-link for after KYC.
           if (isSafeRedirect(redirectTo)) {
             try { sessionStorage.setItem("efm_post_kyc_redirect", redirectTo); } catch { /* noop */ }
           }
-          navigate("/onboarding/identity");
+          // Email confirmation is required — show the "check your inbox" screen.
+          setSignedUpEmail(email);
         }
       } else {
         const { error } = await signIn(email, password);
@@ -54,6 +57,22 @@ const Auth = () => {
       }
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleResend = async () => {
+    if (!signedUpEmail) return;
+    setResending(true);
+    try {
+      const { error } = await supabase.auth.resend({
+        type: "signup",
+        email: signedUpEmail,
+        options: { emailRedirectTo: window.location.origin },
+      });
+      if (error) toast.error(error.message);
+      else toast.success("Verification email sent again.");
+    } finally {
+      setResending(false);
     }
   };
 
@@ -71,6 +90,50 @@ const Auth = () => {
         </div>
       </header>
 
+      {signedUpEmail ? (
+        <main className="flex-1 flex items-center justify-center px-6 py-12">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="w-full max-w-md text-center"
+          >
+            <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+              <MailCheck className="h-8 w-8 text-primary" />
+            </div>
+            <h1 className="text-3xl md:text-4xl font-black tracking-tight text-neutral-900">Check your inbox</h1>
+            <p className="mt-3 text-neutral-600">
+              We sent a verification link to <strong className="text-neutral-900">{signedUpEmail}</strong>.
+              Click it to confirm your email — you'll be signed in automatically and taken to the next step.
+            </p>
+            <button
+              onClick={handleResend}
+              disabled={resending}
+              className="mt-8 w-full h-12 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold disabled:opacity-50 inline-flex items-center justify-center gap-2 transition-all shadow-lg shadow-primary/20"
+            >
+              {resending ? <LoadingSpinner size={20} /> : "Resend verification email"}
+            </button>
+            <p className="mt-6 text-center text-neutral-600">
+              Wrong email?
+              <button
+                onClick={() => { setSignedUpEmail(null); setIsSignUp(true); }}
+                className="ml-2 text-primary hover:text-primary/80 font-bold"
+              >
+                Go back
+              </button>
+            </p>
+            <p className="mt-2 text-center text-neutral-600">
+              Already verified?
+              <button
+                onClick={() => { setSignedUpEmail(null); setIsSignUp(false); }}
+                className="ml-2 text-primary hover:text-primary/80 font-bold"
+              >
+                Sign in
+              </button>
+            </p>
+          </motion.div>
+        </main>
+      ) : (
       <main className="flex-1 flex items-center justify-center px-6 py-12">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -175,6 +238,7 @@ const Auth = () => {
           )}
         </motion.div>
       </main>
+      )}
     </div>
   );
 };

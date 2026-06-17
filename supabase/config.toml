@@ -78,3 +78,10 @@ verify_jwt = false
 
 [functions.market-rates]
 verify_jwt = false
+
+[functions.auth-send-email]
+verify_jwt = false
+# NOTE: the Supabase "Send Email" auth hook is enabled on the hosted project via the
+# Management API (Authentication -> Hooks), pointing at this function. It is intentionally
+# not declared as [auth.hook.send_email] here because that makes `functions deploy`
+# attempt a privileged auth-config sync.

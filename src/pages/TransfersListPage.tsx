@@ -3,10 +3,10 @@ import { motion } from "framer-motion";
 import Header from "@/components/layout/Header";
 import MobileNav from "@/components/layout/MobileNav";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search } from "lucide-react";
+import { filterStatementRows, hasStatementFilters } from "@/lib/statementFilters";
+import { StatementFilters } from "@/components/statement/StatementFilters";
 import { useAuth } from "@/hooks/useAuth";
 import { useWallets } from "@/hooks/useWallets";
 import { useProfile } from "@/hooks/useProfile";
@@ -33,24 +33,13 @@ const TransfersListPage = () => {
     500
   );
 
-  const rows = useMemo(() => {
-    let items = rowsAll ?? [];
-    if (direction === "in") items = items.filter((r) => r.moneyIn > 0);
-    if (direction === "out") items = items.filter((r) => r.moneyOut > 0);
-    if (search.trim()) {
-      const q = search.trim().toLowerCase();
-      items = items.filter(
-        (r) =>
-          r.description.toLowerCase().includes(q) ||
-          r.payee.toLowerCase().includes(q) ||
-          r.reference.toLowerCase().includes(q) ||
-          r.purpose.toLowerCase().includes(q)
-      );
-    }
-    if (from) items = items.filter((r) => new Date(r.date) >= new Date(from));
-    if (to) items = items.filter((r) => new Date(r.date) <= new Date(to + "T23:59:59"));
-    return items;
-  }, [rowsAll, direction, search, from, to]);
+  const rows = useMemo(
+    () => filterStatementRows(rowsAll ?? [], { direction, search, from, to }),
+    [rowsAll, direction, search, from, to],
+  );
+
+  const filtersActive = hasStatementFilters({ direction, search, from, to });
+  const totalCount = rowsAll?.length ?? 0;
 
   // Balance totals = computed across ALL rows (not the filtered view) so the
   // tiles represent the user's true running balance per currency, not the
@@ -151,17 +140,25 @@ const TransfersListPage = () => {
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <div className="relative">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <Input placeholder="Search description, payee, reference, purpose" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
-              </div>
-              <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
-              <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
-            </div>
+            <StatementFilters
+              search={search}
+              onSearchChange={setSearch}
+              from={from}
+              onFromChange={setFrom}
+              to={to}
+              onToChange={setTo}
+              resultCount={rows.length}
+              totalCount={totalCount}
+            />
           </CardHeader>
           <CardContent>
-            <StatementTable rows={rows} loading={isLoading} showBalance={walletFilter !== "all"} />
+            <StatementTable
+              rows={rows}
+              loading={isLoading}
+              showBalance={walletFilter !== "all"}
+              filtered={filtersActive}
+              searchQuery={search}
+            />
           </CardContent>
         </Card>
       </main>

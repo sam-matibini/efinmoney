@@ -11,13 +11,13 @@ export const HERO_W = 960;
 export const HERO_H = 360;
 
 const DESTINATIONS = [
-  { flag: "🇳🇬", label: "Nigeria", angle: -20 },
-  { flag: "🇰🇪", label: "Kenya", angle: 35 },
-  { flag: "🇬🇭", label: "Ghana", angle: 90 },
-  { flag: "🇿🇦", label: "S. Africa", angle: 145 },
-  { flag: "🇺🇬", label: "Uganda", angle: 200 },
-  { flag: "🇹🇿", label: "Tanzania", angle: 255 },
-  { flag: "🇨🇦", label: "Canada", angle: 310 },
+  { cc: "ng", label: "Nigeria", angle: -20 },
+  { cc: "ke", label: "Kenya", angle: 35 },
+  { cc: "gh", label: "Ghana", angle: 90 },
+  { cc: "za", label: "S. Africa", angle: 145 },
+  { cc: "ug", label: "Uganda", angle: 200 },
+  { cc: "tz", label: "Tanzania", angle: 255 },
+  { cc: "ca", label: "Canada", angle: 310 },
 ];
 
 export const MoneyGlobe: React.FC = () => {
@@ -93,7 +93,7 @@ export const MoneyGlobe: React.FC = () => {
         })}
       </svg>
 
-      {/* destination nodes (DOM for emoji crispness) */}
+      {/* destination nodes */}
       {DESTINATIONS.map((d, i) => {
         const a = d.angle + ringRotation;
         const x = cx + rx * Math.cos((a * Math.PI) / 180);
@@ -112,10 +112,16 @@ export const MoneyGlobe: React.FC = () => {
                 width: 38, height: 38, borderRadius: "50%",
                 background: "hsl(var(--card))", border: "1px solid hsl(var(--primary) / 0.4)",
                 boxShadow: "0 4px 16px hsl(var(--primary) / 0.25)",
-                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                overflow: "hidden",
               }}
             >
-              {d.flag}
+              <img
+                src={`https://flagcdn.com/w40/${d.cc}.png`}
+                srcSet={`https://flagcdn.com/w80/${d.cc}.png 2x`}
+                alt={d.label}
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              />
             </div>
             <span style={{ fontSize: 10, color: "hsl(var(--muted-foreground))", fontWeight: 500 }}>{d.label}</span>
           </div>

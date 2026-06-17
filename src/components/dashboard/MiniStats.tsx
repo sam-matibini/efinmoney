@@ -1,4 +1,4 @@
-import { motion, useMotionValue, useSpring, useTransform, useMotionTemplate } from "framer-motion";
+import { motion, useMotionValue, useSpring, useTransform, useMotionTemplate, useReducedMotion } from "framer-motion";
 import { useMemo, useState } from "react";
 import { Send, Globe, PiggyBank, ShieldCheck } from "lucide-react";
 import { useTransfers } from "@/hooks/useTransfers";
@@ -7,13 +7,13 @@ import { useSavingsGoals } from "@/hooks/useSavingsGoals";
 import { Link } from "react-router-dom";
 
 const cardClass =
-  "group relative overflow-hidden rounded-2xl bg-card border border-border p-4 transition-all hover:-translate-y-1 hover:shadow-lg";
+  "group relative overflow-hidden rounded-2xl bg-card border border-border p-4 transition-[transform,box-shadow] duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] hover:-translate-y-1 hover:shadow-lg";
 
 const cardBg: Record<string, string> = {
-  sent: "bg-gradient-to-br from-indigo-500/5 to-transparent",
-  corridors: "bg-gradient-to-br from-primary/5 to-transparent",
-  savings: "bg-gradient-to-br from-violet-500/5 to-transparent",
-  kyc: "bg-gradient-to-br from-amber-500/10 to-transparent",
+  sent: "bg-gradient-to-br from-primary/[0.06] to-transparent",
+  corridors: "bg-gradient-to-br from-primary/[0.06] to-transparent",
+  savings: "bg-gradient-to-br from-[hsl(var(--accent-amber)/0.08)] to-transparent",
+  kyc: "bg-gradient-to-br from-[hsl(var(--accent-amber)/0.10)] to-transparent",
 };
 
 const MiniStats = () => {
@@ -126,7 +126,7 @@ const MiniStats = () => {
         </>
       ),
       icon: Send,
-      iconBg: "bg-indigo-500/15 text-primary",
+      iconBg: "bg-primary/15 text-primary",
     },
     {
       key: "corridors",
@@ -162,13 +162,13 @@ const MiniStats = () => {
               initial={{ width: 0 }}
               animate={{ width: `${goalProgress.pct}%` }}
               transition={{ delay: 0.4, duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-              className="h-full rounded-full bg-gradient-to-r from-violet-400 to-indigo-500"
+              className="h-full rounded-full bg-gradient-to-r from-[hsl(var(--accent-amber))] to-[hsl(var(--accent-amber-glow))]"
             />
           </div>
         </>
       ),
       icon: PiggyBank,
-      iconBg: "bg-violet-500/15 text-violet-600 dark:text-violet-400",
+      iconBg: "bg-[hsl(var(--accent-amber)/0.15)] text-[hsl(36_92%_42%)] dark:text-[hsl(var(--accent-amber))]",
     },
     {
       key: "kyc",
@@ -209,7 +209,7 @@ const MiniStats = () => {
           <div className="flex items-start justify-between mb-3">
             <p className="text-xs font-medium text-muted-foreground">{s.label}</p>
             <div
-              className={`relative p-2.5 rounded-xl ${s.iconBg} ring-1 ring-inset ring-white/10 shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3`}
+              className={`relative p-2.5 rounded-xl ${s.iconBg} ring-1 ring-inset ring-white/10 shadow-sm transition-transform duration-200 ease-out group-hover:scale-105 motion-reduce:group-hover:scale-100`}
             >
               <s.icon className="w-5 h-5" strokeWidth={2.25} />
             </div>
@@ -222,14 +222,15 @@ const MiniStats = () => {
 };
 
 const StatCard = ({ index, className, children }: { index: number; className: string; children: React.ReactNode }) => {
+  const reduceMotion = useReducedMotion();
   const px = useMotionValue(0);
   const py = useMotionValue(0);
   const [hovering, setHovering] = useState(false);
-  const rotateX = useSpring(useTransform(py, [-0.5, 0.5], [6, -6]), { stiffness: 160, damping: 14 });
-  const rotateY = useSpring(useTransform(px, [-0.5, 0.5], [-6, 6]), { stiffness: 160, damping: 14 });
+  const rotateX = useSpring(useTransform(py, [-0.5, 0.5], [4, -4]), { stiffness: 160, damping: 16, bounce: 0.15 });
+  const rotateY = useSpring(useTransform(px, [-0.5, 0.5], [-4, 4]), { stiffness: 160, damping: 16, bounce: 0.15 });
   const spotX = useTransform(px, (v) => `${(v + 0.5) * 100}%`);
   const spotY = useTransform(py, (v) => `${(v + 0.5) * 100}%`);
-  const spotlight = useMotionTemplate`radial-gradient(220px circle at ${spotX} ${spotY}, hsl(265 92% 70% / 0.16), transparent 65%)`;
+  const spotlight = useMotionTemplate`radial-gradient(220px circle at ${spotX} ${spotY}, hsl(var(--primary) / 0.14), transparent 65%)`;
 
   const onMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
@@ -240,14 +241,14 @@ const StatCard = ({ index, className, children }: { index: number; className: st
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 16 }}
+      initial={reduceMotion ? false : { opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.08, duration: 0.4 }}
-      onMouseMove={onMove}
+      transition={{ delay: reduceMotion ? 0 : index * 0.06, duration: 0.35, ease: [0.23, 1, 0.32, 1] }}
+      onMouseMove={reduceMotion ? undefined : onMove}
       onMouseEnter={() => setHovering(true)}
       onMouseLeave={onLeave}
-      style={{ rotateX, rotateY, transformPerspective: 900 }}
-      className={className}
+      style={reduceMotion ? undefined : { rotateX, rotateY, transformPerspective: 900 }}
+      className={`${className} active:scale-[0.98] motion-reduce:active:scale-100`}
     >
       <motion.div
         aria-hidden

@@ -26,6 +26,12 @@ migration-export/
 # Supabase CLI local scratch
 supabase/.temp/
 
+# Local agent skills tooling (not app code)
+.agents/
+
+# Private AI handoff doc (local only — not for git)
+AI_HANDOFF.md
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

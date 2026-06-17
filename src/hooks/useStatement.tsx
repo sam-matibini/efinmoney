@@ -20,6 +20,19 @@ export interface StatementRow {
   status: string;
 }
 
+const TRANSFER_REF_TYPES = new Set([
+  "transfer",
+  "internal_transfer",
+  "stellar_transfer",
+  "cpn_transfer",
+  "intra_ca_transfer",
+]);
+
+const payeeFromDescription = (desc: string): string | null => {
+  const m = desc.match(/(?:Transfer to|Payout to|Paysafe payout to|Payable to|Received from)\s+(.+?)(?:\s*\(|$)/i);
+  return m?.[1]?.trim() || null;
+};
+
 const refOf = (id: string) =>
   `EFM-${id.replace(/-/g, "").slice(0, 8).toUpperCase()}`;
 
@@ -87,7 +100,7 @@ export const useStatement = (walletId?: string | null, limit = 500) => {
       const transferIds = Array.from(
         new Set(
           (entries ?? [])
-            .filter((e) => e.reference_type === "transfer" && e.reference_id)
+            .filter((e) => TRANSFER_REF_TYPES.has(e.reference_type ?? "") && e.reference_id)
             .map((e) => e.reference_id as string)
         )
       );
@@ -119,14 +132,17 @@ export const useStatement = (walletId?: string | null, limit = 500) => {
         const balance = prev + delta;
         runningByWallet[e.wallet_id!] = balance;
 
-        const isTransferRef = e.reference_type === "transfer" && e.reference_id;
+        const isTransferRef = TRANSFER_REF_TYPES.has(e.reference_type ?? "") && e.reference_id;
         const transfer = isTransferRef ? transfersById[e.reference_id as string] : null;
 
         const isOutgoing = dbt > 0;
+        const rawDescription = e.description?.trim() || "";
 
         let payee = "—";
         let purpose = purposeFromRefType(e.reference_type);
-        let description = cleanIncomingTransactionLabel(e.description, e.reference_type);
+        let description = rawDescription
+          ? cleanIncomingTransactionLabel(rawDescription, e.reference_type)
+          : purpose;
 
         if (transfer) {
           purpose = purposeFromTransferType(transfer.transfer_type, transfer.payout_method);
@@ -134,9 +150,14 @@ export const useStatement = (walletId?: string | null, limit = 500) => {
             payee = transfer.recipient_name || "Recipient";
             description = `Transfer to ${payee}${transfer.recipient_country ? ` (${transfer.recipient_country})` : ""}`;
           } else {
-            payee = "From eFinMoney user";
-            description = `Received from ${transfer.recipient_name || "eFinMoney user"}`;
+            payee = transfer.recipient_name || "eFinMoney user";
+            description = `Received from ${payee}`;
           }
+        } else if (rawDescription) {
+          const parsedPayee = payeeFromDescription(rawDescription);
+          if (parsedPayee) payee = parsedPayee;
+          else if (isOutgoing) payee = "Outflow";
+          else payee = "Inflow";
         } else if (isOutgoing) {
           payee = "Outflow";
         } else {

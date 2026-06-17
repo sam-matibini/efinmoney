@@ -28,9 +28,11 @@ interface Props {
   rows: StatementRow[];
   loading?: boolean;
   showBalance?: boolean;
+  filtered?: boolean;
+  searchQuery?: string;
 }
 
-export const StatementTable = ({ rows, loading, showBalance = true }: Props) => {
+export const StatementTable = ({ rows, loading, showBalance = true, filtered = false, searchQuery = "" }: Props) => {
   if (loading) {
     return (
       <div className="space-y-2">
@@ -42,8 +44,14 @@ export const StatementTable = ({ rows, loading, showBalance = true }: Props) => 
     return (
       <EmptyState
         icon={Inbox}
-        title="No transactions"
-        description="Nothing has posted to this account during the selected period."
+        title={filtered ? "No matching transactions" : "No transactions"}
+        description={
+          filtered
+            ? searchQuery.trim()
+              ? `Nothing matches “${searchQuery.trim()}”. Try a payee name, reference (e.g. EFM-5BE83AF8), amount, or purpose.`
+              : "Nothing matches your filters. Try clearing the date range or search."
+            : "Nothing has posted to this account during the selected period."
+        }
         size="sm"
       />
     );

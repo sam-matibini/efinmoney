@@ -12,7 +12,8 @@
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-    <meta name="theme-color" content="#0f172a" />
+    <meta name="theme-color" content="#f7f8fc" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0b2a6f" media="(prefers-color-scheme: dark)" />
 
     <!-- Open Graph -->
     <meta property="og:title" content="eFinMoney" />
@@ -36,7 +37,7 @@
         position: fixed;
         inset: 0;
         z-index: 99999;
-        background: #000;
+        background: #07122e;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -46,10 +47,22 @@
       #initial-splash video {
         width: 140px;
         height: 140px;
-        background: #000;
         mix-blend-mode: screen;
       }
     </style>
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem("efinmoney-theme");
+          var dark =
+            stored === "dark" ||
+            (!stored && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+          if (dark) {
+            document.documentElement.style.setProperty("color-scheme", "dark");
+          }
+        } catch (e) {}
+      })();
+    </script>
     <div id="initial-splash">
       <video src="/spinner.webm" autoplay loop muted playsinline width="140" height="140"></video>
     </div>

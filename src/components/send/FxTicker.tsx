@@ -2,11 +2,7 @@ import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { TrendingUp } from "lucide-react";
 import { useFxRates } from "@/hooks/useFxRates";
-
-const FLAG: Record<string, string> = {
-  USD: "🇺🇸", CAD: "🇨🇦", EUR: "🇪🇺", GBP: "🇬🇧", NGN: "🇳🇬", KES: "🇰🇪",
-  GHS: "🇬🇭", ZAR: "🇿🇦", UGX: "🇺🇬", TZS: "🇹🇿", ZMW: "🇿🇲", XAF: "🌍", XOF: "🌍",
-};
+import { CurrencyFlag } from "@/components/ui/FlagImage";
 
 const PREFERRED = ["NGN", "KES", "GHS", "ZAR", "UGX", "TZS", "ZMW"];
 
@@ -52,10 +48,10 @@ const FxTicker = () => {
         >
           {loop.map((it, i) => (
             <span key={`${it.key}-${i}`} className="flex shrink-0 items-center gap-1.5 text-xs">
-              <span>{FLAG[it.from] || "💱"}</span>
+              <CurrencyFlag code={it.from} size="xs" />
               <span className="font-medium text-muted-foreground">{it.from}</span>
               <TrendingUp className="h-3 w-3 text-emerald-500" />
-              <span>{FLAG[it.to] || "🌍"}</span>
+              <CurrencyFlag code={it.to} size="xs" />
               <span className="font-semibold text-foreground">
                 {it.rate.toLocaleString("en-US", { maximumFractionDigits: it.rate > 100 ? 0 : 4 })}
               </span>

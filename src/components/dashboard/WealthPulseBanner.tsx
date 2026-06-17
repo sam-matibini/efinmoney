@@ -1,22 +1,22 @@
 import { memo, useMemo, useState } from "react";
-import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
+import { motion, useMotionValue, useSpring, useTransform, useReducedMotion } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
 import { Send, Plus, Globe2, ArrowUpRight, CheckCircle2, Loader2 } from "lucide-react";
 import { useWallets } from "@/hooks/useWallets";
 import { useTransfers } from "@/hooks/useTransfers";
 import { useFxRates } from "@/hooks/useFxRates";
 import { buildUsdRateMap, convertToUsd } from "@/lib/fx";
-import { flagForCurrency } from "@/lib/flags";
+import { flagForCurrency, normalizeCountryCode } from "@/lib/flags";
 
 const WALLET_GRADIENT: Record<string, string> = {
-  USD: "linear-gradient(135deg,#6366f1,#4f46e5)",
-  CAD: "linear-gradient(135deg,#0f766e,#134e4a)",
-  NGN: "linear-gradient(135deg,#4338ca,#312e81)",
-  GBP: "linear-gradient(135deg,#14b8a6,#0f766e)",
-  EUR: "linear-gradient(135deg,#8b5cf6,#4338ca)",
-  KES: "linear-gradient(135deg,#65a30d,#3f6212)",
+  USD: "linear-gradient(135deg, hsl(var(--primary)), hsl(var(--brand-700)))",
+  CAD: "linear-gradient(135deg, #0f766e, #134e4a)",
+  NGN: "linear-gradient(135deg, hsl(var(--brand-700)), hsl(var(--brand-800)))",
+  GBP: "linear-gradient(135deg, hsl(220 45% 45%), hsl(220 50% 32%))",
+  EUR: "linear-gradient(135deg, hsl(var(--brand-500)), hsl(var(--brand-700)))",
+  KES: "linear-gradient(135deg, #65a30d, #3f6212)",
 };
-const fallbackGradient = "linear-gradient(135deg,#64748b,#334155)";
+const fallbackGradient = "linear-gradient(135deg, hsl(var(--muted-foreground)), hsl(var(--foreground) / 0.7))";
 
 const fmtUsd = (n: number) =>
   n >= 1000
@@ -26,6 +26,7 @@ const fmtUsd = (n: number) =>
 const PENDING = ["initiated", "funded", "processing"];
 
 const WealthPulseBannerInner = () => {
+  const reduceMotion = useReducedMotion();
   const { data: wallets } = useWallets();
   const { data: transfers } = useTransfers(500);
   const { data: fxRates } = useFxRates();
@@ -47,8 +48,9 @@ const WealthPulseBannerInner = () => {
       if (ts >= startMonth) sentMonthUsd += usd;
       if (t.recipient_country) {
         countries.add(t.recipient_country);
-        if (recentCountries.length < 5 && !recentCountries.includes(t.recipient_country)) {
-          recentCountries.push(t.recipient_country);
+        const cc = normalizeCountryCode(t.recipient_country);
+        if (cc && recentCountries.length < 5 && !recentCountries.includes(cc)) {
+          recentCountries.push(cc);
         }
       }
       if (PENDING.includes(t.status)) { inFlightCount += 1; inFlightUsd += usd; }
@@ -62,8 +64,8 @@ const WealthPulseBannerInner = () => {
   // Cursor parallax on the constellation
   const px = useMotionValue(0);
   const py = useMotionValue(0);
-  const rotateX = useSpring(useTransform(py, [-0.5, 0.5], [7, -7]), { stiffness: 140, damping: 14 });
-  const rotateY = useSpring(useTransform(px, [-0.5, 0.5], [-7, 7]), { stiffness: 140, damping: 14 });
+  const rotateX = useSpring(useTransform(py, [-0.5, 0.5], [5, -5]), { stiffness: 140, damping: 16, bounce: 0.15 });
+  const rotateY = useSpring(useTransform(px, [-0.5, 0.5], [-5, 5]), { stiffness: 140, damping: 16, bounce: 0.15 });
   const onMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
     px.set((e.clientX - r.left) / r.width - 0.5);
@@ -76,26 +78,17 @@ const WealthPulseBannerInner = () => {
 
   return (
     <motion.section
-      initial={{ opacity: 0, y: -12 }}
+      initial={reduceMotion ? false : { opacity: 0, y: -10 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-      className="relative mb-8 overflow-hidden rounded-3xl border border-border bg-card shadow-sm"
+      transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
+      className="relative mb-8 overflow-hidden rounded-2xl border border-border bg-card shadow-sm"
     >
-      {/* soft brand tint (theme-aware, subtle) */}
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/[0.06] via-transparent to-accent/[0.05] dark:from-primary/15 dark:to-accent/10" />
-      <div className="pointer-events-none absolute -top-24 -left-12 h-56 w-56 rounded-full bg-primary/15 blur-[90px]" />
-      <div className="pointer-events-none absolute -bottom-24 right-0 h-56 w-64 rounded-full bg-accent/10 blur-[90px]" />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/[0.04] via-transparent to-[hsl(var(--accent-amber)/0.04)]" />
 
       <div className="relative grid items-center gap-4 p-5 sm:p-7 md:grid-cols-[1.15fr_minmax(220px,0.85fr)]">
         {/* ── Left: real activity summary ── */}
         <div>
-          <span className="inline-flex items-center gap-2 rounded-full border border-border bg-background/60 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground backdrop-blur">
-            <span className="relative flex h-1.5 w-1.5">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-70" />
-              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-primary" />
-            </span>
-            Money in motion
-          </span>
+          <p className="text-sm font-medium text-muted-foreground">Money in motion</p>
 
           <div className="mt-4">
             <p className="text-xs text-muted-foreground">Sent this month</p>
@@ -129,9 +122,9 @@ const WealthPulseBannerInner = () => {
         {/* ── Right: wallet constellation around a Send action ── */}
         <div className="flex items-center justify-center">
           <motion.div
-            onMouseMove={onMove}
+            onMouseMove={reduceMotion ? undefined : onMove}
             onMouseLeave={onLeave}
-            style={{ rotateX, rotateY, transformPerspective: 900 }}
+            style={reduceMotion ? undefined : { rotateX, rotateY, transformPerspective: 900 }}
             className="relative h-[220px] w-[220px]"
           >
             <div className="absolute left-1/2 top-1/2 h-[188px] w-[188px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-border/70" />
@@ -141,7 +134,7 @@ const WealthPulseBannerInner = () => {
               <motion.div
                 className="absolute inset-0"
                 animate={{ rotate: 360 }}
-                transition={{ duration: 60, ease: "linear", repeat: Infinity }}
+                transition={{ duration: 90, ease: "linear", repeat: Infinity }}
               >
                 {/* spokes */}
                 {tokens.map((w, i) => {
@@ -168,7 +161,7 @@ const WealthPulseBannerInner = () => {
                     >
                       <motion.div
                         animate={{ rotate: -360 }}
-                        transition={{ duration: 60, ease: "linear", repeat: Infinity }}
+                        transition={{ duration: 90, ease: "linear", repeat: Infinity }}
                         className="-translate-x-1/2 -translate-y-1/2"
                       >
                         <WalletToken
@@ -191,7 +184,7 @@ const WealthPulseBannerInner = () => {
               {tokens.length > 0 ? (
                 <Link
                   to="/send"
-                  className="group flex h-[88px] w-[88px] flex-col items-center justify-center gap-1 rounded-full bg-gradient-to-br from-primary to-[hsl(245_85%_52%)] text-primary-foreground shadow-[0_0_36px_-4px_hsl(var(--primary)/0.7)] ring-1 ring-white/25 transition-transform hover:scale-105"
+                  className="group flex h-[88px] w-[88px] flex-col items-center justify-center gap-1 rounded-full bg-primary text-primary-foreground shadow-md ring-1 ring-primary/20 transition-transform duration-150 ease-out hover:scale-[1.03] active:scale-[0.97] motion-reduce:hover:scale-100 motion-reduce:active:scale-100"
                 >
                   <Send className="h-6 w-6 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
                   <span className="text-xs font-semibold">Send</span>
@@ -220,13 +213,13 @@ const KpiChip = ({
 }) => (
   <button
     onClick={onClick}
-    className={`group flex flex-col items-start gap-1 rounded-2xl border p-3 text-left transition-all hover:-translate-y-0.5 hover:shadow-md ${
+    className={`group flex flex-col items-start gap-1 rounded-xl border p-3 text-left transition-[transform,box-shadow,background-color] duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] hover:-translate-y-0.5 hover:shadow-md active:scale-[0.98] motion-reduce:hover:translate-y-0 motion-reduce:active:scale-100 ${
       highlight
         ? "border-emerald-500/30 bg-emerald-500/5 hover:bg-emerald-500/10"
         : "border-border bg-background/50 hover:bg-background"
     }`}
   >
-    <span className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+    <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
       {icon} <span className="truncate">{label}</span>
     </span>
     <span className="font-display text-lg font-bold leading-none text-foreground">{value}</span>
@@ -234,8 +227,8 @@ const KpiChip = ({
       <span className="mt-0.5 flex items-center">
         {flags.slice(0, 4).map((cc, i) => (
           <img
-            key={cc}
-            src={`https://flagcdn.com/w40/${cc.toLowerCase()}.png`}
+            key={`${cc}-${i}`}
+            src={`https://flagcdn.com/w40/${cc}.png`}
             alt={cc}
             loading="lazy"
             className="h-4 w-4 rounded-full object-cover ring-2 ring-card"
@@ -262,7 +255,7 @@ const WalletToken = ({
       onClick={onClick}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
-      className="relative flex h-12 w-12 items-center justify-center rounded-full text-xl shadow-lg ring-2 ring-card transition-transform hover:scale-110"
+      className="relative flex h-12 w-12 items-center justify-center rounded-full text-xl shadow-md ring-2 ring-card transition-transform duration-150 ease-out hover:scale-105 active:scale-[0.97] motion-reduce:hover:scale-100 motion-reduce:active:scale-100"
       style={{ background: gradient }}
       aria-label={`${code} wallet`}
     >

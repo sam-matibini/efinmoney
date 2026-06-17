@@ -34,7 +34,8 @@ import { friendlyFlwError, fetchFxRate, cardChargeCurrency, initializeFlwPayment
 import { currencySymbol, countryToCurrency } from "@/lib/currency";
 import { useProfile } from "@/hooks/useProfile";
 import { toast } from "sonner";
-import { ArrowRight, CheckCircle, Users, Clock, Shield, Wallet, Landmark, CreditCard, AlertCircle, X, Search } from "lucide-react";
+import { ArrowRight, CheckCircle, Users, Clock, Shield, Wallet, Landmark, CreditCard, AlertCircle, X, Search, Globe2 } from "lucide-react";
+import { BrandFlag, CountryFlag } from "@/components/ui/FlagImage";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import CanadaSendFlow from "@/components/send/CanadaSendFlow";
 import EfinmoneyP2PFlow from "@/components/send/EfinmoneyP2PFlow";
@@ -874,14 +875,19 @@ const SendPage = () => {
                   style={{ width: 'calc(33.333% - 0.5rem)' }}
                   transition={{ type: "spring", stiffness: 380, damping: 30 }}
                 />
-                <TabsTrigger value="international" className="relative z-10 gap-1 text-xs sm:text-sm data-[state=active]:bg-transparent data-[state=active]:shadow-none">
-                  🌍 International
+                <TabsTrigger value="international" className="relative z-10 gap-1.5 text-xs sm:text-sm data-[state=active]:bg-transparent data-[state=active]:shadow-none">
+                  <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/10 ring-1 ring-border">
+                    <Globe2 className="h-2.5 w-2.5 text-primary" aria-hidden />
+                  </span>
+                  International
                 </TabsTrigger>
-                <TabsTrigger value="efinmoney" className="relative z-10 gap-1 text-xs sm:text-sm data-[state=active]:bg-transparent data-[state=active]:shadow-none">
-                  💸 eFinMoney
+                <TabsTrigger value="efinmoney" className="relative z-10 gap-1.5 text-xs sm:text-sm data-[state=active]:bg-transparent data-[state=active]:shadow-none">
+                  <BrandFlag size="xs" />
+                  eFinMoney
                 </TabsTrigger>
-                <TabsTrigger value="canada" className="relative z-10 gap-1 text-xs sm:text-sm data-[state=active]:bg-transparent data-[state=active]:shadow-none">
-                  🇨🇦 Domestic
+                <TabsTrigger value="canada" className="relative z-10 gap-1.5 text-xs sm:text-sm data-[state=active]:bg-transparent data-[state=active]:shadow-none">
+                  <CountryFlag country="CA" size="xs" />
+                  Domestic
                 </TabsTrigger>
               </TabsList>
 

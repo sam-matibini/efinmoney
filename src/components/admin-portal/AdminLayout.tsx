@@ -1,6 +1,6 @@
 import { ReactNode, useEffect, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, ShieldCheck, Users, Layers, ScrollText, Settings, Bell, Search, LogOut, ChevronLeft, ChevronRight, Sun, Moon, Activity, ExternalLink, SlidersHorizontal } from "lucide-react";
+import { LayoutDashboard, ShieldCheck, Users, Layers, ScrollText, Settings, Bell, Search, LogOut, ChevronLeft, ChevronRight, Sun, Moon, Activity, ExternalLink, SlidersHorizontal, UserCog } from "lucide-react";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +18,7 @@ const NAV = [
   { to: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/admin/kyc", label: "KYC Queue", icon: ShieldCheck },
   { to: "/admin/users", label: "Users", icon: Users },
+  { to: "/admin/staff", label: "Staff", icon: UserCog, requiresStaffMgmt: true },
   { to: "/admin/risk-tiers", label: "Risk Tiers", icon: Layers },
   { to: "/admin/kyc-config", label: "KYC Config", icon: SlidersHorizontal },
   { to: "/admin/audit-log", label: "Audit Log", icon: ScrollText },
@@ -26,7 +27,7 @@ const NAV = [
 ];
 
 const AdminLayout = ({ children }: { children: ReactNode }) => {
-  const { admin, signOut } = useAdminAuth();
+  const { admin, signOut, hasPermission } = useAdminAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
@@ -131,7 +132,7 @@ const AdminLayout = ({ children }: { children: ReactNode }) => {
 
       {/* Nav */}
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-        {NAV.map((item) => {
+        {NAV.filter((item) => !item.requiresStaffMgmt || hasPermission("manage_staff")).map((item) => {
           const Icon = item.icon;
           const active = location.pathname === item.to || location.pathname.startsWith(item.to + "/");
           const badge = item.to === "/admin/kyc" && pendingKycCount > 0 ? pendingKycCount : null;

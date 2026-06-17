@@ -3,12 +3,21 @@ import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
 import { toast } from "sonner";
 
-export type AdminRole = "super_admin" | "compliance_officer" | "support_agent" | "viewer";
+export type AdminRole =
+  | "super_admin"
+  | "compliance_officer"
+  | "finance_officer"
+  | "support_agent"
+  | "viewer";
+
+export type AdminStatus = "invited" | "pending_review" | "active" | "rejected" | "suspended";
 
 export interface AdminRecord {
   id: string;
   role: AdminRole;
+  status: AdminStatus;
   full_name: string | null;
+  email: string | null;
   permissions: Record<string, unknown>;
 }
 
@@ -22,16 +31,22 @@ type AdminAction =
   | "edit_users"
   | "edit_tiers"
   | "manage_admins"
+  | "manage_staff"
+  | "manage_finance"
   | "edit_settings";
 
 const ROLE_PERMISSIONS: Record<AdminRole, AdminAction[]> = {
   super_admin: [
     "view", "approve_kyc", "reject_kyc", "request_info", "escalate",
-    "edit_internal_notes", "edit_users", "edit_tiers", "manage_admins", "edit_settings",
+    "edit_internal_notes", "edit_users", "edit_tiers", "manage_admins",
+    "manage_staff", "manage_finance", "edit_settings",
   ],
   compliance_officer: [
     "view", "approve_kyc", "reject_kyc", "request_info", "escalate",
-    "edit_internal_notes", "edit_users",
+    "edit_internal_notes", "edit_users", "edit_tiers",
+  ],
+  finance_officer: [
+    "view", "manage_finance",
   ],
   support_agent: ["view", "edit_internal_notes"],
   viewer: ["view"],
@@ -60,7 +75,7 @@ export const AdminAuthProvider = ({ children }: { children: ReactNode }) => {
   const fetchAdmin = useCallback(async (uid: string) => {
     const { data, error } = await supabase
       .from("admin_users")
-      .select("id, role, full_name, permissions")
+      .select("id, role, status, full_name, email, permissions")
       .eq("id", uid)
       .maybeSingle();
     if (error || !data) {
@@ -70,7 +85,9 @@ export const AdminAuthProvider = ({ children }: { children: ReactNode }) => {
     const rec: AdminRecord = {
       id: data.id,
       role: data.role as AdminRole,
+      status: (data.status as AdminStatus) ?? "active",
       full_name: data.full_name,
+      email: (data as { email?: string | null }).email ?? null,
       permissions: (data.permissions as Record<string, unknown>) || {},
     };
     setAdmin(rec);
@@ -156,7 +173,7 @@ export const AdminAuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const hasPermission = useCallback((action: AdminAction) => {
-    if (!admin) return false;
+    if (!admin || admin.status !== "active") return false;
     return ROLE_PERMISSIONS[admin.role]?.includes(action) ?? false;
   }, [admin]);
 

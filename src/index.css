@@ -329,4 +329,9 @@
   .animate-bubble-drift {
     animation: bubble-drift 6s ease-in-out infinite;
   }
+
+  /* Brand loading spinner ring */
+  @keyframes efin-spin {
+    to { transform: rotate(360deg); }
+  }
 }

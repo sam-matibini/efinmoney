@@ -47,12 +47,38 @@ export const TierBadge = ({ tier }: { tier: string | null | undefined }) => {
 const ROLE_STYLES: Record<string, string> = {
   super_admin: "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20",
   compliance_officer: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
+  finance_officer: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
   support_agent: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20",
   viewer: "bg-muted text-muted-foreground border-border",
 };
 
 export const RoleBadge = ({ role }: { role: string }) => (
   <Badge variant="outline" className={cn("font-medium border capitalize", ROLE_STYLES[role] || ROLE_STYLES.viewer)}>
-    {role.replace("_", " ")}
+    {role.replace(/_/g, " ")}
   </Badge>
 );
+
+const STAFF_STATUS_STYLES: Record<string, string> = {
+  invited: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
+  pending_review: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
+  active: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20",
+  rejected: "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20",
+  suspended: "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20",
+};
+
+const STAFF_STATUS_LABELS: Record<string, string> = {
+  invited: "Invited",
+  pending_review: "Pending review",
+  active: "Active",
+  rejected: "Rejected",
+  suspended: "Suspended",
+};
+
+export const StaffStatusBadge = ({ status }: { status: string | null | undefined }) => {
+  const key = status || "invited";
+  return (
+    <Badge variant="outline" className={cn("font-medium border", STAFF_STATUS_STYLES[key] || STAFF_STATUS_STYLES.invited)}>
+      {STAFF_STATUS_LABELS[key] || key}
+    </Badge>
+  );
+};

@@ -1,4 +1,4 @@
-import { motion, useMotionValue, useSpring, useTransform, useMotionTemplate } from "framer-motion";
+import { motion, useMotionValue, useSpring, useTransform, useMotionTemplate, useReducedMotion } from "framer-motion";
 import { useMemo, useState, useEffect } from "react";
 import { AreaChart, Area, ResponsiveContainer, Tooltip } from "recharts";
 import { TrendingUp, TrendingDown, Wallet as WalletIcon, Activity, Eye, EyeOff } from "lucide-react";
@@ -28,6 +28,7 @@ const buildUsdRateMap = (rates: { from_currency: string; to_currency: string; ef
 };
 
 const HeroBalance = () => {
+  const reduceMotion = useReducedMotion();
   const { user } = useAuth();
   const { data: profile } = useProfile();
   const { data: wallets, isLoading: walletsLoading } = useWallets();
@@ -108,11 +109,11 @@ const HeroBalance = () => {
   const px = useMotionValue(0); // -0.5 .. 0.5
   const py = useMotionValue(0);
   const [hovering, setHovering] = useState(false);
-  const rotateX = useSpring(useTransform(py, [-0.5, 0.5], [5, -5]), { stiffness: 140, damping: 14 });
-  const rotateY = useSpring(useTransform(px, [-0.5, 0.5], [-5, 5]), { stiffness: 140, damping: 14 });
+  const rotateX = useSpring(useTransform(py, [-0.5, 0.5], [3, -3]), { stiffness: 140, damping: 16, bounce: 0.15 });
+  const rotateY = useSpring(useTransform(px, [-0.5, 0.5], [-3, 3]), { stiffness: 140, damping: 16, bounce: 0.15 });
   const spotX = useTransform(px, (v) => `${(v + 0.5) * 100}%`);
   const spotY = useTransform(py, (v) => `${(v + 0.5) * 100}%`);
-  const spotlight = useMotionTemplate`radial-gradient(480px circle at ${spotX} ${spotY}, hsl(265 92% 72% / 0.20), transparent 62%)`;
+  const spotlight = useMotionTemplate`radial-gradient(480px circle at ${spotX} ${spotY}, hsl(var(--primary) / 0.12), transparent 62%)`;
 
   const handleMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
@@ -123,14 +124,14 @@ const HeroBalance = () => {
 
   return (
     <motion.section
-      initial={{ opacity: 0, y: -16 }}
+      initial={reduceMotion ? false : { opacity: 0, y: -12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-      onMouseMove={handleMove}
+      transition={{ duration: 0.45, ease: [0.23, 1, 0.32, 1] }}
+      onMouseMove={reduceMotion ? undefined : handleMove}
       onMouseEnter={() => setHovering(true)}
       onMouseLeave={handleLeave}
-      style={{ rotateX, rotateY, transformPerspective: 1200 }}
-      className="relative overflow-hidden rounded-3xl mb-8 border backdrop-blur-xl dark:backdrop-blur-2xl bg-white/70 dark:bg-gradient-to-br dark:from-[hsl(250_50%_16%)] dark:via-[hsl(255_45%_10%)] dark:to-[hsl(240_55%_7%)] dark:border-white/10 border-[hsl(258_55%_85%/0.45)] dark:shadow-card-purple shadow-[0_8px_32px_-12px_hsl(244_30%_50%/0.12)] dark:text-white text-[hsl(248_42%_18%)]"
+      style={reduceMotion ? undefined : { rotateX, rotateY, transformPerspective: 1200 }}
+      className="relative overflow-hidden rounded-2xl mb-8 border bg-card dark:bg-gradient-to-br dark:from-[hsl(var(--brand-800))] dark:via-[hsl(var(--brand-900))] dark:to-[hsl(240_55%_7%)] dark:border-white/10 border-border shadow-sm dark:text-white"
     >
       {/* Cursor-follow spotlight */}
       <motion.div
@@ -139,29 +140,9 @@ const HeroBalance = () => {
         style={{ background: spotlight, opacity: hovering ? 1 : 0 }}
       />
       {/* Glass highlight sheen */}
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/[0.06] via-transparent to-transparent" />
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent dark:via-white/25 via-[hsl(258_55%_80%/0.35)] to-transparent" />
-      <div className="absolute -top-32 left-1/2 -translate-x-1/2 h-72 w-[700px] rounded-full bg-[hsl(var(--brand-500)/0.35)] blur-[120px] pointer-events-none" />
-      <div className="absolute -bottom-20 -right-20 h-64 w-64 rounded-full bg-[hsl(180_85%_60%/0.10)] blur-3xl pointer-events-none" />
-      <div className="absolute -bottom-24 -left-16 h-72 w-72 rounded-full bg-[hsl(280_85%_65%/0.14)] blur-3xl pointer-events-none" />
-
-      {/* Floating currency symbols (decorative) */}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        {["💵", "💷", "💶", "₦", "🪙", "$", "€"].map((sym, i) => (
-          <span
-            key={i}
-            className="absolute text-3xl animate-currency-float"
-            style={{
-              left: `${(i * 13 + 8) % 92}%`,
-              bottom: "-30px",
-              animationDelay: `${i * 1.4}s`,
-              animationDuration: `${8 + (i % 3) * 2}s`,
-            }}
-          >
-            {sym}
-          </span>
-        ))}
-      </div>
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/[0.04] via-transparent to-transparent" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+      <div className="absolute -top-32 left-1/2 -translate-x-1/2 h-72 w-[700px] rounded-full bg-[hsl(var(--brand-500)/0.18)] blur-[120px] pointer-events-none" />
 
       <div className="relative p-6 sm:p-10">
         {/* Greeting with waving emoji */}
@@ -171,7 +152,7 @@ const HeroBalance = () => {
           transition={{ delay: 0.05, duration: 0.4 }}
           className="flex items-center justify-center gap-2 mb-6"
         >
-          <h1 className="text-lg sm:text-xl font-display font-semibold dark:text-white/85 text-[hsl(248_40%_22%)]">
+          <h1 className="text-lg sm:text-xl font-display font-semibold text-foreground dark:text-white/90">
             {greeting}, {firstName}
           </h1>
           <span
@@ -184,26 +165,26 @@ const HeroBalance = () => {
 
         {/* Massive balance with progress arc */}
         <motion.div
-          initial={{ opacity: 0, scale: 0.96 }}
+          initial={reduceMotion ? false : { opacity: 0, scale: 0.98 }}
           animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.15, duration: 0.5 }}
+          transition={{ delay: 0.1, duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
           className="text-center mb-2 relative"
         >
           {walletsLoading ? (
             <Skeleton className="h-16 w-72 mx-auto" />
           ) : (
-            <h2 className="text-5xl sm:text-6xl md:text-7xl font-display font-bold tracking-tight dark:text-white text-[hsl(250_45%_16%)] inline-flex items-center justify-center gap-3 sm:gap-4">
+            <h2 className="text-5xl sm:text-6xl md:text-7xl font-display font-bold tracking-tight text-foreground dark:text-white inline-flex items-center justify-center gap-3 sm:gap-4">
               <span>{hidden ? <span className="tracking-widest">••••••</span> : <AnimatedBalance value={totalUsd} />}</span>
               <button
                 onClick={() => setHidden((v) => !v)}
                 aria-label={hidden ? "Show balance" : "Hide balance"}
-                className="p-2 rounded-full dark:text-white/60 text-[hsl(230_12%_45%)] dark:hover:text-white hover:text-[hsl(250_45%_16%)] dark:hover:bg-white/10 hover:bg-[hsl(244_75%_57%/0.06)] transition-colors"
+                className="p-2 rounded-full text-muted-foreground hover:text-foreground dark:hover:text-white hover:bg-muted/60 dark:hover:bg-white/10 transition-colors duration-150 active:scale-[0.97]"
               >
                 {hidden ? <EyeOff className="w-5 h-5 sm:w-6 sm:h-6" /> : <Eye className="w-5 h-5 sm:w-6 sm:h-6" />}
               </button>
             </h2>
           )}
-          <p className="text-sm dark:text-white/55 text-[hsl(230_12%_45%)] mt-2">Total Portfolio Value</p>
+          <p className="text-sm text-muted-foreground mt-2">Total Portfolio Value</p>
 
           {/* Dynamic Trend Pill */}
           {!walletsLoading && (
@@ -249,23 +230,23 @@ const HeroBalance = () => {
         >
           {/* Left-to-right reveal mask */}
           <motion.div
-            initial={{ clipPath: "inset(0 100% 0 0)" }}
+            initial={reduceMotion ? false : { clipPath: "inset(0 100% 0 0)" }}
             animate={{ clipPath: "inset(0 0% 0 0)" }}
-            transition={{ duration: 1.6, ease: [0.22, 1, 0.36, 1], delay: 0.6 }}
+            transition={{ duration: reduceMotion ? 0 : 1.2, ease: [0.23, 1, 0.32, 1], delay: reduceMotion ? 0 : 0.5 }}
             className="absolute inset-0"
           >
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={sparkData} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="hero-stroke" x1="0" y1="0" x2="1" y2="0">
-                    <stop offset="0%" stopColor="hsl(265 95% 72%)" />
-                    <stop offset="50%" stopColor="hsl(280 95% 70%)" />
-                    <stop offset="100%" stopColor="hsl(185 95% 60%)" />
+                    <stop offset="0%" stopColor="hsl(var(--primary))" />
+                    <stop offset="60%" stopColor="hsl(var(--brand-500))" />
+                    <stop offset="100%" stopColor="hsl(var(--accent-amber))" />
                   </linearGradient>
                   <linearGradient id="hero-area" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="hsl(270 90% 70%)" stopOpacity={0.55} />
-                    <stop offset="55%" stopColor="hsl(230 85% 60%)" stopOpacity={0.18} />
-                    <stop offset="100%" stopColor="hsl(190 90% 60%)" stopOpacity={0} />
+                    <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.35} />
+                    <stop offset="55%" stopColor="hsl(var(--brand-500))" stopOpacity={0.12} />
+                    <stop offset="100%" stopColor="hsl(var(--accent-amber))" stopOpacity={0} />
                   </linearGradient>
                   <filter id="hero-glow" x="-20%" y="-50%" width="140%" height="200%">
                     <feGaussianBlur stdDeviation="3" result="blur" />
@@ -296,7 +277,7 @@ const HeroBalance = () => {
                   filter="url(#hero-glow)"
                   isAnimationActive={false}
                   dot={false}
-                  activeDot={{ r: 4, fill: "hsl(280 95% 75%)", stroke: "white", strokeWidth: 1.5 }}
+                  activeDot={{ r: 4, fill: "hsl(var(--primary))", stroke: "white", strokeWidth: 1.5 }}
                 />
               </AreaChart>
             </ResponsiveContainer>
@@ -310,14 +291,14 @@ const HeroBalance = () => {
           transition={{ delay: 0.7, duration: 0.4 }}
           className="flex flex-wrap items-center justify-center gap-2 mt-4"
         >
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold dark:bg-white/10 dark:text-white/85 bg-[hsl(244_60%_55%/0.08)] text-[hsl(244_55%_35%)] backdrop-blur">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold bg-muted/60 text-foreground dark:bg-white/10 dark:text-white/85">
             {(wallets || []).slice(0, 6).map((w) => {
               const f = flagForCurrency(w.currency_code);
               return <span key={w.wallet_id} title={w.currency_code}>{f !== "🌍" ? f : (w.flag_emoji || "💰")}</span>;
             })}
             {walletCount === 0 && <WalletIcon className="w-3 h-3" />}
           </span>
-          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold dark:bg-white/10 dark:text-white/85 bg-[hsl(244_60%_55%/0.08)] text-[hsl(244_55%_35%)] backdrop-blur">
+          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-muted/60 text-muted-foreground dark:bg-white/10 dark:text-white/85">
             <Activity className="w-3 h-3" /> Active
           </span>
         </motion.div>
