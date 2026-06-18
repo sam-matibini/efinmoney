@@ -1,8 +1,9 @@
 import { motion, useMotionValue, useTransform } from "framer-motion";
 import { useRef, useState, useEffect } from "react";
-import { Plus, Send, Download, ArrowUpRight } from "lucide-react";
+import { Plus, Send, Download, ArrowUpRight, CreditCard } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useWallets } from "@/hooks/useWallets";
+import { useWalletCards } from "@/hooks/useWalletCards";
 import { Skeleton } from "@/components/ui/skeleton";
 import CreateWalletModal from "@/components/modals/CreateWalletModal";
 import AnimatedNumber from "@/components/ui/AnimatedNumber";
@@ -43,6 +44,7 @@ const formatBalance = (value: number) =>
 
 const WalletCarousel = () => {
   const { data: wallets, isLoading } = useWallets();
+  const { linkedCardCount } = useWalletCards();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [activeIndex, setActiveIndex] = useState(0);
   const navigate = useNavigate();
@@ -137,12 +139,20 @@ const WalletCarousel = () => {
               <div className="absolute -bottom-10 -left-10 h-32 w-32 rounded-full bg-white/5 blur-xl" />
 
               <div className="relative h-full p-5 flex flex-col justify-between">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-3xl drop-shadow-sm">{flag}</span>
-                    <div>
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-3xl drop-shadow-sm shrink-0">{flag}</span>
+                    <div className="min-w-0">
                       <p className="font-display font-semibold text-sm">{w.currency_code}</p>
-                      <p className="text-[10px] uppercase tracking-wider text-white/60">{w.currency_name}</p>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <p className="text-[10px] uppercase tracking-wider text-white/60">{w.currency_name}</p>
+                        {(linkedCardCount[w.wallet_id] ?? 0) > 0 && (
+                          <span className="flex items-center gap-0.5 text-[9px] uppercase tracking-wider bg-white/20 px-1.5 py-0.5 rounded-full leading-none">
+                            <CreditCard className="w-2 h-2" />
+                            {linkedCardCount[w.wallet_id]}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                   {w.is_default && (

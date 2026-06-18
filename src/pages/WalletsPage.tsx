@@ -4,11 +4,12 @@ import Header from "@/components/layout/Header";
 import MobileNav from "@/components/layout/MobileNav";
 import WalletCard from "@/components/ui/WalletCard";
 import { useWallets } from "@/hooks/useWallets";
+import { useWalletCards } from "@/hooks/useWalletCards";
 import { useWalletManagement } from "@/hooks/useWalletManagement";
 import { useFxRates } from "@/hooks/useFxRates";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Plus, Wallet, TrendingUp, AlertTriangle } from "lucide-react";
+import { Plus, Wallet, CreditCard, TrendingUp, AlertTriangle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import CreateWalletModal from "@/components/modals/CreateWalletModal";
@@ -28,6 +29,7 @@ type WalletModalData = {
 const WalletsPage = () => {
   const { data: wallets, isLoading } = useWallets();
   const { data: fxRates } = useFxRates();
+  const { walletCardMap, totalLinkedCards } = useWalletCards();
   const [editWallet, setEditWallet] = useState<WalletModalData>(null);
   const [deleteWallet, setDeleteWallet] = useState<WalletModalData>(null);
   const { setDefault, toggleFreeze, updateWallet, deleteWallet: deleteWalletFn } = useWalletManagement();
@@ -118,6 +120,12 @@ const WalletsPage = () => {
                 <TrendingUp className="w-4 h-4" />
                 <span className="text-sm">Across {wallets?.length || 0} wallets</span>
               </div>
+              {totalLinkedCards > 0 && (
+                <div className="flex items-center gap-2 mt-1 text-primary-foreground/60">
+                  <CreditCard className="w-3.5 h-3.5" />
+                  <span className="text-xs">{totalLinkedCards} linked card{totalLinkedCards === 1 ? "" : "s"}</span>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -149,6 +157,7 @@ const WalletsPage = () => {
                     isMain={index === 0}
                     isDefault={wallet.is_default}
                     status={wallet.status}
+                    linkedCards={walletCardMap[wallet.wallet_id] ?? []}
                     onSetDefault={setDefault}
                     onToggleFreeze={(id, freeze) => toggleFreeze({ walletId: id, freeze })}
                     onEdit={(w) => setEditWallet(w)}
