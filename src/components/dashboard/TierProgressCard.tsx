@@ -19,13 +19,6 @@ const TierProgressCard = () => {
   const { data: transfers } = useTransfers(200);
   const { data: fxRates } = useFxRates();
 
-  // Only show for new-framework users; legacy users see KYCStatusCard if needed.
-  if ((profile?.kyc_framework_version ?? 2) < 2) return null;
-  if (!tier) return null;
-
-  const current = tier.current_tier as Tier;
-  const upgradeTo = nextTier(current);
-
   const { dailyUsed, monthlyUsed } = useMemo(() => {
     const now = new Date();
     const startDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
@@ -40,6 +33,13 @@ const TierProgressCard = () => {
     }
     return { dailyUsed: d, monthlyUsed: m };
   }, [transfers, fxRates]);
+
+  // Only show for new-framework users; legacy users see KYCStatusCard if needed.
+  if ((profile?.kyc_framework_version ?? 2) < 2) return null;
+  if (!tier) return null;
+
+  const current = tier.current_tier as Tier;
+  const upgradeTo = nextTier(current);
 
   const dailyPct = Math.min(100, (dailyUsed / Number(tier.daily_transaction_limit)) * 100);
   const monthlyPct = Math.min(100, (monthlyUsed / Number(tier.monthly_transaction_limit)) * 100);

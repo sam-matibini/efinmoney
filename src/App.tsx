@@ -17,6 +17,7 @@ import TermsPage from "./pages/TermsPage";
 import CompliancePage from "./pages/CompliancePage";
 import Auth from "./pages/Auth";
 import AuthConfirm from "./pages/AuthConfirm";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
 import NotFound from "./pages/NotFound";
 import FinanceDashboard from "./pages/FinanceDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
@@ -222,6 +223,7 @@ const AppRoutes = () => {
           <Route path="/operations" element={<RoleProtectedRoute allowedRoles={['admin', 'compliance', 'finance']}><OperationsDashboard /></RoleProtectedRoute>} />
           <Route path="/auth" element={<PublicRoute><Auth /></PublicRoute>} />
           <Route path="/auth/confirm" element={<AuthConfirm />} />
+          <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
           <Route path="/portal" element={<CustomerPortalPage />} />
           <Route path="/profile" element={<ProtectedRoute><ProfileSettingsPage /></ProtectedRoute>} />
           <Route path="/more" element={<KycProtectedRoute><MorePage /></KycProtectedRoute>} />

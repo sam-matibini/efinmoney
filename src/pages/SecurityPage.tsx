@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import Header from "@/components/layout/Header";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -11,6 +12,7 @@ import { toast } from "sonner";
 import { Lock, Smartphone } from "lucide-react";
 
 const SecurityPage = () => {
+  const navigate = useNavigate();
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [updating, setUpdating] = useState(false);
@@ -29,6 +31,22 @@ const SecurityPage = () => {
     try {
       const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) throw error;
+
+      let loginPath: string | null = null;
+      try {
+        loginPath = sessionStorage.getItem("efm_post_reset_login");
+        if (loginPath) sessionStorage.removeItem("efm_post_reset_login");
+      } catch {
+        /* noop */
+      }
+
+      if (loginPath) {
+        await supabase.auth.signOut();
+        toast.success("Password updated. Sign in with your new password.");
+        navigate(loginPath, { replace: true });
+        return;
+      }
+
       toast.success("Password updated successfully");
       setNewPassword("");
       setConfirmPassword("");

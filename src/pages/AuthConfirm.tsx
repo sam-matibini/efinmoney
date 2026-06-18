@@ -11,10 +11,18 @@ type EmailOtpType = "signup" | "invite" | "magiclink" | "recovery" | "email_chan
 const DEFAULT_NEXT: Record<string, string> = {
   signup: "/onboarding/identity",
   invite: "/admin/onboarding",
-  recovery: "/security",
+  recovery: "/auth/reset-password",
   email_change: "/profile",
   magiclink: "/",
   email: "/",
+};
+
+const isSafeRedirect = (path: string | null): path is string =>
+  !!path && path.startsWith("/") && !path.startsWith("//");
+
+const recoveryTarget = (nextParam: string | null) => {
+  const loginPath = isSafeRedirect(nextParam) ? nextParam : "/auth";
+  return `/auth/reset-password?next=${encodeURIComponent(loginPath)}`;
 };
 
 const SUCCESS_COPY: Record<string, { title: string; body: string }> = {
@@ -28,7 +36,7 @@ const SUCCESS_COPY: Record<string, { title: string; body: string }> = {
   },
   recovery: {
     title: "Identity confirmed",
-    body: "You're signed in. Let's set a new password for your account…",
+    body: "Let's set a new password for your account. You'll be redirected to sign in when you're done.",
   },
   email_change: {
     title: "Email updated",
@@ -62,9 +70,23 @@ const AuthConfirm = () => {
       const otpType = (params.get("type") || "signup") as EmailOtpType;
       const code = params.get("code");
       const nextParam = params.get("next");
-      const target = nextParam && nextParam !== "/" ? nextParam : DEFAULT_NEXT[otpType] || "/";
+      const target =
+        otpType === "recovery"
+          ? recoveryTarget(nextParam)
+          : nextParam && nextParam !== "/"
+            ? nextParam
+            : DEFAULT_NEXT[otpType] || "/";
       setType(otpType);
       setDest(target);
+
+      if (otpType === "recovery") {
+        const loginPath = isSafeRedirect(nextParam) ? nextParam : "/auth";
+        try {
+          sessionStorage.setItem("efm_post_reset_login", loginPath);
+        } catch {
+          /* noop */
+        }
+      }
 
       try {
         if (tokenHash) {
