@@ -1,8 +1,9 @@
 import { motion, useMotionValue, useSpring, useTransform, useMotionTemplate, useReducedMotion } from "framer-motion";
 import { useMemo, useState, useEffect } from "react";
 import { AreaChart, Area, ResponsiveContainer, Tooltip } from "recharts";
-import { TrendingUp, TrendingDown, Wallet as WalletIcon, Activity, Eye, EyeOff } from "lucide-react";
+import { TrendingUp, TrendingDown, Wallet as WalletIcon, Activity, CreditCard, Eye, EyeOff } from "lucide-react";
 import { useWallets } from "@/hooks/useWallets";
+import { useWalletCards } from "@/hooks/useWalletCards";
 import { useTransfers } from "@/hooks/useTransfers";
 import { useFxRates } from "@/hooks/useFxRates";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -32,6 +33,7 @@ const HeroBalance = () => {
   const { user } = useAuth();
   const { data: profile } = useProfile();
   const { data: wallets, isLoading: walletsLoading } = useWallets();
+  const { totalLinkedCards } = useWalletCards();
   const { data: transfers } = useTransfers(200);
   const { data: fxRates } = useFxRates();
   const [hidden, setHidden] = useState<boolean>(() => {
@@ -301,6 +303,11 @@ const HeroBalance = () => {
           <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-muted/60 text-muted-foreground dark:bg-white/10 dark:text-white/85">
             <Activity className="w-3 h-3" /> Active
           </span>
+          {totalLinkedCards > 0 && (
+            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold dark:bg-white/10 dark:text-white/85 bg-[hsl(244_60%_55%/0.08)] text-[hsl(244_55%_35%)] backdrop-blur">
+              <CreditCard className="w-3 h-3" /> {totalLinkedCards} card{totalLinkedCards === 1 ? "" : "s"}
+            </span>
+          )}
         </motion.div>
       </div>
     </motion.section>
