@@ -40,7 +40,7 @@ const InviteStaffModal = ({ open, onOpenChange }: Props) => {
           email: email.trim().toLowerCase(),
           full_name: fullName.trim(),
           role,
-          redirect_to: `${window.location.origin}/admin/onboarding`,
+          redirect_to: `${import.meta.env.VITE_APP_URL || window.location.origin}/admin/onboarding`,
         },
       });
       if (error) throw error;

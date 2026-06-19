@@ -53,7 +53,7 @@ const Header = () => {
   const navItems = [
     { label: 'Dashboard', href: '/dashboard' },
     { label: 'Send', href: '/send' },
-    { label: '🇨🇦 Top up', href: '/transfers/canada' },
+    { label: 'Top up', href: '/wallet/topup' },
     { label: 'Contacts', href: '/contacts' },
     { label: 'Exchange', href: '/exchange' },
     { label: 'Wallets', href: '/wallets' },

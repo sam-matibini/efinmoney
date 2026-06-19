@@ -85,3 +85,15 @@ verify_jwt = false
 # Management API (Authentication -> Hooks), pointing at this function. It is intentionally
 # not declared as [auth.hook.send_email] here because that makes `functions deploy`
 # attempt a privileged auth-config sync.
+
+[functions.adyen-webhook]
+verify_jwt = false
+
+[functions.adyen-create-session]
+verify_jwt = false
+
+[functions.adyen-create-paylink]
+verify_jwt = false
+
+[functions.adyen-confirm-session]
+verify_jwt = false

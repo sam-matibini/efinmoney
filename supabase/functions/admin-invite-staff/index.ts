@@ -43,7 +43,8 @@ Deno.serve(async (req) => {
     const email = (body?.email || "").trim().toLowerCase();
     const fullName = (body?.full_name || "").trim();
     const role = body?.role;
-    const redirectTo = body?.redirect_to || `${SUPABASE_URL}`;
+    const appUrl = Deno.env.get("APP_URL") || "https://efin.money";
+    const redirectTo = body?.redirect_to || `${appUrl}/admin/onboarding`;
 
     if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
       return json(400, { error: "A valid email is required" });

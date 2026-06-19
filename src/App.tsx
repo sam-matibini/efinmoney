@@ -285,6 +285,7 @@ const AppRoutes = () => {
           <Route path="/onboarding/approved" element={<Navigate to="/dashboard" replace />} />
 
           <Route path="/onboarding/rejected" element={<ProtectedRoute><OnboardingRejected /></ProtectedRoute>} />
+          <Route path="/settings/profile" element={<Navigate to="/profile" replace />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
   );

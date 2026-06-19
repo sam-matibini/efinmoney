@@ -1,4 +1,21 @@
+import { FunctionsHttpError } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+
+async function invokeErrorMessage(error: unknown): Promise<string> {
+  if (error instanceof FunctionsHttpError) {
+    try {
+      const body = await error.context.json();
+      if (body?.error) {
+        const hint = body.hint ? ` (${body.hint})` : "";
+        const detail = body.detail?.message || body.detail?.errorCode || "";
+        return detail ? `${body.error}: ${detail}${hint}` : `${body.error}${hint}`;
+      }
+    } catch {
+      /* ignore parse errors */
+    }
+  }
+  return error instanceof Error ? error.message : "Request failed";
+}
 
 export interface AdyenSessionResult {
   sessionId: string;
@@ -8,6 +25,33 @@ export interface AdyenSessionResult {
   reference: string;
   amount: { value: number; currency: string };
   session_db_id: string;
+}
+
+const ADYEN_CONFIG_KEY = "adyen_checkout_config";
+
+export function storeAdyenCheckoutConfig(config: { clientKey: string; environment: string }) {
+  try {
+    sessionStorage.setItem(ADYEN_CONFIG_KEY, JSON.stringify(config));
+  } catch {
+    /* ignore */
+  }
+}
+
+export function getStoredAdyenCheckoutConfig(): { clientKey: string; environment: string } | null {
+  try {
+    const raw = sessionStorage.getItem(ADYEN_CONFIG_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function resolveAdyenClientConfig(): { clientKey: string; environment: string } | null {
+  const stored = getStoredAdyenCheckoutConfig();
+  const clientKey = stored?.clientKey || import.meta.env.VITE_ADYEN_CLIENT_KEY;
+  const environment = stored?.environment || import.meta.env.VITE_ADYEN_ENV || "test";
+  if (!clientKey) return null;
+  return { clientKey, environment };
 }
 
 export async function createAdyenSession(params: {
@@ -21,9 +65,28 @@ export async function createAdyenSession(params: {
   related_invoice_id?: string | null;
 }): Promise<AdyenSessionResult> {
   const { data, error } = await supabase.functions.invoke("adyen-create-session", { body: params });
-  if (error) throw error;
+  if (error) throw new Error(await invokeErrorMessage(error));
   if ((data as any)?.error) throw new Error((data as any).error);
   return data as AdyenSessionResult;
+}
+
+export async function confirmAdyenSession(params: {
+  sessionId: string;
+  sessionResult?: string | null;
+}) {
+  const { data, error } = await supabase.functions.invoke("adyen-confirm-session", { body: params });
+  if (error) throw new Error(await invokeErrorMessage(error));
+  if ((data as any)?.error) throw new Error((data as any).error);
+  return data as {
+    verified: boolean;
+    credited?: boolean;
+    already?: boolean;
+    credit_error?: string | null;
+    amount?: number;
+    currency?: string;
+    resultCode?: string;
+    status?: string;
+  };
 }
 
 export async function createAdyenPayLink(params: {
@@ -36,7 +99,7 @@ export async function createAdyenPayLink(params: {
   expires_in_hours?: number;
 }) {
   const { data, error } = await supabase.functions.invoke("adyen-create-paylink", { body: params });
-  if (error) throw error;
+  if (error) throw new Error(await invokeErrorMessage(error));
   if ((data as any)?.error) throw new Error((data as any).error);
   return data as {
     id: string;

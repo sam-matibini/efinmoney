@@ -2,36 +2,57 @@ import { createClient } from 'npm:@supabase/supabase-js@2'
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors'
 
 const ADYEN_ENV = (Deno.env.get('ADYEN_ENV') || 'test').toLowerCase()
-const ADYEN_API_KEY = Deno.env.get('ADYEN_API_KEY')!
-const ADYEN_MERCHANT_ACCOUNT = Deno.env.get('ADYEN_MERCHANT_ACCOUNT')!
-const ADYEN_CLIENT_KEY = Deno.env.get('ADYEN_CLIENT_KEY')!
+const ADYEN_API_KEY = (Deno.env.get('ADYEN_API_KEY') || '').trim()
+const ADYEN_MERCHANT_ACCOUNT = (Deno.env.get('ADYEN_MERCHANT_ACCOUNT') || '').trim()
+const ADYEN_CLIENT_KEY = (Deno.env.get('ADYEN_CLIENT_KEY') || '').trim()
 
 const ADYEN_BASE = ADYEN_ENV === 'live'
   ? 'https://checkout-live.adyen.com/v71'
   : 'https://checkout-test.adyen.com/v71'
 
+function missingSecrets(): string[] {
+  const missing: string[] = []
+  if (!Deno.env.get('SUPABASE_URL')) missing.push('SUPABASE_URL')
+  if (!Deno.env.get('SUPABASE_ANON_KEY')) missing.push('SUPABASE_ANON_KEY')
+  if (!Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')) missing.push('SUPABASE_SERVICE_ROLE_KEY')
+  if (!ADYEN_API_KEY) missing.push('ADYEN_API_KEY')
+  if (!ADYEN_MERCHANT_ACCOUNT) missing.push('ADYEN_MERCHANT_ACCOUNT')
+  if (!ADYEN_CLIENT_KEY) missing.push('ADYEN_CLIENT_KEY')
+  return missing
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
   try {
+    const missing = missingSecrets()
+    if (missing.length) {
+      return json({ error: 'Adyen not configured', missing }, 503)
+    }
+
     const authHeader = req.headers.get('Authorization')
     if (!authHeader?.startsWith('Bearer ')) {
       return json({ error: 'Unauthorized' }, 401)
     }
 
-    const supabase = createClient(
+    const token = authHeader.replace('Bearer ', '')
+    const userClient = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_ANON_KEY')!,
-      { global: { headers: { Authorization: authHeader } } }
+      { global: { headers: { Authorization: authHeader } } },
     )
-    const token = authHeader.replace('Bearer ', '')
-    const { data: claims, error: authErr } = await supabase.auth.getClaims(token)
-    if (authErr || !claims?.claims) return json({ error: 'Unauthorized' }, 401)
-    const userId = claims.claims.sub as string
+    const admin = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+    )
+
+    const { data: userData, error: authErr } = await userClient.auth.getUser(token)
+    const userId = userData?.user?.id
+    if (authErr || !userId) return json({ error: 'Unauthorized' }, 401)
 
     const body = await req.json().catch(() => ({}))
     const {
-      amount, // major units, e.g. 25.50
+      amount,
       currency,
       purpose = 'wallet_topup',
       target_wallet_id = null,
@@ -45,31 +66,29 @@ Deno.serve(async (req) => {
     if (!currency || typeof currency !== 'string' || currency.length !== 3) {
       return json({ error: 'Invalid currency' }, 400)
     }
-    if (!['wallet_topup','transfer_funding','invoice','admin_link'].includes(purpose)) {
+    if (!['wallet_topup', 'transfer_funding', 'invoice', 'admin_link'].includes(purpose)) {
       return json({ error: 'Invalid purpose' }, 400)
     }
 
-    // Rate limit
-    const { data: rl } = await supabase.rpc('check_rate_limit', {
+    const { data: rl, error: rlErr } = await admin.rpc('check_rate_limit', {
       p_key: `adyen_session:${userId}`,
       p_max_requests: 10,
       p_window_seconds: 60,
     })
+    if (rlErr) return json({ error: 'Rate limit check failed', detail: rlErr.message }, 500)
     if (rl === false) return json({ error: 'Too many requests' }, 429)
 
-    // Validate wallet ownership if provided
     if (target_wallet_id) {
-      const { data: w } = await supabase.from('wallets').select('user_id,currency_code')
+      const { data: w } = await userClient.from('wallets').select('user_id,currency_code')
         .eq('id', target_wallet_id).maybeSingle()
       if (!w || w.user_id !== userId) return json({ error: 'Invalid wallet' }, 403)
     }
 
     const cur = currency.toUpperCase()
     const amountMinor = Math.round(Number(amount) * 100)
-    const reference = `efin_${purpose}_${userId.slice(0,8)}_${Date.now()}`
+    const reference = `efin_${purpose}_${userId.slice(0, 8)}_${Date.now()}`
 
-    // Create session in DB first (pending)
-    const { data: session, error: insErr } = await supabase
+    const { data: session, error: insErr } = await admin
       .from('adyen_payment_sessions')
       .insert({
         user_id: userId,
@@ -85,9 +104,15 @@ Deno.serve(async (req) => {
       })
       .select()
       .single()
-    if (insErr) return json({ error: insErr.message }, 500)
 
-    // Call Adyen /sessions
+    if (insErr) {
+      console.error('adyen_payment_sessions insert failed', insErr)
+      const hint = insErr.message.includes('adyen_payment_sessions')
+        ? 'Run migration 20260615063015 (Adyen tables) on this Supabase project.'
+        : undefined
+      return json({ error: insErr.message, hint }, 500)
+    }
+
     const adyenRes = await fetch(`${ADYEN_BASE}/sessions`, {
       method: 'POST',
       headers: {
@@ -102,19 +127,20 @@ Deno.serve(async (req) => {
         countryCode: 'CA',
         shopperReference: userId,
         channel: 'Web',
-        allowedPaymentMethods: ['scheme','alipay','interac_card','amex','visa','mc'],
+        allowedPaymentMethods: ['scheme', 'alipay', 'interac_card', 'amex', 'visa', 'mc'],
       }),
     })
 
     const adyenData = await adyenRes.json()
     if (!adyenRes.ok) {
-      await supabase.from('adyen_payment_sessions')
+      console.error('Adyen /sessions failed', adyenData)
+      await admin.from('adyen_payment_sessions')
         .update({ status: 'error', last_event: adyenData })
         .eq('id', session.id)
       return json({ error: 'Adyen session failed', detail: adyenData }, 502)
     }
 
-    await supabase.from('adyen_payment_sessions')
+    await admin.from('adyen_payment_sessions')
       .update({ raw_session: adyenData })
       .eq('id', session.id)
 
@@ -128,6 +154,7 @@ Deno.serve(async (req) => {
       session_db_id: session.id,
     })
   } catch (e) {
+    console.error('adyen-create-session error', e)
     return json({ error: String(e?.message || e) }, 500)
   }
 })

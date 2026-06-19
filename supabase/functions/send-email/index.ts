@@ -10,7 +10,7 @@ const corsHeaders = {
 const FROM = "eFinMoney <noreply@efinsuite.com>";
 
 function welcomeHtml(name: string, accountNumber?: string, efinTag?: string | null, appUrl?: string) {
-  const tagUrl = `${appUrl || "https://efin.money"}/settings/profile`;
+  const tagUrl = `${appUrl || "https://efin.money"}/profile`;
   return `
     <div style="font-family:Inter,system-ui,sans-serif;max-width:560px;margin:auto;padding:24px;color:#0f172a">
       <h1 style="font-size:24px;margin:0 0 12px">Welcome to eFinMoney${name ? ", " + name : ""} 👋</h1>

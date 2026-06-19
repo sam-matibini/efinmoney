@@ -18,7 +18,6 @@ import {
 } from "lucide-react";
 import type { WalletLinkedCard } from "@/hooks/useWalletCards";
 import SendMoneyModal from "@/components/modals/SendMoneyModal";
-import TopUpModal from "@/components/modals/TopUpModal";
 import ReceiveMoneyModal from "@/components/modals/ReceiveMoneyModal";
 import StellarWalletModal from "@/components/modals/StellarWalletModal";
 import {
@@ -105,7 +104,6 @@ const WalletCard = ({
   onDelete,
   showStellarBadge = false,
 }: WalletCardProps) => {
-  const [topUpOpen, setTopUpOpen] = useState(false);
   const [receiveOpen, setReceiveOpen] = useState(false);
   const [stellarOpen, setStellarOpen] = useState(false);
   const [showLinkedCards, setShowLinkedCards] = useState(false);
@@ -412,7 +410,7 @@ const WalletCard = ({
           disabled={isFrozen || !walletId}
           onClick={(e) => {
             e.stopPropagation();
-            if (walletId) setTopUpOpen(true);
+            if (walletId) navigate(`/wallet/topup?walletId=${walletId}`);
           }}
           className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium text-white hover:bg-white/15 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
@@ -426,15 +424,6 @@ const WalletCard = ({
           isOpen={receiveOpen}
           onClose={() => setReceiveOpen(false)}
           wallet={{ walletId, currency, balance, symbol, flag }}
-        />
-      )}
-
-      {walletId && (
-        <TopUpModal
-          open={topUpOpen}
-          onOpenChange={setTopUpOpen}
-          defaultWalletId={walletId}
-          title={`Top up ${currency} wallet`}
         />
       )}
 

@@ -47,12 +47,27 @@ const codeBlock = (code: string) => `
     <span style="font-size:28px;font-weight:700;letter-spacing:0.3em;font-family:ui-monospace,Menlo,monospace">${code}</span>
   </div>`;
 
-function buildEmail(action: string, url: string, token: string): { subject: string; html: string } {
+function buildEmail(
+  action: string,
+  url: string,
+  token: string,
+  opts?: { staffInvite?: boolean },
+): { subject: string; html: string } {
   switch (action) {
     case "invite":
+      if (opts?.staffInvite) {
+        return {
+          subject: "You're invited to the eFinMoney admin portal",
+          html: shell(
+            "Staff invitation",
+            "You've been invited to join the eFinMoney admin team. Accept this invite to set your password, complete your profile, and upload an ID document for review.",
+            button(url, "Accept invitation"),
+          ),
+        };
+      }
       return {
         subject: "You're invited to eFinMoney",
-        html: shell("You've been invited 🎉", "You've been invited to join the eFinMoney admin portal. Confirm your email to set your password and complete onboarding.", button(url, "Accept invite")),
+        html: shell("You've been invited 🎉", "You've been invited to join eFinMoney. Confirm your email to activate your account.", button(url, "Accept invite")),
       };
     case "recovery":
       return {
@@ -127,7 +142,8 @@ Deno.serve(async (req) => {
     `${origin}/auth/confirm?token_hash=${encodeURIComponent(ed.token_hash)}` +
     `&type=${encodeURIComponent(ed.email_action_type)}&next=${encodeURIComponent(nextPath)}`;
 
-  const { subject, html } = buildEmail(ed.email_action_type, confirmUrl, ed.token);
+  const staffInvite = nextPath === "/admin/onboarding";
+  const { subject, html } = buildEmail(ed.email_action_type, confirmUrl, ed.token, { staffInvite });
 
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",

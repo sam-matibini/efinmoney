@@ -7,8 +7,9 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { Sparkles } from "lucide-react";
-import { createAdyenSession, type AdyenSessionResult } from "@/lib/adyen";
+import { createAdyenSession, storeAdyenCheckoutConfig, confirmAdyenSession, type AdyenSessionResult } from "@/lib/adyen";
 import AdyenDropIn from "./AdyenDropIn";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface Props {
   walletId: string;
@@ -16,6 +17,7 @@ interface Props {
 }
 
 export default function AdyenTopUpCard({ walletId, walletCurrency }: Props) {
+  const queryClient = useQueryClient();
   const [amount, setAmount] = useState("");
   const [loading, setLoading] = useState(false);
   const [session, setSession] = useState<AdyenSessionResult | null>(null);
@@ -37,6 +39,7 @@ export default function AdyenTopUpCard({ walletId, walletCurrency }: Props) {
         target_currency: walletCurrency,
         return_url: `${window.location.origin}/wallets`,
       });
+      storeAdyenCheckoutConfig({ clientKey: s.clientKey, environment: s.environment });
       setSession(s);
       setOpen(true);
     } catch (e) {
@@ -93,9 +96,28 @@ export default function AdyenTopUpCard({ walletId, walletCurrency }: Props) {
               clientKey={session.clientKey}
               environment={session.environment}
               amount={session.amount}
-              onPaymentCompleted={(result) => {
-                if (result?.resultCode === "Authorised") {
-                  toast.success("Payment authorised — wallet will credit shortly.");
+              onPaymentCompleted={async (result) => {
+                if (result?.resultCode === "Authorised" || result?.resultCode === "Received") {
+                  try {
+                    const confirmed = await confirmAdyenSession({
+                      sessionId: session.sessionId,
+                      sessionResult: result?.sessionResult ?? null,
+                    });
+                    if (confirmed.credited || confirmed.already) {
+                      await queryClient.invalidateQueries({ queryKey: ["wallets"] });
+                      toast.success(
+                        confirmed.already
+                          ? "Payment already credited to your wallet."
+                          : `Wallet credited: ${confirmed.amount ?? ""} ${confirmed.currency ?? walletCurrency}`.trim(),
+                      );
+                    } else if (confirmed.credit_error) {
+                      toast.error(`Payment OK but wallet not credited: ${confirmed.credit_error}`);
+                    } else {
+                      toast.success("Payment authorised — wallet will credit shortly.");
+                    }
+                  } catch {
+                    toast.success("Payment authorised — wallet will credit shortly.");
+                  }
                   setOpen(false);
                 } else if (result?.resultCode === "Refused") {
                   toast.error("Payment refused");
@@ -105,7 +127,15 @@ export default function AdyenTopUpCard({ walletId, walletCurrency }: Props) {
               }}
               onError={(err) => {
                 console.error(err);
-                toast.error("Payment error — please try again");
+                const msg = String(err?.message || err || "");
+                if (msg.includes("Failed to fetch") || msg.includes("NETWORK_ERROR")) {
+                  toast.error(
+                    "Adyen blocked this page — add http://localhost:8080 under API credentials → Client settings → Allowed origins, then Save.",
+                    { duration: 8000 },
+                  );
+                } else {
+                  toast.error("Payment error — please try again");
+                }
               }}
             />
           )}

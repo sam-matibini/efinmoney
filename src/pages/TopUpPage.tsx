@@ -71,13 +71,19 @@ const TopUpPage = () => {
   const [loading, setLoading] = useState(false);
   const [verifyState, setVerifyState] = useState<{ status: "verifying" | "success" | "failed"; message: string } | null>(null);
 
-  // Initialize default wallet
+  // Initialize wallet from URL or default
   useEffect(() => {
-    if (!selectedWalletId && wallets && wallets.length > 0) {
+    if (!wallets?.length) return;
+    const fromUrl = params.get("walletId");
+    if (fromUrl && wallets.some((w) => w.wallet_id === fromUrl)) {
+      setSelectedWalletId(fromUrl);
+      return;
+    }
+    if (!selectedWalletId) {
       const def = wallets.find((w) => w.is_default) || wallets[0];
       setSelectedWalletId(def.wallet_id);
     }
-  }, [wallets, selectedWalletId]);
+  }, [wallets, params, selectedWalletId]);
 
   const selectedWallet = wallets?.find((w) => w.wallet_id === selectedWalletId);
   const currency = selectedWallet?.currency_code || "USD";

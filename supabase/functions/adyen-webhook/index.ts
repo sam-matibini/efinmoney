@@ -1,6 +1,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors'
 import { createHmac } from 'node:crypto'
+import { creditAdyenTopup } from '../_shared/adyen-credit.ts'
 
 const HMAC_KEY = Deno.env.get('ADYEN_HMAC_KEY') || ''
 
@@ -29,13 +30,21 @@ function escape(s: string) {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
+  if (req.method === 'GET') {
+    return json({ ok: true, service: 'adyen-webhook', hmac_configured: Boolean(HMAC_KEY) })
+  }
+
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
   )
 
   try {
-    const payload = await req.json()
+    const raw = await req.text()
+    if (!raw.trim()) {
+      return json({ '[accepted]': true, note: 'empty body — Adyen sends POST with JSON' })
+    }
+    const payload = JSON.parse(raw)
     const items = payload?.notificationItems || []
     const results: any[] = []
 
@@ -103,7 +112,7 @@ Deno.serve(async (req) => {
 
         // Credit ledger on first authorised/settled (treat AUTHORISATION+success as funds available in test)
         if ((code === 'AUTHORISATION' || code === 'CAPTURE') && success && session.target_wallet_id) {
-          await creditWallet(supabase, session, data)
+          await creditAdyenTopup(supabase, session, data.pspReference, data.paymentMethod)
         }
 
         // Mark related invoice paid
@@ -132,92 +141,16 @@ Deno.serve(async (req) => {
       results.push({ ref: data.pspReference, code, processed: true })
     }
 
-    return new Response(JSON.stringify({ '[accepted]': true, results }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    return json({ '[accepted]': true, results })
   } catch (e) {
     console.error('Adyen webhook error', e)
-    return new Response(JSON.stringify({ '[accepted]': true, error: String(e) }), {
-      status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    return json({ '[accepted]': true, error: String(e) })
   }
 })
 
-async function creditWallet(supabase: any, session: any, data: any) {
-  // Idempotency: skip if a journal already references this psp_reference
-  const refType = `adyen:${data.pspReference}`
-  const { data: existing } = await supabase
-    .from('ledger_entries')
-    .select('id')
-    .eq('reference_type', refType)
-    .limit(1)
-  if (existing && existing.length > 0) return
-
-  const amountMajor = Number(session.amount_minor) / 100
-  const journalId = crypto.randomUUID()
-
-  // Find Adyen clearing account for currency
-  const { data: clearing } = await supabase.from('ledger_accounts')
-    .select('id').eq('code', '1108').eq('currency_code', session.currency).maybeSingle()
-  const { data: liability } = await supabase.from('ledger_accounts')
-    .select('id').like('code', '21%').eq('currency_code', session.currency).maybeSingle()
-
-  if (!clearing?.id || !liability?.id) {
-    console.error('Missing ledger accounts for', session.currency)
-    return
-  }
-
-  await supabase.from('ledger_entries').insert([
-    {
-      journal_id: journalId, account_id: clearing.id, wallet_id: null,
-      currency_code: session.currency, debit_amount: amountMajor, credit_amount: 0,
-      description: `Adyen settlement ${data.paymentMethod || ''}`, reference_type: refType,
-      created_by: session.user_id,
-    },
-    {
-      journal_id: journalId, account_id: liability.id, wallet_id: session.target_wallet_id,
-      currency_code: session.currency, debit_amount: 0, credit_amount: amountMajor,
-      description: `Wallet top-up via Adyen`, reference_type: refType,
-      created_by: session.user_id,
-    },
-  ])
-
-  // FX swap to target currency if different
-  if (session.target_currency && session.target_currency !== session.currency) {
-    try {
-      // Find user's wallet in target currency
-      const { data: defaultWallet } = await supabase.from('wallets').select('id')
-        .eq('user_id', session.user_id).eq('currency_code', session.target_currency)
-        .maybeSingle()
-      if (defaultWallet?.id && session.target_wallet_id !== defaultWallet.id) {
-        // Fetch rate
-        const { data: rate } = await supabase.from('fx_rates').select('rate,markup_pct')
-          .eq('from_currency', session.currency).eq('to_currency', session.target_currency)
-          .order('created_at', { ascending: false }).limit(1).maybeSingle()
-        if (rate?.rate) {
-          const effective = Number(rate.rate) * (1 - Number(rate.markup_pct || 0) / 100)
-          await supabase.rpc('execute_fx_swap', {
-            p_user_id: session.user_id,
-            p_from_wallet_id: session.target_wallet_id,
-            p_to_wallet_id: defaultWallet.id,
-            p_from_amount: amountMajor,
-            p_effective_rate: effective,
-            p_fee_amount: 0,
-          })
-        }
-      }
-    } catch (e) {
-      console.error('Auto FX failed', e)
-    }
-  }
-
-  // Notification
-  await supabase.from('notifications').insert({
-    user_id: session.user_id,
-    title: 'Wallet Topped Up',
-    message: `Your wallet has been credited ${amountMajor} ${session.currency} via Adyen.`,
-    type: 'wallet',
-    is_read: false,
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   })
 }
