@@ -1,26 +1,13 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, ArrowRight, MapPin } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { MapPin } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import LiveFxCalculator from "@/components/fx/LiveFxCalculator";
 import { useWallets } from "@/hooks/useWallets";
-import { useFxRates } from "@/hooks/useFxRates";
-import { fetchFxRate } from "@/lib/flutterwave";
+import { findCountryByCode, COUNTRIES } from "@/lib/countries";
 import { toast } from "sonner";
 
-const targetCountries = [
-  { code: 'NGN', country: 'Nigeria', flag: '🇳🇬', method: 'Bank Transfer' },
-  { code: 'KES', country: 'Kenya', flag: '🇰🇪', method: 'M-Pesa' },
-  { code: 'UGX', country: 'Uganda', flag: '🇺🇬', method: 'Mobile Money' },
-  { code: 'GHS', country: 'Ghana', flag: '🇬🇭', method: 'MTN Mobile' },
-  { code: 'TZS', country: 'Tanzania', flag: '🇹🇿', method: 'M-Pesa' },
-  { code: 'ZMW', country: 'Zambia', flag: '🇿🇲', method: 'MTN Mobile' },
-  { code: 'RWF', country: 'Rwanda', flag: '🇷🇼', method: 'MTN Mobile' },
-  { code: 'USD', country: 'United States', flag: '🇺🇸', method: 'Bank Transfer' },
-];
+const PAYOUT_CODES = COUNTRIES.map((c) => c.code);
 
 interface SendMoneyModalProps {
   children: React.ReactNode;
@@ -29,231 +16,150 @@ interface SendMoneyModalProps {
 const SendMoneyModal = ({ children }: SendMoneyModalProps) => {
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
-  const [amount, setAmount] = useState("");
-  const [selectedWalletId, setSelectedWalletId] = useState<string | null>(null);
-  const [targetCountryCode, setTargetCountryCode] = useState<string | null>(null);
-  const [showSourceDropdown, setShowSourceDropdown] = useState(false);
-  const [showTargetDropdown, setShowTargetDropdown] = useState(false);
+  const [from, setFrom] = useState<string>("USD");
+  const [to, setTo] = useState<string>("NGN");
+  const [amount, setAmount] = useState("100");
 
   const { data: wallets } = useWallets();
-  const { data: fxRates } = useFxRates();
 
-  const selectedWallet = wallets?.find(w => w.wallet_id === selectedWalletId) || wallets?.[0];
-
-  // Default target country to match the source wallet currency so amounts mirror 1:1 until user changes it
-  const sourceCode = selectedWallet?.currency_code;
-  const effectiveTargetCode =
-    targetCountryCode ??
-    (sourceCode && targetCountries.find(c => c.code === sourceCode) ? sourceCode : targetCountries[0].code);
-  const targetCountry =
-    targetCountries.find(c => c.code === effectiveTargetCode) ?? targetCountries[0];
-
-  const isSameCurrency = sourceCode === targetCountry.code;
-  const fxRate = fxRates?.find(
-    r => r.from_currency === selectedWallet?.currency_code && r.to_currency === targetCountry.code
+  const walletCodes = useMemo(
+    () => [...new Set((wallets ?? []).map((w) => w.currency_code))],
+    [wallets],
   );
-  const { data: derivedFxRate } = useQuery({
-    queryKey: ["quick-send-fx-rate", sourceCode, targetCountry.code],
-    queryFn: () => fetchFxRate(sourceCode ?? "", targetCountry.code),
-    enabled: !isSameCurrency && !fxRate && !!sourceCode && !!targetCountry.code,
-    staleTime: 60_000,
-  });
-  const effectiveRate = isSameCurrency
-    ? 1
-    : fxRate
-      ? Number(fxRate.effective_rate)
-      : Number(derivedFxRate || 0);
-  const rateAvailable = isSameCurrency || !!fxRate || !!derivedFxRate;
 
-  const parsedAmount = parseFloat(amount) || 0;
-  const receivedAmount = parsedAmount > 0 && rateAvailable ? parsedAmount * effectiveRate : 0;
+  const selectedWallet = useMemo(() => {
+    const match = wallets?.find((w) => w.currency_code === from);
+    return match ?? wallets?.[0];
+  }, [wallets, from]);
 
-  const fmt = (n: number) =>
-    new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+  useEffect(() => {
+    const primary = wallets?.[0]?.currency_code;
+    if (primary) {
+      setFrom(primary);
+      if (primary === to) {
+        const alt = PAYOUT_CODES.find((c) => c !== primary);
+        if (alt) setTo(alt);
+      }
+    }
+  }, [wallets]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleFromChange = (code: string) => {
+    setFrom(code);
+    if (code === to) {
+      const alt = PAYOUT_CODES.find((c) => c !== code);
+      if (alt) setTo(alt);
+    }
+  };
+
+  const handleToChange = (code: string) => {
+    setTo(code);
+  };
+
+  const parsedAmount = parseFloat(amount.replace(/,/g, "")) || 0;
+  const insufficientBalance =
+    !!selectedWallet && parsedAmount > 0 && parsedAmount > Number(selectedWallet.balance);
 
   const reset = () => {
-    setAmount("");
-    setSelectedWalletId(null);
-    setTargetCountryCode(null);
+    setAmount("100");
+    setFrom(wallets?.[0]?.currency_code ?? "USD");
+    setTo("NGN");
   };
 
-  const goToDomestic = () => {
-    setIsOpen(false);
-    navigate("/send?mode=canada");
-  };
-
-  const handleContinue = () => {
-    if (!selectedWallet) {
-      toast.error("Please select a source wallet");
+  const handleContinue = ({
+    from: f,
+    to: t,
+    sendAmount,
+  }: {
+    from: string;
+    to: string;
+    sendAmount: number;
+    recvAmount: number;
+  }) => {
+    const wallet = wallets?.find((w) => w.currency_code === f) ?? wallets?.[0];
+    if (!wallet) {
+      toast.error("No wallet found for this currency");
       return;
     }
-    if (parsedAmount <= 0) {
+    if (sendAmount <= 0) {
       toast.error("Enter an amount");
       return;
     }
-    if (parsedAmount > Number(selectedWallet.balance)) {
-      toast.error("Insufficient wallet balance");
+
+    const country = findCountryByCode(t);
+    if (!country) {
+      toast.error("Destination not supported yet");
       return;
     }
 
+    if (sendAmount > Number(wallet.balance)) {
+      toast.message("Low balance — continue to top up or send from another source");
+    }
+
     const params = new URLSearchParams({
-      amount: String(parsedAmount),
+      amount: String(sendAmount),
       fundingSource: "wallet",
-      sourceWalletId: selectedWallet.wallet_id,
-      targetCountryCode: targetCountry.code,
+      sourceWalletId: wallet.wallet_id,
+      targetCountryCode: t,
+      from: f,
+      to: t,
     });
     setIsOpen(false);
     navigate(`/send?${params.toString()}`);
     setTimeout(reset, 200);
   };
 
-  const isValid =
-    parsedAmount > 0 &&
-    !!selectedWallet &&
-    parsedAmount <= Number(selectedWallet?.balance ?? 0);
+  const isValid = parsedAmount > 0 && !!findCountryByCode(to);
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { setIsOpen(open); if (!open) reset(); }}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="sm:max-w-md bg-card border-border max-h-[90vh] overflow-y-auto p-4 sm:p-6">
-        <DialogHeader>
-          <DialogTitle className="font-display text-foreground">Quick Send</DialogTitle>
-        </DialogHeader>
-
-        <AnimatePresence mode="wait">
-          <motion.div
-            key="picker"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            className="space-y-6 py-4"
-          >
-            {/* You send */}
-            <div className="space-y-3">
-              <Label className="text-muted-foreground">You send</Label>
-              <div className="flex gap-2">
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setShowSourceDropdown(!showSourceDropdown)}
-                    className="flex items-center gap-2 px-4 py-3 rounded-xl bg-secondary hover:bg-secondary/80 transition-colors"
-                  >
-                    <span className="text-lg">{selectedWallet?.flag_emoji || '💰'}</span>
-                    <span className="font-medium text-foreground">{selectedWallet?.currency_code || 'USD'}</span>
-                    <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                  </button>
-                  {showSourceDropdown && wallets && (
-                    <div className="absolute top-full left-0 mt-2 w-56 bg-popover border border-border rounded-xl shadow-elevated z-50 max-h-64 overflow-y-auto">
-                      {wallets.map((wallet) => (
-                        <button
-                          key={wallet.wallet_id}
-                          type="button"
-                          onClick={() => { setSelectedWalletId(wallet.wallet_id); setShowSourceDropdown(false); }}
-                          className="flex items-center gap-3 w-full px-4 py-3 hover:bg-muted transition-colors first:rounded-t-xl last:rounded-b-xl"
-                        >
-                          <span>{wallet.flag_emoji || '💰'}</span>
-                          <div className="text-left">
-                            <p className="font-medium text-foreground">{wallet.currency_code}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {wallet.symbol}{fmt(Number(wallet.balance))}
-                            </p>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <Input
-                  type="number"
-                  inputMode="decimal"
-                  placeholder="0.00"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  className="flex-1 text-2xl font-display bg-secondary border-none text-foreground"
-                />
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Available: {selectedWallet?.symbol || '$'}{fmt(Number(selectedWallet?.balance || 0))}
-              </p>
-            </div>
-
-            <div className="flex justify-center">
-              <div className="p-2 rounded-full bg-primary/20">
-                <ArrowRight className="w-5 h-5 text-primary rotate-90" />
-              </div>
-            </div>
-
-            {/* They receive */}
-            <div className="space-y-3">
-              <Label className="text-muted-foreground">They receive</Label>
-              <div className="flex gap-2">
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setShowTargetDropdown(!showTargetDropdown)}
-                    className="flex items-center gap-2 px-4 py-3 rounded-xl bg-secondary hover:bg-secondary/80 transition-colors"
-                  >
-                    <span className="text-lg">{targetCountry.flag}</span>
-                    <span className="font-medium text-foreground">{targetCountry.code}</span>
-                    <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                  </button>
-                  {showTargetDropdown && (
-                    <div className="absolute top-full left-0 mt-2 w-60 bg-popover border border-border rounded-xl shadow-elevated z-50 max-h-64 overflow-y-auto">
-                      {targetCountries.map((country) => (
-                        <button
-                          key={country.code}
-                          type="button"
-                          onClick={() => { setTargetCountryCode(country.code); setShowTargetDropdown(false); }}
-                          className="flex items-center gap-3 w-full px-4 py-3 hover:bg-muted transition-colors first:rounded-t-xl last:rounded-b-xl"
-                        >
-                          <span>{country.flag}</span>
-                          <div className="text-left">
-                            <p className="font-medium text-foreground">{country.country}</p>
-                            <p className="text-xs text-muted-foreground">{country.method}</p>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <div className="flex-1 px-4 py-3 rounded-xl bg-muted">
-                  <p className="text-2xl font-display font-bold text-foreground">
-                    {rateAvailable ? fmt(receivedAmount) : "Rate unavailable"}
-                  </p>
-                </div>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                {rateAvailable ? (
-                  <>
-                    Rate: 1 {selectedWallet?.currency_code || 'USD'} = {fmt(effectiveRate)} {targetCountry.code}
-                    {!isSameCurrency && !fxRate && <span className="ml-1 text-amber-500">(indicative)</span>}
-                  </>
-                ) : (
-                  "Live exchange rate unavailable"
-                )}
-              </p>
-            </div>
-
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={handleContinue}
-              disabled={!isValid}
-              className="w-full py-4 rounded-xl gradient-primary text-primary-foreground font-medium shadow-glow disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Continue on Send Page
-            </motion.button>
-
-            <button
-              type="button"
-              onClick={goToDomestic}
-              className="w-full flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <MapPin className="w-4 h-4" />
-              Sending within Canada? Use Domestic 🇨🇦
-            </button>
-          </motion.div>
-        </AnimatePresence>
+      <DialogContent
+        className="w-[calc(100%-1.5rem)] max-w-[400px] gap-0 overflow-visible border-none bg-transparent p-0 shadow-none sm:rounded-2xl [&>button]:right-3 [&>button]:top-3 [&>button]:rounded-full [&>button]:text-white/70 [&>button]:opacity-100 [&>button]:ring-1 [&>button]:ring-white/20 [&>button]:hover:bg-white/10 [&>button]:hover:text-white"
+      >
+        <DialogTitle className="sr-only">Quick Send</DialogTitle>
+        <LiveFxCalculator
+          variant="app"
+          embedded
+          className="w-full"
+          defaultFrom={wallets?.[0]?.currency_code ?? "USD"}
+          defaultTo="NGN"
+          defaultSendAmount="100"
+          from={from}
+          to={to}
+          sendAmount={amount}
+          onFromChange={handleFromChange}
+          onToChange={handleToChange}
+          onSendAmountChange={(v) => setAmount(v)}
+          fromCurrencyFilter={walletCodes.length ? walletCodes : undefined}
+          toCurrencyFilter={PAYOUT_CODES}
+          walletBalance={selectedWallet ? Number(selectedWallet.balance) : null}
+          walletSymbol={selectedWallet?.symbol}
+          showActions
+          showDisclaimer={false}
+          continueLabel="Continue on Send Page"
+          onContinue={handleContinue}
+          continueDisabled={!isValid}
+          footer={
+            <>
+              {insufficientBalance && (
+                <p className="mt-2 text-center text-[10px] font-medium text-amber-300/90">
+                  Balance too low for this amount — you can top up on the next screen
+                </p>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsOpen(false);
+                  navigate("/send?mode=canada");
+                }}
+                className="mt-3 flex w-full items-center justify-center gap-2 text-[11px] text-white/55 transition-colors hover:text-white/80"
+              >
+                <MapPin className="h-3.5 w-3.5" />
+                Sending within Canada? Use Domestic CA
+              </button>
+            </>
+          }
+        />
       </DialogContent>
     </Dialog>
   );

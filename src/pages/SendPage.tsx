@@ -42,9 +42,8 @@ import EfinmoneyP2PFlow from "@/components/send/EfinmoneyP2PFlow";
 import TransactionPinDialog from "@/components/send/TransactionPinDialog";
 import HeroGlobe from "@/components/send/HeroGlobe";
 import FxTicker from "@/components/send/FxTicker";
+import LiveFxCalculator from "@/components/fx/LiveFxCalculator";
 import TransferSuccess from "@/components/send/TransferSuccess";
-import AnimatedNumber from "@/components/ui/AnimatedNumber";
-import CountryPicker from "@/components/ui/CountryPicker";
 import { findCountryById, findCountryByCode, COUNTRIES } from "@/lib/countries";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -383,6 +382,47 @@ const SendPage = () => {
     && !!selectedWallet
     && parsedAmount > 0
     && parsedAmount > Number(selectedWallet.balance);
+
+  const walletCurrencyCodes = useMemo(
+    () => [...new Set((wallets ?? []).map((w) => w.currency_code))],
+    [wallets],
+  );
+  const payoutCurrencyCodes = useMemo(() => COUNTRIES.map((c) => c.code), []);
+
+  const calcQuoteRecipient = useCallback(
+    (sendInFrom: number) => {
+      if (!rateAvailable) return 0;
+      return Math.max(0, (sendInFrom - baseFee - cardFee) * effectiveRate);
+    },
+    [rateAvailable, effectiveRate, baseFee, cardFee],
+  );
+  const calcQuoteSend = useCallback(
+    (recvInTo: number) => {
+      if (!rateAvailable || effectiveRate <= 0) return 0;
+      return recvInTo / effectiveRate + baseFee + cardFee;
+    },
+    [rateAvailable, effectiveRate, baseFee, cardFee],
+  );
+
+  const handleCalcFromChange = useCallback(
+    (code: string) => {
+      if (fundingSource === "wallet") {
+        const w = wallets?.find((wallet) => wallet.currency_code === code);
+        if (w) setSelectedWalletId(w.wallet_id);
+      }
+    },
+    [fundingSource, wallets],
+  );
+
+  const handleCalcToChange = useCallback((code: string) => {
+    const c = findCountryByCode(code);
+    if (c) setTargetCountryId(c.id);
+  }, []);
+
+  const feeDisplayLabel =
+    fee > 0
+      ? `${sourceSymbol}${fee.toFixed(2)} flat`
+      : `${sourceSymbol}0.00 fee`;
 
   const goToStep = (next: number) => {
     setDirection(next > step ? 1 : -1);
@@ -777,8 +817,26 @@ const SendPage = () => {
         setTargetCountryId(c.id);
         next.delete("targetCountryCode");
         touched = true;
-        // Seamless: skip straight to recipient details
         setTimeout(() => goToStep(2), 50);
+      }
+    }
+    const qFrom = searchParams.get("from");
+    const qTo = searchParams.get("to");
+    if (qFrom && wallets?.some((w) => w.currency_code === qFrom)) {
+      const w = wallets.find((w) => w.currency_code === qFrom);
+      if (w) {
+        setSelectedWalletId(w.wallet_id);
+        setFundingSource("wallet");
+      }
+      next.delete("from");
+      touched = true;
+    }
+    if (qTo) {
+      const c = findCountryByCode(qTo);
+      if (c) {
+        setTargetCountryId(c.id);
+        next.delete("to");
+        touched = true;
       }
     }
     if (touched) setSearchParams(next, { replace: true });
@@ -1254,98 +1312,48 @@ const SendPage = () => {
                                     )}
 
 
-                                    <motion.div custom={2} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
-                                      <Label>You Send</Label>
-                                      <div className="relative group">
-                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg text-muted-foreground">{sourceSymbol}</span>
-                                        <Input
-                                          type="number"
-                                          min="0"
-                                          step="0.01"
-                                          placeholder="0.00"
-                                          value={amount}
-                                          onChange={(e) => {
-                                            const v = e.target.value;
-                                            if (v === '' || parseFloat(v) >= 0) setAmount(v);
-                                          }}
-                                          className="pl-10 text-2xl h-14 transition-shadow focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:shadow-[0_0_0_4px_hsl(var(--primary)/0.12)]"
-                                        />
-                                      </div>
-                                      {fundingSource === 'wallet' && selectedWallet && (
-                                        <div className="flex items-center justify-between">
-                                          <p className="text-sm text-muted-foreground">
-                                            Available: {selectedWallet.symbol}{Number(selectedWallet.balance).toFixed(2)}
-                                          </p>
-                                          {insufficientFunds && (
-                                            <motion.p
-                                              initial={{ opacity: 0, x: -6 }}
-                                              animate={{ opacity: 1, x: 0 }}
-                                              className="text-sm font-medium text-destructive flex items-center gap-1"
-                                            >
-                                              <AlertCircle className="w-3.5 h-3.5" /> Insufficient balance
-                                            </motion.p>
-                                          )}
-                                        </div>
-                                      )}
-                                    </motion.div>
-
-                                    <motion.div custom={3} variants={fieldVariants} initial="hidden" animate="show" className="flex justify-center">
-                                      <div className="p-2 rounded-full bg-primary/20">
-                                        <ArrowRight className="w-5 h-5 text-primary rotate-90" />
-                                      </div>
-                                    </motion.div>
-
-                                    <motion.div custom={4} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
-                                      <Label>Destination</Label>
-                                      <CountryPicker
-                                        value={targetCountryId}
-                                        onChange={(c) => setTargetCountryId(c.id)}
+                                    <motion.div custom={2} variants={fieldVariants} initial="hidden" animate="show" className="flex justify-center py-1">
+                                      <LiveFxCalculator
+                                        variant="app"
+                                        className="max-w-none w-full"
+                                        from={sourceCurrency}
+                                        to={targetCountry.code}
+                                        sendAmount={amount}
+                                        onFromChange={handleCalcFromChange}
+                                        onToChange={handleCalcToChange}
+                                        onSendAmountChange={(v) => setAmount(v)}
+                                        fromCurrencyFilter={fundingSource === "wallet" ? walletCurrencyCodes : undefined}
+                                        toCurrencyFilter={payoutCurrencyCodes}
+                                        quoteRecipient={calcQuoteRecipient}
+                                        quoteSend={calcQuoteSend}
+                                        displayRate={rateAvailable ? effectiveRate : null}
+                                        feeLabel={feeDisplayLabel}
+                                        walletBalance={
+                                          fundingSource === "wallet" && selectedWallet
+                                            ? Number(selectedWallet.balance)
+                                            : null
+                                        }
+                                        walletSymbol={selectedWallet?.symbol}
+                                        showActions={false}
+                                        showDisclaimer
                                       />
                                     </motion.div>
 
-                                    <motion.div
-                                      custom={5}
-                                      variants={fieldVariants}
-                                      initial="hidden"
-                                      animate="show"
-                                      className="p-4 rounded-xl bg-muted relative overflow-hidden"
-                                    >
-                                      <p className="text-sm text-muted-foreground mb-1">They receive</p>
+                                    {insufficientFunds && (
                                       <motion.p
-                                        key={`${receivedAmount}-${targetSymbol}`}
-                                        initial={{ scale: 0.96 }}
-                                        animate={{ scale: [1.02, 1] }}
-                                        transition={{ duration: 0.25 }}
-                                        className="text-3xl font-display font-bold text-foreground"
+                                        initial={{ opacity: 0, x: -6 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        className="text-sm font-medium text-destructive flex items-center justify-center gap-1"
                                       >
-                                        {rateAvailable ? (
-                                          <>
-                                            <span>{targetSymbol} </span>
-                                            <AnimatedNumber value={receivedAmount} duration={500} decimals={2} />
-                                          </>
-                                        ) : (
-                                          'Rate unavailable'
-                                        )}
+                                        <AlertCircle className="w-3.5 h-3.5" /> Insufficient wallet balance
                                       </motion.p>
-                                      <AnimatePresence>
-                                        {rateAvailable ? (
-                                          <motion.p
-                                            key="rate"
-                                            initial={{ opacity: 0, y: 4 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            transition={{ delay: 0.3 }}
-                                            className="text-sm text-muted-foreground mt-2"
-                                          >
-                                            Rate: 1 {sourceCurrency} = {effectiveRate.toFixed(2)} {targetCountry.code} • Fee: {sourceSymbol}{fee.toFixed(2)}
-                                            {fundingSource === 'card' && cardFee > 0 && <span className="text-xs"> (incl. {sourceSymbol}{cardFee.toFixed(2)} card fee)</span>}
-                                          </motion.p>
-                                        ) : (
-                                          <p className="text-sm text-muted-foreground mt-2">
-                                            No FX rate available for {sourceCurrency} → {targetCountry.code}. Please choose a different funding source or destination.
-                                          </p>
-                                        )}
-                                      </AnimatePresence>
-                                    </motion.div>
+                                    )}
+
+                                    {!rateAvailable && (
+                                      <p className="text-sm text-center text-muted-foreground">
+                                        No FX rate for {sourceCurrency} → {targetCountry.code}. Try another pair or funding source.
+                                      </p>
+                                    )}
 
                                     <motion.div custom={6} variants={fieldVariants} initial="hidden" animate="show" className="space-y-3">
                                       <motion.div

@@ -359,6 +359,78 @@
   @keyframes efin-spin {
     to { transform: rotate(360deg); }
   }
+
+  /* Dashboard corridor globe */
+  @keyframes corridor-earth-spin {
+    from { background-position: 0% 50%; }
+    to { background-position: -200% 50%; }
+  }
+  @keyframes corridor-orbit-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+  @keyframes corridor-pulse-out {
+    0% { transform: scale(1); opacity: 0.35; }
+    100% { transform: scale(1.55); opacity: 0; }
+  }
+  @keyframes corridor-globe-glow {
+    0%, 100% { opacity: 0.45; transform: scale(1); }
+    50% { opacity: 0.75; transform: scale(1.04); }
+  }
+  @keyframes corridor-orbit-ring {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+  @keyframes corridor-flag-pop {
+    0% { opacity: 0; transform: translateY(6px) scale(0.85); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  @keyframes corridor-flag-float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-3px); }
+  }
+  .corridor-globe-earth {
+    animation: corridor-earth-spin 18s linear infinite;
+  }
+  .corridor-globe-orbit {
+    animation: corridor-orbit-spin 32s linear infinite;
+  }
+  .corridor-globe-flag {
+    animation: corridor-orbit-spin 32s linear infinite reverse;
+  }
+  .corridor-globe-orbit-dash {
+    transform-origin: 120px 120px;
+    animation: corridor-orbit-spin 48s linear infinite;
+  }
+  .corridor-globe-pulse-a {
+    animation: corridor-pulse-out 2.8s ease-out infinite;
+  }
+  .corridor-globe-pulse-b {
+    animation: corridor-pulse-out 2.8s ease-out 0.9s infinite;
+  }
+  .corridor-globe-glow {
+    animation: corridor-globe-glow 4s ease-in-out infinite;
+  }
+  .corridor-orbit-ring {
+    animation: corridor-orbit-ring 24s linear infinite;
+  }
+  .corridor-flag-chip {
+    animation: corridor-flag-float 3.5s ease-in-out infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .corridor-globe-earth,
+    .corridor-globe-orbit,
+    .corridor-globe-flag,
+    .corridor-globe-orbit-dash,
+    .corridor-globe-pulse-a,
+    .corridor-globe-pulse-b,
+    .corridor-globe-glow,
+    .corridor-orbit-ring,
+    .corridor-flag-chip {
+      animation: none;
+    }
+  }
 }
 
 @media print {

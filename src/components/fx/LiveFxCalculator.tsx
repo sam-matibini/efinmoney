@@ -1,0 +1,515 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
+import { ArrowDownUp, ArrowRight, Check, ChevronDown, Search, Sparkles } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { WORLD_CURRENCIES, WORLD_CURRENCY_MAP } from "@/lib/worldCurrencies";
+import {
+  BENCHMARK_A_FLAT_FEE_USD,
+  BENCHMARK_A_MARGIN,
+  BENCHMARK_B_FLAT_FEE_USD,
+  BENCHMARK_B_MARGIN,
+  EFIN_FLAT_FEE_USD,
+  EFIN_FX_MARGIN,
+  buildUsdMap,
+  fmt,
+  midRateFromUsdMap,
+  parseAmount,
+  type MarketResponse,
+} from "@/components/fx/liveFxUtils";
+
+export type LiveFxCalculatorProps = {
+  variant?: "landing" | "app";
+  className?: string;
+  defaultFrom?: string;
+  defaultTo?: string;
+  defaultSendAmount?: string;
+  /** Controlled pair (app / send page). */
+  from?: string;
+  to?: string;
+  sendAmount?: string;
+  onFromChange?: (code: string) => void;
+  onToChange?: (code: string) => void;
+  onSendAmountChange?: (value: string, numeric: number) => void;
+  onRecvAmountChange?: (value: string, numeric: number) => void;
+  /** Limit currency pickers (e.g. user wallets). */
+  fromCurrencyFilter?: string[];
+  toCurrencyFilter?: string[];
+  /** Override quote math with app pricing (send page). */
+  quoteRecipient?: (sendInFrom: number) => number;
+  quoteSend?: (recvInTo: number) => number;
+  displayRate?: number | null;
+  feeLabel?: string;
+  walletBalance?: number | null;
+  walletSymbol?: string;
+  showComparison?: boolean;
+  showDisclaimer?: boolean;
+  showActions?: boolean;
+  continueLabel?: string;
+  onContinue?: (payload: { from: string; to: string; sendAmount: number; recvAmount: number }) => void;
+  continueDisabled?: boolean;
+  footer?: React.ReactNode;
+  /** Tighter layout for dashboard modal — no outer blur bleed, no scrollbars. */
+  embedded?: boolean;
+};
+
+const Flag = ({ code, size = 20 }: { code: string; size?: number }) => {
+  const cc = WORLD_CURRENCY_MAP[code]?.cc;
+  if (!cc) return <span className="inline-block rounded-[2px] bg-white/20" style={{ width: size, height: size * 0.75 }} />;
+  return (
+    <img
+      src={`https://flagcdn.com/${size * 2}x${size * 1.5}/${cc}.png`}
+      width={size}
+      height={size * 0.75}
+      alt={code}
+      loading="lazy"
+      className="inline-block rounded-[2px] ring-1 ring-white/15 object-cover"
+    />
+  );
+};
+
+const LiveFxCalculator = ({
+  variant = "landing",
+  className = "",
+  defaultFrom = "CAD",
+  defaultTo = "NGN",
+  defaultSendAmount = "1000",
+  from: controlledFrom,
+  to: controlledTo,
+  sendAmount: controlledSend,
+  onFromChange,
+  onToChange,
+  onSendAmountChange,
+  onRecvAmountChange,
+  fromCurrencyFilter,
+  toCurrencyFilter,
+  quoteRecipient: quoteRecipientOverride,
+  quoteSend: quoteSendOverride,
+  displayRate,
+  feeLabel,
+  walletBalance,
+  walletSymbol,
+  showComparison = true,
+  showDisclaimer = true,
+  showActions,
+  continueLabel,
+  onContinue,
+  continueDisabled,
+  footer,
+  embedded = false,
+}: LiveFxCalculatorProps) => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const isApp = variant === "app";
+
+  const [internalFrom, setInternalFrom] = useState(defaultFrom);
+  const [internalTo, setInternalTo] = useState(defaultTo);
+  const [sendAmt, setSendAmt] = useState(defaultSendAmount);
+  const [recvAmt, setRecvAmt] = useState("");
+  const [lastEdited, setLastEdited] = useState<"send" | "receive">("send");
+  const [, setTick] = useState(0);
+  const fetchedAtRef = useRef<number>(Date.now());
+
+  const from = controlledFrom ?? internalFrom;
+  const to = controlledTo ?? internalTo;
+  const sendAmtDisplay = controlledSend ?? sendAmt;
+
+  const setFrom = (code: string) => {
+    if (controlledFrom === undefined) setInternalFrom(code);
+    onFromChange?.(code);
+  };
+  const setTo = (code: string) => {
+    if (controlledTo === undefined) setInternalTo(code);
+    onToChange?.(code);
+  };
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["market-rates-fx-calc"],
+    queryFn: async (): Promise<MarketResponse> => {
+      const { data, error } = await supabase.functions.invoke("market-rates");
+      if (error) throw error;
+      fetchedAtRef.current = Date.now();
+      return data as MarketResponse;
+    },
+    refetchInterval: 60_000,
+    staleTime: 30_000,
+  });
+
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const usdMap = useMemo(() => buildUsdMap(data?.fiat ?? []), [data]);
+  const midRate = useMemo(() => midRateFromUsdMap(from, to, usdMap), [from, to, usdMap]);
+
+  const flatFeeInFrom = (usdFee: number): number => {
+    if (!usdFee) return 0;
+    const fUsd = usdMap.get(from);
+    if (!fUsd || fUsd <= 0) return 0;
+    return usdFee / fUsd;
+  };
+
+  const defaultQuoteRecipient = (sendInFrom: number, margin: number, flatUsd: number): number => {
+    if (!midRate || sendInFrom <= 0) return 0;
+    if (from === to) {
+      return Math.max(0, sendInFrom * (1 - margin));
+    }
+    const fee = flatFeeInFrom(flatUsd);
+    const net = Math.max(0, sendInFrom - fee);
+    return net * midRate * (1 - margin);
+  };
+  const defaultQuoteSend = (recvInTo: number, margin: number, flatUsd: number): number => {
+    if (!midRate || recvInTo <= 0) return 0;
+    if (from === to) {
+      return recvInTo / (1 - margin);
+    }
+    const net = recvInTo / (midRate * (1 - margin));
+    return net + flatFeeInFrom(flatUsd);
+  };
+
+  const efinRecipient = (s: number) =>
+    quoteRecipientOverride ? quoteRecipientOverride(s) : defaultQuoteRecipient(s, EFIN_FX_MARGIN, EFIN_FLAT_FEE_USD);
+  const efinSend = (r: number) =>
+    quoteSendOverride ? quoteSendOverride(r) : defaultQuoteSend(r, EFIN_FX_MARGIN, EFIN_FLAT_FEE_USD);
+
+  const syncFromSend = (sendStr: string) => {
+    const s = parseAmount(sendStr);
+    const next = s > 0 ? fmt(efinRecipient(s)) : "";
+    setRecvAmt(next);
+    onRecvAmountChange?.(next, parseAmount(next));
+  };
+
+  const syncFromRecv = (recvStr: string) => {
+    const r = parseAmount(recvStr);
+    const next = r > 0 ? fmt(efinSend(r)) : "";
+    if (controlledSend === undefined) setSendAmt(next);
+    onSendAmountChange?.(next, parseAmount(next));
+  };
+
+  useEffect(() => {
+    if (lastEdited !== "send") return;
+    syncFromSend(sendAmtDisplay);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [midRate, from, to, sendAmtDisplay, quoteRecipientOverride, quoteSendOverride, displayRate]);
+
+  const onSendChange = (v: string) => {
+    const clean = v.replace(/[^0-9.,]/g, "");
+    if (controlledSend === undefined) setSendAmt(clean);
+    setLastEdited("send");
+    onSendAmountChange?.(clean, parseAmount(clean));
+    syncFromSend(clean);
+  };
+
+  const onRecvChange = (v: string) => {
+    const clean = v.replace(/[^0-9.,]/g, "");
+    setRecvAmt(clean);
+    setLastEdited("receive");
+    onRecvAmountChange?.(clean, parseAmount(clean));
+    syncFromRecv(clean);
+  };
+
+  const swap = () => {
+    setFrom(to);
+    setTo(from);
+  };
+
+  const secondsAgo = Math.max(0, Math.floor((Date.now() - fetchedAtRef.current) / 1000));
+  const sendNumeric = parseAmount(sendAmtDisplay);
+  const recvNumeric = parseAmount(recvAmt);
+
+  const efinDisplayRate = displayRate ?? (midRate ? midRate * (1 - EFIN_FX_MARGIN) : null);
+  const marketMargin = Math.max(BENCHMARK_A_MARGIN, BENCHMARK_B_MARGIN);
+  const marketDisplayRate = midRate ? midRate * (1 - marketMargin) : null;
+
+  const benchARecv = defaultQuoteRecipient(sendNumeric, BENCHMARK_A_MARGIN, BENCHMARK_A_FLAT_FEE_USD);
+  const benchBRecv = defaultQuoteRecipient(sendNumeric, BENCHMARK_B_MARGIN, BENCHMARK_B_FLAT_FEE_USD);
+  const bestCompetitorRecv = Math.max(benchARecv, benchBRecv);
+  const savingsInTo = recvNumeric - bestCompetitorRecv;
+  const savingsInSend = midRate && midRate > 0 ? savingsInTo / midRate : 0;
+  const savingsPct = bestCompetitorRecv > 0 ? (savingsInTo / bestCompetitorRecv) * 100 : 0;
+
+  const goNext = (mode: "signup" | "signin" | "direct") => {
+    if (onContinue) {
+      onContinue({ from, to, sendAmount: sendNumeric, recvAmount: recvNumeric });
+      return;
+    }
+    const target = to !== from ? "/send" : "/exchange";
+    const qs = `?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&amount=${encodeURIComponent(String(sendNumeric))}`;
+    const dest = target + qs;
+    try {
+      sessionStorage.setItem("efm_fx_intent", JSON.stringify({ from, to, amount: sendNumeric, at: Date.now() }));
+    } catch { /* ignore */ }
+    if (user || mode === "direct") return navigate(dest);
+    navigate(`/auth?mode=${mode}&redirect=${encodeURIComponent(dest)}`);
+  };
+
+  const rateUnavailable = !isLoading && !midRate && !quoteRecipientOverride && displayRate == null;
+  const actionsVisible = showActions ?? !isApp;
+  const resolvedContinueLabel = continueLabel ?? (isApp ? "Continue" : user ? "Continue" : "Sign up & send");
+
+  return (
+    <div
+      className={`relative w-full ${embedded || isApp ? "max-w-full" : "max-w-[340px] mx-auto"} ${className}`}
+    >
+      {!embedded && !isApp && (
+        <div className="absolute -inset-1 rounded-[24px] bg-gradient-to-br from-[hsl(var(--accent-amber)/0.35)] via-[hsl(var(--brand-500)/0.25)] to-transparent blur-2xl pointer-events-none" />
+      )}
+      {(embedded || isApp) && (
+        <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-br from-[hsl(var(--accent-amber)/0.18)] via-[hsl(var(--primary)/0.12)] to-transparent opacity-80" />
+      )}
+      <div className={`relative overflow-hidden rounded-2xl bg-[hsl(248_60%_8%)]/95 backdrop-blur-xl ring-1 ring-white/15 shadow-2xl ${embedded ? "p-3.5" : "p-4"}`}>
+        <div className="flex items-center justify-between mb-2.5">
+          <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/70">Live FX calculator</div>
+          <div className="inline-flex items-center gap-1.5 text-[9.5px] font-semibold text-white/60">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            {isLoading ? "Loading…" : `${secondsAgo}s ago`}
+          </div>
+        </div>
+
+        <AmountRow
+          label="You send"
+          value={sendAmtDisplay}
+          onChange={onSendChange}
+          currency={from}
+          onCurrencyChange={setFrom}
+          loading={isLoading}
+          currencyFilter={fromCurrencyFilter}
+          compact={embedded}
+        />
+        {walletBalance != null && (
+          <p className={`mt-1 px-1 ${walletBalance <= 0 ? "text-amber-300/90" : "text-white/50"} text-[10px]`}>
+            Available: {walletSymbol ?? ""}{fmt(walletBalance)}
+            {walletBalance <= 0 && sendNumeric > 0 ? " · Top up to send" : ""}
+          </p>
+        )}
+
+        <div className="my-1.5 flex justify-center">
+          <button
+            type="button"
+            onClick={swap}
+            className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 ring-1 ring-white/20 text-white grid place-items-center transition"
+            aria-label="Swap currencies"
+          >
+            <ArrowDownUp className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        <AmountRow
+          label="Recipient gets"
+          value={recvAmt}
+          onChange={onRecvChange}
+          currency={to}
+          onCurrencyChange={setTo}
+          loading={isLoading}
+          highlight
+          currencyFilter={toCurrencyFilter}
+          compact={embedded}
+        />
+
+        {showComparison && (
+          <div className="mt-3 rounded-xl bg-gradient-to-br from-[hsl(var(--accent-amber)/0.12)] to-white/[0.03] ring-1 ring-[hsl(var(--accent-amber)/0.25)] p-2.5">
+            {rateUnavailable ? (
+              <div className="text-[12px] text-white/70">Rate unavailable for this pair — try another currency.</div>
+            ) : (
+              <>
+                {!isApp && (
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[hsl(var(--accent-amber))]">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      You save vs. typical market rate
+                    </div>
+                    <div className="text-right">
+                      <div className="text-base font-black text-white tabular-nums leading-none">
+                        {savingsInSend > 0 ? `+${fmt(savingsInSend)} ${from}` : "—"}
+                      </div>
+                      {savingsPct > 0 && (
+                        <div className="text-[10px] font-bold text-emerald-400 tabular-nums">+{savingsPct.toFixed(1)}%</div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-1.5 text-[11px]">
+                  <Row
+                    label="eFinMoney"
+                    rate={efinDisplayRate ? `1 ${from} = ${fmt(efinDisplayRate)} ${to}` : "—"}
+                    fee={feeLabel ?? "0.8% + $0.99"}
+                    good
+                    compact={embedded || isApp}
+                  />
+                  {!isApp && (
+                    <Row
+                      label="Typical market rate"
+                      rate={marketDisplayRate ? `1 ${from} = ${fmt(marketDisplayRate)} ${to}` : "—"}
+                      fee="~2.2% + fees"
+                    />
+                  )}
+                </div>
+
+                <div className={`mt-2.5 flex flex-wrap gap-1 ${embedded ? "gap-1" : "gap-1.5"}`}>
+                  <Badge compact={embedded}>Mid-market rate</Badge>
+                  <Badge compact={embedded}>No hidden fees</Badge>
+                  <Badge compact={embedded}>{isApp ? "Live rate" : "60s rate lock"}</Badge>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {actionsVisible && (
+          <div className={`mt-3 ${embedded || isApp ? "flex flex-col gap-2" : "grid grid-cols-1 sm:grid-cols-2 gap-2"}`}>
+            <button
+              type="button"
+              onClick={() => goNext(user ? "direct" : "signup")}
+              disabled={continueDisabled ?? (rateUnavailable || sendNumeric <= 0)}
+              className={`group inline-flex w-full items-center justify-center gap-1.5 rounded-full bg-[hsl(var(--accent-amber))] font-bold text-[hsl(var(--brand-900))] shadow-cta-amber transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50 ${embedded ? "h-11 text-sm" : "h-10 text-[13px]"}`}
+            >
+              {resolvedContinueLabel}
+              <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+            </button>
+            {!user && !isApp && (
+              <button
+                type="button"
+                onClick={() => goNext("signin")}
+                className="inline-flex items-center justify-center h-10 rounded-full bg-white/10 hover:bg-white/15 ring-1 ring-white/20 text-white font-bold text-[13px] transition"
+              >
+                Sign in
+              </button>
+            )}
+          </div>
+        )}
+
+        {showDisclaimer && (
+          <p className="mt-2 text-[9.5px] leading-relaxed text-white/45">
+            {isApp
+              ? "Live mid-market rate with eFinMoney fees applied. Final amount confirmed before you send."
+              : "Indicative mid-market rate · 0.8% FX + $0.99 fee. Benchmarked against typical international money-transfer providers. Rate locks for 60 s after sign in."}
+          </p>
+        )}
+
+        {footer}
+      </div>
+    </div>
+  );
+};
+
+const Row = ({ label, rate, fee, good, compact }: { label: string; rate: string; fee: string; good?: boolean; compact?: boolean }) => (
+  <div className="flex items-start justify-between gap-2">
+    <div className="flex min-w-0 shrink-0 items-center gap-1.5">
+      {good ? (
+        <span className="grid h-4 w-4 shrink-0 place-items-center rounded-full bg-emerald-500/20 text-emerald-400">
+          <Check className="h-2.5 w-2.5" strokeWidth={3} />
+        </span>
+      ) : (
+        <span className="h-4 w-4 shrink-0" />
+      )}
+      <span className={good ? "font-bold text-white" : "text-white/60"}>{label}</span>
+    </div>
+    <div className="min-w-0 max-w-[58%] flex-1 text-right">
+      <div className={`break-words leading-snug tabular-nums ${compact ? "text-[10px]" : "text-[11px]"} ${good ? "font-semibold text-white" : "text-white/70"}`}>
+        {rate}
+      </div>
+      <div className={`text-[10px] ${good ? "font-semibold text-emerald-400" : "text-white/50"}`}>{fee}</div>
+    </div>
+  </div>
+);
+
+const Badge = ({ children, compact }: { children: React.ReactNode; compact?: boolean }) => (
+  <span className={`inline-flex items-center gap-1 font-bold uppercase tracking-wider text-white/75 ring-1 ring-white/15 bg-white/8 rounded-full ${compact ? "px-1.5 py-0.5 text-[9px]" : "px-2 py-0.5 text-[10px]"}`}>
+    <Check className="h-2.5 w-2.5 text-emerald-400" strokeWidth={3} />
+    {children}
+  </span>
+);
+
+const AmountRow = ({
+  label, value, onChange, currency, onCurrencyChange, loading, highlight, currencyFilter, compact,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  currency: string;
+  onCurrencyChange: (v: string) => void;
+  loading?: boolean;
+  highlight?: boolean;
+  currencyFilter?: string[];
+  compact?: boolean;
+}) => (
+  <div className={`rounded-xl px-3 py-2.5 ring-1 ${highlight ? "bg-white/[0.08] ring-white/15" : "bg-white/[0.06] ring-white/10"}`}>
+    <div className="mb-1 text-[9.5px] font-semibold uppercase tracking-[0.18em] text-white/55">{label}</div>
+    <div className="flex items-center gap-2">
+      <input
+        inputMode="decimal"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={loading ? "…" : "0.00"}
+        className={`min-w-0 flex-1 border-0 bg-transparent font-black tabular-nums text-white outline-none placeholder:text-white/30 ${compact ? "text-xl" : "text-xl sm:text-2xl"}`}
+      />
+      <CurrencyPicker value={currency} onChange={onCurrencyChange} currencyFilter={currencyFilter} />
+    </div>
+  </div>
+);
+
+const CurrencyPicker = ({ value, onChange, currencyFilter }: { value: string; onChange: (v: string) => void; currencyFilter?: string[] }) => {
+  const [open, setOpen] = useState(false);
+  const options = currencyFilter?.length
+    ? WORLD_CURRENCIES.filter((c) => currencyFilter.includes(c.code))
+    : WORLD_CURRENCIES;
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex items-center gap-1.5 pl-1.5 pr-2 h-9 rounded-lg bg-white/10 hover:bg-white/15 ring-1 ring-white/15 text-white text-[12px] font-bold transition"
+        >
+          <Flag code={value} />
+          <span>{value}</span>
+          <ChevronDown className="w-3.5 h-3.5 opacity-70" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="end"
+        sideOffset={8}
+        className="w-[280px] p-0 bg-[hsl(248_60%_10%)] border-white/15 text-white"
+      >
+        <Command className="bg-transparent">
+          <div className="flex items-center gap-2 px-3 border-b border-white/10">
+            <Search className="w-4 h-4 text-white/50" />
+            <CommandInput
+              placeholder="Search currency or country…"
+              className="bg-transparent text-white placeholder:text-white/40 h-10"
+            />
+          </div>
+          <CommandList className="max-h-72">
+            <CommandEmpty className="py-6 text-center text-sm text-white/50">No match.</CommandEmpty>
+            <CommandGroup>
+              {options.map((c) => (
+                <CommandItem
+                  key={c.code}
+                  value={`${c.code} ${c.name} ${c.country}`}
+                  onSelect={() => {
+                    onChange(c.code);
+                    setOpen(false);
+                  }}
+                  className="flex items-center gap-2.5 cursor-pointer text-white aria-selected:bg-white/10"
+                >
+                  <Flag code={c.code} />
+                  <span className="font-bold w-12 tabular-nums">{c.code}</span>
+                  <span className="flex-1 min-w-0 truncate text-white/80">{c.name}</span>
+                  <span className="text-[10px] text-white/50 truncate max-w-[80px]">{c.country}</span>
+                  {value === c.code && <Check className="w-4 h-4 text-emerald-400" />}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+};
+
+export default LiveFxCalculator;
