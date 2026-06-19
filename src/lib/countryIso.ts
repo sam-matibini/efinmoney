@@ -1,0 +1,108 @@
+import { COUNTRIES, findCountryById, type CountryInfo } from "@/lib/countries";
+
+/** ISO 3166-1 alpha-2 codes for countries in our dataset (used by Flutterwave bill payments). */
+export const COUNTRY_ISO2: Record<string, string> = {
+  Kenya: "KE",
+  Nigeria: "NG",
+  Ghana: "GH",
+  Uganda: "UG",
+  Tanzania: "TZ",
+  Zambia: "ZM",
+  Rwanda: "RW",
+  Ethiopia: "ET",
+  Senegal: "SN",
+  "Ivory Coast": "CI",
+  Cameroon: "CM",
+  "South Africa": "ZA",
+  Mozambique: "MZ",
+  Malawi: "MW",
+  Benin: "BJ",
+  Togo: "TG",
+  "Burkina Faso": "BF",
+  Mali: "ML",
+  Niger: "NE",
+  Guinea: "GN",
+  "Sierra Leone": "SL",
+  Liberia: "LR",
+  Gambia: "GM",
+  Congo: "CG",
+  "DR Congo": "CD",
+  Angola: "AO",
+  Namibia: "NA",
+  Botswana: "BW",
+  Madagascar: "MG",
+  "South Sudan": "SS",
+  Sudan: "SD",
+  Burundi: "BI",
+  Egypt: "EG",
+  Morocco: "MA",
+  Tunisia: "TN",
+  Algeria: "DZ",
+  Canada: "CA",
+  "United States": "US",
+  Mexico: "MX",
+  Jamaica: "JM",
+  "Trinidad & Tobago": "TT",
+  Barbados: "BB",
+  Haiti: "HT",
+  "Dominican Republic": "DO",
+  "United Kingdom": "GB",
+  Germany: "DE",
+  France: "FR",
+  Italy: "IT",
+  Spain: "ES",
+  Netherlands: "NL",
+  Belgium: "BE",
+  Portugal: "PT",
+  Ireland: "IE",
+  Sweden: "SE",
+  Norway: "NO",
+  Denmark: "DK",
+  Switzerland: "CH",
+  Austria: "AT",
+  Poland: "PL",
+  India: "IN",
+  Pakistan: "PK",
+  Bangladesh: "BD",
+  Philippines: "PH",
+  China: "CN",
+  Japan: "JP",
+  "South Korea": "KR",
+  Vietnam: "VN",
+  Indonesia: "ID",
+  Malaysia: "MY",
+  Singapore: "SG",
+  Thailand: "TH",
+  UAE: "AE",
+  "Saudi Arabia": "SA",
+  Qatar: "QA",
+  Kuwait: "KW",
+  Oman: "OM",
+  Israel: "IL",
+  Jordan: "JO",
+  Lebanon: "LB",
+  Nepal: "NP",
+  "Sri Lanka": "LK",
+  Brazil: "BR",
+  Argentina: "AR",
+  Colombia: "CO",
+  Peru: "PE",
+  Chile: "CL",
+  Australia: "AU",
+  "New Zealand": "NZ",
+};
+
+export const getCountryIso2 = (country: CountryInfo | string | null | undefined): string | undefined => {
+  if (!country) return undefined;
+  const id = typeof country === "string" ? country : country.id;
+  return COUNTRY_ISO2[id];
+};
+
+export const findCountryByIso2 = (iso2: string): CountryInfo | undefined => {
+  const code = iso2.toUpperCase();
+  const id = Object.entries(COUNTRY_ISO2).find(([, v]) => v === code)?.[0];
+  return id ? findCountryById(id) : undefined;
+};
+
+/** Countries we expose in bill-payment pickers (all dataset countries with ISO codes). */
+export const BILL_PAYMENT_COUNTRIES: CountryInfo[] = COUNTRIES.filter((c) => !!COUNTRY_ISO2[c.id]);

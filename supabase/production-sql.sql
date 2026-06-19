@@ -101,4 +101,103 @@ ALTER TABLE public.beneficiaries
 CREATE INDEX IF NOT EXISTS beneficiaries_user_category_idx
   ON public.beneficiaries(user_id, category);
 
+-- =============================================================================
+-- 4. Transaction PIN: fix profile lookup (user_id, not id)
+--    Without this, PIN is never saved and "Create PIN" shows every send.
+-- =============================================================================
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS transaction_pin_hash text,
+  ADD COLUMN IF NOT EXISTS transaction_pin_set_at timestamptz,
+  ADD COLUMN IF NOT EXISTS transaction_pin_failed_attempts integer NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS transaction_pin_locked_until timestamptz;
+
+CREATE OR REPLACE FUNCTION public.has_transaction_pin()
+RETURNS boolean
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT coalesce(
+    (SELECT transaction_pin_hash IS NOT NULL FROM public.profiles WHERE user_id = auth.uid()),
+    false
+  );
+$$;
+
+CREATE OR REPLACE FUNCTION public.set_transaction_pin(p_pin text)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions
+AS $$
+DECLARE
+  v_uid uuid := auth.uid();
+BEGIN
+  IF v_uid IS NULL THEN RAISE EXCEPTION 'Not authenticated'; END IF;
+  IF p_pin IS NULL OR p_pin !~ '^[0-9]{4}$' THEN
+    RAISE EXCEPTION 'PIN must be exactly 4 digits';
+  END IF;
+  UPDATE public.profiles
+     SET transaction_pin_hash = crypt(p_pin, gen_salt('bf')),
+         transaction_pin_set_at = now(),
+         transaction_pin_failed_attempts = 0,
+         transaction_pin_locked_until = null
+   WHERE user_id = v_uid;
+  IF NOT FOUND THEN RETURN false; END IF;
+  RETURN true;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.verify_transaction_pin(p_pin text)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions
+AS $$
+DECLARE
+  v_uid uuid := auth.uid();
+  v_hash text;
+  v_failed integer;
+  v_locked timestamptz;
+  v_match boolean;
+BEGIN
+  IF v_uid IS NULL THEN RAISE EXCEPTION 'Not authenticated'; END IF;
+  SELECT transaction_pin_hash, transaction_pin_failed_attempts, transaction_pin_locked_until
+    INTO v_hash, v_failed, v_locked
+    FROM public.profiles WHERE user_id = v_uid;
+  IF v_hash IS NULL THEN
+    RETURN jsonb_build_object('ok', false, 'no_pin', true, 'locked', false, 'attempts_left', 5);
+  END IF;
+  IF v_locked IS NOT NULL AND v_locked > now() THEN
+    RETURN jsonb_build_object('ok', false, 'locked', true, 'locked_until', v_locked, 'attempts_left', 0);
+  END IF;
+  v_match := (v_hash = crypt(coalesce(p_pin, ''), v_hash));
+  IF v_match THEN
+    UPDATE public.profiles
+       SET transaction_pin_failed_attempts = 0, transaction_pin_locked_until = null
+     WHERE user_id = v_uid;
+    RETURN jsonb_build_object('ok', true, 'locked', false, 'attempts_left', 5);
+  END IF;
+  v_failed := coalesce(v_failed, 0) + 1;
+  IF v_failed >= 5 THEN
+    UPDATE public.profiles
+       SET transaction_pin_failed_attempts = v_failed,
+           transaction_pin_locked_until = now() + interval '15 minutes'
+     WHERE user_id = v_uid;
+    RETURN jsonb_build_object('ok', false, 'locked', true,
+      'locked_until', now() + interval '15 minutes', 'attempts_left', 0);
+  ELSE
+    UPDATE public.profiles
+       SET transaction_pin_failed_attempts = v_failed
+     WHERE user_id = v_uid;
+    RETURN jsonb_build_object('ok', false, 'locked', false, 'attempts_left', 5 - v_failed);
+  END IF;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.has_transaction_pin() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.set_transaction_pin(text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.verify_transaction_pin(text) TO authenticated;
+
 NOTIFY pgrst, 'reload schema';

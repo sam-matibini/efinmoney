@@ -35,11 +35,17 @@ const TransactionPinDialog = ({ open, onOpenChange, onVerified, amountLabel }: P
   const [lockedUntil, setLockedUntil] = useState<string | null>(null);
   const shakeRef = useRef(0);
   const [shakeKey, setShakeKey] = useState(0);
+  const submitLockRef = useRef(false);
+  const completedRef = useRef(false);
+  const onVerifiedRef = useRef(onVerified);
+  onVerifiedRef.current = onVerified;
 
   const reset = useCallback(() => {
     setPin("");
     setFirstPin("");
     setError(null);
+    submitLockRef.current = false;
+    completedRef.current = false;
   }, []);
 
   // On open, find out if a PIN already exists.
@@ -63,37 +69,64 @@ const TransactionPinDialog = ({ open, onOpenChange, onVerified, amountLabel }: P
     setShakeKey(shakeRef.current);
   };
 
+  const finishVerified = (opts?: { created?: boolean }) => {
+    if (completedRef.current) return;
+    completedRef.current = true;
+    setPin("");
+    if (opts?.created) {
+      toast.success("Transaction PIN created");
+    }
+    onVerifiedRef.current();
+  };
+
   const submitSet = async (finalPin: string) => {
+    if (submitLockRef.current || busy || completedRef.current) return;
+    submitLockRef.current = true;
     setBusy(true);
     setError(null);
+    setPin("");
     const { data, error: rpcErr } = await supabase.rpc("set_transaction_pin" as any, { p_pin: finalPin });
     setBusy(false);
     if (rpcErr || !data) {
-      setError("Couldn't save your PIN. Please try again.");
+      submitLockRef.current = false;
+      setError(rpcErr?.message?.includes("Not authenticated")
+        ? "Session expired — please sign in again."
+        : "Couldn't save your PIN. Please try again.");
       triggerShake();
-      setPin("");
+      setMode("set");
+      setFirstPin("");
       return;
     }
-    toast.success("Transaction PIN created");
-    onVerified();
+    finishVerified({ created: true });
   };
 
   const submitVerify = async (finalPin: string) => {
+    if (submitLockRef.current || busy || completedRef.current) return;
+    submitLockRef.current = true;
     setBusy(true);
     setError(null);
+    setPin("");
     const { data, error: rpcErr } = await supabase.rpc("verify_transaction_pin" as any, { p_pin: finalPin });
     setBusy(false);
     const res = (data ?? {}) as {
-      ok?: boolean; locked?: boolean; attempts_left?: number; locked_until?: string;
+      ok?: boolean; locked?: boolean; no_pin?: boolean;
+      attempts_left?: number; locked_until?: string;
     };
     if (rpcErr) {
+      submitLockRef.current = false;
       setError("Verification failed. Please try again.");
       triggerShake();
-      setPin("");
       return;
     }
     if (res.ok) {
-      onVerified();
+      finishVerified();
+      return;
+    }
+    submitLockRef.current = false;
+    if (res.no_pin) {
+      setMode("set");
+      setFirstPin("");
+      setError("Set up your PIN first");
       return;
     }
     if (res.locked) {
@@ -108,19 +141,18 @@ const TransactionPinDialog = ({ open, onOpenChange, onVerified, amountLabel }: P
         : "Incorrect PIN",
     );
     triggerShake();
-    setPin("");
   };
 
   // Auto-advance when the PIN reaches full length.
   useEffect(() => {
-    if (pin.length !== PIN_LENGTH || busy) return;
+    if (pin.length !== PIN_LENGTH || busy || submitLockRef.current || completedRef.current) return;
     if (mode === "set") {
       setFirstPin(pin);
       setPin("");
       setMode("set-confirm");
     } else if (mode === "set-confirm") {
       if (pin === firstPin) {
-        submitSet(pin);
+        void submitSet(pin);
       } else {
         setError("PINs don't match — start again");
         triggerShake();
@@ -129,13 +161,13 @@ const TransactionPinDialog = ({ open, onOpenChange, onVerified, amountLabel }: P
         setMode("set");
       }
     } else if (mode === "verify") {
-      submitVerify(pin);
+      void submitVerify(pin);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pin, mode, busy]);
+  }, [pin, mode, busy, firstPin]);
 
   const pressDigit = (d: string) => {
-    if (busy || mode === "locked" || mode === "loading") return;
+    if (busy || submitLockRef.current || mode === "locked" || mode === "loading") return;
     setError(null);
     setPin((p) => (p.length < PIN_LENGTH ? p + d : p));
   };
@@ -148,7 +180,7 @@ const TransactionPinDialog = ({ open, onOpenChange, onVerified, amountLabel }: P
     : "Enter your PIN";
 
   const subtitle =
-    mode === "set" ? "Choose a 4-digit PIN you'll use to approve transfers."
+    mode === "set" ? "Choose a 4-digit PIN you'll use to approve transfers. You only set this once."
     : mode === "set-confirm" ? "Re-enter the 4-digit PIN to confirm."
     : mode === "locked" ? "Your PIN is temporarily locked for security."
     : amountLabel
@@ -156,7 +188,7 @@ const TransactionPinDialog = ({ open, onOpenChange, onVerified, amountLabel }: P
       : "Enter your 4-digit PIN to authorize this transfer.";
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!busy) onOpenChange(o); }}>
+    <Dialog open={open} onOpenChange={(o) => { if (!busy && !completedRef.current) onOpenChange(o); }}>
       <DialogContent className="sm:max-w-sm overflow-hidden">
         <DialogHeader className="items-center text-center">
           <motion.div

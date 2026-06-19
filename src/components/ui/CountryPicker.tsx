@@ -19,6 +19,7 @@ interface CountryPickerProps {
   placeholder?: string;
   className?: string;
   showMethod?: boolean;                   // show payout method in trigger
+  countries?: CountryInfo[];              // optional subset (defaults to all)
 }
 
 const CountryPicker = ({
@@ -27,6 +28,7 @@ const CountryPicker = ({
   placeholder = "Select country",
   className,
   showMethod = true,
+  countries = COUNTRIES,
 }: CountryPickerProps) => {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -34,9 +36,10 @@ const CountryPicker = ({
   const selected = findCountryById(value || undefined);
 
   const grouped = useMemo(() => {
-    const items = filterCountries(query);
+    const base = query.trim() ? filterCountries(query).filter((c) => countries.some((x) => x.id === c.id)) : countries;
+    const items = base;
     const popular = POPULAR_COUNTRY_IDS
-      .map((id) => COUNTRIES.find((c) => c.id === id))
+      .map((id) => countries.find((c) => c.id === id))
       .filter((c): c is CountryInfo => !!c && items.includes(c));
 
     const byRegion = REGION_ORDER.map((region) => ({
@@ -45,7 +48,7 @@ const CountryPicker = ({
     })).filter((g) => g.list.length > 0);
 
     return { popular, byRegion, total: items.length };
-  }, [query]);
+  }, [query, countries]);
 
   return (
     <Popover open={open} onOpenChange={(o) => { setOpen(o); if (!o) setQuery(""); }}>

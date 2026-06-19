@@ -21,11 +21,13 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const category = String(body?.category || "");
     const billerCode = String(body?.billerCode || "");
+    const itemCode = body?.itemCode ? String(body.itemCode) : null;
     const billerName = body?.billerName ? String(body.billerName) : null;
     const customerIdentifier = String(body?.customerIdentifier || "");
     const amount = Number(body?.amount);
     const currency = (body?.currency || "NGN").toString().toUpperCase();
     const country = (body?.country || "NG").toString().toUpperCase();
+    const paymentType = itemCode || String(body?.paymentType || category || billerCode);
     if (!category || !billerCode || !customerIdentifier || !Number.isFinite(amount) || amount <= 0) {
       return new Response(JSON.stringify({ error: "Missing required fields" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
@@ -59,7 +61,7 @@ Deno.serve(async (req) => {
 
     const { ok, json } = await flwV3Fetch("/bills", {
       method: "POST",
-      body: JSON.stringify({ country, customer: customerIdentifier, amount, type: billerCode, reference, recurrence: "ONCE" }),
+      body: JSON.stringify({ country, customer: customerIdentifier, amount, type: paymentType, reference, recurrence: "ONCE" }),
       timeoutMs: 20_000,
     });
 
