@@ -27,7 +27,7 @@ Write-Host "`n=== eFinMoney Supabase deploy ($ProjectRef) ===`n" -ForegroundColo
 try {
   npx supabase link --project-ref $ProjectRef 2>&1 | Out-Null
 } catch {
-  Write-Warning "Could not link project — ensure you are logged in: npx supabase login"
+  Write-Warning "Could not link project - ensure you are logged in: npx supabase login"
 }
 
 function Push-Secrets {
@@ -39,13 +39,14 @@ function Push-Secrets {
   $pairs = @()
   Get-Content $secretsFile | ForEach-Object {
     $line = $_.Trim()
-    if (-not $line -or $line.StartsWith("#")) { return }
-    if ($line -notmatch "^([A-Z0-9_]+)=(.+)$") { return }
-    $name = $Matches[1]
-    $value = $Matches[2].Trim('"')
+    if (-not $line -or $line.StartsWith('#')) { return }
+    $eq = $line.IndexOf('=')
+    if ($eq -lt 1) { return }
+    $name = $line.Substring(0, $eq)
+    $value = $line.Substring($eq + 1).Trim([char]34)
     if ([string]::IsNullOrWhiteSpace($value)) { return }
     # Skip reference-only keys not used by edge functions
-    if ($name -match "_PRODUCTION$|_SANDBOX$") { return }
+    if ($name.EndsWith('_PRODUCTION') -or $name.EndsWith('_SANDBOX')) { return }
     $pairs += "${name}=${value}"
   }
   # Always set public app URL for staff invites
@@ -84,9 +85,8 @@ function Deploy-Functions {
 }
 
 function Push-Db {
-  Write-Host "Applying pending migrations..." -ForegroundColor Yellow
-  npx supabase db push --project-ref $ProjectRef
-  Write-Host "Migrations OK`n" -ForegroundColor Green
+  Write-Host "Database: run supabase/production-sql.sql in Dashboard SQL Editor." -ForegroundColor Yellow
+  Write-Host "(Full db push is skipped — remote DB already exists; pushing all migrations would fail.)`n" -ForegroundColor DarkYellow
 }
 
 try {
@@ -103,7 +103,7 @@ try {
   Write-Host "Next: complete manual steps in supabase/PRODUCTION-DEPLOY.md (Auth URLs + Send Email hook)"
 } catch {
   Write-Host "`nDeploy failed: $_" -ForegroundColor Red
-  Write-Host "If you see 403, log in with the Supabase account that owns project $ProjectRef:"
+  Write-Host "If you see 403, log in with the Supabase account that owns project ${ProjectRef}:"
   Write-Host "  npx supabase login"
   exit 1
 }
