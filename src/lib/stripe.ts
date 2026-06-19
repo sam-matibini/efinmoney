@@ -8,30 +8,44 @@ function isValidPublishableKey(k: unknown): k is string {
   return typeof k === "string" && (k.startsWith("pk_test_") || k.startsWith("pk_live_"));
 }
 
-async function fetchKeyDirect(): Promise<string | null> {
+function publishableKeyFromEnv(): string | null {
+  const key = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
+  return isValidPublishableKey(key) ? key : null;
+}
+
+async function fetchKeyFromEdgeFunction(): Promise<string | null> {
   try {
-    const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stripe-payment-intent?action=publishable_key`;
-    const { data: { session } } = await supabase.auth.getSession();
-    const res = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${session?.access_token ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-      },
+    const { data, error } = await supabase.functions.invoke("stripe-payment-intent", {
+      body: { action: "publishable_key" },
     });
-    const j = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      lastError = j?.error || `Failed to load Stripe key (${res.status})`;
+    if (error) {
+      lastError = error.message || "Failed to load Stripe key";
       return null;
     }
-    if (!isValidPublishableKey(j?.publishableKey)) {
+    if ((data as { error?: string })?.error) {
+      lastError = (data as { error: string }).error;
+      return null;
+    }
+    const key = (data as { publishableKey?: string })?.publishableKey;
+    if (!isValidPublishableKey(key)) {
       lastError = "Stripe is not configured correctly (invalid publishable key).";
       return null;
     }
-    return j.publishableKey as string;
-  } catch (e: any) {
-    lastError = e?.message || "Network error loading Stripe";
+    return key;
+  } catch (e: unknown) {
+    lastError = e instanceof Error ? e.message : "Network error loading Stripe";
     return null;
   }
+}
+
+async function fetchKeyDirect(): Promise<string | null> {
+  const envKey = publishableKeyFromEnv();
+  if (envKey) return envKey;
+
+  const edgeKey = await fetchKeyFromEdgeFunction();
+  if (edgeKey) return edgeKey;
+
+  return null;
 }
 
 export function getStripe(): Promise<Stripe | null> {

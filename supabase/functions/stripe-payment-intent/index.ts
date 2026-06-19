@@ -1,34 +1,52 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import Stripe from "https://esm.sh/stripe@17.3.1?target=denonext";
+import { corsHeaders, corsPreflightResponse, jsonResponse } from "../_shared/cors.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-};
+function getStripeClient(): Stripe {
+  const secret = Deno.env.get("STRIPE_SECRET_KEY");
+  if (!secret) throw new Error("STRIPE_SECRET_KEY is not configured");
+  return new Stripe(secret, {
+    apiVersion: "2024-11-20.acacia",
+    httpClient: Stripe.createFetchHttpClient(),
+  });
+}
 
-const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY")!, {
-  apiVersion: "2024-11-20.acacia",
-  httpClient: Stripe.createFetchHttpClient(),
-});
+function publishableKeyResponse() {
+  const pk = Deno.env.get("STRIPE_PUBLISHABLE_KEY") ?? "";
+  if (!pk.startsWith("pk_test_") && !pk.startsWith("pk_live_")) {
+    return jsonResponse({
+      error: "Stripe publishable key is not configured correctly. Expected a value starting with pk_test_ or pk_live_.",
+    }, 500);
+  }
+  return jsonResponse({ publishableKey: pk });
+}
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  if (req.method === "OPTIONS") return corsPreflightResponse();
 
   try {
     const url = new URL(req.url);
+
     if (req.method === "GET" && url.searchParams.get("action") === "publishable_key") {
-      const pk = Deno.env.get("STRIPE_PUBLISHABLE_KEY") ?? "";
-      if (!pk.startsWith("pk_test_") && !pk.startsWith("pk_live_")) {
-        return json({
-          error: "Stripe publishable key is not configured correctly. Expected a value starting with pk_test_ or pk_live_.",
-        }, 500);
-      }
-      return json({ publishableKey: pk });
+      return publishableKeyResponse();
     }
+
+    let body: Record<string, unknown> = {};
+    if (req.method === "POST") {
+      try {
+        body = await req.json();
+      } catch {
+        body = {};
+      }
+    }
+
+    if (body.action === "publishable_key") {
+      return publishableKeyResponse();
+    }
+
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
-      return json({ error: "Unauthorized" }, 401);
+      return jsonResponse({ error: "Unauthorized" }, 401);
     }
 
     const supabase = createClient(
@@ -39,10 +57,9 @@ Deno.serve(async (req) => {
 
     const token = authHeader.replace("Bearer ", "");
     const { data: userData, error: authErr } = await supabase.auth.getUser(token);
-    if (authErr || !userData?.user) return json({ error: "Unauthorized" }, 401);
+    if (authErr || !userData?.user) return jsonResponse({ error: "Unauthorized" }, 401);
     const userId = userData.user.id;
 
-    const body = await req.json();
     const { action } = body;
 
     const admin = createClient(
@@ -50,23 +67,28 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
+    const stripe = getStripeClient();
+
     if (action === "create") {
-      const { amount, currency, walletId } = body;
+      const { amount, currency, walletId } = body as {
+        amount?: number;
+        currency?: string;
+        walletId?: string;
+      };
       if (!amount || amount <= 0 || !currency || !walletId) {
-        return json({ error: "Invalid input" }, 400);
+        return jsonResponse({ error: "Invalid input" }, 400);
       }
       if (amount > 999999.99) {
-        return json({ error: "Amount must be no more than $999,999.99 per transaction" }, 400);
+        return jsonResponse({ error: "Amount must be no more than $999,999.99 per transaction" }, 400);
       }
 
-      // Verify wallet ownership
       const { data: wallet } = await admin
         .from("wallets")
         .select("id, user_id, currency_code")
         .eq("id", walletId)
         .single();
       if (!wallet || wallet.user_id !== userId) {
-        return json({ error: "Wallet not found" }, 404);
+        return jsonResponse({ error: "Wallet not found" }, 404);
       }
 
       const intent = await stripe.paymentIntents.create({
@@ -76,24 +98,25 @@ Deno.serve(async (req) => {
         metadata: { user_id: userId, wallet_id: walletId },
       });
 
-      return json({ clientSecret: intent.client_secret, paymentIntentId: intent.id });
+      return jsonResponse({ clientSecret: intent.client_secret, paymentIntentId: intent.id });
     }
 
     if (action === "confirm") {
-      const { paymentIntentId } = body;
+      const { paymentIntentId } = body as { paymentIntentId?: string };
+      if (!paymentIntentId) return jsonResponse({ error: "paymentIntentId required" }, 400);
+
       const intent = await stripe.paymentIntents.retrieve(paymentIntentId);
       if (intent.status !== "succeeded") {
-        return json({ error: `Payment not completed (${intent.status})` }, 400);
+        return jsonResponse({ error: `Payment not completed (${intent.status})` }, 400);
       }
       if (intent.metadata.user_id !== userId) {
-        return json({ error: "Unauthorized" }, 403);
+        return jsonResponse({ error: "Unauthorized" }, 403);
       }
 
       const walletId = intent.metadata.wallet_id;
       const amount = intent.amount / 100;
       const currency = intent.currency.toUpperCase();
 
-      // Idempotency: skip if this PaymentIntent was already posted
       const { data: existing } = await admin
         .from("ledger_entries")
         .select("id")
@@ -101,10 +124,9 @@ Deno.serve(async (req) => {
         .eq("external_reference", intent.id)
         .limit(1);
       if (existing && existing.length > 0) {
-        return json({ success: true, alreadyProcessed: true });
+        return jsonResponse({ success: true, alreadyProcessed: true });
       }
 
-      // Dr Stripe Settlement (asset) / Cr Customer Wallet Liability (21xx)
       const { data: stripeAsset } = await admin
         .from("ledger_accounts")
         .select("id")
@@ -122,7 +144,7 @@ Deno.serve(async (req) => {
         .maybeSingle();
 
       if (!stripeAsset || !liabAcc) {
-        return json({ error: `Ledger accounts missing for ${currency}` }, 500);
+        return jsonResponse({ error: `Ledger accounts missing for ${currency}` }, 500);
       }
 
       const journalId = crypto.randomUUID();
@@ -155,9 +177,8 @@ Deno.serve(async (req) => {
       ];
 
       const { error: ledgerErr } = await admin.from("ledger_entries").insert(entries);
-      if (ledgerErr) return json({ error: ledgerErr.message }, 500);
+      if (ledgerErr) return jsonResponse({ error: ledgerErr.message }, 500);
 
-      // Notify the user (best-effort)
       try {
         await admin.from("notifications").insert({
           user_id: userId,
@@ -169,21 +190,17 @@ Deno.serve(async (req) => {
         console.warn("notification insert failed", e);
       }
 
-      return json({ success: true, amount, currency });
+      return jsonResponse({ success: true, amount, currency });
     }
 
-    return json({ error: "Unknown action" }, 400);
+    return jsonResponse({ error: "Unknown action" }, 400);
   } catch (e) {
     console.error("stripe-payment-intent error:", e);
     const msg = (e as Error).message ?? "Unknown error";
     const status = /amount_too_large|no more than/i.test(msg) ? 400 : 500;
-    return json({ error: msg }, status);
+    return jsonResponse({ error: msg }, status);
   }
 });
 
-function json(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
-}
+// Keep corsHeaders exported for any tooling that references it.
+export { corsHeaders };

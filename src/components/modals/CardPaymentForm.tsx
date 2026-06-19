@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useWallets } from "@/hooks/useWallets";
 import { useProfile } from "@/hooks/useProfile";
-import { getStripe } from "@/lib/stripe";
+import { getStripe, getStripeLoadError } from "@/lib/stripe";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -358,9 +358,13 @@ function InnerForm({
 export default function CardPaymentForm(props: Props) {
   const { data: wallets } = useWallets();
   const [stripeReady, setStripeReady] = useState<Awaited<ReturnType<typeof getStripe>> | null>(null);
+  const [stripeFailed, setStripeFailed] = useState(false);
 
   useEffect(() => {
-    getStripe().then(setStripeReady);
+    getStripe().then((stripe) => {
+      setStripeReady(stripe);
+      if (!stripe) setStripeFailed(true);
+    });
   }, []);
 
   const elementsOptions = useMemo(() => {
@@ -375,6 +379,15 @@ export default function CardPaymentForm(props: Props) {
       },
     };
   }, []);
+
+  if (stripeFailed && !stripeReady) {
+    return (
+      <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+        Stripe payments are unavailable right now.
+        {getStripeLoadError() ? ` ${getStripeLoadError()}` : ""}
+      </div>
+    );
+  }
 
   if (!stripeReady) {
     return (

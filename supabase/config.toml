@@ -97,3 +97,65 @@ verify_jwt = false
 
 [functions.adyen-confirm-session]
 verify_jwt = false
+
+# Client-called Stripe / Plaid functions: verify_jwt must be false so browser
+# OPTIONS preflight requests reach the function (they carry no Authorization header).
+[functions.stripe-payment-intent]
+verify_jwt = false
+
+[functions.stripe-create-checkout-session]
+verify_jwt = false
+
+[functions.stripe-save-card]
+verify_jwt = false
+
+[functions.stripe-save-card-confirm]
+verify_jwt = false
+
+[functions.stripe-charge-saved-card]
+verify_jwt = false
+
+[functions.stripe-charge-card]
+verify_jwt = false
+
+[functions.stripe-mode-check]
+verify_jwt = false
+
+[functions.stripe-config-status]
+verify_jwt = false
+
+[functions.stripe-connect-refresh-status]
+verify_jwt = false
+
+[functions.stripe-connect-account-session]
+verify_jwt = false
+
+[functions.stripe-connect-create-account]
+verify_jwt = false
+
+[functions.stripe-connect-instant-payout]
+verify_jwt = false
+
+[functions.stripe-issuing-balance]
+verify_jwt = false
+
+[functions.stripe-issuing-create-card]
+verify_jwt = false
+
+[functions.stripe-issuing-update-card]
+verify_jwt = false
+
+[functions.stripe-issuing-fund-card]
+verify_jwt = false
+
+[functions.stripe-issuing-card-details]
+verify_jwt = false
+
+[functions.plaid-create-link-token]
+verify_jwt = false
+
+[functions.plaid-exchange-token]
+verify_jwt = false
+
+[functions.intra-ca-transfer-create]
+verify_jwt = false
