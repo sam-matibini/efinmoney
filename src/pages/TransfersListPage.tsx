@@ -1,7 +1,5 @@
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import Header from "@/components/layout/Header";
-import MobileNav from "@/components/layout/MobileNav";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -81,9 +79,7 @@ const TransfersListPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-24 md:pb-8">
-      <Header />
-      <main className="container px-4 py-6 max-w-7xl mx-auto space-y-6">
+    <main className="container px-4 py-6 max-w-7xl mx-auto space-y-6">
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl sm:text-3xl font-display font-bold">Account Statement</h1>
@@ -162,8 +158,6 @@ const TransfersListPage = () => {
           </CardContent>
         </Card>
       </main>
-      <MobileNav />
-    </div>
   );
 };
 

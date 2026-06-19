@@ -1,6 +1,4 @@
 import { motion } from "framer-motion";
-import Header from "@/components/layout/Header";
-import MobileNav from "@/components/layout/MobileNav";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CreditCard, Plus, Lock, Unlock, Settings, Trash2, Snowflake, Send } from "lucide-react";
@@ -108,8 +106,6 @@ const CardsPage = () => {
         background:
           "radial-gradient(ellipse 80% 60% at 20% 0%, hsl(var(--primary) / 0.10), transparent 60%), radial-gradient(ellipse 70% 50% at 90% 30%, rgba(99,102,241,0.10), transparent 65%), hsl(var(--background))",
       }}>
-      <Header />
-
       <main className="container relative z-0 px-4 py-6">
         <motion.div
           initial="hidden"
@@ -287,8 +283,6 @@ const CardsPage = () => {
           </div>
         </motion.div>
       </main>
-
-      <MobileNav />
 
       <AddCardModal isOpen={addOpen} onClose={() => setAddOpen(false)} />
 

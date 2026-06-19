@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import Header from "@/components/layout/Header";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -88,9 +87,7 @@ const ProfileSettingsPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
-      <div className="container max-w-2xl mx-auto px-4 py-8">
+    <div className="container max-w-2xl mx-auto px-4 py-8">
         <h1 className="text-2xl font-bold text-foreground mb-6">Profile Settings</h1>
 
         {/* eFinMoney identity card — what others use to send you money */}
@@ -238,7 +235,6 @@ const ProfileSettingsPage = () => {
           </Button>
 
         </Card>
-      </div>
     </div>
   );
 };

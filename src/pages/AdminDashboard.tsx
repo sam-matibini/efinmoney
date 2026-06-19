@@ -1,6 +1,4 @@
 import { motion } from "framer-motion";
-import Header from "@/components/layout/Header";
-import MobileNav from "@/components/layout/MobileNav";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UsersPanel } from "@/components/admin/UsersPanel";
 import { ComplianceAlertsPanel } from "@/components/admin/ComplianceAlertsPanel";
@@ -11,10 +9,7 @@ import { RiskTiersPanel } from "@/components/admin/RiskTiersPanel";
 
 const AdminDashboard = () => {
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
-      
-      <main className="container px-4 py-6 pb-24 md:pb-6">
+    <main className="container px-4 py-6 pb-24 md:pb-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -60,10 +55,7 @@ const AdminDashboard = () => {
             </TabsContent>
           </Tabs>
         </motion.div>
-      </main>
-
-      <MobileNav />
-    </div>
+    </main>
   );
 };
 

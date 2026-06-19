@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { useSearchParams } from "react-router-dom";
-import Header from "@/components/layout/Header";
-import MobileNav from "@/components/layout/MobileNav";
 import BackToDashboard from "@/components/layout/BackToDashboard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -179,9 +177,7 @@ const TopUpPage = () => {
   }, [gateway]);
 
   return (
-    <div className="min-h-screen bg-background pb-24 md:pb-8">
-      <Header />
-      <main className="container px-4 py-6">
+    <main className="container px-4 py-6">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-xl mx-auto space-y-6">
           <BackToDashboard />
           <div>
@@ -357,8 +353,6 @@ const TopUpPage = () => {
           )}
         </motion.div>
       </main>
-      <MobileNav />
-    </div>
   );
 };
 

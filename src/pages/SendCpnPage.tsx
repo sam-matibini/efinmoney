@@ -3,8 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowRight, Globe, ShieldCheck, Zap } from "lucide-react";
 import LoadingSpinner from "@/components/LoadingSpinner";
-import Header from "@/components/layout/Header";
-import MobileNav from "@/components/layout/MobileNav";
 import BackToDashboard from "@/components/layout/BackToDashboard";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -121,8 +119,7 @@ const SendCpnPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-24 lg:pb-0">
-      <Header />
+    <>
       <main className="container mx-auto px-4 py-6 lg:py-10 max-w-3xl">
         <BackToDashboard />
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
@@ -254,9 +251,8 @@ const SendCpnPage = () => {
           )}
         </motion.div>
       </main>
-      <MobileNav />
       {pinGate}
-    </div>
+    </>
   );
 };
 

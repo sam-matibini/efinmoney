@@ -4,8 +4,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useUserRoles } from "@/hooks/useUserRoles";
 import { useTransfers } from "@/hooks/useTransfers";
-import MobileNav from "@/components/layout/MobileNav";
-import Header from "@/components/layout/Header";
 import { Badge } from "@/components/ui/badge";
 import {
   User as UserIcon,
@@ -87,12 +85,7 @@ const MorePage = () => {
   const verified = profile?.kyc_status === "approved" || profile?.kyc_status === "verified";
 
   return (
-    <div className="min-h-screen bg-background pb-24 md:pb-12">
-      <div className="hidden md:block">
-        <Header />
-      </div>
-
-      <main className="container max-w-2xl px-4 pt-6 md:pt-8">
+    <main className="container max-w-2xl px-4 pt-6 md:pt-8">
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -244,9 +237,6 @@ const MorePage = () => {
           <p className="text-center text-xs text-muted-foreground/70">eFinMoney · v3.10.2</p>
         </motion.div>
       </main>
-
-      <MobileNav />
-    </div>
   );
 };
 

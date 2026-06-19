@@ -1,8 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Copy, Plus, Share2, Wallet as WalletIcon } from "lucide-react";
-import Header from "@/components/layout/Header";
-import MobileNav from "@/components/layout/MobileNav";
 import BackToDashboard from "@/components/layout/BackToDashboard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -49,9 +47,7 @@ const ReceivePage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-24 md:pb-8">
-      <Header />
-      <main className="container px-4 py-6">
+    <main className="container px-4 py-6">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 max-w-3xl mx-auto">
           <BackToDashboard />
           <div>
@@ -173,8 +169,6 @@ const ReceivePage = () => {
           </p>
         </motion.div>
       </main>
-      <MobileNav />
-    </div>
   );
 };
 

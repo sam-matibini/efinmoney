@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import Header from "@/components/layout/Header";
-import MobileNav from "@/components/layout/MobileNav";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -64,8 +62,7 @@ const ContactsPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-24 md:pb-8">
-      <Header />
+    <>
       <main className="container px-4 py-6 max-w-4xl mx-auto space-y-6">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
@@ -254,8 +251,7 @@ const ContactsPage = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-      <MobileNav />
-    </div>
+    </>
   );
 };
 

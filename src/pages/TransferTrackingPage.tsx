@@ -4,8 +4,6 @@ import { motion } from "framer-motion";
 import { CheckCircle2, Circle, Share2, ArrowLeft, AlertCircle, Download, XCircle, Copy, Smartphone, RefreshCw } from "lucide-react";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { downloadTransferReceipt } from "@/lib/receipt";
-import Header from "@/components/layout/Header";
-import MobileNav from "@/components/layout/MobileNav";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -235,9 +233,7 @@ const TransferTrackingPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-24 md:pb-8">
-      <Header />
-      <main className="container px-4 py-6 max-w-3xl mx-auto space-y-6">
+    <main className="container px-4 py-6 max-w-3xl mx-auto space-y-6">
         <Button asChild variant="ghost" size="sm" className="gap-2">
           <Link to="/transfers"><ArrowLeft className="w-4 h-4" /> All transfers</Link>
         </Button>
@@ -476,8 +472,6 @@ const TransferTrackingPage = () => {
           </>
         )}
       </main>
-      <MobileNav />
-    </div>
   );
 };
 

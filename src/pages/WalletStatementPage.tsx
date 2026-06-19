@@ -1,8 +1,6 @@
 import { useMemo, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import Header from "@/components/layout/Header";
-import MobileNav from "@/components/layout/MobileNav";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -65,9 +63,7 @@ const WalletStatementPage = () => {
   const flag = wallet ? (flagForCurrency(wallet.currency_code) !== "🌍" ? flagForCurrency(wallet.currency_code) : wallet.flag_emoji || "💰") : "💰";
 
   return (
-    <div className="min-h-screen bg-background pb-24 md:pb-8">
-      <Header />
-      <main className="container px-4 py-6 max-w-7xl mx-auto space-y-6">
+    <main className="container px-4 py-6 max-w-7xl mx-auto space-y-6">
         <Button
           variant="ghost"
           size="sm"
@@ -169,8 +165,6 @@ const WalletStatementPage = () => {
           </CardContent>
         </Card>
       </main>
-      <MobileNav />
-    </div>
   );
 };
 

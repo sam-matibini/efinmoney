@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import Header from "@/components/layout/Header";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -58,9 +57,7 @@ const SecurityPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
-      <div className="container max-w-2xl mx-auto px-4 py-8">
+    <div className="container max-w-2xl mx-auto px-4 py-8">
         <h1 className="text-2xl font-bold text-foreground mb-6">Security</h1>
         <div className="space-y-4">
           <Card className="p-6">
@@ -118,7 +115,6 @@ const SecurityPage = () => {
             </div>
           </Card>
         </div>
-      </div>
     </div>
   );
 };

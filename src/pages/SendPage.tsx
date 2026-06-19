@@ -13,8 +13,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useBeneficiaries, recordTransferRecipient, type Beneficiary } from "@/hooks/useBeneficiaries";
 import { useAuth } from "@/hooks/useAuth";
 
-import Header from "@/components/layout/Header";
-import MobileNav from "@/components/layout/MobileNav";
 import BackToDashboard from "@/components/layout/BackToDashboard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -816,9 +814,7 @@ const SendPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-24 md:pb-8">
-      <Header />
-
+    <>
       <main className="container px-4 py-6">
         <div className="max-w-2xl mx-auto space-y-6">
           <BackToDashboard />
@@ -1887,8 +1883,7 @@ const SendPage = () => {
       />
       <AddCardModal isOpen={addCardOpen} onClose={() => setAddCardOpen(false)} defaultMode="link" />
       <TopUpModal open={topUpOpen} onOpenChange={setTopUpOpen} defaultWalletId={selectedWallet?.wallet_id} title="Top up wallet" />
-      <MobileNav />
-    </div>
+    </>
   );
 };
 

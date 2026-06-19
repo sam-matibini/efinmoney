@@ -1,7 +1,5 @@
 import { motion } from "framer-motion";
 import { useMemo, useState } from "react";
-import Header from "@/components/layout/Header";
-import MobileNav from "@/components/layout/MobileNav";
 import WalletCard from "@/components/ui/WalletCard";
 import { useWallets } from "@/hooks/useWallets";
 import { useWalletCards } from "@/hooks/useWalletCards";
@@ -72,9 +70,7 @@ const WalletsPage = () => {
   });
 
   return (
-    <div className="min-h-screen bg-background pb-24 md:pb-8">
-      <Header />
-      
+    <>
       <main className="container px-4 py-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -188,8 +184,6 @@ const WalletsPage = () => {
         </motion.div>
       </main>
 
-      <MobileNav />
-
       {/* Edit Wallet Modal */}
       <EditWalletModal
         isOpen={!!editWallet}
@@ -205,7 +199,7 @@ const WalletsPage = () => {
         wallet={deleteWallet}
         onDelete={(walletId) => deleteWalletFn(walletId, deleteWallet?.balance || 0)}
       />
-    </div>
+    </>
   );
 };
 

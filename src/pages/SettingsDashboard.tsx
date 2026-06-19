@@ -1,6 +1,4 @@
 import { motion } from "framer-motion";
-import Header from "@/components/layout/Header";
-import MobileNav from "@/components/layout/MobileNav";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PricingSettingsPanel } from "@/components/settings/PricingSettingsPanel";
 import { ModuleAccessPanel } from "@/components/settings/ModuleAccessPanel";
@@ -11,10 +9,7 @@ import { CircleCpnConfigPanel } from "@/components/settings/CircleCpnConfigPanel
 
 const SettingsDashboard = () => {
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
-      
-      <main className="container px-4 py-6 pb-24 md:pb-6">
+    <main className="container px-4 py-6 pb-24 md:pb-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -62,10 +57,7 @@ const SettingsDashboard = () => {
             </TabsContent>
           </Tabs>
         </motion.div>
-      </main>
-
-      <MobileNav />
-    </div>
+    </main>
   );
 };
 

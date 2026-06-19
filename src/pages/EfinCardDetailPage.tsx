@@ -1,7 +1,5 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import Header from "@/components/layout/Header";
-import MobileNav from "@/components/layout/MobileNav";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -40,22 +38,16 @@ const EfinCardDetailPage = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background">
-        <Header />
-        <main className="container px-4 py-6"><Skeleton className="h-64 w-full" /></main>
-      </div>
+      <main className="container px-4 py-6"><Skeleton className="h-64 w-full" /></main>
     );
   }
 
   if (!card) {
     return (
-      <div className="min-h-screen bg-background">
-        <Header />
-        <main className="container px-4 py-6">
-          <Button variant="ghost" onClick={() => navigate("/cards")}><ArrowLeft className="w-4 h-4 mr-2" /> Back</Button>
-          <p className="mt-6 text-muted-foreground">Card not found.</p>
-        </main>
-      </div>
+      <main className="container px-4 py-6">
+        <Button variant="ghost" onClick={() => navigate("/cards")}><ArrowLeft className="w-4 h-4 mr-2" /> Back</Button>
+        <p className="mt-6 text-muted-foreground">Card not found.</p>
+      </main>
     );
   }
 
@@ -74,9 +66,7 @@ const EfinCardDetailPage = () => {
   const handleReveal = () => setShowReveal((s) => !s);
 
   return (
-    <div className="min-h-screen bg-background pb-24 md:pb-6">
-      <Header />
-      <main className="container px-4 py-6 space-y-6 max-w-3xl">
+    <main className="container px-4 py-6 space-y-6 max-w-3xl">
         <Button variant="ghost" size="sm" onClick={() => navigate("/cards")}>
           <ArrowLeft className="w-4 h-4 mr-2" /> All cards
         </Button>
@@ -240,8 +230,6 @@ const EfinCardDetailPage = () => {
           </Card>
         )}
       </main>
-      <MobileNav />
-    </div>
   );
 };
 

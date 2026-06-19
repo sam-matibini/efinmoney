@@ -2,7 +2,6 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Copy, Receipt, CheckCircle2, Clock, XCircle, ExternalLink } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import Header from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -80,9 +79,7 @@ const TransactionDetailPage = () => {
 
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
+    <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
         <button
           onClick={() => navigate(-1)}
           className="no-print flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors"
@@ -250,7 +247,6 @@ const TransactionDetailPage = () => {
             </>
           )}
         </div>
-      </div>
     </div>
   );
 };

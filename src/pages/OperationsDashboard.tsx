@@ -1,6 +1,4 @@
 import { motion } from "framer-motion";
-import Header from "@/components/layout/Header";
-import MobileNav from "@/components/layout/MobileNav";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CrmCustomersPanel } from "@/components/crm/CrmCustomersPanel";
 import { TransactionMonitoringPanel } from "@/components/operations/TransactionMonitoringPanel";
@@ -15,10 +13,7 @@ import { CircleCpnHealthCard } from "@/components/operations/CircleCpnHealthCard
 
 const OperationsDashboard = () => {
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
-      
-      <main className="container px-4 py-6 pb-24 md:pb-6">
+    <main className="container px-4 py-6 pb-24 md:pb-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -82,10 +77,7 @@ const OperationsDashboard = () => {
             </TabsContent>
           </Tabs>
         </motion.div>
-      </main>
-
-      <MobileNav />
-    </div>
+    </main>
   );
 };
 

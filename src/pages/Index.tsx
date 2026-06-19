@@ -1,5 +1,3 @@
-import Header from "@/components/layout/Header";
-import MobileNav from "@/components/layout/MobileNav";
 import WealthPulseBanner from "@/components/dashboard/WealthPulseBanner";
 import HeroBalance from "@/components/dashboard/HeroBalance";
 import WalletCarousel from "@/components/dashboard/WalletCarousel";
@@ -12,27 +10,20 @@ import TierProgressCard from "@/components/dashboard/TierProgressCard";
 
 const Index = () => {
   return (
-    <div className="min-h-screen bg-background pb-24 md:pb-8">
-      <Header />
+    <main className="container px-4 py-4 sm:py-6">
 
-      <main className="container px-4 py-4 sm:py-6">
-
-        <WealthPulseBanner />
-        <HeroBalance />
-        <WalletCarousel />
-        <QuickActions />
-        <MiniStats />
-        <TierProgressCard />
-        <RecentTransactions />
-        <div className="mt-6">
-          <ExchangeRates />
-        </div>
-      </main>
-
-      <MobileNav />
-    </div>
+      <WealthPulseBanner />
+      <HeroBalance />
+      <WalletCarousel />
+      <QuickActions />
+      <MiniStats />
+      <TierProgressCard />
+      <RecentTransactions />
+      <div className="mt-6">
+        <ExchangeRates />
+      </div>
+    </main>
   );
 };
 
 export default Index;
-

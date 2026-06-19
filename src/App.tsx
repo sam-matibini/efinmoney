@@ -4,11 +4,12 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import ScrollToTop from "./components/ScrollToTop";
-import { AnimatePresence } from "framer-motion";
 import { useEffect } from "react";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { useUserRoles } from "@/hooks/useUserRoles";
-import PageTransition from "@/components/ui/PageTransition";
+import KycAppLayout from "@/components/layout/KycAppLayout";
+import ProtectedShell from "@/components/layout/ProtectedShell";
+import ClientShell from "@/components/layout/ClientShell";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import Index from "./pages/Index";
 import Landing from "./pages/Landing";
@@ -81,7 +82,14 @@ import AfricanCardSendPage from "./pages/AfricanCardSendPage";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import SplashScreen from "@/components/SplashScreen";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 60_000,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
@@ -149,10 +157,26 @@ const PublicRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
-const KycProtectedRoute = ({ children }: { children: React.ReactNode }) => (
+const KycShellRoute = () => (
   <ProtectedRoute>
-    <KYCGuard>{children}</KYCGuard>
+    <KycAppLayout />
   </ProtectedRoute>
+);
+
+const ProtectedShellRoute = () => (
+  <ProtectedRoute>
+    <ProtectedShell />
+  </ProtectedRoute>
+);
+
+const RoleShellRoute = ({
+  allowedRoles,
+}: {
+  allowedRoles: ("admin" | "finance" | "compliance")[];
+}) => (
+  <RoleProtectedRoute allowedRoles={allowedRoles}>
+    <ClientShell />
+  </RoleProtectedRoute>
 );
 
 const RootRoute = () => {
@@ -165,7 +189,7 @@ const RootRoute = () => {
     );
   }
   if (!user) return <Landing />;
-  return <KYCGuard><Index /></KYCGuard>;
+  return <Navigate to="/dashboard" replace />;
 };
 
 const AppRoutes = () => {
@@ -181,27 +205,54 @@ const AppRoutes = () => {
   }, [location.pathname]);
 
   return (
-    <AnimatePresence mode="wait">
-      <PageTransition key={location.pathname}>
-        <Routes location={location}>
+    <Routes location={location}>
           <Route path="/" element={<RootRoute />} />
           <Route path="/s/:code" element={<ShortLinkResolver />} />
           <Route path="/claim/:code" element={<ClaimPaymentLinkPage />} />
           <Route path="/privacy" element={<PrivacyPolicyPage />} />
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/compliance" element={<CompliancePage />} />
-          <Route path="/dashboard" element={<KycProtectedRoute><Index /></KycProtectedRoute>} />
-          <Route path="/wallets" element={<KycProtectedRoute><WalletsPage /></KycProtectedRoute>} />
-          <Route path="/wallets/:walletId/statement" element={<KycProtectedRoute><WalletStatementPage /></KycProtectedRoute>} />
-          <Route path="/send" element={<KycProtectedRoute><SendPage /></KycProtectedRoute>} />
-          <Route path="/send/cpn" element={<KycProtectedRoute><SendCpnPage /></KycProtectedRoute>} />
-          <Route path="/send/african-card" element={<KycProtectedRoute><AfricanCardSendPage /></KycProtectedRoute>} />
-          <Route path="/exchange" element={<KycProtectedRoute><ExchangePage /></KycProtectedRoute>} />
-          <Route path="/cards" element={<KycProtectedRoute><CardsPage /></KycProtectedRoute>} />
-          <Route path="/cards/efin/:id" element={<KycProtectedRoute><EfinCardDetailPage /></KycProtectedRoute>} />
 
-          <Route path="/finance" element={<RoleProtectedRoute allowedRoles={['admin', 'finance']}><FinanceDashboard /></RoleProtectedRoute>} />
-          <Route path="/admin/legacy" element={<RoleProtectedRoute allowedRoles={['admin']}><AdminDashboard /></RoleProtectedRoute>} />
+          <Route element={<KycShellRoute />}>
+            <Route path="/dashboard" element={<Index />} />
+            <Route path="/wallets" element={<WalletsPage />} />
+            <Route path="/wallets/:walletId/statement" element={<WalletStatementPage />} />
+            <Route path="/send" element={<SendPage />} />
+            <Route path="/send/cpn" element={<SendCpnPage />} />
+            <Route path="/send/african-card" element={<AfricanCardSendPage />} />
+            <Route path="/exchange" element={<ExchangePage />} />
+            <Route path="/cards" element={<CardsPage />} />
+            <Route path="/cards/efin/:id" element={<EfinCardDetailPage />} />
+            <Route path="/more" element={<MorePage />} />
+            <Route path="/transfers" element={<TransfersListPage />} />
+            <Route path="/transfers/:id" element={<TransferTrackingPage />} />
+            <Route path="/transactions/:journalId" element={<TransactionDetailPage />} />
+            <Route path="/contacts" element={<ContactsPage />} />
+            <Route path="/payees" element={<ContactsPage />} />
+            <Route path="/payment-links" element={<PaymentLinksPage />} />
+            <Route path="/transfers/canada" element={<CanadaTransferPage />} />
+            <Route path="/wallet/receive" element={<ReceivePage />} />
+            <Route path="/wallet/topup" element={<TopUpPage />} />
+            <Route path="/pay-bills" element={<PayBillsPage />} />
+            <Route path="/stripe-connect" element={<StripeConnectInstantPage />} />
+          </Route>
+
+          <Route element={<RoleShellRoute allowedRoles={['admin', 'finance']} />}>
+            <Route path="/finance" element={<FinanceDashboard />} />
+          </Route>
+          <Route element={<RoleShellRoute allowedRoles={['admin']} />}>
+            <Route path="/admin/legacy" element={<AdminDashboard />} />
+            <Route path="/settings" element={<SettingsDashboard />} />
+          </Route>
+          <Route element={<RoleShellRoute allowedRoles={['admin', 'compliance', 'finance']} />}>
+            <Route path="/operations" element={<OperationsDashboard />} />
+          </Route>
+
+          <Route element={<ProtectedShellRoute />}>
+            <Route path="/profile" element={<ProfileSettingsPage />} />
+            <Route path="/kyc" element={<KYCPage />} />
+            <Route path="/security" element={<SecurityPage />} />
+          </Route>
           <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
           <Route path="/admin/login" element={<AdminAuthProvider><AdminLogin /></AdminAuthProvider>} />
           <Route path="/admin/dashboard" element={<AdminAuthProvider><AdminGuard><AdminDashboardPage /></AdminGuard></AdminAuthProvider>} />
@@ -219,27 +270,10 @@ const AppRoutes = () => {
           <Route path="/admin/staff/:id" element={<AdminAuthProvider><AdminGuard><StaffDetailPage /></AdminGuard></AdminAuthProvider>} />
           <Route path="/admin/onboarding" element={<AdminAuthProvider><AdminGuard><StaffOnboardingPage /></AdminGuard></AdminAuthProvider>} />
           <Route path="/admin/payments/adyen" element={<AdminAuthProvider><AdminGuard><AdminAdyenLinksPage /></AdminGuard></AdminAuthProvider>} />
-          <Route path="/settings" element={<RoleProtectedRoute allowedRoles={['admin']}><SettingsDashboard /></RoleProtectedRoute>} />
-          <Route path="/operations" element={<RoleProtectedRoute allowedRoles={['admin', 'compliance', 'finance']}><OperationsDashboard /></RoleProtectedRoute>} />
           <Route path="/auth" element={<PublicRoute><Auth /></PublicRoute>} />
           <Route path="/auth/confirm" element={<AuthConfirm />} />
           <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
           <Route path="/portal" element={<CustomerPortalPage />} />
-          <Route path="/profile" element={<ProtectedRoute><ProfileSettingsPage /></ProtectedRoute>} />
-          <Route path="/more" element={<KycProtectedRoute><MorePage /></KycProtectedRoute>} />
-          <Route path="/kyc" element={<ProtectedRoute><KYCPage /></ProtectedRoute>} />
-          <Route path="/security" element={<ProtectedRoute><SecurityPage /></ProtectedRoute>} />
-          <Route path="/transfers" element={<KycProtectedRoute><TransfersListPage /></KycProtectedRoute>} />
-          <Route path="/transfers/:id" element={<KycProtectedRoute><TransferTrackingPage /></KycProtectedRoute>} />
-          <Route path="/transactions/:journalId" element={<KycProtectedRoute><TransactionDetailPage /></KycProtectedRoute>} />
-          <Route path="/contacts" element={<KycProtectedRoute><ContactsPage /></KycProtectedRoute>} />
-          <Route path="/payees" element={<KycProtectedRoute><ContactsPage /></KycProtectedRoute>} />
-          <Route path="/payment-links" element={<KycProtectedRoute><PaymentLinksPage /></KycProtectedRoute>} />
-          <Route path="/transfers/canada" element={<KycProtectedRoute><CanadaTransferPage /></KycProtectedRoute>} />
-          <Route path="/wallet/receive" element={<KycProtectedRoute><ReceivePage /></KycProtectedRoute>} />
-          <Route path="/wallet/topup" element={<KycProtectedRoute><TopUpPage /></KycProtectedRoute>} />
-          <Route path="/pay-bills" element={<KycProtectedRoute><PayBillsPage /></KycProtectedRoute>} />
-          <Route path="/stripe-connect" element={<KycProtectedRoute><StripeConnectInstantPage /></KycProtectedRoute>} />
           <Route path="/deposit/complete" element={<DepositComplete />} />
           <Route path="/payment-callback" element={<PaymentCallback />} />
           <Route path="/callback" element={<InteracCallback />} />
@@ -253,8 +287,6 @@ const AppRoutes = () => {
           <Route path="/onboarding/rejected" element={<ProtectedRoute><OnboardingRejected /></ProtectedRoute>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
-      </PageTransition>
-    </AnimatePresence>
   );
 };
 
@@ -277,3 +309,4 @@ const App = () => (
 );
 
 export default App;
+

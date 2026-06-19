@@ -1,5 +1,4 @@
 import { useEffect, useState, useCallback } from "react";
-import Header from "@/components/layout/Header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -154,8 +153,7 @@ export default function CanadaTransferPage() {
   const missingEft = selectedAcct && (!selectedAcct.institution_number || !selectedAcct.account_number);
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
+    <>
       <main className="container mx-auto px-4 py-8 max-w-3xl">
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">Intra-Canada Transfer</h1>
@@ -335,6 +333,6 @@ export default function CanadaTransferPage() {
         </Card>
       </main>
       {pinGate}
-    </div>
+    </>
   );
 }

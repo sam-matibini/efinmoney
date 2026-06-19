@@ -1,8 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import Header from "@/components/layout/Header";
-import MobileNav from "@/components/layout/MobileNav";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -104,9 +102,7 @@ const PaymentLinksPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-24 md:pb-8">
-      <Header />
-      <main className="container px-4 py-6 max-w-4xl mx-auto space-y-6">
+    <main className="container px-4 py-6 max-w-4xl mx-auto space-y-6">
         <div className="flex items-center justify-between gap-3">
           <div>
             <Button asChild variant="ghost" size="sm" className="-ml-2 mb-1">
@@ -211,8 +207,6 @@ const PaymentLinksPage = () => {
         )}
 
       </main>
-      <MobileNav />
-    </div>
   );
 };
 

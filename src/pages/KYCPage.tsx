@@ -1,4 +1,3 @@
-import Header from "@/components/layout/Header";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -55,9 +54,7 @@ const KYCPage = () => {
   const Icon = cfg.icon;
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
-      <div className="container max-w-4xl mx-auto px-4 py-8">
+    <div className="container max-w-4xl mx-auto px-4 py-8">
         <h1 className="text-2xl font-bold text-foreground mb-6">KYC Verification</h1>
         {isLoading ? (
           <Card className="p-6">Loading...</Card>
@@ -242,7 +239,6 @@ const KYCPage = () => {
 
           </div>
         )}
-      </div>
     </div>
   );
 };
