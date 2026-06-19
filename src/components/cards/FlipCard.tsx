@@ -1,9 +1,10 @@
 import { useRef, useState, MouseEvent } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Copy, Wifi, ShieldCheck } from "lucide-react";
+import { Copy, Wifi, ShieldCheck, Smartphone, CreditCard as CreditCardIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import type { Card as CardRow } from "@/hooks/useCards";
+import { cardKindBadgeClass, getCardKind, getCardKindLabel } from "@/lib/cardDisplay";
 
 interface FlipCardProps {
   card: CardRow;
@@ -16,6 +17,10 @@ const formatPan = (pan: string) => pan.replace(/(.{4})/g, "$1 ").trim();
 
 const FlipCard = ({ card, flipped, onToggle, index }: FlipCardProps) => {
   const isExternal = card.funding_source === "external";
+  const kind = getCardKind(card);
+  const kindLabel = getCardKindLabel(card);
+  const isVirtual = kind === "virtual";
+  const isPhysical = kind === "physical";
   const wrapRef = useRef<HTMLDivElement>(null);
   const [tilt, setTilt] = useState({ rx: 0, ry: 0, mx: 50, my: 50 });
   const [hovering, setHovering] = useState(false);
@@ -25,8 +30,12 @@ const FlipCard = ({ card, flipped, onToggle, index }: FlipCardProps) => {
   // Premium brand gradients: Visa = deep sapphire blue, Mastercard = dark charcoal
   const bgClass =
     card.card_network === "mastercard"
-      ? "bg-[linear-gradient(135deg,#0a0a0a_0%,#1a1a1a_50%,#2a2a2a_100%)]"
-      : "bg-[linear-gradient(135deg,#021431_0%,#0a2f6e_50%,#1d4ed8_100%)]";
+      ? isVirtual
+        ? "bg-[linear-gradient(135deg,#0a0a0a_0%,#1f1147_45%,#2a2a2a_100%)]"
+        : "bg-[linear-gradient(135deg,#0a0a0a_0%,#1a1a1a_50%,#2a2a2a_100%)]"
+      : isVirtual
+        ? "bg-[linear-gradient(135deg,#021431_0%,#312e81_50%,#1d4ed8_100%)]"
+        : "bg-[linear-gradient(135deg,#021431_0%,#0a2f6e_50%,#1d4ed8_100%)]";
 
   const expiry =
     card.expiry_month && card.expiry_year
@@ -183,7 +192,21 @@ const FlipCard = ({ card, flipped, onToggle, index }: FlipCardProps) => {
               </div>
             )}
 
-            <div className="relative z-10 h-full flex flex-col">
+            <div className="absolute top-3 left-3 z-10">
+              <span className={`inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full border shadow-sm ${cardKindBadgeClass(kind)}`}>
+                {isVirtual && <Smartphone className="w-3 h-3" />}
+                {isPhysical && <CreditCardIcon className="w-3 h-3" />}
+                {kindLabel}
+              </span>
+            </div>
+
+            {isVirtual && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.06]">
+                <span className="text-4xl font-black tracking-[0.3em] rotate-[-18deg]">VIRTUAL</span>
+              </div>
+            )}
+
+            <div className="relative z-10 h-full flex flex-col pt-8">
               {/* Top: brand + contactless */}
               <div className="flex items-start justify-between">
                 <span className="font-display font-black text-lg tracking-tight">
@@ -192,15 +215,29 @@ const FlipCard = ({ card, flipped, onToggle, index }: FlipCardProps) => {
                 <Wifi className="w-5 h-5 rotate-90 opacity-80" />
               </div>
 
-              {/* Chip */}
-              <div className="mt-4">
-                <Chip />
+              {/* Chip — physical cards show chip; virtual cards show contactless-first layout */}
+              <div className="mt-4 flex items-center gap-3">
+                {isPhysical && <Chip />}
+                {isVirtual && (
+                  <span className="text-[10px] uppercase tracking-widest opacity-70 bg-white/10 px-2 py-1 rounded-md">
+                    Instant · Online
+                  </span>
+                )}
               </div>
 
               {/* Card number */}
               <div className="mt-4 font-mono text-xl tracking-[0.18em] drop-shadow">
                 •••• •••• •••• <span className="text-white">{card.last_four}</span>
               </div>
+
+              {!isExternal && (
+                <div className="mt-3">
+                  <p className="text-[9px] uppercase tracking-widest opacity-60">Available</p>
+                  <p className="font-display font-bold text-lg tabular-nums">
+                    {card.currency_code || "USD"} {Number(card.balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                </div>
+              )}
 
               {/* Bottom row */}
               <div className="mt-auto flex items-end justify-between">

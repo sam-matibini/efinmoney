@@ -12,10 +12,12 @@ type Mode = "loading" | "set" | "set-confirm" | "verify" | "locked";
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Called once the PIN is successfully set or verified. */
-  onVerified: () => void;
+  /** Called once the PIN is successfully set or verified. Receives the PIN for server-side checks. */
+  onVerified: (pin: string) => void;
   /** Optional context shown in the header (e.g. amount being sent). */
   amountLabel?: string;
+  /** Override the verify-mode subtitle (e.g. viewing card details). */
+  verifyDescription?: string;
 }
 
 const PIN_LENGTH = 4;
@@ -25,7 +27,7 @@ const PIN_LENGTH = 4;
  * create a PIN (first send) or enter their existing one, and only calls
  * onVerified() once the server confirms the PIN.
  */
-const TransactionPinDialog = ({ open, onOpenChange, onVerified, amountLabel }: Props) => {
+const TransactionPinDialog = ({ open, onOpenChange, onVerified, amountLabel, verifyDescription }: Props) => {
   const [mode, setMode] = useState<Mode>("loading");
   const [pin, setPin] = useState("");
   const [firstPin, setFirstPin] = useState("");
@@ -69,14 +71,14 @@ const TransactionPinDialog = ({ open, onOpenChange, onVerified, amountLabel }: P
     setShakeKey(shakeRef.current);
   };
 
-  const finishVerified = (opts?: { created?: boolean }) => {
+  const finishVerified = (verifiedPin: string, opts?: { created?: boolean }) => {
     if (completedRef.current) return;
     completedRef.current = true;
     setPin("");
     if (opts?.created) {
       toast.success("Transaction PIN created");
     }
-    onVerifiedRef.current();
+    onVerifiedRef.current(verifiedPin);
   };
 
   const submitSet = async (finalPin: string) => {
@@ -97,7 +99,7 @@ const TransactionPinDialog = ({ open, onOpenChange, onVerified, amountLabel }: P
       setFirstPin("");
       return;
     }
-    finishVerified({ created: true });
+    finishVerified(finalPin, { created: true });
   };
 
   const submitVerify = async (finalPin: string) => {
@@ -119,7 +121,7 @@ const TransactionPinDialog = ({ open, onOpenChange, onVerified, amountLabel }: P
       return;
     }
     if (res.ok) {
-      finishVerified();
+      finishVerified(finalPin);
       return;
     }
     submitLockRef.current = false;
@@ -183,9 +185,10 @@ const TransactionPinDialog = ({ open, onOpenChange, onVerified, amountLabel }: P
     mode === "set" ? "Choose a 4-digit PIN you'll use to approve transfers. You only set this once."
     : mode === "set-confirm" ? "Re-enter the 4-digit PIN to confirm."
     : mode === "locked" ? "Your PIN is temporarily locked for security."
-    : amountLabel
-      ? `Authorize sending ${amountLabel}`
-      : "Enter your 4-digit PIN to authorize this transfer.";
+    : verifyDescription
+      ?? (amountLabel
+        ? `Authorize sending ${amountLabel}`
+        : "Enter your 4-digit PIN to authorize this transfer.");
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!busy && !completedRef.current) onOpenChange(o); }}>

@@ -17,7 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { useCardMutations, type Card as CardRow, type CardType, type CardNetwork } from "@/hooks/useCards";
+import { useCardMutations, type CreatedCardResult, type CardType, type CardNetwork } from "@/hooks/useCards";
 import { useWallets } from "@/hooks/useWallets";
 import { Copy, Check, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
@@ -42,27 +42,34 @@ const AddCardModal = ({ isOpen, onClose, defaultMode = "issue" }: AddCardModalPr
   }, [isOpen, defaultMode]);
 
   // Issue mode state
-  const [cardType, setCardType] = useState<CardType>("debit");
+  const [cardType, setCardType] = useState<CardType>("virtual");
   const [cardNetwork, setCardNetwork] = useState<CardNetwork>("visa");
   const [cardholderName, setCardholderName] = useState("");
   const [spendingLimit, setSpendingLimit] = useState("5000");
   const [creditLimit, setCreditLimit] = useState("10000");
   const [walletId, setWalletId] = useState<string>("");
+  const [initialFund, setInitialFund] = useState("");
 
-  const [createdCard, setCreatedCard] = useState<CardRow | null>(null);
+  const [createdCard, setCreatedCard] = useState<CreatedCardResult | null>(null);
   const [reveal, setReveal] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  const canReveal = !!(createdCard?.pan && createdCard?.cvv);
+  const expiryLabel = createdCard
+    ? `${String(createdCard.expiry_month).padStart(2, "0")}/${String(createdCard.expiry_year).slice(-2)}`
+    : "";
 
   const isCredit = cardType === "credit";
 
   const reset = () => {
     setMode(defaultMode);
-    setCardType("debit");
+    setCardType("virtual");
     setCardNetwork("visa");
     setCardholderName("");
     setSpendingLimit("5000");
     setCreditLimit("10000");
     setWalletId("");
+    setInitialFund("");
     setCreatedCard(null);
     setReveal(false);
     setCopied(false);
@@ -78,10 +85,13 @@ const AddCardModal = ({ isOpen, onClose, defaultMode = "issue" }: AddCardModalPr
   const handleIssue = async () => {
     if (!cardholderName.trim()) return toast.error("Cardholder name is required");
     if (!isCredit && !walletId) return toast.error("Select a linked wallet");
-    if (!isCredit && selectedWallet && Number(selectedWallet.balance) <= 0)
-      return toast.error("Selected wallet has no available balance");
     if (isCredit && (!creditLimit || Number(creditLimit) <= 0))
       return toast.error("Enter a valid credit limit");
+
+    const fundAmt = Number(initialFund);
+    if (!isCredit && fundAmt > 0 && selectedWallet && fundAmt > Number(selectedWallet.balance)) {
+      return toast.error("Initial fund exceeds wallet balance");
+    }
 
     try {
       const card = await createCard.mutateAsync({
@@ -91,8 +101,11 @@ const AddCardModal = ({ isOpen, onClose, defaultMode = "issue" }: AddCardModalPr
         spending_limit: Number(spendingLimit) || 5000,
         credit_limit: isCredit ? Number(creditLimit) : null,
         wallet_id: isCredit ? null : walletId,
+        currency_code: selectedWallet?.currency_code ?? null,
+        initial_fund: !isCredit && fundAmt > 0 ? fundAmt : undefined,
       });
       setCreatedCard(card);
+      setReveal(!!card.pan);
     } catch {
       /* toast handled */
     }
@@ -100,10 +113,21 @@ const AddCardModal = ({ isOpen, onClose, defaultMode = "issue" }: AddCardModalPr
 
   const copyDetails = async () => {
     if (!createdCard) return;
-    const text = `Card ending: ${createdCard.last_four}\nExpiry: ${String(createdCard.expiry_month).padStart(2, "0")}/${String(createdCard.expiry_year).slice(-2)}`;
-    await navigator.clipboard.writeText(text);
+    const lines = [
+      `Cardholder: ${createdCard.cardholder_name}`,
+      createdCard.pan
+        ? `Card number: ${formatPan(createdCard.pan)}`
+        : `Card ending: ${createdCard.last_four}`,
+      `Expiry: ${expiryLabel}`,
+      createdCard.cvv ? `CVV: ${createdCard.cvv}` : undefined,
+      createdCard.currency_code && Number(createdCard.balance) > 0
+        ? `Balance: ${createdCard.currency_code} ${Number(createdCard.balance).toFixed(2)}`
+        : undefined,
+    ].filter(Boolean);
+    await navigator.clipboard.writeText(lines.join("\n"));
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
+    toast.success("Card details copied");
   };
 
 
@@ -125,13 +149,27 @@ const AddCardModal = ({ isOpen, onClose, defaultMode = "issue" }: AddCardModalPr
               </div>
               <div className="flex items-center gap-2 mb-4">
                 <p className="font-mono text-lg tracking-wider">
-                  {`•••• •••• •••• ${createdCard.last_four}`}
+                  {reveal && createdCard.pan
+                    ? formatPan(createdCard.pan)
+                    : `•••• •••• •••• ${createdCard.last_four}`}
                 </p>
-
-                <button onClick={() => setReveal((r) => !r)} className="p-1 hover:bg-primary-foreground/10 rounded">
-                  {reveal ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
+                {canReveal && (
+                  <button
+                    type="button"
+                    onClick={() => setReveal((r) => !r)}
+                    className="p-1 hover:bg-primary-foreground/10 rounded"
+                    aria-label={reveal ? "Hide card details" : "Reveal card details"}
+                  >
+                    {reveal ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                )}
               </div>
+              {Number(createdCard.balance) > 0 && (
+                <p className="text-sm mb-3 opacity-90">
+                  Funded: {createdCard.currency_code || "USD"}{" "}
+                  {Number(createdCard.balance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+              )}
               <div className="flex justify-between text-sm">
                 <div>
                   <p className="opacity-70 text-xs">Cardholder</p>
@@ -139,13 +177,11 @@ const AddCardModal = ({ isOpen, onClose, defaultMode = "issue" }: AddCardModalPr
                 </div>
                 <div>
                   <p className="opacity-70 text-xs">Expires</p>
-                  <p className="font-mono">
-                    {String(createdCard.expiry_month).padStart(2, "0")}/{String(createdCard.expiry_year).slice(-2)}
-                  </p>
+                  <p className="font-mono">{expiryLabel}</p>
                 </div>
                 <div>
                   <p className="opacity-70 text-xs">CVV</p>
-                  <p className="font-mono">•••</p>
+                  <p className="font-mono">{reveal && createdCard.cvv ? createdCard.cvv : "•••"}</p>
                 </div>
               </div>
             </div>
@@ -159,7 +195,7 @@ const AddCardModal = ({ isOpen, onClose, defaultMode = "issue" }: AddCardModalPr
             </div>
 
             <p className="text-xs text-muted-foreground text-center">
-              Save these details now. CVV will be masked after closing.
+              Your full card number and CVV are saved securely. View them anytime from My Cards with your transaction PIN.
             </p>
           </div>
         ) : (
@@ -182,13 +218,16 @@ const AddCardModal = ({ isOpen, onClose, defaultMode = "issue" }: AddCardModalPr
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  <Label>Card Type</Label>
-                  <Select value={cardType} onValueChange={(v) => setCardType(v as CardType)}>
+                  <Label>Card format</Label>
+                  <Select
+                    value={cardType === "credit" ? "credit" : cardType === "physical" ? "physical" : "virtual"}
+                    onValueChange={(v) => setCardType(v as CardType)}
+                  >
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="debit">Debit</SelectItem>
-                      <SelectItem value="debit_visa">Debit Visa</SelectItem>
-                      <SelectItem value="credit">Credit Card</SelectItem>
+                      <SelectItem value="virtual">Virtual — instant online</SelectItem>
+                      <SelectItem value="physical">Physical — chip card</SelectItem>
+                      <SelectItem value="credit">Credit line</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -205,19 +244,41 @@ const AddCardModal = ({ isOpen, onClose, defaultMode = "issue" }: AddCardModalPr
               </div>
 
               {!isCredit && (
-                <div className="space-y-2">
-                  <Label>Linked Wallet</Label>
-                  <Select value={walletId} onValueChange={setWalletId}>
-                    <SelectTrigger><SelectValue placeholder="Select a wallet" /></SelectTrigger>
-                    <SelectContent>
-                      {wallets?.map((w) => (
-                        <SelectItem key={w.wallet_id} value={w.wallet_id}>
-                          {w.flag_emoji} {w.currency_code} — {w.symbol}{Number(w.balance).toFixed(2)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                <>
+                  <div className="space-y-2">
+                    <Label>Linked Wallet</Label>
+                    <Select value={walletId} onValueChange={setWalletId}>
+                      <SelectTrigger><SelectValue placeholder="Select a wallet" /></SelectTrigger>
+                      <SelectContent>
+                        {wallets?.map((w) => (
+                          <SelectItem key={w.wallet_id} value={w.wallet_id}>
+                            {w.flag_emoji} {w.currency_code} — {w.symbol}{Number(w.balance).toFixed(2)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Card spends from its own balance. Fund it from this wallet when creating or anytime after.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Initial fund (optional)</Label>
+                    <Input
+                      type="number"
+                      inputMode="decimal"
+                      min={0}
+                      step="0.01"
+                      placeholder="0.00"
+                      value={initialFund}
+                      onChange={(e) => setInitialFund(e.target.value)}
+                    />
+                    {selectedWallet && Number(initialFund) > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        {selectedWallet.currency_code} {Number(initialFund).toFixed(2)} will move from your wallet to this card.
+                      </p>
+                    )}
+                  </div>
+                </>
               )}
 
               {isCredit ? (

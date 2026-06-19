@@ -1,19 +1,24 @@
 import { motion } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CreditCard, Plus, Lock, Unlock, Settings, Trash2, Snowflake, Send } from "lucide-react";
+import { CreditCard, Plus, Lock, Unlock, Settings, Trash2, Snowflake, Send, Wallet, ArrowRightLeft, Eye } from "lucide-react";
 import { useMemo, useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Skeleton } from "@/components/ui/skeleton";
 import EditCardModal from "@/components/modals/EditCardModal";
 import DeleteCardModal from "@/components/modals/DeleteCardModal";
 import AddCardModal from "@/components/modals/AddCardModal";
+import FundCardModal from "@/components/modals/FundCardModal";
+import TransferCardModal from "@/components/modals/TransferCardModal";
+import ViewCardDetailsModal from "@/components/modals/ViewCardDetailsModal";
 import CardPaymentModal from "@/components/modals/CardPaymentModal";
 import FlipCard from "@/components/cards/FlipCard";
 import CardStack from "@/components/cards/CardStack";
 import MockEfinVisaCard from "@/components/cards/MockEfinVisaCard";
-import { useCards, useCardMutations, type Card as CardRow } from "@/hooks/useCards";
+import { useCards, useCardMutations, type Card as CardRow, type RevealedCardSecrets } from "@/hooks/useCards";
+import { usePinGate } from "@/components/send/usePinGate";
 import { useSavedCards, useDeleteSavedCard } from "@/hooks/useSavedCards";
+import { getCardKindLabel, isFundableIssuedCard } from "@/lib/cardDisplay";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -57,14 +62,20 @@ const CardsPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { data: issuedCards, isLoading } = useCards();
   const { data: stripeCards } = useSavedCards();
-  const { updateCardStatus, updateCard, deleteCard } = useCardMutations();
+  const { updateCardStatus, updateCard, deleteCard, revealCardSecrets } = useCardMutations();
   const deleteStripeCard = useDeleteSavedCard();
+  const { requirePin, pinGate } = usePinGate();
+
+  const [revealedSecrets, setRevealedSecrets] = useState<RevealedCardSecrets | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   const [flipped, setFlipped] = useState<Record<string, boolean>>({});
   const [editCard, setEditCard] = useState<CardRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<CardRow | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [addMode, setAddMode] = useState<"issue" | "link">("issue");
+  const [fundCardTarget, setFundCardTarget] = useState<CardRow | null>(null);
+  const [transferSource, setTransferSource] = useState<CardRow | null>(null);
   const [fundCard, setFundCard] = useState<CardRow | null>(null);
 
   useEffect(() => {
@@ -74,6 +85,11 @@ const CardsPage = () => {
       setSearchParams({}, { replace: true });
     }
   }, [searchParams, setSearchParams]);
+
+  const fundableCards = useMemo(
+    () => (issuedCards ?? []).filter(isFundableIssuedCard),
+    [issuedCards],
+  );
 
   const cards = useMemo<CardRow[]>(() => {
     const issued = issuedCards ?? [];
@@ -92,6 +108,8 @@ const CardsPage = () => {
       credit_limit: null,
       funding_source: "external",
       wallet_id: null,
+      balance: 0,
+      currency_code: null,
       expires_at: c.exp_year && c.exp_month
         ? new Date(c.exp_year, c.exp_month - 1, 1).toISOString()
         : new Date().toISOString(),
@@ -108,6 +126,18 @@ const CardsPage = () => {
       id: card.id,
       status: card.status === "frozen" ? "active" : "frozen",
     });
+  };
+
+  const handleViewFullDetails = (card: CardRow) => {
+    requirePin(
+      async (pin) => {
+        const secrets = await revealCardSecrets.mutateAsync({ card_id: card.id, pin });
+        setRevealedSecrets(secrets);
+        setDetailsOpen(true);
+      },
+      undefined,
+      `Enter your transaction PIN to view full details for card ending ${card.last_four}.`,
+    );
   };
 
   return (
@@ -181,8 +211,11 @@ const CardsPage = () => {
                 const isFrozen = card.status === "frozen";
                 const isStripe = card.id.startsWith(STRIPE_PREFIX);
                 const isExternal = card.funding_source === "external";
+                const isFundable = isFundableIssuedCard(card);
+                const canTransfer = isFundable && fundableCards.length > 1;
                 return (
-                  <div className="flex items-start justify-center gap-6 pt-1">
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="flex items-start justify-center gap-4 sm:gap-6 pt-1 min-w-max mx-auto px-2">
                     {isStripe ? (
                       <>
                         <ActionTile
@@ -196,17 +229,36 @@ const CardsPage = () => {
                           onClick={() => navigate("/wallet/topup")}
                         />
                       </>
+                    ) : isFundable ? (
+                      <>
+                        <ActionTile
+                          icon={<Wallet className="w-5 h-5" />}
+                          label="Fund card"
+                          onClick={() => setFundCardTarget(card)}
+                        />
+                        <ActionTile
+                          icon={<ArrowRightLeft className="w-5 h-5" />}
+                          label="Transfer"
+                          onClick={() => setTransferSource(card)}
+                        />
+                        <ActionTile
+                          icon={isFrozen ? <Unlock className="w-5 h-5" /> : <Lock className="w-5 h-5" />}
+                          label={isFrozen ? "Unlock" : "Lock"}
+                          onClick={() => handleToggleFreeze(card)}
+                        />
+                      </>
                     ) : isExternal ? (
                       <ActionTile
                         icon={<CreditCard className="w-5 h-5" />}
                         label="Fund wallet"
                         onClick={() => setFundCard(card)}
                       />
-                    ) : (
+                    ) : null}
+                    {!isStripe && !isExternal && (
                       <ActionTile
-                        icon={isFrozen ? <Unlock className="w-5 h-5" /> : <Lock className="w-5 h-5" />}
-                        label={isFrozen ? "Unlock card" : "Lock card"}
-                        onClick={() => handleToggleFreeze(card)}
+                        icon={<Eye className="w-5 h-5" />}
+                        label="View full details"
+                        onClick={() => handleViewFullDetails(card)}
                       />
                     )}
                     <ActionTile
@@ -254,6 +306,12 @@ const CardsPage = () => {
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
+                    </div>
+                    {isFundable && !canTransfer && (
+                      <p className="text-[11px] text-muted-foreground text-center px-4">
+                        Create another {getCardKindLabel(card).toLowerCase()} card in the same currency to transfer between cards.
+                      </p>
+                    )}
                   </div>
                 );
               }}
@@ -302,6 +360,18 @@ const CardsPage = () => {
       </main>
 
       <AddCardModal isOpen={addOpen} onClose={() => setAddOpen(false)} defaultMode={addMode} />
+
+      <FundCardModal
+        open={!!fundCardTarget}
+        onClose={() => setFundCardTarget(null)}
+        card={fundCardTarget}
+      />
+
+      <TransferCardModal
+        open={!!transferSource}
+        onClose={() => setTransferSource(null)}
+        sourceCard={transferSource}
+      />
 
       <EditCardModal
         isOpen={!!editCard}
@@ -360,6 +430,17 @@ const CardsPage = () => {
         defaultWalletId={fundCard?.wallet_id ?? undefined}
         title={fundCard ? `Fund wallet with •••• ${fundCard.last_four}` : "Fund Wallet"}
         onSuccess={() => setFundCard(null)}
+      />
+
+      {pinGate}
+
+      <ViewCardDetailsModal
+        open={detailsOpen}
+        onClose={() => {
+          setDetailsOpen(false);
+          setRevealedSecrets(null);
+        }}
+        secrets={revealedSecrets}
       />
     </div>
   );

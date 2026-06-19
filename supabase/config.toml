@@ -159,3 +159,15 @@ verify_jwt = false
 
 [functions.intra-ca-transfer-create]
 verify_jwt = false
+
+[functions.virtual-card-ops]
+verify_jwt = false
+
+[functions.flw-get-billers]
+verify_jwt = false
+
+[functions.flw-validate-bill]
+verify_jwt = false
+
+[functions.flw-bill-payment]
+verify_jwt = false

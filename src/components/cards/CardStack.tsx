@@ -3,6 +3,7 @@ import { motion, AnimatePresence, PanInfo } from "framer-motion";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import FlipCard from "./FlipCard";
 import type { Card as CardRow } from "@/hooks/useCards";
+import { getCardKindLabel, cardKindBadgeClass, getCardKind } from "@/lib/cardDisplay";
 
 interface Props {
   cards: CardRow[];
@@ -36,8 +37,7 @@ const CardStack = ({ cards, flipped, onToggleFlip, renderActions, onAddCard }: P
 
   const networkLabel = (c: CardRow) =>
     c.card_network === "visa" ? "Visa" : "Mastercard";
-  const typeLabel = (c: CardRow) =>
-    c.card_type === "virtual" ? "Virtual" : "Physical";
+  const typeLabel = (c: CardRow) => getCardKindLabel(c);
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -174,15 +174,18 @@ const CardStack = ({ cards, flipped, onToggleFlip, renderActions, onAddCard }: P
                 }`}
               >
                 <div
-                  className="w-20 h-12 rounded-md flex items-end justify-between p-1.5 text-white"
+                  className="w-20 h-12 rounded-md flex flex-col justify-between p-1.5 text-white relative overflow-hidden"
                   style={{ background: grad }}
                 >
-                  <span className="text-[8px] font-mono opacity-80">
-                    ••{c.last_four}
+                  <span className={`self-start text-[7px] font-bold uppercase px-1 py-0.5 rounded ${cardKindBadgeClass(getCardKind(c))}`}>
+                    {getCardKind(c) === "virtual" ? "V" : getCardKind(c) === "physical" ? "P" : getCardKindLabel(c).slice(0, 1)}
                   </span>
-                  <span className="text-[8px] font-display font-bold italic">
-                    {c.card_network === "visa" ? "VISA" : "MC"}
-                  </span>
+                  <div className="flex items-end justify-between">
+                    <span className="text-[8px] font-mono opacity-80">••{c.last_four}</span>
+                    <span className="text-[8px] font-display font-bold italic">
+                      {c.card_network === "visa" ? "VISA" : "MC"}
+                    </span>
+                  </div>
                 </div>
               </button>
             );
@@ -206,21 +209,30 @@ const CardStack = ({ cards, flipped, onToggleFlip, renderActions, onAddCard }: P
       {/* Selected card name */}
       <AnimatePresence mode="wait">
         {activeCard && (
-          <motion.p
+          <motion.div
             key={activeCard.id}
             initial={{ opacity: 0, y: 4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
             transition={{ duration: 0.2 }}
-            className="mt-5 text-center text-sm font-medium text-foreground"
+            className="mt-5 text-center space-y-1"
           >
-            {networkLabel(activeCard)} {typeLabel(activeCard)} •••• {activeCard.last_four}
-          </motion.p>
+            <p className="text-sm font-medium text-foreground">
+              {networkLabel(activeCard)} {typeLabel(activeCard)} •••• {activeCard.last_four}
+            </p>
+            {!activeCard.funding_source?.includes("external") && (
+              <p className="text-xs text-muted-foreground tabular-nums">
+                {activeCard.currency_code || "USD"}{" "}
+                {Number(activeCard.balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{" "}
+                available
+              </p>
+            )}
+          </motion.div>
         )}
       </AnimatePresence>
 
       {/* Actions for active card */}
-      <div className="mt-3">
+      <div className="mt-3 overflow-x-auto pb-1">
         {activeCard ? (
           renderActions(activeCard)
         ) : (

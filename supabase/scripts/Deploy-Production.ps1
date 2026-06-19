@@ -54,6 +54,19 @@ function Push-Secrets {
     $pairs += "APP_URL=https://efin.money"
   }
 
+  # CARD_SECRETS_KEY encrypts virtual-card PAN/CVV — generate if missing from secrets.env
+  $hasCardSecrets = $false
+  foreach ($p in $pairs) {
+    if ($p -like "CARD_SECRETS_KEY=*") { $hasCardSecrets = $true; break }
+  }
+  if (-not $hasCardSecrets) {
+    $bytes = New-Object byte[] 32
+    [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
+    $generatedKey = [Convert]::ToBase64String($bytes)
+    $pairs += "CARD_SECRETS_KEY=$generatedKey"
+    Write-Host "Generated CARD_SECRETS_KEY (add to migration-export/secrets.env to reuse on redeploy)" -ForegroundColor Yellow
+  }
+
   Write-Host "Pushing $($pairs.Count) secrets..." -ForegroundColor Yellow
   npx supabase secrets set --project-ref $ProjectRef @pairs
   Write-Host "Secrets OK`n" -ForegroundColor Green
@@ -76,7 +89,11 @@ function Deploy-Functions {
     "send-email",
     "adyen-create-session",
     "adyen-confirm-session",
-    "adyen-webhook"
+    "adyen-webhook",
+    "virtual-card-ops",
+    "flw-get-billers",
+    "flw-validate-bill",
+    "flw-bill-payment"
   )
 
   Write-Host "Deploying $($critical.Count) critical functions (verify_jwt from config.toml)..." -ForegroundColor Yellow

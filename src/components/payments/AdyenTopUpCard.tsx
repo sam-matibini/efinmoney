@@ -129,9 +129,10 @@ export default function AdyenTopUpCard({ walletId, walletCurrency }: Props) {
                 console.error(err);
                 const msg = String(err?.message || err || "");
                 if (msg.includes("Failed to fetch") || msg.includes("NETWORK_ERROR")) {
+                  const origin = window.location.origin;
                   toast.error(
-                    "Adyen blocked this page — add http://localhost:8080 under API credentials → Client settings → Allowed origins, then Save.",
-                    { duration: 8000 },
+                    `Adyen blocked this page — add ${origin} under Adyen → Developers → API credentials → Client settings → Allowed origins, then Save. (Also add https://efin.money and https://www.efin.money if users visit both.)`,
+                    { duration: 10000 },
                   );
                 } else {
                   toast.error("Payment error — please try again");

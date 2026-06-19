@@ -6,25 +6,31 @@ import TransactionPinDialog from "@/components/send/TransactionPinDialog";
  * enter (or first create) their 4-digit PIN before it runs.
  *
  *   const { requirePin, pinGate } = usePinGate();
- *   <Button onClick={() => requirePin(() => doSend(), "₦100.00 NGN")}>Send</Button>
+ *   <Button onClick={() => requirePin((pin) => doSend(), "₦100.00 NGN")}>Send</Button>
  *   {pinGate}
  */
 export function usePinGate() {
   const [open, setOpen] = useState(false);
   const [amountLabel, setAmountLabel] = useState<string | undefined>(undefined);
-  const actionRef = useRef<null | (() => void | Promise<void>)>(null);
+  const [verifyDescription, setVerifyDescription] = useState<string | undefined>(undefined);
+  const actionRef = useRef<null | ((pin: string) => void | Promise<void>)>(null);
 
-  const requirePin = (action: () => void | Promise<void>, label?: string) => {
+  const requirePin = (
+    action: (pin: string) => void | Promise<void>,
+    label?: string,
+    description?: string,
+  ) => {
     actionRef.current = action;
     setAmountLabel(label);
+    setVerifyDescription(description);
     setOpen(true);
   };
 
-  const handleVerified = () => {
+  const handleVerified = (pin: string) => {
     setOpen(false);
     const action = actionRef.current;
     actionRef.current = null;
-    if (action) void action();
+    if (action) void action(pin);
   };
 
   const pinGate: ReactNode = (
@@ -33,6 +39,7 @@ export function usePinGate() {
       onOpenChange={setOpen}
       onVerified={handleVerified}
       amountLabel={amountLabel}
+      verifyDescription={verifyDescription}
     />
   );
 
