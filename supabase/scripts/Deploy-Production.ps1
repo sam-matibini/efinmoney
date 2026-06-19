@@ -21,7 +21,9 @@ $ProjectRef = "dkdnwumllibwdlqbjkwy"
 $Root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 Set-Location $Root
 
-Write-Host "`n=== eFinMoney Supabase deploy ($ProjectRef) ===`n" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "=== eFinMoney Supabase deploy ($ProjectRef) ===" -ForegroundColor Cyan
+Write-Host ""
 
 # --- Link project (ignore if already linked) ---
 try {
@@ -54,7 +56,7 @@ function Push-Secrets {
     $pairs += "APP_URL=https://efin.money"
   }
 
-  # CARD_SECRETS_KEY encrypts virtual-card PAN/CVV — generate if missing from secrets.env
+  # CARD_SECRETS_KEY encrypts virtual-card PAN/CVV - generate if missing from secrets.env
   $hasCardSecrets = $false
   foreach ($p in $pairs) {
     if ($p -like "CARD_SECRETS_KEY=*") { $hasCardSecrets = $true; break }
@@ -64,12 +66,13 @@ function Push-Secrets {
     [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
     $generatedKey = [Convert]::ToBase64String($bytes)
     $pairs += "CARD_SECRETS_KEY=$generatedKey"
-    Write-Host "Generated CARD_SECRETS_KEY (add to migration-export/secrets.env to reuse on redeploy)" -ForegroundColor Yellow
+    Write-Host "Generated CARD_SECRETS_KEY - add to migration-export/secrets.env to reuse on redeploy" -ForegroundColor Yellow
   }
 
   Write-Host "Pushing $($pairs.Count) secrets..." -ForegroundColor Yellow
   npx supabase secrets set --project-ref $ProjectRef @pairs
-  Write-Host "Secrets OK`n" -ForegroundColor Green
+  Write-Host "Secrets OK" -ForegroundColor Green
+  Write-Host ""
 }
 
 function Deploy-Functions {
@@ -96,14 +99,16 @@ function Deploy-Functions {
     "flw-bill-payment"
   )
 
-  Write-Host "Deploying $($critical.Count) critical functions (verify_jwt from config.toml)..." -ForegroundColor Yellow
+  Write-Host "Deploying $($critical.Count) critical functions..." -ForegroundColor Yellow
   npx supabase functions deploy @critical --project-ref $ProjectRef
-  Write-Host "Functions OK`n" -ForegroundColor Green
+  Write-Host "Functions OK" -ForegroundColor Green
+  Write-Host ""
 }
 
 function Push-Db {
   Write-Host "Database: run supabase/production-sql.sql in Dashboard SQL Editor." -ForegroundColor Yellow
-  Write-Host "(Full db push is skipped — remote DB already exists; pushing all migrations would fail.)`n" -ForegroundColor DarkYellow
+  Write-Host "Full db push is skipped - run production-sql.sql manually instead." -ForegroundColor DarkYellow
+  Write-Host ""
 }
 
 try {
@@ -117,10 +122,11 @@ try {
 
   Write-Host "=== Deploy complete ===" -ForegroundColor Green
   Write-Host "Dashboard: https://supabase.com/dashboard/project/$ProjectRef"
-  Write-Host "Next: complete manual steps in supabase/PRODUCTION-DEPLOY.md (Auth URLs + Send Email hook)"
+  Write-Host "Next: complete manual steps in supabase/PRODUCTION-DEPLOY.md"
 } catch {
-  Write-Host "`nDeploy failed: $_" -ForegroundColor Red
-  Write-Host "If you see 403, log in with the Supabase account that owns project ${ProjectRef}:"
+  Write-Host ""
+  Write-Host "Deploy failed: $_" -ForegroundColor Red
+  Write-Host "If you see 403, log in with the Supabase account that owns project $ProjectRef"
   Write-Host "  npx supabase login"
   exit 1
 }
