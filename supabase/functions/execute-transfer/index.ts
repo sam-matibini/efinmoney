@@ -333,7 +333,20 @@ Deno.serve(async (req) => {
     try {
       const isCanada = transfer.transfer_type === "domestic_canada" || transfer.recipient_country === "CA";
 
-      if (usePawapay) {
+      if (isZambia) {
+        const res = await fetch(
+          `${Deno.env.get("SUPABASE_URL")}/functions/v1/elicate-payout`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-internal-secret": Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "",
+            },
+            body: JSON.stringify({ transfer_id }),
+          },
+        );
+        payoutResult = await res.json();
+      } else if (usePawapay) {
         const res = await fetch(
           `${Deno.env.get("SUPABASE_URL")}/functions/v1/pawapay-payout`,
           {
@@ -360,19 +373,6 @@ Deno.serve(async (req) => {
         );
         payoutResult = await res.json();
 
-      } else if (isZambia) {
-        const res = await fetch(
-          `${Deno.env.get("SUPABASE_URL")}/functions/v1/elicate-payout`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-internal-secret": Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "",
-            },
-            body: JSON.stringify({ transfer_id }),
-          },
-        );
-        payoutResult = await res.json();
       } else if (useStellar) {
         const res = await fetch(
           `${Deno.env.get("SUPABASE_URL")}/functions/v1/stellar-sep31-payout`,

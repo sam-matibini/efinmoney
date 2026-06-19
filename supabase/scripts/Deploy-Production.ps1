@@ -96,7 +96,11 @@ function Deploy-Functions {
     "virtual-card-ops",
     "flw-get-billers",
     "flw-validate-bill",
-    "flw-bill-payment"
+    "flw-bill-payment",
+    "elicate-payout",
+    "elicate-webhook",
+    "elicate-reconcile",
+    "execute-transfer"
   )
 
   Write-Host "Deploying $($critical.Count) critical functions..." -ForegroundColor Yellow
