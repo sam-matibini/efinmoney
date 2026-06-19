@@ -2,8 +2,8 @@ import { motion } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CreditCard, Plus, Lock, Unlock, Settings, Trash2, Snowflake, Send } from "lucide-react";
-import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useMemo, useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Skeleton } from "@/components/ui/skeleton";
 import EditCardModal from "@/components/modals/EditCardModal";
 import DeleteCardModal from "@/components/modals/DeleteCardModal";
@@ -54,6 +54,7 @@ const ActionTile = ({ icon, label, onClick, variant = "default" }: ActionTilePro
 
 const CardsPage = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { data: issuedCards, isLoading } = useCards();
   const { data: stripeCards } = useSavedCards();
   const { updateCardStatus, updateCard, deleteCard } = useCardMutations();
@@ -63,7 +64,16 @@ const CardsPage = () => {
   const [editCard, setEditCard] = useState<CardRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<CardRow | null>(null);
   const [addOpen, setAddOpen] = useState(false);
+  const [addMode, setAddMode] = useState<"issue" | "link">("issue");
   const [fundCard, setFundCard] = useState<CardRow | null>(null);
+
+  useEffect(() => {
+    if (searchParams.get("link") === "1") {
+      setAddMode("link");
+      setAddOpen(true);
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const cards = useMemo<CardRow[]>(() => {
     const issued = issuedCards ?? [];
@@ -129,7 +139,7 @@ const CardsPage = () => {
               <p className="text-muted-foreground">Tap a card to flip and view details</p>
             </div>
             <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-              <Button onClick={() => setAddOpen(true)} className="shadow-[0_10px_30px_-10px_hsl(var(--primary)/0.6)]">
+              <Button onClick={() => { setAddMode("issue"); setAddOpen(true); }} className="shadow-[0_10px_30px_-10px_hsl(var(--primary)/0.6)]">
                 <Plus className="w-4 h-4 mr-2" />
                 New Card
               </Button>
@@ -174,11 +184,18 @@ const CardsPage = () => {
                 return (
                   <div className="flex items-start justify-center gap-6 pt-1">
                     {isStripe ? (
-                      <ActionTile
-                        icon={<Send className="w-5 h-5" />}
-                        label="Use to send"
-                        onClick={() => navigate("/send?source=card")}
-                      />
+                      <>
+                        <ActionTile
+                          icon={<Send className="w-5 h-5" />}
+                          label="Use to send"
+                          onClick={() => navigate("/send?source=card")}
+                        />
+                        <ActionTile
+                          icon={<CreditCard className="w-5 h-5" />}
+                          label="Top up wallet"
+                          onClick={() => navigate("/wallet/topup")}
+                        />
+                      </>
                     ) : isExternal ? (
                       <ActionTile
                         icon={<CreditCard className="w-5 h-5" />}
@@ -284,7 +301,7 @@ const CardsPage = () => {
         </motion.div>
       </main>
 
-      <AddCardModal isOpen={addOpen} onClose={() => setAddOpen(false)} />
+      <AddCardModal isOpen={addOpen} onClose={() => setAddOpen(false)} defaultMode={addMode} />
 
       <EditCardModal
         isOpen={!!editCard}

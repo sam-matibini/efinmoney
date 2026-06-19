@@ -250,21 +250,75 @@ const LiveFxCalculator = ({
   const rateUnavailable = !isLoading && !midRate && !quoteRecipientOverride && displayRate == null;
   const actionsVisible = showActions ?? !isApp;
   const resolvedContinueLabel = continueLabel ?? (isApp ? "Continue" : user ? "Continue" : "Sign up & send");
+  const appSurface = embedded || isApp;
+
+  const shell = appSurface
+    ? {
+        card: "bg-card border border-border shadow-sm",
+        title: "text-muted-foreground",
+        meta: "text-muted-foreground",
+        amountRow: "bg-muted/40 ring-border",
+        amountRowHi: "bg-muted/60 ring-border",
+        amountLabel: "text-muted-foreground",
+        amountInput: "text-foreground placeholder:text-muted-foreground/60",
+        walletHint: "text-muted-foreground",
+        walletWarn: "text-amber-600 dark:text-amber-400",
+        swapBtn: "bg-muted hover:bg-muted/80 ring-border text-foreground",
+        compareBox: "bg-muted/30 ring-border",
+        compareTitle: "text-foreground",
+        compareMuted: "text-muted-foreground",
+        rowGood: "font-bold text-foreground",
+        rowMuted: "text-muted-foreground",
+        rowRateGood: "font-semibold text-foreground",
+        rowRateMuted: "text-muted-foreground",
+        badge: "text-muted-foreground ring-border bg-muted/50",
+        disclaimer: "text-muted-foreground",
+        pickerBtn: "bg-background hover:bg-muted ring-border text-foreground",
+        popover: "bg-popover border-border text-popover-foreground",
+        popoverInput: "text-foreground placeholder:text-muted-foreground",
+        popoverEmpty: "text-muted-foreground",
+        popoverItem: "text-foreground aria-selected:bg-muted",
+        popoverMuted: "text-muted-foreground",
+      }
+    : {
+        card: "bg-[hsl(248_60%_8%)]/95 backdrop-blur-xl ring-1 ring-white/15 shadow-2xl",
+        title: "text-white/70",
+        meta: "text-white/60",
+        amountRow: "bg-white/[0.06] ring-white/10",
+        amountRowHi: "bg-white/[0.08] ring-white/15",
+        amountLabel: "text-white/55",
+        amountInput: "text-white placeholder:text-white/30",
+        walletHint: "text-white/50",
+        walletWarn: "text-amber-300/90",
+        swapBtn: "bg-white/10 hover:bg-white/20 ring-white/20 text-white",
+        compareBox: "bg-gradient-to-br from-[hsl(var(--accent-amber)/0.12)] to-white/[0.03] ring-[hsl(var(--accent-amber)/0.25)]",
+        compareTitle: "text-white",
+        compareMuted: "text-white/70",
+        rowGood: "font-bold text-white",
+        rowMuted: "text-white/60",
+        rowRateGood: "font-semibold text-white",
+        rowRateMuted: "text-white/70",
+        badge: "text-white/75 ring-white/15 bg-white/8",
+        disclaimer: "text-white/45",
+        pickerBtn: "bg-white/10 hover:bg-white/15 ring-white/15 text-white",
+        popover: "bg-[hsl(248_60%_10%)] border-white/15 text-white",
+        popoverInput: "text-white placeholder:text-white/40",
+        popoverEmpty: "text-white/50",
+        popoverItem: "text-white aria-selected:bg-white/10",
+        popoverMuted: "text-white/50",
+      };
 
   return (
     <div
       className={`relative w-full ${embedded || isApp ? "max-w-full" : "max-w-[340px] mx-auto"} ${className}`}
     >
-      {!embedded && !isApp && (
+      {!appSurface && !embedded && !isApp && (
         <div className="absolute -inset-1 rounded-[24px] bg-gradient-to-br from-[hsl(var(--accent-amber)/0.35)] via-[hsl(var(--brand-500)/0.25)] to-transparent blur-2xl pointer-events-none" />
       )}
-      {(embedded || isApp) && (
-        <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-br from-[hsl(var(--accent-amber)/0.18)] via-[hsl(var(--primary)/0.12)] to-transparent opacity-80" />
-      )}
-      <div className={`relative overflow-hidden rounded-2xl bg-[hsl(248_60%_8%)]/95 backdrop-blur-xl ring-1 ring-white/15 shadow-2xl ${embedded ? "p-3.5" : "p-4"}`}>
+      <div className={`relative overflow-hidden rounded-2xl ${shell.card} ${embedded ? "p-3.5" : "p-4"}`}>
         <div className="flex items-center justify-between mb-2.5">
-          <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/70">Live FX calculator</div>
-          <div className="inline-flex items-center gap-1.5 text-[9.5px] font-semibold text-white/60">
+          <div className={`text-[10px] font-bold uppercase tracking-[0.18em] ${shell.title}`}>Live FX calculator</div>
+          <div className={`inline-flex items-center gap-1.5 text-[9.5px] font-semibold ${shell.meta}`}>
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
             {isLoading ? "Loading…" : `${secondsAgo}s ago`}
           </div>
@@ -279,9 +333,10 @@ const LiveFxCalculator = ({
           loading={isLoading}
           currencyFilter={fromCurrencyFilter}
           compact={embedded}
+          shell={shell}
         />
         {walletBalance != null && (
-          <p className={`mt-1 px-1 ${walletBalance <= 0 ? "text-amber-300/90" : "text-white/50"} text-[10px]`}>
+          <p className={`mt-1 px-1 ${walletBalance <= 0 ? shell.walletWarn : shell.walletHint} text-[10px]`}>
             Available: {walletSymbol ?? ""}{fmt(walletBalance)}
             {walletBalance <= 0 && sendNumeric > 0 ? " · Top up to send" : ""}
           </p>
@@ -291,7 +346,7 @@ const LiveFxCalculator = ({
           <button
             type="button"
             onClick={swap}
-            className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 ring-1 ring-white/20 text-white grid place-items-center transition"
+            className={`w-8 h-8 rounded-full ring-1 grid place-items-center transition ${shell.swapBtn}`}
             aria-label="Swap currencies"
           >
             <ArrowDownUp className="w-3.5 h-3.5" />
@@ -308,12 +363,13 @@ const LiveFxCalculator = ({
           highlight
           currencyFilter={toCurrencyFilter}
           compact={embedded}
+          shell={shell}
         />
 
         {showComparison && (
-          <div className="mt-3 rounded-xl bg-gradient-to-br from-[hsl(var(--accent-amber)/0.12)] to-white/[0.03] ring-1 ring-[hsl(var(--accent-amber)/0.25)] p-2.5">
+          <div className={`mt-3 rounded-xl ring-1 p-2.5 ${shell.compareBox}`}>
             {rateUnavailable ? (
-              <div className="text-[12px] text-white/70">Rate unavailable for this pair — try another currency.</div>
+              <div className={`text-[12px] ${shell.compareMuted}`}>Rate unavailable for this pair — try another currency.</div>
             ) : (
               <>
                 {!isApp && (
@@ -323,7 +379,7 @@ const LiveFxCalculator = ({
                       You save vs. typical market rate
                     </div>
                     <div className="text-right">
-                      <div className="text-base font-black text-white tabular-nums leading-none">
+                      <div className={`text-base font-black tabular-nums leading-none ${shell.compareTitle}`}>
                         {savingsInSend > 0 ? `+${fmt(savingsInSend)} ${from}` : "—"}
                       </div>
                       {savingsPct > 0 && (
@@ -340,20 +396,22 @@ const LiveFxCalculator = ({
                     fee={feeLabel ?? "0.8% + $0.99"}
                     good
                     compact={embedded || isApp}
+                    shell={shell}
                   />
                   {!isApp && (
                     <Row
                       label="Typical market rate"
                       rate={marketDisplayRate ? `1 ${from} = ${fmt(marketDisplayRate)} ${to}` : "—"}
                       fee="~2.2% + fees"
+                      shell={shell}
                     />
                   )}
                 </div>
 
                 <div className={`mt-2.5 flex flex-wrap gap-1 ${embedded ? "gap-1" : "gap-1.5"}`}>
-                  <Badge compact={embedded}>Mid-market rate</Badge>
-                  <Badge compact={embedded}>No hidden fees</Badge>
-                  <Badge compact={embedded}>{isApp ? "Live rate" : "60s rate lock"}</Badge>
+                  <Badge compact={embedded} shell={shell}>Mid-market rate</Badge>
+                  <Badge compact={embedded} shell={shell}>No hidden fees</Badge>
+                  <Badge compact={embedded} shell={shell}>{isApp ? "Live rate" : "60s rate lock"}</Badge>
                 </div>
               </>
             )}
@@ -384,7 +442,7 @@ const LiveFxCalculator = ({
         )}
 
         {showDisclaimer && (
-          <p className="mt-2 text-[9.5px] leading-relaxed text-white/45">
+          <p className={`mt-2 text-[9.5px] leading-relaxed ${shell.disclaimer}`}>
             {isApp
               ? "Live mid-market rate with eFinMoney fees applied. Final amount confirmed before you send."
               : "Indicative mid-market rate · 0.8% FX + $0.99 fee. Benchmarked against typical international money-transfer providers. Rate locks for 60 s after sign in."}
@@ -397,36 +455,50 @@ const LiveFxCalculator = ({
   );
 };
 
-const Row = ({ label, rate, fee, good, compact }: { label: string; rate: string; fee: string; good?: boolean; compact?: boolean }) => (
+const Row = ({
+  label, rate, fee, good, compact, shell,
+}: {
+  label: string;
+  rate: string;
+  fee: string;
+  good?: boolean;
+  compact?: boolean;
+  shell: {
+    rowGood: string;
+    rowMuted: string;
+    rowRateGood: string;
+    rowRateMuted: string;
+  };
+}) => (
   <div className="flex items-start justify-between gap-2">
     <div className="flex min-w-0 shrink-0 items-center gap-1.5">
       {good ? (
-        <span className="grid h-4 w-4 shrink-0 place-items-center rounded-full bg-emerald-500/20 text-emerald-400">
+        <span className="grid h-4 w-4 shrink-0 place-items-center rounded-full bg-emerald-500/20 text-emerald-500 dark:text-emerald-400">
           <Check className="h-2.5 w-2.5" strokeWidth={3} />
         </span>
       ) : (
         <span className="h-4 w-4 shrink-0" />
       )}
-      <span className={good ? "font-bold text-white" : "text-white/60"}>{label}</span>
+      <span className={good ? shell.rowGood : shell.rowMuted}>{label}</span>
     </div>
     <div className="min-w-0 max-w-[58%] flex-1 text-right">
-      <div className={`break-words leading-snug tabular-nums ${compact ? "text-[10px]" : "text-[11px]"} ${good ? "font-semibold text-white" : "text-white/70"}`}>
+      <div className={`break-words leading-snug tabular-nums ${compact ? "text-[10px]" : "text-[11px]"} ${good ? shell.rowRateGood : shell.rowRateMuted}`}>
         {rate}
       </div>
-      <div className={`text-[10px] ${good ? "font-semibold text-emerald-400" : "text-white/50"}`}>{fee}</div>
+      <div className={`text-[10px] ${good ? "font-semibold text-emerald-600 dark:text-emerald-400" : shell.rowRateMuted}`}>{fee}</div>
     </div>
   </div>
 );
 
-const Badge = ({ children, compact }: { children: React.ReactNode; compact?: boolean }) => (
-  <span className={`inline-flex items-center gap-1 font-bold uppercase tracking-wider text-white/75 ring-1 ring-white/15 bg-white/8 rounded-full ${compact ? "px-1.5 py-0.5 text-[9px]" : "px-2 py-0.5 text-[10px]"}`}>
-    <Check className="h-2.5 w-2.5 text-emerald-400" strokeWidth={3} />
+const Badge = ({ children, compact, shell }: { children: React.ReactNode; compact?: boolean; shell: { badge: string } }) => (
+  <span className={`inline-flex items-center gap-1 font-bold uppercase tracking-wider ring-1 rounded-full ${shell.badge} ${compact ? "px-1.5 py-0.5 text-[9px]" : "px-2 py-0.5 text-[10px]"}`}>
+    <Check className="h-2.5 w-2.5 text-emerald-500 dark:text-emerald-400" strokeWidth={3} />
     {children}
   </span>
 );
 
 const AmountRow = ({
-  label, value, onChange, currency, onCurrencyChange, loading, highlight, currencyFilter, compact,
+  label, value, onChange, currency, onCurrencyChange, loading, highlight, currencyFilter, compact, shell,
 }: {
   label: string;
   value: string;
@@ -437,23 +509,49 @@ const AmountRow = ({
   highlight?: boolean;
   currencyFilter?: string[];
   compact?: boolean;
+  shell: {
+    amountRow: string;
+    amountRowHi: string;
+    amountLabel: string;
+    amountInput: string;
+    pickerBtn: string;
+    popover: string;
+    popoverInput: string;
+    popoverEmpty: string;
+    popoverItem: string;
+    popoverMuted: string;
+  };
 }) => (
-  <div className={`rounded-xl px-3 py-2.5 ring-1 ${highlight ? "bg-white/[0.08] ring-white/15" : "bg-white/[0.06] ring-white/10"}`}>
-    <div className="mb-1 text-[9.5px] font-semibold uppercase tracking-[0.18em] text-white/55">{label}</div>
+  <div className={`rounded-xl px-3 py-2.5 ring-1 ${highlight ? shell.amountRowHi : shell.amountRow}`}>
+    <div className={`mb-1 text-[9.5px] font-semibold uppercase tracking-[0.18em] ${shell.amountLabel}`}>{label}</div>
     <div className="flex items-center gap-2">
       <input
         inputMode="decimal"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={loading ? "…" : "0.00"}
-        className={`min-w-0 flex-1 border-0 bg-transparent font-black tabular-nums text-white outline-none placeholder:text-white/30 ${compact ? "text-xl" : "text-xl sm:text-2xl"}`}
+        className={`min-w-0 flex-1 border-0 bg-transparent font-black tabular-nums outline-none ${shell.amountInput} ${compact ? "text-xl" : "text-xl sm:text-2xl"}`}
       />
-      <CurrencyPicker value={currency} onChange={onCurrencyChange} currencyFilter={currencyFilter} />
+      <CurrencyPicker value={currency} onChange={onCurrencyChange} currencyFilter={currencyFilter} shell={shell} />
     </div>
   </div>
 );
 
-const CurrencyPicker = ({ value, onChange, currencyFilter }: { value: string; onChange: (v: string) => void; currencyFilter?: string[] }) => {
+const CurrencyPicker = ({
+  value, onChange, currencyFilter, shell,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  currencyFilter?: string[];
+  shell: {
+    pickerBtn: string;
+    popover: string;
+    popoverInput: string;
+    popoverEmpty: string;
+    popoverItem: string;
+    popoverMuted: string;
+  };
+}) => {
   const [open, setOpen] = useState(false);
   const options = currencyFilter?.length
     ? WORLD_CURRENCIES.filter((c) => currencyFilter.includes(c.code))
@@ -464,7 +562,7 @@ const CurrencyPicker = ({ value, onChange, currencyFilter }: { value: string; on
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="inline-flex items-center gap-1.5 pl-1.5 pr-2 h-9 rounded-lg bg-white/10 hover:bg-white/15 ring-1 ring-white/15 text-white text-[12px] font-bold transition"
+          className={`inline-flex items-center gap-1.5 pl-1.5 pr-2 h-9 rounded-lg ring-1 text-[12px] font-bold transition ${shell.pickerBtn}`}
         >
           <Flag code={value} />
           <span>{value}</span>
@@ -474,18 +572,18 @@ const CurrencyPicker = ({ value, onChange, currencyFilter }: { value: string; on
       <PopoverContent
         align="end"
         sideOffset={8}
-        className="w-[280px] p-0 bg-[hsl(248_60%_10%)] border-white/15 text-white"
+        className={`w-[280px] p-0 ${shell.popover}`}
       >
         <Command className="bg-transparent">
-          <div className="flex items-center gap-2 px-3 border-b border-white/10">
-            <Search className="w-4 h-4 text-white/50" />
+          <div className="flex items-center gap-2 px-3 border-b border-border">
+            <Search className="w-4 h-4 text-muted-foreground" />
             <CommandInput
               placeholder="Search currency or country…"
-              className="bg-transparent text-white placeholder:text-white/40 h-10"
+              className={`bg-transparent h-10 ${shell.popoverInput}`}
             />
           </div>
           <CommandList className="max-h-72">
-            <CommandEmpty className="py-6 text-center text-sm text-white/50">No match.</CommandEmpty>
+            <CommandEmpty className={`py-6 text-center text-sm ${shell.popoverEmpty}`}>No match.</CommandEmpty>
             <CommandGroup>
               {options.map((c) => (
                 <CommandItem
@@ -495,13 +593,13 @@ const CurrencyPicker = ({ value, onChange, currencyFilter }: { value: string; on
                     onChange(c.code);
                     setOpen(false);
                   }}
-                  className="flex items-center gap-2.5 cursor-pointer text-white aria-selected:bg-white/10"
+                  className={`flex items-center gap-2.5 cursor-pointer ${shell.popoverItem}`}
                 >
                   <Flag code={c.code} />
                   <span className="font-bold w-12 tabular-nums">{c.code}</span>
-                  <span className="flex-1 min-w-0 truncate text-white/80">{c.name}</span>
-                  <span className="text-[10px] text-white/50 truncate max-w-[80px]">{c.country}</span>
-                  {value === c.code && <Check className="w-4 h-4 text-emerald-400" />}
+                  <span className={`flex-1 min-w-0 truncate ${shell.popoverMuted}`}>{c.name}</span>
+                  <span className={`text-[10px] truncate max-w-[80px] ${shell.popoverMuted}`}>{c.country}</span>
+                  {value === c.code && <Check className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />}
                 </CommandItem>
               ))}
             </CommandGroup>

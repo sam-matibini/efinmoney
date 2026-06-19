@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -36,6 +36,10 @@ const AddCardModal = ({ isOpen, onClose, defaultMode = "issue" }: AddCardModalPr
   const { data: wallets } = useWallets();
 
   const [mode, setMode] = useState<"issue" | "link">(defaultMode);
+
+  useEffect(() => {
+    if (isOpen) setMode(defaultMode);
+  }, [isOpen, defaultMode]);
 
   // Issue mode state
   const [cardType, setCardType] = useState<CardType>("debit");
