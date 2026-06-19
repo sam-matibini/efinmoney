@@ -3507,6 +3507,10 @@ export type Database = {
           stellar_seed_encrypted: string | null
           street_address: string | null
           stripe_customer_id: string | null
+          transaction_pin_failed_attempts: number
+          transaction_pin_hash: string | null
+          transaction_pin_locked_until: string | null
+          transaction_pin_set_at: string | null
           updated_at: string
           user_id: string
         }
@@ -3537,6 +3541,10 @@ export type Database = {
           stellar_seed_encrypted?: string | null
           street_address?: string | null
           stripe_customer_id?: string | null
+          transaction_pin_failed_attempts?: number
+          transaction_pin_hash?: string | null
+          transaction_pin_locked_until?: string | null
+          transaction_pin_set_at?: string | null
           updated_at?: string
           user_id: string
         }
@@ -3567,6 +3575,10 @@ export type Database = {
           stellar_seed_encrypted?: string | null
           street_address?: string | null
           stripe_customer_id?: string | null
+          transaction_pin_failed_attempts?: number
+          transaction_pin_hash?: string | null
+          transaction_pin_locked_until?: string | null
+          transaction_pin_set_at?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -5503,6 +5515,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      has_transaction_pin: { Args: never; Returns: boolean }
       invoke_aml_screen: {
         Args: { p_trigger: string; p_trigger_ref: string; p_user_id: string }
         Returns: undefined
@@ -5544,12 +5557,14 @@ export type Database = {
         Args: { p_transfer_id: string }
         Returns: number
       }
+      set_transaction_pin: { Args: { p_pin: string }; Returns: boolean }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
       validate_compliance_parameters: {
         Args: { p_parameters: Json; p_rule_type: string }
         Returns: boolean
       }
+      verify_transaction_pin: { Args: { p_pin: string }; Returns: Json }
     }
     Enums: {
       account_status_enum:
