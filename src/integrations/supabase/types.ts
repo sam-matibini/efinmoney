@@ -45,13 +45,19 @@ export type Database = {
         Row: {
           created_at: string
           department: string | null
+          document_status: string | null
           email: string | null
           full_name: string | null
           id: string
+          id_document_type: string | null
+          id_document_url: string | null
+          invited_at: string | null
           last_login_at: string | null
           permissions: Json
           phone: string | null
           position: string | null
+          rejection_reason: string | null
+          reviewed_at: string | null
           role: Database["public"]["Enums"]["admin_user_role"]
           status: string
           updated_at: string
@@ -59,13 +65,19 @@ export type Database = {
         Insert: {
           created_at?: string
           department?: string | null
+          document_status?: string | null
           email?: string | null
           full_name?: string | null
           id: string
+          id_document_type?: string | null
+          id_document_url?: string | null
+          invited_at?: string | null
           last_login_at?: string | null
           permissions?: Json
           phone?: string | null
           position?: string | null
+          rejection_reason?: string | null
+          reviewed_at?: string | null
           role?: Database["public"]["Enums"]["admin_user_role"]
           status?: string
           updated_at?: string
@@ -73,13 +85,19 @@ export type Database = {
         Update: {
           created_at?: string
           department?: string | null
+          document_status?: string | null
           email?: string | null
           full_name?: string | null
           id?: string
+          id_document_type?: string | null
+          id_document_url?: string | null
+          invited_at?: string | null
           last_login_at?: string | null
           permissions?: Json
           phone?: string | null
           position?: string | null
+          rejection_reason?: string | null
+          reviewed_at?: string | null
           role?: Database["public"]["Enums"]["admin_user_role"]
           status?: string
           updated_at?: string
