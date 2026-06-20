@@ -17,8 +17,24 @@ async function creditWalletViaLedger(admin: ReturnType<typeof createClient>, use
   const { data: existing } = await admin.from("ledger_entries").select("id").eq("reference_type", "flw_topup").eq("reference_id", ref).limit(1);
   if (existing && existing.length > 0) return { wallet_id: wallet.id, already: true };
 
-  const { data: liab } = await admin.from("ledger_accounts").select("id").like("code", "21%").eq("currency_code", currency).limit(1).maybeSingle();
-  const { data: cash } = await admin.from("ledger_accounts").select("id").like("code", "11%").eq("currency_code", currency).limit(1).maybeSingle();
+  // FLW settlement accounts are in the 12xx range (e.g. 1231 = Flutterwave Settlement - NGN).
+  // Fall back to 11xx (Bank Trust) if no 12xx account exists for the currency.
+  const { data: liab } = await admin.from("ledger_accounts").select("id").like("code", "21%").eq("currency_code", currency).order("code").limit(1).maybeSingle();
+  let { data: cash } = await admin.from("ledger_accounts").select("id").like("code", "123%").eq("currency_code", currency).limit(1).maybeSingle();
+  if (!cash) {
+    const { data: fallback } = await admin.from("ledger_accounts").select("id").like("code", "12%").eq("currency_code", currency).limit(1).maybeSingle();
+    cash = fallback;
+  }
+  if (!cash) {
+    const { data: fallback } = await admin.from("ledger_accounts").select("id").like("code", "11%").eq("currency_code", currency).limit(1).maybeSingle();
+    cash = fallback;
+  }
+  if (!cash) {
+    // Last resort: use any asset account for this currency
+    const { data: fallback } = await admin.from("ledger_accounts").select("id").eq("account_type", "asset").eq("currency_code", currency).limit(1).maybeSingle();
+    cash = fallback;
+  }
+
   const j = crypto.randomUUID();
   const rows: any[] = [];
   if (cash) rows.push({ journal_id: j, account_id: cash.id, wallet_id: null, currency_code: currency, debit_amount: amount, credit_amount: 0, description: `Top-up via Flutterwave ${flwId}`, reference_type: "flw_topup", reference_id: ref });
@@ -26,6 +42,16 @@ async function creditWalletViaLedger(admin: ReturnType<typeof createClient>, use
   if (rows.length === 2) {
     const { error } = await admin.from("ledger_entries").insert(rows);
     if (error) throw error;
+  } else {
+    // Liability account is missing — credit wallet directly via a single entry so the balance still updates
+    if (liab) {
+      const { error } = await admin.from("ledger_entries").insert([
+        { journal_id: j, account_id: liab.id, wallet_id: wallet.id, currency_code: currency, debit_amount: 0, credit_amount: amount, description: `Top-up via Flutterwave ${flwId}`, reference_type: "flw_topup", reference_id: ref }
+      ]);
+      if (error) throw error;
+    } else {
+      throw new Error(`No liability ledger account found for ${currency} — cannot credit wallet`);
+    }
   }
   return { wallet_id: wallet.id, already: false };
 }
