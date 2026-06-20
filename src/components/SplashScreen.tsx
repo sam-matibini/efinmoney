@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import LoadingSpinner from "@/components/LoadingSpinner";
 
-const MIN_DURATION_MS = 1200;
+const MIN_DURATION_MS = 600;
+const MAX_DURATION_MS = 2000;
 
 const SplashScreen = () => {
   const [visible, setVisible] = useState(true);
@@ -9,14 +10,6 @@ const SplashScreen = () => {
 
   useEffect(() => {
     const start = performance.now();
-    const hide = () => {
-      const elapsed = performance.now() - start;
-      const wait = Math.max(0, MIN_DURATION_MS - elapsed);
-      window.setTimeout(() => {
-        setFading(true);
-        window.setTimeout(() => setVisible(false), 350);
-      }, wait);
-    };
 
     // Remove the static HTML splash now that React has mounted.
     const staticSplash = document.getElementById("initial-splash");
@@ -25,16 +18,24 @@ const SplashScreen = () => {
       window.setTimeout(() => staticSplash.remove(), 400);
     }
 
-    if (document.readyState === "complete") {
-      hide();
-    } else {
-      window.addEventListener("load", hide, { once: true });
-      const fallback = window.setTimeout(hide, 3000);
-      return () => {
-        window.removeEventListener("load", hide);
-        window.clearTimeout(fallback);
-      };
-    }
+    const hide = () => {
+      const elapsed = performance.now() - start;
+      const wait = Math.max(0, MIN_DURATION_MS - elapsed);
+      window.setTimeout(() => {
+        setFading(true);
+        window.setTimeout(() => setVisible(false), 300);
+      }, wait);
+    };
+
+    // React has mounted — hide right after the minimum brand window,
+    // and enforce a hard maximum so we never trap the user on the spinner.
+    const raf = requestAnimationFrame(hide);
+    const hardStop = window.setTimeout(hide, MAX_DURATION_MS);
+
+    return () => {
+      cancelAnimationFrame(raf);
+      window.clearTimeout(hardStop);
+    };
   }, []);
 
   if (!visible) return null;
@@ -51,7 +52,7 @@ const SplashScreen = () => {
         alignItems: "center",
         justifyContent: "center",
         opacity: fading ? 0 : 1,
-        transition: "opacity 350ms ease-out",
+        transition: "opacity 300ms ease-out",
         pointerEvents: fading ? "none" : "auto",
       }}
     >
