@@ -76,6 +76,14 @@ export default function AdminAdyenTransactionsPage() {
     return m;
   };
 
+  // Immediate-settlement methods (Alipay etc.) can't be captured/cancelled/refunded.
+  const NON_MODIFIABLE = ["alipay", "wechatpay", "paypal", "ideal", "sofort", "giropay", "blik", "mbway", "trustly"];
+  const isModifiable = (m: string | null) => {
+    if (!m) return true;
+    const lower = m.toLowerCase();
+    return !NON_MODIFIABLE.some((x) => lower.includes(x));
+  };
+
   return (
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-6xl mx-auto space-y-6">
@@ -101,7 +109,8 @@ export default function AdminAdyenTransactionsPage() {
             <li><strong>Capture</strong> an authorised payment to settle it. After that, Cancel is no longer possible.</li>
             <li><strong>Refund</strong> only works <em>after</em> a payment is captured (settled).</li>
           </ul>
-          <p className="text-muted-foreground">To test all four, use separate payments: cancel one authorised payment, and capture + refund a different one.</p>
+          <li><strong>Use a card</strong> (test card <code>4111 1111 1111 1111</code>). Alipay and other instant wallets settle immediately and can't be captured, cancelled, or refunded.</li>
+          <p className="text-muted-foreground">To test all four, use separate <em>card</em> payments: cancel one authorised payment, and capture + refund a different one.</p>
         </div>
 
         <Card>
@@ -123,9 +132,10 @@ export default function AdminAdyenTransactionsPage() {
                   <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No authorised payments yet — complete a test top-up first.</TableCell></TableRow>
                 ) : sessions.map((s) => {
                   const acting = actingOn === s.id;
-                  const canCapture = s.status === "authorised";
-                  const canCancel = s.status === "authorised";
-                  const canRefund = s.status === "settled";
+                  const modifiable = isModifiable(s.payment_method);
+                  const canCapture = modifiable && s.status === "authorised";
+                  const canCancel = modifiable && s.status === "authorised";
+                  const canRefund = modifiable && s.status === "settled";
                   return (
                     <TableRow key={s.id}>
                       <TableCell className="font-mono text-xs">{s.reference.slice(-24)}</TableCell>
@@ -134,15 +144,23 @@ export default function AdminAdyenTransactionsPage() {
                       <TableCell className="text-xs">{prettyMethod(s.payment_method)}</TableCell>
                       <TableCell className="text-xs">{new Date(s.created_at).toLocaleString()}</TableCell>
                       <TableCell className="text-right space-x-2">
-                        <Button size="sm" variant="outline" disabled={!canCapture || acting} onClick={() => act(s, "capture")}>
-                          Capture
-                        </Button>
-                        <Button size="sm" variant="outline" disabled={!canCancel || acting} onClick={() => act(s, "cancel")}>
-                          Cancel
-                        </Button>
-                        <Button size="sm" variant="outline" disabled={!canRefund || acting} onClick={() => act(s, "refund")}>
-                          Refund
-                        </Button>
+                        {!modifiable ? (
+                          <span className="text-xs text-muted-foreground">
+                            {prettyMethod(s.payment_method)} settles instantly — no capture/cancel/refund
+                          </span>
+                        ) : (
+                          <>
+                            <Button size="sm" variant="outline" disabled={!canCapture || acting} onClick={() => act(s, "capture")}>
+                              Capture
+                            </Button>
+                            <Button size="sm" variant="outline" disabled={!canCancel || acting} onClick={() => act(s, "cancel")}>
+                              Cancel
+                            </Button>
+                            <Button size="sm" variant="outline" disabled={!canRefund || acting} onClick={() => act(s, "refund")}>
+                              Refund
+                            </Button>
+                          </>
+                        )}
                       </TableCell>
                     </TableRow>
                   );

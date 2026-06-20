@@ -60,6 +60,18 @@ Deno.serve(async (req) => {
       return json({ error: 'No psp_reference on this session yet — payment has not been authorised' }, 400)
     }
 
+    // Immediate-settlement methods (Alipay, WeChat Pay, and most redirect APMs) do not
+    // support the authorise -> capture/cancel/refund modification lifecycle. Adyen accepts
+    // the modification (201 "received") but then fails it asynchronously, so guard here.
+    const method = String(session.payment_method || '').toLowerCase()
+    const NON_MODIFIABLE = ['alipay', 'wechatpay', 'paypal', 'ideal', 'sofort', 'giropay', 'blik', 'mbway', 'trustly']
+    if (NON_MODIFIABLE.some((m) => method.includes(m))) {
+      return json({
+        error: `${session.payment_method} settles immediately and does not support ${action}. `
+          + `Use a card payment (test card 4111 1111 1111 1111) to exercise capture/cancel/refund.`,
+      }, 409)
+    }
+
     // Adyen rules: capture/cancel only apply to an authorised (un-captured) payment;
     // refund only applies after capture (settled). Guard here so the user gets a clear
     // message instead of an async "received" that silently fails later.

@@ -127,8 +127,12 @@ Deno.serve(async (req) => {
         countryCode: 'CA',
         shopperReference: userId,
         channel: 'Web',
-        // scheme = card form; list cards before wallets so Drop-in opens card fields first
-        allowedPaymentMethods: ['scheme', 'visa', 'mc', 'amex', 'interac_card', 'alipay'],
+        // In test mode, restrict to cards ('scheme') so the Drop-in opens directly on the
+        // card form and capture/cancel/refund can be exercised (instant wallets like Alipay
+        // can't be captured/cancelled/refunded). Live mode keeps the full method list.
+        allowedPaymentMethods: ADYEN_ENV === 'live'
+          ? ['scheme', 'alipay', 'interac_card']
+          : ['scheme'],
       }),
     })
 
