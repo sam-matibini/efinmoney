@@ -83,7 +83,7 @@ export default function AdyenReturnHandler() {
             const code = result?.resultCode;
             const credited = await finalizeAdyenPayment(
               sessionId,
-              result?.sessionResult,
+              (result as { sessionResult?: string })?.sessionResult,
               queryClient,
             );
             if (!credited) {
