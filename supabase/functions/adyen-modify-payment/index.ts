@@ -60,6 +60,20 @@ Deno.serve(async (req) => {
       return json({ error: 'No psp_reference on this session yet — payment has not been authorised' }, 400)
     }
 
+    // Adyen rules: capture/cancel only apply to an authorised (un-captured) payment;
+    // refund only applies after capture (settled). Guard here so the user gets a clear
+    // message instead of an async "received" that silently fails later.
+    const status = session.status
+    if ((action === 'capture' || action === 'cancel') && status === 'settled') {
+      return json({ error: `Payment already captured — cannot ${action}. Use Refund instead.` }, 409)
+    }
+    if (action === 'refund' && status !== 'settled') {
+      return json({ error: 'Payment is not captured yet — capture it first, then refund.' }, 409)
+    }
+    if ((action === 'capture' || action === 'cancel') && status === 'cancelled') {
+      return json({ error: 'Payment already cancelled.' }, 409)
+    }
+
     const reference = `${session.reference}_${action}_${Date.now()}`
     const adyenBody: Record<string, unknown> = {
       merchantAccount: ADYEN_MERCHANT_ACCOUNT,

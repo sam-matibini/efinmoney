@@ -96,6 +96,18 @@ async function creditAdyenTopup(
   return { credited: true, amount: amountMajor, currency }
 }
 
+// Adyen returns paymentMethod as a string ("alipay") for some methods and as an
+// object ({ type: "scheme", brand: "visa" }) for cards. Coerce to a readable string.
+function normalizePaymentMethod(pm: unknown): string {
+  if (!pm) return ''
+  if (typeof pm === 'string') return pm
+  if (typeof pm === 'object') {
+    const o = pm as Record<string, unknown>
+    return String(o.brand || o.type || '')
+  }
+  return ''
+}
+
 function paymentSucceeded(adyenSession: Record<string, unknown>): boolean {
   if (adyenSession.status === 'completed') return true
   const payments = adyenSession.payments as Array<Record<string, unknown>> | undefined
@@ -172,7 +184,7 @@ Deno.serve(async (req) => {
     const pspReference = String(
       payments?.[0]?.pspReference || session.psp_reference || sessionId,
     )
-    const paymentMethod = String(payments?.[0]?.paymentMethod || session.payment_method || '')
+    const paymentMethod = normalizePaymentMethod(payments?.[0]?.paymentMethod) || session.payment_method || ''
 
     await admin.from('adyen_payment_sessions').update({
       status: 'authorised',

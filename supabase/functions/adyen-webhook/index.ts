@@ -103,10 +103,17 @@ Deno.serve(async (req) => {
         if (code === 'CANCELLATION') newStatus = 'cancelled'
         if (code === 'REFUND' && success) newStatus = 'refunded'
 
+        const pmRaw = data.paymentMethod
+        const pm = typeof pmRaw === 'string'
+          ? pmRaw
+          : pmRaw && typeof pmRaw === 'object'
+            ? (pmRaw.brand || pmRaw.type || null)
+            : null
+
         await supabase.from('adyen_payment_sessions').update({
           status: newStatus,
           psp_reference: data.pspReference,
-          payment_method: data.paymentMethod ?? session.payment_method,
+          payment_method: pm ?? session.payment_method,
           last_event: data,
         }).eq('id', session.id)
 

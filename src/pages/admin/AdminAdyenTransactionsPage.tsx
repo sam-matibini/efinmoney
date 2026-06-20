@@ -54,13 +54,26 @@ export default function AdminAdyenTransactionsPage() {
     setActingOn(session.id);
     try {
       const result = await modifyAdyenPayment({ session_id: session.id, action });
-      toast.success(`${action[0].toUpperCase()}${action.slice(1)} sent — ${result.adyen.status}`);
-      await load();
+      toast.success(
+        `${action[0].toUpperCase()}${action.slice(1)} request accepted (${result.adyen.status}). ` +
+        `Final status arrives via webhook in a few seconds.`,
+      );
+      // The capture/cancel/refund is async on Adyen's side — the row's status only
+      // flips once the webhook lands. Poll a few times so the table self-updates.
+      for (let i = 0; i < 4; i++) {
+        await new Promise((r) => setTimeout(r, 2500));
+        await load();
+      }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : `${action} failed`);
     } finally {
       setActingOn(null);
     }
+  };
+
+  const prettyMethod = (m: string | null) => {
+    if (!m || m === "[object Object]") return "card";
+    return m;
   };
 
   return (
@@ -79,6 +92,16 @@ export default function AdminAdyenTransactionsPage() {
           <Button variant="outline" size="sm" onClick={load} disabled={loading}>
             <RefreshCw className={`w-4 h-4 mr-2 ${loading ? "animate-spin" : ""}`} /> Refresh
           </Button>
+        </div>
+
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm space-y-1">
+          <p className="font-medium">Order matters (Adyen rules):</p>
+          <ul className="list-disc pl-5 text-muted-foreground space-y-0.5">
+            <li><strong>Cancel</strong> only works on an <em>authorised</em> payment that has <em>not</em> been captured.</li>
+            <li><strong>Capture</strong> an authorised payment to settle it. After that, Cancel is no longer possible.</li>
+            <li><strong>Refund</strong> only works <em>after</em> a payment is captured (settled).</li>
+          </ul>
+          <p className="text-muted-foreground">To test all four, use separate payments: cancel one authorised payment, and capture + refund a different one.</p>
         </div>
 
         <Card>
@@ -108,7 +131,7 @@ export default function AdminAdyenTransactionsPage() {
                       <TableCell className="font-mono text-xs">{s.reference.slice(-24)}</TableCell>
                       <TableCell>{(s.amount_minor / 100).toFixed(2)} {s.currency}</TableCell>
                       <TableCell><Badge variant={STATUS_VARIANT[s.status] || "outline"}>{s.status}</Badge></TableCell>
-                      <TableCell className="text-xs">{s.payment_method || "—"}</TableCell>
+                      <TableCell className="text-xs">{prettyMethod(s.payment_method)}</TableCell>
                       <TableCell className="text-xs">{new Date(s.created_at).toLocaleString()}</TableCell>
                       <TableCell className="text-right space-x-2">
                         <Button size="sm" variant="outline" disabled={!canCapture || acting} onClick={() => act(s, "capture")}>
