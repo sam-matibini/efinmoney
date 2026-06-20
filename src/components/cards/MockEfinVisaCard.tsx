@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Wifi, Eye, EyeOff, Copy, Sparkles, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { useProfile } from "@/hooks/useProfile";
 
 const FAKE_NUMBER = "4111 2222 3333 1978";
 const FAKE_CVV = "123";
@@ -29,6 +30,15 @@ const EmvChip = () => (
 const MockEfinVisaCard = () => {
   const [isFlipped, setIsFlipped] = useState(false);
   const [isRevealed, setIsRevealed] = useState(false);
+  const [name, setName] = useState("Loading...");
+  const { data: profile } = useProfile();
+
+  useEffect(() => {
+    if (profile) {
+      const p = profile as any;
+      setName(p.full_name);
+    }
+  }, [profile]);
 
   const copy = async (label: string, value: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -125,7 +135,7 @@ const MockEfinVisaCard = () => {
                 <div className="min-w-0">
                   <div className="text-[9px] tracking-[0.18em] opacity-70">CARDHOLDER</div>
                   <div className="text-sm font-semibold tracking-wide truncate max-w-[12rem]">
-                    Samson Matibini
+                    {name !== null ? name.toUpperCase() : "DEFAULT NAME"}
                   </div>
                 </div>
                 <div>
