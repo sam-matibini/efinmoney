@@ -5,7 +5,7 @@ const SYMBOLS: Record<string, string> = {
   EUR: "€", GBP: "£", JPY: "¥", CNY: "¥", CHF: "CHF",
   NGN: "₦", KES: "KSh", UGX: "USh", TZS: "TSh", RWF: "FRw",
   ZMW: "ZK", GHS: "₵", ZAR: "R", XOF: "CFA", XAF: "FCFA",
-  EGP: "E£", MAD: "DH", INR: "₹", BRL: "R$", MXN: "MX$",
+  BWP: "P", EGP: "E£", MAD: "DH", INR: "₹", BRL: "R$", MXN: "MX$",
   AED: "د.إ", SAR: "﷼", TRY: "₺",
 };
 
