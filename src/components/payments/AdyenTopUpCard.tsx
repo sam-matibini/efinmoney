@@ -57,7 +57,7 @@ export default function AdyenTopUpCard({ walletId, walletCurrency }: Props) {
             Pay with Card
             <Badge variant="outline" className="border-primary/30 text-primary">
               <Sparkles className="w-3 h-3 mr-1" />
-              Visa · MC · Amex · Alipay · Interac
+              Visa · MC · Amex
             </Badge>
           </CardTitle>
         </CardHeader>
@@ -75,7 +75,7 @@ export default function AdyenTopUpCard({ walletId, walletCurrency }: Props) {
           </div>
           <div className="p-3 rounded-lg bg-accent/10 border border-accent/20">
             <p className="text-xs text-foreground">
-              Embedded checkout — pay with Visa, Mastercard, Amex, Alipay, or Interac card. Powered by Adyen (test mode).
+              Embedded card checkout — enter your Visa, Mastercard, or Amex card details. Powered by Adyen (test mode).
             </p>
           </div>
           <Button className="w-full" size="lg" onClick={start} disabled={loading}>

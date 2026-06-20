@@ -1,7 +1,6 @@
 import { useEffect, useRef } from "react";
-import { AdyenCheckout, Dropin } from "@adyen/adyen-web";
+import { AdyenCheckout, Card } from "@adyen/adyen-web";
 import "@adyen/adyen-web/styles/adyen.css";
-
 
 interface Props {
   sessionId: string;
@@ -23,7 +22,7 @@ export default function AdyenDropIn({
   onError,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const dropinRef = useRef<any>(null);
+  const cmpRef = useRef<any>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -38,31 +37,25 @@ export default function AdyenDropIn({
           locale: "en-US",
           countryCode: "CA",
           analytics: { enabled: false },
-          // Cards first — otherwise Drop-in auto-opens Alipay with no card fields.
-          paymentMethodOrder: ["scheme", "visa", "mc", "amex", "interac_card", "alipay"],
           onPaymentCompleted: (result: any) => onPaymentCompleted?.(result),
           onError: (err: any) => onError?.(err),
         });
         if (cancelled) return;
-        const dropin = new Dropin(checkout, {
-          openFirstPaymentMethod: true,
-          paymentMethodOrder: ["scheme", "visa", "mc", "amex", "interac_card", "alipay"],
-          paymentMethodsConfiguration: {
-            card: {
-              hasHolderName: true,
-              holderNameRequired: false,
-            },
-          },
+        // Render the card form directly (no payment-method list). This is the clearest
+        // "enter your card" UI and avoids Drop-in's single-method rendering quirks.
+        const card = new Card(checkout, {
+          hasHolderName: true,
+          holderNameRequired: false,
         });
-        dropin.mount(containerRef.current);
-        dropinRef.current = dropin;
+        card.mount(containerRef.current);
+        cmpRef.current = card;
       } catch (e) {
         onError?.(e);
       }
     })();
     return () => {
       cancelled = true;
-      try { dropinRef.current?.unmount(); } catch {}
+      try { cmpRef.current?.unmount(); } catch {}
     };
   }, [sessionId, sessionData, clientKey, environment]);
 
