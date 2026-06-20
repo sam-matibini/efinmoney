@@ -143,10 +143,10 @@ const KpiChip = ({
               <img
                 src={`https://flagcdn.com/w40/${cc}.png`}
                 srcSet={`https://flagcdn.com/w80/${cc}.png 2x`}
-                alt={cc}
-                loading="lazy"
+            alt={cc}
+            loading="lazy"
                 className="h-full w-full rounded-full object-cover"
-              />
+          />
             </span>
           </span>
         ))}
