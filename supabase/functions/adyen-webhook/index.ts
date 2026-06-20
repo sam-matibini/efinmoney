@@ -84,12 +84,27 @@ Deno.serve(async (req) => {
         continue
       }
 
-      // Find session by merchantReference
-      const { data: session } = await supabase
-        .from('adyen_payment_sessions')
-        .select('*')
-        .eq('reference', data.merchantReference)
-        .maybeSingle()
+      // Find the session. Modification events (CAPTURE/CANCELLATION/REFUND) carry
+      // originalReference = the original payment's psp reference, while merchantReference
+      // is the modification reference (which does NOT match the session). Match on the
+      // original psp reference first, then fall back to merchantReference for AUTHORISATION.
+      let session: Record<string, any> | null = null
+      if (data.originalReference) {
+        const r = await supabase
+          .from('adyen_payment_sessions')
+          .select('*')
+          .eq('psp_reference', data.originalReference)
+          .maybeSingle()
+        session = r.data
+      }
+      if (!session) {
+        const r = await supabase
+          .from('adyen_payment_sessions')
+          .select('*')
+          .eq('reference', data.merchantReference)
+          .maybeSingle()
+        session = r.data
+      }
 
       // Process events
       const success = data.success === 'true' || data.success === true
@@ -100,7 +115,7 @@ Deno.serve(async (req) => {
         if (code === 'AUTHORISATION' && success) newStatus = 'authorised'
         if (code === 'CAPTURE' && success) newStatus = 'settled'
         if (code === 'AUTHORISATION' && !success) newStatus = 'refused'
-        if (code === 'CANCELLATION') newStatus = 'cancelled'
+        if (code === 'CANCELLATION' && success) newStatus = 'cancelled'
         if (code === 'REFUND' && success) newStatus = 'refunded'
 
         const pmRaw = data.paymentMethod
@@ -110,16 +125,22 @@ Deno.serve(async (req) => {
             ? (pmRaw.brand || pmRaw.type || null)
             : null
 
-        await supabase.from('adyen_payment_sessions').update({
+        // Only set psp_reference from the AUTHORISATION (original payment). Modification
+        // events carry the modification psp ref, which must not overwrite the original —
+        // otherwise later refund/lookup by originalReference would break.
+        const updates: Record<string, unknown> = {
           status: newStatus,
-          psp_reference: data.pspReference,
           payment_method: pm ?? session.payment_method,
           last_event: data,
-        }).eq('id', session.id)
+        }
+        if (code === 'AUTHORISATION') updates.psp_reference = data.pspReference
+        await supabase.from('adyen_payment_sessions').update(updates).eq('id', session.id)
 
-        // Credit ledger on first authorised/settled (treat AUTHORISATION+success as funds available in test)
+        // Credit ledger once. Key idempotency on the ORIGINAL psp reference so an
+        // AUTHORISATION followed by a CAPTURE does not double-credit the wallet.
+        const creditRef = session.psp_reference || data.pspReference
         if ((code === 'AUTHORISATION' || code === 'CAPTURE') && success && session.target_wallet_id) {
-          await creditAdyenTopup(supabase, session, data.pspReference, data.paymentMethod)
+          await creditAdyenTopup(supabase, session, creditRef, pm ?? undefined)
         }
 
         // Mark related invoice paid
