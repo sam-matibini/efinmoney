@@ -19,6 +19,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import NotificationsPanel from "@/components/header/NotificationsPanel";
+import QuickActionsPopover from "@/components/layout/QuickActionsPopover";
 import SearchModal from "@/components/header/SearchModal";
 import { Logo, Wordmark } from "@/components/Logo";
 import ThemeToggle from "@/components/theme/ThemeToggle";
@@ -189,6 +190,7 @@ const Header = () => {
 
           <ThemeToggle />
           <NotificationsPanel />
+          <QuickActionsPopover />
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

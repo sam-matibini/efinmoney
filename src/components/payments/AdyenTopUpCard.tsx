@@ -54,7 +54,7 @@ export default function AdyenTopUpCard({ walletId, walletCurrency }: Props) {
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
-            Pay with Adyen
+            Pay with Card
             <Badge variant="outline" className="border-primary/30 text-primary">
               <Sparkles className="w-3 h-3 mr-1" />
               Visa · MC · Amex · Alipay · Interac

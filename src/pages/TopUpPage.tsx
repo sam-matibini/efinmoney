@@ -266,7 +266,7 @@ const TopUpPage = () => {
 
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">Or pay from any country</CardTitle>
+                  <CardTitle className="text-base">Or pay Internationally</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div>
