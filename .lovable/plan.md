@@ -1,48 +1,50 @@
-# Botswana (BWP) Localization
+# Fix FX Calculator (BWP) + Build Errors
 
-Add Botswana as a first-class corridor so users can hold, exchange, send to, and receive in Botswana Pula (BWP).
+The calculator returns "Rate unavailable" because our FX provider (OpenExchangeRates) is rate-limited until **2026-06-29**, so no BWP rows exist in `fx_rates`. Also clearing the pre-existing TS build errors flagged by the builder (Adyen, admin_users, cards).
 
-## 1. FX feed
-- `supabase/functions/refresh-fx-rates/index.ts`: add `BWP` to `SUPPORTED`. After deploy, run the function once so cross-rates for BWP↔USD/CAD/EUR/GBP/NGN/KES/ZAR/etc. populate `fx_rates`.
-- `FxTicker` / `LiveFxCalculator` will pick BWP up automatically once rates exist.
+## 1. Make FX feed resilient (real fix for the calculator)
 
-## 2. Currency + symbol
-- `src/lib/currency.ts`: add `BWP: "P"` to `SYMBOLS` and `BW: "BWP"` to `COUNTRY_CCY`.
-- `currencies` table already has BWP (seeded). No migration needed.
+`supabase/functions/refresh-fx-rates/index.ts`:
+- Try OpenExchangeRates first.
+- On failure (429 / network / no key), **fall back to `https://open.er-api.com/v6/latest/USD`** — free, no API key, covers BWP and all our SUPPORTED currencies.
+- Same downstream math (cross-rates via USD, 0.5% markup), same `fx_rates` insert.
 
-## 3. Country / payout config
-- `src/lib/countries.ts`: upgrade the existing Botswana entry to expose mobile-money networks and a bank fallback:
-  - Orange Money Botswana (`orange_money`)
-  - Mascom MyZaka (`myzaka`)
-  - BTC Smega / e-Pula (`smega`)
-  - Bank transfer (`bank`) as fallback
-  - `method: "Mobile Money / Bank"`, `symbol: "P"`, `dialCode +267`.
-- `src/lib/mobileMoneyNetworks.ts`: add `BW` entry with the three MNOs above and dial code `+267`.
+After the change, invoke the function once so BWP cross-rates populate immediately. The landing-page `LiveFxCalculator` will then resolve CAD↔BWP without any UI change.
 
-## 4. Payout routing
-- `supabase/functions/pawapay-payout/index.ts`: add `BW` to the correspondent table and `BWP: "BW"` to `currencyFallback`. Tokens (subject to PawaPay enabling the corridor for our account):
-  - `ORANGE: "ORANGE_BWA"`, `MYZAKA: "MYZAKA_BWA"`, `SMEGA: "SMEGA_BWA"`, `DEFAULT: "ORANGE_BWA"`.
-  - If PawaPay has not yet activated Botswana for our merchant, the bank-transfer route via Flutterwave (already country-agnostic for BWP bank payouts) remains the working default.
-- `supabase/functions/flutterwave-payout/index.ts`: no code change needed — it already accepts `BW`/`BWP` bank payouts; we just need it reachable from the new country option.
+Also seed a one-time set of BWP rows via a small immediate insert (no migration needed — just call the refreshed function) so the calculator works without waiting on the OpenExchangeRates quota reset.
 
-## 5. New user defaults (optional but recommended for the launch market)
-- For users whose country = Botswana, auto-create a BWP wallet on signup in `handle_new_user()` alongside USD/CAD. Implemented as a small migration that adds a BWP wallet when `profiles.country_code = 'BW'`.
+## 2. Schema fixes for admin_users (resolves 8 TS errors)
 
-## 6. KYC / tier limits
-No change — Botswana users follow the same tiered limits in `tier_limits`. Persona & Sumsub already accept BW IDs (passport / national ID / driving licence).
+Migration to add the columns the app already reads/writes:
+- `admin_users.email text`
+- `admin_users.status text default 'active'`
+- `admin_users.phone text`
 
-## 7. UI surfaces that will reflect Botswana automatically once the above lands
-- Send flow country picker (`SendPage`, `AddBeneficiaryModal`, `ContactsPickerModal`)
-- Exchange (wallet selector + `LiveFxCalculator`)
-- Wallets page (Create Wallet → BWP option)
-- FX ticker on landing & send pages
-- Receipts / statement formatting (symbol "P")
+Affected files compile again automatically once the regenerated `types.ts` includes the new columns:
+- `src/contexts/AdminAuthContext.tsx` (id/role/status/full_name/permissions)
+- `src/hooks/useUserRoles.tsx` (status/role)
+- `src/pages/admin/StaffDetailPage.tsx`, `StaffPage.tsx`, `StaffOnboardingPage.tsx` (phone)
 
-## 8. Verification
-- Run `refresh-fx-rates` and confirm BWP rows in `fx_rates`.
-- In the preview, open Exchange and verify USD→BWP and BWP→USD quote.
-- Open Send → pick Botswana → confirm network options and that a test transfer reaches `pawapay-payout` (or `flutterwave-payout` for bank) without "unsupported country" errors.
+## 3. Schema fixes for cards (resolves 3 TS errors)
 
-## Technical notes
-- PawaPay corridor tokens for BWA are listed per their MNO catalog; if their sandbox rejects them for our account we'll log a clear "corridor not enabled" message and fall back to bank payout. No schema change required for fallback.
-- All values are config/code changes — no destructive DB migrations.
+Migration:
+- `cards.currency_code text`
+- `cards.balance numeric not null default 0`
+
+Backfill `currency_code` from the linked wallet where `wallet_id is not null`. Resolves the `useCards.tsx` casts.
+
+## 4. AdyenReturnHandler typing
+
+`src/components/payments/AdyenReturnHandler.tsx` line 86: `result?.sessionResult` isn't in the Drop-in `PaymentCompletedData` type but is present at runtime. Cast `result` to `any` for that property access only — single, localized fix.
+
+## 5. Verification
+
+- Hit `refresh-fx-rates` → confirm `success:true` and BWP rows in `fx_rates`.
+- Reload landing page → CAD 1000 → BWP shows a real quote (≈ 9-10k BWP), and the "Rate unavailable" banner disappears.
+- Build passes (no TS errors).
+
+## Notes
+
+- No UI/visual changes — only the calculator's rate lookup starts returning real numbers.
+- New columns are nullable / defaulted so existing rows aren't broken.
+- The fallback FX source stays in place even after OpenExchangeRates resets, so we won't see this outage again.

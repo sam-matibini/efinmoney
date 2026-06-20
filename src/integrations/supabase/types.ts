@@ -44,26 +44,62 @@ export type Database = {
       admin_users: {
         Row: {
           created_at: string
+          department: string | null
+          document_status: string | null
+          email: string | null
           full_name: string | null
           id: string
+          id_document_type: string | null
+          id_document_url: string | null
+          invited_at: string | null
+          last_login_at: string | null
           permissions: Json
+          phone: string | null
+          position: string | null
+          rejection_reason: string | null
+          reviewed_at: string | null
           role: Database["public"]["Enums"]["admin_user_role"]
+          status: string
           updated_at: string
         }
         Insert: {
           created_at?: string
+          department?: string | null
+          document_status?: string | null
+          email?: string | null
           full_name?: string | null
           id: string
+          id_document_type?: string | null
+          id_document_url?: string | null
+          invited_at?: string | null
+          last_login_at?: string | null
           permissions?: Json
+          phone?: string | null
+          position?: string | null
+          rejection_reason?: string | null
+          reviewed_at?: string | null
           role?: Database["public"]["Enums"]["admin_user_role"]
+          status?: string
           updated_at?: string
         }
         Update: {
           created_at?: string
+          department?: string | null
+          document_status?: string | null
+          email?: string | null
           full_name?: string | null
           id?: string
+          id_document_type?: string | null
+          id_document_url?: string | null
+          invited_at?: string | null
+          last_login_at?: string | null
           permissions?: Json
+          phone?: string | null
+          position?: string | null
+          rejection_reason?: string | null
+          reviewed_at?: string | null
           role?: Database["public"]["Enums"]["admin_user_role"]
+          status?: string
           updated_at?: string
         }
         Relationships: []
@@ -1229,11 +1265,13 @@ export type Database = {
       }
       cards: {
         Row: {
+          balance: number
           card_network: string
           card_type: string
           cardholder_name: string
           created_at: string
           credit_limit: number | null
+          currency_code: string | null
           expires_at: string
           expiry_month: number | null
           expiry_year: number | null
@@ -1247,11 +1285,13 @@ export type Database = {
           wallet_id: string | null
         }
         Insert: {
+          balance?: number
           card_network?: string
           card_type?: string
           cardholder_name: string
           created_at?: string
           credit_limit?: number | null
+          currency_code?: string | null
           expires_at?: string
           expiry_month?: number | null
           expiry_year?: number | null
@@ -1265,11 +1305,13 @@ export type Database = {
           wallet_id?: string | null
         }
         Update: {
+          balance?: number
           card_network?: string
           card_type?: string
           cardholder_name?: string
           created_at?: string
           credit_limit?: number | null
+          currency_code?: string | null
           expires_at?: string
           expiry_month?: number | null
           expiry_year?: number | null

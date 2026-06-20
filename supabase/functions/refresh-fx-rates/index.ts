@@ -8,27 +8,45 @@ const corsHeaders = {
 const SUPPORTED = ["USD", "CAD", "EUR", "GBP", "NGN", "KES", "UGX", "TZS", "ZMW", "BIF", "MZN", "GHS", "RWF", "XAF", "XOF", "MWK", "ZAR", "BWP"];
 const MARKUP = 0.005; // 0.5% spread
 
+// Try OpenExchangeRates (paid, accurate). On any failure fall back to
+// open.er-api.com (free, no key, covers every currency we list).
+async function fetchUsdRates(): Promise<{ source: string; rates: Record<string, number> }> {
+  const appId = Deno.env.get("OPENEXCHANGERATES_APP_ID");
+  if (appId) {
+    try {
+      const symbols = SUPPORTED.filter((c) => c !== "USD").join(",");
+      const url = `https://openexchangerates.org/api/latest.json?app_id=${appId}&base=USD&symbols=${symbols}`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        return { source: "openexchangerates", rates: { USD: 1, ...(data.rates || {}) } };
+      }
+      console.warn("OpenExchangeRates failed:", res.status, await res.text());
+    } catch (e) {
+      console.warn("OpenExchangeRates threw:", e);
+    }
+  }
+
+  // Fallback: free, no key, base=USD
+  const fbRes = await fetch("https://open.er-api.com/v6/latest/USD");
+  if (!fbRes.ok) {
+    throw new Error(`Fallback FX provider failed [${fbRes.status}]: ${await fbRes.text()}`);
+  }
+  const fbData = await fbRes.json();
+  if (!fbData?.rates) throw new Error("Fallback FX provider returned no rates");
+  return { source: "open.er-api.com", rates: { USD: 1, ...fbData.rates } };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const appId = Deno.env.get("OPENEXCHANGERATES_APP_ID");
-    if (!appId) throw new Error("OPENEXCHANGERATES_APP_ID is not configured");
-
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    const symbols = SUPPORTED.filter((c) => c !== "USD").join(",");
-    const url = `https://openexchangerates.org/api/latest.json?app_id=${appId}&base=USD&symbols=${symbols}`;
-    const res = await fetch(url);
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`OpenExchangeRates error [${res.status}]: ${body}`);
-    }
-    const data = await res.json();
-    const rates: Record<string, number> = { USD: 1, ...data.rates };
+    const { source, rates } = await fetchUsdRates();
 
     const now = new Date();
     const validUntil = new Date(now.getTime() + 2 * 60 * 60 * 1000).toISOString();
@@ -49,19 +67,18 @@ Deno.serve(async (req) => {
           rate: market,
           markup_rate: MARKUP,
           effective_rate: effective,
-          source: "openexchangerates",
+          source,
           valid_from: now.toISOString(),
           valid_until: validUntil,
         });
       }
     }
 
-    // Insert fresh rows (fx_rates is a time-series table; valid_from differs each run)
     const { error } = await supabase.from("fx_rates").insert(rows);
     if (error) throw error;
 
     return new Response(
-      JSON.stringify({ success: true, inserted: rows.length, fetched_at: now.toISOString() }),
+      JSON.stringify({ success: true, source, inserted: rows.length, fetched_at: now.toISOString() }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (err) {
