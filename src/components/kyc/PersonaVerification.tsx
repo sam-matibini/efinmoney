@@ -45,7 +45,9 @@ export const PersonaVerification = ({ userId, onComplete, onError, className, la
       });
       console.log("[Persona] create-inquiry response", {
         hasData: !!data,
+        mode: data?.mode,
         environment: data?.environment,
+        environmentId: data?.environmentId,
         inquiryId: data?.inquiryId,
         hasSessionToken: !!data?.sessionToken,
         alreadySubmitted: !!data?.alreadySubmitted,
@@ -79,16 +81,11 @@ export const PersonaVerification = ({ userId, onComplete, onError, className, la
             : errorMessage,
         );
       }
-      if (error || !data?.sessionToken) {
+      if (error || (!data?.sessionToken && data?.mode !== "client" && !data?.templateId)) {
         throw new Error(data?.error || "Failed to initialize verification");
       }
 
-      // IMPORTANT: When resuming via sessionToken, do NOT pass templateId.
-      // Passing both causes the SDK to create a brand-new inquiry from the
-      // template (without our referenceId), producing orphan "Needs Review"
-      // inquiries that can never be linked back to the user.
       const clientConfig: Record<string, unknown> = {
-        environment: data.environment || "production",
         onReady: () => {
           console.log("[Persona] SDK ready — opening overlay");
           setLoading(false);
@@ -119,7 +116,22 @@ export const PersonaVerification = ({ userId, onComplete, onError, className, la
           onError?.(e);
         },
       };
-      if (data.sessionToken) {
+
+      if (data.environmentId) {
+        clientConfig.environmentId = data.environmentId;
+      } else {
+        clientConfig.environment = data.environment || "sandbox";
+      }
+
+      // Client-side flow: template + referenceId (no server-created inquiry).
+      if (data.mode === "client" || (!data.sessionToken && data.templateId)) {
+        clientConfig.templateId = data.templateId;
+        clientConfig.referenceId = userId;
+      } else if (data.sessionToken) {
+        // IMPORTANT: When resuming via sessionToken, do NOT pass templateId.
+        // Passing both causes the SDK to create a brand-new inquiry from the
+        // template (without our referenceId), producing orphan "Needs Review"
+        // inquiries that can never be linked back to the user.
         clientConfig.sessionToken = data.sessionToken;
         if (data.inquiryId) clientConfig.inquiryId = data.inquiryId;
       } else if (data.templateId) {

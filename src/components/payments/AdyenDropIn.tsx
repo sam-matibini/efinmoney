@@ -38,12 +38,21 @@ export default function AdyenDropIn({
           locale: "en-US",
           countryCode: "CA",
           analytics: { enabled: false },
+          // Cards first — otherwise Drop-in auto-opens Alipay with no card fields.
+          paymentMethodOrder: ["scheme", "visa", "mc", "amex", "interac_card", "alipay"],
           onPaymentCompleted: (result: any) => onPaymentCompleted?.(result),
           onError: (err: any) => onError?.(err),
         });
         if (cancelled) return;
         const dropin = new Dropin(checkout, {
           openFirstPaymentMethod: true,
+          paymentMethodOrder: ["scheme", "visa", "mc", "amex", "interac_card", "alipay"],
+          paymentMethodsConfiguration: {
+            card: {
+              hasHolderName: true,
+              holderNameRequired: false,
+            },
+          },
         });
         dropin.mount(containerRef.current);
         dropinRef.current = dropin;

@@ -93,7 +93,7 @@ const TierProgressCard = () => {
             );
           }
           return (
-            <Button size="sm" variant="outline" onClick={() => navigate(upgradeRoute(current))}>
+            <Button size="sm" variant="outline" onClick={() => navigate(upgradeRoute(current) + (current === "tier_1" ? "?autostart=persona" : ""))}>
               Upgrade <ArrowRight className="w-3 h-3 ml-1" />
             </Button>
           );

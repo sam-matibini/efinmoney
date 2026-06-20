@@ -127,7 +127,8 @@ Deno.serve(async (req) => {
         countryCode: 'CA',
         shopperReference: userId,
         channel: 'Web',
-        allowedPaymentMethods: ['scheme', 'alipay', 'interac_card', 'amex', 'visa', 'mc'],
+        // scheme = card form; list cards before wallets so Drop-in opens card fields first
+        allowedPaymentMethods: ['scheme', 'visa', 'mc', 'amex', 'interac_card', 'alipay'],
       }),
     })
 

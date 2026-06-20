@@ -7,10 +7,11 @@ import { useWalletManagement } from "@/hooks/useWalletManagement";
 import { useFxRates } from "@/hooks/useFxRates";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Plus, Wallet, CreditCard, TrendingUp, AlertTriangle } from "lucide-react";
+import { Plus, Wallet, CreditCard, TrendingUp, AlertTriangle, ArrowRightLeft } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import CreateWalletModal from "@/components/modals/CreateWalletModal";
+import WalletTransferModal from "@/components/modals/WalletTransferModal";
 import EditWalletModal from "@/components/modals/EditWalletModal";
 import DeleteWalletModal from "@/components/modals/DeleteWalletModal";
 import { flagForCurrency } from "@/lib/flags";
@@ -82,12 +83,22 @@ const WalletsPage = () => {
               <h1 className="text-2xl font-display font-bold text-foreground">My Wallets</h1>
               <p className="text-muted-foreground">Manage your multi-currency wallets</p>
             </div>
-            <CreateWalletModal>
-              <Button>
-                <Plus className="w-4 h-4 mr-2" />
-                Add Wallet
-              </Button>
-            </CreateWalletModal>
+            <div className="flex items-center gap-2">
+              {(wallets?.length ?? 0) >= 2 ? (
+                <WalletTransferModal>
+                  <Button variant="outline">
+                    <ArrowRightLeft className="w-4 h-4 mr-2" />
+                    Transfer
+                  </Button>
+                </WalletTransferModal>
+              ) : null}
+              <CreateWalletModal>
+                <Button>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Wallet
+                </Button>
+              </CreateWalletModal>
+            </div>
           </div>
 
           {/* Total Balance Card */}

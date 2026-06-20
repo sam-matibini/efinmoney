@@ -24,21 +24,25 @@ async function finalizeAdyenPayment(
           `Wallet credited: ${result.amount ?? ""} ${result.currency ?? ""}`.trim(),
         );
       }
-      return true;
+      return { ok: true as const, refused: false };
     }
     if (result.verified && result.credit_error) {
       toast.error(`Payment OK but wallet not credited: ${result.credit_error}`);
-      return false;
+      return { ok: false as const, refused: false };
     }
     if (result.verified) {
       toast.success("Payment confirmed — wallet will update shortly.");
       await queryClient.invalidateQueries({ queryKey: ["wallets"] });
-      return true;
+      return { ok: true as const, refused: false };
     }
-    return false;
+    const code = String(result.resultCode || "").toLowerCase();
+    if (code === "refused" || code === "cancelled" || code === "error") {
+      return { ok: false as const, refused: true };
+    }
+    return { ok: false as const, refused: false };
   } catch (e) {
     console.error("Adyen confirm failed", e);
-    return false;
+    return { ok: false as const, refused: false };
   }
 }
 
@@ -70,6 +74,21 @@ export default function AdyenReturnHandler() {
       return;
     }
 
+    let settled = false;
+    const settle = (fn: () => void) => {
+      if (settled) return;
+      settled = true;
+      toast.dismiss("adyen-return");
+      fn();
+    };
+
+    const timeout = window.setTimeout(() => {
+      settle(() => {
+        toast.error("Payment confirmation timed out. Refresh the page if needed.");
+        stripReturnParams(setParams);
+      });
+    }, 25000);
+
     (async () => {
       toast.loading("Confirming your payment…", { id: "adyen-return" });
       try {
@@ -79,44 +98,68 @@ export default function AdyenReturnHandler() {
           session: { id: sessionId },
           analytics: { enabled: false },
           onPaymentCompleted: async (result) => {
-            toast.dismiss("adyen-return");
+            clearTimeout(timeout);
             const code = result?.resultCode;
-            const credited = await finalizeAdyenPayment(
+            if (code === "Refused" || code === "Cancelled" || code === "Error") {
+              settle(() => {
+                toast.error("Payment was declined.");
+                stripReturnParams(setParams);
+              });
+              return;
+            }
+            const outcome = await finalizeAdyenPayment(
               sessionId,
               (result as { sessionResult?: string })?.sessionResult,
               queryClient,
             );
-            if (!credited) {
-              if (code === "Authorised" || code === "Received") {
-                toast.success("Payment successful — your wallet will update shortly.");
-                await queryClient.invalidateQueries({ queryKey: ["wallets"] });
-              } else if (code === "Refused") {
-                toast.error("Payment was refused.");
-              } else {
+            settle(() => {
+              if (!outcome.ok && code !== "Authorised" && code !== "Received") {
                 toast.info(`Payment status: ${code || "pending"}`);
               }
-            }
-            stripReturnParams(setParams);
-            try {
-              sessionStorage.removeItem("adyen_checkout_config");
-            } catch {
-              /* ignore */
-            }
+              stripReturnParams(setParams);
+              try {
+                sessionStorage.removeItem("adyen_checkout_config");
+              } catch {
+                /* ignore */
+              }
+            });
           },
           onError: (err) => {
-            toast.dismiss("adyen-return");
+            clearTimeout(timeout);
             console.error(err);
-            toast.error("Could not confirm payment after redirect.");
-            stripReturnParams(setParams);
+            settle(() => {
+              toast.error("Payment was declined or could not be confirmed.");
+              stripReturnParams(setParams);
+            });
           },
         });
 
         await checkout.submitDetails({ details: { redirectResult } });
+
+        // Refused/cancelled redirects often never fire onPaymentCompleted — confirm server-side.
+        await new Promise((r) => setTimeout(r, 1500));
+        if (settled) return;
+
+        clearTimeout(timeout);
+        const outcome = await finalizeAdyenPayment(sessionId, redirectResult, queryClient);
+        settle(() => {
+          if (outcome.refused || !outcome.ok) {
+            toast.error("Payment was declined — no funds were added.");
+          }
+          stripReturnParams(setParams);
+          try {
+            sessionStorage.removeItem("adyen_checkout_config");
+          } catch {
+            /* ignore */
+          }
+        });
       } catch (err) {
-        toast.dismiss("adyen-return");
+        clearTimeout(timeout);
         console.error(err);
-        toast.error("Could not complete payment return.");
-        stripReturnParams(setParams);
+        settle(() => {
+          toast.error("Payment was declined or could not be completed.");
+          stripReturnParams(setParams);
+        });
       }
     })();
   }, [params, setParams, queryClient]);

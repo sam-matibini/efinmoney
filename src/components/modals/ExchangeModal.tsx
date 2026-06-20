@@ -97,18 +97,20 @@ const ExchangeModal = ({ children }: ExchangeModalProps) => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       
-      const response = await supabase.functions.invoke('fx-engine/execute', {
+      const response = await supabase.functions.invoke('fx-engine', {
         body: {
+          action: 'execute',
           from_wallet_id: fromWallet.wallet_id,
           to_wallet_id: toWallet.wallet_id,
           from_currency: fromWallet.currency_code,
           to_currency: toWallet.currency_code,
-          from_amount: parseFloat(amount)
-        }
+          from_amount: parseFloat(amount),
+        },
       });
 
-      if (response.error) {
-        throw new Error(response.error.message);
+      const serverError = (response.data as { error?: string })?.error;
+      if (response.error || serverError) {
+        throw new Error(serverError || response.error?.message || 'Exchange failed');
       }
 
       setStep(2);

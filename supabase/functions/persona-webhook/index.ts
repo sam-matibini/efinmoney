@@ -62,12 +62,33 @@ Deno.serve(async (req) => {
 async function processEvent(supabase: any, eventType: string | null, inquiryId: string | null, payload: any) {
   if (!eventType || !inquiryId) return { skipped: true, reason: "missing event type or inquiry id" };
 
+  const referenceId =
+    payload?.data?.attributes?.payload?.data?.attributes?.["reference-id"] ||
+    payload?.data?.attributes?.payload?.data?.attributes?.referenceId ||
+    null;
+
   // Look up the kyc_verification row
-  const { data: kyc } = await supabase
+  let { data: kyc } = await supabase
     .from("kyc_verifications")
-    .select("id, user_id, verification_status, submitted_at")
+    .select("id, user_id, verification_status, submitted_at, persona_inquiry_id")
     .eq("persona_inquiry_id", inquiryId)
     .maybeSingle();
+
+  if (!kyc && referenceId) {
+    const byRef = await supabase
+      .from("kyc_verifications")
+      .select("id, user_id, verification_status, submitted_at, persona_inquiry_id")
+      .eq("user_id", referenceId)
+      .maybeSingle();
+    kyc = byRef.data;
+    if (kyc && !kyc.persona_inquiry_id) {
+      await supabase
+        .from("kyc_verifications")
+        .update({ persona_inquiry_id: inquiryId })
+        .eq("id", kyc.id);
+      kyc.persona_inquiry_id = inquiryId;
+    }
+  }
 
   if (!kyc) return { skipped: true, reason: "no matching kyc_verification" };
 

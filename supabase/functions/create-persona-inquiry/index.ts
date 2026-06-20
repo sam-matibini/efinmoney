@@ -39,10 +39,11 @@ Deno.serve(async (req) => {
 
     const apiKey = Deno.env.get("PERSONA_API_KEY");
     const templateId = Deno.env.get("PERSONA_TEMPLATE_ID");
+    const environmentId = Deno.env.get("PERSONA_ENVIRONMENT_ID") || null;
     const rawEnvironment = Deno.env.get("PERSONA_ENVIRONMENT") || "production";
     const environment = rawEnvironment === "sandbox" ? "sandbox" : "production";
-    if (!apiKey || !templateId) {
-      console.error("Missing Persona env vars");
+    if (!templateId) {
+      console.error("Missing PERSONA_TEMPLATE_ID");
       return json({ error: "Persona is not configured" }, 500);
     }
     if (!templateId.startsWith(PERSONA_TEMPLATE_PREFIX)) {
@@ -55,6 +56,19 @@ Deno.serve(async (req) => {
         },
         400,
       );
+    }
+
+    // Without an API key, launch the embedded SDK client-side (template + referenceId).
+    // Server-side inquiry creation is preferred when PERSONA_API_KEY is set.
+    if (!apiKey) {
+      console.warn("PERSONA_API_KEY missing — returning client-side Persona config");
+      return json({
+        mode: "client",
+        templateId,
+        environmentId,
+        environment,
+        referenceId: userId,
+      });
     }
 
     const { data: existingKyc } = await supabase
@@ -73,6 +87,7 @@ Deno.serve(async (req) => {
       ) {
         return json({
           templateId,
+          environmentId,
           environment,
           inquiryId: existingKyc.persona_inquiry_id,
           status: existingKyc.persona_inquiry_status || existingKyc.verification_status,
@@ -92,6 +107,7 @@ Deno.serve(async (req) => {
 
         return json({
           templateId,
+          environmentId,
           environment,
           inquiryId: existingKyc.persona_inquiry_id,
           sessionToken: resumed.sessionToken,
@@ -175,6 +191,7 @@ Deno.serve(async (req) => {
 
     return json({
       templateId,
+      environmentId,
       sessionToken,
       inquiryId,
       environment,

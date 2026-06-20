@@ -174,3 +174,6 @@ verify_jwt = false
 
 [functions.flw-bill-payment]
 verify_jwt = false
+
+[functions.persona-webhook]
+verify_jwt = false

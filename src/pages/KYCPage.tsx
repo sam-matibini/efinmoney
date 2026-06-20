@@ -2,6 +2,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useProfile } from "@/hooks/useProfile";
+import KycPromptBanner from "@/components/kyc/KycPromptBanner";
 import { Shield, Upload, CheckCircle2, AlertTriangle, Clock, Check, X, Lock, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
@@ -56,6 +57,7 @@ const KYCPage = () => {
   return (
     <div className="container max-w-4xl mx-auto px-4 py-8">
         <h1 className="text-2xl font-bold text-foreground mb-6">KYC Verification</h1>
+        <KycPromptBanner />
         {isLoading ? (
           <Card className="p-6">Loading...</Card>
         ) : (

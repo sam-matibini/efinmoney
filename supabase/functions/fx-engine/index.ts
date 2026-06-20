@@ -74,30 +74,97 @@ function validateExecuteRequest(body: unknown): { valid: true; data: FxExecuteRe
   if (!body || typeof body !== 'object') {
     return { valid: false, error: 'Invalid request body' };
   }
-  
+
   const { from_wallet_id, to_wallet_id, from_currency, to_currency, from_amount } = body as Record<string, unknown>;
-  
+
   if (!isValidUUID(from_wallet_id)) {
     return { valid: false, error: 'Invalid from_wallet_id: must be a valid UUID' };
   }
-  
+
   if (!isValidUUID(to_wallet_id)) {
     return { valid: false, error: 'Invalid to_wallet_id: must be a valid UUID' };
   }
-  
+
+  if (from_wallet_id === to_wallet_id) {
+    return { valid: false, error: 'Source and destination wallet must differ' };
+  }
+
   if (!isValidCurrencyCode(from_currency)) {
     return { valid: false, error: 'Invalid from_currency: must be 3-4 uppercase letters' };
   }
-  
+
   if (!isValidCurrencyCode(to_currency)) {
     return { valid: false, error: 'Invalid to_currency: must be 3-4 uppercase letters' };
   }
-  
+
   if (!isValidAmount(from_amount)) {
     return { valid: false, error: `Invalid from_amount: must be a number between ${MIN_AMOUNT} and ${MAX_AMOUNT}` };
   }
-  
-  return { valid: true, data: { from_wallet_id, to_wallet_id, from_currency, to_currency, from_amount: from_amount as number } };
+
+  return {
+    valid: true,
+    data: {
+      from_wallet_id,
+      to_wallet_id,
+      from_currency,
+      to_currency,
+      from_amount: from_amount as number,
+    },
+  };
+}
+
+type ResolvedRate = {
+  effective_rate: number;
+  market_rate: number;
+  markup_rate: number;
+  fee_rate: number;
+};
+
+async function resolveFxRate(
+  supabase: ReturnType<typeof createClient>,
+  from_currency: string,
+  to_currency: string,
+): Promise<ResolvedRate | null> {
+  if (from_currency === to_currency) {
+    return { effective_rate: 1, market_rate: 1, markup_rate: 0, fee_rate: 0 };
+  }
+
+  const { data: rateData } = await supabase
+    .from('fx_rates')
+    .select('*')
+    .eq('from_currency', from_currency)
+    .eq('to_currency', to_currency)
+    .is('valid_until', null)
+    .maybeSingle();
+
+  if (rateData) {
+    return {
+      effective_rate: Number(rateData.effective_rate),
+      market_rate: Number(rateData.rate),
+      markup_rate: Number(rateData.markup_rate),
+      fee_rate: 0.005,
+    };
+  }
+
+  const { data: reverseRate } = await supabase
+    .from('fx_rates')
+    .select('*')
+    .eq('from_currency', to_currency)
+    .eq('to_currency', from_currency)
+    .is('valid_until', null)
+    .maybeSingle();
+
+  if (!reverseRate) return null;
+
+  const effective = Number(reverseRate.effective_rate);
+  if (!effective) return null;
+
+  return {
+    effective_rate: 1 / effective,
+    market_rate: 1 / Number(reverseRate.rate),
+    markup_rate: Number(reverseRate.markup_rate),
+    fee_rate: 0.005,
+  };
 }
 
 // Rate limiting helper
@@ -204,58 +271,23 @@ serve(async (req) => {
 
       const { from_currency, to_currency, amount } = validation.data;
 
-      const { data: rateData, error: rateError } = await supabase
-        .from('fx_rates')
-        .select('*')
-        .eq('from_currency', from_currency)
-        .eq('to_currency', to_currency)
-        .is('valid_until', null)
-        .single();
-
-      if (rateError || !rateData) {
-        const { data: reverseRate } = await supabase
-          .from('fx_rates')
-          .select('*')
-          .eq('from_currency', to_currency)
-          .eq('to_currency', from_currency)
-          .is('valid_until', null)
-          .single();
-
-        if (!reverseRate) {
-          return new Response(
-            JSON.stringify({ error: 'Exchange rate not available for this pair' }),
-            { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
-
-        const inverseRate = 1 / Number(reverseRate.effective_rate);
-        const fee = amount * 0.005;
-        const toAmount = (amount - fee) * inverseRate;
-
+      const resolved = await resolveFxRate(supabase, from_currency, to_currency);
+      if (!resolved) {
         return new Response(
-          JSON.stringify({
-            from_currency, to_currency, from_amount: amount, to_amount: toAmount,
-            market_rate: 1 / Number(reverseRate.rate),
-            markup_rate: Number(reverseRate.markup_rate),
-            effective_rate: inverseRate, fee_amount: fee,
-            rate_locked_until: new Date(Date.now() + 60000).toISOString(),
-            expires_in_seconds: 60
-          }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          JSON.stringify({ error: 'Exchange rate not available for this pair' }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
-      const marketRate = Number(rateData.rate);
-      const markupRate = Number(rateData.markup_rate);
-      const effectiveRate = Number(rateData.effective_rate);
-      const fee = amount * 0.005;
-      const toAmount = (amount - fee) * effectiveRate;
+      const fee = amount * resolved.fee_rate;
+      const toAmount = (amount - fee) * resolved.effective_rate;
 
       return new Response(
         JSON.stringify({
           from_currency, to_currency, from_amount: amount, to_amount: toAmount,
-          market_rate: marketRate, markup_rate: markupRate,
-          effective_rate: effectiveRate, fee_amount: fee,
+          market_rate: resolved.market_rate,
+          markup_rate: resolved.markup_rate,
+          effective_rate: resolved.effective_rate, fee_amount: fee,
           rate_locked_until: new Date(Date.now() + 60000).toISOString(),
           expires_in_seconds: 60
         }),
@@ -312,23 +344,47 @@ serve(async (req) => {
         );
       }
 
-      const { data: rateData } = await supabase
-        .from('fx_rates')
-        .select('*')
-        .eq('from_currency', from_currency)
-        .eq('to_currency', to_currency)
-        .is('valid_until', null)
-        .single();
-
-      if (!rateData) {
+      if (fromWallet.status !== 'active') {
         return new Response(
-          JSON.stringify({ error: 'Exchange rate not available' }),
+          JSON.stringify({ error: `Source wallet is ${fromWallet.status}` }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (toWallet.status !== 'active') {
+        return new Response(
+          JSON.stringify({ error: `Destination wallet is ${toWallet.status}` }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (fromWallet.currency_code !== from_currency || toWallet.currency_code !== to_currency) {
+        return new Response(
+          JSON.stringify({ error: 'Wallet currencies do not match request' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const { data: walletBalances } = await supabase.rpc('get_user_wallet_balances', { p_user_id: userId });
+      const fromBalanceRow = (walletBalances ?? []).find((w: { wallet_id: string }) => w.wallet_id === from_wallet_id);
+      const fromBalance = Number(fromBalanceRow?.balance ?? 0);
+      if (from_amount > fromBalance) {
+        return new Response(
+          JSON.stringify({ error: 'Insufficient wallet balance' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const resolved = await resolveFxRate(supabase, from_currency, to_currency);
+      if (!resolved) {
+        return new Response(
+          JSON.stringify({ error: 'Exchange rate not available for this pair' }),
           { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
-      const effectiveRate = Number(rateData.effective_rate);
-      const fee = from_amount * 0.005;
+      const effectiveRate = resolved.effective_rate;
+      const fee = from_amount * resolved.fee_rate;
       const toAmount = (from_amount - fee) * effectiveRate;
 
       const { data: journalId, error: swapError } = await supabase.rpc('execute_fx_swap', {
@@ -342,8 +398,11 @@ serve(async (req) => {
 
       if (swapError) {
         console.error('FX swap error:', swapError);
+        const msg = swapError.message?.includes('Insufficient')
+          ? 'Insufficient wallet balance'
+          : 'Failed to execute transfer. Please try again.';
         return new Response(
-          JSON.stringify({ error: 'Failed to execute swap. Please try again.' }),
+          JSON.stringify({ error: msg }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -352,8 +411,8 @@ serve(async (req) => {
         .from('fx_transactions')
         .insert({
           user_id: userId, from_wallet_id, to_wallet_id, from_currency, to_currency, from_amount,
-          to_amount: toAmount, market_rate: Number(rateData.rate),
-          markup_rate: Number(rateData.markup_rate), effective_rate: effectiveRate, fee_amount: fee,
+          to_amount: toAmount, market_rate: resolved.market_rate,
+          markup_rate: resolved.markup_rate, effective_rate: effectiveRate, fee_amount: fee,
           rate_expires_at: new Date(Date.now() + 60000).toISOString(),
           status: 'executed', journal_id: journalId, executed_at: new Date().toISOString()
         })

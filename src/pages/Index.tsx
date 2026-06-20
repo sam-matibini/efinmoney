@@ -1,3 +1,4 @@
+import KycPromptBanner from "@/components/kyc/KycPromptBanner";
 import WealthPulseBanner from "@/components/dashboard/WealthPulseBanner";
 import HeroBalance from "@/components/dashboard/HeroBalance";
 import WalletCarousel from "@/components/dashboard/WalletCarousel";
@@ -12,6 +13,7 @@ const Index = () => {
   return (
     <main className="container px-4 py-4 sm:py-6">
 
+      <KycPromptBanner />
       <WealthPulseBanner />
       <HeroBalance />
       <WalletCarousel />

@@ -100,7 +100,10 @@ function Deploy-Functions {
     "elicate-payout",
     "elicate-webhook",
     "elicate-reconcile",
-    "execute-transfer"
+    "execute-transfer",
+    "create-persona-inquiry",
+    "persona-self-approve",
+    "persona-webhook"
   )
 
   Write-Host "Deploying $($critical.Count) critical functions..." -ForegroundColor Yellow
