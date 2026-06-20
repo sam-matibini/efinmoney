@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   CreditCard, Droplet, Phone, Receipt, Tv, Wifi, Zap,
@@ -82,7 +83,9 @@ const PayBillsPage = () => {
   const [submitting, setSubmitting] = useState(false);
   const [validating, setValidating] = useState(false);
   const [validation, setValidation] = useState<ValidationResult | null>(null);
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
 
+  const navigate = useNavigate();
   const { data: wallets } = useWallets();
   const country = findCountryById(countryId);
   const countryIso = getCountryIso2(countryId);
@@ -157,6 +160,12 @@ const PayBillsPage = () => {
       }
     })();
   }, [categoryCode, countryIso]);
+
+  useEffect(() => {
+    if (!paymentSuccess) return;
+    const t = setTimeout(() => navigate("/"), 2500);
+    return () => clearTimeout(t);
+  }, [paymentSuccess, navigate]);
 
   const selectedBiller = useMemo(() => {
     if (!billerKey) return null;
@@ -241,17 +250,40 @@ const PayBillsPage = () => {
       if ((data as { success?: boolean })?.success === false) {
         throw new Error((data as { error?: string })?.error || "Payment failed");
       }
-      toast.success("Bill payment submitted");
       setAmount("");
       setCustomer("");
       setValidation(null);
       setBillerKey("");
+      setPaymentSuccess(true);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Payment failed");
     } finally {
       setSubmitting(false);
     }
   };
+
+  if (paymentSuccess) {
+    return (
+      <main className="container px-4 py-6 min-h-[80vh] flex items-center justify-center">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="max-w-md w-full text-center space-y-4 p-8 rounded-2xl border border-border bg-card"
+        >
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ type: "spring", stiffness: 400, damping: 16, delay: 0.1 }}
+            className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/10"
+          >
+            <CheckCircle2 className="h-8 w-8 text-emerald-500" />
+          </motion.div>
+          <h1 className="text-2xl font-display font-bold text-foreground">Bill payment successful!</h1>
+          <p className="text-sm text-muted-foreground">Redirecting to your dashboard…</p>
+        </motion.div>
+      </main>
+    );
+  }
 
   return (
     <main className="container px-4 py-6">
