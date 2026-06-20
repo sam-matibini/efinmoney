@@ -1,0 +1,134 @@
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { ArrowLeft, RefreshCw } from "lucide-react";
+import { modifyAdyenPayment } from "@/lib/adyen";
+
+interface PaymentSession {
+  id: string;
+  reference: string;
+  psp_reference: string | null;
+  amount_minor: number;
+  currency: string;
+  status: string;
+  payment_method: string | null;
+  created_at: string;
+}
+
+const STATUS_VARIANT: Record<string, "default" | "outline" | "destructive" | "secondary"> = {
+  settled: "default",
+  authorised: "secondary",
+  refunded: "outline",
+  cancelled: "outline",
+  refused: "destructive",
+  error: "destructive",
+  pending: "outline",
+};
+
+export default function AdminAdyenTransactionsPage() {
+  const navigate = useNavigate();
+  const [sessions, setSessions] = useState<PaymentSession[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [actingOn, setActingOn] = useState<string | null>(null);
+
+  const load = async () => {
+    setLoading(true);
+    const { data } = await supabase
+      .from("adyen_payment_sessions")
+      .select("id,reference,psp_reference,amount_minor,currency,status,payment_method,created_at")
+      .not("psp_reference", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(50);
+    setSessions((data as any) || []);
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const act = async (session: PaymentSession, action: "capture" | "cancel" | "refund") => {
+    setActingOn(session.id);
+    try {
+      const result = await modifyAdyenPayment({ session_id: session.id, action });
+      toast.success(`${action[0].toUpperCase()}${action.slice(1)} sent — ${result.adyen.status}`);
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : `${action} failed`);
+    } finally {
+      setActingOn(null);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-background p-6">
+      <div className="max-w-6xl mx-auto space-y-6">
+        <Button variant="ghost" size="sm" onClick={() => navigate("/admin")}>
+          <ArrowLeft className="w-4 h-4 mr-2" /> Admin
+        </Button>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-display font-bold">Adyen Transactions</h1>
+            <p className="text-muted-foreground">
+              Capture, cancel, or refund authorised test payments — useful to complete Adyen's test-integration checklist.
+            </p>
+          </div>
+          <Button variant="outline" size="sm" onClick={load} disabled={loading}>
+            <RefreshCw className={`w-4 h-4 mr-2 ${loading ? "animate-spin" : ""}`} /> Refresh
+          </Button>
+        </div>
+
+        <Card>
+          <CardHeader><CardTitle>Recent authorised payments</CardTitle></CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Reference</TableHead>
+                  <TableHead>Amount</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Method</TableHead>
+                  <TableHead>Created</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {sessions.length === 0 ? (
+                  <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No authorised payments yet — complete a test top-up first.</TableCell></TableRow>
+                ) : sessions.map((s) => {
+                  const acting = actingOn === s.id;
+                  const canCapture = s.status === "authorised";
+                  const canCancel = s.status === "authorised";
+                  const canRefund = s.status === "settled";
+                  return (
+                    <TableRow key={s.id}>
+                      <TableCell className="font-mono text-xs">{s.reference.slice(-24)}</TableCell>
+                      <TableCell>{(s.amount_minor / 100).toFixed(2)} {s.currency}</TableCell>
+                      <TableCell><Badge variant={STATUS_VARIANT[s.status] || "outline"}>{s.status}</Badge></TableCell>
+                      <TableCell className="text-xs">{s.payment_method || "—"}</TableCell>
+                      <TableCell className="text-xs">{new Date(s.created_at).toLocaleString()}</TableCell>
+                      <TableCell className="text-right space-x-2">
+                        <Button size="sm" variant="outline" disabled={!canCapture || acting} onClick={() => act(s, "capture")}>
+                          Capture
+                        </Button>
+                        <Button size="sm" variant="outline" disabled={!canCancel || acting} onClick={() => act(s, "cancel")}>
+                          Cancel
+                        </Button>
+                        <Button size="sm" variant="outline" disabled={!canRefund || acting} onClick={() => act(s, "refund")}>
+                          Refund
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}

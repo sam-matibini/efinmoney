@@ -66,6 +66,7 @@ const AdminDashboardPage = lazy(() => import("./pages/admin/AdminDashboardPage")
 const KycQueuePage = lazy(() => import("./pages/admin/KycQueuePage"));
 const KycReviewPage = lazy(() => import("./pages/admin/KycReviewPage"));
 const AdminAdyenLinksPage = lazy(() => import("./pages/admin/AdminAdyenLinksPage"));
+const AdminAdyenTransactionsPage = lazy(() => import("./pages/admin/AdminAdyenTransactionsPage"));
 const RiskTiersPage = lazy(() => import("./pages/admin/RiskTiersPage"));
 const AuditLogPage = lazy(() => import("./pages/admin/AuditLogPage"));
 const ApiManagementPage = lazy(() => import("./pages/admin/ApiManagementPage"));
@@ -242,6 +243,7 @@ const AppRoutes = () => {
         <Route path="/admin/staff/:id" element={<AdminAuthProvider><AdminGuard><StaffDetailPage /></AdminGuard></AdminAuthProvider>} />
         <Route path="/admin/onboarding" element={<AdminAuthProvider><AdminGuard><StaffOnboardingPage /></AdminGuard></AdminAuthProvider>} />
         <Route path="/admin/payments/adyen" element={<AdminAuthProvider><AdminGuard><AdminAdyenLinksPage /></AdminGuard></AdminAuthProvider>} />
+        <Route path="/admin/payments/adyen/transactions" element={<AdminAuthProvider><AdminGuard><AdminAdyenTransactionsPage /></AdminGuard></AdminAuthProvider>} />
 
         <Route path="/auth" element={<PublicRoute><Auth /></PublicRoute>} />
         <Route path="/auth/confirm" element={<AuthConfirm />} />

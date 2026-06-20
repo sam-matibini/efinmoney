@@ -89,6 +89,16 @@ export async function confirmAdyenSession(params: {
   };
 }
 
+export async function modifyAdyenPayment(params: {
+  session_id: string;
+  action: "capture" | "cancel" | "refund";
+}) {
+  const { data, error } = await supabase.functions.invoke("adyen-modify-payment", { body: params });
+  if (error) throw new Error(await invokeErrorMessage(error));
+  if ((data as any)?.error) throw new Error((data as any).error);
+  return data as { action: string; reference: string; adyen: { pspReference: string; status: string } };
+}
+
 export async function createAdyenPayLink(params: {
   amount: number;
   currency: string;

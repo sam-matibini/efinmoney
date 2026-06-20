@@ -82,9 +82,14 @@ export default function AdminAdyenLinksPage() {
         <Button variant="ghost" size="sm" onClick={() => navigate("/admin")}>
           <ArrowLeft className="w-4 h-4 mr-2" /> Admin
         </Button>
-        <div>
-          <h1 className="text-2xl font-display font-bold">Adyen Pay by Link</h1>
-          <p className="text-muted-foreground">Generate hosted payment links for any customer.</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-display font-bold">Adyen Pay by Link</h1>
+            <p className="text-muted-foreground">Generate hosted payment links for any customer.</p>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => navigate("/admin/payments/adyen/transactions")}>
+            Transactions (capture / cancel / refund)
+          </Button>
         </div>
 
         <Card>
