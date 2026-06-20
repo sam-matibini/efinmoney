@@ -208,7 +208,7 @@ Deno.serve(async (req) => {
     await admin.from("notifications").insert({
       user_id: recipient_user_id,
       title: "Money received",
-      message: `You received ${targetAmount} ${toCurrency} from an eFinMoney user.`,
+      message: `You received ${targetAmount} ${toCurrency} from ${senderName}.`,
       type: "transfer",
       is_read: false,
     });
