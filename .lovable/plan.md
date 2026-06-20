@@ -1,19 +1,37 @@
-## Root cause
+## Problem to fix
 
-The landing-page calculator calls the `market-rates` edge function, not `fx_rates` directly. That function only returns 8 hardcoded pairs (USD↔CAD/NGN/KES/GHS/ZMW, CAD→NGN, GBP→USD, EUR→USD). **BWP is not in that list**, so `buildUsdMap` has no BWP entry and `midRate(CAD, BWP)` is `null` → "Rate unavailable for this pair".
+The app preview is sitting on the branded spinner because the current initial render waits too long before showing the route. The performance profile shows the page eventually loads, but it is heavy for preview/dev mode:
 
-The underlying `fx_rates` table already has fresh BWP rows (CAD→BWP ≈ 9.69), so no provider work is needed — only the edge function's pair list.
+- Full page load is around 13.5s.
+- DOMContentLoaded is around 9.7s.
+- The preview loads about 247 script resources before becoming fully ready.
+- `App.tsx` eagerly imports every page/admin/dashboard/payment module, so even a public landing-page preview downloads code for routes the user is not viewing.
+- `SplashScreen` waits for the full `window.load` event, so slow non-critical resources can keep the spinner visible.
 
-## Fix
+## Plan
 
-Edit `supabase/functions/market-rates/index.ts`:
+1. **Unblock the splash screen**
+   - Change `SplashScreen` so it hides after React is mounted and a short minimum brand display, instead of waiting for the full browser `load` event.
+   - Keep the branded spinner feature, but add a hard maximum timeout so it cannot trap users on the loading screen.
 
-1. Replace the 8 hardcoded `FIAT_PAIRS` with pairs auto-generated from a `SUPPORTED` list that matches `refresh-fx-rates` (USD, CAD, EUR, GBP, NGN, KES, UGX, TZS, ZMW, BIF, MZN, GHS, RWF, XAF, XOF, MWK, ZAR, **BWP**). Emit `USD↔X` for every non-USD currency so `buildUsdMap` can derive every cross-rate the calculator needs.
-2. Keep the existing 60s in-memory cache, 24h change calc, and crypto block unchanged.
-3. Redeploy `market-rates`.
+2. **Make route loading responsive**
+   - Convert heavy route/page imports in `App.tsx` to `React.lazy` with `Suspense`.
+   - Keep the root landing route available immediately, while admin, finance, operations, dashboard, wallets, send, cards, KYC, payment, and settings pages load only when visited.
+   - Use the existing `LoadingSpinner` as the fallback so the visual loading experience remains consistent.
 
-## Verification
+3. **Avoid auth blocking the public landing page longer than necessary**
+   - Add a brief failsafe around auth initialization so the public route can render instead of showing an indefinite spinner if session restoration is slow in preview.
+   - Preserve protected-route security: authenticated-only pages still redirect or wait as needed.
 
-- After redeploy, hit the landing page → CAD 1000 → BWP shows ~9,600 BWP and the "Rate unavailable" banner disappears.
-- Other new corridors (e.g. CAD→MWK, CAD→XAF) also resolve.
-- No DB migration, no UI changes, no impact on `refresh-fx-rates`.
+4. **Reduce landing-page main-thread work without removing features**
+   - Lazy-load heavier landing sections/components that are below the first viewport, while keeping the hero, calculator, and market ticker functional.
+   - This preserves the full landing page but improves first preview responsiveness.
+
+5. **Validate**
+   - Re-open `/` in preview.
+   - Confirm the spinner disappears quickly and the landing page is interactive.
+   - Re-check console/network/performance signals for errors and obvious regressions.
+
+## Expected result
+
+The app should still show the branded spinner briefly, but it should no longer feel stuck on the spinning banner. The preview should render the landing experience faster, and the rest of the app should remain available through lazy-loaded routes.
