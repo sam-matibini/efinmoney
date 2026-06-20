@@ -94,8 +94,8 @@ const queryClient = new QueryClient({
 });
 
 const FullPageSpinner = () => (
-  <div className="min-h-screen bg-background flex items-center justify-center">
-    <LoadingSpinner size={120} />
+  <div className="min-h-screen flex items-center justify-center" style={{ background: "#07122e" }}>
+    <LoadingSpinner size={140} />
   </div>
 );
 

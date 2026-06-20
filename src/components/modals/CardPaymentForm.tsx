@@ -503,18 +503,18 @@ function NewCardTopUp({
         )}
 
         {!embedded && (
-          <div className="space-y-2">
-            <Label className="text-xs">Amount ({currency})</Label>
-            <Input
-              type="text"
-              inputMode="decimal"
-              value={amount}
-              onChange={(event) => setAmount(event.target.value.replace(/[^0-9.]/g, ""))}
-              placeholder="0.00"
-              disabled={lockAmount}
-              className="h-12 text-lg"
-            />
-          </div>
+        <div className="space-y-2">
+          <Label className="text-xs">Amount ({currency})</Label>
+          <Input
+            type="text"
+            inputMode="decimal"
+            value={amount}
+            onChange={(event) => setAmount(event.target.value.replace(/[^0-9.]/g, ""))}
+            placeholder="0.00"
+            disabled={lockAmount}
+            className="h-12 text-lg"
+          />
+        </div>
         )}
 
         <div className="space-y-2">
@@ -557,13 +557,13 @@ function NewCardTopUp({
           />
         </div>
 
-        <Button type="submit" size="lg" className="w-full" disabled={!canSubmit}>
-          {processing ? (
-            <><LoadingSpinner size={16} className="mr-2" /> Processing…</>
-          ) : (
-            ctaLabel ?? `Pay ${symbol}${amountNum.toFixed(2)} ${currency}`
-          )}
-        </Button>
+          <Button type="submit" size="lg" className="w-full" disabled={!canSubmit}>
+            {processing ? (
+              <><LoadingSpinner size={16} className="mr-2" /> Processing…</>
+            ) : (
+              ctaLabel ?? `Pay ${symbol}${amountNum.toFixed(2)} ${currency}`
+            )}
+          </Button>
       </form>
 
       {processing && processingStage && <ProcessingOverlay stage={processingStage} />}
@@ -580,7 +580,7 @@ function CardPaymentFormInner(props: Props) {
     return (
       <div className="flex items-center justify-center py-6 text-muted-foreground">
         <LoadingSpinner size={16} className="mr-2" /> Loading your cards…
-      </div>
+          </div>
     );
   }
 
@@ -595,7 +595,7 @@ function CardPaymentFormInner(props: Props) {
               <p className="text-xs text-muted-foreground">
                 Link a debit or credit card on the Cards page (Link existing tab). Issued eFin virtual cards spend from your wallet — they cannot top up a wallet.
               </p>
-            </div>
+          </div>
           </div>
           <Button type="button" className="w-full" onClick={() => navigate("/cards?link=1")}>
             <CreditCard className="w-4 h-4 mr-2" /> Link a card on Cards page
@@ -603,8 +603,8 @@ function CardPaymentFormInner(props: Props) {
         </div>
         <p className="text-xs text-center text-muted-foreground">Or pay once with a new card below</p>
         <NewCardTopUp {...props} wallets={wallets} />
-      </div>
-    );
+    </div>
+  );
   }
 
   return <SavedCardTopUp {...props} wallets={wallets} savedCards={savedCards} />;
