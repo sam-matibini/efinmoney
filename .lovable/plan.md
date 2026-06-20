@@ -1,50 +1,19 @@
-# Fix FX Calculator (BWP) + Build Errors
+## Root cause
 
-The calculator returns "Rate unavailable" because our FX provider (OpenExchangeRates) is rate-limited until **2026-06-29**, so no BWP rows exist in `fx_rates`. Also clearing the pre-existing TS build errors flagged by the builder (Adyen, admin_users, cards).
+The landing-page calculator calls the `market-rates` edge function, not `fx_rates` directly. That function only returns 8 hardcoded pairs (USD↔CAD/NGN/KES/GHS/ZMW, CAD→NGN, GBP→USD, EUR→USD). **BWP is not in that list**, so `buildUsdMap` has no BWP entry and `midRate(CAD, BWP)` is `null` → "Rate unavailable for this pair".
 
-## 1. Make FX feed resilient (real fix for the calculator)
+The underlying `fx_rates` table already has fresh BWP rows (CAD→BWP ≈ 9.69), so no provider work is needed — only the edge function's pair list.
 
-`supabase/functions/refresh-fx-rates/index.ts`:
-- Try OpenExchangeRates first.
-- On failure (429 / network / no key), **fall back to `https://open.er-api.com/v6/latest/USD`** — free, no API key, covers BWP and all our SUPPORTED currencies.
-- Same downstream math (cross-rates via USD, 0.5% markup), same `fx_rates` insert.
+## Fix
 
-After the change, invoke the function once so BWP cross-rates populate immediately. The landing-page `LiveFxCalculator` will then resolve CAD↔BWP without any UI change.
+Edit `supabase/functions/market-rates/index.ts`:
 
-Also seed a one-time set of BWP rows via a small immediate insert (no migration needed — just call the refreshed function) so the calculator works without waiting on the OpenExchangeRates quota reset.
+1. Replace the 8 hardcoded `FIAT_PAIRS` with pairs auto-generated from a `SUPPORTED` list that matches `refresh-fx-rates` (USD, CAD, EUR, GBP, NGN, KES, UGX, TZS, ZMW, BIF, MZN, GHS, RWF, XAF, XOF, MWK, ZAR, **BWP**). Emit `USD↔X` for every non-USD currency so `buildUsdMap` can derive every cross-rate the calculator needs.
+2. Keep the existing 60s in-memory cache, 24h change calc, and crypto block unchanged.
+3. Redeploy `market-rates`.
 
-## 2. Schema fixes for admin_users (resolves 8 TS errors)
+## Verification
 
-Migration to add the columns the app already reads/writes:
-- `admin_users.email text`
-- `admin_users.status text default 'active'`
-- `admin_users.phone text`
-
-Affected files compile again automatically once the regenerated `types.ts` includes the new columns:
-- `src/contexts/AdminAuthContext.tsx` (id/role/status/full_name/permissions)
-- `src/hooks/useUserRoles.tsx` (status/role)
-- `src/pages/admin/StaffDetailPage.tsx`, `StaffPage.tsx`, `StaffOnboardingPage.tsx` (phone)
-
-## 3. Schema fixes for cards (resolves 3 TS errors)
-
-Migration:
-- `cards.currency_code text`
-- `cards.balance numeric not null default 0`
-
-Backfill `currency_code` from the linked wallet where `wallet_id is not null`. Resolves the `useCards.tsx` casts.
-
-## 4. AdyenReturnHandler typing
-
-`src/components/payments/AdyenReturnHandler.tsx` line 86: `result?.sessionResult` isn't in the Drop-in `PaymentCompletedData` type but is present at runtime. Cast `result` to `any` for that property access only — single, localized fix.
-
-## 5. Verification
-
-- Hit `refresh-fx-rates` → confirm `success:true` and BWP rows in `fx_rates`.
-- Reload landing page → CAD 1000 → BWP shows a real quote (≈ 9-10k BWP), and the "Rate unavailable" banner disappears.
-- Build passes (no TS errors).
-
-## Notes
-
-- No UI/visual changes — only the calculator's rate lookup starts returning real numbers.
-- New columns are nullable / defaulted so existing rows aren't broken.
-- The fallback FX source stays in place even after OpenExchangeRates resets, so we won't see this outage again.
+- After redeploy, hit the landing page → CAD 1000 → BWP shows ~9,600 BWP and the "Rate unavailable" banner disappears.
+- Other new corridors (e.g. CAD→MWK, CAD→XAF) also resolve.
+- No DB migration, no UI changes, no impact on `refresh-fx-rates`.
