@@ -6,13 +6,19 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 };
 
+// Keep in sync with refresh-fx-rates SUPPORTED list.
+const SUPPORTED = [
+  "USD", "CAD", "EUR", "GBP", "NGN", "KES", "UGX", "TZS", "ZMW",
+  "BIF", "MZN", "GHS", "RWF", "XAF", "XOF", "MWK", "ZAR", "BWP",
+];
+
+// USD↔X for every non-USD currency lets buildUsdMap on the client derive
+// every cross-rate (including CAD→BWP, GBP→BWP, etc.).
 const FIAT_PAIRS: { from: string; to: string }[] = [
-  { from: "USD", to: "CAD" },
-  { from: "USD", to: "NGN" },
-  { from: "USD", to: "KES" },
-  { from: "USD", to: "GHS" },
-  { from: "USD", to: "ZMW" },
+  ...SUPPORTED.filter((c) => c !== "USD").map((c) => ({ from: "USD", to: c })),
+  // A couple of explicit non-USD pairs we want a direct 24h-change series for.
   { from: "CAD", to: "NGN" },
+  { from: "CAD", to: "BWP" },
   { from: "GBP", to: "USD" },
   { from: "EUR", to: "USD" },
 ];
