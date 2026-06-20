@@ -1,44 +1,48 @@
-## Goal
+# Botswana (BWP) Localization
 
-Add a Share / Print / Download toolbar to `TransactionDetailPage` so any transaction report can be sent via Email, SMS, WhatsApp, printed, or saved as PDF — without a backend round-trip.
+Add Botswana as a first-class corridor so users can hold, exchange, send to, and receive in Botswana Pula (BWP).
 
-## Approach
+## 1. FX feed
+- `supabase/functions/refresh-fx-rates/index.ts`: add `BWP` to `SUPPORTED`. After deploy, run the function once so cross-rates for BWP↔USD/CAD/EUR/GBP/NGN/KES/ZAR/etc. populate `fx_rates`.
+- `FxTicker` / `LiveFxCalculator` will pick BWP up automatically once rates exist.
 
-Client-only. Reuse the existing rendered details card; no new edge function.
+## 2. Currency + symbol
+- `src/lib/currency.ts`: add `BWP: "P"` to `SYMBOLS` and `BW: "BWP"` to `COUNTRY_CCY`.
+- `currencies` table already has BWP (seeded). No migration needed.
 
-## Implementation
+## 3. Country / payout config
+- `src/lib/countries.ts`: upgrade the existing Botswana entry to expose mobile-money networks and a bank fallback:
+  - Orange Money Botswana (`orange_money`)
+  - Mascom MyZaka (`myzaka`)
+  - BTC Smega / e-Pula (`smega`)
+  - Bank transfer (`bank`) as fallback
+  - `method: "Mobile Money / Bank"`, `symbol: "P"`, `dialCode +267`.
+- `src/lib/mobileMoneyNetworks.ts`: add `BW` entry with the three MNOs above and dial code `+267`.
 
-1. **`src/components/transactions/TransactionShareBar.tsx`** (new). Renders a row of buttons sitting between the header and the status banner on `TransactionDetailPage`:
-   - **Share** — Web Share API (`navigator.share`). On mobile this opens the OS sheet (WhatsApp, SMS, Mail, etc.). Falls back to a dropdown when unsupported.
-   - **WhatsApp** — `https://wa.me/?text=<encoded summary + link>`
-   - **SMS** — `sms:?&body=<encoded summary + link>`
-   - **Email** — `mailto:?subject=...&body=...`
-   - **Print** — `window.print()`
-   - **Save as PDF** — also `window.print()` (browser print dialog → "Save as PDF"). One button, tooltip explains.
-   - **Download (.txt)** — Generates a plain-text receipt blob (account/debit/credit lines, totals, journal id, status) and triggers a download — guaranteed offline export.
-   - **Copy link** — `navigator.clipboard.writeText(window.location.href)`.
+## 4. Payout routing
+- `supabase/functions/pawapay-payout/index.ts`: add `BW` to the correspondent table and `BWP: "BW"` to `currencyFallback`. Tokens (subject to PawaPay enabling the corridor for our account):
+  - `ORANGE: "ORANGE_BWA"`, `MYZAKA: "MYZAKA_BWA"`, `SMEGA: "SMEGA_BWA"`, `DEFAULT: "ORANGE_BWA"`.
+  - If PawaPay has not yet activated Botswana for our merchant, the bank-transfer route via Flutterwave (already country-agnostic for BWP bank payouts) remains the working default.
+- `supabase/functions/flutterwave-payout/index.ts`: no code change needed — it already accepts `BW`/`BWP` bank payouts; we just need it reachable from the new country option.
 
-   Helper `buildShareText(entries, journalId, status)` produces a compact, line-broken summary:
-   ```
-   eFinMoney — Transaction
-   Ref: PAYMENT LINK ESCROW [BJBNADV]
-   Status: Paid · claimed via INTERAC
-   Jun 15, 2026 1:56 AM
-   2.00 CAD
-   View: https://efin.money/transactions/<id>
-   ```
+## 5. New user defaults (optional but recommended for the launch market)
+- For users whose country = Botswana, auto-create a BWP wallet on signup in `handle_new_user()` alongside USD/CAD. Implemented as a small migration that adds a BWP wallet when `profiles.country_code = 'BW'`.
 
-2. **`src/pages/TransactionDetailPage.tsx`** — mount `<TransactionShareBar entries={entries} journalId={journalId} status={plLink?.status} referenceLabel={referenceLabel} firstDate={first?.created_at} />` just below the title row. Pass `paymentLink` info when available to enrich the share text.
+## 6. KYC / tier limits
+No change — Botswana users follow the same tiered limits in `tier_limits`. Persona & Sumsub already accept BW IDs (passport / national ID / driving licence).
 
-3. **Print stylesheet** — add a small `@media print` block to `src/index.css`:
-   - Hide `header`, `nav`, `.no-print` (apply this class to the share bar + Back/Copy ref buttons).
-   - Force white background on `.bg-card`, drop shadows, set `body { background: white }`.
-   - Page-break-inside: avoid on the journal table.
+## 7. UI surfaces that will reflect Botswana automatically once the above lands
+- Send flow country picker (`SendPage`, `AddBeneficiaryModal`, `ContactsPickerModal`)
+- Exchange (wallet selector + `LiveFxCalculator`)
+- Wallets page (Create Wallet → BWP option)
+- FX ticker on landing & send pages
+- Receipts / statement formatting (symbol "P")
 
-   This keeps "Save as PDF" output clean — only the transaction card prints.
+## 8. Verification
+- Run `refresh-fx-rates` and confirm BWP rows in `fx_rates`.
+- In the preview, open Exchange and verify USD→BWP and BWP→USD quote.
+- Open Send → pick Botswana → confirm network options and that a test transfer reaches `pawapay-payout` (or `flutterwave-payout` for bank) without "unsupported country" errors.
 
-4. **No backend, no schema changes, no new dependencies.** Web Share + `mailto:`/`sms:`/`wa.me` + `window.print` cover everything on both desktop and mobile.
-
-## Out of scope
-- Server-rendered PDF (the journal already exports cleanly via the browser's PDF engine).
-- Sending Email/SMS through eFinMoney's own infra (uses the user's mail/SMS client, which is what the request implies and what Plaid/Wise do here).
+## Technical notes
+- PawaPay corridor tokens for BWA are listed per their MNO catalog; if their sandbox rejects them for our account we'll log a clear "corridor not enabled" message and fall back to bank payout. No schema change required for fallback.
+- All values are config/code changes — no destructive DB migrations.

@@ -65,7 +65,12 @@ export const COUNTRIES: CountryInfo[] = [
   { id: "DR Congo", country: "DR Congo", code: "CDF", flag: "🇨🇩", method: "M-Pesa", payout: "mpesa", region: "Africa" },
   { id: "Angola", country: "Angola", code: "AOA", flag: "🇦🇴", method: "Bank Transfer", payout: "bank", region: "Africa" },
   { id: "Namibia", country: "Namibia", code: "NAD", flag: "🇳🇦", method: "Bank Transfer", payout: "bank", region: "Africa" },
-  { id: "Botswana", country: "Botswana", code: "BWP", flag: "🇧🇼", method: "Mobile Money", payout: "mobile_money", region: "Africa" },
+  { id: "Botswana", country: "Botswana", code: "BWP", flag: "🇧🇼", method: "Mobile Money / Bank", payout: "orange_money", region: "Africa", symbol: "P", networks: [
+    { id: "orange", label: "Orange Money Botswana", payout: "orange_money" },
+    { id: "myzaka", label: "Mascom MyZaka", payout: "myzaka" },
+    { id: "smega", label: "BTC Smega / e-Pula", payout: "smega" },
+    { id: "bank", label: "Bank Transfer", payout: "bank" },
+  ] },
   { id: "Madagascar", country: "Madagascar", code: "MGA", flag: "🇲🇬", method: "Mobile Money", payout: "mobile_money", region: "Africa" },
   { id: "South Sudan", country: "South Sudan", code: "SSP", flag: "🇸🇸", method: "Bank Transfer", payout: "bank", region: "Africa" },
   { id: "Sudan", country: "Sudan", code: "SDG", flag: "🇸🇩", method: "Bank Transfer", payout: "bank", region: "Africa" },

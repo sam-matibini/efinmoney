@@ -25,6 +25,7 @@ function resolveCorrespondent(country: string, currency: string, payoutMethod?: 
     ZM: { MTN: "MTN_MOMO_ZMB", AIRTEL: "AIRTEL_OAPI_ZMB", ZAMTEL: "ZAMTEL_ZMB", DEFAULT: "MTN_MOMO_ZMB" },
     GH: { MTN: "MTN_MOMO_GHA", VODAFONE: "VODAFONE_GHA", AIRTELTIGO: "AIRTELTIGO_GHA", DEFAULT: "MTN_MOMO_GHA" },
     MW: { AIRTEL: "AIRTEL_OAPI_MWI", TNM: "TNM_MWI", DEFAULT: "AIRTEL_OAPI_MWI" },
+    BW: { ORANGE: "ORANGE_BWA", MYZAKA: "MYZAKA_BWA", SMEGA: "SMEGA_BWA", DEFAULT: "ORANGE_BWA" },
   };
 
   const currencyFallback: Record<string, string> = {
@@ -35,6 +36,7 @@ function resolveCorrespondent(country: string, currency: string, payoutMethod?: 
     ZMW: "ZM",
     GHS: "GH",
     MWK: "MW",
+    BWP: "BW",
     XOF: hint === "SENEGAL" ? "SN" : hint === "IVORY COAST" ? "CI" : hint === "BENIN" ? "BJ" : hint === "BURKINA FASO" ? "BF" : "",
     XAF: hint === "CAMEROON" ? "CM" : "",
   };

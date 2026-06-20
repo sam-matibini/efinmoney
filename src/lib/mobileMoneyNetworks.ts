@@ -84,6 +84,11 @@ export const MM_COUNTRIES: MMCountry[] = [
     { value: "EMOLA",  label: "eMola (Movitel)" },
     { value: "MKESH",  label: "mKesh (Tmcel)" },
   ]},
+  { code: "BW", name: "Botswana", flag: "🇧🇼", currency: "BWP", dialCode: "+267", networks: [
+    { value: "ORANGE", label: "Orange Money" },
+    { value: "MYZAKA", label: "Mascom MyZaka" },
+    { value: "SMEGA",  label: "BTC Smega / e-Pula" },
+  ]},
 ];
 
 export const POPULAR_MM_CODES = ["KE", "GH", "UG", "RW"];
