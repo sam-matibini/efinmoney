@@ -44,26 +44,35 @@ export type Database = {
       admin_users: {
         Row: {
           created_at: string
+          email: string | null
           full_name: string | null
           id: string
           permissions: Json
+          phone: string | null
           role: Database["public"]["Enums"]["admin_user_role"]
+          status: string
           updated_at: string
         }
         Insert: {
           created_at?: string
+          email?: string | null
           full_name?: string | null
           id: string
           permissions?: Json
+          phone?: string | null
           role?: Database["public"]["Enums"]["admin_user_role"]
+          status?: string
           updated_at?: string
         }
         Update: {
           created_at?: string
+          email?: string | null
           full_name?: string | null
           id?: string
           permissions?: Json
+          phone?: string | null
           role?: Database["public"]["Enums"]["admin_user_role"]
+          status?: string
           updated_at?: string
         }
         Relationships: []
@@ -1229,11 +1238,13 @@ export type Database = {
       }
       cards: {
         Row: {
+          balance: number
           card_network: string
           card_type: string
           cardholder_name: string
           created_at: string
           credit_limit: number | null
+          currency_code: string | null
           expires_at: string
           expiry_month: number | null
           expiry_year: number | null
@@ -1247,11 +1258,13 @@ export type Database = {
           wallet_id: string | null
         }
         Insert: {
+          balance?: number
           card_network?: string
           card_type?: string
           cardholder_name: string
           created_at?: string
           credit_limit?: number | null
+          currency_code?: string | null
           expires_at?: string
           expiry_month?: number | null
           expiry_year?: number | null
@@ -1265,11 +1278,13 @@ export type Database = {
           wallet_id?: string | null
         }
         Update: {
+          balance?: number
           card_network?: string
           card_type?: string
           cardholder_name?: string
           created_at?: string
           credit_limit?: number | null
+          currency_code?: string | null
           expires_at?: string
           expiry_month?: number | null
           expiry_year?: number | null
