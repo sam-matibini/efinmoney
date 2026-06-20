@@ -48,15 +48,29 @@ Deno.serve(async (req) => {
     }).select("*").single();
     if (bErr) throw bErr;
 
-    // Debit wallet via ledger
-    const { data: liab } = await admin.from("ledger_accounts").select("id").like("code", "21%").eq("currency_code", currency).limit(1).maybeSingle();
-    const { data: exp } = await admin.from("ledger_accounts").select("id").like("code", "5%").eq("currency_code", currency).limit(1).maybeSingle();
-    if (liab && exp) {
+    // Debit wallet via ledger (double-entry).
+    // Liability account (21xx) is currency-specific; expense account (5xxx) is generic (no currency_code).
+    const { data: liab } = await admin.from("ledger_accounts").select("id")
+      .like("code", "21%").eq("currency_code", currency)
+      .ilike("name", "Customer Wallet Liability%").limit(1).maybeSingle();
+    // 5xxx expense accounts are system-wide (currency_code IS NULL) — query without currency filter
+    let { data: exp } = await admin.from("ledger_accounts").select("id")
+      .like("code", "5%").is("currency_code", null).limit(1).maybeSingle();
+    if (!exp) {
+      // Fallback: any 5xxx account
+      const { data: fb } = await admin.from("ledger_accounts").select("id").like("code", "5%").limit(1).maybeSingle();
+      exp = fb;
+    }
+
+    if (liab) {
       const j = crypto.randomUUID();
-      await admin.from("ledger_entries").insert([
-        { journal_id: j, account_id: liab.id, wallet_id: wallet.id, currency_code: currency, debit_amount: amount, credit_amount: 0, description: `Bill payment ${category}`, reference_type: "bill_payment", reference_id: bill.id },
-        { journal_id: j, account_id: exp.id, wallet_id: null, currency_code: currency, debit_amount: 0, credit_amount: amount, description: `Bill payment ${category}`, reference_type: "bill_payment", reference_id: bill.id },
-      ]);
+      const entries: unknown[] = [
+        { journal_id: j, account_id: liab.id, wallet_id: wallet.id, currency_code: currency, debit_amount: amount, credit_amount: 0, description: `Bill payment — ${billerName || category}`, reference_type: "bill_payment", reference_id: bill.id },
+      ];
+      if (exp) {
+        entries.push({ journal_id: j, account_id: exp.id, wallet_id: null, currency_code: currency, debit_amount: 0, credit_amount: amount, description: `Bill payment — ${billerName || category}`, reference_type: "bill_payment", reference_id: bill.id });
+      }
+      await admin.from("ledger_entries").insert(entries);
     }
 
     const { ok, json } = await flwV3Fetch("/bills", {
@@ -74,14 +88,19 @@ Deno.serve(async (req) => {
     }).eq("id", bill.id);
 
     if (!success) {
-      if (liab && exp) {
+      // Reverse the ledger debit
+      if (liab) {
         const j = crypto.randomUUID();
-        await admin.from("ledger_entries").insert([
-          { journal_id: j, account_id: liab.id, wallet_id: wallet.id, currency_code: currency, debit_amount: 0, credit_amount: amount, description: `Bill payment refund ${category}`, reference_type: "bill_payment_refund", reference_id: bill.id },
-          { journal_id: j, account_id: exp.id, wallet_id: null, currency_code: currency, debit_amount: amount, credit_amount: 0, description: `Bill payment refund ${category}`, reference_type: "bill_payment_refund", reference_id: bill.id },
-        ]);
+        const refunds: unknown[] = [
+          { journal_id: j, account_id: liab.id, wallet_id: wallet.id, currency_code: currency, debit_amount: 0, credit_amount: amount, description: `Bill payment refund — ${billerName || category}`, reference_type: "bill_payment_refund", reference_id: bill.id },
+        ];
+        if (exp) {
+          refunds.push({ journal_id: j, account_id: exp.id, wallet_id: null, currency_code: currency, debit_amount: amount, credit_amount: 0, description: `Bill payment refund — ${billerName || category}`, reference_type: "bill_payment_refund", reference_id: bill.id });
+        }
+        await admin.from("ledger_entries").insert(refunds);
       }
-      return new Response(JSON.stringify({ success: false, error: json?.message || "Bill payment failed" }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      // Always return 200 so the client can read the error message
+      return new Response(JSON.stringify({ success: false, error: json?.message || "Bill payment failed" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
     return new Response(JSON.stringify({ success: true, bill_id: bill.id, reference, flw_data: json?.data }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (err) {
