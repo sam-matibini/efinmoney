@@ -16,6 +16,7 @@ import { useWallets } from "@/hooks/useWallets";
 import { useAuth } from "@/hooks/useAuth";
 import CardPaymentForm from "@/components/modals/CardPaymentForm";
 import AdyenTopUpCard from "@/components/payments/AdyenTopUpCard";
+import ElicateTopUpCard from "@/components/payments/ElicateTopUpCard";
 import { validateMinAmount, friendlyFlwError, minAmount, type FlwMethod } from "@/lib/flutterwave";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { MM_COUNTRIES } from "@/lib/mobileMoneyNetworks";
@@ -351,6 +352,11 @@ const TopUpPage = () => {
                 </Button>
               </CardContent>
             </Card>
+          )}
+
+          {/* Elicate route — direct mobile-money top-up for Zambia (ZMW) */}
+          {selectedWallet && currency === "ZMW" && (
+            <ElicateTopUpCard walletId={selectedWallet.wallet_id} walletCurrency={currency} />
           )}
 
           {/* Adyen route — available for all currencies as alternative */}

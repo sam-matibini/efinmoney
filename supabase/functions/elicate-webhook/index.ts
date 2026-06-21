@@ -101,7 +101,148 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Locate the originating transfer
+    const isSuccess = (() => {
+      const successEvents = ["payout.successful", "payout.success", "charge.successful", "charge.success", "payment.successful", "payment.success"];
+      if (successEvents.includes(eventType)) return true;
+      const s = String(data.status ?? "").toLowerCase();
+      return ["successful", "success", "completed"].includes(s);
+    })();
+    const isFailure = (() => {
+      const failureEvents = ["payout.failed", "payout.failure", "charge.failed", "payment.failed"];
+      if (failureEvents.includes(eventType)) return true;
+      const s = String(data.status ?? "").toLowerCase();
+      return ["failed", "failure"].includes(s);
+    })();
+
+    // ----------------------------------------------------------------
+    // First check if this references an inbound CHARGE (top-up). If so,
+    // handle it and return — otherwise fall through to the payout/transfer
+    // lookup below. References are unique across both tables.
+    // ----------------------------------------------------------------
+    const findCharge = async () => {
+      if (providerRef) {
+        const r = await supabase.from("elicate_charges").select("*").eq("psp_reference", providerRef).maybeSingle();
+        if (r.data) return r.data;
+      }
+      if (merchantReference) {
+        const r = await supabase.from("elicate_charges").select("*").eq("reference", merchantReference).maybeSingle();
+        if (r.data) return r.data;
+      }
+      return null;
+    };
+    const charge = await findCharge();
+
+    if (charge) {
+      // Idempotency
+      if (charge.status === "completed") {
+        return new Response(JSON.stringify({ received: true, duplicate: true, kind: "charge" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      if (isFailure) {
+        await supabase.from("elicate_charges").update({
+          status: "failed",
+          failure_reason: data.reason || data.message || "Top-up failed",
+          last_event: data,
+        }).eq("id", charge.id);
+        return new Response(JSON.stringify({ received: true, kind: "charge", outcome: "failed" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      if (isSuccess) {
+        if (!charge.target_wallet_id) {
+          console.error("Elicate charge has no target wallet", charge.id);
+          return new Response(JSON.stringify({ error: "Charge has no target wallet" }), {
+            status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        const { data: clearing } = await supabase
+          .from("ledger_accounts").select("id").eq("code", "1205").maybeSingle();
+        const { data: liability } = await supabase
+          .from("ledger_accounts").select("id").eq("code", "2108").maybeSingle();
+
+        if (!clearing || !liability) {
+          console.error("Missing ledger accounts for Elicate charge settlement (1205/2108)");
+          return new Response(JSON.stringify({ error: "Ledger setup incomplete" }), {
+            status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        const amountMajor = Number(charge.amount_minor) / 100;
+        const journalId = crypto.randomUUID();
+        const desc = `Elicate top-up (${providerRef ?? merchantReference})`;
+
+        // Inbound credit: the user paid Elicate via mobile money, Elicate's float grew,
+        // and the user's wallet balance must grow to match. Mirror of the payout entries.
+        const entries = [
+          {
+            journal_id: journalId,
+            account_id: clearing.id,
+            wallet_id: null,
+            currency_code: "ZMW",
+            debit_amount: amountMajor,
+            credit_amount: 0,
+            description: desc,
+            reference_type: "elicate_topup",
+            reference_id: charge.id,
+            external_reference: providerRef ?? merchantReference ?? null,
+            created_by: charge.user_id,
+          },
+          {
+            journal_id: journalId,
+            account_id: liability.id,
+            wallet_id: charge.target_wallet_id,
+            currency_code: "ZMW",
+            debit_amount: 0,
+            credit_amount: amountMajor,
+            description: desc,
+            reference_type: "elicate_topup",
+            reference_id: charge.id,
+            external_reference: providerRef ?? merchantReference ?? null,
+            created_by: charge.user_id,
+          },
+        ];
+
+        const { error: leErr } = await supabase.from("ledger_entries").insert(entries);
+        if (leErr) {
+          console.error("Ledger insert failed (charge):", leErr);
+          return new Response(JSON.stringify({ error: "Ledger post failed" }), {
+            status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        await supabase.from("elicate_charges").update({
+          status: "completed",
+          psp_reference: providerRef ?? charge.psp_reference,
+          last_event: data,
+        }).eq("id", charge.id);
+
+        await supabase.from("notifications").insert({
+          user_id: charge.user_id,
+          title: "Wallet Topped Up",
+          message: `Your ZMW wallet has been credited ${amountMajor.toLocaleString()} ZMW.`,
+          type: "wallet",
+          is_read: false,
+        }).then(() => null, () => null);
+
+        return new Response(JSON.stringify({ received: true, kind: "charge", outcome: "completed" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Neither success nor failure (intermediate state) — just log the event.
+      await supabase.from("elicate_charges").update({ last_event: data }).eq("id", charge.id);
+      return new Response(JSON.stringify({ received: true, kind: "charge", outcome: "noop" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ----------------------------------------------------------------
+    // Not a charge — fall through to existing outbound TRANSFER lookup.
+    // ----------------------------------------------------------------
     let transfer: any = null;
 
     if (providerRef) {
@@ -132,16 +273,11 @@ Deno.serve(async (req) => {
     }
 
     if (!transfer) {
-      console.warn("Elicate webhook: no transfer for refs", { providerRef, merchantReference });
+      console.warn("Elicate webhook: no transfer or charge for refs", { providerRef, merchantReference });
       return new Response(JSON.stringify({ received: true, matched: false }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-
-    const successEvents = ["payout.successful", "payout.success", "charge.successful", "charge.success", "payment.successful", "payment.success"];
-    const failureEvents = ["payout.failed", "payout.failure", "charge.failed", "payment.failed"];
-    const isSuccess = successEvents.includes(eventType) || (data.status && ["successful", "success", "completed"].includes(String(data.status).toLowerCase()));
-    const isFailure = failureEvents.includes(eventType) || (data.status && ["failed", "failure"].includes(String(data.status).toLowerCase()));
 
     if (isSuccess) {
       // Idempotency: skip if already completed
