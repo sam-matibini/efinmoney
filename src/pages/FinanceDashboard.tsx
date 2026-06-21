@@ -18,6 +18,7 @@ import { PurchaseBillsPanel } from "@/components/finance/PurchaseBillsPanel";
 import { ReportsCentrePanel } from "@/components/finance/ReportsCentrePanel";
 import { SalesTaxPanel } from "@/components/finance/SalesTaxPanel";
 import { TreasuryPanel } from "@/components/finance/treasury/TreasuryPanel";
+import { TreasuryWorkerPanel } from "@/components/finance/treasury/TreasuryWorkerPanel";
 
 const FinanceDashboard = () => {
   const [accountingTab, setAccountingTab] = useState("coa");
@@ -102,7 +103,18 @@ const FinanceDashboard = () => {
             </TabsContent>
 
             <TabsContent value="treasury" className="space-y-4">
-              <TreasuryPanel />
+              <Tabs defaultValue="worker" className="space-y-4">
+                <TabsList>
+                  <TabsTrigger value="worker">Settlement Worker</TabsTrigger>
+                  <TabsTrigger value="stripe-fa">Stripe Treasury</TabsTrigger>
+                </TabsList>
+                <TabsContent value="worker">
+                  <TreasuryWorkerPanel />
+                </TabsContent>
+                <TabsContent value="stripe-fa">
+                  <TreasuryPanel />
+                </TabsContent>
+              </Tabs>
             </TabsContent>
 
             <TabsContent value="reports" className="space-y-4">

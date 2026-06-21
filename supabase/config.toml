@@ -175,5 +175,11 @@ verify_jwt = false
 [functions.flw-bill-payment]
 verify_jwt = false
 
+[functions.treasury-sync-balances]
+verify_jwt = false
+
+[functions.treasury-worker]
+verify_jwt = false
+
 [functions.persona-webhook]
 verify_jwt = false

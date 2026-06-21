@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Search, User, LogOut, Shield, Wallet, Settings, Cog, X, Menu } from "lucide-react";
+import { Search, LogOut, Shield, Wallet, Settings, Cog, X, Menu } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Sheet,
   SheetContent,
@@ -27,6 +28,7 @@ import { useWallets } from "@/hooks/useWallets";
 import { useProfile } from "@/hooks/useProfile";
 import { getGreeting } from "@/lib/greeting";
 import { prefetchRoute } from "@/lib/prefetchRoute";
+import { avatarInitials, resolveAvatarUrl } from "@/lib/avatar";
 
 const navLinkClass = (active: boolean) =>
   `text-sm font-medium transition-colors duration-75 flex items-center gap-1.5 whitespace-nowrap rounded-lg px-2 py-1.5 -mx-2 active:scale-[0.97] active:opacity-80 ${
@@ -46,6 +48,8 @@ const Header = () => {
   const [searchExpanded, setSearchExpanded] = useState(false);
 
   const greeting = getGreeting(profile?.country_code);
+  const avatarUrl = resolveAvatarUrl(profile, user);
+  const avatarInitial = avatarInitials(profile, user);
 
   const warmRoute = (href: string) => {
     if (user?.id) prefetchRoute(queryClient, href, user.id);
@@ -195,9 +199,12 @@ const Header = () => {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="ml-1 p-1 pr-2 rounded-xl bg-secondary hover:bg-secondary/80 transition-colors group flex items-center gap-1.5">
-                <div className="relative w-8 h-8 rounded-lg gradient-primary flex items-center justify-center transition-shadow group-hover:shadow-[0_0_0_4px_hsl(var(--primary)/0.2)]">
-                  <User className="w-4 h-4 text-primary-foreground" />
-                </div>
+                <Avatar className="h-8 w-8 rounded-lg border border-primary/20">
+                  <AvatarImage src={avatarUrl ?? undefined} alt="Profile" />
+                  <AvatarFallback className="rounded-lg gradient-primary text-primary-foreground text-xs font-bold">
+                    {avatarInitial}
+                  </AvatarFallback>
+                </Avatar>
                 {defaultWallet?.flag_emoji && (
                   <span className="text-base leading-none" title={`Default: ${defaultWallet.currency_code}`}>
                     {defaultWallet.flag_emoji}

@@ -440,7 +440,7 @@ Deno.serve(async (req) => {
       console.error("Payout trigger error:", e);
     }
 
-    if (payoutResult && payoutResult.success === false) {
+    if (payoutResult && payoutResult.success === false && !payoutResult.pending_liquidity && !payoutResult.queued) {
       return new Response(JSON.stringify({
         success: false,
         error: payoutResult.error || "Payout failed",
@@ -448,6 +448,16 @@ Deno.serve(async (req) => {
         refunded: payoutResult.refunded,
         payout: payoutResult,
       }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    if (payoutResult?.pending_liquidity || payoutResult?.queued) {
+      return new Response(JSON.stringify({
+        success: true,
+        queued: true,
+        pending_liquidity: true,
+        message: "Transfer queued — will send automatically when settlement funds are available.",
+        payout: payoutResult,
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     return new Response(JSON.stringify({ success: true, payout: payoutResult }), {

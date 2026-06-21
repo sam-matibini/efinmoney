@@ -61,7 +61,8 @@ const statusMeta = (status: string) => {
       return { label: status[0].toUpperCase() + status.slice(1), className: "bg-destructive/20 text-destructive border-destructive/40" };
     case "processing":
     case "funded":
-      return { label: "Processing", className: "bg-yellow-500/20 text-yellow-500 border-yellow-500/40" };
+    case "pending_liquidity":
+      return { label: status === "pending_liquidity" ? "Awaiting settlement" : "Processing", className: "bg-yellow-500/20 text-yellow-500 border-yellow-500/40" };
     default:
       return { label: "Initiated", className: "bg-amber-500/20 text-amber-600 border-amber-500/40" };
   }
@@ -92,6 +93,10 @@ const buildTimeline = (t: Transfer): TimelineStep[] => {
     steps[1].state = "current";
   } else if (status === "funded") {
     steps[1].state = "done"; steps[1].timestamp = updated;
+    steps[2].state = "current";
+  } else if (status === "pending_liquidity") {
+    steps[1].state = "done"; steps[1].timestamp = updated;
+    steps[2].label = "Awaiting settlement funds";
     steps[2].state = "current";
   } else if (status === "processing") {
     steps[1].state = "done"; steps[1].timestamp = updated;
@@ -124,8 +129,8 @@ const TransferTrackingPage = () => {
   const [notFound, setNotFound] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const cancelTransfer = useCancelTransfer();
-  const canCancel = transfer && ["initiated", "funded", "processing"].includes(transfer.status);
-  const isPending = transfer && ["initiated", "funded", "processing"].includes(transfer.status);
+  const canCancel = transfer && ["initiated", "funded", "processing", "pending_liquidity"].includes(transfer.status);
+  const isPending = transfer && ["initiated", "funded", "processing", "pending_liquidity"].includes(transfer.status);
 
   // Ask Flutterwave directly for the real status and update the row.
   const verifyStatus = useCallback(async (silent = false) => {

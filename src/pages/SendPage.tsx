@@ -566,7 +566,11 @@ const SendPage = () => {
           window.open(redirectUrl, '_blank', 'noopener,noreferrer');
           toast.success('Please complete the verification on the payment page to finalize your transfer.', { duration: 10000 });
         } else {
-          toast.success(payout?.queued ? 'Transfer queued — awaiting payout partner' : 'Transfer sent successfully!');
+          toast.success(
+            data?.pending_liquidity || data?.queued || payout?.queued || payout?.pending_liquidity
+              ? 'Transfer queued — will send automatically when settlement funds are ready'
+              : 'Transfer sent successfully!',
+          );
         }
       } catch (e: any) {
         const raw = String(e?.message || '');
@@ -681,7 +685,11 @@ const SendPage = () => {
         window.open(redirectUrl, '_blank', 'noopener,noreferrer');
         toast.success('Please complete the verification on the payment page to finalize your transfer.', { duration: 10000 });
       } else {
-        toast.success(payout?.queued ? 'Card charged — payout queued' : 'Transfer sent successfully!');
+        toast.success(
+          data?.pending_liquidity || data?.queued || payout?.queued || payout?.pending_liquidity
+            ? 'Card charged — transfer queued for settlement'
+            : 'Transfer sent successfully!',
+        );
       }
     } catch (e: any) {
       const msg = String(e?.message ?? 'orchestration pending');

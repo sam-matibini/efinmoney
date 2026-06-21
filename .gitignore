@@ -42,3 +42,4 @@ AI_HANDOFF.md
 *.njsproj
 *.sln
 *.sw?
+.vercel

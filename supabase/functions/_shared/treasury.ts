@@ -4,7 +4,8 @@ import Stripe from "https://esm.sh/stripe@17.3.1?target=denonext";
 
 export const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, stripe-signature",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, stripe-signature, x-internal-secret",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 };
 
 export const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY")!, {

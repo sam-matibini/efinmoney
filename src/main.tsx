@@ -20,8 +20,10 @@ Sentry.init({
   environment: import.meta.env.MODE,
 });
 
+import ChunkErrorFallback from "./components/ChunkErrorFallback.tsx";
+
 createRoot(document.getElementById("root")!).render(
-  <Sentry.ErrorBoundary fallback={<p>Something went wrong. Our team has been notified.</p>}>
+  <Sentry.ErrorBoundary fallback={<ChunkErrorFallback />}>
     <App />
   </Sentry.ErrorBoundary>
 );

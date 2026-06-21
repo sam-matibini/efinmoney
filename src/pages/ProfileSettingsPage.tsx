@@ -9,6 +9,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { AtSign, Copy, Hash } from "lucide-react";
+import { AvatarUpload } from "@/components/profile/AvatarUpload";
+import { normalizeToE164 } from "@/lib/phone";
 
 const ProfileSettingsPage = () => {
   const { user } = useAuth();
@@ -49,13 +51,33 @@ const ProfileSettingsPage = () => {
     }
     setSaving(true);
     try {
+      const country = addressCountry
+        ? addressCountry.toUpperCase().slice(0, 2)
+        : (profile as any)?.address_country ?? (profile as any)?.country_code ?? null;
+      let normalizedPhone: string | null = null;
+      if (phoneNumber.trim()) {
+        normalizedPhone = normalizeToE164(phoneNumber.trim(), country);
+        if (!normalizedPhone && phoneNumber.trim().startsWith("+")) {
+          normalizedPhone = phoneNumber.trim().replace(/[\s\-()]/g, "");
+        }
+        if (!normalizedPhone) {
+          toast.error(
+            country
+              ? "Use +… international format or a local number starting with 0 for your country."
+              : "Use +… international format, or set Country (ISO-2) on your profile first.",
+          );
+          setSaving(false);
+          return;
+        }
+      }
+
       const { error } = await supabase
         .from('profiles')
         .update({
           full_name: fullName,
           email,
           efin_tag: cleanTag || null,
-          phone_number: phoneNumber || null,
+          phone_number: normalizedPhone,
           street_address: streetAddress || null,
           city: city || null,
           state_province: stateProvince || null,
@@ -89,6 +111,10 @@ const ProfileSettingsPage = () => {
   return (
     <div className="container max-w-2xl mx-auto px-4 py-8">
         <h1 className="text-2xl font-bold text-foreground mb-6">Profile Settings</h1>
+
+        <Card className="p-6 mb-4">
+          <AvatarUpload />
+        </Card>
 
         {/* eFinMoney identity card — what others use to send you money */}
         <Card className="p-6 mb-4 space-y-4 border-primary/30 bg-gradient-to-br from-primary/5 to-transparent">
@@ -197,7 +223,10 @@ const ProfileSettingsPage = () => {
 
           <div className="space-y-2">
             <Label htmlFor="phone">Phone number</Label>
-            <Input id="phone" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} placeholder="+1 555 123 4567" />
+            <Input id="phone" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} placeholder="+234 806 860 8302" />
+            <p className="text-xs text-muted-foreground">
+              Use + and country code (+1, +234, +44…). Local 0… numbers convert using Country below (NG→+234, CA→+1).
+            </p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="street">Street address</Label>

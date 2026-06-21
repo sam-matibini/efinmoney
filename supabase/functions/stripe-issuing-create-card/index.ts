@@ -1,5 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import Stripe from "npm:stripe@14";
+import { toE164 } from "../_shared/phone-e164.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -91,6 +92,13 @@ Deno.serve(async (req) => {
 
     const addressCountry = ((profile as any)?.address_country || (profile as any)?.country_code || "CA").toUpperCase().slice(0, 2);
 
+    const phoneE164 = toE164(profile.phone_number, addressCountry);
+    if (profile.phone_number?.trim() && !phoneE164) {
+      return json({
+        error: "Phone number must be in international format (e.g. +2348068608302 for Nigeria). Update it in Profile Settings.",
+      }, 400);
+    }
+
     if (!profile?.full_name || !(profile as any).street_address || !profile.city || !profile.postal_code) {
       return json({
         error: "Missing profile data. Please complete your full name and billing address (street, city, postal code) in Profile Settings.",
@@ -117,7 +125,7 @@ Deno.serve(async (req) => {
           type: "individual",
           name: profile.full_name,
           email: profile.email || claimData.claims.email,
-          phone_number: profile.phone_number || undefined,
+          phone_number: phoneE164,
           billing: {
             address: {
               line1: (profile as any).street_address,
@@ -131,7 +139,7 @@ Deno.serve(async (req) => {
         stripeCardholderId = ch.id;
       } catch (e: any) {
         console.error("Stripe Issuing cardholder create failed:", e?.message);
-        return json({ error: `Stripe Issuing cardholder error: ${e?.message || "unknown"}` }, 400);
+        return json({ error: friendlyIssuingError(e?.message || "unknown") }, 400);
       }
       const { data: newCh, error: chErr } = await admin
         .from("cardholders")
@@ -141,7 +149,7 @@ Deno.serve(async (req) => {
           type: "individual",
           legal_name: profile.full_name,
           email: profile.email || claimData.claims.email,
-          phone: profile.phone_number,
+          phone: phoneE164 ?? profile.phone_number,
           billing_line1: (profile as any).street_address,
           billing_city: profile.city,
           billing_state: profile.state_province || "ON",
@@ -277,6 +285,25 @@ Deno.serve(async (req) => {
     return json({ error: e?.message || "Failed to create card" }, 500);
   }
 });
+
+function friendlyIssuingError(raw: string): string {
+  if (/not set up to use Issuing|issuing.*not enabled/i.test(raw)) {
+    return "eFinVISA is not available yet — Stripe Issuing must be enabled on the eFinMoney Stripe account. Contact support or try again later.";
+  }
+  if (/balance_insufficient|insufficient.*issuing/i.test(raw)) {
+    return "Card program balance is low. Top up Stripe Issuing in the dashboard, then retry.";
+  }
+  if (/phone|not a valid phone/i.test(raw)) {
+    return "Phone number must be in international format (e.g. +2348068608302). Update it in Profile Settings.";
+  }
+  if (/profile|billing address|street|postal|full name/i.test(raw)) {
+    return "Missing profile data. Please complete your full name and billing address in Profile Settings.";
+  }
+  if (/tier 3|tier_3/i.test(raw)) {
+    return "Card issuance requires Tier 3 identity verification.";
+  }
+  return raw.replace(/^Stripe Issuing cardholder error:\s*/i, "").replace(/^Stripe Issuing card create failed:\s*/i, "");
+}
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +9,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useWallets } from "@/hooks/useWallets";
 import { useIssuedCardMutations, useIssuingBalance, type IssuedCardPurpose } from "@/hooks/useIssuedCards";
 import { useProfile } from "@/hooks/useProfile";
+import {
+  cardIssueActionLabel,
+  getCardIssueRedirect,
+  getProfileBillingGap,
+} from "@/lib/cardIssueErrors";
 import { Sparkles, Wifi, CreditCard, Smartphone, AlertCircle } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -18,10 +24,13 @@ interface IssueVirtualCardModalProps {
 }
 
 const IssueVirtualCardModal = ({ open, onClose, onCreated }: IssueVirtualCardModalProps) => {
+  const navigate = useNavigate();
   const { data: wallets } = useWallets();
   const { createCard, fundCard } = useIssuedCardMutations();
   const { data: balance, isLoading: balLoading, refetch: refetchBal } = useIssuingBalance();
-  const { data: profile } = useProfile() as any;
+  const { data: profile } = useProfile();
+
+  const [error, setError] = useState("");
 
   const [cardType, setCardType] = useState<"virtual" | "physical">("virtual");
   const [nickname, setNickname] = useState("");
@@ -47,6 +56,10 @@ const IssueVirtualCardModal = ({ open, onClose, onCreated }: IssueVirtualCardMod
   }, [open, refetchBal]);
 
   useEffect(() => {
+    if (!open) setError("");
+  }, [open]);
+
+  useEffect(() => {
     if (!profile) return;
     setShipName((n) => n || profile.full_name || "");
     setShipLine1((v) => v || profile.street_address || "");
@@ -57,6 +70,7 @@ const IssueVirtualCardModal = ({ open, onClose, onCreated }: IssueVirtualCardMod
   }, [profile]);
 
   const reset = () => {
+    setError("");
     setCardType("virtual");
     setNickname("");
     setPurpose("personal");
@@ -72,44 +86,63 @@ const IssueVirtualCardModal = ({ open, onClose, onCreated }: IssueVirtualCardMod
   const issuingAvail = balance?.available?.[currency] ?? 0;
   const lowBalance = issuingAvail <= 0;
 
-  const submit = async () => {
-    const res = await createCard.mutateAsync({
-      nickname: nickname.trim() || undefined,
-      currency,
-      purpose,
-      card_type: cardType,
-      funding_wallet_id: walletId || undefined,
-      tap_to_pay: tapToPay,
-      controls: {
-        monthly_limit: Number(monthlyLimit) || undefined,
-        per_authorization_limit: Number(perAuthLimit) || undefined,
-        single_use: purpose === "single_use",
-      },
-      shipping: cardType === "physical" ? {
-        name: shipName.trim(),
-        line1: shipLine1.trim(),
-        line2: shipLine2.trim() || undefined,
-        city: shipCity.trim(),
-        state: shipState.trim(),
-        postal_code: shipPostal.trim(),
-        country: shipCountry.trim().toUpperCase().slice(0, 2),
-        service: shipService,
-      } : undefined,
-    });
+  const errorRedirect = error ? getCardIssueRedirect(error) : null;
 
-    const newCardId = res?.card?.id;
-    const fundAmt = Number(initialFund);
-    if (newCardId && walletId && fundAmt > 0) {
-      try {
-        await fundCard.mutateAsync({ card_id: newCardId, wallet_id: walletId, amount: fundAmt });
-      } catch {
-        // toast already shown by mutation
-      }
-    }
-
+  const goToFix = () => {
     reset();
     onClose();
-    if (newCardId) onCreated?.(newCardId);
+    navigate(errorRedirect === "kyc" ? "/kyc" : "/profile");
+  };
+
+  const submit = async () => {
+    setError("");
+    const profileGap = getProfileBillingGap(profile);
+    if (profileGap) {
+      setError(profileGap);
+      return;
+    }
+
+    try {
+      const res = await createCard.mutateAsync({
+        nickname: nickname.trim() || undefined,
+        currency,
+        purpose,
+        card_type: cardType,
+        funding_wallet_id: walletId || undefined,
+        tap_to_pay: tapToPay,
+        controls: {
+          monthly_limit: Number(monthlyLimit) || undefined,
+          per_authorization_limit: Number(perAuthLimit) || undefined,
+          single_use: purpose === "single_use",
+        },
+        shipping: cardType === "physical" ? {
+          name: shipName.trim(),
+          line1: shipLine1.trim(),
+          line2: shipLine2.trim() || undefined,
+          city: shipCity.trim(),
+          state: shipState.trim(),
+          postal_code: shipPostal.trim(),
+          country: shipCountry.trim().toUpperCase().slice(0, 2),
+          service: shipService,
+        } : undefined,
+      });
+
+      const newCardId = res?.card?.id;
+      const fundAmt = Number(initialFund);
+      if (newCardId && walletId && fundAmt > 0) {
+        try {
+          await fundCard.mutateAsync({ card_id: newCardId, wallet_id: walletId, amount: fundAmt });
+        } catch {
+          /* toast already shown by mutation */
+        }
+      }
+
+      reset();
+      onClose();
+      if (newCardId) onCreated?.(newCardId);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to create card");
+    }
   };
 
   const physicalShipValid = cardType !== "physical" || (
@@ -302,6 +335,17 @@ const IssueVirtualCardModal = ({ open, onClose, onCreated }: IssueVirtualCardMod
               ? `eFinVISA virtual cards work instantly online. Funded from your ${currency} wallet — every authorization checks your balance in real time.`
               : `Your eFinVISA physical card ships from Stripe and works worldwide once activated.`}
           </p>
+
+          {error ? (
+            <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 space-y-3">
+              <p className="text-sm text-destructive">{error}</p>
+              {errorRedirect ? (
+                <Button type="button" size="sm" onClick={goToFix}>
+                  {cardIssueActionLabel(errorRedirect)}
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
         </div>
 
         <DialogFooter>

@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { toast } from "sonner";
+import { getCardIssueRedirect } from "@/lib/cardIssueErrors";
 
 export type IssuedCardStatus = "active" | "frozen" | "cancelled" | "pending";
 export type IssuedCardPurpose = "personal" | "business" | "single_use" | "subscription";
@@ -220,26 +221,8 @@ export const useIssuedCardMutations = () => {
     },
     onError: (e: Error) => {
       const msg = e.message || "Failed to create card";
-      if (/profile|address|full name|postal|street|city/i.test(msg)) {
-        toast.error("Complete your profile to issue a card", {
-          description: "We need your full name and billing address (street, city, postal code) before issuing a Visa/Mastercard.",
-          action: {
-            label: "Open Profile Settings",
-            onClick: () => { window.location.href = "/profile"; },
-          },
-          duration: 10000,
-        });
-      } else if (/tier 3|tier_3|verification/i.test(msg)) {
-        toast.error("Identity verification required", {
-          description: "Card issuance requires Tier 3 (full ID + address verification).",
-          action: { label: "Verify identity", onClick: () => { window.location.href = "/kyc"; } },
-          duration: 10000,
-        });
-      } else if (/rate limit/i.test(msg)) {
-        toast.error("Too many attempts", { description: "Please wait a few minutes before trying again." });
-      } else {
-        toast.error(msg);
-      }
+      if (getCardIssueRedirect(msg)) return;
+      toast.error(msg);
     },
 
   });

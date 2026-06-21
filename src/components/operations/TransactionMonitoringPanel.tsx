@@ -30,6 +30,7 @@ const statusConfig: Record<string, { icon: typeof Clock; color: string; label: s
   initiated: { icon: Clock, color: 'bg-blue-500/10 text-blue-600', label: 'Initiated' },
   funded: { icon: CheckCircle2, color: 'bg-indigo-500/10 text-indigo-600', label: 'Funded' },
   processing: { icon: RefreshCw, color: 'bg-amber-500/10 text-amber-600', label: 'Processing' },
+  pending_liquidity: { icon: Clock, color: 'bg-orange-500/10 text-orange-600', label: 'Awaiting settlement' },
   completed: { icon: CheckCircle2, color: 'bg-indigo-500/10 text-indigo-600', label: 'Completed' },
   failed: { icon: XCircle, color: 'bg-red-500/10 text-red-600', label: 'Failed' },
   reversed: { icon: ArrowRightLeft, color: 'bg-purple-500/10 text-purple-600', label: 'Reversed' },
@@ -195,6 +196,7 @@ export const TransactionMonitoringPanel = () => {
                 <SelectItem value="initiated">Initiated</SelectItem>
                 <SelectItem value="funded">Funded</SelectItem>
                 <SelectItem value="processing">Processing</SelectItem>
+                <SelectItem value="pending_liquidity">Awaiting settlement</SelectItem>
                 <SelectItem value="completed">Completed</SelectItem>
                 <SelectItem value="failed">Failed</SelectItem>
                 <SelectItem value="reversed">Reversed</SelectItem>

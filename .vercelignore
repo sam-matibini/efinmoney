@@ -1,0 +1,13 @@
+node_modules
+dist
+migration-export
+database-export
+.git
+.vercel
+efinmoney-mobile
+*.log
+.env
+.env.*
+supabase/.temp
+.agents
+AI_HANDOFF.md

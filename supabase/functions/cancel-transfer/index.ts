@@ -40,7 +40,7 @@ Deno.serve(async (req) => {
 
     if (tErr || !transfer) return json({ error: "Transfer not found" }, 404);
 
-    const cancellable = ["initiated", "funded", "processing"];
+    const cancellable = ["initiated", "funded", "processing", "pending_liquidity"];
     if (!cancellable.includes(transfer.status)) {
       return json({ error: `Cannot cancel a transfer that is ${transfer.status}` }, 400);
     }
