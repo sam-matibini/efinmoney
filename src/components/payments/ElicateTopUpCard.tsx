@@ -23,7 +23,7 @@ const NETWORKS = [
 ];
 
 type DialogState =
-  | { kind: "awaiting"; chargeId: string }
+  | { kind: "awaiting"; chargeId: string; redirectUrl: string | null }
   | { kind: "completed"; amount: number }
   | { kind: "failed"; reason: string }
   | null;
@@ -89,7 +89,7 @@ export default function ElicateTopUpCard({ walletId, walletCurrency }: Props) {
         phone: phone.trim(),
         network,
       });
-      setDialog({ kind: "awaiting", chargeId: result.charge_id });
+      setDialog({ kind: "awaiting", chargeId: result.charge_id, redirectUrl: result.redirect_url });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not start top-up");
     } finally {
@@ -178,6 +178,21 @@ export default function ElicateTopUpCard({ walletId, walletCurrency }: Props) {
                   Enter your Mobile Money PIN on the {network} prompt to confirm the {amount} ZMW top-up.
                 </p>
               </div>
+              {dialog.redirectUrl && (
+                <div className="space-y-2 pt-2 border-t border-border">
+                  <p className="text-xs text-muted-foreground">
+                    No prompt on your phone? Open the payment page to complete it manually:
+                  </p>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => window.open(dialog.redirectUrl!, "_blank", "noopener,noreferrer")}
+                  >
+                    Open payment page
+                  </Button>
+                </div>
+              )}
               <Button variant="outline" size="sm" onClick={closeDialog}>
                 Cancel and close
               </Button>
