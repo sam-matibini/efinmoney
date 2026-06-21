@@ -41,6 +41,7 @@ export async function initiateElicateCharge(params: {
   phone: string;
   network: string;
   customer_name?: string;
+  return_url?: string;
 }): Promise<ElicateChargeResult> {
   const { data, error } = await supabase.functions.invoke("elicate-charge", { body: params });
   if (error) throw new Error(await invokeErrorMessage(error));

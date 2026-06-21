@@ -1,15 +1,15 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Smartphone, CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import { Smartphone } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { initiateElicateCharge, getElicateChargeStatus } from "@/lib/elicate";
+import { initiateElicateCharge } from "@/lib/elicate";
 
 interface Props {
   walletId: string;
@@ -22,52 +22,34 @@ const NETWORKS = [
   { value: "ZAMTEL", label: "Zamtel Kwacha" },
 ];
 
-type DialogState =
-  | { kind: "awaiting"; chargeId: string; redirectUrl: string | null }
-  | { kind: "completed"; amount: number }
-  | { kind: "failed"; reason: string }
-  | null;
-
 export default function ElicateTopUpCard({ walletId, walletCurrency }: Props) {
   const queryClient = useQueryClient();
+  const [params, setParams] = useSearchParams();
   const [amount, setAmount] = useState("");
   const [network, setNetwork] = useState("MTN");
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
-  const [dialog, setDialog] = useState<DialogState>(null);
-  const pollRef = useRef<number | null>(null);
 
-  // Poll the charge status every 3s while awaiting approval. Stops on terminal state
-  // or after 4 minutes (USSD prompts typically expire in 60-90s).
+  // Handle return from Elicate hosted page. Elicate appends a status to our return URL.
   useEffect(() => {
-    if (!dialog || dialog.kind !== "awaiting") return;
-    const startedAt = Date.now();
-    const tick = async () => {
-      const status = await getElicateChargeStatus(dialog.chargeId);
-      if (!status) return;
-      if (status.status === "completed") {
-        await queryClient.invalidateQueries({ queryKey: ["wallets"] });
-        setDialog({ kind: "completed", amount: status.amount_minor / 100 });
-      } else if (["failed", "cancelled", "expired"].includes(status.status)) {
-        setDialog({
-          kind: "failed",
-          reason: status.failure_reason || "The top-up was not completed.",
-        });
-      } else if (Date.now() - startedAt > 4 * 60 * 1000) {
-        setDialog({
-          kind: "failed",
-          reason: "Timed out waiting for approval. Please check your phone and try again.",
-        });
-      }
-    };
-    pollRef.current = window.setInterval(tick, 3000);
-    return () => {
-      if (pollRef.current) {
-        window.clearInterval(pollRef.current);
-        pollRef.current = null;
-      }
-    };
-  }, [dialog, queryClient]);
+    const status = params.get("elicate_status");
+    if (!status) return;
+    if (status === "success" || status === "successful" || status === "completed") {
+      toast.success("Top-up successful — your wallet has been credited.");
+      queryClient.invalidateQueries({ queryKey: ["wallets"] });
+    } else if (status === "failed" || status === "cancelled") {
+      toast.error("Top-up was not completed.");
+    } else {
+      toast.info(`Top-up status: ${status}`);
+    }
+    setParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete("elicate_status");
+      next.delete("transaction_id");
+      next.delete("reference");
+      return next;
+    }, { replace: true });
+  }, [params, setParams, queryClient]);
 
   if (walletCurrency !== "ZMW") return null;
 
@@ -83,13 +65,24 @@ export default function ElicateTopUpCard({ walletId, walletCurrency }: Props) {
     }
     setLoading(true);
     try {
+      const returnUrl = `${window.location.origin}/wallets/topup?walletId=${walletId}&elicate_status=success`;
       const result = await initiateElicateCharge({
         amount: amt,
         target_wallet_id: walletId,
         phone: phone.trim(),
         network,
+        return_url: returnUrl,
       });
-      setDialog({ kind: "awaiting", chargeId: result.charge_id, redirectUrl: result.redirect_url });
+      if (result.redirect_url) {
+        // Redirect-first flow (Elicate's documented model): user completes payment on
+        // Elicate's hosted page, then returns to us. Webhook credits the wallet.
+        window.location.href = result.redirect_url;
+        return;
+      }
+      // Provider didn't return a redirect URL — surface a clear error rather than
+      // leaving the user staring at a spinner. Mobile-money authorisation always needs
+      // a PIN step that cannot happen inside our app.
+      toast.error("Top-up could not start — provider did not return a payment page. Please try again or contact support.");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not start top-up");
     } finally {
@@ -97,123 +90,60 @@ export default function ElicateTopUpCard({ walletId, walletCurrency }: Props) {
     }
   };
 
-  const closeDialog = () => {
-    setDialog(null);
-    setAmount("");
-    setPhone("");
-  };
-
   return (
-    <>
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            Top up with Mobile Money
-            <Badge variant="outline" className="border-primary/30 text-primary">
-              <Smartphone className="w-3 h-3 mr-1" />
-              MTN · Airtel · Zamtel
-            </Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <Label>Amount (ZMW)</Label>
-            <Input
-              type="number"
-              inputMode="decimal"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="0.00"
-              className="h-12 text-lg"
-            />
-          </div>
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2">
+          Top up with Mobile Money
+          <Badge variant="outline" className="border-primary/30 text-primary">
+            <Smartphone className="w-3 h-3 mr-1" />
+            MTN · Airtel · Zamtel
+          </Badge>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div>
+          <Label>Amount (ZMW)</Label>
+          <Input
+            type="number"
+            inputMode="decimal"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="0.00"
+            className="h-12 text-lg"
+          />
+        </div>
 
-          <div>
-            <Label>Mobile Money Network</Label>
-            <Select value={network} onValueChange={setNetwork}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {NETWORKS.map((n) => (
-                  <SelectItem key={n.value} value={n.value}>{n.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+        <div>
+          <Label>Mobile Money Network</Label>
+          <Select value={network} onValueChange={setNetwork}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {NETWORKS.map((n) => (
+                <SelectItem key={n.value} value={n.value}>{n.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-          <div>
-            <Label>Mobile Money Number</Label>
-            <Input
-              type="tel"
-              inputMode="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="+260 97 123 4567"
-            />
-            <p className="text-xs text-muted-foreground mt-1">
-              You will receive a prompt on your phone to enter your PIN and approve the top-up.
-            </p>
-          </div>
+        <div>
+          <Label>Mobile Money Number</Label>
+          <Input
+            type="tel"
+            inputMode="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="+260 97 123 4567"
+          />
+          <p className="text-xs text-muted-foreground mt-1">
+            You'll be taken to a secure payment page to confirm with your PIN. After payment, you'll return here automatically and your wallet will update.
+          </p>
+        </div>
 
-          <Button className="w-full" size="lg" onClick={start} disabled={loading}>
-            {loading ? "Sending prompt to your phone…" : `Top up ${amount ? `ZMW ${amount}` : "with Mobile Money"}`}
-          </Button>
-        </CardContent>
-      </Card>
-
-      <Dialog open={dialog !== null} onOpenChange={(o) => { if (!o) closeDialog(); }}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>
-              {dialog?.kind === "awaiting" && "Approve on your phone"}
-              {dialog?.kind === "completed" && "Top-up successful"}
-              {dialog?.kind === "failed" && "Top-up failed"}
-            </DialogTitle>
-          </DialogHeader>
-          {dialog?.kind === "awaiting" && (
-            <div className="space-y-4 text-center py-4">
-              <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto" />
-              <div className="space-y-1">
-                <p className="font-medium">Check your phone for the prompt</p>
-                <p className="text-sm text-muted-foreground">
-                  Enter your Mobile Money PIN on the {network} prompt to confirm the {amount} ZMW top-up.
-                </p>
-              </div>
-              {dialog.redirectUrl && (
-                <div className="space-y-2 pt-2 border-t border-border">
-                  <p className="text-xs text-muted-foreground">
-                    No prompt on your phone? Open the payment page to complete it manually:
-                  </p>
-                  <Button
-                    variant="default"
-                    size="sm"
-                    className="w-full"
-                    onClick={() => window.open(dialog.redirectUrl!, "_blank", "noopener,noreferrer")}
-                  >
-                    Open payment page
-                  </Button>
-                </div>
-              )}
-              <Button variant="outline" size="sm" onClick={closeDialog}>
-                Cancel and close
-              </Button>
-            </div>
-          )}
-          {dialog?.kind === "completed" && (
-            <div className="space-y-4 text-center py-4">
-              <CheckCircle2 className="w-14 h-14 text-emerald-500 mx-auto" />
-              <p className="font-medium">{dialog.amount} ZMW added to your wallet.</p>
-              <Button className="w-full" onClick={closeDialog}>Done</Button>
-            </div>
-          )}
-          {dialog?.kind === "failed" && (
-            <div className="space-y-4 text-center py-4">
-              <XCircle className="w-14 h-14 text-destructive mx-auto" />
-              <p className="text-sm text-muted-foreground">{dialog.reason}</p>
-              <Button className="w-full" onClick={closeDialog}>Close</Button>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-    </>
+        <Button className="w-full" size="lg" onClick={start} disabled={loading}>
+          {loading ? "Starting secure payment…" : `Top up ${amount ? `ZMW ${amount}` : "with Mobile Money"}`}
+        </Button>
+      </CardContent>
+    </Card>
   );
 }

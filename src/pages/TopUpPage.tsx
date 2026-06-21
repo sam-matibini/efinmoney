@@ -24,11 +24,15 @@ import { MM_COUNTRIES } from "@/lib/mobileMoneyNetworks";
 const MM_BY_CCY = Object.fromEntries(MM_COUNTRIES.map((c) => [c.currency, c]));
 
 // Smart Gateway Routing
-const FLUTTERWAVE_CURRENCIES = ["NGN", "KES", "UGX", "ZMW", "RWF", "GHS", "TZS"];
+// ZMW deliberately omitted: ZMW uses Elicate (mobile money) directly via
+// ElicateTopUpCard, not Flutterwave's hosted checkout.
+const FLUTTERWAVE_CURRENCIES = ["NGN", "KES", "UGX", "RWF", "GHS", "TZS"];
 const STRIPE_CURRENCIES = ["USD", "CAD", "EUR", "GBP"];
+const ELICATE_CURRENCIES = ["ZMW"];
 
-type Gateway = "flutterwave" | "stripe" | "unsupported";
+type Gateway = "flutterwave" | "stripe" | "elicate" | "unsupported";
 const routeGateway = (currency: string): Gateway => {
+  if (ELICATE_CURRENCIES.includes(currency)) return "elicate";
   if (FLUTTERWAVE_CURRENCIES.includes(currency)) return "flutterwave";
   if (STRIPE_CURRENCIES.includes(currency)) return "stripe";
   return "unsupported";
@@ -178,6 +182,7 @@ const TopUpPage = () => {
   };
 
   const gatewayBadge = useMemo(() => {
+    if (gateway === "elicate") return { label: "Mobile Money", icon: Smartphone, color: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30" };
     if (gateway === "flutterwave") return { label: "Flutterwave", icon: Globe, color: "bg-orange-500/10 text-orange-500 border-orange-500/30" };
     if (gateway === "stripe") return { label: "Stripe", icon: CreditCard, color: "bg-indigo-500/10 text-indigo-500 border-indigo-500/30" };
     return { label: "Unavailable", icon: XCircle, color: "bg-muted text-muted-foreground" };

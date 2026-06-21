@@ -69,6 +69,7 @@ Deno.serve(async (req) => {
       phone,
       network,
       customer_name,
+      return_url,
     } = body as Record<string, unknown>;
 
     const amt = Number(amount);
@@ -141,7 +142,7 @@ Deno.serve(async (req) => {
       return json({ error: "Could not record charge", detail: insErr.message }, 500);
     }
 
-    const payload = {
+    const payload: Record<string, unknown> = {
       amount: amountRounded,
       phone: phoneNormalized,
       network: networkResolved,
@@ -149,6 +150,11 @@ Deno.serve(async (req) => {
       reference,
       customer_name: beneficiaryName,
     };
+    if (typeof return_url === "string" && return_url.trim()) {
+      // Elicate redirects the user back here after they complete payment on the hosted page.
+      payload.redirect_url = return_url.trim();
+      payload.return_url = return_url.trim();
+    }
 
     console.log("Elicate CHARGE request:", { mode: elicate.mode, url: elicate.chargeUrl, payload });
 
@@ -191,7 +197,10 @@ Deno.serve(async (req) => {
     const transactionId =
       data?.transaction_id || data?.transactionId || data?.id || null;
     const providerReference = transactionId || data?.reference || reference;
+    // Per Elicate docs the redirect URL lives at data.meta.redirect_url.
+    // Check the other common shapes as defensive fallbacks.
     const redirectUrl =
+      data?.meta?.redirect_url ||
       data?.meta?.authorization?.redirect_url ||
       data?.authorization?.redirect_url ||
       data?.redirect_url ||
@@ -212,7 +221,9 @@ Deno.serve(async (req) => {
       provider_reference: providerReference,
       redirect_url: redirectUrl,
       status: "awaiting_approval",
-      message: "Approve the prompt that just appeared on your phone to complete the top-up.",
+      message: redirectUrl
+        ? "Redirecting to the secure payment page…"
+        : "Approve the prompt that just appeared on your phone to complete the top-up.",
     });
   } catch (e) {
     console.error("elicate-charge error", e);
