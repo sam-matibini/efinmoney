@@ -7,35 +7,17 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-// Map internal payout_method / network codes -> Elicate uppercase network string
-const NETWORK_MAP: Record<string, string> = {
-  mtn: "MTN",
-  mtn_mobile: "MTN",
-  mtn_zambia: "MTN",
-  mtn_money: "MTN",
-  airtel: "AIRTEL",
-  airtel_money: "AIRTEL",
-  airtel_zambia: "AIRTEL",
-  zamtel: "ZAMTEL",
-  zamtel_money: "ZAMTEL",
-};
+// Elicate routes by phone prefix, so a single bank code "MPS" (Mobile Payment Service)
+// works across MTN / Airtel / Zamtel on Zambia.
+const ELICATE_BANK_CODE = "MPS";
 
-function resolveNetwork(input?: string | null): string {
-  if (!input) return "MTN";
-  const key = input.toLowerCase();
-  if (NETWORK_MAP[key]) return NETWORK_MAP[key];
-  if (key.includes("mtn")) return "MTN";
-  if (key.includes("airtel")) return "AIRTEL";
-  if (key.includes("zamtel")) return "ZAMTEL";
-  return input.toUpperCase();
-}
-
-// Normalize to local Zambian format (e.g. 0961234567)
-function normalizeZmPhone(raw?: string | null): string {
+// Normalize to Elicate's required international format: 260XXXXXXXXX (NO leading zero).
+// Accepts any of: +260971234567, 260971234567, 0971234567, 971234567, with spaces/dashes.
+function normalizeZmPhoneIntl(raw?: string | null): string {
   let phone = String(raw || "").replace(/[^\d]/g, "");
-  if (phone.startsWith("00")) phone = phone.slice(2);
-  if (phone.startsWith("260")) phone = phone.slice(3);
-  if (!phone.startsWith("0")) phone = "0" + phone;
+  if (phone.startsWith("00")) phone = phone.slice(2);    // 00260... -> 260...
+  if (phone.startsWith("0")) phone = phone.slice(1);     // 0971...  -> 971...
+  if (!phone.startsWith("260")) phone = `260${phone}`;   // 971...   -> 260971...
   return phone;
 }
 
@@ -107,13 +89,13 @@ Deno.serve(async (req) => {
 
     const elicate = getElicateConfig();
     const secret = elicate.secretKey;
-    const ELICATE_URL = elicate.url;
+    const PAYOUT_URL = elicate.payoutUrl;
     if (!secret) {
       return new Response(JSON.stringify({ success: false, error: `ELICATE_${elicate.mode === "live" ? "LIVE_" : ""}SECRET_KEY not configured` }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    if (!ELICATE_URL) {
+    if (!PAYOUT_URL) {
       return new Response(JSON.stringify({ success: false, error: "ELICATE_LIVE_BASE_URL not configured" }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -131,24 +113,37 @@ Deno.serve(async (req) => {
       });
     }
 
-    const network = resolveNetwork(transfer.payout_method || transfer.recipient_network);
-    const phone = normalizeZmPhone(transfer.recipient_phone);
+    // Idempotency: if this transfer was already dispatched, don't fire a second payout.
+    // Webhook will (or already did) flip status to completed/failed.
+    if (["processing", "completed", "refunded"].includes(transfer.status) && transfer.provider_reference) {
+      return new Response(JSON.stringify({
+        success: true,
+        already_dispatched: true,
+        status: transfer.status,
+        provider_reference: transfer.provider_reference,
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const phone = normalizeZmPhoneIntl(transfer.recipient_phone);
     const amount = Math.round(Number(transfer.target_amount ?? transfer.source_amount) * 100) / 100;
     const reference = buildReference(transfer_id, transfer.provider_reference);
-    const customerName = String(transfer.recipient_name || "Customer").trim() || "Customer";
+    const beneficiaryName = String(transfer.recipient_name || "Customer").trim() || "Customer";
+    const narration = String(transfer.purpose || transfer.notes || "eFinMoney payout").slice(0, 100);
 
+    // Elicate payout (disbursement) — pushes funds to the beneficiary; no PIN prompt.
     const payload = {
       amount,
-      phone,
-      network,
       currency: "ZMW",
+      account_bank: ELICATE_BANK_CODE,
+      account_number: phone,
+      beneficiary_name: beneficiaryName,
       reference,
-      customer_name: customerName,
+      narration,
     };
 
-    console.log("Elicate charge request:", { mode: elicate.mode, url: ELICATE_URL, payload });
+    console.log("Elicate PAYOUT request:", { mode: elicate.mode, url: PAYOUT_URL, payload });
 
-    const res = await fetch(ELICATE_URL, {
+    const res = await fetch(PAYOUT_URL, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${secret}`,
@@ -159,15 +154,15 @@ Deno.serve(async (req) => {
     });
 
     const respText = await res.text();
-    console.log("Elicate charge response:", res.status, respText);
+    console.log("Elicate PAYOUT response:", res.status, respText);
 
     let respJson: any = {};
     try { respJson = JSON.parse(respText); } catch { respJson = { raw: respText }; }
 
     if (!res.ok) {
       const friendlyError = res.status >= 500
-        ? "Elicate sandbox returned an internal server error. The request matched their documented format, so this appears to be an upstream sandbox issue."
-        : respJson?.message || respJson?.error || "Elicate charge failed";
+        ? "Elicate returned an internal server error. Please retry in a few moments."
+        : respJson?.message || respJson?.error || "Elicate payout failed";
 
       const reversal = await reverseTransferLedger(supabase, transfer_id);
 
@@ -186,18 +181,11 @@ Deno.serve(async (req) => {
       }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Extract documented fields: transaction_id + meta.authorization.redirect_url
+    // Extract documented fields: transaction_id / id from the payout response.
     const data = respJson?.data || respJson;
     const transactionId =
       data?.transaction_id || data?.transactionId || data?.id || null;
-    const providerReference =
-      transactionId || data?.reference || reference;
-    const redirectUrl =
-      data?.meta?.authorization?.redirect_url ||
-      data?.authorization?.redirect_url ||
-      data?.redirect_url ||
-      respJson?.redirect_url ||
-      null;
+    const providerReference = transactionId || data?.reference || reference;
 
     await supabase.from("transfers").update({
       status: "processing",
@@ -207,7 +195,6 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({
       success: true,
       transaction_id: transactionId,
-      redirect_url: redirectUrl,
       provider_reference: providerReference,
       provider_response: respJson,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
