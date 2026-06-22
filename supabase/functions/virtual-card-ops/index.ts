@@ -11,6 +11,12 @@ function formatDbError(err: unknown): string {
     : "";
   const full = `${msg} ${details}`.trim();
 
+  if (/permission denied for table card_secrets/i.test(full)) {
+    return "Edge function cannot write to card_secrets. Run: GRANT ALL ON public.card_secrets TO service_role;";
+  }
+  if (/permission denied for table virtual_card_transfers/i.test(full)) {
+    return "Edge function cannot write to virtual_card_transfers. Run: GRANT ALL ON public.virtual_card_transfers TO service_role;";
+  }
   if (/card_secrets/i.test(full) && /does not exist|schema cache|Could not find/i.test(full)) {
     return "Virtual card secrets storage is not set up. In Supabase SQL Editor, run production-sql.sql sections 5–6.";
   }

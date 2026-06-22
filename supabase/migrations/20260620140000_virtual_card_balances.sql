@@ -25,6 +25,8 @@ CREATE TABLE IF NOT EXISTS public.virtual_card_transfers (
 
 ALTER TABLE public.virtual_card_transfers ENABLE ROW LEVEL SECURITY;
 
+GRANT ALL ON public.virtual_card_transfers TO service_role;
+
 CREATE POLICY "Users view own virtual card transfers"
   ON public.virtual_card_transfers FOR SELECT
   USING (auth.uid() = user_id);

@@ -229,6 +229,8 @@ CREATE TABLE IF NOT EXISTS public.virtual_card_transfers (
 
 ALTER TABLE public.virtual_card_transfers ENABLE ROW LEVEL SECURITY;
 
+GRANT ALL ON public.virtual_card_transfers TO service_role;
+
 DROP POLICY IF EXISTS "Users view own virtual card transfers" ON public.virtual_card_transfers;
 CREATE POLICY "Users view own virtual card transfers"
   ON public.virtual_card_transfers FOR SELECT
@@ -248,6 +250,8 @@ CREATE TABLE IF NOT EXISTS public.card_secrets (
 
 ALTER TABLE public.card_secrets ENABLE ROW LEVEL SECURITY;
 -- No authenticated policies: only service-role edge functions may read/write.
+
+GRANT ALL ON public.card_secrets TO service_role;
 
 CREATE INDEX IF NOT EXISTS idx_card_secrets_card ON public.card_secrets(card_id);
 
