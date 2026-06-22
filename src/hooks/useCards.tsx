@@ -104,6 +104,7 @@ export const useCardMutations = () => {
           card?: Card;
           pan?: string;
           cvv?: string;
+          warning?: string;
         }>('virtual-card-ops', {
           action: 'create',
           card_type: input.card_type,
@@ -116,6 +117,8 @@ export const useCardMutations = () => {
           initial_fund: !isCredit && Number(input.initial_fund) > 0 ? Number(input.initial_fund) : undefined,
         });
         if (!res.card) throw new Error('Card creation failed');
+
+        if (res.warning) toast.warning(res.warning);
 
         return {
           ...res.card,

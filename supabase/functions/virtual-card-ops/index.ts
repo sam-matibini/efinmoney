@@ -6,16 +6,24 @@ type Sb = ReturnType<typeof createClient>;
 
 function formatDbError(err: unknown): string {
   const msg = err instanceof Error ? err.message : String(err);
-  if (/card_secrets/i.test(msg) && /does not exist|schema cache/i.test(msg)) {
-    return "Virtual card secrets storage is not set up. Run production SQL section 6 (card_secrets table), then redeploy virtual-card-ops.";
+  const details = typeof err === "object" && err && "details" in err
+    ? String((err as { details?: string }).details || "")
+    : "";
+  const full = `${msg} ${details}`.trim();
+
+  if (/card_secrets/i.test(full) && /does not exist|schema cache|Could not find/i.test(full)) {
+    return "Virtual card secrets storage is not set up. In Supabase SQL Editor, run production-sql.sql sections 5–6.";
   }
-  if (/virtual_card_transfers/i.test(msg) && /does not exist|schema cache/i.test(msg)) {
-    return "Virtual card transfers table is missing. Run production SQL section 5.";
+  if (/virtual_card_transfers/i.test(full) && /does not exist|schema cache|Could not find/i.test(full)) {
+    return "Virtual card transfers table is missing. Run production-sql.sql section 5.";
   }
-  if (/column.*(balance|currency_code).*does not exist/i.test(msg)) {
-    return "Cards table is missing balance/currency columns. Run production SQL section 5.";
+  if (/Could not find the .*column.*cards/i.test(full) || /column.*(balance|currency_code).*does not exist/i.test(full)) {
+    return "Cards table is missing balance/currency columns. Run production-sql.sql section 5.";
   }
-  return msg;
+  if (/null value in column "account_id"/i.test(full)) {
+    return "Ledger is missing a wallet liability account for this currency. Ensure account 2101 (CAD) exists in ledger_accounts.";
+  }
+  return full || msg;
 }
 
 async function walletLiabilityAccountId(admin: Sb, currency: string): Promise<string | null> {
@@ -78,6 +86,15 @@ async function verifyUserPin(supabase: Sb, pin: string): Promise<{ ok: boolean; 
 }
 
 async function createCard(admin: Sb, userId: string, body: Record<string, unknown>) {
+  try {
+    return await createCardInner(admin, userId, body);
+  } catch (err) {
+    console.error("createCard error:", err);
+    return jsonResponse({ error: formatDbError(err) }, 500);
+  }
+}
+
+async function createCardInner(admin: Sb, userId: string, body: Record<string, unknown>) {
   const cardType = String(body.card_type || "virtual");
   const network = String(body.card_network || "visa") === "mastercard" ? "mastercard" : "visa";
   const cardholderName = String(body.cardholder_name || "").trim();
@@ -128,17 +145,36 @@ async function createCard(admin: Sb, userId: string, body: Record<string, unknow
 
   let balance = 0;
   if (!isCredit && walletId && initialFund > 0) {
-    const fundRes = await fundFromWallet(admin, userId, {
-      card_id: card.id,
-      wallet_id: walletId,
-      amount: initialFund,
-    });
-    if (fundRes.status !== 200) {
-      const errBody = await fundRes.json();
-      return jsonResponse({ error: errBody.error || "Card created but funding failed", card_id: card.id }, 400);
+    try {
+      const fundRes = await fundFromWallet(admin, userId, {
+        card_id: card.id,
+        wallet_id: walletId,
+        amount: initialFund,
+      });
+      if (fundRes.status !== 200) {
+        const errBody = await fundRes.json();
+        return jsonResponse({
+          ok: true,
+          card: { ...card, balance: 0 },
+          pan,
+          cvv,
+          secrets_stored: true,
+          warning: errBody.error || "Card created but initial funding failed — fund it manually from the Cards page.",
+        });
+      }
+      const fundJson = await fundRes.json();
+      balance = Number(fundJson.card_balance ?? initialFund);
+    } catch (fundErr) {
+      console.error("createCard funding error:", fundErr);
+      return jsonResponse({
+        ok: true,
+        card: { ...card, balance: 0 },
+        pan,
+        cvv,
+        secrets_stored: true,
+        warning: `Card created but initial funding failed: ${formatDbError(fundErr)}`,
+      });
     }
-    const fundJson = await fundRes.json();
-    balance = Number(fundJson.card_balance ?? initialFund);
   }
 
   return jsonResponse({
@@ -235,8 +271,14 @@ async function fundFromWallet(admin: Sb, userId: string, body: Record<string, un
   if (walletBal < amt) return jsonResponse({ error: "Insufficient wallet balance" }, 400);
 
   const fromAcctId = await walletLiabilityAccountId(admin, currency);
+  if (!fromAcctId) {
+    return jsonResponse({
+      error: `No wallet liability ledger account for ${currency}. Ensure ledger account 2101 (CAD) or equivalent exists.`,
+    }, 400);
+  }
   const { data: floatAcct } = await admin.from("ledger_accounts").select("id")
     .eq("code", "2200").maybeSingle();
+  const floatAcctId = floatAcct?.id || fromAcctId;
 
   const journalId = crypto.randomUUID();
   const { error: ledgerErr } = await admin.from("ledger_entries").insert([
@@ -254,7 +296,7 @@ async function fundFromWallet(admin: Sb, userId: string, body: Record<string, un
     },
     {
       journal_id: journalId,
-      account_id: floatAcct?.id || fromAcctId,
+      account_id: floatAcctId,
       wallet_id: null,
       currency_code: currency,
       debit_amount: 0,
@@ -265,7 +307,10 @@ async function fundFromWallet(admin: Sb, userId: string, body: Record<string, un
       created_by: userId,
     },
   ]);
-  if (ledgerErr) throw ledgerErr;
+  if (ledgerErr) {
+    console.error("fundFromWallet ledger error:", ledgerErr);
+    return jsonResponse({ error: formatDbError(ledgerErr) }, 400);
+  }
 
   const newBalance = Number(card.balance || 0) + amt;
   const { error: cardErr } = await admin.from("cards").update({
@@ -273,9 +318,12 @@ async function fundFromWallet(admin: Sb, userId: string, body: Record<string, un
     currency_code: currency,
     wallet_id: card.wallet_id || walletId,
   }).eq("id", cardId);
-  if (cardErr) throw cardErr;
+  if (cardErr) {
+    console.error("fundFromWallet card update error:", cardErr);
+    return jsonResponse({ error: formatDbError(cardErr) }, 400);
+  }
 
-  await admin.from("virtual_card_transfers").insert({
+  const { error: xferErr } = await admin.from("virtual_card_transfers").insert({
     user_id: userId,
     from_wallet_id: walletId,
     to_card_id: cardId,
@@ -283,6 +331,10 @@ async function fundFromWallet(admin: Sb, userId: string, body: Record<string, un
     currency_code: currency,
     transfer_type: "wallet_to_card",
   });
+  if (xferErr) {
+    console.error("fundFromWallet transfer log error:", xferErr);
+    // Card balance already updated — don't fail the fund over audit log.
+  }
 
   return jsonResponse({ ok: true, card_balance: newBalance, currency });
 }
