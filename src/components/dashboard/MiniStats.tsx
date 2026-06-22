@@ -4,7 +4,31 @@ import { Send, Globe, PiggyBank, ShieldCheck } from "lucide-react";
 import { useTransfers } from "@/hooks/useTransfers";
 import { useProfile } from "@/hooks/useProfile";
 import { useSavingsGoals } from "@/hooks/useSavingsGoals";
+import { useFxRates } from "@/hooks/useFxRates";
 import { Link } from "react-router-dom";
+
+// Build a lookup of latest from→USD rates
+const buildUsdRateMap = (rates: { from_currency: string; to_currency: string; effective_rate: number }[]) => {
+  const map = new Map<string, number>();
+  map.set("USD", 1);
+  for (const r of rates) {
+    if (r.to_currency === "USD" && !map.has(r.from_currency)) {
+      map.set(r.from_currency, Number(r.effective_rate));
+    }
+  }
+  for (const r of rates) {
+    if (r.from_currency === "USD" && !map.has(r.to_currency) && Number(r.effective_rate) > 0) {
+      map.set(r.to_currency, 1 / Number(r.effective_rate));
+    }
+  }
+  return map;
+};
+
+const convertToUsd = (amount: number, currency: string, rateMap: Map<string, number>): number | null => {
+  const r = rateMap.get(currency);
+  if (r === undefined) return null;
+  return amount * r;
+};
 
 const cardClass =
   "group relative overflow-hidden rounded-2xl bg-card border border-border p-4 transition-[transform,box-shadow] duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] hover:-translate-y-1 hover:shadow-lg";
@@ -20,39 +44,48 @@ const MiniStats = () => {
   const { data: transfers } = useTransfers(500);
   const { data: profile } = useProfile();
   const { data: goals } = useSavingsGoals();
+  const { data: fxRates } = useFxRates();
 
   const monthData = useMemo(() => {
+    const rateMap = buildUsdRateMap(fxRates || []);
     const now = new Date();
     const start = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-    const recent = (transfers || []).filter((t) => new Date(t.created_at).getTime() >= start);
+    const recent = (transfers || []).filter(
+      (t) => t.status === "completed" && new Date(t.created_at).getTime() >= start
+    );
 
-    // Group totals by source currency
-    const byCurrency: Record<string, number> = {};
+    // Convert each transfer to USD; track amounts without a known rate separately
+    let totalUsd = 0;
+    const unconverted: Record<string, number> = {};
     recent.forEach((t) => {
       const c = (t.source_currency || "USD").toUpperCase();
-      byCurrency[c] = (byCurrency[c] || 0) + Number(t.source_amount);
+      const usd = convertToUsd(Number(t.source_amount), c, rateMap);
+      if (usd === null) {
+        unconverted[c] = (unconverted[c] || 0) + Number(t.source_amount);
+      } else {
+        totalUsd += usd;
+      }
     });
-    const sorted = Object.entries(byCurrency).sort((a, b) => b[1] - a[1]);
-    const primary = sorted[0] || ["USD", 0];
-    const others = sorted.slice(1);
+    const others = Object.entries(unconverted).sort((a, b) => b[1] - a[1]);
 
-    // Bars: per-day buckets for the primary currency only
+    // Bars: per-day USD-converted totals
     const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
     const bars = new Array(daysInMonth).fill(0);
-    recent
-      .filter((t) => (t.source_currency || "USD").toUpperCase() === primary[0])
-      .forEach((t) => {
-        const day = new Date(t.created_at).getDate();
-        bars[day - 1] += Number(t.source_amount);
-      });
+    recent.forEach((t) => {
+      const c = (t.source_currency || "USD").toUpperCase();
+      const usd = convertToUsd(Number(t.source_amount), c, rateMap);
+      if (usd === null) return;
+      const day = new Date(t.created_at).getDate();
+      bars[day - 1] += usd;
+    });
     const max = Math.max(...bars, 1);
     return {
-      currency: primary[0] as string,
-      total: primary[1] as number,
+      currency: "USD",
+      total: totalUsd,
       others,
       bars: bars.map((b) => (b > 0 ? Math.max(15, (b / max) * 100) : 6)),
     };
-  }, [transfers]);
+  }, [transfers, fxRates]);
 
   const formatMoney = (amount: number, currency: string) => {
     try {
