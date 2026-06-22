@@ -8,9 +8,25 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Smartphone, ShieldCheck, ArrowRight, Loader2, MessageSquare, KeyRound, Wallet } from "lucide-react";
+import { Smartphone, ShieldCheck, ArrowRight, Loader2, MessageSquare, KeyRound, Wallet, User } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { initiateElicateCharge } from "@/lib/elicate";
+import { useProfile } from "@/hooks/useProfile";
+
+// Zambia mobile-money prefix → default network. User can still override.
+function networkFromPhone(raw: string): string | null {
+  const digits = raw.replace(/[^\d]/g, "");
+  // Normalise to last 9 (national) — strip 260 country code if present.
+  let n = digits;
+  if (n.startsWith("260")) n = n.slice(3);
+  if (n.startsWith("0")) n = n.slice(1);
+  if (n.length < 2) return null;
+  const prefix = n.slice(0, 2);
+  if (["96", "76"].includes(prefix)) return "MTN";
+  if (["97", "77"].includes(prefix)) return "AIRTEL";
+  if (["95", "75"].includes(prefix)) return "ZAMTEL";
+  return null;
+}
 
 interface Props {
   walletId: string;
@@ -25,12 +41,29 @@ const NETWORKS = [
 
 export default function ElicateTopUpCard({ walletId, walletCurrency }: Props) {
   const queryClient = useQueryClient();
+  const { data: profile } = useProfile();
   const [params, setParams] = useSearchParams();
   const [amount, setAmount] = useState("");
   const [network, setNetwork] = useState("MTN");
   const [phone, setPhone] = useState("");
+  const [phoneTouched, setPhoneTouched] = useState(false);
+  const [networkTouched, setNetworkTouched] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [redirecting, setRedirecting] = useState(false);
+
+  // Pre-fill the user's saved phone (one-time, before they type anything).
+  useEffect(() => {
+    if (phoneTouched) return;
+    const saved = profile?.phone_number?.trim();
+    if (saved && !phone) setPhone(saved);
+  }, [profile?.phone_number, phone, phoneTouched]);
+
+  // Auto-detect network from phone prefix unless user has manually picked one.
+  useEffect(() => {
+    if (networkTouched) return;
+    const detected = networkFromPhone(phone);
+    if (detected && detected !== network) setNetwork(detected);
+  }, [phone, network, networkTouched]);
 
   // Handle return from Elicate hosted page.
   useEffect(() => {
@@ -120,7 +153,7 @@ export default function ElicateTopUpCard({ walletId, walletCurrency }: Props) {
 
           <div>
             <Label>Mobile Money Network</Label>
-            <Select value={network} onValueChange={setNetwork}>
+            <Select value={network} onValueChange={(v) => { setNetwork(v); setNetworkTouched(true); }}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 {NETWORKS.map((n) => (
@@ -128,17 +161,43 @@ export default function ElicateTopUpCard({ walletId, walletCurrency }: Props) {
                 ))}
               </SelectContent>
             </Select>
+            {!networkTouched && phone && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Auto-selected from phone prefix — change manually if wrong.
+              </p>
+            )}
           </div>
 
           <div>
-            <Label>Mobile Money Number</Label>
+            <div className="flex items-center justify-between">
+              <Label>Mobile Money Number</Label>
+              {profile?.phone_number && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 text-xs px-2"
+                  onClick={() => { setPhone(profile.phone_number || ""); setPhoneTouched(true); }}
+                >
+                  <User className="w-3 h-3 mr-1" />
+                  Use my number
+                </Button>
+              )}
+            </div>
             <Input
               type="tel"
               inputMode="tel"
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              onChange={(e) => { setPhone(e.target.value); setPhoneTouched(true); }}
               placeholder="+260 97 123 4567"
             />
+            <p className="text-xs text-muted-foreground mt-1">
+              {profile?.phone_number && phone === profile.phone_number
+                ? "Topping up your own wallet. Change the number to top up someone else."
+                : phone && phone !== profile?.phone_number
+                  ? "Topping up someone else's mobile money — make sure the number is correct."
+                  : "Enter the phone number to charge for this top-up."}
+            </p>
           </div>
 
           <div className="p-3 rounded-lg bg-muted/40 border border-border flex items-start gap-2">
@@ -161,7 +220,11 @@ export default function ElicateTopUpCard({ walletId, walletCurrency }: Props) {
           <DialogHeader>
             <DialogTitle>You're about to leave eFinMoney</DialogTitle>
             <DialogDescription>
-              We'll take you to our secure payment partner to authorise this {network} top-up of <strong>ZMW {amount}</strong> from <strong>{phone}</strong>.
+              {profile?.phone_number && phone === profile.phone_number ? (
+                <>We'll take you to our secure payment partner to authorise this {network} top-up of <strong>ZMW {amount}</strong> from <strong>{phone}</strong>.</>
+              ) : (
+                <>This will charge <strong>{phone}</strong> ({network}) <strong>ZMW {amount}</strong> and credit your wallet. The owner of that phone must approve the OTP and PIN — so only proceed if you have access to it (or they're with you).</>
+              )}
             </DialogDescription>
           </DialogHeader>
 
