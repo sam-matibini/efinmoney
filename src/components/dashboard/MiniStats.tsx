@@ -5,30 +5,11 @@ import { useTransfers } from "@/hooks/useTransfers";
 import { useProfile } from "@/hooks/useProfile";
 import { useSavingsGoals } from "@/hooks/useSavingsGoals";
 import { useFxRates } from "@/hooks/useFxRates";
+import { buildUsdRateMap, convertToUsd } from "@/lib/fx";
 import { Link } from "react-router-dom";
 
-// Build a lookup of latest from→USD rates
-const buildUsdRateMap = (rates: { from_currency: string; to_currency: string; effective_rate: number }[]) => {
-  const map = new Map<string, number>();
-  map.set("USD", 1);
-  for (const r of rates) {
-    if (r.to_currency === "USD" && !map.has(r.from_currency)) {
-      map.set(r.from_currency, Number(r.effective_rate));
-    }
-  }
-  for (const r of rates) {
-    if (r.from_currency === "USD" && !map.has(r.to_currency) && Number(r.effective_rate) > 0) {
-      map.set(r.to_currency, 1 / Number(r.effective_rate));
-    }
-  }
-  return map;
-};
-
-const convertToUsd = (amount: number, currency: string, rateMap: Map<string, number>): number | null => {
-  const r = rateMap.get(currency);
-  if (r === undefined) return null;
-  return amount * r;
-};
+// Same statuses counted toward "this month" by the tier limit check (lib/tierLimits.ts)
+const COUNTS_TOWARD_MONTH = ["initiated", "funded", "processing", "completed"];
 
 const cardClass =
   "group relative overflow-hidden rounded-2xl bg-card border border-border p-4 transition-[transform,box-shadow] duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] hover:-translate-y-1 hover:shadow-lg";
@@ -51,7 +32,7 @@ const MiniStats = () => {
     const now = new Date();
     const start = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
     const recent = (transfers || []).filter(
-      (t) => t.status === "completed" && new Date(t.created_at).getTime() >= start
+      (t) => COUNTS_TOWARD_MONTH.includes(t.status) && new Date(t.created_at).getTime() >= start
     );
 
     // Convert each transfer to USD; track amounts without a known rate separately
