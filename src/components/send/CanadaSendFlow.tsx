@@ -13,16 +13,12 @@ import { useProfile } from "@/hooks/useProfile";
 import { downloadTransferReceipt } from "@/lib/receipt";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { CheckCircle, Landmark, AlertCircle, Info, CreditCard, Wallet, Zap, Check, Building2, Link2, Copy, Share2 } from "lucide-react";
+import { CheckCircle, Landmark, AlertCircle, Info, CreditCard, Wallet, Zap, Check, Building2, Link2 } from "lucide-react";
 import { useStripeConnectedAccount, isConnectReady, getConnectReadiness } from "@/hooks/useStripeConnectedAccount";
 import { tokenizeDebitCard } from "@/lib/stripePayouts";
 import { usePinGate } from "@/components/send/usePinGate";
-import {
-  RecipientCardSection,
-  type RecipientCardHandle,
-  useStripeElementStyle,
-  elementWrapperClass,
-} from "@/components/send/RecipientCardSection";
+import { useStripeElementStyle, elementWrapperClass } from "@/components/send/RecipientCardSection";
+import { createPaymentLink, PaymentLinkSuccess, type PaymentLinkResult } from "@/components/send/PaymentLinkSuccess";
 import { getStripe } from "@/lib/stripe";
 import type { Stripe } from "@stripe/stripe-js";
 import {
@@ -34,6 +30,16 @@ import {
   useElements,
 } from "@stripe/react-stripe-js";
 
+// Sending to another person uses a claim link (recipient enters their own
+// payout details). "stripe_connect" is a self-withdrawal to your own account.
+type DeliveryMethod = "paylink" | "interac" | "eft" | "stripe_connect";
+type FundingSource = "wallet" | "card";
+
+// Feature flag: flip to false instantly if Paysafe Interac e-Transfer is unavailable.
+const INTERAC_ETRANSFER_ENABLED = true;
+
+const DELIVERY_FEES: Record<DeliveryMethod, number> = { paylink: 0, interac: 0.5, eft: 0, stripe_connect: 1.0 };
+const CARD_PROCESSING_FEE = 1.5;
 
 const CanadaSendFlow = () => {
   const [stripeP] = useState<Promise<Stripe | null>>(() => getStripe());
@@ -58,7 +64,7 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
   const { data: profile } = useProfile();
 
   const [step, setStep] = useState(1);
-  const [method, setMethod] = useState<DeliveryMethod>("eft");
+  const [method, setMethod] = useState<DeliveryMethod>("paylink");
   const [funding, setFunding] = useState<FundingSource>("wallet");
   const [amount, setAmount] = useState("");
   const [walletId, setWalletId] = useState("");
@@ -79,14 +85,11 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
   const [cardCvcComplete, setCardCvcComplete] = useState(false);
   const [cardSubmitting, setCardSubmitting] = useState(false);
 
-  // Recipient debit card (separate Stripe Elements scope, only for card_push)
-  const recipientCardRef = useRef<RecipientCardHandle>(null);
-  const [recipientCardComplete, setRecipientCardComplete] = useState(false);
   const cardPanelRef = useRef<HTMLDivElement | null>(null);
 
   const [lastTransferId, setLastTransferId] = useState<string | null>(null);
   const [security, setSecurity] = useState<{ question: string; answer: string } | null>(null);
-  const [paylinkResult, setPaylinkResult] = useState<{ url: string; code: string; expires_at: string } | null>(null);
+  const [paylinkResult, setPaylinkResult] = useState<PaymentLinkResult | null>(null);
   const [paylinkSubmitting, setPaylinkSubmitting] = useState(false);
 
   const { data: wallets } = useWallets();
@@ -154,17 +157,16 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
   const recipientValid = method === "stripe_connect"
     ? !!connectAcct
     : method === "paylink"
-      ? true  // recipient details optional for paylink (sender just generates a link)
-      : method === "card_push"
-        ? recipientName.trim().length > 1 && recipientCardComplete
-        : method === "interac"
-          ? recipientName.trim().length > 1
-              && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail)
-              && interacQAValid
-          : recipientName.trim().length > 1
-              && /^\d{3}$/.test(institutionNumber)
-              && /^\d{5}$/.test(transitNumber)
-              && accountNumber.trim().length >= 4;
+      // Name optional; if an email is provided it must be valid (we auto-send the link).
+      ? (!recipientEmail || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail))
+      : method === "interac"
+        ? recipientName.trim().length > 1
+            && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail)
+            && interacQAValid
+        : recipientName.trim().length > 1
+            && /^\d{3}$/.test(institutionNumber)
+            && /^\d{5}$/.test(transitNumber)
+            && accountNumber.trim().length >= 4;
 
   const cardFieldsValid = funding === "wallet"
     ? true
@@ -175,27 +177,22 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
   const handleSubmit = async () => {
     if (funding === "wallet" && !selectedWallet) return;
 
-    // Payment Link branch — escrow funds and generate a claim link.
+    // Payment Link branch — escrow funds and generate a claim link (auto-emailed).
     if (method === "paylink") {
       if (!selectedWallet) { toast.error("Select a CAD wallet"); return; }
       setPaylinkSubmitting(true);
       try {
-        const { data, error } = await supabase.functions.invoke("payment-link-create", {
-          body: {
-            amount: parsedAmount,
-            currency: "CAD",
-            sender_wallet_id: selectedWallet.wallet_id,
-            recipient_name: recipientName || null,
-            recipient_note: message || null,
-            source: "send",
-            base_url: window.location.origin,
-          },
+        const result = await createPaymentLink({
+          amount: parsedAmount,
+          currency: "CAD",
+          sender_wallet_id: selectedWallet.wallet_id,
+          recipient_name: recipientName || null,
+          recipient_email: recipientEmail || null,
+          recipient_note: message || null,
         });
-        if (error) throw error;
-        if (!data?.success) throw new Error(data?.error || "Could not create payment link");
-        setPaylinkResult({ url: data.url, code: data.code, expires_at: data.expires_at });
+        setPaylinkResult(result);
         setStep(3);
-        toast.success("Payment link created");
+        toast.success(result.emailed ? "Payment link sent" : "Payment link created");
       } catch (e: any) {
         toast.error(e?.message || "Could not create payment link");
       } finally {
@@ -244,33 +241,14 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
         }
       }
 
-      // Tokenize recipient debit card if instant card_push delivery
-      let recipientTok: { token: string; last4: string; brand: string } | null = null;
-      if (method === "card_push") {
-        if (!recipientCardRef.current?.isComplete()) {
-          toast.error("Please complete the recipient's card details");
-          return;
-        }
-        setCardSubmitting(true);
-        try {
-          recipientTok = await recipientCardRef.current.tokenize(recipientName);
-        } catch (e: any) {
-          setCardSubmitting(false);
-          toast.error(e?.message || "Couldn't tokenize recipient card");
-          return;
-        }
-      }
-
       const transfer = await createTransfer.mutateAsync({
         sender_wallet_id: (funding === "wallet" ? selectedWallet?.wallet_id : (selectedWallet?.wallet_id || fallbackWallet?.wallet_id))!,
         recipient_name: recipientName,
         recipient_account: method === "eft"
           ? `${institutionNumber}-${transitNumber}-${accountNumber}`
-          : method === "card_push"
-            ? (recipientEmail || `card-${recipientTok?.last4 || "xxxx"}`)
-            : method === "stripe_connect"
-              ? (connectAcct?.stripe_account_id || recipientEmail || "stripe_connect")
-              : recipientEmail,
+          : method === "stripe_connect"
+            ? (connectAcct?.stripe_account_id || recipientEmail || "stripe_connect")
+            : recipientEmail,
         recipient_country: "CA",
         transfer_type: "domestic_canada",
         payout_method: method,
@@ -295,12 +273,6 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
           body.card_token = tokenized.token;
           body.last4 = tokenized.last4;
           body.brand = tokenized.brand;
-        }
-        if (method === "card_push" && recipientTok) {
-          body.recipient_card_token = recipientTok.token;
-          body.recipient_last4 = recipientTok.last4;
-          body.recipient_brand = recipientTok.brand;
-          body.recipient_email = recipientEmail || null;
         }
         const { data: execData } = await supabase.functions.invoke("execute-transfer", { body });
         if (execData?.success === false) {
@@ -331,8 +303,7 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
     setSecurityQuestion(""); setSecurityAnswer("");
     setInstitutionNumber(""); setTransitNumber(""); setAccountNumber(""); setBankName("");
     setCardNumComplete(false); setCardExpComplete(false); setCardCvcComplete(false);
-    setRecipientCardComplete(false);
-    setMethod("eft");
+    setMethod("paylink");
     setFunding("wallet");
     setLastTransferId(null);
     setPaylinkResult(null);
@@ -415,7 +386,21 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
 
             <div className="space-y-2">
               <Label>Delivery Method (how recipient receives)</Label>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <Button
+                  type="button"
+                  variant={method === "paylink" ? "default" : "outline"}
+                  className="relative flex flex-col items-center gap-1 h-auto py-3"
+                  onClick={() => setMethod("paylink")}
+                  title="Email the recipient a secure link — they choose how to receive it (no card details from you)"
+                >
+                  <span className="absolute top-1 right-1 text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-primary/15 text-primary">
+                    EASIEST
+                  </span>
+                  <Link2 className="w-5 h-5" />
+                  <span className="text-xs">Send with a link</span>
+                  <span className="text-[10px] opacity-70">Free · recipient picks</span>
+                </Button>
                 <Button
                   type="button"
                   variant={method === "eft" ? "default" : "outline"}
@@ -443,16 +428,6 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
                 )}
                 <Button
                   type="button"
-                  variant={method === "card_push" ? "default" : "outline"}
-                  className="flex flex-col items-center gap-1 h-auto py-3"
-                  onClick={() => setMethod("card_push")}
-                >
-                  <Zap className="w-5 h-5" />
-                  <span className="text-xs">Send to debit card · Stripe</span>
-                  <span className="text-[10px] opacity-70">C$1.00 · seconds</span>
-                </Button>
-                <Button
-                  type="button"
                   variant={method === "stripe_connect" ? "default" : "outline"}
                   className="relative flex flex-col items-center gap-1 h-auto py-3"
                   onClick={() => setMethod("stripe_connect")}
@@ -465,17 +440,6 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
                   <Building2 className="w-5 h-5" />
                   <span className="text-xs">Withdraw to my Stripe</span>
                   <span className="text-[10px] opacity-70">C$1.00 · instant</span>
-                </Button>
-                <Button
-                  type="button"
-                  variant={method === "paylink" ? "default" : "outline"}
-                  className="flex flex-col items-center gap-1 h-auto py-3"
-                  onClick={() => setMethod("paylink")}
-                  title="Generate a one-time link the recipient opens to choose how they get paid"
-                >
-                  <Link2 className="w-5 h-5" />
-                  <span className="text-xs">Payment Link</span>
-                  <span className="text-[10px] opacity-70">Free · 7-day expiry</span>
                 </Button>
               </div>
               {(!connectReady || !connectState.hasAccount) && (
@@ -532,13 +496,17 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
               {method === "paylink" && (
                 <>
                   <div className="space-y-2">
+                    <Label>Recipient email <span className="text-xs text-muted-foreground">(we'll send them the link)</span></Label>
+                    <Input type="email" value={recipientEmail} onChange={(e) => setRecipientEmail(e.target.value)} placeholder="jane@example.com" />
+                  </div>
+                  <div className="space-y-2">
                     <Label>Note for recipient (optional)</Label>
                     <Textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Thanks for lunch 🍕" rows={2} />
                   </div>
                   <div className="p-3 rounded-lg bg-primary/5 border border-primary/30 text-xs text-foreground flex items-start gap-2">
                     <Link2 className="w-4 h-4 mt-0.5 text-primary shrink-0" />
                     <div className="space-y-1">
-                      <p><strong>How it works:</strong> we hold C${parsedAmount.toFixed(2)} from your CAD wallet, then send you a one-time link. The recipient opens it, picks Interac / EFT / debit card, and the funds are released.</p>
+                      <p><strong>How it works:</strong> we hold C${parsedAmount.toFixed(2)} from your CAD wallet and email {recipientEmail || "the recipient"} a secure link. They open it, choose Interac / EFT / their own debit card, and the funds are released — you never handle their card details.</p>
                       <p>The link expires in 7 days. You can revoke it anytime before it's claimed and the funds return to your wallet.</p>
                     </div>
                   </div>
@@ -639,19 +607,6 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
                 </>
               )}
 
-              {method === "card_push" && (
-                <>
-                  <div className="space-y-2">
-                    <Label>Recipient Email (optional, for receipt)</Label>
-                    <Input type="email" value={recipientEmail} onChange={(e) => setRecipientEmail(e.target.value)} placeholder="jane@example.com" />
-                  </div>
-                  <RecipientCardSection
-                    ref={recipientCardRef}
-                    onValidityChange={setRecipientCardComplete}
-                    elementStyle={elementStyle}
-                  />
-                </>
-              )}
             </div>
 
             {/* Funding source — hidden for paylink (always wallet escrow) */}
@@ -785,12 +740,11 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
                 {(createTransfer.isPending || cardSubmitting || paylinkSubmitting)
                   ? "Processing..."
                   : method === "paylink"
-                    ? `Create C$${parsedAmount.toFixed(2)} Payment Link`
+                    ? (recipientEmail ? `Send C$${parsedAmount.toFixed(2)} link to email` : `Create C$${parsedAmount.toFixed(2)} link`)
                     : `Send C$${parsedAmount.toFixed(2)} via ${
                         method === "eft" ? "Bank Transfer"
                           : method === "interac" ? "Interac e-Transfer"
-                          : method === "stripe_connect" ? "Stripe (my account)"
-                          : "Stripe · Visa Direct"
+                          : "Stripe (my account)"
                       }`}
               </Button>
             </div>
@@ -809,8 +763,7 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
                   Delivery: {
                     method === "eft" ? "Bank Transfer (EFT)"
                       : method === "interac" ? "Interac e-Transfer (email)"
-                      : method === "stripe_connect" ? "Stripe — instant payout to your own connected account"
-                      : "Stripe — instant to recipient's debit card (Visa Direct)"
+                      : "Stripe — instant payout to your own connected account"
                   }
                 </p>
               </div>
@@ -820,43 +773,12 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
       )}
 
       {step === 3 && method === "paylink" && paylinkResult && (
-        <Card>
-          <CardContent className="py-10 text-center space-y-5">
-            <motion.div
-              initial={{ scale: 0 }} animate={{ scale: 1 }}
-              className="w-20 h-20 mx-auto rounded-full bg-primary/15 flex items-center justify-center"
-            >
-              <Link2 className="w-10 h-10 text-primary" />
-            </motion.div>
-            <div>
-              <h3 className="text-2xl font-display font-bold mb-1">Payment link ready</h3>
-              <p className="text-sm text-muted-foreground">
-                C${parsedAmount.toFixed(2)} is held in escrow. Share the link below.
-              </p>
-            </div>
-            <div className="p-3 rounded-lg border border-border bg-muted/40 text-left">
-              <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">Claim link</p>
-              <code className="block text-sm break-all">{paylinkResult.url}</code>
-              <p className="text-[11px] text-muted-foreground mt-2">
-                Expires {new Date(paylinkResult.expires_at).toLocaleString()} · single use
-              </p>
-            </div>
-            <div className="flex flex-col sm:flex-row gap-2 justify-center">
-              <Button onClick={async () => { await navigator.clipboard.writeText(paylinkResult.url); toast.success("Link copied"); }}>
-                <Copy className="w-4 h-4 mr-2" /> Copy link
-              </Button>
-              {typeof navigator !== "undefined" && (navigator as any).share && (
-                <Button variant="outline" onClick={() => (navigator as any).share({ title: "Payment for you", text: `${recipientName || "Hey"}, claim your C$${parsedAmount.toFixed(2)} here:`, url: paylinkResult.url })}>
-                  <Share2 className="w-4 h-4 mr-2" /> Share
-                </Button>
-              )}
-              <Button variant="outline" asChild>
-                <a href={`mailto:${recipientEmail || ""}?subject=${encodeURIComponent("You've got a payment")}&body=${encodeURIComponent(`Claim your C$${parsedAmount.toFixed(2)} here: ${paylinkResult.url}`)}`}>Email it</a>
-              </Button>
-              <Button variant="outline" onClick={reset}>Done</Button>
-            </div>
-          </CardContent>
-        </Card>
+        <PaymentLinkSuccess
+          result={paylinkResult}
+          amountLabel={`C$${parsedAmount.toFixed(2)}`}
+          recipientName={recipientName}
+          onDone={reset}
+        />
       )}
 
       {step === 3 && method !== "paylink" && (
@@ -886,11 +808,6 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
                     Security Q: <strong>{security.question}</strong> · A: <strong>{security.answer}</strong>
                   </span>
                 )}
-              </p>
-            )}
-            {method === "card_push" && (
-              <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
-                Funds are being pushed to {recipientName}'s debit card via Visa Direct and typically arrive within seconds.
               </p>
             )}
             {method === "stripe_connect" && (

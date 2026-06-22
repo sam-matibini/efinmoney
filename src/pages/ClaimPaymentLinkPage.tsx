@@ -18,6 +18,7 @@ import {
 import type { Stripe as StripeJs } from "@stripe/stripe-js";
 import { getStripe } from "@/lib/stripe";
 import { tokenizeDebitCard } from "@/lib/stripePayouts";
+import { getClaimKyc, isClaimCardCurrency } from "@/lib/stripeCorridors";
 
 type Resolved = {
   code: string;
@@ -45,7 +46,11 @@ const ClaimInner = ({ link, code }: { link: Resolved; code: string }) => {
   const stripe = useStripe();
   const elements = useElements();
 
-  const [rail, setRail] = useState<Rail>("interac");
+  // Corridor-aware KYC descriptor derived from the link's payout currency.
+  const kycSpec = getClaimKyc(link.currency);
+  const cardAvailable = isClaimCardCurrency(link.currency);
+
+  const [rail, setRail] = useState<Rail>(cardAvailable && link.currency !== "CAD" ? "card_push" : "interac");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [inst, setInst] = useState("");
@@ -63,6 +68,8 @@ const ClaimInner = ({ link, code }: { link: Resolved; code: string }) => {
   const [addrCity, setAddrCity] = useState("");
   const [addrState, setAddrState] = useState("");
   const [addrPostal, setAddrPostal] = useState("");
+  const [addrCountry, setAddrCountry] = useState(kycSpec?.countries[0]?.iso ?? "");
+  const [ssnLast4, setSsnLast4] = useState("");
   const [tosAccepted, setTosAccepted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState<{ method: Rail } | null>(null);
@@ -70,6 +77,7 @@ const ClaimInner = ({ link, code }: { link: Resolved; code: string }) => {
   const cardComplete = cardNumComplete && cardExpComplete && cardCvcComplete;
 
   const kycValid = useMemo(() => {
+    if (!kycSpec) return false;
     const d = parseInt(dobDay, 10), m = parseInt(dobMonth, 10), y = parseInt(dobYear, 10);
     if (!d || !m || !y || d < 1 || d > 31 || m < 1 || m > 12 || y < 1900) return false;
     const dob = new Date(y, m - 1, d);
@@ -78,11 +86,13 @@ const ClaimInner = ({ link, code }: { link: Resolved; code: string }) => {
     if (!/^\+?\d[\d\s\-()]{7,16}$/.test(phone)) return false;
     if (addrLine1.trim().length < 3) return false;
     if (addrCity.trim().length < 2) return false;
-    if (!/^(AB|BC|MB|NB|NL|NS|NT|NU|ON|PE|QC|SK|YT)$/.test(addrState)) return false;
-    if (!/^[A-Za-z]\d[A-Za-z] ?\d[A-Za-z]\d$/.test(addrPostal.trim())) return false;
+    if (!addrCountry) return false;
+    if (kycSpec.stateLabel && !addrState) return false;
+    if (!new RegExp(kycSpec.postalRegex).test(addrPostal.trim().toUpperCase().replace(/\s+/g, ""))) return false;
+    if (kycSpec.personalIdRegex && !new RegExp(kycSpec.personalIdRegex).test(ssnLast4.trim())) return false;
     if (!tosAccepted) return false;
     return true;
-  }, [dobDay, dobMonth, dobYear, phone, addrLine1, addrCity, addrState, addrPostal, tosAccepted]);
+  }, [kycSpec, dobDay, dobMonth, dobYear, phone, addrLine1, addrCity, addrState, addrCountry, addrPostal, ssnLast4, tosAccepted]);
 
   const isValid = useMemo(() => {
     if (name.trim().length < 2) return false;
@@ -103,7 +113,7 @@ const ClaimInner = ({ link, code }: { link: Resolved; code: string }) => {
         if (!stripe || !elements) throw new Error("Card form not ready");
         const cardEl = elements.getElement(CardNumberElement);
         if (!cardEl) throw new Error("Card form not ready");
-        const tok = await tokenizeDebitCard(stripe, cardEl, { name: name.trim(), currency: "cad" });
+        const tok = await tokenizeDebitCard(stripe, cardEl, { name: name.trim(), currency: link.currency.toLowerCase() });
         payload = {
           card_token: tok.token,
           card_last4: tok.last4,
@@ -111,12 +121,13 @@ const ClaimInner = ({ link, code }: { link: Resolved; code: string }) => {
           kyc: {
             dob: { day: parseInt(dobDay, 10), month: parseInt(dobMonth, 10), year: parseInt(dobYear, 10) },
             phone: phone.trim(),
+            ...(kycSpec?.personalIdLabel ? { ssn_last_4: ssnLast4.trim() } : {}),
             address: {
               line1: addrLine1.trim(),
               city: addrCity.trim(),
-              state: addrState.trim().toUpperCase(),
+              ...(kycSpec?.stateLabel ? { state: addrState.trim().toUpperCase() } : {}),
               postal_code: addrPostal.trim().toUpperCase().replace(/\s+/g, ""),
-              country: "CA",
+              country: addrCountry,
             },
           },
           tos: { accepted: true },
@@ -180,18 +191,28 @@ const ClaimInner = ({ link, code }: { link: Resolved; code: string }) => {
         <div>
           <Label>How would you like to receive it?</Label>
           <div className="grid grid-cols-3 gap-2 mt-2">
-            <Button variant={rail === "interac" ? "default" : "outline"} onClick={() => setRail("interac")} className="flex-col h-auto py-3">
+            <Button
+              variant={rail === "interac" ? "default" : "outline"}
+              onClick={() => setRail("interac")}
+              className="flex-col h-auto py-3"
+              disabled={link.currency !== "CAD"}
+            >
               <Zap className="w-5 h-5 mb-1" /><span className="text-xs">Interac</span>
             </Button>
             <Button
               variant={rail === "card_push" ? "default" : "outline"}
               onClick={() => setRail("card_push")}
               className="flex-col h-auto py-3"
-              disabled={link.currency !== "CAD"}
+              disabled={!cardAvailable}
             >
               <CreditCard className="w-5 h-5 mb-1" /><span className="text-xs">Debit card</span>
             </Button>
-            <Button variant={rail === "eft" ? "default" : "outline"} onClick={() => setRail("eft")} className="flex-col h-auto py-3">
+            <Button
+              variant={rail === "eft" ? "default" : "outline"}
+              onClick={() => setRail("eft")}
+              className="flex-col h-auto py-3"
+              disabled={link.currency !== "CAD"}
+            >
               <Landmark className="w-5 h-5 mb-1" /><span className="text-xs">Bank (EFT)</span>
             </Button>
           </div>
@@ -236,7 +257,7 @@ const ClaimInner = ({ link, code }: { link: Resolved; code: string }) => {
               <Label>Debit card number</Label>
               <div className={elementWrapperClass}>
                 <CardNumberElement
-                  options={{ showIcon: true, placeholder: "Canadian debit card" }}
+                  options={{ showIcon: true, placeholder: "Your debit card" }}
                   onChange={(e) => setCardNumComplete(e.complete)}
                   className="w-full"
                 />
@@ -257,7 +278,7 @@ const ClaimInner = ({ link, code }: { link: Resolved; code: string }) => {
               </div>
             </div>
             <p className="text-[11px] text-muted-foreground">
-              Canadian debit cards only (Visa Debit, Debit Mastercard, Interac). Funds arrive in seconds via Visa Direct.
+              Debit cards only (Visa Debit, Debit Mastercard) issued in {link.currency === "CAD" ? "Canada" : link.currency === "USD" ? "the US" : link.currency === "GBP" ? "the UK" : "the EU"}. Funds arrive in seconds via Visa Direct.
             </p>
 
             <div className="pt-3 border-t space-y-3">
@@ -284,37 +305,63 @@ const ClaimInner = ({ link, code }: { link: Resolved; code: string }) => {
                   onChange={(e) => setPhone(e.target.value)} />
               </div>
 
+              {kycSpec && kycSpec.countries.length > 1 && (
+                <div className="space-y-2">
+                  <Label>Country</Label>
+                  <select
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    value={addrCountry}
+                    onChange={(e) => setAddrCountry(e.target.value)}
+                  >
+                    {kycSpec.countries.map((c) => (
+                      <option key={c.iso} value={c.iso}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <div className="space-y-2">
                 <Label>Street address</Label>
                 <Input placeholder="123 Main St" value={addrLine1}
                   onChange={(e) => setAddrLine1(e.target.value)} />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className={kycSpec?.stateLabel ? "grid grid-cols-2 gap-3" : "space-y-2"}>
                 <div className="space-y-2">
                   <Label>City</Label>
-                  <Input placeholder="Toronto" value={addrCity}
+                  <Input placeholder="City" value={addrCity}
                     onChange={(e) => setAddrCity(e.target.value)} />
                 </div>
-                <div className="space-y-2">
-                  <Label>Province</Label>
-                  <select
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    value={addrState}
-                    onChange={(e) => setAddrState(e.target.value)}
-                  >
-                    <option value="">Select…</option>
-                    {["AB","BC","MB","NB","NL","NS","NT","NU","ON","PE","QC","SK","YT"].map(p => (
-                      <option key={p} value={p}>{p}</option>
-                    ))}
-                  </select>
-                </div>
+                {kycSpec?.stateLabel && (
+                  <div className="space-y-2">
+                    <Label>{kycSpec.stateLabel}</Label>
+                    <select
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      value={addrState}
+                      onChange={(e) => setAddrState(e.target.value)}
+                    >
+                      <option value="">Select…</option>
+                      {(kycSpec.states ?? []).map((s) => (
+                        <option key={s.code} value={s.code}>{s.code} — {s.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
 
-              <div className="space-y-2">
-                <Label>Postal code</Label>
-                <Input placeholder="M5H 1A1" value={addrPostal}
-                  onChange={(e) => setAddrPostal(e.target.value.toUpperCase())} />
+              <div className={kycSpec?.personalIdLabel ? "grid grid-cols-2 gap-3" : "space-y-2"}>
+                <div className="space-y-2">
+                  <Label>{kycSpec?.postalLabel ?? "Postal code"}</Label>
+                  <Input placeholder={kycSpec?.postalLabel ?? "Postal code"} value={addrPostal}
+                    onChange={(e) => setAddrPostal(e.target.value.toUpperCase())} />
+                </div>
+                {kycSpec?.personalIdLabel && (
+                  <div className="space-y-2">
+                    <Label>{kycSpec.personalIdLabel}</Label>
+                    <Input inputMode="numeric" maxLength={4} placeholder="1234" value={ssnLast4}
+                      onChange={(e) => setSsnLast4(e.target.value.replace(/\D/g, "").slice(0, 4))} />
+                  </div>
+                )}
               </div>
 
               <label className="flex items-start gap-2 text-xs text-muted-foreground cursor-pointer">

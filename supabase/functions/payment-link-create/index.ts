@@ -33,6 +33,8 @@ Deno.serve(async (req) => {
   const currency: string = String(body?.currency ?? "CAD").toUpperCase();
   const senderWalletId: string | null = body?.sender_wallet_id ?? null;
   const recipientName: string | null = body?.recipient_name ?? null;
+  const recipientEmailRaw: string = String(body?.recipient_email ?? "").trim();
+  const recipientEmail: string | null = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmailRaw) ? recipientEmailRaw : null;
   const recipientNote: string | null = body?.recipient_note ?? null;
   const source: "send" | "invoice" = body?.source === "invoice" ? "invoice" : "send";
   const sourceRef: string | null = body?.source_ref ?? null;
@@ -181,6 +183,7 @@ Deno.serve(async (req) => {
       amount,
       currency,
       recipient_name: recipientName,
+      recipient_email: recipientEmail,
       recipient_note: recipientNote,
       short_code: shortCode,
       short_url: shortUrl,
@@ -194,11 +197,51 @@ Deno.serve(async (req) => {
     .single();
   if (insErr) return json({ error: insErr.message }, 500);
 
+  // Best-effort: email the claim link to the recipient. Never fail link
+  // creation if the email send hiccups — the sender still gets the URL to share.
+  let emailed = false;
+  if (recipientEmail) {
+    try {
+      const { data: senderProfile } = await admin
+        .from("profiles")
+        .select("full_name")
+        .eq("id", userId)
+        .maybeSingle();
+      const senderName = senderProfile?.full_name || userData.user.email || "Someone";
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${SERVICE_ROLE}`,
+          apikey: SERVICE_ROLE,
+        },
+        body: JSON.stringify({
+          type: "payment_link",
+          to: recipientEmail,
+          data: {
+            sender_name: senderName,
+            amount,
+            currency,
+            note: recipientNote,
+            claim_url: shortUrl,
+            expires_at: row.expires_at,
+          },
+        }),
+      });
+      emailed = res.ok;
+      if (!res.ok) console.error("payment_link email failed", await res.text());
+    } catch (e) {
+      console.error("payment_link email threw", e);
+    }
+  }
+
   return json({
     success: true,
     id: row.id,
     code: shortCode,
     url: shortUrl,
     expires_at: row.expires_at,
+    emailed,
+    recipient_email: recipientEmail,
   });
 });

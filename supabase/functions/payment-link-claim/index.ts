@@ -22,6 +22,17 @@ function json(body: unknown, status = 200) {
   });
 }
 
+// Recipient card-payout (Visa Direct) corridors, keyed by the link's payout
+// CURRENCY. Mirrors src/lib/stripeCorridors.ts (CLAIM_KYC_BY_CURRENCY) and the
+// CORRIDOR allow-list in stripe-payout. EUR spans several countries, so the
+// recipient supplies their country in the claim payload.
+const CLAIM_CORRIDORS: Record<string, { countries: string[]; postal: RegExp; requiresState: boolean; statePattern?: RegExp; usesSsnLast4?: boolean }> = {
+  CAD: { countries: ["CA"], postal: /^[A-Z]\d[A-Z]\d[A-Z]\d$/, requiresState: true, statePattern: /^(AB|BC|MB|NB|NL|NS|NT|NU|ON|PE|QC|SK|YT)$/ },
+  USD: { countries: ["US"], postal: /^\d{5}(\d{4})?$/, requiresState: true, statePattern: /^[A-Z]{2}$/, usesSsnLast4: true },
+  GBP: { countries: ["GB"], postal: /^[A-Z0-9 ]{4,10}$/, requiresState: false },
+  EUR: { countries: ["DE","FR","IT","ES","NL","BE","PT","IE","AT"], postal: /^[A-Z0-9 -]{3,12}$/, requiresState: false },
+};
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
@@ -134,25 +145,36 @@ Deno.serve(async (req) => {
       await rollback(admin, claimed.id);
       return json({ error: "Card payouts are not configured" }, 500);
     }
-    if (String(claimed.currency).toUpperCase() !== "CAD") {
+    const corridor = CLAIM_CORRIDORS[String(claimed.currency).toUpperCase()];
+    if (!corridor) {
       await rollback(admin, claimed.id);
-      return json({ error: "Card payouts are only available for CAD links" }, 400);
+      return json({ error: `Card payouts are not available for ${claimed.currency} links` }, 400);
     }
     const k = payload?.kyc;
+    // For single-country currencies the country is fixed; for EUR the recipient
+    // selects it. Validate it is within the corridor's allowed countries.
+    const claimCountry = String(k?.address?.country || corridor.countries[0] || "").toUpperCase();
+    if (!corridor.countries.includes(claimCountry)) {
+      await rollback(admin, claimed.id);
+      return json({ error: "Please select a supported recipient country." }, 400);
+    }
     const tosOk = payload?.tos?.accepted === true;
     const dobOk =
       k?.dob &&
       Number.isInteger(k.dob.day) && k.dob.day >= 1 && k.dob.day <= 31 &&
       Number.isInteger(k.dob.month) && k.dob.month >= 1 && k.dob.month <= 12 &&
       Number.isInteger(k.dob.year) && k.dob.year >= 1900 && k.dob.year <= new Date().getFullYear() - 18;
+    const stateOk = !corridor.requiresState
+      || (corridor.statePattern?.test(String(k?.address?.state || "").toUpperCase()) ?? false);
     const addrOk =
       k?.address &&
       typeof k.address.line1 === "string" && k.address.line1.trim().length >= 3 &&
       typeof k.address.city === "string" && k.address.city.trim().length >= 2 &&
-      /^(AB|BC|MB|NB|NL|NS|NT|NU|ON|PE|QC|SK|YT)$/.test(String(k.address.state || "")) &&
-      /^[A-Z]\d[A-Z]\d[A-Z]\d$/.test(String(k.address.postal_code || "").toUpperCase().replace(/\s+/g, ""));
+      stateOk &&
+      corridor.postal.test(String(k.address.postal_code || "").toUpperCase().replace(/\s+/g, ""));
     const phoneOk = typeof k?.phone === "string" && /^\+?\d[\d\s\-()]{7,16}$/.test(k.phone);
-    if (!tosOk || !dobOk || !addrOk || !phoneOk) {
+    const ssnOk = !corridor.usesSsnLast4 || /^\d{4}$/.test(String(k?.ssn_last_4 || ""));
+    if (!tosOk || !dobOk || !addrOk || !phoneOk || !ssnOk) {
       await rollback(admin, claimed.id);
       return json({ error: "Identity verification fields are incomplete or invalid" }, 400);
     }
@@ -160,13 +182,18 @@ Deno.serve(async (req) => {
 
   // === Card push: execute Stripe Visa Direct payout BEFORE posting release ledger ===
   let stripePayoutId: string | null = null;
+  let cardPayoutCountry = "CA";
   if (method === "card_push") {
     try {
       const k = payload.kyc;
+      const corridor = CLAIM_CORRIDORS[String(claimed.currency).toUpperCase()]!;
+      const acctCountry = String(k?.address?.country || corridor.countries[0]).toUpperCase();
+      cardPayoutCountry = acctCountry;
+      const payoutCurrency = String(claimed.currency).toLowerCase();
       const cleanPostal = String(k.address.postal_code).toUpperCase().replace(/\s+/g, "");
       const acct = await stripe!.accounts.create({
         type: "custom",
-        country: "CA",
+        country: acctCountry,
         business_type: "individual",
         capabilities: {
           transfers: { requested: true },
@@ -177,12 +204,13 @@ Deno.serve(async (req) => {
           email: recipientEmail || undefined,
           phone: String(k.phone),
           dob: { day: k.dob.day, month: k.dob.month, year: k.dob.year },
+          ...(corridor.usesSsnLast4 && k.ssn_last_4 ? { ssn_last_4: String(k.ssn_last_4) } : {}),
           address: {
             line1: String(k.address.line1),
             city: String(k.address.city),
-            state: String(k.address.state).toUpperCase(),
+            ...(k.address.state ? { state: String(k.address.state).toUpperCase() } : {}),
             postal_code: cleanPostal,
-            country: "CA",
+            country: acctCountry,
           },
         },
         business_profile: {
@@ -217,14 +245,14 @@ Deno.serve(async (req) => {
         return json({
           error: due.length
             ? `Card payouts could not be enabled. Missing: ${due.join(", ")}. Please try a different debit card.`
-            : "Card payouts could not be enabled for this card. Please try a different Canadian debit card.",
+            : "Card payouts could not be enabled for this card. Please try a different debit card.",
         }, 400);
       }
 
       const payout = await stripe!.payouts.create(
         {
           amount: Math.round(Number(claimed.amount) * 100),
-          currency: "cad",
+          currency: payoutCurrency,
           method: "instant",
           destination: (ext as any).id,
           metadata: { payment_link_code: code, sender_id: claimed.sender_id },
@@ -312,8 +340,8 @@ Deno.serve(async (req) => {
         : method === "card_push"
           ? `card-${payload.card_last4 || "xxxx"}`
           : (recipientEmail || "card"),
-      recipient_country: "CA",
-      transfer_type: "domestic_canada",
+      recipient_country: method === "card_push" ? cardPayoutCountry : "CA",
+      transfer_type: method === "card_push" && cardPayoutCountry !== "CA" ? "card_push" : "domestic_canada",
       payout_method: method,
       funding_source: "wallet",
       source_currency: claimed.currency,

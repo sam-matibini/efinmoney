@@ -39,12 +39,8 @@ import { BrandFlag, CountryFlag } from "@/components/ui/FlagImage";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import CanadaSendFlow from "@/components/send/CanadaSendFlow";
 import EfinmoneyP2PFlow from "@/components/send/EfinmoneyP2PFlow";
-import {
-  RecipientCardSection,
-  type RecipientCardHandle,
-  useStripeElementStyle,
-} from "@/components/send/RecipientCardSection";
-import { getStripeCorridor } from "@/lib/stripeCorridors";
+import { createPaymentLink, PaymentLinkSuccess, type PaymentLinkResult } from "@/components/send/PaymentLinkSuccess";
+import { isClaimCardCurrency } from "@/lib/stripeCorridors";
 import TransactionPinDialog from "@/components/send/TransactionPinDialog";
 import HeroGlobe from "@/components/send/HeroGlobe";
 import FxTicker from "@/components/send/FxTicker";
@@ -121,11 +117,12 @@ const SendPage = () => {
   const [ghBankCode, setGhBankCode] = useState<string>("");
   const [ghBankSearch, setGhBankSearch] = useState("");
   const [ghAccountNumber, setGhAccountNumber] = useState<string>("");
-  // International Stripe card-push (Visa Direct) — send to recipient's debit card.
-  const [intlStripeCard, setIntlStripeCard] = useState(false);
-  const recipientCardRef = useRef<RecipientCardHandle>(null);
-  const [recipientCardComplete, setRecipientCardComplete] = useState(false);
-  const recipientCardStyle = useStripeElementStyle();
+  // International "send a secure link" — recipient gets an emailed claim link and
+  // enters their own payout details (no card details handled by the sender).
+  const [intlLinkMode, setIntlLinkMode] = useState(false);
+  const [recipientEmail, setRecipientEmail] = useState("");
+  const [linkResult, setLinkResult] = useState<PaymentLinkResult | null>(null);
+  const [creatingLink, setCreatingLink] = useState(false);
   // V4: no public key needed
   const navigate = useNavigate();
 
@@ -265,19 +262,19 @@ const SendPage = () => {
     setGhPayoutMode('mobile');
     setGhBankCode("");
     setGhAccountNumber("");
-    setIntlStripeCard(false);
-    setRecipientCardComplete(false);
+    setIntlLinkMode(false);
   }, [targetCountryId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const isNGNBank = targetCountry.code === "NGN";
   const isGhanaBank = targetCountry.code === "GHS" && ghPayoutMode === "bank";
   const isBankPayout = isNGNBank || isGhanaBank;
 
-  // Stripe card-push corridor (CA/US/GB/EU-27). When eligible, the user can opt
-  // to push funds straight to the recipient's debit card via Stripe/Visa Direct.
-  const stripeCorridor = getStripeCorridor(targetCountryId);
-  const stripeCardEligible = !!stripeCorridor && !isBankPayout;
-  const useStripeCard = stripeCardEligible && intlStripeCard;
+  // "Send a secure link" is available when the destination currency supports
+  // recipient claims (CAD/USD/GBP/EUR) and the sender holds a wallet in it to
+  // escrow from. The recipient picks how to receive it on the claim page.
+  const linkWallet = (wallets || []).find((w) => w.currency_code === targetCountry.code);
+  const linkEligible = isClaimCardCurrency(targetCountry.code) && !!linkWallet;
+  const useLink = linkEligible && intlLinkMode;
 
   // Fetch Nigerian banks list when NGN destination is selected
   useEffect(() => {
@@ -487,18 +484,15 @@ const SendPage = () => {
     const transfer = await createTransfer.mutateAsync({
       sender_wallet_id: fundingSource === 'wallet' ? selectedWallet!.wallet_id : wallets?.[0]?.wallet_id || '',
       recipient_name: recipientName,
-      recipient_phone: useStripeCard || isBankPayout ? undefined : recipientPhone,
-      recipient_account: useStripeCard ? undefined : isBankPayout ? bankAcct : undefined,
+      recipient_phone: isBankPayout ? undefined : recipientPhone,
+      recipient_account: isBankPayout ? bankAcct : undefined,
       recipient_bank_code: isBankPayout ? bankCode : undefined,
       recipient_bank_name: isBankPayout ? (bankName || undefined) : undefined,
-      // Stripe card-push needs the ISO country code (not the currency code) so
-      // stripe-payout's corridor allow-list matches; target currency is the
-      // corridor payout currency.
-      recipient_country: useStripeCard ? stripeCorridor!.iso : targetCountry.code,
-      transfer_type: useStripeCard ? 'card_push' : isBankPayout ? 'bank' : 'mobile_money',
-      payout_method: useStripeCard ? 'card_push' : isBankPayout ? 'bank' : effectivePayoutMethod,
+      recipient_country: targetCountry.code,
+      transfer_type: isBankPayout ? 'bank' : 'mobile_money',
+      payout_method: isBankPayout ? 'bank' : effectivePayoutMethod,
       source_currency: sourceCurrency,
-      target_currency: useStripeCard ? stripeCorridor!.currency : targetCountry.code,
+      target_currency: targetCountry.code,
       source_amount: parsedAmount,
       target_amount: receivedAmount,
       exchange_rate: effectiveRate,
@@ -511,11 +505,11 @@ const SendPage = () => {
         const { isNew } = await recordTransferRecipient({
           user_id: user.id,
           name: recipientName,
-          phone: useStripeCard || isBankPayout ? "" : recipientPhone,
-          country_code: useStripeCard ? stripeCorridor!.iso : targetCountry.code,
-          payout_method: useStripeCard ? 'card_push' : isBankPayout ? 'bank' : effectivePayoutMethod,
-          network: useStripeCard || isBankPayout ? null : (activeNetwork?.id || null),
-          currency_code: useStripeCard ? stripeCorridor!.currency : targetCountry.code,
+          phone: isBankPayout ? "" : recipientPhone,
+          country_code: targetCountry.code,
+          payout_method: isBankPayout ? 'bank' : effectivePayoutMethod,
+          network: isBankPayout ? null : (activeNetwork?.id || null),
+          currency_code: targetCountry.code,
           bank_name: isBankPayout ? bankName : null,
           bank_account: isBankPayout ? bankAcct : null,
         } as any);
@@ -537,36 +531,33 @@ const SendPage = () => {
     void handleConfirm();
   };
 
+  // ── Secure link: escrow from the matching-currency wallet and email a
+  // claim link. The recipient enters their own payout details on /claim.
+  const handleCreateLink = async () => {
+    if (creatingLink) return;
+    if (!linkWallet) { toast.error(`You need a ${targetCountry.code} wallet to send a link.`); return; }
+    setCreatingLink(true);
+    try {
+      const result = await createPaymentLink({
+        amount: parsedAmount,
+        currency: targetCountry.code,
+        sender_wallet_id: linkWallet.wallet_id,
+        recipient_name: recipientName || null,
+        recipient_email: recipientEmail || null,
+      });
+      setLinkResult(result);
+      goToStep(4);
+      toast.success(result.emailed ? "Payment link sent" : "Payment link created");
+    } catch (e: any) {
+      toast.error(e?.message || "Could not create payment link");
+    } finally {
+      setCreatingLink(false);
+    }
+  };
+
   const handleConfirm = async () => {
     if (confirming) return;
     setConfirming(true);
-
-    // ── Stripe card-push: tokenize the recipient's debit card up front ───
-    // (Visa Direct). Requires wallet or card funding — the bank-funding path
-    // never invokes execute-transfer, so it can't fire a Stripe payout.
-    let recipientTok: { token: string; last4: string; brand: string } | null = null;
-    if (useStripeCard) {
-      if (fundingSource === 'bank') {
-        toast.error('Stripe card payout needs wallet or card funding. Pick one of those in step 1.');
-        setConfirming(false);
-        return;
-      }
-      if (!recipientCardRef.current?.isComplete()) {
-        toast.error("Please complete the recipient's card details.");
-        setConfirming(false);
-        return;
-      }
-      try {
-        recipientTok = await recipientCardRef.current.tokenize(recipientName);
-      } catch (e: any) {
-        toast.error(e?.message || "Couldn't tokenize the recipient's card.");
-        setConfirming(false);
-        return;
-      }
-    }
-    const recipientCardBody = recipientTok
-      ? { recipient_card_token: recipientTok.token, recipient_last4: recipientTok.last4, recipient_brand: recipientTok.brand }
-      : {};
 
     // ── Wallet: create + execute payout immediately ──────────────────────
     if (fundingSource === 'wallet') {
@@ -576,7 +567,7 @@ const SendPage = () => {
         let data: any = null;
         let invokeErr: any = null;
         try {
-          const res = await supabase.functions.invoke('execute-transfer', { body: { transfer_id: tid, use_stellar: isNGNBank && useStellar, use_pawapay: !isBankPayout && usePawapay, recipient_country_hint: targetCountry.country, ...recipientCardBody } });
+          const res = await supabase.functions.invoke('execute-transfer', { body: { transfer_id: tid, use_stellar: isNGNBank && useStellar, use_pawapay: !isBankPayout && usePawapay, recipient_country_hint: targetCountry.country } });
           data = res.data;
           invokeErr = res.error;
         } catch (err) {
@@ -724,7 +715,7 @@ const SendPage = () => {
 
     // Step C: trigger payout via Flutterwave
     try {
-      const { data, error } = await supabase.functions.invoke('execute-transfer', { body: { transfer_id: tid, use_stellar: isNGNBank && useStellar, use_pawapay: !isBankPayout && usePawapay, recipient_country_hint: targetCountry.country, prefunded: true, charge_reference: (chargeData as any)?.payment_intent_id ?? null, ...recipientCardBody } });
+      const { data, error } = await supabase.functions.invoke('execute-transfer', { body: { transfer_id: tid, use_stellar: isNGNBank && useStellar, use_pawapay: !isBankPayout && usePawapay, recipient_country_hint: targetCountry.country, prefunded: true, charge_reference: (chargeData as any)?.payment_intent_id ?? null } });
       if (error || (data as any)?.error) throw new Error((data as any)?.error || error?.message || 'Payout failed');
       const payout = (data as any)?.payout;
       if (payout && payout.success === false) throw new Error(payout.error || 'Payout failed');
@@ -907,13 +898,16 @@ const SendPage = () => {
     setAmount("");
     setRecipientName("");
     setRecipientPhone("");
+    setRecipientEmail("");
     setFundingSource('wallet');
     setPickedBeneficiaryId(null);
+    setIntlLinkMode(false);
+    setLinkResult(null);
   };
 
   const isStep1Valid = parsedAmount > 0 && parsedAmount > fee && receivedAmount > 0 && rateAvailable && !noLinkedSource && !insufficientFunds;
-  const isStep2Valid = useStripeCard
-    ? (recipientName.trim().length > 2 && recipientCardComplete && receivedAmount > 0)
+  const isStep2Valid = useLink
+    ? (recipientName.trim().length > 2 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail) && parsedAmount > 0)
     : isNGNBank
     ? (!!ngnBankCode && ngnAccountNumber.replace(/\D/g, "").length === 10 && !!ngnResolvedName && receivedAmount > 0)
     : isGhanaBank
@@ -1510,20 +1504,20 @@ const SendPage = () => {
                                         className="transition-shadow focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:shadow-[0_0_0_4px_hsl(var(--primary)/0.12)]"
                                       />
                                     </motion.div>
-                                    {stripeCardEligible && (
+                                    {linkEligible && (
                                       <motion.div custom={1.1} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
                                         <Label>How should {targetCountry.country} receive it?</Label>
                                         <div className="grid grid-cols-2 gap-2">
                                           {([
                                             { v: false, label: targetCountry.method || 'Bank Transfer', sub: 'Local rails' },
-                                            { v: true,  label: 'Debit card · Stripe', sub: 'Visa Direct · instant' },
+                                            { v: true,  label: 'Send a secure link', sub: 'Recipient picks · emailed' },
                                           ] as const).map(({ v, label, sub }) => {
-                                            const active = intlStripeCard === v;
+                                            const active = intlLinkMode === v;
                                             return (
                                               <button
                                                 key={String(v)}
                                                 type="button"
-                                                onClick={() => setIntlStripeCard(v)}
+                                                onClick={() => setIntlLinkMode(v)}
                                                 className={`flex flex-col items-start rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
                                                   active
                                                     ? "border-primary bg-primary/10 text-primary"
@@ -1537,11 +1531,11 @@ const SendPage = () => {
                                           })}
                                         </div>
                                         <p className="text-[11px] text-muted-foreground">
-                                          Stripe pushes funds straight to the recipient's debit card (CA/US/UK/EU). You enter their card below.
+                                          We escrow {targetCountry.symbol || ""}{parsedAmount.toFixed(2)} from your {targetCountry.code} wallet and email the recipient a secure link — they choose Interac / bank / their own debit card. You never handle their details.
                                         </p>
                                       </motion.div>
                                     )}
-                                    {!useStripeCard && targetCountry.code === "GHS" && (
+                                    {!useLink && targetCountry.code === "GHS" && (
                                       <motion.div custom={1.2} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
                                         <Label>Payout Method</Label>
                                         <div className="grid grid-cols-2 gap-2">
@@ -1568,7 +1562,7 @@ const SendPage = () => {
                                         </div>
                                       </motion.div>
                                     )}
-                                    {availableNetworks && availableNetworks.length > 1 && !isGhanaBank && !isNGNBank && (
+                                    {!useLink && availableNetworks && availableNetworks.length > 1 && !isGhanaBank && !isNGNBank && (
                                       <motion.div custom={1.5} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
                                         <Label>Mobile Money Network</Label>
                                         <div className="grid grid-cols-3 gap-2">
@@ -1592,14 +1586,19 @@ const SendPage = () => {
                                         </div>
                                       </motion.div>
                                     )}
-                                    {useStripeCard ? (
-                                      <motion.div custom={2} variants={fieldVariants} initial="hidden" animate="show">
-                                        <RecipientCardSection
-                                          ref={recipientCardRef}
-                                          onValidityChange={setRecipientCardComplete}
-                                          elementStyle={recipientCardStyle}
-                                          currency={stripeCorridor!.currency.toLowerCase()}
+                                    {useLink ? (
+                                      <motion.div custom={2} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
+                                        <Label>Recipient email <span className="text-xs text-muted-foreground">(we'll send the link here)</span></Label>
+                                        <Input
+                                          type="email"
+                                          value={recipientEmail}
+                                          onChange={(e) => setRecipientEmail(e.target.value)}
+                                          placeholder="jane@example.com"
+                                          className="transition-shadow focus-visible:ring-2 focus-visible:ring-primary/40"
                                         />
+                                        <p className="text-xs text-muted-foreground">
+                                          The recipient opens the link and chooses how to receive {targetCountry.code} — bank, Interac (CAD), or their own debit card.
+                                        </p>
                                       </motion.div>
                                     ) : isNGNBank ? (
                                       <>
@@ -1803,8 +1802,8 @@ const SendPage = () => {
                                   <CardContent className="space-y-5">
                                     <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-2 text-sm">
                                       <div className="flex justify-between"><span className="text-muted-foreground">Recipient</span><span className="font-medium">{recipientName}</span></div>
-                                      {useStripeCard ? (
-                                        <div className="flex justify-between"><span className="text-muted-foreground">Payout</span><span className="font-medium">Recipient debit card</span></div>
+                                      {useLink ? (
+                                        <div className="flex justify-between"><span className="text-muted-foreground">Email</span><span className="font-medium">{recipientEmail}</span></div>
                                       ) : isBankPayout ? (
                                         <>
                                           <div className="flex justify-between"><span className="text-muted-foreground">Bank</span><span className="font-medium">{isNGNBank ? (ngnBanks.find((b) => b.code === ngnBankCode)?.name || "—") : (ghBanks.find((b) => b.code === ghBankCode)?.name || "—")}</span></div>
@@ -1814,7 +1813,7 @@ const SendPage = () => {
                                         <div className="flex justify-between"><span className="text-muted-foreground">Phone</span><span className="font-medium">{recipientPhone}</span></div>
                                       )}
                                       <div className="flex justify-between"><span className="text-muted-foreground">Destination</span><span className="font-medium">{targetCountry.flag} {targetCountry.country}</span></div>
-                                      <div className="flex justify-between"><span className="text-muted-foreground">Method</span><span className="font-medium">{useStripeCard ? "Stripe · Visa Direct" : isBankPayout ? "Bank Transfer" : effectiveMethodLabel}</span></div>
+                                      <div className="flex justify-between"><span className="text-muted-foreground">Method</span><span className="font-medium">{useLink ? "Secure link (recipient picks)" : isBankPayout ? "Bank Transfer" : effectiveMethodLabel}</span></div>
                                       <div className="flex justify-between"><span className="text-muted-foreground">Funding</span><span className="font-medium capitalize">{fundingSource}</span></div>
                                     </div>
                                     <div className="rounded-xl border border-border bg-card p-4 space-y-2 text-sm">
@@ -1833,9 +1832,9 @@ const SendPage = () => {
                                       <p className="text-xs text-muted-foreground text-center">You'll be redirected to a secure card checkout in {cardCurrency}.</p>
                                     )}
                                     <div className="flex gap-3">
-                                      <Button variant="outline" className="flex-1" onClick={() => goToStep(2)} disabled={confirming}>Back</Button>
-                                      <Button className="flex-1" onClick={requestConfirm} disabled={confirming}>
-                                        {confirming ? (
+                                      <Button variant="outline" className="flex-1" onClick={() => goToStep(2)} disabled={confirming || creatingLink}>Back</Button>
+                                      <Button className="flex-1" onClick={useLink ? handleCreateLink : requestConfirm} disabled={confirming || creatingLink}>
+                                        {(confirming || creatingLink) ? (
                                           <span className="inline-flex items-center gap-2">
                                             <LoadingSpinner size={16} />
                                             Processing...
@@ -1843,7 +1842,7 @@ const SendPage = () => {
                                         ) : (
                                           <span className="inline-flex items-center gap-2">
                                             <Shield className="w-4 h-4" />
-                                            {fundingSource === 'card' ? 'Pay with Card' : 'Confirm Transfer'}
+                                            {useLink ? 'Send secure link' : fundingSource === 'card' ? 'Pay with Card' : 'Confirm Transfer'}
                                           </span>
                                         )}
                                       </Button>
@@ -1871,14 +1870,23 @@ const SendPage = () => {
                                 exit="exit"
                                 transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
                               >
-                                <TransferSuccess
-                                  transferId={lastTransferId}
-                                  amount={parsedAmount}
-                                  currency={sourceCurrency}
-                                  recipientName={recipientName}
-                                  targetFlag={targetCountry.flag}
-                                  onSendAnother={resetForm}
-                                />
+                                {linkResult ? (
+                                  <PaymentLinkSuccess
+                                    result={linkResult}
+                                    amountLabel={`${targetSymbol}${parsedAmount.toFixed(2)}`}
+                                    recipientName={recipientName}
+                                    onDone={resetForm}
+                                  />
+                                ) : (
+                                  <TransferSuccess
+                                    transferId={lastTransferId}
+                                    amount={parsedAmount}
+                                    currency={sourceCurrency}
+                                    recipientName={recipientName}
+                                    targetFlag={targetCountry.flag}
+                                    onSendAnother={resetForm}
+                                  />
+                                )}
                               </motion.div>
                             )}
                           </AnimatePresence>

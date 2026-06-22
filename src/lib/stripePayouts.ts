@@ -10,13 +10,14 @@ export interface TokenizedCard {
  * Tokenize a card via Stripe Elements (used for charging the SENDER's funding card).
  * Raw PAN never leaves the Stripe iframe.
  *
- * Pass `currency` only when the token will be used as a payout destination
- * (Visa Direct). For regular charges, omit it.
+ * Pass `currency` (lowercase ISO, e.g. "cad", "usd", "gbp", "eur") only when the
+ * token will be used as a payout destination (Visa Direct). For regular charges,
+ * omit it.
  */
 export async function tokenizeDebitCard(
   stripe: Stripe,
   cardNumberElement: StripeCardNumberElement,
-  opts: { name: string; currency?: "cad" }
+  opts: { name: string; currency?: string }
 ): Promise<TokenizedCard> {
   const tokenData: Record<string, string> = { name: opts.name };
   if (opts.currency) tokenData.currency = opts.currency;

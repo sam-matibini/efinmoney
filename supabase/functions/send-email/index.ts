@@ -53,6 +53,31 @@ function transferReceiptHtml(d: Record<string, any>) {
     </div>`;
 }
 
+function paymentLinkHtml(d: Record<string, any>) {
+  const amount = `${d.currency || ""} ${Number(d.amount || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`.trim();
+  const sender = d.sender_name || "Someone";
+  const expires = d.expires_at ? new Date(d.expires_at).toLocaleDateString() : null;
+  return `
+    <div style="font-family:Inter,system-ui,sans-serif;max-width:560px;margin:auto;padding:24px;color:#0f172a">
+      <h1 style="font-size:22px;margin:0 0 8px">${sender} sent you money 💸</h1>
+      <p style="line-height:1.55;margin:0 0 20px">You've been sent a payment via eFinMoney. Click below to choose how you'd like to receive it — your bank, Interac, or your debit card.</p>
+      <div style="margin:0 0 20px;padding:20px;border:1px solid #e2e8f0;border-radius:12px;background:#f8fafc">
+        <p style="margin:0 0 6px;color:#64748b;font-size:12px;text-transform:uppercase;letter-spacing:0.05em">Amount</p>
+        <p style="margin:0;font-size:28px;font-weight:700">${amount}</p>
+        ${d.note ? `<p style="margin:12px 0 0;color:#475569;font-style:italic">"${d.note}"</p>` : ""}
+      </div>
+      <a href="${d.claim_url}" style="display:inline-block;background:#10b981;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:9999px;font-weight:600;font-size:15px">
+        Receive ${amount}
+      </a>
+      <p style="line-height:1.55;color:#64748b;font-size:12px;margin-top:20px">
+        Or paste this link into your browser:<br>
+        <a href="${d.claim_url}" style="color:#10b981;word-break:break-all">${d.claim_url}</a>
+      </p>
+      ${expires ? `<p style="color:#64748b;font-size:12px;margin-top:12px">This link expires on ${expires} and can only be claimed once.</p>` : ""}
+      <p style="color:#94a3b8;font-size:11px;margin-top:24px">If you weren't expecting this, you can safely ignore this email. eFinMoney protects payment links with encryption and fraud monitoring.</p>
+    </div>`;
+}
+
 function kycHtml(status: string) {
   const pretty = status.charAt(0).toUpperCase() + status.slice(1);
   return `
@@ -90,6 +115,10 @@ Deno.serve(async (req) => {
     } else if (type === "transfer_completed") {
       subject = `Transfer to ${data.recipient_name || "recipient"} completed`;
       html = transferReceiptHtml(data);
+    } else if (type === "payment_link") {
+      const amt = `${data.currency || ""} ${Number(data.amount || 0).toFixed(2)}`.trim();
+      subject = `${data.sender_name || "Someone"} sent you ${amt}`;
+      html = paymentLinkHtml(data);
     } else if (type === "kyc_update") {
       subject = `KYC status updated: ${data.status}`;
       html = kycHtml(data.status || "updated");
