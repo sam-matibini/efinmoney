@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { toast } from "sonner";
 import { Smartphone, ShieldCheck, ArrowRight, Loader2, MessageSquare, KeyRound, Wallet, User } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { initiateElicateCharge } from "@/lib/elicate";
+import { initiateElicateCharge, getElicateChargeStatus } from "@/lib/elicate";
 import { useProfile } from "@/hooks/useProfile";
 
 // Zambia mobile-money prefix → default network. User can still override.
@@ -65,26 +65,52 @@ export default function ElicateTopUpCard({ walletId, walletCurrency }: Props) {
     if (detected && detected !== network) setNetwork(detected);
   }, [phone, network, networkTouched]);
 
-  // Handle return from Elicate hosted page.
+  // Handle return from Elicate hosted page: poll the real charge status rather
+  // than trusting the redirect alone (webhook delivery isn't always immediate).
+  // Runs once on mount only — the cleanup below must not be torn down by our
+  // own setParams call clearing the query string.
   useEffect(() => {
-    const status = params.get("elicate_status");
-    if (!status) return;
-    if (status === "success" || status === "successful" || status === "completed") {
-      toast.success("Top-up successful — your wallet has been credited.");
-      queryClient.invalidateQueries({ queryKey: ["wallets"] });
-    } else if (status === "failed" || status === "cancelled") {
-      toast.error("Top-up was not completed.");
-    } else {
-      toast.info(`Top-up status: ${status}`);
-    }
+    const chargeId = new URLSearchParams(window.location.search).get("elicate_charge_id");
+    if (!chargeId) return;
+
     setParams((prev) => {
       const next = new URLSearchParams(prev);
+      next.delete("elicate_charge_id");
       next.delete("elicate_status");
       next.delete("transaction_id");
       next.delete("reference");
       return next;
     }, { replace: true });
-  }, [params, setParams, queryClient]);
+
+    let cancelled = false;
+    const POLL_INTERVAL_MS = 3000;
+    const MAX_ATTEMPTS = 20; // ~60s
+
+    const poll = async (attempt: number) => {
+      if (cancelled) return;
+      const charge = await getElicateChargeStatus(chargeId);
+      if (cancelled) return;
+
+      if (charge?.status === "completed") {
+        toast.success("Top-up successful — your wallet has been credited.");
+        queryClient.invalidateQueries({ queryKey: ["wallets"] });
+        return;
+      }
+      if (charge?.status === "failed" || charge?.status === "cancelled" || charge?.status === "expired") {
+        toast.error(charge.failure_reason || "Top-up was not completed.");
+        return;
+      }
+      if (attempt >= MAX_ATTEMPTS) {
+        toast.info("Still confirming your top-up — check back shortly if your balance hasn't updated.");
+        return;
+      }
+      setTimeout(() => poll(attempt + 1), POLL_INTERVAL_MS);
+    };
+
+    poll(0);
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (walletCurrency !== "ZMW") return null;
 
@@ -105,7 +131,7 @@ export default function ElicateTopUpCard({ walletId, walletCurrency }: Props) {
     setConfirming(false);
     setRedirecting(true);
     try {
-      const returnUrl = `${window.location.origin}/wallets/topup?walletId=${walletId}&elicate_status=success`;
+      const returnUrl = `${window.location.origin}/wallets/topup?walletId=${walletId}`;
       const result = await initiateElicateCharge({
         amount: Number(amount),
         target_wallet_id: walletId,

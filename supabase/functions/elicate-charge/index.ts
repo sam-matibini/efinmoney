@@ -152,8 +152,15 @@ Deno.serve(async (req) => {
     };
     if (typeof return_url === "string" && return_url.trim()) {
       // Elicate redirects the user back here after they complete payment on the hosted page.
-      payload.redirect_url = return_url.trim();
-      payload.return_url = return_url.trim();
+      // Stamp our charge id on it so the frontend polls the real outcome instead of assuming success.
+      let redirectTarget = return_url.trim();
+      try {
+        const u = new URL(redirectTarget);
+        u.searchParams.set("elicate_charge_id", charge.id);
+        redirectTarget = u.toString();
+      } catch { /* leave as-is if not a valid absolute URL */ }
+      payload.redirect_url = redirectTarget;
+      payload.return_url = redirectTarget;
     }
 
     console.log("Elicate CHARGE request:", { mode: elicate.mode, url: elicate.chargeUrl, payload });
