@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { mapPaysafeCreditStatus } from "../_shared/paysafe-client.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -22,9 +23,12 @@ async function verifyPaysafeSignature(rawBody: string, sigHeader: string | null)
       "raw", enc.encode(WEBHOOK_SECRET), { name: "HMAC", hash: "SHA-256" }, false, ["sign"],
     );
     const mac = await crypto.subtle.sign("HMAC", key, enc.encode(rawBody));
-    const hex = Array.from(new Uint8Array(mac)).map((b) => b.toString(16).padStart(2, "0")).join("");
-    const provided = sigHeader.replace(/^sha256=/, "").trim();
-    return hex === provided;
+    const bytes = new Uint8Array(mac);
+    // Paysafe Payment Hub: signature = base64(HMAC-SHA256(secret, raw JSON body))
+    const b64 = btoa(String.fromCharCode(...bytes));
+    const hex = Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
+    const provided = sigHeader.replace(/^sha256=/i, "").trim();
+    return provided === b64 || provided.toLowerCase() === hex.toLowerCase();
   } catch (e) {
     console.error("Paysafe signature verification error", e);
     return false;
@@ -74,7 +78,9 @@ Deno.serve(async (req) => {
     });
   }
 
-  const sig = req.headers.get("paysafe-signature")
+  const sig = req.headers.get("Signature")
+    || req.headers.get("signature")
+    || req.headers.get("paysafe-signature")
     || req.headers.get("x-paysafe-signature")
     || req.headers.get("x-signature");
   const sigOk = await verifyPaysafeSignature(raw, sig);
@@ -122,53 +128,52 @@ Deno.serve(async (req) => {
   // 2) Try to update the matching transfer record
   try {
     const refStr = merchantRefNum ? String(merchantRefNum) : "";
-    const transferId = refStr.startsWith("EFM-") ? refStr.slice(4) : null;
+    let transferId = refStr.startsWith("EFM-") ? refStr.slice(4) : null;
 
-    let newStatus: string | null = null;
+    if (!transferId && paymentId) {
+      const { data: byPaysafeId } = await supabase
+        .from("transfers")
+        .select("id")
+        .eq("paysafe_payment_id", String(paymentId))
+        .maybeSingle();
+      transferId = byPaysafeId?.id ?? null;
+    }
+
+    const newStatus = mapPaysafeCreditStatus(status || "", eventType);
     let failure: string | null = null;
-    const s = status || "";
-    const evU = eventType.toUpperCase();
-
-    // Reversal-class events (Interac cancelled/expired or returned disbursement) → reverse the ledger
-    const isReversal =
-      evU.includes("CANCELLED") || evU.includes("CANCELED") ||
-      evU.includes("EXPIRED") || evU.includes("RETURNED") || evU.includes("REVERSED") ||
-      s.includes("CANCELLED") || s.includes("CANCELED") ||
-      s.includes("EXPIRED") || s.includes("RETURNED") || s.includes("REVERSED");
-
-    const isCompleted =
-      evU.includes("DISBURSEMENT_COMPLETED") ||
-      ["COMPLETED", "DELIVERED", "DEPOSITED", "RECEIVED", "PAYMENT_COMPLETED", "PAYMENT_HANDLE_COMPLETED"]
-        .some((v) => s.includes(v) || evU.includes(v));
-
-    const isFailed = !isCompleted && !isReversal && (
-      evU.includes("DISBURSEMENT_FAILED") ||
-      ["FAILED", "DECLINED", "PAYMENT_FAILED", "PAYMENT_HANDLE_FAILED"]
-        .some((v) => s.includes(v) || evU.includes(v))
-    );
-
-    if (isCompleted) {
-      newStatus = "completed";
-    } else if (isReversal) {
-      newStatus = "reversed";
-      failure = `Paysafe reversal: ${eventType} ${s}`.trim();
-    } else if (isFailed) {
-      newStatus = "failed";
-      failure = `Paysafe: ${eventType} ${s}`.trim();
-    } else if (s.includes("PROCESSING") || s.includes("PENDING") || evU.includes("PROCESSING") || evU.includes("INITIATED")) {
-      newStatus = "processing";
+    if (newStatus === "failed") {
+      failure = `Paysafe: ${eventType} ${status || ""}`.trim();
+    } else if (newStatus === "processing") {
+      // keep existing failure_reason untouched
     }
 
     if (transferId && newStatus) {
+      const { data: existing } = await supabase
+        .from("transfers")
+        .select("status")
+        .eq("id", transferId)
+        .maybeSingle();
+
       const update: Record<string, unknown> = { status: newStatus };
       if (failure) update.failure_reason = failure;
       if (paymentId) update.paysafe_payment_id = String(paymentId);
       if (newStatus === "completed") update.completed_at = new Date().toISOString();
 
-      await supabase.from("transfers").update(update).eq("id", transferId);
+      if (existing?.status !== newStatus) {
+        await supabase.from("transfers").update(update).eq("id", transferId);
+      }
 
-      // Refund wallet on failure OR reversal (Interac cancelled/expired/returned)
-      if (newStatus === "failed" || newStatus === "reversed") {
+      // Refund wallet on failure OR reversal (Interac cancelled/expired/returned).
+      // Skip for payment-link claims — funds are in escrow (2199), not the sender wallet.
+      if (existing?.status !== newStatus && (newStatus === "failed" || newStatus === "reversed")) {
+        const { data: plink } = await supabase
+          .from("payment_link_payouts")
+          .select("id")
+          .eq("transfer_id", transferId)
+          .maybeSingle();
+        if (plink) {
+          console.log("paysafe-webhook: skipping wallet refund for payment-link transfer", transferId);
+        } else {
         const { data: t } = await supabase.from("transfers").select("*").eq("id", transferId).single();
         if (t && t.funding_source === "wallet") {
           const refType = newStatus === "reversed" ? "transfer_reversal" : "transfer_refund";
@@ -198,6 +203,7 @@ Deno.serve(async (req) => {
               }]);
             }
           }
+        }
         }
       }
     }

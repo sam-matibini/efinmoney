@@ -3,6 +3,7 @@
 // reality even if the async webhook never arrives.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { flwV3Fetch } from "../_shared/flw-v3.ts";
+import { checkFlutterwaveLiquidity } from "../_shared/treasury-worker.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,6 +12,43 @@ const corsHeaders = {
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+
+function resolveNetwork(payoutMethod: string | null | undefined, currency: string): string {
+  const map: Record<string, string> = {
+    mtn_mobile: "mtn", airtel_money: "airtel", mpesa: "mpesa", bank: "bank",
+  };
+  if (payoutMethod && map[payoutMethod]) return map[payoutMethod];
+  const defaults: Record<string, string> = { KES: "mpesa", GHS: "mtn", UGX: "mtn", TZS: "airtel", ZMW: "mtn", NGN: "bank" };
+  return defaults[currency] || "mpesa";
+}
+
+async function retryPendingPayout(supabase: ReturnType<typeof createClient>, transfer: Record<string, unknown>) {
+  const body = {
+    transfer_id: transfer.id,
+    phone_number: transfer.recipient_phone,
+    account_number: transfer.recipient_account,
+    bank_code: transfer.recipient_bank_code,
+    amount: Number(transfer.target_amount ?? transfer.source_amount),
+    currency: transfer.target_currency ?? transfer.source_currency,
+    network: resolveNetwork(
+      transfer.payout_method as string,
+      String(transfer.target_currency ?? transfer.source_currency),
+    ),
+    recipient_name: transfer.recipient_name,
+  };
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/flutterwave-payout`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-internal-secret": SERVICE_KEY,
+    },
+    body: JSON.stringify(body),
+  });
+  return res.json();
+}
 
 async function reverseTransferLedger(supabase: ReturnType<typeof createClient>, transferId: string) {
   const { data: existing } = await supabase.from("ledger_entries").select("id")
@@ -52,6 +90,31 @@ Deno.serve(async (req) => {
     // Already terminal — nothing to do.
     if (["completed", "failed", "reversed", "expired", "cancelled"].includes(transfer.status)) {
       return json({ success: true, status: transfer.status, changed: false });
+    }
+
+    // Queued for payout — retry automatically when provider balance covers this transfer.
+    if (transfer.status === "pending_liquidity") {
+      const amt = Number(transfer.target_amount ?? 0);
+      const cur = String(transfer.target_currency ?? "NGN");
+      const liq = await checkFlutterwaveLiquidity(supabase, amt, cur, { requireBuffer: false });
+      if (liq.sufficient) {
+        const payout = await retryPendingPayout(supabase, transfer);
+        if (payout?.success && !payout?.pending_liquidity) {
+          const { data: fresh } = await supabase.from("transfers").select("*").eq("id", transfer_id).maybeSingle();
+          return json({
+            success: true,
+            status: fresh?.status ?? "processing",
+            changed: fresh?.status !== "pending_liquidity",
+            retried: true,
+          });
+        }
+      }
+      return json({
+        success: true,
+        status: transfer.status,
+        changed: false,
+        note: "still_processing",
+      });
     }
 
     const providerRef = transfer.provider_reference;

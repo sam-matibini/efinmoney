@@ -17,6 +17,7 @@ import { useWallets } from "@/hooks/useWallets";
 import { useProfile } from "@/hooks/useProfile";
 import { useSavedCards, type SavedCard } from "@/hooks/useSavedCards";
 import { getStripe, getStripeLoadError } from "@/lib/stripe";
+import { invokeEdgeFunction } from "@/lib/invokeEdgeFunction";
 import { cardBrandClass, cardBrandLabel } from "@/lib/cardBrand";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
@@ -435,11 +436,14 @@ function NewCardTopUp({
     setProcessingStage("auth");
 
     try {
-      const { data: createData, error: createErr } = await supabase.functions.invoke("stripe-payment-intent", {
-        body: { action: "create", walletId: wallet.wallet_id, amount: amountNum, currency },
+      const createData = await invokeEdgeFunction<{ clientSecret?: string }>("stripe-payment-intent", {
+        action: "create",
+        walletId: wallet.wallet_id,
+        amount: amountNum,
+        currency,
       });
-      if (createErr || !createData?.clientSecret) {
-        throw new Error(createErr?.message || createData?.error || "Failed to initialize payment");
+      if (!createData?.clientSecret) {
+        throw new Error("Failed to initialize payment");
       }
 
       setProcessingStage("charge");
@@ -458,11 +462,12 @@ function NewCardTopUp({
       }
 
       setProcessingStage("credit");
-      const { data, error } = await supabase.functions.invoke("stripe-payment-intent", {
-        body: { action: "confirm", paymentIntentId: paymentIntent.id },
+      const data = await invokeEdgeFunction<{ success?: boolean }>("stripe-payment-intent", {
+        action: "confirm",
+        paymentIntentId: paymentIntent.id,
       });
-      if (error || !data?.success) {
-        throw new Error(error?.message || data?.error || "Failed to credit wallet");
+      if (!data?.success) {
+        throw new Error("Failed to credit wallet");
       }
 
       await queryClient.invalidateQueries({ queryKey: ["wallets"] });

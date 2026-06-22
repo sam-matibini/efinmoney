@@ -22,6 +22,10 @@ const refOf = (id: string) => `EFM-${id.replace(/-/g, "").slice(0, 8).toUpperCas
 
 const friendlyFailureReason = (reason: string): string => {
   const r = reason.toLowerCase();
+  if (r.includes("flutterwave") || r.includes("settlement") || r.includes("pending_liquidity") ||
+      (r.includes("available") && r.includes("need"))) {
+    return "Your transfer is still being processed. Delivery usually completes within a few minutes.";
+  }
   if (r.includes("provider setup required") || r.includes("ip whitelist") || r.includes("whitelisting")) {
     return "This payout corridor is temporarily unavailable. Your funds have been returned to your wallet. Please try again shortly or contact support.";
   }
@@ -62,7 +66,7 @@ const statusMeta = (status: string) => {
     case "processing":
     case "funded":
     case "pending_liquidity":
-      return { label: status === "pending_liquidity" ? "Awaiting settlement" : "Processing", className: "bg-yellow-500/20 text-yellow-500 border-yellow-500/40" };
+      return { label: "Processing", className: "bg-yellow-500/20 text-yellow-500 border-yellow-500/40" };
     default:
       return { label: "Initiated", className: "bg-amber-500/20 text-amber-600 border-amber-500/40" };
   }
@@ -96,7 +100,7 @@ const buildTimeline = (t: Transfer): TimelineStep[] => {
     steps[2].state = "current";
   } else if (status === "pending_liquidity") {
     steps[1].state = "done"; steps[1].timestamp = updated;
-    steps[2].label = "Awaiting settlement funds";
+    steps[2].label = "Delivering to recipient";
     steps[2].state = "current";
   } else if (status === "processing") {
     steps[1].state = "done"; steps[1].timestamp = updated;
@@ -132,12 +136,18 @@ const TransferTrackingPage = () => {
   const canCancel = transfer && ["initiated", "funded", "processing", "pending_liquidity"].includes(transfer.status);
   const isPending = transfer && ["initiated", "funded", "processing", "pending_liquidity"].includes(transfer.status);
 
-  // Ask Flutterwave directly for the real status and update the row.
+  // Poll Paysafe for the latest standalone credit status and update our DB.
   const verifyStatus = useCallback(async (silent = false) => {
-    if (!id) return;
+    if (!id || !transfer) return;
     if (!silent) setVerifying(true);
     try {
-      const { data } = await supabase.functions.invoke("flw-verify-transfer", { body: { transfer_id: id } });
+      const isPaysafe = transfer.recipient_country === "CA"
+        || transfer.transfer_type === "domestic_canada"
+        || transfer.payout_method === "interac"
+        || transfer.payout_method === "eft";
+      const fn = isPaysafe ? "paysafe-verify-transfer" : "flw-verify-transfer";
+      const { data, error } = await supabase.functions.invoke(fn, { body: { transfer_id: id } });
+      if (error) throw error;
       if (data?.changed && data?.status) {
         const { data: fresh } = await supabase.from("transfers").select("*").eq("id", id).maybeSingle();
         if (fresh) setTransfer(fresh as Transfer);
@@ -147,14 +157,16 @@ const TransferTrackingPage = () => {
             : toast.info(`Transfer status: ${data.status}`);
         }
       } else if (!silent) {
-        toast.info("Still processing — we'll keep checking.");
+        toast.info(data?.note === "paysafe lookup unavailable"
+          ? "Couldn't reach Paysafe — try again shortly."
+          : "Still processing — we'll keep checking.");
       }
     } catch {
       if (!silent) toast.error("Couldn't refresh status. Please try again.");
     } finally {
       if (!silent) setVerifying(false);
     }
-  }, [id]);
+  }, [id, transfer]);
 
   const handleCancel = async () => {
     if (!transfer) return;
@@ -386,7 +398,12 @@ const TransferTrackingPage = () => {
                     </motion.li>
                   ))}
                 </ol>
-                {transfer.failure_reason && (
+                {transfer.status === "pending_liquidity" && (
+                  <div className="mt-4 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-sm text-foreground">
+                    Your payment was received. We're completing delivery to your recipient — this usually takes a few minutes.
+                  </div>
+                )}
+                {transfer.failure_reason && transfer.status !== "pending_liquidity" && (
                   <div className="mt-4 p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-sm text-destructive">
                     {friendlyFailureReason(transfer.failure_reason)}
                   </div>

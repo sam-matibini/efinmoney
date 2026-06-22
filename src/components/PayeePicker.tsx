@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useBeneficiaries, type Beneficiary, type BeneficiaryCategory } from "@/hooks/useBeneficiaries";
+import { useBeneficiaries, isCanadaBeneficiary, type Beneficiary, type BeneficiaryCategory } from "@/hooks/useBeneficiaries";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search, Users, Plus } from "lucide-react";
@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 interface Props {
   onSelect: (b: Beneficiary) => void;
   filterCategory?: BeneficiaryCategory | "all";
+  filterCanada?: boolean;
   placeholder?: string;
   onAddNew?: () => void;
 }
@@ -25,7 +26,7 @@ const CAT_LABEL: Record<BeneficiaryCategory, string> = {
 };
 
 /** Compact typeahead over the saved payees / beneficiaries. */
-export default function PayeePicker({ onSelect, filterCategory = "all", placeholder = "Search saved payees…", onAddNew }: Props) {
+export default function PayeePicker({ onSelect, filterCategory = "all", filterCanada = false, placeholder = "Search saved payees…", onAddNew }: Props) {
   const { data: list, isLoading } = useBeneficiaries();
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
@@ -35,6 +36,7 @@ export default function PayeePicker({ onSelect, filterCategory = "all", placehol
     const qq = q.trim().toLowerCase();
     return items
       .filter(b => filterCategory === "all" ? true : (b.category || "person") === filterCategory)
+      .filter(b => !filterCanada || isCanadaBeneficiary(b))
       .filter(b => {
         if (!qq) return true;
         return [b.name, b.nickname, b.email, b.phone, ...(b.tags || [])]
@@ -42,7 +44,7 @@ export default function PayeePicker({ onSelect, filterCategory = "all", placehol
           .some(v => String(v).toLowerCase().includes(qq));
       })
       .slice(0, 12);
-  }, [list, q, filterCategory]);
+  }, [list, q, filterCategory, filterCanada]);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>

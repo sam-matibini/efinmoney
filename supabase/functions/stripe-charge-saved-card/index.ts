@@ -93,7 +93,6 @@ Deno.serve(async (req) => {
         payment_method: paymentMethodId,
         off_session: true,
         confirm: true,
-        automatic_payment_methods: { enabled: true, allow_redirects: "never" },
         metadata: { user_id: userId, wallet_id: resolvedWalletId, transfer_id: transferId ?? "", purpose },
       });
     } catch (err: any) {

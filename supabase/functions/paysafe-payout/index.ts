@@ -5,17 +5,17 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const PAYSAFE_API_KEY = Deno.env.get("PAYSAFE_API_KEY")!;
+const PAYSAFE_API_KEY = Deno.env.get("PAYSAFE_API_KEY") || "";
 const PAYSAFE_ENV = (Deno.env.get("PAYSAFE_ENV") || "test").toLowerCase();
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const BASE = PAYSAFE_ENV === "live"
+const BASE = PAYSAFE_ENV === "live" || PAYSAFE_ENV === "production"
   ? "https://api.paysafe.com"
   : "https://api.test.paysafe.com";
 
 function authHeader() {
-  // Paysafe HTTP Basic with the API key (already in user:pass form)
-  const b64 = btoa(PAYSAFE_API_KEY);
-  return `Basic ${b64}`;
+  if (!PAYSAFE_API_KEY) throw new Error("PAYSAFE_API_KEY not configured");
+  // Key is already username:password (pmle-…:B-qa2-…)
+  return `Basic ${btoa(PAYSAFE_API_KEY)}`;
 }
 
 function splitName(full: string) {
@@ -154,8 +154,16 @@ Deno.serve(async (req) => {
 
   const supabase = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
+  let skipWalletRefund = false;
   try {
-    const { transfer_id } = await req.json();
+    const body = await req.json();
+    const { transfer_id } = body;
+    skipWalletRefund = body?.skip_wallet_refund === true;
+    if (!PAYSAFE_API_KEY) {
+      return new Response(JSON.stringify({ error: "Paysafe not configured (PAYSAFE_API_KEY missing)" }), {
+        status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
     if (!transfer_id) {
       return new Response(JSON.stringify({ error: "transfer_id required" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -184,7 +192,7 @@ Deno.serve(async (req) => {
     const { data: profile } = await supabase
       .from("profiles")
       .select("street_address, city, state, postal_code, address_country, country")
-      .eq("id", transfer.user_id)
+      .eq("user_id", transfer.sender_id)
       .maybeSingle();
 
     const billingDetails = {
@@ -262,11 +270,19 @@ Deno.serve(async (req) => {
     }
 
     const failAndRefund = async (reason: string, details?: any) => {
-      const refunded = await refundWallet(supabase, transfer, reason);
-      await supabase.from("transfers").update({
-        status: "failed",
-        failure_reason: reason,
-      }).eq("id", transfer.id);
+      let refunded = false;
+      if (skipWalletRefund) {
+        await supabase.from("transfers").update({
+          status: "failed",
+          failure_reason: reason,
+        }).eq("id", transfer.id);
+      } else {
+        refunded = await refundWallet(supabase, transfer, reason);
+        await supabase.from("transfers").update({
+          status: "failed",
+          failure_reason: reason,
+        }).eq("id", transfer.id);
+      }
       return new Response(JSON.stringify({
         success: false, error: reason, refunded, details: details ?? null,
       }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -339,9 +355,9 @@ Deno.serve(async (req) => {
     console.error("paysafe-payout error", err);
     // Best-effort refund on unexpected error
     try {
-      const body = await req.clone().json().catch(() => ({}));
-      if (body?.transfer_id) {
-        const { data: t } = await supabase.from("transfers").select("*").eq("id", body.transfer_id).single();
+      const errBody = await req.clone().json().catch(() => ({}));
+      if (errBody?.transfer_id && !errBody?.skip_wallet_refund) {
+        const { data: t } = await supabase.from("transfers").select("*").eq("id", errBody.transfer_id).single();
         if (t && t.status !== "completed" && t.status !== "processing") {
           await refundWallet(supabase, t, "Unexpected payout error");
           await supabase.from("transfers").update({
@@ -349,6 +365,11 @@ Deno.serve(async (req) => {
             failure_reason: "We couldn't complete this Canadian transfer right now. Your money has been returned to your wallet.",
           }).eq("id", t.id);
         }
+      } else if (errBody?.transfer_id && errBody?.skip_wallet_refund) {
+        await supabase.from("transfers").update({
+          status: "failed",
+          failure_reason: "We couldn't complete this Canadian transfer right now.",
+        }).eq("id", errBody.transfer_id);
       }
     } catch (_) { /* ignore */ }
     return new Response(JSON.stringify({

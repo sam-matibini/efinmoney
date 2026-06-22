@@ -14,7 +14,6 @@ import ViewCardDetailsModal from "@/components/modals/ViewCardDetailsModal";
 import CardPaymentModal from "@/components/modals/CardPaymentModal";
 import FlipCard from "@/components/cards/FlipCard";
 import CardStack from "@/components/cards/CardStack";
-import MockEfinVisaCard from "@/components/cards/MockEfinVisaCard";
 import { useCards, useCardMutations, type Card as CardRow, type RevealedCardSecrets } from "@/hooks/useCards";
 import { usePinGate } from "@/components/send/usePinGate";
 import { useSavedCards, useDeleteSavedCard } from "@/hooks/useSavedCards";
@@ -156,20 +155,22 @@ const CardsPage = () => {
           }}
           className="space-y-6"
         >
-          <motion.div variants={{ hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 180, damping: 22 } } }}>
-            <MockEfinVisaCard />
-          </motion.div>
-
           <motion.div
             variants={{ hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 180, damping: 22 } } }}
-            className="flex items-center justify-between"
+            className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4"
           >
             <div>
-              <h1 className="text-2xl font-display font-bold text-foreground">My Cards</h1>
-              <p className="text-muted-foreground">Tap a card to flip and view details</p>
+              <h1 className="text-2xl md:text-3xl font-display font-bold text-foreground">My Cards</h1>
+              <p className="text-muted-foreground mt-1">
+                {isLoading
+                  ? "Loading your cards…"
+                  : cards.length === 0
+                    ? "Issue a virtual card or link an existing debit card"
+                    : `${cards.length} card${cards.length === 1 ? "" : "s"} · tap to flip, swipe to browse`}
+              </p>
             </div>
-            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-              <Button onClick={() => { setAddMode("issue"); setAddOpen(true); }} className="shadow-[0_10px_30px_-10px_hsl(var(--primary)/0.6)]">
+            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="shrink-0">
+              <Button onClick={() => { setAddMode("issue"); setAddOpen(true); }} className="w-full sm:w-auto shadow-[0_10px_30px_-10px_hsl(var(--primary)/0.6)]">
                 <Plus className="w-4 h-4 mr-2" />
                 New Card
               </Button>
@@ -178,7 +179,7 @@ const CardsPage = () => {
 
           <motion.div
             variants={{ hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 180, damping: 22 } } }}
-            className="rounded-3xl border border-white/10 bg-white/[0.03] backdrop-blur-xl p-4 sm:p-6 shadow-[0_20px_60px_-30px_rgba(0,0,0,0.6)]"
+            className="rounded-3xl border border-border/80 bg-card/40 backdrop-blur-xl p-4 sm:p-6 shadow-sm"
           >
           {isLoading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

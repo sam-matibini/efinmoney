@@ -30,7 +30,8 @@ import { useFundingSources } from "@/hooks/useFundingSources";
 import { useSavedCards } from "@/hooks/useSavedCards";
 import { usePricingConfig } from "@/hooks/usePricingConfig";
 import { supabase } from "@/integrations/supabase/client";
-import { friendlyFlwError, fetchFxRate, cardChargeCurrency, initializeFlwPayment } from "@/lib/flutterwave";
+import { fetchFxRate, cardChargeCurrency, initializeFlwPayment } from "@/lib/flutterwave";
+import { resolveEffectiveRate } from "@/lib/fx";
 import { currencySymbol, countryToCurrency } from "@/lib/currency";
 import { useProfile } from "@/hooks/useProfile";
 import { toast } from "sonner";
@@ -45,6 +46,8 @@ import TransactionPinDialog from "@/components/send/TransactionPinDialog";
 import HeroGlobe from "@/components/send/HeroGlobe";
 import FxTicker from "@/components/send/FxTicker";
 import LiveFxCalculator from "@/components/fx/LiveFxCalculator";
+import { parseAmount } from "@/components/fx/liveFxUtils";
+import { clearSendHandoff, readSendHandoff } from "@/lib/sendHandoff";
 import TransferSuccess from "@/components/send/TransferSuccess";
 import { findCountryById, findCountryByCode, COUNTRIES } from "@/lib/countries";
 import {
@@ -110,6 +113,7 @@ const SendPage = () => {
   const [ngnResolveError, setNgnResolveError] = useState<string | null>(null);
   const [useStellar, setUseStellar] = useState<boolean>(false);
   const [usePawapay, setUsePawapay] = useState<boolean>(false);
+  const [fromQuickSend, setFromQuickSend] = useState(false);
 
   // Ghana bank payout state (toggle between Mobile Money and Bank Transfer)
   const [ghPayoutMode, setGhPayoutMode] = useState<'mobile' | 'bank'>('mobile');
@@ -372,20 +376,25 @@ const SendPage = () => {
   const fxRate = fxRates?.find(
     r => r.from_currency === sourceCurrency && r.to_currency === targetCountry.code
   );
+  const resolvedDbRate = useMemo(
+    () => (fxRates?.length ? resolveEffectiveRate(sourceCurrency, targetCountry.code, fxRates) : null),
+    [fxRates, sourceCurrency, targetCountry.code],
+  );
   const { data: derivedFxRate } = useQuery({
     queryKey: ["send-fx-rate", sourceCurrency, targetCountry.code],
     queryFn: () => fetchFxRate(sourceCurrency, targetCountry.code),
-    enabled: !isSameCurrency && !fxRate && !!sourceCurrency && !!targetCountry.code,
+    enabled: !isSameCurrency && !resolvedDbRate && !!sourceCurrency && !!targetCountry.code,
     staleTime: 60_000,
   });
+  const directDbRate =
+    fxRate && Number(fxRate.effective_rate) > 0 ? Number(fxRate.effective_rate) : null;
+  const derivedRate = derivedFxRate && Number(derivedFxRate) > 0 ? Number(derivedFxRate) : null;
   const effectiveRate = isSameCurrency
     ? 1
-    : fxRate
-      ? Number(fxRate.effective_rate)
-      : Number(derivedFxRate || 0);
-  const rateAvailable = isSameCurrency || !!fxRate || !!derivedFxRate;
+    : resolvedDbRate ?? directDbRate ?? derivedRate ?? 0;
+  const rateAvailable = isSameCurrency || effectiveRate > 0;
 
-  const parsedAmount = Math.max(0, parseFloat(amount) || 0);
+  const parsedAmount = Math.max(0, parseAmount(amount));
   const baseFee = pricing?.transfer_base_fee ?? 0;
   const cardFee = fundingSource === 'card' ? (pricing?.transfer_card_surcharge ?? 0) : 0;
   const fee = parsedAmount > 0 ? baseFee + cardFee : 0;
@@ -407,7 +416,7 @@ const SendPage = () => {
 
   const calcQuoteRecipient = useCallback(
     (sendInFrom: number) => {
-      if (!rateAvailable) return 0;
+      if (!rateAvailable || effectiveRate <= 0) return 0;
       return Math.max(0, (sendInFrom - baseFee - cardFee) * effectiveRate);
     },
     [rateAvailable, effectiveRate, baseFee, cardFee],
@@ -443,6 +452,7 @@ const SendPage = () => {
   const goToStep = (next: number) => {
     setDirection(next > step ? 1 : -1);
     setStep(next);
+    if (next === 4) clearSendHandoff();
   };
 
   // For card payments we always charge in USD (or NGN for NGN wallets).
@@ -608,7 +618,7 @@ const SendPage = () => {
         } else {
           toast.success(
             data?.pending_liquidity || data?.queued || payout?.queued || payout?.pending_liquidity
-              ? 'Transfer queued — will send automatically when settlement funds are ready'
+              ? 'Payment received — completing delivery to your recipient'
               : 'Transfer sent successfully!',
           );
         }
@@ -727,7 +737,7 @@ const SendPage = () => {
       } else {
         toast.success(
           data?.pending_liquidity || data?.queued || payout?.queued || payout?.pending_liquidity
-            ? 'Card charged — transfer queued for settlement'
+            ? 'Card charged — completing delivery to your recipient'
             : 'Transfer sent successfully!',
         );
       }
@@ -834,62 +844,84 @@ const SendPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [beneficiaries]);
 
-  // Handoff from dashboard SendMoneyModal: prefill amount/wallet/destination
+  // Handoff from dashboard quick-send modal (sessionStorage + URL; survives Strict Mode remount)
+  const handoffApplyingRef = useRef(false);
   useEffect(() => {
-    const qAmount = searchParams.get("amount");
-    const qFundingSource = searchParams.get("fundingSource");
-    const qWalletId = searchParams.get("sourceWalletId");
-    const qCountryCode = searchParams.get("targetCountryCode");
-    let touched = false;
-    const next = new URLSearchParams(searchParams);
+    if (!wallets?.length || handoffApplyingRef.current) return;
 
-    if (qAmount && /^\d+(\.\d+)?$/.test(qAmount)) {
-      setAmount(qAmount);
-      next.delete("amount");
-      touched = true;
+    const intent = readSendHandoff();
+    const hasUrlHandoff =
+      searchParams.get("quick") === "1" ||
+      !!searchParams.get("amount") ||
+      !!searchParams.get("targetCountryCode") ||
+      !!searchParams.get("from");
+
+    if (!intent && !hasUrlHandoff) return;
+
+    handoffApplyingRef.current = true;
+
+    const amountVal =
+      intent?.amount ??
+      (searchParams.get("amount") ? parseAmount(searchParams.get("amount")!) : 0);
+    if (amountVal > 0) setAmount(String(amountVal));
+
+    const funding =
+      intent?.fundingSource ??
+      (searchParams.get("fundingSource") as FundingSource | null);
+    if (funding === "wallet" || funding === "bank" || funding === "card") {
+      setFundingSource(funding);
     }
-    if (qWalletId && wallets?.some((w) => w.wallet_id === qWalletId)) {
-      setSelectedWalletId(qWalletId);
-      setFundingSource('wallet');
-      next.delete("sourceWalletId");
-      touched = true;
+
+    const walletId = intent?.sourceWalletId ?? searchParams.get("sourceWalletId");
+    if (walletId && wallets.some((w) => w.wallet_id === walletId)) {
+      setSelectedWalletId(walletId);
+      setFundingSource("wallet");
     }
-    if (qFundingSource === 'wallet' || qFundingSource === 'bank' || qFundingSource === 'card') {
-      setFundingSource(qFundingSource);
-      next.delete("fundingSource");
-      touched = true;
-    }
-    if (qCountryCode) {
-      const c = findCountryByCode(qCountryCode);
-      if (c) {
-        setTargetCountryId(c.id);
-        next.delete("targetCountryCode");
-        touched = true;
-        setTimeout(() => goToStep(2), 50);
-      }
-    }
-    const qFrom = searchParams.get("from");
-    const qTo = searchParams.get("to");
-    if (qFrom && wallets?.some((w) => w.currency_code === qFrom)) {
-      const w = wallets.find((w) => w.currency_code === qFrom);
+
+    const fromCode = intent?.from ?? searchParams.get("from");
+    if (fromCode) {
+      const w = wallets.find((wallet) => wallet.currency_code === fromCode);
       if (w) {
         setSelectedWalletId(w.wallet_id);
         setFundingSource("wallet");
       }
-      next.delete("from");
-      touched = true;
     }
-    if (qTo) {
-      const c = findCountryByCode(qTo);
-      if (c) {
-        setTargetCountryId(c.id);
-        next.delete("to");
-        touched = true;
+
+    const toCode =
+      intent?.to ??
+      searchParams.get("targetCountryCode") ??
+      searchParams.get("to");
+    if (toCode) {
+      const c = findCountryByCode(toCode);
+      if (c) setTargetCountryId(c.id);
+    }
+
+    setFromQuickSend(true);
+    setTimeout(() => goToStep(2), 0);
+
+    const destCode = toCode;
+    if (destCode && beneficiaries?.length) {
+      const matches = beneficiaries.filter((b) => b.country_code === destCode);
+      if (matches.length > 0) {
+        setTimeout(() => setPickerOpen(true), 150);
       }
     }
-    if (touched) setSearchParams(next, { replace: true });
+
+    const next = new URLSearchParams(searchParams);
+    let stripped = false;
+    for (const key of ["quick", "amount", "fundingSource", "sourceWalletId", "targetCountryCode", "from", "to"]) {
+      if (next.has(key)) {
+        next.delete(key);
+        stripped = true;
+      }
+    }
+    if (stripped) setSearchParams(next, { replace: true });
+
+    setTimeout(() => {
+      handoffApplyingRef.current = false;
+    }, 200);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wallets]);
+  }, [wallets, searchParams, beneficiaries]);
 
 
   const resetForm = () => {
@@ -903,6 +935,8 @@ const SendPage = () => {
     setPickedBeneficiaryId(null);
     setIntlLinkMode(false);
     setLinkResult(null);
+    setFromQuickSend(false);
+    clearSendHandoff();
   };
 
   const isStep1Valid = parsedAmount > 0 && parsedAmount > fee && receivedAmount > 0 && rateAvailable && !noLinkedSource && !insufficientFunds;
@@ -1377,8 +1411,8 @@ const SendPage = () => {
                                         onSendAmountChange={(v) => setAmount(v)}
                                         fromCurrencyFilter={fundingSource === "wallet" ? walletCurrencyCodes : undefined}
                                         toCurrencyFilter={payoutCurrencyCodes}
-                                        quoteRecipient={calcQuoteRecipient}
-                                        quoteSend={calcQuoteSend}
+                                        quoteRecipient={rateAvailable ? calcQuoteRecipient : undefined}
+                                        quoteSend={rateAvailable ? calcQuoteSend : undefined}
                                         displayRate={rateAvailable ? effectiveRate : null}
                                         feeLabel={feeDisplayLabel}
                                         walletBalance={
@@ -1464,6 +1498,43 @@ const SendPage = () => {
                                     </button>
                                   </CardHeader>
                                   <CardContent className="space-y-6">
+                                    {fromQuickSend && parsedAmount > 0 && receivedAmount > 0 && (
+                                      <motion.div
+                                        custom={0}
+                                        variants={fieldVariants}
+                                        initial="hidden"
+                                        animate="show"
+                                        className="rounded-xl border border-primary/25 bg-primary/5 p-4 space-y-2"
+                                      >
+                                        <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
+                                          Ready from calculator
+                                        </p>
+                                        <p className="text-base font-bold tabular-nums">
+                                          {sourceSymbol}
+                                          {parsedAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{" "}
+                                          {sourceCurrency}
+                                          <span className="mx-2 text-muted-foreground font-normal">→</span>
+                                          {targetSymbol}
+                                          {receivedAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{" "}
+                                          {targetCountry.code}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground">
+                                          Wallet funded · pick a saved contact below or enter details
+                                        </p>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setFromQuickSend(false);
+                                            clearSendHandoff();
+                                            goToStep(1);
+                                          }}
+                                          className="text-xs font-medium text-primary hover:underline"
+                                        >
+                                          Edit amount or funding
+                                        </button>
+                                      </motion.div>
+                                    )}
+
                                     <motion.div custom={0} variants={fieldVariants} initial="hidden" animate="show">
                                       <Button
                                         type="button"

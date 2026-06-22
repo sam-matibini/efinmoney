@@ -180,6 +180,83 @@ Deno.serve(async (req) => {
     }
   }
 
+  // === Interac / EFT: execute Paysafe payout BEFORE posting release ledger ===
+  let paysafeResult: Record<string, unknown> | null = null;
+  let paysafeTransferId: string | null = null;
+
+  if (method === "interac" || method === "eft") {
+    const recipientAccount = method === "eft"
+      ? `${payload.institution_number}-${payload.transit_number}-${String(payload.account_number ?? "")}`
+      : recipientEmail;
+
+    const { data: payTransfer, error: tInsErr } = await admin
+      .from("transfers")
+      .insert({
+        sender_id: claimed.sender_id,
+        sender_wallet_id: claimed.sender_wallet_id,
+        recipient_name: recipientName,
+        recipient_account: recipientAccount,
+        recipient_country: "CA",
+        transfer_type: "domestic_canada",
+        payout_method: method,
+        funding_source: "wallet",
+        source_currency: claimed.currency,
+        target_currency: claimed.currency,
+        source_amount: claimed.amount,
+        target_amount: claimed.amount,
+        exchange_rate: 1,
+        fee_amount: 0,
+        status: "initiated",
+        provider_reference: `PLINK-${code}`,
+      })
+      .select()
+      .single();
+
+    if (tInsErr || !payTransfer) {
+      await rollback(admin, claimed.id);
+      return json({ error: "Could not create transfer record" }, 500);
+    }
+    paysafeTransferId = payTransfer.id;
+
+    try {
+      const psRes = await fetch(`${SUPABASE_URL}/functions/v1/paysafe-payout`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-internal-secret": SERVICE_ROLE,
+        },
+        body: JSON.stringify({ transfer_id: payTransfer.id, skip_wallet_refund: true }),
+      });
+      paysafeResult = await psRes.json();
+    } catch (err) {
+      console.error("paysafe-payout invoke failed for payment link", code, err);
+      await admin.from("transfers").update({
+        status: "failed",
+        failure_reason: "Payout provider unreachable",
+      }).eq("id", payTransfer.id);
+      await rollback(admin, claimed.id);
+      return json({ error: "We couldn't reach our Canadian payments partner. Please try again shortly." }, 502);
+    }
+
+    if (!paysafeResult?.success) {
+      await rollback(admin, claimed.id);
+      const details = paysafeResult?.details as { error?: { code?: string; message?: string } } | null;
+      const paysafeCode = details?.error?.code;
+      let msg: string;
+      if (paysafeCode === "PAYMENTHUB-1") {
+        msg = method === "interac"
+          ? "Interac e-Transfer isn't enabled on our Canadian payments account yet. Please try Bank (EFT) or debit card, or contact support."
+          : "This bank transfer option isn't enabled on our Canadian payments account yet. Please try a different delivery method.";
+      } else {
+        msg = String(paysafeResult?.error || "Canadian payout failed")
+          .replace(/Your money has been returned to your wallet\s*[—-]?\s*/gi, "")
+          .replace(/returned to your wallet\.?\s*/gi, "")
+          .trim();
+      }
+      return json({ error: msg }, 502);
+    }
+  }
+
   // === Card push: execute Stripe Visa Direct payout BEFORE posting release ledger ===
   let stripePayoutId: string | null = null;
   let cardPayoutCountry = "CA";
@@ -329,32 +406,42 @@ Deno.serve(async (req) => {
   }
 
   // Create a transfers row mirroring the disbursement so it shows in history
-  const { data: transfer } = await admin
-    .from("transfers")
-    .insert({
-      sender_id: claimed.sender_id,
-      sender_wallet_id: claimed.sender_wallet_id,
-      recipient_name: recipientName,
-      recipient_account: method === "eft"
-        ? `${payload.institution_number}-${payload.transit_number}-${String(payload.account_number).slice(-4)}`
-        : method === "card_push"
+  let transfer: { id: string } | null = null;
+  if (method === "interac" || method === "eft") {
+    const { data: existingTransfer } = await admin
+      .from("transfers")
+      .select("id")
+      .eq("id", paysafeTransferId!)
+      .single();
+    transfer = existingTransfer;
+  } else {
+    const { data: cardTransfer } = await admin
+      .from("transfers")
+      .insert({
+        sender_id: claimed.sender_id,
+        sender_wallet_id: claimed.sender_wallet_id,
+        recipient_name: recipientName,
+        recipient_account: method === "card_push"
           ? `card-${payload.card_last4 || "xxxx"}`
           : (recipientEmail || "card"),
-      recipient_country: method === "card_push" ? cardPayoutCountry : "CA",
-      transfer_type: method === "card_push" && cardPayoutCountry !== "CA" ? "card_push" : "domestic_canada",
-      payout_method: method,
-      funding_source: "wallet",
-      source_currency: claimed.currency,
-      target_currency: claimed.currency,
-      source_amount: claimed.amount,
-      target_amount: claimed.amount,
-      exchange_rate: 1,
-      fee_amount: 0,
-      status: method === "card_push" ? "processing" : "completed",
-      provider_reference: stripePayoutId || `PLINK-${code}`,
-    })
-    .select()
-    .single();
+        recipient_country: method === "card_push" ? cardPayoutCountry : "CA",
+        transfer_type: method === "card_push" && cardPayoutCountry !== "CA" ? "card_push" : "domestic_canada",
+        payout_method: method,
+        funding_source: "wallet",
+        source_currency: claimed.currency,
+        target_currency: claimed.currency,
+        source_amount: claimed.amount,
+        target_amount: claimed.amount,
+        exchange_rate: 1,
+        fee_amount: 0,
+        status: method === "card_push" ? "processing" : "completed",
+        provider_reference: stripePayoutId || `PLINK-${code}`,
+        stripe_payout_id: stripePayoutId,
+      })
+      .select()
+      .single();
+    transfer = cardTransfer;
+  }
 
   await admin
     .from("payment_link_payouts")
@@ -367,6 +454,12 @@ Deno.serve(async (req) => {
         recipient_email: recipientEmail || null,
         method,
         ...(method === "card_push" ? { stripe_payout_id: stripePayoutId } : {}),
+        ...(method === "interac" || method === "eft"
+          ? {
+              paysafe_id: paysafeResult?.paysafe_id ?? null,
+              paysafe_status: paysafeResult?.status ?? null,
+            }
+          : {}),
       },
     })
     .eq("id", claimed.id);
@@ -378,6 +471,8 @@ Deno.serve(async (req) => {
     method,
     transfer_id: transfer?.id ?? null,
     stripe_payout_id: stripePayoutId,
+    paysafe_id: paysafeResult?.paysafe_id ?? null,
+    security: paysafeResult?.security ?? null,
   });
 });
 

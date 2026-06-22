@@ -13,6 +13,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Link2, Copy, Search, X, CheckCircle, Clock, AlertCircle, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
+import { RevokePaymentLinkDialog } from "@/components/payment-links/RevokePaymentLinkDialog";
 
 type Row = {
   id: string;
@@ -44,6 +45,8 @@ const PaymentLinksPage = () => {
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<"all" | "pending" | "claimed" | "expired">("all");
+  const [revokeTarget, setRevokeTarget] = useState<Row | null>(null);
+  const [revokeBusy, setRevokeBusy] = useState(false);
 
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ["payment-link-payouts", user?.id],
@@ -89,15 +92,20 @@ const PaymentLinksPage = () => {
     try { await navigator.clipboard.writeText(url); toast.success("Link copied"); } catch { toast.error("Copy failed"); }
   };
 
-  const revoke = async (row: Row) => {
+  const confirmRevoke = async () => {
+    if (!revokeTarget) return;
+    setRevokeBusy(true);
     try {
-      const { data, error } = await supabase.functions.invoke("payment-link-revoke", { body: { code: row.short_code } });
+      const { data, error } = await supabase.functions.invoke("payment-link-revoke", { body: { code: revokeTarget.short_code } });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       toast.success("Link revoked — funds returned to wallet");
+      setRevokeTarget(null);
       qc.invalidateQueries({ queryKey: ["payment-link-payouts"] });
     } catch (e: any) {
       toast.error(e?.message || "Failed to revoke");
+    } finally {
+      setRevokeBusy(false);
     }
   };
 
@@ -194,7 +202,7 @@ const PaymentLinksPage = () => {
                         </Button>
                       )}
                       {r.status === "pending" && (
-                        <Button size="sm" variant="outline" onClick={() => revoke(r)}>
+                        <Button size="sm" variant="outline" onClick={() => setRevokeTarget(r)}>
                           <X className="w-3.5 h-3.5 mr-1" /> Revoke
                         </Button>
                       )}
@@ -206,6 +214,16 @@ const PaymentLinksPage = () => {
           </CardContent></Card>
         )}
 
+        <RevokePaymentLinkDialog
+          open={!!revokeTarget}
+          onOpenChange={(open) => { if (!open && !revokeBusy) setRevokeTarget(null); }}
+          shortCode={revokeTarget?.short_code ?? ""}
+          amount={Number(revokeTarget?.amount ?? 0)}
+          currency={revokeTarget?.currency ?? "CAD"}
+          recipientLabel={revokeTarget?.recipient_name}
+          busy={revokeBusy}
+          onConfirm={confirmRevoke}
+        />
       </main>
   );
 };

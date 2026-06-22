@@ -15,6 +15,9 @@ verify_jwt = false
 [functions.paysafe-payout]
 verify_jwt = false
 
+[functions.paysafe-verify-transfer]
+verify_jwt = false
+
 [functions.stripe-webhook]
 verify_jwt = false
 
@@ -185,4 +188,17 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.persona-webhook]
+verify_jwt = false
+
+# Payment links: resolve + claim are public (recipients are not logged in).
+[functions.payment-link-resolve]
+verify_jwt = false
+
+[functions.payment-link-claim]
+verify_jwt = false
+
+[functions.payment-link-create]
+verify_jwt = false
+
+[functions.payment-link-revoke]
 verify_jwt = false

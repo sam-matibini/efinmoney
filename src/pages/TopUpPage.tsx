@@ -20,6 +20,7 @@ import ElicateTopUpCard from "@/components/payments/ElicateTopUpCard";
 import { validateMinAmount, friendlyFlwError, minAmount, type FlwMethod } from "@/lib/flutterwave";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { MM_COUNTRIES } from "@/lib/mobileMoneyNetworks";
+import { invokeEdgeFunction } from "@/lib/invokeEdgeFunction";
 
 const MM_BY_CCY = Object.fromEntries(MM_COUNTRIES.map((c) => [c.currency, c]));
 
@@ -109,13 +110,63 @@ const TopUpPage = () => {
     }
   }, [mmCountry, network]);
 
-  // Verify FLW return callback
+  // Verify Stripe / Flutterwave return callbacks
   useEffect(() => {
     const stripeStatus = params.get("stripe");
+    const stripeSessionId = params.get("session_id");
+
     if (stripeStatus === "success") {
-      setVerifyState({ status: "success", message: "Payment received. Your wallet will be credited within a few seconds." });
-      toast.success("Stripe top-up received");
-      return;
+      setVerifyState({ status: "verifying", message: "Confirming your Stripe payment…" });
+      let cancelled = false;
+      let attempts = 0;
+
+      const pollStripeSession = async () => {
+        if (cancelled) return;
+        if (stripeSessionId) {
+          const { data, error } = await supabase
+            .from("stripe_payin_sessions")
+            .select("status, credit_amount, credit_currency, failure_reason")
+            .eq("stripe_session_id", stripeSessionId)
+            .maybeSingle();
+
+          if (!cancelled && !error && data?.status === "succeeded") {
+            const amt = Number(data.credit_amount);
+            const ccy = data.credit_currency ?? "USD";
+            setVerifyState({
+              status: "success",
+              message: `Wallet credited with ${ccy} ${Number.isFinite(amt) ? amt.toFixed(2) : data.credit_amount}`,
+            });
+            toast.success("Stripe top-up complete");
+            return;
+          }
+          if (!cancelled && data?.status === "failed") {
+            setVerifyState({
+              status: "failed",
+              message: data.failure_reason || "Stripe payment could not be completed",
+            });
+            return;
+          }
+        }
+
+        attempts += 1;
+        if (attempts < 20 && !cancelled) {
+          window.setTimeout(pollStripeSession, 2000);
+          return;
+        }
+
+        if (!cancelled) {
+          setVerifyState({
+            status: "success",
+            message: "Payment received. Your wallet should update within a minute.",
+          });
+          toast.success("Stripe payment received");
+        }
+      };
+
+      void pollStripeSession();
+      return () => {
+        cancelled = true;
+      };
     }
     if (stripeStatus === "cancelled") {
       setVerifyState({ status: "failed", message: "Stripe payment was cancelled" });
@@ -304,14 +355,12 @@ const TopUpPage = () => {
                       if (!Number.isFinite(amt) || amt < 5) { toast.error("Minimum 5"); return; }
                       setLoading(true);
                       try {
-                        const { data, error } = await supabase.functions.invoke(
+                        const data = await invokeEdgeFunction<{ url?: string }>(
                           "stripe-create-checkout-session",
-                          { body: { wallet_id: selectedWallet.wallet_id, amount: amt, currency } },
+                          { wallet_id: selectedWallet.wallet_id, amount: amt, currency },
                         );
-                        if (error) throw error;
-                        const url = (data as { url?: string; error?: string })?.url;
-                        if (!url) throw new Error((data as { error?: string })?.error || "No checkout URL");
-                        window.location.href = url;
+                        if (!data.url) throw new Error("No checkout URL returned");
+                        window.location.href = data.url;
                       } catch (e) {
                         toast.error(e instanceof Error ? e.message : "Could not start checkout");
                       } finally {

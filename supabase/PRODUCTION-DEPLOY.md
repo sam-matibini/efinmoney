@@ -22,8 +22,35 @@ If you only need one step:
 ```powershell
 .\supabase\scripts\Deploy-Production.ps1 -SecretsOnly
 .\supabase\scripts\Deploy-Production.ps1 -FunctionsOnly
+.\supabase\scripts\Deploy-Production.ps1 -CanadaOnly      # domestic CAD rails only (sequential, safer)
+.\supabase\scripts\Deploy-Production.ps1 -CanadaOnly -SkipSecrets
 .\supabase\scripts\Deploy-Production.ps1 -DbOnly
 ```
+
+### Canada domestic rails (one command)
+
+Deploys EFT, Interac, Instant-to-Card, Payment Links, and Stripe Connect functions **one at a time** (avoids CLI 403 on batch deploy):
+
+```powershell
+cd efinmoney-d4767097
+npx supabase login
+.\supabase\scripts\Deploy-Production.ps1 -CanadaOnly
+```
+
+Pushes `PAYSAFE_*` + `STRIPE_*` secrets from `migration-export/secrets.env`, then deploys:
+
+| Function | Rail |
+|----------|------|
+| `execute-transfer` | Routes CAD payouts |
+| `paysafe-payout` | Bank EFT + Interac e-Transfer |
+| `paysafe-webhook` | Paysafe callbacks |
+| `stripe-payout` | Instant to debit card |
+| `stripe-payout-webhook` | Card payout status |
+| `stripe-payin-webhook` | Card-funded send |
+| `stripe-charge-card` | Pay domestic send by card |
+| `payment-link-*` | Create / resolve / claim / revoke |
+| `stripe-connect-*` | Connect onboarding + instant payout |
+| `test-integrations` | Admin diagnostics |
 
 ---
 
@@ -63,6 +90,9 @@ Ensure these exist (values in `migration-export/secrets.env`):
 | `ELICATE_LIVE_PUBLIC_KEY` | Live public key from Elicate dashboard |
 | `ELICATE_LIVE_SECRET_KEY` | Live secret key from Elicate dashboard |
 | `ELICATE_LIVE_WEBHOOK_SECRET` | Webhook signing secret (same value in Elicate → Webhooks) |
+| `PAYSAFE_ENV` | `test` (sandbox) or `live` (production Interac/EFT) |
+| `PAYSAFE_API_KEY` | Paysafe `pmle-…` secret |
+| `PAYSAFE_WEBHOOK_SECRET` | Paysafe webhook HMAC (after creating webhook) |
 
 ### 3. Verify JWT = OFF (browser-called functions)
 
@@ -83,8 +113,10 @@ These **must** be OFF or browsers get CORS/preflight failures:
 - `virtual-card-ops`
 - `flw-get-billers`, `flw-validate-bill`, `flw-bill-payment`
 - `elicate-payout`, `elicate-webhook`, `elicate-reconcile`
+- `payment-link-create`, `payment-link-resolve`, `payment-link-claim`, `payment-link-revoke`
+- `stripe-connect-create-account`, `stripe-connect-account-session`, `stripe-connect-refresh-status`
 
-Webhooks (Stripe, Flutterwave, Adyen, etc.) should also have JWT verification **OFF**.
+Webhooks (Stripe, Flutterwave, Adyen, Paysafe, etc.) should also have JWT verification **OFF**.
 
 Each function still validates the user JWT **inside** the function code where needed.
 
@@ -135,6 +167,27 @@ https://www.efin.money/admin/onboarding
 | Connect payouts | `.../stripe-payout-webhook` |
 | Pay-in | `.../stripe-payin-webhook` |
 
+### 7b. Paysafe webhook (Canada Interac / EFT)
+
+In **Paysafe portal → Developer → Webhook Configurations**, add a config for your **CAD / EFT account** (`1003142770`), not the card account:
+
+| Field | Value |
+|-------|--------|
+| **URL** | `https://dkdnwumllibwdlqbjkwy.supabase.co/functions/v1/paysafe-webhook` |
+| **Secret** | Generate in Paysafe → set as Supabase secret `PAYSAFE_WEBHOOK_SECRET` |
+| **Events** | `SA CREDIT COMPLETED`, `SA CREDIT FAILED`, `STANDALONE CREDIT COMPLETED`, and related SA CREDIT events |
+
+```powershell
+supabase secrets set PAYSAFE_WEBHOOK_SECRET=your-generated-key --project-ref dkdnwumllibwdlqbjkwy
+```
+
+**Verify JWT = OFF** for `paysafe-webhook` and `paysafe-verify-transfer`.
+
+Canada transfers poll `paysafe-verify-transfer` on the tracking page until the webhook fires. When status becomes `completed`, the DB trigger emails the sender via Resend.
+
+Sandbox keys (`B-qa2` prefix) use `PAYSAFE_ENV=test` and `api.test.paysafe.com`.  
+For real Canadian payouts, switch to live keys from [portals.paysafe.com](https://portals.paysafe.com) and set `PAYSAFE_ENV=live`, then redeploy with `-CanadaOnly`.
+
 ### 8. Adyen webhook
 
 `https://dkdnwumllibwdlqbjkwy.supabase.co/functions/v1/adyen-webhook`  
@@ -176,6 +229,17 @@ VITE_APP_URL=https://efin.money
 | Send → Link bank account | Plaid modal opens |
 | Admin → Invite staff | Email says "admin portal", link works |
 | Adyen top-up test | Wallet credits after payment |
+| Send → Domestic → Payment Link | Link created; recipient claims at `/claim/{code}` |
+| Admin → System Diagnostics | Paysafe + Stripe show **Connected** |
+| Send → Domestic → EFT (sandbox) | Transfer completes or refunds with clear error |
+
+### Canada domestic smoke test
+
+1. Run `.\supabase\scripts\Deploy-Production.ps1 -CanadaOnly`
+2. Admin → **System Diagnostics** — Paysafe + Stripe green
+3. **Payment Link** — create C$5 link from CAD wallet; open `/claim/{code}` in incognito
+4. **EFT** — Paysafe sandbox test bank details (not real money until `PAYSAFE_ENV=live`)
+5. **Instant to Card** — Canadian debit card; check transfer tracking for Stripe payout id
 
 ### Smoke-test Stripe key endpoint
 
@@ -201,3 +265,9 @@ Turn off **Verify JWT** for that function and redeploy.
 
 **Staff gets consumer welcome email**  
 Run `production-sql.sql` and re-invite the staff member.
+
+**Canada deploy stops mid-way (403)**  
+Re-run `.\supabase\scripts\Deploy-Production.ps1 -CanadaOnly` — it deploys one function at a time and reports which failed.
+
+**Paysafe Interac/EFT fails with "temporarily unavailable"**  
+Keys are still sandbox (`PAYSAFE_ENV=test`) or Interac/EFT not enabled on your Paysafe account. Switch to live keys when ready.

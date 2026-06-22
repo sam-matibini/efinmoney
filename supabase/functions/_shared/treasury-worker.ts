@@ -16,8 +16,8 @@ export function flwDebitCurrency(): string {
 }
 
 export function treasuryBufferAmount(): number {
-  const n = Number(Deno.env.get("TREASURY_FLW_BUFFER") || "50000");
-  return Number.isFinite(n) && n >= 0 ? n : 50_000;
+  const n = Number(Deno.env.get("TREASURY_FLW_BUFFER") || "5000");
+  return Number.isFinite(n) && n >= 0 ? n : 5_000;
 }
 
 export function autoStripePayoutEnabled(): boolean {
@@ -277,10 +277,10 @@ export async function checkFlutterwaveLiquidity(
   db: SupabaseClient,
   amount: number,
   payoutCurrency: string,
-): Promise<{ sufficient: boolean; available: number; debitCurrency: string }> {
+  options?: { requireBuffer?: boolean },
+): Promise<{ sufficient: boolean; available: number; debitCurrency: string; needed: number }> {
   const debitCurrency = flwDebitCurrency();
   const targetCur = payoutCurrency.toUpperCase();
-  // When debit currency matches payout currency, compare directly
   const compareCur = debitCurrency === targetCur ? targetCur : debitCurrency;
   let available = await getCachedBalance(db, "flutterwave", compareCur);
   if (available <= 0) {
@@ -289,29 +289,35 @@ export async function checkFlutterwaveLiquidity(
     const row = live.find((b) => b.currency === compareCur);
     available = row?.available ?? 0;
   }
-  const buffer = treasuryBufferAmount();
-  const needed = debitCurrency === targetCur ? amount : amount; // same for NGN payouts debiting NGN
+  const buffer = options?.requireBuffer && compareCur === "NGN" ? treasuryBufferAmount() : 0;
+  const needed = amount + buffer;
   return {
-    sufficient: available >= needed + (compareCur === "NGN" ? buffer : 0),
+    sufficient: available >= needed,
     available,
     debitCurrency,
+    needed,
   };
 }
+
+/** Client-safe copy — never expose provider balances or settlement internals. */
+export const PENDING_LIQUIDITY_USER_MESSAGE =
+  "Your payment was received. We're completing delivery to your recipient — this usually takes a few minutes.";
 
 export async function queuePendingLiquidity(
   db: SupabaseClient,
   transferId: string,
   userId: string,
-  reason: string,
+  internalReason: string,
 ) {
+  console.log(`[treasury] pending_liquidity ${transferId}: ${internalReason}`);
   await db.from("transfers").update({
     status: "pending_liquidity",
-    failure_reason: reason.slice(0, 500),
+    failure_reason: null,
   }).eq("id", transferId);
   await db.from("notifications").insert({
     user_id: userId,
-    title: "Transfer queued",
-    message: "Your transfer is queued and will be sent automatically once settlement funds are available. This usually takes a few hours.",
+    title: "Transfer in progress",
+    message: PENDING_LIQUIDITY_USER_MESSAGE,
     type: "info",
   });
 }

@@ -58,6 +58,7 @@ const Header = () => {
   const navItems = [
     { label: 'Dashboard', href: '/dashboard' },
     { label: 'Send', href: '/send' },
+    { label: 'Payment links', href: '/payment-links' },
     { label: 'Top up', href: '/wallet/topup' },
     { label: 'Contacts', href: '/contacts' },
     { label: 'Exchange', href: '/exchange' },

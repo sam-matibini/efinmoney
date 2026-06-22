@@ -470,7 +470,7 @@ Deno.serve(async (req) => {
         success: true,
         queued: true,
         pending_liquidity: true,
-        message: "Transfer queued — will send automatically when settlement funds are available.",
+        message: "Your payment was received. We're completing delivery to your recipient.",
         payout: payoutResult,
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }

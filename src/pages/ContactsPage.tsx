@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import AddBeneficiaryModal, { BENEFICIARY_COUNTRIES } from "@/components/modals/AddBeneficiaryModal";
 import {
-  useBeneficiaries, useDeleteBeneficiary, type Beneficiary,
+  useBeneficiaries, useDeleteBeneficiary, isCanadaBeneficiary, type Beneficiary,
 } from "@/hooks/useBeneficiaries";
 import { Search, Plus, Send, Pencil, Trash2, Users, LayoutGrid, List as ListIcon } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
@@ -58,6 +58,10 @@ const ContactsPage = () => {
   }, [contacts, search]);
 
   const handleSendTo = (c: Beneficiary) => {
+    if (isCanadaBeneficiary(c)) {
+      navigate(`/send?mode=canada&beneficiaryId=${c.id}`);
+      return;
+    }
     navigate(`/send?beneficiaryId=${c.id}`);
   };
 

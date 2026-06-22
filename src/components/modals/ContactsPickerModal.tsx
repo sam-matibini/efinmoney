@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useBeneficiaries, type Beneficiary } from "@/hooks/useBeneficiaries";
+import { useBeneficiaries, isCanadaBeneficiary, type Beneficiary } from "@/hooks/useBeneficiaries";
 import { BENEFICIARY_COUNTRIES } from "@/components/modals/AddBeneficiaryModal";
 import { Search, Users } from "lucide-react";
 
@@ -10,22 +10,27 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSelect: (b: Beneficiary) => void;
+  filterCanada?: boolean;
+  onAddNew?: () => void;
 }
 
-const ContactsPickerModal = ({ open, onOpenChange, onSelect }: Props) => {
+const ContactsPickerModal = ({ open, onOpenChange, onSelect, filterCanada = false, onAddNew }: Props) => {
   const { data: contacts, isLoading } = useBeneficiaries();
   const [search, setSearch] = useState("");
 
   const filtered = useMemo(() => {
-    const items = contacts || [];
+    const items = (contacts || []).filter((c) => !filterCanada || isCanadaBeneficiary(c));
     if (!search.trim()) return items;
     const q = search.trim().toLowerCase();
     return items.filter((c) =>
       c.name.toLowerCase().includes(q) ||
       (c.nickname || "").toLowerCase().includes(q) ||
-      (c.phone || "").toLowerCase().includes(q)
+      (c.phone || "").toLowerCase().includes(q) ||
+      (c.email || "").toLowerCase().includes(q) ||
+      (c.interac_email || "").toLowerCase().includes(q) ||
+      (c.eft_account || "").includes(q)
     );
-  }, [contacts, search]);
+  }, [contacts, search, filterCanada]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -50,10 +55,17 @@ const ContactsPickerModal = ({ open, onOpenChange, onSelect }: Props) => {
             <div className="py-8 text-center space-y-2">
               <Users className="w-8 h-8 mx-auto text-muted-foreground" />
               <p className="text-sm text-muted-foreground">
-                {(contacts || []).length === 0
-                  ? "No contacts yet — they'll appear here after your first transfer."
+                {(contacts || []).filter((c) => !filterCanada || isCanadaBeneficiary(c)).length === 0
+                  ? filterCanada
+                    ? "No Canadian contacts yet — add one or send to someone new."
+                    : "No contacts yet — they'll appear here after your first transfer."
                   : "No contacts match your search."}
               </p>
+              {onAddNew && (
+                <Button size="sm" variant="outline" onClick={() => { onAddNew(); onOpenChange(false); }}>
+                  Add contact
+                </Button>
+              )}
             </div>
           ) : (
             <ul className="divide-y divide-border">
@@ -72,7 +84,11 @@ const ContactsPickerModal = ({ open, onOpenChange, onSelect }: Props) => {
                       <div className="min-w-0 flex-1">
                         <p className="font-medium truncate">{c.nickname || c.name}</p>
                         <p className="text-xs text-muted-foreground truncate">
-                          {flag} {c.phone || c.bank_account || ""}
+                          {c.interac_email
+                            ? `Interac · ${c.interac_email}`
+                            : c.eft_account
+                              ? `EFT · ···${c.eft_account.slice(-4)}`
+                              : `${flag} ${c.phone || c.email || c.bank_account || ""}`}
                         </p>
                       </div>
                       <span className="text-xs text-muted-foreground">{c.transfer_count}×</span>

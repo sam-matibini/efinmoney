@@ -12,7 +12,7 @@ Claim methods:
 
 **Debit card claim requires inline KYC** on ClaimPaymentLinkPage: full name, email, DOB, phone, address (line1/city/province/postal), and ToS acceptance. The edge function `payment-link-claim` seeds a Stripe Custom Connect account with these fields + `tos_acceptance` (recipient service agreement) and polls up to 6s for the `transfers` capability to activate before calling `payouts.create({ method: "instant" })`. Without these fields, Stripe returns "requirements need to be collected" and the payout fails.
 
-Ledger release on success: DR 2199 / CR 1108. Rollback restores escrow on any failure.
+Ledger release on success: DR 2199 / CR 1108. Rollback restores escrow on any failure. Interac/EFT claims invoke `paysafe-payout` (with `skip_wallet_refund`) before ledger release; card claims use Stripe instant payout.
 
 UI status surfacing: escrow journal stays DR 2101 / CR 2199 forever; claim posts a separate release journal DR 2199 / CR 1108. `TransactionDetailPage` parses `[CODE]` from the description and renders a Paid/Pending/Expired banner sourced from `payment_link_payouts.status`, with a cross-link to the counterpart journal. `PaymentLinksPage` labels claimed rows as "Paid" (DB value stays `claimed`) and auto-expires stale pending rows on load.
 

@@ -56,10 +56,23 @@ export function TreasuryWorkerPanel() {
   const handleRunWorker = async () => {
     try {
       const result = await runWorker.mutateAsync(false);
-      const processed = (result?.processed as unknown[])?.length ?? 0;
+      const items = (result?.processed as { action?: string; error?: string; payout?: { error?: string } }[]) ?? [];
+      const sent = items.filter((i) => i.action === "payout_sent").length;
+      const skipped = items.filter((i) => i.action === "skipped").length;
+      const failed = items.filter((i) => i.action === "payout_failed");
+      const stillQueued = items.filter((i) => i.action === "still_queued").length;
+      const parts: string[] = [];
+      if (sent) parts.push(`${sent} paid out`);
+      if (skipped) parts.push(`${skipped} skipped (balance too low)`);
+      if (stillQueued) parts.push(`${stillQueued} re-queued`);
+      if (failed.length) {
+        const err = failed[0].error || failed[0].payout?.error || "see Supabase function logs";
+        parts.push(`${failed.length} failed: ${err}`);
+      }
       toast({
-        title: "Worker finished",
-        description: `Processed ${processed} queued transfer(s).`,
+        title: sent ? "Payouts sent" : failed.length ? "Worker error" : "Worker finished",
+        description: parts.length ? parts.join(" · ") : "No queued transfers to process.",
+        variant: failed.length ? "destructive" : "default",
       });
     } catch (e) {
       toast({ title: "Worker failed", description: (e as Error).message, variant: "destructive" });
@@ -167,7 +180,9 @@ export function TreasuryWorkerPanel() {
           <CardTitle className="text-base flex items-center gap-2">
             <ArrowRightLeft className="h-4 w-4" /> Pending liquidity transfers
           </CardTitle>
-          <CardDescription>Will auto-send when Flutterwave balance is sufficient</CardDescription>
+          <CardDescription>
+            Pays queued transfers when FLW balance covers each amount. Larger older transfers may wait until you prefund FLW.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {!pendingTransfers.data?.length ? (

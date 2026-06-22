@@ -1,3 +1,5 @@
+import { resolveEffectiveRate } from "@/lib/fxRatesCore";
+
 export const WALLET_TRANSFER_FEE_RATE = 0.005;
 
 export type FxRateRow = {
@@ -15,14 +17,9 @@ export function findEffectiveRate(
 ): { effective_rate: number; fee_rate: number } | null {
   if (from === to) return { effective_rate: 1, fee_rate: 0 };
 
-  const direct = rates?.find((r) => r.from_currency === from && r.to_currency === to);
-  if (direct) {
-    return { effective_rate: Number(direct.effective_rate), fee_rate: WALLET_TRANSFER_FEE_RATE };
-  }
-
-  const reverse = rates?.find((r) => r.from_currency === to && r.to_currency === from);
-  if (reverse && Number(reverse.effective_rate) > 0) {
-    return { effective_rate: 1 / Number(reverse.effective_rate), fee_rate: WALLET_TRANSFER_FEE_RATE };
+  const resolved = rates?.length ? resolveEffectiveRate(from, to, rates) : null;
+  if (resolved && resolved > 0) {
+    return { effective_rate: resolved, fee_rate: WALLET_TRANSFER_FEE_RATE };
   }
 
   return null;

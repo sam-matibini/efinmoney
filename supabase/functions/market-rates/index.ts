@@ -52,14 +52,14 @@ Deno.serve(async (req) => {
     );
 
     // FIAT: most-recent + closest-to-24h-old row per pair
-    const fiat: { from: string; to: string; price: number; change24h: number }[] = [];
+    const fiat: { from: string; to: string; price: number; market_price: number; change24h: number }[] = [];
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
     await Promise.all(
       FIAT_PAIRS.map(async (p) => {
         const { data: latestArr } = await supabase
           .from("fx_rates")
-          .select("effective_rate, valid_from")
+          .select("rate, effective_rate, valid_from")
           .eq("from_currency", p.from)
           .eq("to_currency", p.to)
           .order("valid_from", { ascending: false })
@@ -77,10 +77,11 @@ Deno.serve(async (req) => {
           .limit(1);
         const prior = priorArr?.[0];
         const price = Number(latest.effective_rate);
+        const market_price = Number(latest.rate) || price;
         const change24h = prior && Number(prior.effective_rate) > 0
           ? ((price - Number(prior.effective_rate)) / Number(prior.effective_rate)) * 100
           : 0;
-        fiat.push({ from: p.from, to: p.to, price, change24h });
+        fiat.push({ from: p.from, to: p.to, price, market_price, change24h });
       }),
     );
 

@@ -15,6 +15,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { RefreshCw, ArrowUpDown, TrendingUp, CheckCircle, Bitcoin, DollarSign, ExternalLink, Sparkles } from "lucide-react";
 import { CryptoTradingPanel } from "@/components/crypto/CryptoTradingPanel";
 import { flagForCurrency } from "@/lib/flags";
+import { resolveEffectiveRate } from "@/lib/fx";
 import { CurrencyFlag } from "@/components/ui/FlagImage";
 
 // Synthetic wallet id used to represent the on-chain USDC option.
@@ -66,16 +67,14 @@ const FxTradingPanel = () => {
   const toWallet = destinationOptions.find(w => w.wallet_id === toWalletId) ?? destinationOptions[1];
   const isCryptoSwap = toWallet && "isStellar" in toWallet && toWallet.isStellar;
 
-  // For USDC destination we use the FIAT → USD rate (USDC is pegged to USD).
-  const fxRate = toWallet
-    ? isCryptoSwap
-      ? fromWallet?.currency_code === "USD"
-        ? { effective_rate: 1, rate: 1, markup_rate: 0 }
-        : fxRates?.find(r => r.from_currency === fromWallet?.currency_code && r.to_currency === "USD")
-      : fxRates?.find(r => r.from_currency === fromWallet?.currency_code && r.to_currency === toWallet.currency_code)
-    : null;
-
-  const effectiveRate = fxRate ? Number(fxRate.effective_rate) : null;
+  const effectiveRate = useMemo(() => {
+    if (!fromWallet?.currency_code || !toWallet?.currency_code) return null;
+    if (isCryptoSwap) {
+      if (fromWallet.currency_code === "USD") return 1;
+      return resolveEffectiveRate(fromWallet.currency_code, "USD", fxRates ?? []);
+    }
+    return resolveEffectiveRate(fromWallet.currency_code, toWallet.currency_code, fxRates ?? []);
+  }, [fromWallet?.currency_code, toWallet?.currency_code, isCryptoSwap, fxRates]);
   const recvDecimals = isCryptoSwap ? 4 : 2;
 
   const quoteReceive = useCallback(

@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useWallets } from "@/hooks/useWallets";
 import { useFxRates } from "@/hooks/useFxRates";
+import { resolveEffectiveRate } from "@/lib/fx";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -60,13 +61,10 @@ const ExchangeModal = ({ children }: ExchangeModalProps) => {
   const fromWallet = wallets?.find(w => w.wallet_id === fromWalletId) || wallets?.[0];
   const toWallet = wallets?.find(w => w.wallet_id === toWalletId) || wallets?.[1];
 
-  // Get FX rate
-  const fxRate = fxRates?.find(
-    r => r.from_currency === fromWallet?.currency_code && r.to_currency === toWallet?.currency_code
-  );
-
-  const effectiveRate = fxRate ? Number(fxRate.effective_rate) : 
-    (fromWallet?.currency_code === 'USD' && toWallet?.currency_code === 'CAD' ? 1.35 : 1);
+  // Get FX rate (direct, inverse, or USD cross)
+  const effectiveRate = fromWallet?.currency_code && toWallet?.currency_code
+    ? resolveEffectiveRate(fromWallet.currency_code, toWallet.currency_code, fxRates ?? []) ?? 1
+    : 1;
 
   const fee = parseFloat(amount) > 0 ? parseFloat(amount) * 0.005 : 0;
   const receivedAmount = parseFloat(amount) > 0 

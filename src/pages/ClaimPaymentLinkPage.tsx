@@ -408,10 +408,20 @@ const ClaimPaymentLinkPage = () => {
         const res = await fetch(`${FUNCTIONS_BASE}/payment-link-resolve?code=${encodeURIComponent(code)}`, {
           headers: { apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string },
         });
-        const j = await res.json();
-        if (!res.ok) throw new Error(j?.error || "Failed to load link");
-        setLink(j);
-      } catch (e: any) { setErr(e.message); } finally { setLoading(false); }
+        const j = await res.json().catch(() => ({}));
+        if (res.status === 404 && (j as { code?: string })?.code === "NOT_FOUND") {
+          throw new Error("Payment link lookup is not available yet. Ask the sender to try again later.");
+        }
+        if (!res.ok) throw new Error((j as { error?: string })?.error || `Could not load link (${res.status})`);
+        setLink(j as Resolved);
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : "Failed to load link";
+        setErr(/load failed|failed to fetch|networkerror/i.test(msg)
+          ? "Could not reach the payment server. If this keeps happening, the claim service may need to be deployed."
+          : msg);
+      } finally {
+        setLoading(false);
+      }
     })();
   }, [code]);
 

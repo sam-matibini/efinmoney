@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { ArrowDownUp, ArrowRight, Check, ChevronDown, Search, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { usePricingConfig } from "@/hooks/usePricingConfig";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { WORLD_CURRENCIES, WORLD_CURRENCY_MAP } from "@/lib/worldCurrencies";
@@ -13,11 +14,13 @@ import {
   BENCHMARK_B_FLAT_FEE_USD,
   BENCHMARK_B_MARGIN,
   EFIN_FLAT_FEE_USD,
-  EFIN_FX_MARGIN,
   buildUsdMap,
   fmt,
   midRateFromUsdMap,
   parseAmount,
+  formatAmountInput,
+  quoteTransferRecipient,
+  quoteTransferSend,
   type MarketResponse,
 } from "@/components/fx/liveFxUtils";
 
@@ -103,11 +106,12 @@ const LiveFxCalculator = ({
 }: LiveFxCalculatorProps) => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { data: pricing } = usePricingConfig();
   const isApp = variant === "app";
 
   const [internalFrom, setInternalFrom] = useState(defaultFrom);
   const [internalTo, setInternalTo] = useState(defaultTo);
-  const [sendAmt, setSendAmt] = useState(defaultSendAmount);
+  const [sendAmt, setSendAmt] = useState(() => formatAmountInput(defaultSendAmount));
   const [recvAmt, setRecvAmt] = useState("");
   const [lastEdited, setLastEdited] = useState<"send" | "receive">("send");
   const [, setTick] = useState(0);
@@ -116,6 +120,7 @@ const LiveFxCalculator = ({
   const from = controlledFrom ?? internalFrom;
   const to = controlledTo ?? internalTo;
   const sendAmtDisplay = controlledSend ?? sendAmt;
+  const sendAmtFormatted = formatAmountInput(sendAmtDisplay);
 
   const setFrom = (code: string) => {
     if (controlledFrom === undefined) setInternalFrom(code);
@@ -143,38 +148,78 @@ const LiveFxCalculator = ({
     return () => clearInterval(id);
   }, []);
 
-  const usdMap = useMemo(() => buildUsdMap(data?.fiat ?? []), [data]);
-  const midRate = useMemo(() => midRateFromUsdMap(from, to, usdMap), [from, to, usdMap]);
+  const usdMapEffective = useMemo(() => buildUsdMap(data?.fiat ?? [], "price"), [data]);
+  const usdMapMarket = useMemo(() => buildUsdMap(data?.fiat ?? [], "market_price"), [data]);
+  const marketRate = useMemo(() => midRateFromUsdMap(from, to, usdMapEffective), [from, to, usdMapEffective]);
+  const marketMidRate = useMemo(() => midRateFromUsdMap(from, to, usdMapMarket), [from, to, usdMapMarket]);
+
+  /** Rate used for quotes — parent DB rate wins, then live market cross-rate. */
+  const resolvedQuoteRate = useMemo(() => {
+    if (displayRate != null && displayRate > 0) return displayRate;
+    if (marketRate != null && marketRate > 0) return marketRate;
+    return null;
+  }, [displayRate, marketRate]);
 
   const flatFeeInFrom = (usdFee: number): number => {
     if (!usdFee) return 0;
-    const fUsd = usdMap.get(from);
-    if (!fUsd || fUsd <= 0) return 0;
+    const fUsd = usdMapEffective.get(from);
+    if (!fUsd || fUsd <= 0) return usdFee;
     return usdFee / fUsd;
   };
 
-  const defaultQuoteRecipient = (sendInFrom: number, margin: number, flatUsd: number): number => {
-    if (!midRate || sendInFrom <= 0) return 0;
+  const transferFlatFee =
+    pricing?.transfer_base_fee != null
+      ? pricing.transfer_base_fee
+      : flatFeeInFrom(EFIN_FLAT_FEE_USD);
+
+  const resolvedFeeLabel =
+    feeLabel ??
+    (pricing?.transfer_base_fee != null
+      ? `${from} ${fmt(pricing.transfer_base_fee)} flat fee`
+      : "0.8% + $0.99");
+
+  const defaultQuoteRecipient = (sendInFrom: number, margin: number, flatUsd: number, rate: number): number => {
+    if (!rate || sendInFrom <= 0) return 0;
     if (from === to) {
       return Math.max(0, sendInFrom * (1 - margin));
     }
     const fee = flatFeeInFrom(flatUsd);
     const net = Math.max(0, sendInFrom - fee);
-    return net * midRate * (1 - margin);
-  };
-  const defaultQuoteSend = (recvInTo: number, margin: number, flatUsd: number): number => {
-    if (!midRate || recvInTo <= 0) return 0;
-    if (from === to) {
-      return recvInTo / (1 - margin);
-    }
-    const net = recvInTo / (midRate * (1 - margin));
-    return net + flatFeeInFrom(flatUsd);
+    return net * rate * (1 - margin);
   };
 
-  const efinRecipient = (s: number) =>
-    quoteRecipientOverride ? quoteRecipientOverride(s) : defaultQuoteRecipient(s, EFIN_FX_MARGIN, EFIN_FLAT_FEE_USD);
-  const efinSend = (r: number) =>
-    quoteSendOverride ? quoteSendOverride(r) : defaultQuoteSend(r, EFIN_FX_MARGIN, EFIN_FLAT_FEE_USD);
+  const defaultEfinRecipient = (sendInFrom: number): number => {
+    if (from === to) return Math.max(0, sendInFrom);
+    return quoteTransferRecipient(sendInFrom, resolvedQuoteRate ?? 0, transferFlatFee);
+  };
+
+  const defaultEfinSend = (recvInTo: number): number => {
+    if (from === to) return recvInTo;
+    return quoteTransferSend(recvInTo, resolvedQuoteRate ?? 0, transferFlatFee);
+  };
+
+  const efinRecipient = (s: number) => {
+    if (quoteRecipientOverride) {
+      const overridden = quoteRecipientOverride(s);
+      if (overridden > 0 || s <= 0) return overridden;
+      if (resolvedQuoteRate && resolvedQuoteRate > 0) {
+        return quoteTransferRecipient(s, resolvedQuoteRate, transferFlatFee);
+      }
+      return overridden;
+    }
+    return defaultEfinRecipient(s);
+  };
+  const efinSend = (r: number) => {
+    if (quoteSendOverride) {
+      const overridden = quoteSendOverride(r);
+      if (overridden > 0 || r <= 0) return overridden;
+      if (resolvedQuoteRate && resolvedQuoteRate > 0) {
+        return quoteTransferSend(r, resolvedQuoteRate, transferFlatFee);
+      }
+      return overridden;
+    }
+    return defaultEfinSend(r);
+  };
 
   const syncFromSend = (sendStr: string) => {
     const s = parseAmount(sendStr);
@@ -185,7 +230,8 @@ const LiveFxCalculator = ({
 
   const syncFromRecv = (recvStr: string) => {
     const r = parseAmount(recvStr);
-    const next = r > 0 ? fmt(efinSend(r)) : "";
+    const sendVal = r > 0 ? efinSend(r) : 0;
+    const next = sendVal > 0 ? formatAmountInput(String(sendVal)) : "";
     if (controlledSend === undefined) setSendAmt(next);
     onSendAmountChange?.(next, parseAmount(next));
   };
@@ -194,22 +240,22 @@ const LiveFxCalculator = ({
     if (lastEdited !== "send") return;
     syncFromSend(sendAmtDisplay);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [midRate, from, to, sendAmtDisplay, quoteRecipientOverride, quoteSendOverride, displayRate]);
+  }, [resolvedQuoteRate, transferFlatFee, from, to, sendAmtDisplay, quoteRecipientOverride, quoteSendOverride, displayRate]);
 
   const onSendChange = (v: string) => {
-    const clean = v.replace(/[^0-9.,]/g, "");
-    if (controlledSend === undefined) setSendAmt(clean);
+    const formatted = formatAmountInput(v);
+    if (controlledSend === undefined) setSendAmt(formatted);
     setLastEdited("send");
-    onSendAmountChange?.(clean, parseAmount(clean));
-    syncFromSend(clean);
+    onSendAmountChange?.(formatted, parseAmount(formatted));
+    syncFromSend(formatted);
   };
 
   const onRecvChange = (v: string) => {
-    const clean = v.replace(/[^0-9.,]/g, "");
-    setRecvAmt(clean);
+    const formatted = formatAmountInput(v);
+    setRecvAmt(formatted);
     setLastEdited("receive");
-    onRecvAmountChange?.(clean, parseAmount(clean));
-    syncFromRecv(clean);
+    onRecvAmountChange?.(formatted, parseAmount(formatted));
+    syncFromRecv(formatted);
   };
 
   const swap = () => {
@@ -221,15 +267,15 @@ const LiveFxCalculator = ({
   const sendNumeric = parseAmount(sendAmtDisplay);
   const recvNumeric = parseAmount(recvAmt);
 
-  const efinDisplayRate = displayRate ?? (midRate ? midRate * (1 - EFIN_FX_MARGIN) : null);
+  const efinDisplayRate = resolvedQuoteRate;
   const marketMargin = Math.max(BENCHMARK_A_MARGIN, BENCHMARK_B_MARGIN);
-  const marketDisplayRate = midRate ? midRate * (1 - marketMargin) : null;
+  const marketDisplayRate = marketMidRate ? marketMidRate * (1 - marketMargin) : null;
 
-  const benchARecv = defaultQuoteRecipient(sendNumeric, BENCHMARK_A_MARGIN, BENCHMARK_A_FLAT_FEE_USD);
-  const benchBRecv = defaultQuoteRecipient(sendNumeric, BENCHMARK_B_MARGIN, BENCHMARK_B_FLAT_FEE_USD);
+  const benchARecv = defaultQuoteRecipient(sendNumeric, BENCHMARK_A_MARGIN, BENCHMARK_A_FLAT_FEE_USD, marketMidRate ?? 0);
+  const benchBRecv = defaultQuoteRecipient(sendNumeric, BENCHMARK_B_MARGIN, BENCHMARK_B_FLAT_FEE_USD, marketMidRate ?? 0);
   const bestCompetitorRecv = Math.max(benchARecv, benchBRecv);
   const savingsInTo = recvNumeric - bestCompetitorRecv;
-  const savingsInSend = midRate && midRate > 0 ? savingsInTo / midRate : 0;
+  const savingsInSend = marketMidRate && marketMidRate > 0 ? savingsInTo / marketMidRate : 0;
   const savingsPct = bestCompetitorRecv > 0 ? (savingsInTo / bestCompetitorRecv) * 100 : 0;
 
   const goNext = (mode: "signup" | "signin" | "direct") => {
@@ -247,7 +293,7 @@ const LiveFxCalculator = ({
     navigate(`/auth?mode=${mode}&redirect=${encodeURIComponent(dest)}`);
   };
 
-  const rateUnavailable = !isLoading && !midRate && !quoteRecipientOverride && displayRate == null;
+  const rateUnavailable = !isLoading && !resolvedQuoteRate && !quoteRecipientOverride;
   const actionsVisible = showActions ?? !isApp;
   const resolvedContinueLabel = continueLabel ?? (isApp ? "Continue" : user ? "Continue" : "Sign up & send");
   const appSurface = embedded || isApp;
@@ -326,7 +372,7 @@ const LiveFxCalculator = ({
 
         <AmountRow
           label="You send"
-          value={sendAmtDisplay}
+          value={sendAmtFormatted}
           onChange={onSendChange}
           currency={from}
           onCurrencyChange={setFrom}
@@ -339,6 +385,11 @@ const LiveFxCalculator = ({
           <p className={`mt-1 px-1 ${walletBalance <= 0 ? shell.walletWarn : shell.walletHint} text-[10px]`}>
             Available: {walletSymbol ?? ""}{fmt(walletBalance)}
             {walletBalance <= 0 && sendNumeric > 0 ? " · Top up to send" : ""}
+          </p>
+        )}
+        {appSurface && sendNumeric > 0 && transferFlatFee > 0 && (
+          <p className={`mt-0.5 px-1 text-[10px] ${shell.walletHint}`}>
+            {fmt(transferFlatFee)} {from} fee deducted · {fmt(Math.max(0, sendNumeric - transferFlatFee))} {from} converted at rate
           </p>
         )}
 
@@ -393,7 +444,7 @@ const LiveFxCalculator = ({
                   <Row
                     label="eFinMoney"
                     rate={efinDisplayRate ? `1 ${from} = ${fmt(efinDisplayRate)} ${to}` : "—"}
-                    fee={feeLabel ?? "0.8% + $0.99"}
+                    fee={resolvedFeeLabel}
                     good
                     compact={embedded || isApp}
                     shell={shell}

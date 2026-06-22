@@ -127,6 +127,13 @@ export const useDeleteBeneficiary = () => {
 };
 
 /** Find an existing beneficiary by phone (or name) for the current user, or create one. */
+export const isCanadaBeneficiary = (b: Beneficiary) =>
+  b.country_code === "CAD"
+  || !!b.eft_account
+  || !!b.interac_email
+  || b.payout_method === "eft"
+  || b.payout_method === "interac";
+
 export const recordTransferRecipient = async (params: {
   user_id: string;
   name: string;
@@ -137,6 +144,12 @@ export const recordTransferRecipient = async (params: {
   currency_code?: string | null;
   bank_name?: string | null;
   bank_account?: string | null;
+  email?: string | null;
+  eft_institution?: string | null;
+  eft_transit?: string | null;
+  eft_account?: string | null;
+  eft_account_holder?: string | null;
+  interac_email?: string | null;
 }) => {
   const now = new Date().toISOString();
   // Try to find existing
@@ -145,7 +158,11 @@ export const recordTransferRecipient = async (params: {
     .select("*")
     .eq("user_id", params.user_id)
     .limit(1);
-  if (params.phone) {
+  if (params.interac_email) {
+    query = query.eq("interac_email", params.interac_email);
+  } else if (params.eft_account) {
+    query = query.eq("eft_account", params.eft_account);
+  } else if (params.phone) {
     query = query.eq("phone", params.phone);
   } else {
     query = query.eq("name", params.name);
@@ -165,6 +182,12 @@ export const recordTransferRecipient = async (params: {
     if (!found.bank_name && params.bank_name) patch.bank_name = params.bank_name;
     if (!found.bank_account && params.bank_account) patch.bank_account = params.bank_account;
     if (!found.country_code && params.country_code) patch.country_code = params.country_code;
+    if (!found.email && params.email) patch.email = params.email;
+    if (!found.eft_institution && params.eft_institution) patch.eft_institution = params.eft_institution;
+    if (!found.eft_transit && params.eft_transit) patch.eft_transit = params.eft_transit;
+    if (!found.eft_account && params.eft_account) patch.eft_account = params.eft_account;
+    if (!found.eft_account_holder && params.eft_account_holder) patch.eft_account_holder = params.eft_account_holder;
+    if (!found.interac_email && params.interac_email) patch.interac_email = params.interac_email;
     await supabase.from("beneficiaries" as any).update(patch).eq("id", found.id);
     return { beneficiary: { ...found, ...patch } as Beneficiary, isNew: false };
   }

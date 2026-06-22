@@ -25,7 +25,9 @@ function resolveNetwork(payoutMethod: string | null | undefined, currency: strin
     mtn_mobile: "mtn", airtel_money: "airtel", mpesa: "mpesa", bank: "bank",
   };
   if (payoutMethod && map[payoutMethod]) return map[payoutMethod];
-  const defaults: Record<string, string> = { KES: "mpesa", GHS: "mtn", UGX: "mtn", TZS: "airtel", ZMW: "mtn" };
+  const defaults: Record<string, string> = {
+    KES: "mpesa", GHS: "mtn", UGX: "mtn", TZS: "airtel", ZMW: "mtn", NGN: "bank",
+  };
   return defaults[currency] || "mpesa";
 }
 
@@ -73,7 +75,7 @@ Deno.serve(async (req) => {
 
     const debitCur = flwDebitCurrency();
     const { count: pendingCount, total: pendingTotal } = await sumPendingLiquidityNeed(db, debitCur);
-    const liquidity = await checkFlutterwaveLiquidity(db, pendingTotal || 0, debitCur);
+    const liquidity = await checkFlutterwaveLiquidity(db, pendingTotal || 0, debitCur, { requireBuffer: true });
 
     const results: Record<string, unknown> = {
       synced: stripeRows.length + flwRows.length,
@@ -100,20 +102,30 @@ Deno.serve(async (req) => {
     for (const t of queued ?? []) {
       const amt = Number(t.target_amount ?? 0);
       const cur = String(t.target_currency ?? "NGN").toUpperCase();
-      const check = await checkFlutterwaveLiquidity(db, amt, cur);
+      const check = await checkFlutterwaveLiquidity(db, amt, cur, { requireBuffer: false });
       if (!check.sufficient) {
         (results.processed as unknown[]).push({
           transfer_id: t.id,
           action: "skipped",
           reason: "insufficient_balance",
           available: check.available,
+          needed: check.needed,
         });
-        break; // stop FIFO when we can't cover next
+        continue; // skip this one — try smaller/newer queued transfers
       }
       const payout = await invokeFlutterwavePayout(t);
+      let action: string;
+      if (payout?.pending_liquidity || payout?.queued) {
+        action = "still_queued";
+      } else if (payout?.success) {
+        action = "payout_sent";
+      } else {
+        action = "payout_failed";
+      }
       (results.processed as unknown[]).push({
         transfer_id: t.id,
-        action: payout?.success ? "payout_sent" : "payout_failed",
+        action,
+        error: payout?.error ?? payout?.provider_message ?? null,
         payout,
       });
     }

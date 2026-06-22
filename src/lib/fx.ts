@@ -1,28 +1,8 @@
 import { supabase } from "@/integrations/supabase/client";
 
-export interface RateRow {
-  from_currency: string;
-  to_currency: string;
-  effective_rate: number;
-}
-
-/** Build a lookup of latest from→USD rates from a list of fx_rates rows. */
-export const buildUsdRateMap = (rates: RateRow[]): Map<string, number> => {
-  const map = new Map<string, number>();
-  map.set("USD", 1);
-  for (const r of rates) {
-    if (r.to_currency === "USD" && !map.has(r.from_currency)) {
-      map.set(r.from_currency, Number(r.effective_rate));
-    }
-  }
-  // Derive inverse rates if only USD->X exists
-  for (const r of rates) {
-    if (r.from_currency === "USD" && !map.has(r.to_currency) && Number(r.effective_rate) > 0) {
-      map.set(r.to_currency, 1 / Number(r.effective_rate));
-    }
-  }
-  return map;
-};
+export type { RateRow } from "@/lib/fxRatesCore";
+export { buildUsdRateMap, resolveEffectiveRate } from "@/lib/fxRatesCore";
+import { buildUsdRateMap, type RateRow } from "@/lib/fxRatesCore";
 
 /** Convert a (currency, amount) pair to USD. Returns null if no rate. */
 export const convertToUsd = (

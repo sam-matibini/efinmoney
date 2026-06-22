@@ -1,10 +1,24 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { MapPin } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import LiveFxCalculator from "@/components/fx/LiveFxCalculator";
+import {
+  buildUsdMap,
+  midRateFromUsdMap,
+  quoteTransferRecipient,
+  quoteTransferSend,
+  parseAmount,
+  type MarketResponse,
+} from "@/components/fx/liveFxUtils";
+import { resolveEffectiveRate } from "@/lib/fx";
+import { supabase } from "@/integrations/supabase/client";
 import { useWallets } from "@/hooks/useWallets";
+import { useFxRates } from "@/hooks/useFxRates";
+import { usePricingConfig } from "@/hooks/usePricingConfig";
 import { findCountryByCode, COUNTRIES } from "@/lib/countries";
+import { saveSendHandoff } from "@/lib/sendHandoff";
 import { toast } from "sonner";
 
 const PAYOUT_CODES = COUNTRIES.map((c) => c.code);
@@ -21,6 +35,51 @@ const SendMoneyModal = ({ children }: SendMoneyModalProps) => {
   const [amount, setAmount] = useState("100");
 
   const { data: wallets } = useWallets();
+  const { data: fxRates } = useFxRates();
+  const { data: pricing } = usePricingConfig();
+
+  const { data: marketData } = useQuery({
+    queryKey: ["market-rates-fx-calc"],
+    queryFn: async (): Promise<MarketResponse> => {
+      const { data, error } = await supabase.functions.invoke("market-rates");
+      if (error) throw error;
+      return data as MarketResponse;
+    },
+    staleTime: 30_000,
+  });
+
+  const dbRate = useMemo(() => {
+    if (!fxRates?.length) return null;
+    return resolveEffectiveRate(from, to, fxRates);
+  }, [fxRates, from, to]);
+
+  const marketRate = useMemo(() => {
+    const map = buildUsdMap(marketData?.fiat ?? [], "price");
+    return midRateFromUsdMap(from, to, map);
+  }, [marketData, from, to]);
+
+  const effectiveRate = dbRate ?? marketRate;
+  const rateReady = effectiveRate != null && effectiveRate > 0;
+
+  const baseFee = pricing?.transfer_base_fee ?? 0;
+
+  const quoteRecipient = useCallback(
+    (send: number) => {
+      if (!rateReady || !effectiveRate) return 0;
+      return quoteTransferRecipient(send, effectiveRate, baseFee);
+    },
+    [rateReady, effectiveRate, baseFee],
+  );
+
+  const quoteSend = useCallback(
+    (recv: number) => {
+      if (!rateReady || !effectiveRate) return 0;
+      return quoteTransferSend(recv, effectiveRate, baseFee);
+    },
+    [rateReady, effectiveRate, baseFee],
+  );
+
+  const feeLabel = baseFee > 0 ? `${from} ${baseFee.toFixed(2)} flat fee` : "No transfer fee";
 
   const walletCodes = useMemo(
     () => [...new Set((wallets ?? []).map((w) => w.currency_code))],
@@ -55,7 +114,7 @@ const SendMoneyModal = ({ children }: SendMoneyModalProps) => {
     setTo(code);
   };
 
-  const parsedAmount = parseFloat(amount.replace(/,/g, "")) || 0;
+  const parsedAmount = parseAmount(amount);
   const insufficientBalance =
     !!selectedWallet && parsedAmount > 0 && parsedAmount > Number(selectedWallet.balance);
 
@@ -69,6 +128,7 @@ const SendMoneyModal = ({ children }: SendMoneyModalProps) => {
     from: f,
     to: t,
     sendAmount,
+    recvAmount,
   }: {
     from: string;
     to: string;
@@ -95,7 +155,17 @@ const SendMoneyModal = ({ children }: SendMoneyModalProps) => {
       toast.message("Low balance — continue to top up or send from another source");
     }
 
+    saveSendHandoff({
+      amount: sendAmount,
+      from: f,
+      to: t,
+      recvAmount,
+      sourceWalletId: wallet.wallet_id,
+      fundingSource: "wallet",
+    });
+
     const params = new URLSearchParams({
+      quick: "1",
       amount: String(sendAmount),
       fundingSource: "wallet",
       sourceWalletId: wallet.wallet_id,
@@ -130,13 +200,17 @@ const SendMoneyModal = ({ children }: SendMoneyModalProps) => {
           onFromChange={handleFromChange}
           onToChange={handleToChange}
           onSendAmountChange={(v) => setAmount(v)}
+          quoteRecipient={rateReady ? quoteRecipient : undefined}
+          quoteSend={rateReady ? quoteSend : undefined}
+          displayRate={rateReady ? effectiveRate : undefined}
+          feeLabel={feeLabel}
           fromCurrencyFilter={walletCodes.length ? walletCodes : undefined}
           toCurrencyFilter={PAYOUT_CODES}
           walletBalance={selectedWallet ? Number(selectedWallet.balance) : null}
           walletSymbol={selectedWallet?.symbol}
           showActions
           showDisclaimer={false}
-          continueLabel="Continue on Send Page"
+          continueLabel="Add recipient →"
           onContinue={handleContinue}
           continueDisabled={!isValid}
           footer={

@@ -18,6 +18,7 @@ interface Props {
   editing?: Beneficiary | null;
   onSaved?: (b: Beneficiary) => void;
   defaultCategory?: BeneficiaryCategory;
+  defaultMethod?: "mobile" | "bank" | "eft" | "interac" | "none";
 }
 
 const CATEGORIES: { value: BeneficiaryCategory; label: string }[] = [
@@ -29,7 +30,7 @@ const CATEGORIES: { value: BeneficiaryCategory; label: string }[] = [
   { value: "other", label: "Other" },
 ];
 
-const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCategory }: Props) => {
+const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCategory, defaultMethod }: Props) => {
   const create = useCreateBeneficiary();
   const update = useUpdateBeneficiary();
   const [category, setCategory] = useState<BeneficiaryCategory>("person");
@@ -64,7 +65,7 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
       editing?.eft_account ? "eft" :
       editing?.interac_email ? "interac" :
       editing?.bank_account ? "bank" :
-      editing?.phone ? "mobile" : "none"
+      editing?.phone ? "mobile" : (defaultMethod || "none")
     );
     setPhone(editing?.phone || "");
     setBankName(editing?.bank_name || "");
@@ -77,7 +78,7 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
     setNotes(editing?.notes || "");
     setTags((editing?.tags || []).join(", "));
     setShowAdvanced(!!editing?.notes || !!editing?.tags?.length);
-  }, [open, editing, defaultCategory]);
+  }, [open, editing, defaultCategory, defaultMethod]);
 
   const country = findCountryById(countryId) || COUNTRIES[0];
 

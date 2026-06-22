@@ -6,12 +6,18 @@
 # Optional flags:
 #   -SecretsOnly    Only push edge-function secrets
 #   -FunctionsOnly  Only deploy updated edge functions
+#   -CanadaOnly     Only deploy Canada domestic rails (one function at a time)
 #   -DbOnly         Only run pending SQL migrations
 #   -SkipSecrets    Skip secrets push
+#
+# Canada domestic (EFT, Interac, card push, payment links, Stripe Connect):
+#   .\supabase\scripts\Deploy-Production.ps1 -CanadaOnly
+#   .\supabase\scripts\Deploy-Production.ps1 -CanadaOnly -SkipSecrets
 
 param(
   [switch]$SecretsOnly,
   [switch]$FunctionsOnly,
+  [switch]$CanadaOnly,
   [switch]$DbOnly,
   [switch]$SkipSecrets
 )
@@ -75,6 +81,47 @@ function Push-Secrets {
   Write-Host ""
 }
 
+function Deploy-CanadaFunctions {
+  # Deploy one at a time — batch deploy often hits 403 mid-run on Windows CLI.
+  $canada = @(
+    "execute-transfer",              # routes CAD payouts to Paysafe / Stripe
+    "paysafe-payout",                # EFT + Interac e-Transfer
+    "paysafe-verify-transfer",       # poll Paysafe for EFT/Interac completion
+    "paysafe-webhook",               # Paysafe status callbacks
+    "stripe-payout",                 # Instant to Card (Visa Direct)
+    "stripe-payout-webhook",         # card payout status
+    "stripe-payin-webhook",          # card-funded send confirmations
+    "stripe-charge-card",            # pay-by-card on domestic send
+    "payment-link-create",           # escrow + generate claim link
+    "payment-link-resolve",          # public link lookup (/claim/:code)
+    "payment-link-claim",            # recipient picks Interac / EFT / card
+    "payment-link-revoke",           # sender cancels unclaimed link
+    "stripe-connect-create-account", # Connect onboarding
+    "stripe-connect-account-session",
+    "stripe-connect-refresh-status",
+    "stripe-connect-instant-payout", # self-payout to connected account
+    "test-integrations"            # Admin diagnostics (Paysafe + Stripe health)
+  )
+
+  Write-Host "Deploying $($canada.Count) Canada domestic functions (sequential)..." -ForegroundColor Yellow
+  $failed = @()
+  foreach ($fn in $canada) {
+    Write-Host "  -> $fn" -ForegroundColor DarkCyan
+    try {
+      npx supabase functions deploy $fn --project-ref $ProjectRef
+      if ($LASTEXITCODE -ne 0) { throw "exit $LASTEXITCODE" }
+    } catch {
+      Write-Host "  FAILED: $fn — $_" -ForegroundColor Red
+      $failed += $fn
+    }
+  }
+  if ($failed.Count -gt 0) {
+    throw "Canada deploy incomplete. Failed: $($failed -join ', '). Re-run -CanadaOnly after npx supabase login"
+  }
+  Write-Host "Canada domestic functions OK" -ForegroundColor Green
+  Write-Host ""
+}
+
 function Deploy-Functions {
   $critical = @(
     "stripe-payment-intent",
@@ -101,6 +148,20 @@ function Deploy-Functions {
     "elicate-webhook",
     "elicate-reconcile",
     "execute-transfer",
+    "paysafe-payout",
+    "paysafe-webhook",
+    "stripe-payout",
+    "stripe-payout-webhook",
+    "stripe-payin-webhook",
+    "payment-link-create",
+    "payment-link-resolve",
+    "payment-link-claim",
+    "payment-link-revoke",
+    "stripe-connect-create-account",
+    "stripe-connect-account-session",
+    "stripe-connect-refresh-status",
+    "stripe-connect-instant-payout",
+    "test-integrations",
     "create-persona-inquiry",
     "persona-self-approve",
     "persona-webhook"
@@ -120,6 +181,16 @@ function Push-Db {
 
 try {
   if ($SecretsOnly) { Push-Secrets; exit 0 }
+  if ($CanadaOnly) {
+    if (-not $SkipSecrets) { Push-Secrets }
+    Deploy-CanadaFunctions
+    Write-Host "=== Canada domestic deploy complete ===" -ForegroundColor Green
+    Write-Host "Paysafe webhook: https://dkdnwumllibwdlqbjkwy.supabase.co/functions/v1/paysafe-webhook"
+    Write-Host "Stripe payout webhook: .../stripe-payout-webhook"
+    Write-Host "Claim page: https://efin.money/claim/{code}"
+    Write-Host "Diagnostics: Admin -> System Diagnostics"
+    exit 0
+  }
   if ($FunctionsOnly) { Deploy-Functions; exit 0 }
   if ($DbOnly) { Push-Db; exit 0 }
 
