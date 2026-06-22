@@ -49,22 +49,10 @@ const MiniStats = () => {
     });
     const others = Object.entries(unconverted).sort((a, b) => b[1] - a[1]);
 
-    // Bars: per-day USD-converted totals
-    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-    const bars = new Array(daysInMonth).fill(0);
-    recent.forEach((t) => {
-      const c = (t.source_currency || "USD").toUpperCase();
-      const usd = convertToUsd(Number(t.source_amount), c, rateMap);
-      if (usd === null) return;
-      const day = new Date(t.created_at).getDate();
-      bars[day - 1] += usd;
-    });
-    const max = Math.max(...bars, 1);
     return {
       currency: "USD",
       total: totalUsd,
       others,
-      bars: bars.map((b) => (b > 0 ? Math.max(15, (b / max) * 100) : 6)),
     };
   }, [transfers, fxRates]);
 
@@ -126,17 +114,6 @@ const MiniStats = () => {
               + {monthData.others.map(([c, v]) => formatMoney(v, c)).join(" · ")}
             </p>
           )}
-          <div className="flex items-end gap-[2px] h-8 mt-2">
-            {monthData.bars.map((h, i) => (
-              <motion.div
-                key={i}
-                initial={{ height: 0 }}
-                animate={{ height: `${h}%` }}
-                transition={{ delay: 0.3 + i * 0.01, duration: 0.4, ease: "easeOut" }}
-                className="flex-1 rounded-[1px] bg-primary/60"
-              />
-            ))}
-          </div>
         </>
       ),
       icon: Send,
