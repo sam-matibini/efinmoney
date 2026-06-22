@@ -1,25 +1,23 @@
 // Recipient claims a payment link: chooses Interac / Debit card (Visa Direct) / EFT
 // and we hand off to the underlying payout rail. Releases escrow on success.
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
-import Stripe from "https://esm.sh/stripe@13.9.0?target=deno";
+import { createClient } from "npm:@supabase/supabase-js@2";
+import { corsPreflightResponse, jsonResponse } from "../_shared/cors.ts";
+import Stripe from "https://esm.sh/stripe@17.3.1?target=denonext";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const STRIPE_SECRET_KEY = Deno.env.get("STRIPE_SECRET_KEY") || "";
 
-const stripe = STRIPE_SECRET_KEY
-  ? new Stripe(STRIPE_SECRET_KEY, {
-      apiVersion: "2023-10-16",
-      httpClient: Stripe.createFetchHttpClient(),
-    })
-  : null;
+function getStripe(): Stripe | null {
+  if (!STRIPE_SECRET_KEY) return null;
+  return new Stripe(STRIPE_SECRET_KEY, {
+    apiVersion: "2024-11-20.acacia",
+    httpClient: Stripe.createFetchHttpClient(),
+  });
+}
 
 function json(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
+  return jsonResponse(body, status);
 }
 
 // Recipient card-payout (Visa Direct) corridors, keyed by the link's payout
@@ -34,8 +32,10 @@ const CLAIM_CORRIDORS: Record<string, { countries: string[]; postal: RegExp; req
 };
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  if (req.method === "OPTIONS") return corsPreflightResponse();
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
+
+  const stripe = getStripe();
 
   let body: any;
   try { body = await req.json(); } catch { return json({ error: "Invalid JSON" }, 400); }
