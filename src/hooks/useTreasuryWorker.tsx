@@ -118,8 +118,8 @@ export function useTreasuryWorker() {
   });
 
   const runWorker = useMutation({
-    mutationFn: async (syncOnly = false) => {
-      return invokeEdgeFunction("treasury-worker", { sync_only: syncOnly });
+    mutationFn: async (syncOnly: boolean) => {
+      return invokeEdgeFunction<{ processed?: unknown[] }>("treasury-worker", { sync_only: syncOnly });
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["treasury-worker"] });

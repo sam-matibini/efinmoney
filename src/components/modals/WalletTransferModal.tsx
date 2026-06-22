@@ -138,7 +138,7 @@ export default function WalletTransferModal({ children, defaultFromWalletId }: P
                     .map((w) => (
                       <SelectItem key={w.wallet_id} value={w.wallet_id}>
                         <span className="flex items-center gap-2">
-                          <CurrencyFlag code={w.currency_code} size="w-4 h-4" />
+                          <CurrencyFlag code={w.currency_code} size="sm" />
                           {w.currency_code} · {w.symbol}
                           {Number(w.balance).toLocaleString()}
                         </span>
@@ -166,7 +166,7 @@ export default function WalletTransferModal({ children, defaultFromWalletId }: P
                     .map((w) => (
                       <SelectItem key={w.wallet_id} value={w.wallet_id}>
                         <span className="flex items-center gap-2">
-                          <CurrencyFlag code={w.currency_code} size="w-4 h-4" />
+                          <CurrencyFlag code={w.currency_code} size="sm" />
                           {w.currency_code} · {w.symbol}
                           {Number(w.balance).toLocaleString()}
                         </span>

@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  typecheck-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      # Note: `tsc -p tsconfig.json` is a no-op on this repo (root tsconfig
+      # has "files": [] and only references other configs) — it always
+      # exits 0 without checking anything. Use `tsc -b` against the app
+      # project so type errors actually fail the build.
+      - run: npm run typecheck
+
+      - run: NODE_OPTIONS=--max-old-space-size=6144 npm run build

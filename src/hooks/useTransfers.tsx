@@ -13,7 +13,7 @@ export interface Transfer {
   recipient_bank_code?: string | null;
   recipient_bank_name?: string | null;
   recipient_country: string;
-  transfer_type: 'internal' | 'mobile_money' | 'bank' | 'crypto' | 'bill_payment' | 'domestic_canada';
+  transfer_type: 'internal' | 'mobile_money' | 'bank' | 'crypto' | 'bill_payment' | 'domestic_canada' | 'card_push';
   payout_method: string | null;
   source_currency: string;
   target_currency: string;
@@ -21,7 +21,7 @@ export interface Transfer {
   target_amount: number;
   exchange_rate: number;
   fee_amount: number;
-  status: 'initiated' | 'funded' | 'processing' | 'completed' | 'failed' | 'reversed' | 'expired';
+  status: 'initiated' | 'funded' | 'processing' | 'completed' | 'failed' | 'reversed' | 'expired' | 'pending_liquidity';
   provider_reference: string | null;
   failure_reason: string | null;
   completed_at: string | null;

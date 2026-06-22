@@ -5064,6 +5064,96 @@ export type Database = {
           },
         ]
       }
+      treasury_provider_balances: {
+        Row: {
+          available_amount: number
+          currency: string
+          id: string
+          pending_amount: number
+          provider: string
+          raw: Json | null
+          synced_at: string
+        }
+        Insert: {
+          available_amount?: number
+          currency: string
+          id?: string
+          pending_amount?: number
+          provider: string
+          raw?: Json | null
+          synced_at?: string
+        }
+        Update: {
+          available_amount?: number
+          currency?: string
+          id?: string
+          pending_amount?: number
+          provider?: string
+          raw?: Json | null
+          synced_at?: string
+        }
+        Relationships: []
+      }
+      treasury_settlement_jobs: {
+        Row: {
+          completed_at: string | null
+          corridor: string
+          created_at: string
+          dest_amount_filled: number
+          dest_amount_needed: number
+          dest_currency: string
+          dest_provider: string
+          external_reference: string | null
+          failure_reason: string | null
+          id: string
+          metadata: Json
+          source_amount: number | null
+          source_currency: string
+          source_provider: string
+          status: string
+          stripe_payout_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          completed_at?: string | null
+          corridor?: string
+          created_at?: string
+          dest_amount_filled?: number
+          dest_amount_needed: number
+          dest_currency?: string
+          dest_provider?: string
+          external_reference?: string | null
+          failure_reason?: string | null
+          id?: string
+          metadata?: Json
+          source_amount?: number | null
+          source_currency?: string
+          source_provider?: string
+          status?: string
+          stripe_payout_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          completed_at?: string | null
+          corridor?: string
+          created_at?: string
+          dest_amount_filled?: number
+          dest_amount_needed?: number
+          dest_currency?: string
+          dest_provider?: string
+          external_reference?: string | null
+          failure_reason?: string | null
+          id?: string
+          metadata?: Json
+          source_amount?: number | null
+          source_currency?: string
+          source_provider?: string
+          status?: string
+          stripe_payout_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       treasury_transfers: {
         Row: {
           amount: number
@@ -5719,6 +5809,7 @@ export type Database = {
         | "failed"
         | "reversed"
         | "expired"
+        | "pending_liquidity"
       transfer_type:
         | "internal"
         | "mobile_money"
@@ -5726,6 +5817,7 @@ export type Database = {
         | "crypto"
         | "bill_payment"
         | "domestic_canada"
+        | "card_push"
       user_risk_tier: "tier_1" | "tier_2" | "tier_3" | "tier_4"
       virtual_account_status: "active" | "inactive" | "expired"
       wallet_status: "active" | "frozen" | "suspended" | "closed"
@@ -5979,6 +6071,7 @@ export const Constants = {
         "failed",
         "reversed",
         "expired",
+        "pending_liquidity",
       ],
       transfer_type: [
         "internal",
@@ -5987,6 +6080,7 @@ export const Constants = {
         "crypto",
         "bill_payment",
         "domestic_canada",
+        "card_push",
       ],
       user_risk_tier: ["tier_1", "tier_2", "tier_3", "tier_4"],
       virtual_account_status: ["active", "inactive", "expired"],
