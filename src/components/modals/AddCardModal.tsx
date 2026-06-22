@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -138,6 +139,11 @@ const AddCardModal = ({ isOpen, onClose, defaultMode = "issue" }: AddCardModalPr
           <DialogTitle className="font-display">
             {createdCard ? "Card Created" : "Add New Card"}
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            {createdCard
+              ? "Your new card details and optional initial balance."
+              : "Issue a new virtual card or link an existing card from another bank."}
+          </DialogDescription>
         </DialogHeader>
 
         {createdCard ? (

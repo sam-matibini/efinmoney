@@ -4,6 +4,31 @@ import { decryptSecret, encryptSecret, generateCvv, generatePan } from "../_shar
 
 type Sb = ReturnType<typeof createClient>;
 
+function formatDbError(err: unknown): string {
+  const msg = err instanceof Error ? err.message : String(err);
+  if (/card_secrets/i.test(msg) && /does not exist|schema cache/i.test(msg)) {
+    return "Virtual card secrets storage is not set up. Run production SQL section 6 (card_secrets table), then redeploy virtual-card-ops.";
+  }
+  if (/virtual_card_transfers/i.test(msg) && /does not exist|schema cache/i.test(msg)) {
+    return "Virtual card transfers table is missing. Run production SQL section 5.";
+  }
+  if (/column.*(balance|currency_code).*does not exist/i.test(msg)) {
+    return "Cards table is missing balance/currency columns. Run production SQL section 5.";
+  }
+  return msg;
+}
+
+async function walletLiabilityAccountId(admin: Sb, currency: string): Promise<string | null> {
+  const { data } = await admin.from("ledger_accounts").select("id")
+    .eq("account_type", "liability")
+    .eq("currency_code", currency)
+    .like("code", "21%")
+    .order("code", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  return data?.id ?? null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return corsPreflightResponse();
 
@@ -37,7 +62,7 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: "Unknown action" }, 400);
   } catch (err) {
     console.error("virtual-card-ops error:", err);
-    return jsonResponse({ error: err instanceof Error ? err.message : "Failed" }, 500);
+    return jsonResponse({ error: formatDbError(err) }, 500);
   }
 });
 
@@ -209,16 +234,15 @@ async function fundFromWallet(admin: Sb, userId: string, body: Record<string, un
   const walletBal = Number(balData || 0);
   if (walletBal < amt) return jsonResponse({ error: "Insufficient wallet balance" }, 400);
 
-  const { data: fromAcct } = await admin.from("ledger_accounts").select("id")
-    .like("code", "21%").eq("currency_code", currency).limit(1).maybeSingle();
+  const fromAcctId = await walletLiabilityAccountId(admin, currency);
   const { data: floatAcct } = await admin.from("ledger_accounts").select("id")
-    .like("code", "22%").eq("currency_code", currency).limit(1).maybeSingle();
+    .eq("code", "2200").maybeSingle();
 
   const journalId = crypto.randomUUID();
   const { error: ledgerErr } = await admin.from("ledger_entries").insert([
     {
       journal_id: journalId,
-      account_id: fromAcct?.id || null,
+      account_id: fromAcctId,
       wallet_id: walletId,
       currency_code: currency,
       debit_amount: amt,
@@ -230,7 +254,7 @@ async function fundFromWallet(admin: Sb, userId: string, body: Record<string, un
     },
     {
       journal_id: journalId,
-      account_id: floatAcct?.id || fromAcct?.id || null,
+      account_id: floatAcct?.id || fromAcctId,
       wallet_id: null,
       currency_code: currency,
       debit_amount: 0,
