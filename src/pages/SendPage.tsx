@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence, type Variants } from "framer-motion";
 import { useSearchParams, useNavigate, Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -39,6 +39,12 @@ import { BrandFlag, CountryFlag } from "@/components/ui/FlagImage";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import CanadaSendFlow from "@/components/send/CanadaSendFlow";
 import EfinmoneyP2PFlow from "@/components/send/EfinmoneyP2PFlow";
+import {
+  RecipientCardSection,
+  type RecipientCardHandle,
+  useStripeElementStyle,
+} from "@/components/send/RecipientCardSection";
+import { getStripeCorridor } from "@/lib/stripeCorridors";
 import TransactionPinDialog from "@/components/send/TransactionPinDialog";
 import HeroGlobe from "@/components/send/HeroGlobe";
 import FxTicker from "@/components/send/FxTicker";
@@ -115,6 +121,11 @@ const SendPage = () => {
   const [ghBankCode, setGhBankCode] = useState<string>("");
   const [ghBankSearch, setGhBankSearch] = useState("");
   const [ghAccountNumber, setGhAccountNumber] = useState<string>("");
+  // International Stripe card-push (Visa Direct) — send to recipient's debit card.
+  const [intlStripeCard, setIntlStripeCard] = useState(false);
+  const recipientCardRef = useRef<RecipientCardHandle>(null);
+  const [recipientCardComplete, setRecipientCardComplete] = useState(false);
+  const recipientCardStyle = useStripeElementStyle();
   // V4: no public key needed
   const navigate = useNavigate();
 
@@ -254,11 +265,19 @@ const SendPage = () => {
     setGhPayoutMode('mobile');
     setGhBankCode("");
     setGhAccountNumber("");
+    setIntlStripeCard(false);
+    setRecipientCardComplete(false);
   }, [targetCountryId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const isNGNBank = targetCountry.code === "NGN";
   const isGhanaBank = targetCountry.code === "GHS" && ghPayoutMode === "bank";
   const isBankPayout = isNGNBank || isGhanaBank;
+
+  // Stripe card-push corridor (CA/US/GB/EU-27). When eligible, the user can opt
+  // to push funds straight to the recipient's debit card via Stripe/Visa Direct.
+  const stripeCorridor = getStripeCorridor(targetCountryId);
+  const stripeCardEligible = !!stripeCorridor && !isBankPayout;
+  const useStripeCard = stripeCardEligible && intlStripeCard;
 
   // Fetch Nigerian banks list when NGN destination is selected
   useEffect(() => {
@@ -468,15 +487,18 @@ const SendPage = () => {
     const transfer = await createTransfer.mutateAsync({
       sender_wallet_id: fundingSource === 'wallet' ? selectedWallet!.wallet_id : wallets?.[0]?.wallet_id || '',
       recipient_name: recipientName,
-      recipient_phone: isBankPayout ? undefined : recipientPhone,
-      recipient_account: isBankPayout ? bankAcct : undefined,
+      recipient_phone: useStripeCard || isBankPayout ? undefined : recipientPhone,
+      recipient_account: useStripeCard ? undefined : isBankPayout ? bankAcct : undefined,
       recipient_bank_code: isBankPayout ? bankCode : undefined,
       recipient_bank_name: isBankPayout ? (bankName || undefined) : undefined,
-      recipient_country: targetCountry.code,
-      transfer_type: isBankPayout ? 'bank' : 'mobile_money',
-      payout_method: isBankPayout ? 'bank' : effectivePayoutMethod,
+      // Stripe card-push needs the ISO country code (not the currency code) so
+      // stripe-payout's corridor allow-list matches; target currency is the
+      // corridor payout currency.
+      recipient_country: useStripeCard ? stripeCorridor!.iso : targetCountry.code,
+      transfer_type: useStripeCard ? 'card_push' : isBankPayout ? 'bank' : 'mobile_money',
+      payout_method: useStripeCard ? 'card_push' : isBankPayout ? 'bank' : effectivePayoutMethod,
       source_currency: sourceCurrency,
-      target_currency: targetCountry.code,
+      target_currency: useStripeCard ? stripeCorridor!.currency : targetCountry.code,
       source_amount: parsedAmount,
       target_amount: receivedAmount,
       exchange_rate: effectiveRate,
@@ -489,11 +511,11 @@ const SendPage = () => {
         const { isNew } = await recordTransferRecipient({
           user_id: user.id,
           name: recipientName,
-          phone: isBankPayout ? "" : recipientPhone,
-          country_code: targetCountry.code,
-          payout_method: isBankPayout ? 'bank' : effectivePayoutMethod,
-          network: isBankPayout ? null : (activeNetwork?.id || null),
-          currency_code: targetCountry.code,
+          phone: useStripeCard || isBankPayout ? "" : recipientPhone,
+          country_code: useStripeCard ? stripeCorridor!.iso : targetCountry.code,
+          payout_method: useStripeCard ? 'card_push' : isBankPayout ? 'bank' : effectivePayoutMethod,
+          network: useStripeCard || isBankPayout ? null : (activeNetwork?.id || null),
+          currency_code: useStripeCard ? stripeCorridor!.currency : targetCountry.code,
           bank_name: isBankPayout ? bankName : null,
           bank_account: isBankPayout ? bankAcct : null,
         } as any);
@@ -519,6 +541,33 @@ const SendPage = () => {
     if (confirming) return;
     setConfirming(true);
 
+    // ── Stripe card-push: tokenize the recipient's debit card up front ───
+    // (Visa Direct). Requires wallet or card funding — the bank-funding path
+    // never invokes execute-transfer, so it can't fire a Stripe payout.
+    let recipientTok: { token: string; last4: string; brand: string } | null = null;
+    if (useStripeCard) {
+      if (fundingSource === 'bank') {
+        toast.error('Stripe card payout needs wallet or card funding. Pick one of those in step 1.');
+        setConfirming(false);
+        return;
+      }
+      if (!recipientCardRef.current?.isComplete()) {
+        toast.error("Please complete the recipient's card details.");
+        setConfirming(false);
+        return;
+      }
+      try {
+        recipientTok = await recipientCardRef.current.tokenize(recipientName);
+      } catch (e: any) {
+        toast.error(e?.message || "Couldn't tokenize the recipient's card.");
+        setConfirming(false);
+        return;
+      }
+    }
+    const recipientCardBody = recipientTok
+      ? { recipient_card_token: recipientTok.token, recipient_last4: recipientTok.last4, recipient_brand: recipientTok.brand }
+      : {};
+
     // ── Wallet: create + execute payout immediately ──────────────────────
     if (fundingSource === 'wallet') {
       if (!selectedWallet) { setConfirming(false); return; }
@@ -527,7 +576,7 @@ const SendPage = () => {
         let data: any = null;
         let invokeErr: any = null;
         try {
-          const res = await supabase.functions.invoke('execute-transfer', { body: { transfer_id: tid, use_stellar: isNGNBank && useStellar, use_pawapay: !isBankPayout && usePawapay, recipient_country_hint: targetCountry.country } });
+          const res = await supabase.functions.invoke('execute-transfer', { body: { transfer_id: tid, use_stellar: isNGNBank && useStellar, use_pawapay: !isBankPayout && usePawapay, recipient_country_hint: targetCountry.country, ...recipientCardBody } });
           data = res.data;
           invokeErr = res.error;
         } catch (err) {
@@ -675,7 +724,7 @@ const SendPage = () => {
 
     // Step C: trigger payout via Flutterwave
     try {
-      const { data, error } = await supabase.functions.invoke('execute-transfer', { body: { transfer_id: tid, use_stellar: isNGNBank && useStellar, use_pawapay: !isBankPayout && usePawapay, recipient_country_hint: targetCountry.country, prefunded: true, charge_reference: (chargeData as any)?.payment_intent_id ?? null } });
+      const { data, error } = await supabase.functions.invoke('execute-transfer', { body: { transfer_id: tid, use_stellar: isNGNBank && useStellar, use_pawapay: !isBankPayout && usePawapay, recipient_country_hint: targetCountry.country, prefunded: true, charge_reference: (chargeData as any)?.payment_intent_id ?? null, ...recipientCardBody } });
       if (error || (data as any)?.error) throw new Error((data as any)?.error || error?.message || 'Payout failed');
       const payout = (data as any)?.payout;
       if (payout && payout.success === false) throw new Error(payout.error || 'Payout failed');
@@ -863,7 +912,9 @@ const SendPage = () => {
   };
 
   const isStep1Valid = parsedAmount > 0 && parsedAmount > fee && receivedAmount > 0 && rateAvailable && !noLinkedSource && !insufficientFunds;
-  const isStep2Valid = isNGNBank
+  const isStep2Valid = useStripeCard
+    ? (recipientName.trim().length > 2 && recipientCardComplete && receivedAmount > 0)
+    : isNGNBank
     ? (!!ngnBankCode && ngnAccountNumber.replace(/\D/g, "").length === 10 && !!ngnResolvedName && receivedAmount > 0)
     : isGhanaBank
     ? (recipientName.trim().length > 2 && !!ghBankCode && ghAccountNumber.replace(/\D/g, "").length >= 6 && receivedAmount > 0)
@@ -1459,7 +1510,38 @@ const SendPage = () => {
                                         className="transition-shadow focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:shadow-[0_0_0_4px_hsl(var(--primary)/0.12)]"
                                       />
                                     </motion.div>
-                                    {targetCountry.code === "GHS" && (
+                                    {stripeCardEligible && (
+                                      <motion.div custom={1.1} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
+                                        <Label>How should {targetCountry.country} receive it?</Label>
+                                        <div className="grid grid-cols-2 gap-2">
+                                          {([
+                                            { v: false, label: targetCountry.method || 'Bank Transfer', sub: 'Local rails' },
+                                            { v: true,  label: 'Debit card · Stripe', sub: 'Visa Direct · instant' },
+                                          ] as const).map(({ v, label, sub }) => {
+                                            const active = intlStripeCard === v;
+                                            return (
+                                              <button
+                                                key={String(v)}
+                                                type="button"
+                                                onClick={() => setIntlStripeCard(v)}
+                                                className={`flex flex-col items-start rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
+                                                  active
+                                                    ? "border-primary bg-primary/10 text-primary"
+                                                    : "border-border bg-card hover:bg-muted text-foreground"
+                                                }`}
+                                              >
+                                                <span>{label}</span>
+                                                <span className="text-[10px] font-normal opacity-70">{sub}</span>
+                                              </button>
+                                            );
+                                          })}
+                                        </div>
+                                        <p className="text-[11px] text-muted-foreground">
+                                          Stripe pushes funds straight to the recipient's debit card (CA/US/UK/EU). You enter their card below.
+                                        </p>
+                                      </motion.div>
+                                    )}
+                                    {!useStripeCard && targetCountry.code === "GHS" && (
                                       <motion.div custom={1.2} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
                                         <Label>Payout Method</Label>
                                         <div className="grid grid-cols-2 gap-2">
@@ -1510,7 +1592,16 @@ const SendPage = () => {
                                         </div>
                                       </motion.div>
                                     )}
-                                    {isNGNBank ? (
+                                    {useStripeCard ? (
+                                      <motion.div custom={2} variants={fieldVariants} initial="hidden" animate="show">
+                                        <RecipientCardSection
+                                          ref={recipientCardRef}
+                                          onValidityChange={setRecipientCardComplete}
+                                          elementStyle={recipientCardStyle}
+                                          currency={stripeCorridor!.currency.toLowerCase()}
+                                        />
+                                      </motion.div>
+                                    ) : isNGNBank ? (
                                       <>
                                         <motion.div custom={2} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
                                           <Label>Recipient Bank</Label>
@@ -1712,7 +1803,9 @@ const SendPage = () => {
                                   <CardContent className="space-y-5">
                                     <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-2 text-sm">
                                       <div className="flex justify-between"><span className="text-muted-foreground">Recipient</span><span className="font-medium">{recipientName}</span></div>
-                                      {isBankPayout ? (
+                                      {useStripeCard ? (
+                                        <div className="flex justify-between"><span className="text-muted-foreground">Payout</span><span className="font-medium">Recipient debit card</span></div>
+                                      ) : isBankPayout ? (
                                         <>
                                           <div className="flex justify-between"><span className="text-muted-foreground">Bank</span><span className="font-medium">{isNGNBank ? (ngnBanks.find((b) => b.code === ngnBankCode)?.name || "—") : (ghBanks.find((b) => b.code === ghBankCode)?.name || "—")}</span></div>
                                           <div className="flex justify-between"><span className="text-muted-foreground">Account</span><span className="font-medium">{isNGNBank ? ngnAccountNumber : ghAccountNumber}</span></div>
@@ -1721,7 +1814,7 @@ const SendPage = () => {
                                         <div className="flex justify-between"><span className="text-muted-foreground">Phone</span><span className="font-medium">{recipientPhone}</span></div>
                                       )}
                                       <div className="flex justify-between"><span className="text-muted-foreground">Destination</span><span className="font-medium">{targetCountry.flag} {targetCountry.country}</span></div>
-                                      <div className="flex justify-between"><span className="text-muted-foreground">Method</span><span className="font-medium">{isBankPayout ? "Bank Transfer" : effectiveMethodLabel}</span></div>
+                                      <div className="flex justify-between"><span className="text-muted-foreground">Method</span><span className="font-medium">{useStripeCard ? "Stripe · Visa Direct" : isBankPayout ? "Bank Transfer" : effectiveMethodLabel}</span></div>
                                       <div className="flex justify-between"><span className="text-muted-foreground">Funding</span><span className="font-medium capitalize">{fundingSource}</span></div>
                                     </div>
                                     <div className="rounded-xl border border-border bg-card p-4 space-y-2 text-sm">

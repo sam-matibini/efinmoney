@@ -386,21 +386,36 @@ Deno.serve(async (req) => {
           },
         );
         payoutResult = await res.json();
+      } else if (transfer.payout_method === "card_push") {
+        // Stripe card-push (Visa Direct / Mastercard Send) to the recipient's
+        // debit card. Works for any Stripe corridor (CA/US/GB/EU-27) — the
+        // stripe-payout function enforces the supported-corridor allow-list,
+        // so this is intentionally NOT gated on isCanada.
+        const fnBody: Record<string, unknown> = {
+          transfer_id,
+          card_token: payload.recipient_card_token,
+          last4: payload.recipient_last4,
+          brand: payload.recipient_brand,
+          recipient_email: payload.recipient_email,
+        };
+        const res = await fetch(
+          `${Deno.env.get("SUPABASE_URL")}/functions/v1/stripe-payout`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-internal-secret": Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "",
+            },
+            body: JSON.stringify(fnBody),
+          },
+        );
+        payoutResult = await res.json();
       } else if (isCanada) {
-        const isCardPush = transfer.payout_method === "card_push";
-        const isStripeConnect = transfer.payout_method === "stripe_connect";
-        const fnName = isStripeConnect
+        // Canadian non-card_push payouts: self-payout to own connected
+        // account (stripe_connect) or Interac/EFT via Paysafe.
+        const fnName = transfer.payout_method === "stripe_connect"
           ? "stripe-connect-instant-payout"
-          : isCardPush
-            ? "stripe-payout"
-            : "paysafe-payout";
-        const fnBody: Record<string, unknown> = { transfer_id };
-        if (isCardPush) {
-          fnBody.card_token = payload.recipient_card_token;
-          fnBody.last4 = payload.recipient_last4;
-          fnBody.brand = payload.recipient_brand;
-          fnBody.recipient_email = payload.recipient_email;
-        }
+          : "paysafe-payout";
         const res = await fetch(
           `${Deno.env.get("SUPABASE_URL")}/functions/v1/${fnName}`,
           {
@@ -409,7 +424,7 @@ Deno.serve(async (req) => {
               "Content-Type": "application/json",
               "x-internal-secret": Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "",
             },
-            body: JSON.stringify(fnBody),
+            body: JSON.stringify({ transfer_id }),
           },
         );
         payoutResult = await res.json();

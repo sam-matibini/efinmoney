@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,7 +17,13 @@ import { CheckCircle, Landmark, AlertCircle, Info, CreditCard, Wallet, Zap, Chec
 import { useStripeConnectedAccount, isConnectReady, getConnectReadiness } from "@/hooks/useStripeConnectedAccount";
 import { tokenizeDebitCard } from "@/lib/stripePayouts";
 import { usePinGate } from "@/components/send/usePinGate";
-import { getStripe, getStripeSecondary } from "@/lib/stripe";
+import {
+  RecipientCardSection,
+  type RecipientCardHandle,
+  useStripeElementStyle,
+  elementWrapperClass,
+} from "@/components/send/RecipientCardSection";
+import { getStripe } from "@/lib/stripe";
 import type { Stripe } from "@stripe/stripe-js";
 import {
   Elements,
@@ -28,172 +34,6 @@ import {
   useElements,
 } from "@stripe/react-stripe-js";
 
-function readHslVar(name: string, fallback: string): string {
-  if (typeof window === "undefined") return fallback;
-  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  return v ? `hsl(${v})` : fallback;
-}
-
-function useStripeElementStyle() {
-  return useMemo(() => {
-    const fg = readHslVar("--foreground", "#0a0a0a");
-    const muted = readHslVar("--muted-foreground", "#6b7280");
-    const danger = readHslVar("--destructive", "#dc2626");
-    return {
-      base: {
-        color: fg,
-        fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
-        fontSize: "15px",
-        "::placeholder": { color: muted },
-        iconColor: muted,
-      },
-      invalid: { color: danger, iconColor: danger },
-    };
-  }, []);
-}
-
-const elementWrapperClass =
-  "flex h-10 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-within:outline-none focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2";
-
-type DeliveryMethod = "interac" | "eft" | "card_push" | "stripe_connect" | "paylink";
-type FundingSource = "wallet" | "card";
-
-// Feature flag: flip to false instantly if Paysafe Interac e-Transfer is unavailable.
-const INTERAC_ETRANSFER_ENABLED = true;
-
-const DELIVERY_FEES: Record<DeliveryMethod, number> = { interac: 0.5, eft: 0, card_push: 1.0, stripe_connect: 1.0, paylink: 0 };
-const CARD_PROCESSING_FEE = 1.5;
-
-// Recipient card section runs in its OWN <Elements> provider so it can host
-// a second CardNumberElement alongside the sender card. Exposes tokenize() via ref.
-type RecipientCardHandle = {
-  tokenize: (recipientName: string) => Promise<{ token: string; last4: string; brand: string }>;
-  isComplete: () => boolean;
-};
-
-const RecipientCardInner = forwardRef<RecipientCardHandle, { onValidityChange: (v: boolean) => void; elementStyle: any }>(
-  ({ onValidityChange, elementStyle }, ref) => {
-    const stripe = useStripe();
-    const elements = useElements();
-    const [num, setNum] = useState(false);
-    const [exp, setExp] = useState(false);
-    const [cvc, setCvc] = useState(false);
-    const [numReady, setNumReady] = useState(false);
-
-    useEffect(() => { onValidityChange(num && exp && cvc); }, [num, exp, cvc, onValidityChange]);
-
-    // Once the card number iframe is ready, focus it briefly to confirm it's
-    // interactive. If focus() throws, surface a console warning so we can spot
-    // dead iframes during QA.
-    useEffect(() => {
-      if (!numReady || !elements) return;
-      const el = elements.getElement(CardNumberElement);
-      if (!el) return;
-      try { el.focus(); el.blur(); } catch (e) {
-        console.warn("[RecipientCard] CardNumberElement not focusable:", e);
-      }
-    }, [numReady, elements]);
-
-    useImperativeHandle(ref, () => ({
-      isComplete: () => num && exp && cvc,
-      tokenize: async (recipientName: string) => {
-        if (!stripe || !elements) throw new Error("Recipient card form not ready");
-        const cardEl = elements.getElement(CardNumberElement);
-        if (!cardEl) throw new Error("Recipient card form not ready");
-        return tokenizeDebitCard(stripe, cardEl, { name: recipientName || "Recipient", currency: "cad" });
-      },
-    }), [stripe, elements, num, exp, cvc]);
-
-    return (
-      <div className="space-y-4 p-4 rounded-lg border border-primary/30 bg-primary/5">
-        <div className="flex items-center gap-2 text-sm font-medium">
-          <Zap className="w-4 h-4" /> Recipient's debit card (where funds land instantly)
-        </div>
-        <div className="p-2 rounded bg-muted/40 text-[11px] text-muted-foreground flex items-start gap-2">
-          <Info className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-          <span>
-            Visa Direct / Mastercard Send pushes funds directly to this debit card.
-            <strong> You (the sender) must enter it</strong> — the recipient does not get a separate page to fill in.
-          </span>
-        </div>
-        <div className="space-y-2">
-          <Label>Card Number</Label>
-          <div className={elementWrapperClass}>
-            <CardNumberElement
-              options={{ style: elementStyle, showIcon: true, placeholder: "Recipient debit card" }}
-              onChange={(e) => setNum(e.complete)}
-              onReady={() => setNumReady(true)}
-              className="w-full"
-            />
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-2">
-            <Label>Expiry (MM / YY)</Label>
-            <div className={elementWrapperClass}>
-              <CardExpiryElement options={{ style: elementStyle }} onChange={(e) => setExp(e.complete)} className="w-full" />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label>CVC</Label>
-            <div className={elementWrapperClass}>
-              <CardCvcElement options={{ style: elementStyle }} onChange={(e) => setCvc(e.complete)} className="w-full" />
-            </div>
-          </div>
-        </div>
-        <p className="text-[11px] text-muted-foreground">
-          Canadian debit cards only (Visa Debit, Debit Mastercard, Interac).
-        </p>
-      </div>
-    );
-  }
-);
-RecipientCardInner.displayName = "RecipientCardInner";
-
-
-const RecipientCardSection = forwardRef<RecipientCardHandle, { onValidityChange: (v: boolean) => void; elementStyle: any }>(
-  (props, ref) => {
-    // Use a SEPARATE Stripe instance from the page-level one so two
-    // CardNumberElements (sender + recipient) can coexist. If the secondary
-    // fails to load, fall back to the primary instance so the form is at
-    // least degraded-working rather than dead.
-    const [stripeP, setStripeP] = useState<Promise<Stripe | null>>(() => getStripeSecondary());
-    const [ready, setReady] = useState<boolean | null>(null);
-    useEffect(() => {
-      let alive = true;
-      stripeP.then((s) => {
-        if (!alive) return;
-        if (s) { setReady(true); return; }
-        console.warn("[RecipientCard] secondary Stripe instance failed; falling back to primary");
-        const fallback = getStripe();
-        setStripeP(fallback);
-        fallback.then((s2) => { if (alive) setReady(!!s2); });
-      });
-      return () => { alive = false; };
-    }, [stripeP]);
-
-    if (ready === false) {
-      return (
-        <div className="p-4 rounded-lg border border-destructive/40 bg-destructive/10 text-sm text-destructive">
-          Recipient card form unavailable — Stripe failed to load. Please refresh.
-        </div>
-      );
-    }
-    if (ready === null) {
-      return (
-        <div className="p-4 rounded-lg border border-border bg-muted/30 text-sm text-muted-foreground">
-          Loading recipient card form…
-        </div>
-      );
-    }
-    return (
-      <Elements stripe={stripeP} key="recipient-card-elements">
-        <RecipientCardInner {...props} ref={ref} />
-      </Elements>
-    );
-  }
-);
-RecipientCardSection.displayName = "RecipientCardSection";
 
 const CanadaSendFlow = () => {
   const [stripeP] = useState<Promise<Stripe | null>>(() => getStripe());
@@ -608,7 +448,7 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
                   onClick={() => setMethod("card_push")}
                 >
                   <Zap className="w-5 h-5" />
-                  <span className="text-xs">Instant to Card</span>
+                  <span className="text-xs">Send to debit card · Stripe</span>
                   <span className="text-[10px] opacity-70">C$1.00 · seconds</span>
                 </Button>
                 <Button
@@ -617,13 +457,13 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
                   className="relative flex flex-col items-center gap-1 h-auto py-3"
                   onClick={() => setMethod("stripe_connect")}
                   disabled={!connectState.hasAccount}
-                  title={connectState.hasAccount ? "Send to your Stripe connected account" : "Finish setup at /stripe-connect first"}
+                  title={connectState.hasAccount ? "Withdraw to your own Stripe account / external debit card" : "Finish setup at /stripe-connect first"}
                 >
                   <span className="absolute top-1 right-1 text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400">
                     TEST
                   </span>
                   <Building2 className="w-5 h-5" />
-                  <span className="text-xs">Stripe Connect</span>
+                  <span className="text-xs">Withdraw to my Stripe</span>
                   <span className="text-[10px] opacity-70">C$1.00 · instant</span>
                 </Button>
                 <Button
@@ -708,9 +548,12 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
               {method === "stripe_connect" && (
                 <div className="p-4 rounded-lg border border-emerald-500/30 bg-emerald-500/5 space-y-2">
                   <div className="flex items-center gap-2 text-sm font-medium text-emerald-700 dark:text-emerald-400">
-                    <Building2 className="w-4 h-4" /> Sending to your Stripe Connected Account
+                    <Building2 className="w-4 h-4" /> Withdraw to your own Stripe account
                   </div>
                   <div className="text-xs text-muted-foreground space-y-1">
+                    <p>
+                      This pays <strong>yourself</strong> — to send money to someone else, use “Send to debit card · Stripe” instead.
+                    </p>
                     <p>
                       Recipient: <strong>{recipientName || profile?.full_name || profile?.email || "You"}</strong>
                     </p>
@@ -946,8 +789,8 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
                     : `Send C$${parsedAmount.toFixed(2)} via ${
                         method === "eft" ? "Bank Transfer"
                           : method === "interac" ? "Interac e-Transfer"
-                          : method === "stripe_connect" ? "Stripe Connect"
-                          : "Visa Direct"
+                          : method === "stripe_connect" ? "Stripe (my account)"
+                          : "Stripe · Visa Direct"
                       }`}
               </Button>
             </div>
@@ -966,8 +809,8 @@ const CanadaSendFlowInner = ({ stripeReady }: { stripeReady: boolean | null }) =
                   Delivery: {
                     method === "eft" ? "Bank Transfer (EFT)"
                       : method === "interac" ? "Interac e-Transfer (email)"
-                      : method === "stripe_connect" ? "Stripe Connect — instant payout to your connected account"
-                      : "Instant to debit card (Visa Direct)"
+                      : method === "stripe_connect" ? "Stripe — instant payout to your own connected account"
+                      : "Stripe — instant to recipient's debit card (Visa Direct)"
                   }
                 </p>
               </div>
