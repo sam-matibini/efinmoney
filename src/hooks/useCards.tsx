@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { invokeEdgeFunction } from '@/lib/invokeEdgeFunction';
+import { invokeEdgeFunction, stringifyErrorValue } from '@/lib/invokeEdgeFunction';
 import { useAuth } from './useAuth';
 import { toast } from 'sonner';
 
@@ -155,7 +155,7 @@ export const useCardMutations = () => {
       toast.success('Card created');
       invalidate();
     },
-    onError: (e: Error) => toast.error(e.message || 'Failed to create card'),
+    onError: (e: unknown) => toast.error(stringifyErrorValue(e) || 'Failed to create card'),
   });
 
   const revealCardSecrets = useMutation({
@@ -168,7 +168,7 @@ export const useCardMutations = () => {
       if (!res.pan || !res.cvv) throw new Error('Could not load card details');
       return res;
     },
-    onError: (e: Error) => toast.error(e.message || 'Could not reveal card details'),
+    onError: (e: unknown) => toast.error(stringifyErrorValue(e) || 'Could not reveal card details'),
   });
 
   const updateCardStatus = useMutation({
@@ -177,7 +177,7 @@ export const useCardMutations = () => {
       if (error) throw error;
     },
     onSuccess: () => invalidate(),
-    onError: (e: Error) => toast.error(e.message || 'Failed to update card'),
+    onError: (e: unknown) => toast.error(stringifyErrorValue(e) || 'Failed to update card'),
   });
 
   const updateCard = useMutation({
@@ -189,7 +189,7 @@ export const useCardMutations = () => {
       toast.success('Card updated');
       invalidate();
     },
-    onError: (e: Error) => toast.error(e.message || 'Failed to update card'),
+    onError: (e: unknown) => toast.error(stringifyErrorValue(e) || 'Failed to update card'),
   });
 
   const deleteCard = useMutation({
@@ -201,7 +201,7 @@ export const useCardMutations = () => {
       toast.success('Card deleted');
       invalidate();
     },
-    onError: (e: Error) => toast.error(e.message || 'Failed to delete card'),
+    onError: (e: unknown) => toast.error(stringifyErrorValue(e) || 'Failed to delete card'),
   });
 
   const fundCard = useMutation({
@@ -213,7 +213,7 @@ export const useCardMutations = () => {
       invalidate();
       qc.invalidateQueries({ queryKey: ['wallets'] });
     },
-    onError: (e: Error) => toast.error(e.message || 'Funding failed'),
+    onError: (e: unknown) => toast.error(stringifyErrorValue(e) || 'Funding failed'),
   });
 
   const transferBetweenCards = useMutation({
@@ -224,7 +224,7 @@ export const useCardMutations = () => {
       toast.success('Transfer complete');
       invalidate();
     },
-    onError: (e: Error) => toast.error(e.message || 'Transfer failed'),
+    onError: (e: unknown) => toast.error(stringifyErrorValue(e) || 'Transfer failed'),
   });
 
   return {
