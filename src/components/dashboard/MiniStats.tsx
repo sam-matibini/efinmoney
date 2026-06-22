@@ -1,21 +1,15 @@
 import { motion, useMotionValue, useSpring, useTransform, useMotionTemplate, useReducedMotion } from "framer-motion";
 import { useMemo, useState } from "react";
-import { Send, Globe, PiggyBank, ShieldCheck } from "lucide-react";
+import { Globe, PiggyBank, ShieldCheck } from "lucide-react";
 import { useTransfers } from "@/hooks/useTransfers";
 import { useProfile } from "@/hooks/useProfile";
 import { useSavingsGoals } from "@/hooks/useSavingsGoals";
-import { useFxRates } from "@/hooks/useFxRates";
-import { buildUsdRateMap, convertToUsd } from "@/lib/fx";
 import { Link } from "react-router-dom";
-
-// Same statuses counted toward "this month" by the tier limit check (lib/tierLimits.ts)
-const COUNTS_TOWARD_MONTH = ["initiated", "funded", "processing", "completed"];
 
 const cardClass =
   "group relative overflow-hidden rounded-2xl bg-card border border-border p-4 transition-[transform,box-shadow] duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] hover:-translate-y-1 hover:shadow-lg";
 
 const cardBg: Record<string, string> = {
-  sent: "bg-gradient-to-br from-primary/[0.06] to-transparent",
   corridors: "bg-gradient-to-br from-primary/[0.06] to-transparent",
   savings: "bg-gradient-to-br from-[hsl(var(--accent-amber)/0.08)] to-transparent",
   kyc: "bg-gradient-to-br from-[hsl(var(--accent-amber)/0.10)] to-transparent",
@@ -25,48 +19,6 @@ const MiniStats = () => {
   const { data: transfers } = useTransfers(500);
   const { data: profile } = useProfile();
   const { data: goals } = useSavingsGoals();
-  const { data: fxRates } = useFxRates();
-
-  const monthData = useMemo(() => {
-    const rateMap = buildUsdRateMap(fxRates || []);
-    const now = new Date();
-    const start = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-    const recent = (transfers || []).filter(
-      (t) => COUNTS_TOWARD_MONTH.includes(t.status) && new Date(t.created_at).getTime() >= start
-    );
-
-    // Convert each transfer to USD; track amounts without a known rate separately
-    let totalUsd = 0;
-    const unconverted: Record<string, number> = {};
-    recent.forEach((t) => {
-      const c = (t.source_currency || "USD").toUpperCase();
-      const usd = convertToUsd(Number(t.source_amount), c, rateMap);
-      if (usd === null) {
-        unconverted[c] = (unconverted[c] || 0) + Number(t.source_amount);
-      } else {
-        totalUsd += usd;
-      }
-    });
-    const others = Object.entries(unconverted).sort((a, b) => b[1] - a[1]);
-
-    return {
-      currency: "USD",
-      total: totalUsd,
-      others,
-    };
-  }, [transfers, fxRates]);
-
-  const formatMoney = (amount: number, currency: string) => {
-    try {
-      return new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency,
-        maximumFractionDigits: 0,
-      }).format(amount);
-    } catch {
-      return `${currency} ${amount.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
-    }
-  };
 
   const corridors = useMemo(() => {
     const set = new Set<string>();
@@ -101,24 +53,6 @@ const MiniStats = () => {
   const tierNum = Number(tier);
 
   const stats = [
-    {
-      key: "sent",
-      label: "Sent this month",
-      content: (
-        <>
-          <p className="text-2xl font-display font-bold text-foreground">
-            {formatMoney(monthData.total, monthData.currency)}
-          </p>
-          {monthData.others.length > 0 && (
-            <p className="text-[11px] text-muted-foreground mt-0.5 truncate">
-              + {monthData.others.map(([c, v]) => formatMoney(v, c)).join(" · ")}
-            </p>
-          )}
-        </>
-      ),
-      icon: Send,
-      iconBg: "bg-primary/15 text-primary",
-    },
     {
       key: "corridors",
       label: "Active corridors",
@@ -194,7 +128,7 @@ const MiniStats = () => {
   ];
 
   return (
-    <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
+    <section className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-8">
       {stats.map((s, i) => (
         <StatCard key={s.key} index={i} className={`${cardClass} ${cardBg[s.key] || ""}`}>
           <div className="flex items-start justify-between mb-3">
