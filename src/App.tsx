@@ -55,6 +55,7 @@ const CanadaTransferPage = lazyImport(() => import("./pages/CanadaTransferPage")
 const ReceivePage = lazyImport(() => import("./pages/ReceivePage"));
 const TopUpPage = lazyImport(() => import("./pages/TopUpPage"));
 const PayBillsPage = lazyImport(() => import("./pages/PayBillsPage"));
+const CanadaBillPayPage = lazyImport(() => import("./pages/CanadaBillPayPage"));
 const Welcome = lazyImport(() => import("./pages/onboarding/Welcome"));
 const OnboardingIdentity = lazyImport(() => import("./pages/onboarding/Identity"));
 const OnboardingEnhanced = lazyImport(() => import("./pages/onboarding/Enhanced"));
@@ -207,6 +208,7 @@ const AppRoutes = () => {
           <Route path="/wallet/receive" element={<ReceivePage />} />
           <Route path="/wallet/topup" element={<TopUpPage />} />
           <Route path="/pay-bills" element={<PayBillsPage />} />
+          <Route path="/pay-bills/canada" element={<CanadaBillPayPage />} />
           <Route path="/stripe-connect" element={<StripeConnectInstantPage />} />
         </Route>
 

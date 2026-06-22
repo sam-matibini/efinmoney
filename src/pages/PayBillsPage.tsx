@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   CreditCard, Droplet, Phone, Receipt, Tv, Wifi, Zap,
-  Loader2, CheckCircle2, AlertCircle,
+  Loader2, CheckCircle2, AlertCircle, ArrowRight, Building2,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -127,14 +127,20 @@ const PayBillsPage = () => {
     }
   }, []);
 
+  const isCanada = countryId === "Canada";
+  const isWesternUnsupported = !categoriesSupported && countryIso && !isCanada;
+
   useEffect(() => {
-    if (!countryIso) {
-      setCategories([]);
-      setCategoriesSupported(false);
+    if (!countryIso || isCanada) {
+      if (isCanada) {
+        setCategories([]);
+        setCategoriesSupported(true);
+        setLoadingCategories(false);
+      }
       return;
     }
     fetchCategories(countryIso);
-  }, [countryIso, fetchCategories]);
+  }, [countryIso, isCanada, fetchCategories]);
 
   useEffect(() => {
     if (!categoryCode || !countryIso) {
@@ -313,10 +319,39 @@ const PayBillsPage = () => {
               />
             </div>
 
-            {loadingCategories ? (
+            {isCanada ? (
+              <div className="rounded-xl border border-primary/30 bg-primary/5 p-5 space-y-3">
+                <div className="flex items-start gap-3">
+                  <Building2 className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <p className="font-medium">Canada — pay by EFT</p>
+                    <p className="text-sm text-muted-foreground">
+                      Pay utilities, telecom, insurance, tax, and other Canadian billers from your CAD wallet.
+                      Enter the biller&apos;s bank details from your invoice or online banking payee setup.
+                    </p>
+                  </div>
+                </div>
+                <Button asChild className="w-full sm:w-auto">
+                  <Link to="/pay-bills/canada">
+                    Pay a Canadian bill
+                    <ArrowRight className="w-4 h-4 ml-2" />
+                  </Link>
+                </Button>
+              </div>
+            ) : loadingCategories ? (
               <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
                 <Loader2 className="w-4 h-4 animate-spin" />
                 Loading bill categories…
+              </div>
+            ) : isWesternUnsupported ? (
+              <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
+                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <p>
+                  Instant bill catalog is not available for {country?.country || "this country"} yet.
+                  {countryId === "United States" || countryId === "United Kingdom"
+                    ? " US/UK bill pay is coming soon."
+                    : " Try Nigeria, Kenya, Ghana, South Africa, Uganda, or Canada (EFT)."}
+                </p>
               </div>
             ) : !categoriesSupported ? (
               <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm">

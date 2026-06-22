@@ -144,6 +144,7 @@ function Deploy-Functions {
     "flw-get-billers",
     "flw-validate-bill",
     "flw-bill-payment",
+    "ca-bill-payment",
     "elicate-payout",
     "elicate-webhook",
     "elicate-reconcile",
