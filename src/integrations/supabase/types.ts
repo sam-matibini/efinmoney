@@ -10,7 +10,32 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.1"
+    PostgrestVersion: "13.0.5"
+  }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
   public: {
     Tables: {
@@ -45,61 +70,64 @@ export type Database = {
         Row: {
           created_at: string
           department: string | null
-          document_status: string | null
+          document_status: string
           email: string | null
           full_name: string | null
           id: string
           id_document_type: string | null
           id_document_url: string | null
           invited_at: string | null
-          last_login_at: string | null
+          invited_by: string | null
           permissions: Json
           phone: string | null
           position: string | null
           rejection_reason: string | null
           reviewed_at: string | null
+          reviewed_by: string | null
           role: Database["public"]["Enums"]["admin_user_role"]
-          status: string
+          status: Database["public"]["Enums"]["admin_status"]
           updated_at: string
         }
         Insert: {
           created_at?: string
           department?: string | null
-          document_status?: string | null
+          document_status?: string
           email?: string | null
           full_name?: string | null
           id: string
           id_document_type?: string | null
           id_document_url?: string | null
           invited_at?: string | null
-          last_login_at?: string | null
+          invited_by?: string | null
           permissions?: Json
           phone?: string | null
           position?: string | null
           rejection_reason?: string | null
           reviewed_at?: string | null
+          reviewed_by?: string | null
           role?: Database["public"]["Enums"]["admin_user_role"]
-          status?: string
+          status?: Database["public"]["Enums"]["admin_status"]
           updated_at?: string
         }
         Update: {
           created_at?: string
           department?: string | null
-          document_status?: string | null
+          document_status?: string
           email?: string | null
           full_name?: string | null
           id?: string
           id_document_type?: string | null
           id_document_url?: string | null
           invited_at?: string | null
-          last_login_at?: string | null
+          invited_by?: string | null
           permissions?: Json
           phone?: string | null
           position?: string | null
           rejection_reason?: string | null
           reviewed_at?: string | null
+          reviewed_by?: string | null
           role?: Database["public"]["Enums"]["admin_user_role"]
-          status?: string
+          status?: Database["public"]["Enums"]["admin_status"]
           updated_at?: string
         }
         Relationships: []
@@ -1074,6 +1102,35 @@ export type Database = {
             columns: ["source_wallet_id"]
             isOneToOne: false
             referencedRelation: "wallets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      card_secrets: {
+        Row: {
+          card_id: string
+          created_at: string
+          cvv_encrypted: string
+          pan_encrypted: string
+        }
+        Insert: {
+          card_id: string
+          created_at?: string
+          cvv_encrypted: string
+          pan_encrypted: string
+        }
+        Update: {
+          card_id?: string
+          created_at?: string
+          cvv_encrypted?: string
+          pan_encrypted?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_secrets_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: true
+            referencedRelation: "cards"
             referencedColumns: ["id"]
           },
         ]
@@ -2260,6 +2317,77 @@ export type Database = {
           },
         ]
       }
+      elicate_charges: {
+        Row: {
+          amount_minor: number
+          created_at: string
+          currency: string
+          customer_name: string | null
+          failure_reason: string | null
+          id: string
+          last_event: Json | null
+          network: string
+          phone: string
+          psp_reference: string | null
+          raw_request: Json | null
+          raw_response: Json | null
+          redirect_url: string | null
+          reference: string
+          status: string
+          target_wallet_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount_minor: number
+          created_at?: string
+          currency: string
+          customer_name?: string | null
+          failure_reason?: string | null
+          id?: string
+          last_event?: Json | null
+          network: string
+          phone: string
+          psp_reference?: string | null
+          raw_request?: Json | null
+          raw_response?: Json | null
+          redirect_url?: string | null
+          reference: string
+          status?: string
+          target_wallet_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount_minor?: number
+          created_at?: string
+          currency?: string
+          customer_name?: string | null
+          failure_reason?: string | null
+          id?: string
+          last_event?: Json | null
+          network?: string
+          phone?: string
+          psp_reference?: string | null
+          raw_request?: Json | null
+          raw_response?: Json | null
+          redirect_url?: string | null
+          reference?: string
+          status?: string
+          target_wallet_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "elicate_charges_target_wallet_id_fkey"
+            columns: ["target_wallet_id"]
+            isOneToOne: false
+            referencedRelation: "wallets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       flw_banks_cache: {
         Row: {
           banks: Json
@@ -3243,6 +3371,7 @@ export type Database = {
           id: string
           preset_method: string | null
           preset_payload: Json | null
+          recipient_email: string | null
           recipient_name: string | null
           recipient_note: string | null
           release_journal_id: string | null
@@ -3274,6 +3403,7 @@ export type Database = {
           id?: string
           preset_method?: string | null
           preset_payload?: Json | null
+          recipient_email?: string | null
           recipient_name?: string | null
           recipient_note?: string | null
           release_journal_id?: string | null
@@ -3305,6 +3435,7 @@ export type Database = {
           id?: string
           preset_method?: string | null
           preset_payload?: Json | null
+          recipient_email?: string | null
           recipient_name?: string | null
           recipient_note?: string | null
           release_journal_id?: string | null
@@ -4163,6 +4294,41 @@ export type Database = {
         }
         Relationships: []
       }
+      staff_audit_log: {
+        Row: {
+          action: string
+          actor_id: string | null
+          created_at: string
+          details: Json
+          id: string
+          target_admin_id: string | null
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          created_at?: string
+          details?: Json
+          id?: string
+          target_admin_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          created_at?: string
+          details?: Json
+          id?: string
+          target_admin_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_audit_log_target_admin_id_fkey"
+            columns: ["target_admin_id"]
+            isOneToOne: false
+            referencedRelation: "admin_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stripe_connected_accounts: {
         Row: {
           capabilities: Json
@@ -5005,6 +5171,36 @@ export type Database = {
         }
         Relationships: []
       }
+      treasury_provider_balances: {
+        Row: {
+          available_amount: number
+          currency: string
+          id: string
+          pending_amount: number
+          provider: string
+          raw: Json | null
+          synced_at: string
+        }
+        Insert: {
+          available_amount?: number
+          currency: string
+          id?: string
+          pending_amount?: number
+          provider: string
+          raw?: Json | null
+          synced_at?: string
+        }
+        Update: {
+          available_amount?: number
+          currency?: string
+          id?: string
+          pending_amount?: number
+          provider?: string
+          raw?: Json | null
+          synced_at?: string
+        }
+        Relationships: []
+      }
       treasury_received_entries: {
         Row: {
           amount: number
@@ -5063,36 +5259,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      treasury_provider_balances: {
-        Row: {
-          available_amount: number
-          currency: string
-          id: string
-          pending_amount: number
-          provider: string
-          raw: Json | null
-          synced_at: string
-        }
-        Insert: {
-          available_amount?: number
-          currency: string
-          id?: string
-          pending_amount?: number
-          provider: string
-          raw?: Json | null
-          synced_at?: string
-        }
-        Update: {
-          available_amount?: number
-          currency?: string
-          id?: string
-          pending_amount?: number
-          provider?: string
-          raw?: Json | null
-          synced_at?: string
-        }
-        Relationships: []
       }
       treasury_settlement_jobs: {
         Row: {
@@ -5422,6 +5588,64 @@ export type Database = {
           },
         ]
       }
+      virtual_card_transfers: {
+        Row: {
+          amount: number
+          created_at: string
+          currency_code: string
+          from_card_id: string | null
+          from_wallet_id: string | null
+          id: string
+          to_card_id: string | null
+          transfer_type: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          currency_code: string
+          from_card_id?: string | null
+          from_wallet_id?: string | null
+          id?: string
+          to_card_id?: string | null
+          transfer_type: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          currency_code?: string
+          from_card_id?: string | null
+          from_wallet_id?: string | null
+          id?: string
+          to_card_id?: string | null
+          transfer_type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "virtual_card_transfers_from_card_id_fkey"
+            columns: ["from_card_id"]
+            isOneToOne: false
+            referencedRelation: "cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "virtual_card_transfers_from_wallet_id_fkey"
+            columns: ["from_wallet_id"]
+            isOneToOne: false
+            referencedRelation: "wallets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "virtual_card_transfers_to_card_id_fkey"
+            columns: ["to_card_id"]
+            isOneToOne: false
+            referencedRelation: "cards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       wallet_operations: {
         Row: {
           approval_required: boolean
@@ -5660,6 +5884,7 @@ export type Database = {
         Args: { p_data: Json; p_to: string; p_type: string }
         Returns: undefined
       }
+      is_active_admin: { Args: { _uid: string }; Returns: boolean }
       is_admin_user: { Args: { _uid: string }; Returns: boolean }
       is_business_program_owner: {
         Args: { _program_id: string; _user_id: string }
@@ -5705,11 +5930,18 @@ export type Database = {
         | "suspended"
         | "closed"
       account_type: "asset" | "liability" | "income" | "expense" | "equity"
+      admin_status:
+        | "invited"
+        | "pending_review"
+        | "active"
+        | "rejected"
+        | "suspended"
       admin_user_role:
         | "super_admin"
         | "compliance_officer"
         | "support_agent"
         | "viewer"
+        | "finance_officer"
       alert_severity: "low" | "medium" | "high" | "critical"
       alert_status:
         | "open"
@@ -5946,6 +6178,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       account_status_enum: [
@@ -5955,11 +6190,19 @@ export const Constants = {
         "closed",
       ],
       account_type: ["asset", "liability", "income", "expense", "equity"],
+      admin_status: [
+        "invited",
+        "pending_review",
+        "active",
+        "rejected",
+        "suspended",
+      ],
       admin_user_role: [
         "super_admin",
         "compliance_officer",
         "support_agent",
         "viewer",
+        "finance_officer",
       ],
       alert_severity: ["low", "medium", "high", "critical"],
       alert_status: [

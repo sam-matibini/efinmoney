@@ -88,9 +88,11 @@ $$;
 grant execute on function public.set_transaction_pin(text) to authenticated;
 grant execute on function public.verify_transaction_pin(text) to authenticated;
 
--- Sanity check that pgcrypto is reachable now.
+-- Sanity check that pgcrypto is reachable now (same search_path fix as above —
+-- this anonymous block doesn't inherit the functions' SET search_path).
 do $$
 begin
+  set local search_path = public, extensions;
   perform crypt('1234', gen_salt('bf'));
   raise notice 'pgcrypto reachable: OK';
 end $$;
