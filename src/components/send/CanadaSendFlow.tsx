@@ -727,7 +727,7 @@ const CanadaSendFlow = () => {
             name: recipientName,
             country_code: "CAD",
             currency_code: "CAD",
-            payout_method: method === "paylink" ? null : method,
+            payout_method: method,
             email: recipientEmail || null,
             eft_institution: method === "eft" ? institutionNumber : null,
             eft_transit: method === "eft" ? transitNumber : null,
