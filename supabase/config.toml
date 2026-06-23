@@ -1,5 +1,8 @@
 project_id = "dkdnwumllibwdlqbjkwy"
 
+[functions.safeguarding-check]
+verify_jwt = false
+
 [functions.refresh-fx-rates]
 verify_jwt = false
 
