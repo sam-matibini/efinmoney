@@ -51,12 +51,34 @@ $$;
 REVOKE ALL ON FUNCTION public.run_safeguarding_check() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.run_safeguarding_check() TO service_role;
 
--- Schedule daily at 06:00 UTC. Idempotent: drop any prior job of the same name first.
+-- Schedule daily at 06:00 UTC. pg_cron's functions may live in the `cron` or
+-- `extensions` schema depending on how the extension was installed, so resolve
+-- the schema dynamically. Idempotent: drop any prior job of the same name first.
+-- If pg_cron isn't found, skip without failing the migration.
 DO $$
+DECLARE
+  v_schema text;
 BEGIN
-  PERFORM cron.unschedule('safeguarding-daily');
-EXCEPTION WHEN OTHERS THEN
-  NULL; -- job didn't exist yet
-END $$;
+  SELECT n.nspname INTO v_schema
+  FROM pg_proc p
+  JOIN pg_namespace n ON n.oid = p.pronamespace
+  WHERE p.proname = 'schedule'
+    AND n.nspname IN ('cron', 'extensions')
+  LIMIT 1;
 
-SELECT cron.schedule('safeguarding-daily', '0 6 * * *', $cron$ SELECT public.run_safeguarding_check(); $cron$);
+  IF v_schema IS NULL THEN
+    RAISE NOTICE 'pg_cron schedule() not found; skipping cron scheduling (schedule run_safeguarding_check() manually)';
+    RETURN;
+  END IF;
+
+  BEGIN
+    EXECUTE format('SELECT %I.unschedule(%L)', v_schema, 'safeguarding-daily');
+  EXCEPTION WHEN OTHERS THEN
+    NULL; -- job didn't exist yet
+  END;
+
+  EXECUTE format(
+    'SELECT %I.schedule(%L, %L, %L)',
+    v_schema, 'safeguarding-daily', '0 6 * * *', 'SELECT public.run_safeguarding_check();'
+  );
+END $$;
