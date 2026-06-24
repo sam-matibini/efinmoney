@@ -21,6 +21,7 @@ const NAV = [
   { to: "/admin/staff", label: "Staff", icon: UserCog, requiresStaffMgmt: true },
   { to: "/admin/board-dashboard", label: "Board", icon: Gauge },
   { to: "/admin/security", label: "Security", icon: ShieldCheck },
+  { to: "/admin/compliance-register", label: "Compliance", icon: FileText },
   { to: "/admin/risk-tiers", label: "Risk Tiers", icon: Layers },
   { to: "/admin/kyc-config", label: "KYC Config", icon: SlidersHorizontal },
   { to: "/admin/audit-log", label: "Audit Log", icon: ScrollText },

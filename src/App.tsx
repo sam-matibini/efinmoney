@@ -83,6 +83,8 @@ const StaffOnboardingPage = lazyImport(() => import("./pages/admin/StaffOnboardi
 const BoardDashboardPage = lazyImport(() => import("./pages/admin/BoardDashboardPage"));
 const SecurityMonitoringPage = lazyImport(() => import("./pages/admin/SecurityMonitoringPage"));
 const OperationalRiskPage = lazyImport(() => import("./pages/admin/OperationalRiskPage"));
+const ComplianceRegisterPage = lazyImport(() => import("./pages/admin/ComplianceRegisterPage"));
+const EddWorkflowPage = lazyImport(() => import("./pages/admin/EddWorkflowPage"));
 const InteracCallback = lazyImport(() => import("./pages/InteracCallback"));
 const InteracHubCallback = lazyImport(() => import("./pages/InteracHubCallback"));
 const MorePage = lazyImport(() => import("./pages/MorePage"));
@@ -251,6 +253,8 @@ const AppRoutes = () => {
         <Route path="/admin/board-dashboard" element={<AdminAuthProvider><AdminGuard><BoardDashboardPage /></AdminGuard></AdminAuthProvider>} />
         <Route path="/admin/security" element={<AdminAuthProvider><AdminGuard><SecurityMonitoringPage /></AdminGuard></AdminAuthProvider>} />
         <Route path="/admin/operational-risks" element={<AdminAuthProvider><AdminGuard><OperationalRiskPage /></AdminGuard></AdminAuthProvider>} />
+        <Route path="/admin/compliance-register" element={<AdminAuthProvider><AdminGuard><ComplianceRegisterPage /></AdminGuard></AdminAuthProvider>} />
+        <Route path="/admin/edd" element={<AdminAuthProvider><AdminGuard><EddWorkflowPage /></AdminGuard></AdminAuthProvider>} />
         <Route path="/admin/payments/adyen" element={<AdminAuthProvider><AdminGuard><AdminAdyenLinksPage /></AdminGuard></AdminAuthProvider>} />
         <Route path="/admin/payments/adyen/transactions" element={<AdminAuthProvider><AdminGuard><AdminAdyenTransactionsPage /></AdminGuard></AdminAuthProvider>} />
 

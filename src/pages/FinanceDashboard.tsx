@@ -21,6 +21,8 @@ import { TreasuryPanel } from "@/components/finance/treasury/TreasuryPanel";
 import { TreasuryWorkerPanel } from "@/components/finance/treasury/TreasuryWorkerPanel";
 import { SafeguardingPanel } from "@/components/finance/SafeguardingPanel";
 import { UnclaimedFundsPanel } from "@/components/finance/UnclaimedFundsPanel";
+import { SettlementReconciliationPanel } from "@/components/finance/SettlementReconciliationPanel";
+import { PeriodEndControlsPanel } from "@/components/finance/PeriodEndControlsPanel";
 
 const FinanceDashboard = () => {
   const [accountingTab, setAccountingTab] = useState("coa");
@@ -55,6 +57,8 @@ const FinanceDashboard = () => {
               <TabsTrigger value="invoices">Invoices</TabsTrigger>
               <TabsTrigger value="bills">Bills</TabsTrigger>
               <TabsTrigger value="fx">FX</TabsTrigger>
+              <TabsTrigger value="period-close">Period Close</TabsTrigger>
+              <TabsTrigger value="settlement">Settlement</TabsTrigger>
               <TabsTrigger value="unclaimed">Unclaimed Funds</TabsTrigger>
               <TabsTrigger value="crypto">Crypto</TabsTrigger>
             </TabsList>
@@ -158,6 +162,14 @@ const FinanceDashboard = () => {
 
             <TabsContent value="fx" className="space-y-4">
               <FxTradesPanel />
+            </TabsContent>
+
+            <TabsContent value="period-close" className="space-y-4">
+              <PeriodEndControlsPanel />
+            </TabsContent>
+
+            <TabsContent value="settlement" className="space-y-4">
+              <SettlementReconciliationPanel />
             </TabsContent>
 
             <TabsContent value="unclaimed" className="space-y-4">
