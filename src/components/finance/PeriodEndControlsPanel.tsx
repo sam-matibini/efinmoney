@@ -17,7 +17,7 @@ export const PeriodEndControlsPanel = () => {
   const { data: periods = [], isLoading } = useQuery({
     queryKey: ["period-locks"],
     queryFn: async () => {
-      const { data } = await supabase.from("period_locks").select("*").order("period_end", { ascending: false });
+      const { data } = await (supabase as any).from("period_locks").select("*").order("period_end", { ascending: false });
       return data || [];
     },
   });
@@ -25,21 +25,21 @@ export const PeriodEndControlsPanel = () => {
   const { data: checklists = [], refetch: refetchChecklists } = useQuery({
     queryKey: ["period-checklists"],
     queryFn: async () => {
-      const { data } = await supabase.from("period_close_checklists").select("*").order("created_at", { ascending: true });
+      const { data } = await (supabase as any).from("period_close_checklists").select("*").order("created_at", { ascending: true });
       return data || [];
     },
   });
 
   const advanceMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      await supabase.from("period_locks").update({ status, locked_at: status === "locked" ? new Date().toISOString() : null, locked_by: status === "locked" ? (await supabase.auth.getUser()).data.user?.id : null }).eq("id", id);
+      await (supabase as any).from("period_locks").update({ status, locked_at: status === "locked" ? new Date().toISOString() : null, locked_by: status === "locked" ? (await supabase.auth.getUser()).data.user?.id : null }).eq("id", id);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["period-locks"] }),
   });
 
   const toggleChecklist = useMutation({
     mutationFn: async ({ id, completed }: { id: string; completed: boolean }) => {
-      await supabase.from("period_close_checklists").update({ completed, completed_at: completed ? new Date().toISOString() : null, completed_by: completed ? (await supabase.auth.getUser()).data.user?.id : null }).eq("id", id);
+      await (supabase as any).from("period_close_checklists").update({ completed, completed_at: completed ? new Date().toISOString() : null, completed_by: completed ? (await supabase.auth.getUser()).data.user?.id : null }).eq("id", id);
     },
     onSuccess: () => refetchChecklists(),
   });
@@ -49,7 +49,7 @@ export const PeriodEndControlsPanel = () => {
       const now = new Date();
       const start = new Date(now.getFullYear(), now.getMonth(), 1);
       const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-      const { data: newPeriod } = await supabase.from("period_locks").insert({ period_start: start.toISOString().split("T")[0], period_end: end.toISOString().split("T")[0] }).select("id").single();
+      const { data: newPeriod } = await (supabase as any).from("period_locks").insert({ period_start: start.toISOString().split("T")[0], period_end: end.toISOString().split("T")[0] }).select("id").single();
       if (newPeriod) {
         const seedTasks = [
           "Complete all bank reconciliations",
@@ -59,7 +59,7 @@ export const PeriodEndControlsPanel = () => {
           "Finance review sign-off",
           "Controller approval",
         ];
-        await supabase.from("period_close_checklists").insert(seedTasks.map(task => ({ period_lock_id: newPeriod.id, task })));
+        await (supabase as any).from("period_close_checklists").insert(seedTasks.map(task => ({ period_lock_id: newPeriod.id, task })));
       }
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["period-locks"] }); refetchChecklists(); toast.success("Period created with checklist"); },

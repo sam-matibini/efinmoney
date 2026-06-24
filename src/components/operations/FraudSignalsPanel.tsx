@@ -23,7 +23,7 @@ export const FraudSignalsPanel = () => {
   const { data: signals = [], isLoading } = useQuery({
     queryKey: ["fraud-signals", typeFilter],
     queryFn: async () => {
-      let q = supabase.from("fraud_signals").select("*").order("created_at", { ascending: false }).limit(50);
+      let q = (supabase as any).from("fraud_signals").select("*").order("created_at", { ascending: false }).limit(50);
       if (typeFilter !== "all") q = q.eq("signal_type", typeFilter);
       const { data, error } = await q;
       if (error) throw error;
@@ -35,14 +35,14 @@ export const FraudSignalsPanel = () => {
   const { data: rules = [] } = useQuery({
     queryKey: ["fraud-rules"],
     queryFn: async () => {
-      const { data } = await supabase.from("fraud_rules").select("*").eq("is_active", true);
+      const { data } = await (supabase as any).from("fraud_rules").select("*").eq("is_active", true);
       return data || [];
     },
   });
 
   const resolveMutation = useMutation({
     mutationFn: async (id: string) => {
-      await supabase.from("fraud_signals").update({ resolved: true, resolved_at: new Date().toISOString() }).eq("id", id);
+      await (supabase as any).from("fraud_signals").update({ resolved: true, resolved_at: new Date().toISOString() }).eq("id", id);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["fraud-signals"] });

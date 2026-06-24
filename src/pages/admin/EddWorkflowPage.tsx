@@ -24,7 +24,7 @@ export default function EddWorkflowPage() {
   const { data: cases = [], isLoading } = useQuery({
     queryKey: ["edd-cases"],
     queryFn: async () => {
-      const { data } = await supabase.from("edd_cases").select("*").order("created_at", { ascending: false });
+      const { data } = await (supabase as any).from("edd_cases").select("*").order("created_at", { ascending: false });
       return data || [];
     },
     refetchInterval: 30_000,
@@ -32,7 +32,7 @@ export default function EddWorkflowPage() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      await supabase.from("edd_cases").update({ status, reviewed_at: status === "approved" || status === "rejected" ? new Date().toISOString() : null, reviewed_by: (await supabase.auth.getUser()).data.user?.id }).eq("id", id);
+      await (supabase as any).from("edd_cases").update({ status, reviewed_at: status === "approved" || status === "rejected" ? new Date().toISOString() : null, reviewed_by: (await supabase.auth.getUser()).data.user?.id }).eq("id", id);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["edd-cases"] }),
   });

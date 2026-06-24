@@ -21,7 +21,7 @@ export default function AuditorPortalPage() {
   const { data: auditors = [], isLoading } = useQuery({
     queryKey: ["auditor-access"],
     queryFn: async () => {
-      const { data } = await supabase.from("auditor_access").select("*").order("created_at", { ascending: false });
+      const { data } = await (supabase as any).from("auditor_access").select("*").order("created_at", { ascending: false });
       return data || [];
     },
     refetchInterval: 30_000,
@@ -30,7 +30,7 @@ export default function AuditorPortalPage() {
   const { data: sessions = [] } = useQuery({
     queryKey: ["audit-sessions"],
     queryFn: async () => {
-      const { data } = await supabase.from("audit_sessions").select("*").order("created_at", { ascending: false }).limit(50);
+      const { data } = await (supabase as any).from("audit_sessions").select("*").order("created_at", { ascending: false }).limit(50);
       return data || [];
     },
   });
@@ -39,7 +39,7 @@ export default function AuditorPortalPage() {
     mutationFn: async () => {
       const token = crypto.randomUUID();
       const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-      await supabase.from("auditor_access").insert({
+      await (supabase as any).from("auditor_access").insert({
         email: inviteEmail,
         access_token: token,
         token_expires_at: expiresAt,
@@ -59,7 +59,7 @@ export default function AuditorPortalPage() {
 
   const deactivateMutation = useMutation({
     mutationFn: async (id: string) => {
-      await supabase.from("auditor_access").update({ is_active: false }).eq("id", id);
+      await (supabase as any).from("auditor_access").update({ is_active: false }).eq("id", id);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["auditor-access"] }),
   });

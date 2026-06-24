@@ -27,7 +27,7 @@ export const UnclaimedFundsPanel = () => {
   const { data: funds = [], isLoading } = useQuery({
     queryKey: ["unclaimed-funds"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("unclaimed_funds").select("*").order("days_outstanding", { ascending: false });
+      const { data, error } = await (supabase as any).from("unclaimed_funds").select("*").order("days_outstanding", { ascending: false });
       if (error) throw error;
       return data || [];
     },
@@ -36,7 +36,7 @@ export const UnclaimedFundsPanel = () => {
 
   const resolveMutation = useMutation({
     mutationFn: async ({ id, action }: { id: string; action: "resolved" | "written_off" }) => {
-      await supabase.from("unclaimed_funds").update({ status: action, resolved_at: new Date().toISOString() }).eq("id", id);
+      await (supabase as any).from("unclaimed_funds").update({ status: action, resolved_at: new Date().toISOString() }).eq("id", id);
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["unclaimed-funds"] }); toast.success("Updated"); },
   });

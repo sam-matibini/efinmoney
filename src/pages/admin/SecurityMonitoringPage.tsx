@@ -24,7 +24,7 @@ export default function SecurityMonitoringPage() {
   const { data: incidents = [], isLoading: incLoading } = useQuery({
     queryKey: ["security-incidents"],
     queryFn: async () => {
-      const { data } = await supabase.from("security_incidents").select("*").order("created_at", { ascending: false }).limit(20);
+      const { data } = await (supabase as any).from("security_incidents").select("*").order("created_at", { ascending: false }).limit(20);
       return data || [];
     },
     refetchInterval: 30_000,

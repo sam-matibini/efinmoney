@@ -37,7 +37,8 @@ export const EvidenceRepositoryPanel = () => {
   const { data: records = [], isLoading } = useQuery({
     queryKey: ["evidence-records"],
     queryFn: async () => {
-      const { data } = await supabase.from("evidence_records").select("*").order("created_at", { ascending: false });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data } = await (supabase as any).from("evidence_records").select("*").order("created_at", { ascending: false });
       return data || [];
     },
     refetchInterval: 60_000,
@@ -55,7 +56,8 @@ export const EvidenceRepositoryPanel = () => {
 
   const uploadMutation = useMutation({
     mutationFn: async () => {
-      await supabase.from("evidence_records").insert({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (supabase as any).from("evidence_records").insert({
         category: newFile.category,
         file_name: newFile.file_name || "uploaded-file",
         file_path: `evidence/${Date.now()}-${newFile.file_name || "file"}`,

@@ -20,7 +20,7 @@ export const useOperationalRisks = () =>
   useQuery({
     queryKey: ["operational-risks"],
     queryFn: async (): Promise<OperationalRisk[]> => {
-      const { data, error } = await supabase.from("operational_risks").select("*").order("risk_score", { ascending: false });
+      const { data, error } = await (supabase as any).from("operational_risks").select("*").order("risk_score", { ascending: false });
       if (error) throw error;
       return data || [];
     },
@@ -30,7 +30,7 @@ export const useCreateOperationalRisk = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (p: { title: string; category: string; likelihood: number; impact: number; mitigation?: string }) => {
-      const { data, error } = await supabase.from("operational_risks").insert(p).select().single();
+      const { data, error } = await (supabase as any).from("operational_risks").insert(p).select().single();
       if (error) throw error;
       return data;
     },
@@ -42,7 +42,7 @@ export const useUpdateOperationalRisk = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, ...updates }: { id: string; status?: string; mitigation?: string }) => {
-      const { error } = await supabase.from("operational_risks").update(updates).eq("id", id);
+      const { error } = await (supabase as any).from("operational_risks").update(updates).eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["operational-risks"] }),

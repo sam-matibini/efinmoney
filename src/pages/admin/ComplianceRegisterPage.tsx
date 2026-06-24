@@ -29,7 +29,7 @@ export default function ComplianceRegisterPage() {
   const { data: obligations = [], isLoading } = useQuery({
     queryKey: ["compliance-obligations"],
     queryFn: async () => {
-      const { data } = await supabase.from("compliance_obligations").select("*").order("next_due", { ascending: true, nullsFirst: false });
+      const { data } = await (supabase as any).from("compliance_obligations").select("*").order("next_due", { ascending: true, nullsFirst: false });
       return data || [];
     },
     refetchInterval: 60_000,
@@ -47,7 +47,7 @@ export default function ComplianceRegisterPage() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      await supabase.from("compliance_obligations").update({ status, last_reviewed: status === "completed" ? new Date().toISOString() : null }).eq("id", id);
+      await (supabase as any).from("compliance_obligations").update({ status, last_reviewed: status === "completed" ? new Date().toISOString() : null }).eq("id", id);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["compliance-obligations"] }),
   });

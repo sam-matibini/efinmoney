@@ -38,7 +38,8 @@ export const useBeneficialOwners = (customerId: string | undefined) =>
     queryKey: ["beneficial-owners", customerId],
     enabled: !!customerId,
     queryFn: async (): Promise<BeneficialOwner[]> => {
-      const { data, error } = await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any)
         .from("beneficial_owners")
         .select("*")
         .eq("customer_id", customerId)
@@ -52,7 +53,7 @@ export const useUboComplianceView = () =>
   useQuery({
     queryKey: ["ubo-compliance-view"],
     queryFn: async (): Promise<UboComplianceEntry[]> => {
-      const { data, error } = await supabase.from("ubo_compliance_view").select("*").order("customer_name");
+      const { data, error } = await (supabase as any).from("ubo_compliance_view").select("*").order("customer_name");
       if (error) throw error;
       return data || [];
     },
@@ -63,7 +64,7 @@ export const useCreateBeneficialOwner = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (payload: Omit<BeneficialOwner, "id" | "created_at" | "updated_at" | "verified_at" | "verified_by">) => {
-      const { data, error } = await supabase.from("beneficial_owners").insert(payload).select().single();
+      const { data, error } = await (supabase as any).from("beneficial_owners").insert(payload).select().single();
       if (error) throw error;
       return data;
     },
@@ -83,7 +84,7 @@ export const useUpdateBeneficialOwner = () => {
         payload.verified_at = new Date().toISOString();
         payload.verified_by = (await supabase.auth.getUser()).data.user?.id;
       }
-      const { data, error } = await supabase.from("beneficial_owners").update(payload).eq("id", id).select().single();
+      const { data, error } = await (supabase as any).from("beneficial_owners").update(payload).eq("id", id).select().single();
       if (error) throw error;
       return data;
     },
@@ -98,7 +99,7 @@ export const useDeleteBeneficialOwner = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, customerId }: { id: string; customerId: string }) => {
-      const { error } = await supabase.from("beneficial_owners").delete().eq("id", id);
+      const { error } = await (supabase as any).from("beneficial_owners").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: (_, vars) => {

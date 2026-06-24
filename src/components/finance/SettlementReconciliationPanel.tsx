@@ -16,7 +16,8 @@ export const SettlementReconciliationPanel = () => {
   const { data: items = [], isLoading } = useQuery({
     queryKey: ["settlement-reconciliations"],
     queryFn: async () => {
-      const { data } = await supabase.from("settlement_reconciliations").select("*").order("created_at", { ascending: false }).limit(50);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data } = await (supabase as any).from("settlement_reconciliations").select("*").order("created_at", { ascending: false }).limit(50);
       return data || [];
     },
     refetchInterval: 30_000,
