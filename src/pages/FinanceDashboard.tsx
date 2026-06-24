@@ -23,6 +23,7 @@ import { SafeguardingPanel } from "@/components/finance/SafeguardingPanel";
 import { UnclaimedFundsPanel } from "@/components/finance/UnclaimedFundsPanel";
 import { SettlementReconciliationPanel } from "@/components/finance/SettlementReconciliationPanel";
 import { PeriodEndControlsPanel } from "@/components/finance/PeriodEndControlsPanel";
+import { EvidenceRepositoryPanel } from "@/components/finance/EvidenceRepositoryPanel";
 
 const FinanceDashboard = () => {
   const [accountingTab, setAccountingTab] = useState("coa");
@@ -61,6 +62,7 @@ const FinanceDashboard = () => {
               <TabsTrigger value="settlement">Settlement</TabsTrigger>
               <TabsTrigger value="unclaimed">Unclaimed Funds</TabsTrigger>
               <TabsTrigger value="crypto">Crypto</TabsTrigger>
+              <TabsTrigger value="evidence">Evidence</TabsTrigger>
             </TabsList>
             </div>
 
@@ -178,6 +180,10 @@ const FinanceDashboard = () => {
 
             <TabsContent value="crypto" className="space-y-4">
               <CryptoTradesPanel />
+            </TabsContent>
+
+            <TabsContent value="evidence" className="space-y-4">
+              <EvidenceRepositoryPanel />
             </TabsContent>
           </Tabs>
         </motion.div>

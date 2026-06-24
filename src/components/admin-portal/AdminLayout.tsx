@@ -1,6 +1,6 @@
 import { ReactNode, useEffect, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, ShieldCheck, Users, Layers, ScrollText, Settings, Bell, Search, LogOut, ChevronLeft, ChevronRight, Sun, Moon, Activity, ExternalLink, SlidersHorizontal, UserCog, Gauge, AlertCircle, FileText } from "lucide-react";
+import { LayoutDashboard, ShieldCheck, Users, Layers, ScrollText, Settings, Bell, Search, LogOut, ChevronLeft, ChevronRight, Sun, Moon, Activity, ExternalLink, SlidersHorizontal, UserCog, Gauge, AlertCircle, FileText, Eye, ShieldAlert } from "lucide-react";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +22,8 @@ const NAV = [
   { to: "/admin/board-dashboard", label: "Board", icon: Gauge },
   { to: "/admin/security", label: "Security", icon: ShieldCheck },
   { to: "/admin/compliance-register", label: "Compliance", icon: FileText },
+  { to: "/admin/edd", label: "EDD", icon: ShieldAlert },
+  { to: "/admin/auditor-portal", label: "Auditor", icon: Eye },
   { to: "/admin/risk-tiers", label: "Risk Tiers", icon: Layers },
   { to: "/admin/kyc-config", label: "KYC Config", icon: SlidersHorizontal },
   { to: "/admin/audit-log", label: "Audit Log", icon: ScrollText },
