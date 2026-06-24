@@ -43,3 +43,7 @@ AI_HANDOFF.md
 *.sln
 *.sw?
 .vercel
+
+# TypeScript build info (auto-generated)
+*.tsbuildinfo
+tsconfig.app.tsbuildinfo
