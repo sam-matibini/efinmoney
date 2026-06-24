@@ -86,6 +86,23 @@ const OperationalRiskPage = lazyImport(() => import("./pages/admin/OperationalRi
 const ComplianceRegisterPage = lazyImport(() => import("./pages/admin/ComplianceRegisterPage"));
 const EddWorkflowPage = lazyImport(() => import("./pages/admin/EddWorkflowPage"));
 const AuditorPortalPage = lazyImport(() => import("./pages/admin/AuditorPortalPage"));
+const AmlPolicyPage = lazyImport(() => import("./pages/admin/AmlPolicyPage"));
+const CddWorkflowPage = lazyImport(() => import("./pages/admin/CddWorkflowPage"));
+const TransactionMonitoringPage = lazyImport(() => import("./pages/admin/TransactionMonitoringPage"));
+const SanctionsScreeningPage = lazyImport(() => import("./pages/admin/SanctionsScreeningPage"));
+const BeneficialOwnershipPage = lazyImport(() => import("./pages/admin/BeneficialOwnershipPage"));
+const PepScreeningPage = lazyImport(() => import("./pages/admin/PepScreeningPage"));
+const StrFilingPage = lazyImport(() => import("./pages/admin/StrFilingPage"));
+const IncidentManagementPage = lazyImport(() => import("./pages/admin/IncidentManagementPage"));
+const StaffTrainingPage = lazyImport(() => import("./pages/admin/StaffTrainingPage"));
+const CorrespondentBankingPage = lazyImport(() => import("./pages/admin/CorrespondentBankingPage"));
+const GeographicRiskPage = lazyImport(() => import("./pages/admin/GeographicRiskPage"));
+const TravelRulePage = lazyImport(() => import("./pages/admin/TravelRulePage"));
+const LctrPage = lazyImport(() => import("./pages/admin/LctrPage"));
+const EftrPage = lazyImport(() => import("./pages/admin/EftrPage"));
+const TradeAmlPage = lazyImport(() => import("./pages/admin/TradeAmlPage"));
+const WireTransfersPage = lazyImport(() => import("./pages/admin/WireTransfersPage"));
+const RegulatoryChangesPage = lazyImport(() => import("./pages/admin/RegulatoryChangesPage"));
 const InteracCallback = lazyImport(() => import("./pages/InteracCallback"));
 const InteracHubCallback = lazyImport(() => import("./pages/InteracHubCallback"));
 const MorePage = lazyImport(() => import("./pages/MorePage"));
@@ -257,6 +274,23 @@ const AppRoutes = () => {
         <Route path="/admin/compliance-register" element={<AdminAuthProvider><AdminGuard><ComplianceRegisterPage /></AdminGuard></AdminAuthProvider>} />
         <Route path="/admin/edd" element={<AdminAuthProvider><AdminGuard><EddWorkflowPage /></AdminGuard></AdminAuthProvider>} />
         <Route path="/admin/auditor-portal" element={<AdminAuthProvider><AdminGuard><AuditorPortalPage /></AdminGuard></AdminAuthProvider>} />
+        <Route path="/admin/aml-policy" element={<AdminAuthProvider><AdminGuard><AmlPolicyPage /></AdminGuard></AdminAuthProvider>} />
+        <Route path="/admin/cdd" element={<AdminAuthProvider><AdminGuard><CddWorkflowPage /></AdminGuard></AdminAuthProvider>} />
+        <Route path="/admin/transaction-monitoring" element={<AdminAuthProvider><AdminGuard><TransactionMonitoringPage /></AdminGuard></AdminAuthProvider>} />
+        <Route path="/admin/sanctions" element={<AdminAuthProvider><AdminGuard><SanctionsScreeningPage /></AdminGuard></AdminAuthProvider>} />
+        <Route path="/admin/beneficial-ownership" element={<AdminAuthProvider><AdminGuard><BeneficialOwnershipPage /></AdminGuard></AdminAuthProvider>} />
+        <Route path="/admin/pep-screening" element={<AdminAuthProvider><AdminGuard><PepScreeningPage /></AdminGuard></AdminAuthProvider>} />
+        <Route path="/admin/str-filing" element={<AdminAuthProvider><AdminGuard><StrFilingPage /></AdminGuard></AdminAuthProvider>} />
+        <Route path="/admin/incidents" element={<AdminAuthProvider><AdminGuard><IncidentManagementPage /></AdminGuard></AdminAuthProvider>} />
+        <Route path="/admin/training" element={<AdminAuthProvider><AdminGuard><StaffTrainingPage /></AdminGuard></AdminAuthProvider>} />
+        <Route path="/admin/correspondent-banking" element={<AdminAuthProvider><AdminGuard><CorrespondentBankingPage /></AdminGuard></AdminAuthProvider>} />
+        <Route path="/admin/geographic-risk" element={<AdminAuthProvider><AdminGuard><GeographicRiskPage /></AdminGuard></AdminAuthProvider>} />
+        <Route path="/admin/travel-rule" element={<AdminAuthProvider><AdminGuard><TravelRulePage /></AdminGuard></AdminAuthProvider>} />
+        <Route path="/admin/lctr" element={<AdminAuthProvider><AdminGuard><LctrPage /></AdminGuard></AdminAuthProvider>} />
+        <Route path="/admin/eftr" element={<AdminAuthProvider><AdminGuard><EftrPage /></AdminGuard></AdminAuthProvider>} />
+        <Route path="/admin/trade-aml" element={<AdminAuthProvider><AdminGuard><TradeAmlPage /></AdminGuard></AdminAuthProvider>} />
+        <Route path="/admin/wire-transfers" element={<AdminAuthProvider><AdminGuard><WireTransfersPage /></AdminGuard></AdminAuthProvider>} />
+        <Route path="/admin/regulatory-changes" element={<AdminAuthProvider><AdminGuard><RegulatoryChangesPage /></AdminGuard></AdminAuthProvider>} />
         <Route path="/admin/payments/adyen" element={<AdminAuthProvider><AdminGuard><AdminAdyenLinksPage /></AdminGuard></AdminAuthProvider>} />
         <Route path="/admin/payments/adyen/transactions" element={<AdminAuthProvider><AdminGuard><AdminAdyenTransactionsPage /></AdminGuard></AdminAuthProvider>} />
 

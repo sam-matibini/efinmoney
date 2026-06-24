@@ -44,18 +44,7 @@ CREATE TABLE IF NOT EXISTS public.period_close_checklists (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
--- Seed standard period-close checklist items
-INSERT INTO public.period_close_checklists (period_lock_id, task)
-SELECT '00000000-0000-0000-0000-000000000002'::uuid, t
-FROM unnest(ARRAY[
-  'Complete all bank reconciliations',
-  'Verify safeguarding snapshot',
-  'Review and post all journal entries',
-  'Run trial balance',
-  'Finance review sign-off',
-  'Controller approval'
-]) AS t
-ON CONFLICT DO NOTHING;
+-- No seed data: period_close_checklists requires a valid period_lock_id FK
 
 ALTER TABLE public.period_locks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.period_close_checklists ENABLE ROW LEVEL SECURITY;

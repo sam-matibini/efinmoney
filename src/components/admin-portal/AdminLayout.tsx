@@ -1,6 +1,6 @@
 import { ReactNode, useEffect, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, ShieldCheck, Users, Layers, ScrollText, Settings, Bell, Search, LogOut, ChevronLeft, ChevronRight, Sun, Moon, Activity, ExternalLink, SlidersHorizontal, UserCog, Gauge, AlertCircle, FileText, Eye, ShieldAlert } from "lucide-react";
+import { LayoutDashboard, ShieldCheck, Users, Layers, ScrollText, Settings, Bell, Search, LogOut, ChevronLeft, ChevronRight, Sun, Moon, Activity, ExternalLink, SlidersHorizontal, UserCog, Gauge, AlertCircle, FileText, Eye, ShieldAlert, Shield, ClipboardList, Ban, UserX, Building2, FileWarning, GraduationCap, Landmark, Globe, ArrowLeftRight, Banknote, RefreshCw, TrendingUp, Zap, BookOpen, BarChart2 } from "lucide-react";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,10 +20,27 @@ const NAV = [
   { to: "/admin/users", label: "Users", icon: Users },
   { to: "/admin/staff", label: "Staff", icon: UserCog, requiresStaffMgmt: true },
   { to: "/admin/board-dashboard", label: "Board", icon: Gauge },
-  { to: "/admin/security", label: "Security", icon: ShieldCheck },
-  { to: "/admin/compliance-register", label: "Compliance", icon: FileText },
-  { to: "/admin/edd", label: "EDD", icon: ShieldAlert },
-  { to: "/admin/auditor-portal", label: "Auditor", icon: Eye },
+  { to: "/admin/security", label: "Security", icon: ShieldAlert },
+  { to: "/admin/incidents", label: "Incidents", icon: AlertCircle },
+  { to: "/admin/compliance-register", label: "Compliance Reg.", icon: FileText },
+  { to: "/admin/aml-policy", label: "AML Policy", icon: Shield },
+  { to: "/admin/cdd", label: "CDD", icon: ClipboardList },
+  { to: "/admin/edd", label: "EDD", icon: ShieldCheck },
+  { to: "/admin/sanctions", label: "Sanctions", icon: Ban },
+  { to: "/admin/pep-screening", label: "PEP Screening", icon: UserX },
+  { to: "/admin/beneficial-ownership", label: "Ownership", icon: Building2 },
+  { to: "/admin/str-filing", label: "STR / SAR", icon: FileWarning },
+  { to: "/admin/transaction-monitoring", label: "TX Monitor", icon: BarChart2 },
+  { to: "/admin/trade-aml", label: "Trade AML", icon: TrendingUp },
+  { to: "/admin/correspondent-banking", label: "Correspond. Banks", icon: Landmark },
+  { to: "/admin/geographic-risk", label: "Geo Risk", icon: Globe },
+  { to: "/admin/travel-rule", label: "Travel Rule", icon: ArrowLeftRight },
+  { to: "/admin/lctr", label: "LCTR", icon: Banknote },
+  { to: "/admin/eftr", label: "EFTR", icon: RefreshCw },
+  { to: "/admin/wire-transfers", label: "Wire Act", icon: Zap },
+  { to: "/admin/regulatory-changes", label: "Reg. Changes", icon: BookOpen },
+  { to: "/admin/training", label: "Training", icon: GraduationCap },
+  { to: "/admin/auditor-portal", label: "Auditor Portal", icon: Eye },
   { to: "/admin/risk-tiers", label: "Risk Tiers", icon: Layers },
   { to: "/admin/kyc-config", label: "KYC Config", icon: SlidersHorizontal },
   { to: "/admin/audit-log", label: "Audit Log", icon: ScrollText },

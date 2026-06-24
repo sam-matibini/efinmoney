@@ -54,13 +54,4 @@ DROP POLICY IF EXISTS "EDD documents readable by admin compliance" ON public.edd
 CREATE POLICY "EDD documents readable by admin compliance" ON public.edd_documents FOR SELECT TO authenticated
   USING (public.has_role(auth.uid(), 'admin'::app_role) OR public.has_role(auth.uid(), 'compliance'::app_role));
 
--- Default EDD questionnaire template
-INSERT INTO public.edd_questionnaires (edd_case_id, questions) VALUES
-  ('00000000-0000-0000-0000-000000000001', '[
-    {"question": "Source of wealth / funds", "type": "text"},
-    {"question": "Expected transaction volume (monthly)", "type": "text"},
-    {"question": "Countries of operation", "type": "text"},
-    {"question": "Nature of business relationship", "type": "text"},
-    {"question": "Any regulatory actions or investigations?", "type": "yes_no"}
-  ]'::jsonb)
-ON CONFLICT DO NOTHING;
+-- No seed data: edd_questionnaires requires a valid edd_case_id FK
