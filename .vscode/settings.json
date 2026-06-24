@@ -1,0 +1,9 @@
+{
+  "cline.autoApproval.enabled": true,
+  "cline.autoApproval.executeCommands": true,
+  "cline.autoApproval.readFiles": true,
+  "cline.autoApproval.editFiles": true,
+  "cline.autoApproval.deleteFiles": true,
+  "cline.autoApproval.writeToNew": true,
+  "cline.skipConfirmation": true
+}
