@@ -2,6 +2,8 @@ import { motion } from "framer-motion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CrmCustomersPanel } from "@/components/crm/CrmCustomersPanel";
 import { TransactionMonitoringPanel } from "@/components/operations/TransactionMonitoringPanel";
+import { IncidentsPanel } from "@/components/operations/IncidentsPanel";
+import { FraudSignalsPanel } from "@/components/operations/FraudSignalsPanel";
 import { DisputesPanel } from "@/components/operations/DisputesPanel";
 import { WalletOperationsPanel } from "@/components/operations/WalletOperationsPanel";
 import { OperationsKPIsPanel } from "@/components/operations/OperationsKPIsPanel";
@@ -40,6 +42,8 @@ const OperationsDashboard = () => {
                 <TabsTrigger value="comms">Communications</TabsTrigger>
                 <TabsTrigger value="reg-reports">Regulatory</TabsTrigger>
                 <TabsTrigger value="maker-checker">Approvals</TabsTrigger>
+                <TabsTrigger value="incidents">Incidents</TabsTrigger>
+                <TabsTrigger value="fraud">Fraud</TabsTrigger>
                 <TabsTrigger value="kpis">KPIs</TabsTrigger>
               </TabsList>
             </div>
@@ -70,6 +74,14 @@ const OperationsDashboard = () => {
 
             <TabsContent value="maker-checker" className="space-y-4">
               <MakerCheckerPanel />
+            </TabsContent>
+
+            <TabsContent value="incidents" className="space-y-4">
+              <IncidentsPanel />
+            </TabsContent>
+
+            <TabsContent value="fraud" className="space-y-4">
+              <FraudSignalsPanel />
             </TabsContent>
 
             <TabsContent value="kpis" className="space-y-4">

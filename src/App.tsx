@@ -80,6 +80,9 @@ const DataExportPage = lazyImport(() => import("./pages/admin/DataExportPage"));
 const StaffPage = lazyImport(() => import("./pages/admin/StaffPage"));
 const StaffDetailPage = lazyImport(() => import("./pages/admin/StaffDetailPage"));
 const StaffOnboardingPage = lazyImport(() => import("./pages/admin/StaffOnboardingPage"));
+const BoardDashboardPage = lazyImport(() => import("./pages/admin/BoardDashboardPage"));
+const SecurityMonitoringPage = lazyImport(() => import("./pages/admin/SecurityMonitoringPage"));
+const OperationalRiskPage = lazyImport(() => import("./pages/admin/OperationalRiskPage"));
 const InteracCallback = lazyImport(() => import("./pages/InteracCallback"));
 const InteracHubCallback = lazyImport(() => import("./pages/InteracHubCallback"));
 const MorePage = lazyImport(() => import("./pages/MorePage"));
@@ -245,6 +248,9 @@ const AppRoutes = () => {
         <Route path="/admin/staff" element={<AdminAuthProvider><AdminGuard><StaffPage /></AdminGuard></AdminAuthProvider>} />
         <Route path="/admin/staff/:id" element={<AdminAuthProvider><AdminGuard><StaffDetailPage /></AdminGuard></AdminAuthProvider>} />
         <Route path="/admin/onboarding" element={<AdminAuthProvider><AdminGuard><StaffOnboardingPage /></AdminGuard></AdminAuthProvider>} />
+        <Route path="/admin/board-dashboard" element={<AdminAuthProvider><AdminGuard><BoardDashboardPage /></AdminGuard></AdminAuthProvider>} />
+        <Route path="/admin/security" element={<AdminAuthProvider><AdminGuard><SecurityMonitoringPage /></AdminGuard></AdminAuthProvider>} />
+        <Route path="/admin/operational-risks" element={<AdminAuthProvider><AdminGuard><OperationalRiskPage /></AdminGuard></AdminAuthProvider>} />
         <Route path="/admin/payments/adyen" element={<AdminAuthProvider><AdminGuard><AdminAdyenLinksPage /></AdminGuard></AdminAuthProvider>} />
         <Route path="/admin/payments/adyen/transactions" element={<AdminAuthProvider><AdminGuard><AdminAdyenTransactionsPage /></AdminGuard></AdminAuthProvider>} />
 
