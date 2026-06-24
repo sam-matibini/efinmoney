@@ -987,20 +987,20 @@ export const FinancialStatementsPanel = () => {
                 </h3>
                 {renderAccountSection('Equity', 'equity', ACCOUNT_CATEGORIES.equity.Equity, <DollarSign className="h-4 w-4 text-indigo-500" />)}
                 <div className="flex justify-between items-center py-2 px-3 border-l-2 border-muted ml-6">
-                  <span className="text-sm italic">Retained Earnings (Net Income)</span>
+                  <span className="text-sm italic">Retained Earnings (Assets − Liabilities)</span>
                   <div className="flex items-center gap-4">
                     {compareConfig.enabled && comparisonPeriods.map((_, idx) => {
-                      const compIncome = getComparisonTypeTotal('income', idx);
-                      const compExpenses = getComparisonTypeTotal('expense', idx);
-                      const compNetIncome = compIncome - compExpenses;
+                      const compAssets = getComparisonTypeTotal('asset', idx);
+                      const compLiab = getComparisonTypeTotal('liability', idx);
+                      const compCalcEquity = compAssets - compLiab;
                       return (
-                        <span key={idx} className={cn("font-mono text-sm min-w-[90px] text-right", compNetIncome >= 0 ? "text-indigo-600" : "text-red-600")}>
-                          {formatCurrency(compNetIncome)}
+                        <span key={idx} className={cn("font-mono text-sm min-w-[90px] text-right", compCalcEquity >= 0 ? "text-indigo-600" : "text-red-600")}>
+                          {formatCurrency(compCalcEquity)}
                         </span>
                       );
                     })}
-                    <span className={cn("font-mono text-sm min-w-[100px] text-right", netIncome >= 0 ? "text-indigo-600" : "text-red-600")}>
-                      {formatCurrency(netIncome)}
+                    <span className={cn("font-mono text-sm min-w-[100px] text-right", calculatedEquity >= 0 ? "text-indigo-600" : "text-red-600")}>
+                      {formatCurrency(calculatedEquity)}
                     </span>
                   </div>
                 </div>
@@ -1008,17 +1008,15 @@ export const FinancialStatementsPanel = () => {
                   <span>Total Equity</span>
                   <div className="flex items-center gap-4">
                     {compareConfig.enabled && comparisonPeriods.map((_, idx) => {
-                      const compEquity = getComparisonTypeTotal('equity', idx);
-                      const compIncome = getComparisonTypeTotal('income', idx);
-                      const compExpenses = getComparisonTypeTotal('expense', idx);
-                      const compNetIncome = compIncome - compExpenses;
+                      const compAssets = getComparisonTypeTotal('asset', idx);
+                      const compLiab = getComparisonTypeTotal('liability', idx);
                       return (
                         <span key={idx} className="font-mono text-sm text-muted-foreground min-w-[90px] text-right">
-                          {formatCurrency(compEquity + compNetIncome)}
+                          {formatCurrency(compAssets - compLiab)}
                         </span>
                       );
                     })}
-                    <span className="font-mono min-w-[100px] text-right">{formatCurrency(totalEquity + netIncome)}</span>
+                    <span className="font-mono min-w-[100px] text-right">{formatCurrency(calculatedEquity)}</span>
                   </div>
                 </div>
               </div>
@@ -1029,25 +1027,16 @@ export const FinancialStatementsPanel = () => {
                   <span>Total Liabilities & Equity</span>
                   <div className="flex items-center gap-4">
                     {compareConfig.enabled && comparisonPeriods.map((_, idx) => {
-                      const compLiab = getComparisonTypeTotal('liability', idx);
-                      const compEquity = getComparisonTypeTotal('equity', idx);
-                      const compIncome = getComparisonTypeTotal('income', idx);
-                      const compExpenses = getComparisonTypeTotal('expense', idx);
-                      const compNetIncome = compIncome - compExpenses;
+                      const compAssets = getComparisonTypeTotal('asset', idx);
                       return (
                         <span key={idx} className="font-mono text-sm text-muted-foreground min-w-[90px] text-right">
-                          {formatCurrency(compLiab + compEquity + compNetIncome)}
+                          {formatCurrency(compAssets)}
                         </span>
                       );
                     })}
-                    <span className="font-mono min-w-[100px] text-right">{formatCurrency(totalLiabilities + totalEquity + netIncome)}</span>
+                    <span className="font-mono min-w-[100px] text-right">{formatCurrency(totalAssets)}</span>
                   </div>
                 </div>
-                {Math.abs(totalAssets - (totalLiabilities + totalEquity + netIncome)) > 0.01 && (
-                  <p className="text-xs text-destructive mt-2">
-                    ⚠️ Balance sheet does not balance. Difference: {formatCurrency(totalAssets - (totalLiabilities + totalEquity + netIncome))}
-                  </p>
-                )}
               </div>
             </CardContent>
           </Card>
