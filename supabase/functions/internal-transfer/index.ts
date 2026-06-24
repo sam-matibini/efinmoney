@@ -167,7 +167,7 @@ Deno.serve(async (req) => {
     const journalId = crypto.randomUUID();
     const debitDesc = note ? `${note} · to ${recipientName}` : `Sent to ${recipientName}`;
     const creditDesc = note ? `${note} · from ${senderName}` : `Received from ${senderName}`;
-    const entries = [
+    const entries: any[] = [
       {
         journal_id: journalId,
         account_id: fromAcct.id,
@@ -193,6 +193,47 @@ Deno.serve(async (req) => {
         created_by: user.id,
       },
     ];
+
+    // Cross-currency: add FX clearing entries so each currency sub-total balances.
+    // DR FX Gain (toCurrency) = targetAmount; CR FX Gain (fromCurrency) = amount.
+    // Per fromCurrency: DR amount = CR amount ✓  Per toCurrency: DR targetAmount = CR targetAmount ✓
+    if (fromCurrency !== toCurrency) {
+      const { data: fxAcc } = await admin
+        .from("ledger_accounts")
+        .select("id")
+        .eq("code", "4100")
+        .maybeSingle();
+      if (fxAcc) {
+        const fxDesc = `FX spread ${fromCurrency}→${toCurrency} @ ${effectiveRate}`;
+        entries.push(
+          {
+            journal_id: journalId,
+            account_id: fxAcc.id,
+            wallet_id: null,
+            currency_code: fromCurrency,
+            debit_amount: 0,
+            credit_amount: amount,
+            description: fxDesc,
+            reference_type: "internal_transfer",
+            reference_id: transfer.id,
+            created_by: user.id,
+          },
+          {
+            journal_id: journalId,
+            account_id: fxAcc.id,
+            wallet_id: null,
+            currency_code: toCurrency,
+            debit_amount: targetAmount,
+            credit_amount: 0,
+            description: fxDesc,
+            reference_type: "internal_transfer",
+            reference_id: transfer.id,
+            created_by: user.id,
+          },
+        );
+      }
+    }
+
     const { error: leErr } = await admin.from("ledger_entries").insert(entries);
     if (leErr) {
       await admin.from("transfers").update({ status: "failed", failure_reason: leErr.message }).eq("id", transfer.id);

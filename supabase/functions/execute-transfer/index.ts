@@ -254,13 +254,15 @@ Deno.serve(async (req) => {
       ];
 
       if (payableAcc) {
+        // Credit payable in source currency so the journal balances within one currency.
+        // (target_amount in a foreign currency would make raw debit ≠ credit totals.)
         entries.push({
           journal_id: journalId,
           account_id: payableAcc.id,
           wallet_id: null,
-          currency_code: transfer.target_currency,
+          currency_code: transfer.source_currency,
           debit_amount: 0,
-          credit_amount: Number(transfer.target_amount),
+          credit_amount: Number(transfer.source_amount),
           description: isCanadaPayout
             ? `Paysafe payout to ${transfer.recipient_name} (${transfer.payout_method || "interac"})`
             : `Payable to ${transfer.recipient_name}`,

@@ -69,7 +69,8 @@ export const TrialBalancePanel = () => {
     { debit: 0, credit: 0 }
   );
 
-  const isBalanced = Math.abs(totals.debit - totals.credit) < 0.01;
+  const difference = totals.debit - totals.credit;
+  const isBalanced = Math.abs(difference) < 0.01;
 
   if (isLoading) {
     return (
@@ -97,10 +98,17 @@ export const TrialBalancePanel = () => {
             As of {format(new Date(), 'MMMM d, yyyy')}
           </p>
         </div>
-        <div className={`px-3 py-1 rounded-full text-sm font-medium ${
-          isBalanced ? 'bg-indigo-500/10 text-indigo-500' : 'bg-red-500/10 text-red-500'
-        }`}>
-          {isBalanced ? 'Balanced' : 'Unbalanced'}
+        <div className="flex flex-col items-end gap-1">
+          <div className={`px-3 py-1 rounded-full text-sm font-medium ${
+            isBalanced ? 'bg-indigo-500/10 text-indigo-500' : 'bg-red-500/10 text-red-500'
+          }`}>
+            {isBalanced ? 'Balanced' : 'Unbalanced'}
+          </div>
+          {!isBalanced && (
+            <p className="text-xs text-muted-foreground max-w-xs text-right">
+              Difference: {Math.abs(difference).toFixed(2)} — historical cross-currency FX entries posted debit and credit in different currencies; only new transfers are corrected.
+            </p>
+          )}
         </div>
       </CardHeader>
       <CardContent>
