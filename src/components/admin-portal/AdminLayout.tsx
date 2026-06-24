@@ -1,6 +1,6 @@
 import { ReactNode, useEffect, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, ShieldCheck, Users, Layers, ScrollText, Settings, Bell, Search, LogOut, ChevronLeft, ChevronRight, Sun, Moon, Activity, ExternalLink, SlidersHorizontal, UserCog, Gauge, AlertCircle, FileText, Eye, ShieldAlert, Shield, ClipboardList, Ban, UserX, Building2, FileWarning, GraduationCap, Landmark, Globe, ArrowLeftRight, Banknote, RefreshCw, TrendingUp, Zap, BookOpen, BarChart2, Scale, CalendarCheck, Archive } from "lucide-react";
+import { LayoutDashboard, ShieldCheck, Users, Layers, ScrollText, Settings, Bell, Search, LogOut, ChevronLeft, ChevronRight, Sun, Moon, Activity, ExternalLink, SlidersHorizontal, UserCog, Gauge, AlertCircle, FileText, Eye, ShieldAlert, Shield, ClipboardList, Ban, UserX, Building2, FileWarning, GraduationCap, Landmark, Globe, ArrowLeftRight, Banknote, RefreshCw, TrendingUp, Zap, BookOpen, BarChart2, Scale, CalendarCheck, Archive, PanelLeft } from "lucide-react";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,7 @@ const NAV = [
   { to: "/admin/users", label: "Users", icon: Users },
   { to: "/admin/staff", label: "Staff", icon: UserCog, requiresStaffMgmt: true },
   { to: "/admin/board-dashboard", label: "Board", icon: Gauge },
+  { to: "/operations", label: "Operations", icon: PanelLeft },
   { to: "/admin/security", label: "Security", icon: ShieldAlert },
   { to: "/admin/incidents", label: "Incidents", icon: AlertCircle },
   { to: "/admin/compliance-register", label: "Compliance Reg.", icon: FileText },
@@ -233,6 +234,9 @@ const AdminLayout = ({ children }: { children: ReactNode }) => {
         <header className="h-16 sticky top-0 z-30 bg-background/80 backdrop-blur border-b border-border flex items-center gap-3 px-4">
           <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setMobileOpen(true)}>
             <Layers className="w-5 h-5" />
+          </Button>
+          <Button variant="ghost" size="icon" className="hidden lg:flex" onClick={() => setCollapsed((c) => !c)}>
+            <PanelLeft className="w-5 h-5" />
           </Button>
 
           <form onSubmit={handleSearch} className="flex-1 max-w-md">
