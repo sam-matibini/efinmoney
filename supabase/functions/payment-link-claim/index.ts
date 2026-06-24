@@ -2,6 +2,7 @@
 // and we hand off to the underlying payout rail. Releases escrow on success.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsPreflightResponse, jsonResponse } from "../_shared/cors.ts";
+import { getPendingClaimAccountId } from "../_shared/payment-link-ledger.ts";
 import Stripe from "https://esm.sh/stripe@17.3.1?target=denonext";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -30,6 +31,84 @@ const CLAIM_CORRIDORS: Record<string, { countries: string[]; postal: RegExp; req
   GBP: { countries: ["GB"], postal: /^[A-Z0-9 ]{4,10}$/, requiresState: false },
   EUR: { countries: ["DE","FR","IT","ES","NL","BE","PT","IE","AT"], postal: /^[A-Z0-9 -]{3,12}$/, requiresState: false },
 };
+
+const STRIPE_REQUIREMENT_LABELS: Record<string, string> = {
+  "individual.address.line1": "Street address",
+  "individual.address.city": "City",
+  "individual.address.state": "Province/state",
+  "individual.address.postal_code": "Postal code",
+  "individual.address.country": "Country",
+  "individual.dob.day": "Date of birth",
+  "individual.dob.month": "Date of birth",
+  "individual.dob.year": "Date of birth",
+  "individual.first_name": "First name",
+  "individual.last_name": "Last name",
+  "individual.phone": "Phone number",
+  "individual.email": "Email",
+  "individual.ssn_last_4": "SSN (last 4 digits)",
+  "individual.id_number": "Government ID",
+  "external_account": "Debit card",
+  "tos_acceptance.date": "Terms acceptance",
+  "tos_acceptance.ip": "Terms acceptance",
+};
+
+function labelStripeRequirement(field: string): string {
+  return STRIPE_REQUIREMENT_LABELS[field]
+    ?? field.replace(/^individual\./, "").replace(/\./g, " ").replace(/_/g, " ");
+}
+
+function collectStripeRequirements(account: { requirements?: { currently_due?: string[]; past_due?: string[]; eventually_due?: string[] } }): string[] {
+  const req = account.requirements;
+  return [...new Set([
+    ...(req?.currently_due ?? []),
+    ...(req?.past_due ?? []),
+    ...(req?.eventually_due ?? []),
+  ])];
+}
+
+async function buildCardPushStripeError(
+  err: { raw?: { message?: string; code?: string; param?: string }; message?: string; code?: string; param?: string },
+  stripe: Stripe,
+  accountId: string | null,
+): Promise<{ error: string; details?: string; missing_fields?: string[]; stripe_code?: string }> {
+  const raw = String(err?.raw?.message || err?.message || "").trim();
+  const stripeCode = err?.raw?.code || err?.code || undefined;
+  const param = err?.raw?.param || err?.param;
+
+  let missing: string[] = [];
+  if (accountId) {
+    try {
+      const fresh = await stripe.accounts.retrieve(accountId);
+      missing = collectStripeRequirements(fresh).map(labelStripeRequirement);
+      missing = [...new Set(missing)];
+    } catch { /* best-effort */ }
+  }
+
+  const lower = raw.toLowerCase();
+  let error = raw || "Card payout failed";
+
+  if (lower.includes("card_declined") || (lower.includes("declined") && !lower.includes("requirements"))) {
+    error = "This card was declined. Try a different debit card.";
+  } else if (lower.includes("invalid_card_type") || lower.includes("not a debit") || lower.includes("ineligible")) {
+    error = "This card can't receive instant payouts. Use a Visa Debit or Debit Mastercard.";
+  } else if (missing.length > 0) {
+    error = `Card payouts couldn't be enabled. Check: ${missing.join(", ")}.`;
+  } else if (lower.includes("requirements")) {
+    error = "Card payouts couldn't be enabled with the details provided.";
+  }
+
+  const detailsParts: string[] = [];
+  if (raw && raw !== error) detailsParts.push(raw);
+  if (param) detailsParts.push(`Field: ${labelStripeRequirement(String(param))}`);
+  if (stripeCode) detailsParts.push(`Stripe code: ${stripeCode}`);
+
+  return {
+    error,
+    ...(detailsParts.length ? { details: detailsParts.join(" · ") } : {}),
+    ...(missing.length ? { missing_fields: missing } : {}),
+    ...(stripeCode ? { stripe_code: stripeCode } : {}),
+  };
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return corsPreflightResponse();
@@ -261,6 +340,7 @@ Deno.serve(async (req) => {
   let stripePayoutId: string | null = null;
   let cardPayoutCountry = "CA";
   if (method === "card_push") {
+    let stripeAcctId: string | null = null;
     try {
       const k = payload.kyc;
       const corridor = CLAIM_CORRIDORS[String(claimed.currency).toUpperCase()]!;
@@ -301,6 +381,7 @@ Deno.serve(async (req) => {
         },
         metadata: { payment_link_code: code, sender_id: claimed.sender_id },
       });
+      stripeAcctId = acct.id;
 
       const ext = await stripe!.accounts.createExternalAccount(acct.id, {
         external_account: payload.card_token,
@@ -316,13 +397,18 @@ Deno.serve(async (req) => {
       }
       if (!capActive) {
         const fresh = await stripe!.accounts.retrieve(acct.id);
-        const due = (fresh.requirements as any)?.currently_due || [];
+        const due = collectStripeRequirements(fresh);
+        const missing = [...new Set(due.map(labelStripeRequirement))];
         console.error("Stripe transfers capability not active", acct.id, due);
         await rollback(admin, claimed.id);
         return json({
-          error: due.length
-            ? `Card payouts could not be enabled. Missing: ${due.join(", ")}. Please try a different debit card.`
-            : "Card payouts could not be enabled for this card. Please try a different debit card.",
+          error: missing.length
+            ? `Card payouts could not be enabled. Check: ${missing.join(", ")}.`
+            : "Card payouts could not be enabled for this card. Try a different debit card.",
+          details: due.length
+            ? `Stripe transfers capability stayed inactive. Raw fields: ${due.join(", ")}`
+            : "Stripe transfers capability stayed inactive after verification.",
+          ...(missing.length ? { missing_fields: missing } : {}),
         }, 400);
       }
 
@@ -340,26 +426,14 @@ Deno.serve(async (req) => {
     } catch (err: any) {
       console.error("Stripe card-push failed for payment link", code, err?.message, err?.raw);
       await rollback(admin, claimed.id);
-      const raw = err?.raw?.message || err?.message || "";
-      let msg = raw || "Card payout failed";
-      const lower = raw.toLowerCase();
-      if (lower.includes("card_declined") || lower.includes("declined")) {
-        msg = "This card was declined. Please try a different Canadian debit card.";
-      } else if (lower.includes("invalid_card_type") || lower.includes("not a debit") || lower.includes("ineligible")) {
-        msg = "This card can't receive instant payouts. Please use a Canadian Visa Debit or Debit Mastercard.";
-      } else if (lower.includes("requirements")) {
-        msg = "Card payouts couldn't be enabled with the details provided. Please double-check your name, address and date of birth.";
-      }
-      return json({ error: msg }, 502);
+      const errBody = await buildCardPushStripeError(err, stripe!, stripeAcctId);
+      return json(errBody, 502);
     }
   }
 
 
-  // Find COA accounts for release journal: DR 2199 / CR settlement (1108)
-  const { data: pendingAcc } = await admin
-    .from("ledger_accounts").select("id")
-    .eq("code", "2199").eq("currency_code", claimed.currency).maybeSingle();
-
+  // Find COA accounts for release journal: DR pending claim / CR settlement (1108)
+  const pendingAccId = await getPendingClaimAccountId(admin, claimed.currency);
   const { data: settleAcc } = await admin
     .from("ledger_accounts").select("id")
     .eq("code", "1108").eq("currency_code", claimed.currency).maybeSingle();
@@ -368,7 +442,7 @@ Deno.serve(async (req) => {
     .eq("code", "1108").limit(1).maybeSingle();
 
   const settleAccountId = settleAcc?.id ?? settleFallback?.id;
-  if (!pendingAcc?.id || !settleAccountId) {
+  if (!pendingAccId || !settleAccountId) {
     await rollback(admin, claimed.id);
     return json({ error: "Missing ledger accounts" }, 500);
   }
@@ -377,7 +451,7 @@ Deno.serve(async (req) => {
   const { error: ledErr } = await admin.from("ledger_entries").insert([
     {
       journal_id: releaseJournalId,
-      account_id: pendingAcc.id,
+      account_id: pendingAccId,
       wallet_id: null,
       currency_code: claimed.currency,
       debit_amount: claimed.amount,

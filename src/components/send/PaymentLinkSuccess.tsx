@@ -23,6 +23,21 @@ export type CreatePaymentLinkParams = {
   source?: "send" | "invoice";
 };
 
+// Extract a human-readable message from Supabase edge function failures.
+async function edgeFunctionErrorMessage(error: unknown, data: unknown): Promise<string> {
+  if (data && typeof data === "object" && "error" in data && typeof (data as { error: unknown }).error === "string") {
+    return (data as { error: string }).error;
+  }
+  const err = error as { message?: string; context?: { json?: () => Promise<unknown> } };
+  if (err?.context?.json) {
+    try {
+      const body = await err.context.json() as { error?: string };
+      if (body?.error) return body.error;
+    } catch { /* ignore */ }
+  }
+  return err?.message ?? "Could not create payment link";
+}
+
 // Thin wrapper over the payment-link-create edge function. Throws on failure.
 export async function createPaymentLink(params: CreatePaymentLinkParams): Promise<PaymentLinkResult> {
   const { data, error } = await supabase.functions.invoke("payment-link-create", {
@@ -37,7 +52,7 @@ export async function createPaymentLink(params: CreatePaymentLinkParams): Promis
       base_url: window.location.origin,
     },
   });
-  if (error) throw error;
+  if (error) throw new Error(await edgeFunctionErrorMessage(error, data));
   if (!data?.success) throw new Error(data?.error || "Could not create payment link");
   return {
     url: data.url,

@@ -1,8 +1,7 @@
 import { motion } from "framer-motion";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CreditCard, Plus, Lock, Unlock, Settings, Trash2, Snowflake, Send, Wallet, ArrowRightLeft, Eye } from "lucide-react";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, forwardRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Skeleton } from "@/components/ui/skeleton";
 import EditCardModal from "@/components/modals/EditCardModal";
@@ -12,12 +11,14 @@ import FundCardModal from "@/components/modals/FundCardModal";
 import TransferCardModal from "@/components/modals/TransferCardModal";
 import ViewCardDetailsModal from "@/components/modals/ViewCardDetailsModal";
 import CardPaymentModal from "@/components/modals/CardPaymentModal";
-import FlipCard from "@/components/cards/FlipCard";
 import CardStack from "@/components/cards/CardStack";
+import CardFeatureSpotlights from "@/components/cards/CardFeatureSpotlights";
 import { useCards, useCardMutations, type Card as CardRow, type RevealedCardSecrets } from "@/hooks/useCards";
 import { usePinGate } from "@/components/send/usePinGate";
 import { useSavedCards, useDeleteSavedCard } from "@/hooks/useSavedCards";
 import { getCardKindLabel, isFundableIssuedCard } from "@/lib/cardDisplay";
+import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,28 +34,46 @@ const formatExpires = (iso: string) => {
   return `${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getFullYear()).slice(-2)}`;
 };
 
-interface ActionTileProps {
+interface ActionTileProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   icon: React.ReactNode;
   label: string;
-  onClick: () => void;
-  variant?: "default" | "destructive";
+  variant?: "default" | "destructive" | "primary";
 }
 
-const ActionTile = ({ icon, label, onClick, variant = "default" }: ActionTileProps) => (
-  <button
-    onClick={onClick}
-    className="flex flex-col items-center gap-1.5 group"
-  >
-    <span
-      className={`w-12 h-12 rounded-2xl flex items-center justify-center border bg-card group-hover:bg-accent transition-colors ${
-        variant === "destructive" ? "text-destructive" : "text-foreground"
-      }`}
+const ActionTile = forwardRef<HTMLButtonElement, ActionTileProps>(
+  ({ icon, label, variant = "default", disabled, className, ...props }, ref) => (
+    <button
+      ref={ref}
+      type="button"
+      disabled={disabled}
+      className={cn(
+        "flex flex-col items-center gap-2 min-w-[4.5rem] group",
+        disabled && "opacity-45 cursor-not-allowed",
+        className,
+      )}
+      {...props}
     >
-      {icon}
-    </span>
-    <span className="text-xs text-muted-foreground">{label}</span>
-  </button>
+      <span
+        className={cn(
+          "w-14 h-14 rounded-2xl flex items-center justify-center border transition-all duration-200",
+          "bg-card/90 shadow-sm",
+          "group-hover:scale-105 group-hover:shadow-md group-hover:border-primary/35 group-hover:bg-accent/80",
+          "group-active:scale-95",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
+          variant === "destructive" && "text-destructive group-hover:border-destructive/35 group-hover:bg-destructive/5",
+          variant === "primary" && "border-primary/25 bg-primary/5 text-primary group-hover:bg-primary/10 group-hover:border-primary/50",
+          variant === "default" && "text-foreground",
+        )}
+      >
+        {icon}
+      </span>
+      <span className="text-xs font-medium text-muted-foreground group-hover:text-foreground transition-colors text-center leading-tight max-w-[5rem]">
+        {label}
+      </span>
+    </button>
+  ),
 );
+ActionTile.displayName = "ActionTile";
 
 const CardsPage = () => {
   const navigate = useNavigate();
@@ -76,6 +95,7 @@ const CardsPage = () => {
   const [fundCardTarget, setFundCardTarget] = useState<CardRow | null>(null);
   const [transferSource, setTransferSource] = useState<CardRow | null>(null);
   const [fundCard, setFundCard] = useState<CardRow | null>(null);
+  const [activeCard, setActiveCard] = useState<CardRow | null>(null);
 
   useEffect(() => {
     if (searchParams.get("link") === "1") {
@@ -83,6 +103,17 @@ const CardsPage = () => {
       setAddOpen(true);
       setSearchParams({}, { replace: true });
     }
+  }, [searchParams, setSearchParams]);
+
+  useEffect(() => {
+    const topup = searchParams.get("topup");
+    if (!topup) return;
+    if (topup === "success" || topup === "1") {
+      toast.success("Wallet topped up — use Fund card to move money to your card");
+    } else if (topup === "cancelled") {
+      toast.message("Top-up cancelled");
+    }
+    setSearchParams({}, { replace: true });
   }, [searchParams, setSearchParams]);
 
   const fundableCards = useMemo(
@@ -137,6 +168,31 @@ const CardsPage = () => {
       undefined,
       `Enter your transaction PIN to view full details for card ending ${card.last_four}.`,
     );
+  };
+
+  const isStripeCard = (card: CardRow | null) => !!card?.id.startsWith(STRIPE_PREFIX);
+  const isIssuedManageable = (card: CardRow | null) =>
+    !!card && !isStripeCard(card) && card.funding_source !== "external";
+
+  const handleFeatureLock = () => {
+    if (!isIssuedManageable(activeCard)) {
+      toast.info("Select an issued eFin card above to lock or unlock it.");
+      return;
+    }
+    handleToggleFreeze(activeCard!);
+  };
+
+  const handleFeatureVirtual = () => {
+    setAddMode("issue");
+    setAddOpen(true);
+  };
+
+  const handleFeatureLimits = () => {
+    if (!isIssuedManageable(activeCard)) {
+      toast.info("Select an issued eFin card above to set spending limits.");
+      return;
+    }
+    setEditCard(activeCard);
   };
 
   return (
@@ -208,6 +264,7 @@ const CardsPage = () => {
               flipped={flipped}
               onToggleFlip={toggleFlip}
               onAddCard={() => setAddOpen(true)}
+              onActiveCardChange={setActiveCard}
               renderActions={(card) => {
                 const isFrozen = card.status === "frozen";
                 const isStripe = card.id.startsWith(STRIPE_PREFIX);
@@ -215,13 +272,15 @@ const CardsPage = () => {
                 const isFundable = isFundableIssuedCard(card);
                 const canTransfer = isFundable && fundableCards.length > 1;
                 return (
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="flex items-start justify-center gap-4 sm:gap-6 pt-1 min-w-max mx-auto px-2">
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="rounded-2xl border border-border/60 bg-muted/20 px-3 py-3 sm:px-4">
+                      <div className="flex items-start justify-center gap-3 sm:gap-5 min-w-max mx-auto">
                     {isStripe ? (
                       <>
                         <ActionTile
                           icon={<Send className="w-5 h-5" />}
                           label="Use to send"
+                          variant="primary"
                           onClick={() => navigate("/send?source=card")}
                         />
                         <ActionTile
@@ -235,12 +294,14 @@ const CardsPage = () => {
                         <ActionTile
                           icon={<Wallet className="w-5 h-5" />}
                           label="Fund card"
+                          variant="primary"
                           onClick={() => setFundCardTarget(card)}
                         />
                         <ActionTile
                           icon={<ArrowRightLeft className="w-5 h-5" />}
                           label="Transfer"
                           onClick={() => setTransferSource(card)}
+                          disabled={!canTransfer}
                         />
                         <ActionTile
                           icon={isFrozen ? <Unlock className="w-5 h-5" /> : <Lock className="w-5 h-5" />}
@@ -252,6 +313,7 @@ const CardsPage = () => {
                       <ActionTile
                         icon={<CreditCard className="w-5 h-5" />}
                         label="Fund wallet"
+                        variant="primary"
                         onClick={() => setFundCard(card)}
                       />
                     ) : null}
@@ -269,12 +331,10 @@ const CardsPage = () => {
                     />
                     <DropdownMenu modal={false}>
                       <DropdownMenuTrigger asChild>
-                        <button className="flex flex-col items-center gap-1.5 group">
-                          <span className="w-12 h-12 rounded-2xl flex items-center justify-center border bg-card group-hover:bg-accent transition-colors">
-                            <Settings className="w-5 h-5" />
-                          </span>
-                          <span className="text-xs text-muted-foreground">Settings</span>
-                        </button>
+                        <ActionTile
+                          icon={<Settings className="w-5 h-5" />}
+                          label="Settings"
+                        />
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="center">
                         {!isStripe && (
@@ -307,6 +367,7 @@ const CardsPage = () => {
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
+                      </div>
                     </div>
                     {isFundable && !canTransfer && (
                       <p className="text-[11px] text-muted-foreground text-center px-4">
@@ -322,41 +383,13 @@ const CardsPage = () => {
 
 
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card>
-              <CardContent className="pt-6">
-                <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center mb-3">
-                  <Lock className="w-5 h-5 text-primary" />
-                </div>
-                <h4 className="font-semibold mb-1">Instant Lock</h4>
-                <p className="text-sm text-muted-foreground">
-                  Lock your card instantly from the app if it's lost or stolen
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center mb-3">
-                  <CreditCard className="w-5 h-5 text-primary" />
-                </div>
-                <h4 className="font-semibold mb-1">Virtual Cards</h4>
-                <p className="text-sm text-muted-foreground">
-                  Create unlimited virtual cards for secure online shopping
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center mb-3">
-                  <Settings className="w-5 h-5 text-primary" />
-                </div>
-                <h4 className="font-semibold mb-1">Spending Limits</h4>
-                <p className="text-sm text-muted-foreground">
-                  Set custom spending limits for better financial control
-                </p>
-              </CardContent>
-            </Card>
-          </div>
+          <CardFeatureSpotlights
+            hasIssuedCard={isIssuedManageable(activeCard)}
+            activeCardFrozen={activeCard?.status === "frozen"}
+            onLock={handleFeatureLock}
+            onCreateVirtual={handleFeatureVirtual}
+            onSpendingLimits={handleFeatureLimits}
+          />
         </motion.div>
       </main>
 
@@ -385,9 +418,11 @@ const CardsPage = () => {
                 last_four: editCard.last_four,
                 brand: editCard.card_network,
                 status: editCard.status,
-                currency: "USD",
-                balance: 0,
+                currency: editCard.currency_code || "USD",
+                balance: Number(editCard.balance || 0),
                 expires: formatExpires(editCard.expires_at),
+                nickname: editCard.cardholder_name,
+                dailyLimit: editCard.spending_limit,
               }
             : null
         }

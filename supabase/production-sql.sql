@@ -255,4 +255,15 @@ GRANT ALL ON public.card_secrets TO service_role;
 
 CREATE INDEX IF NOT EXISTS idx_card_secrets_card ON public.card_secrets(card_id);
 
+-- =============================================================================
+-- Payment link escrow: per-currency pending-claim accounts (code is UNIQUE)
+-- =============================================================================
+INSERT INTO public.ledger_accounts (code, name, account_type, currency_code, is_active)
+VALUES
+  ('2199', 'Payouts Pending Claim - CAD', 'liability', 'CAD', true),
+  ('2201', 'Payouts Pending Claim - USD', 'liability', 'USD', true),
+  ('2202', 'Payouts Pending Claim - EUR', 'liability', 'EUR', true),
+  ('2203', 'Payouts Pending Claim - GBP', 'liability', 'GBP', true)
+ON CONFLICT (code) DO NOTHING;
+
 NOTIFY pgrst, 'reload schema';

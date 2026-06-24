@@ -2,6 +2,10 @@
 // and returns a short URL the recipient can claim.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import {
+  getPendingClaimAccountId,
+  getWalletLiabilityAccountId,
+} from "../_shared/payment-link-ledger.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -99,23 +103,13 @@ Deno.serve(async (req) => {
   const balance = Number(balRow ?? 0);
   if (balance < amount) return json({ error: "Insufficient balance" }, 400);
 
-  // Find COA accounts
-  const { data: walletLiab } = await admin
-    .from("ledger_accounts")
-    .select("id")
-    .like("code", "21%")
-    .neq("code", "2199")
-    .eq("currency_code", currency)
-    .limit(1)
-    .maybeSingle();
-  const { data: pendingLiab } = await admin
-    .from("ledger_accounts")
-    .select("id")
-    .eq("code", "2199")
-    .eq("currency_code", currency)
-    .maybeSingle();
-  if (!walletLiab?.id || !pendingLiab?.id) {
-    return json({ error: `Missing ledger accounts for ${currency}` }, 500);
+  // Find COA accounts for escrow journal
+  const walletLiabId = await getWalletLiabilityAccountId(admin, currency);
+  const pendingLiabId = await getPendingClaimAccountId(admin, currency);
+  if (!walletLiabId || !pendingLiabId) {
+    return json({
+      error: `Missing ledger accounts for ${currency}. Run migration 20260624120000_payment_link_pending_claim_accounts.`,
+    }, 500);
   }
 
   // Generate unique short code (6 chars, retry on collision)
@@ -143,7 +137,7 @@ Deno.serve(async (req) => {
   const entries = [
     {
       journal_id: journalId,
-      account_id: walletLiab.id,
+      account_id: walletLiabId,
       wallet_id: senderWalletId,
       currency_code: currency,
       debit_amount: amount,
@@ -155,7 +149,7 @@ Deno.serve(async (req) => {
     },
     {
       journal_id: journalId,
-      account_id: pendingLiab.id,
+      account_id: pendingLiabId,
       wallet_id: null,
       currency_code: currency,
       debit_amount: 0,

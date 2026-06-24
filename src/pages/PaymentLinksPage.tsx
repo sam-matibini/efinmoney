@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,10 +9,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Link2, Copy, Search, X, CheckCircle, Clock, AlertCircle, ArrowLeft } from "lucide-react";
+import { Link2, Copy, Search, X, CheckCircle, Clock, AlertCircle, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { RevokePaymentLinkDialog } from "@/components/payment-links/RevokePaymentLinkDialog";
+import CreatePaymentLinkModal from "@/components/payment-links/CreatePaymentLinkModal";
 
 type Row = {
   id: string;
@@ -47,6 +47,7 @@ const PaymentLinksPage = () => {
   const [tab, setTab] = useState<"all" | "pending" | "claimed" | "expired">("all");
   const [revokeTarget, setRevokeTarget] = useState<Row | null>(null);
   const [revokeBusy, setRevokeBusy] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
 
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ["payment-link-payouts", user?.id],
@@ -111,14 +112,14 @@ const PaymentLinksPage = () => {
 
   return (
     <main className="container px-4 py-6 max-w-4xl mx-auto space-y-6">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
-            <Button asChild variant="ghost" size="sm" className="-ml-2 mb-1">
-              <Link to="/send"><ArrowLeft className="w-4 h-4 mr-1" /> Send</Link>
-            </Button>
             <h1 className="text-2xl font-display font-bold">Payment links</h1>
-            <p className="text-sm text-muted-foreground">Track every link you've shared. Pending links can be revoked anytime.</p>
+            <p className="text-sm text-muted-foreground">Create and track claim links. Pending links can be revoked anytime.</p>
           </div>
+          <Button onClick={() => setCreateOpen(true)}>
+            <Plus className="w-4 h-4 mr-2" /> New link
+          </Button>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
@@ -143,8 +144,8 @@ const PaymentLinksPage = () => {
             <EmptyState
               icon={Link2}
               title="No payment links yet"
-              description="Create one from the Send page to share an instant claim link with anyone."
-              action={<Button asChild><Link to="/send">Create a link</Link></Button>}
+              description="Create a link to hold funds in escrow until someone claims them."
+              action={<Button onClick={() => setCreateOpen(true)}>New payment link</Button>}
             />
           </CardContent></Card>
         ) : (
@@ -223,6 +224,12 @@ const PaymentLinksPage = () => {
           recipientLabel={revokeTarget?.recipient_name}
           busy={revokeBusy}
           onConfirm={confirmRevoke}
+        />
+
+        <CreatePaymentLinkModal
+          open={createOpen}
+          onOpenChange={setCreateOpen}
+          onCreated={() => qc.invalidateQueries({ queryKey: ["payment-link-payouts"] })}
         />
       </main>
   );

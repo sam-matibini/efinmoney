@@ -20,6 +20,27 @@ import { getStripe } from "@/lib/stripe";
 import { tokenizeDebitCard } from "@/lib/stripePayouts";
 import { getClaimKyc, isClaimCardCurrency } from "@/lib/stripeCorridors";
 
+type ClaimErrorBody = {
+  error?: string;
+  details?: string;
+  missing_fields?: string[];
+  stripe_code?: string;
+};
+
+function showClaimError(body: ClaimErrorBody) {
+  const title = body.error || "Claim failed";
+  const descriptionParts: string[] = [];
+  if (body.details) descriptionParts.push(body.details);
+  if (body.missing_fields?.length && !title.includes(body.missing_fields[0])) {
+    descriptionParts.push(`Fields to fix: ${body.missing_fields.join(", ")}`);
+  }
+  if (body.stripe_code && !body.details?.includes(body.stripe_code)) {
+    descriptionParts.push(`Stripe code: ${body.stripe_code}`);
+  }
+  const description = descriptionParts.join("\n");
+  toast.error(title, description ? { description, duration: 12_000 } : undefined);
+}
+
 type Resolved = {
   code: string;
   amount: number;
@@ -74,8 +95,6 @@ const ClaimInner = ({ link, code }: { link: Resolved; code: string }) => {
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState<{ method: Rail } | null>(null);
 
-  const cardComplete = cardNumComplete && cardExpComplete && cardCvcComplete;
-
   const kycValid = useMemo(() => {
     if (!kycSpec) return false;
     const d = parseInt(dobDay, 10), m = parseInt(dobMonth, 10), y = parseInt(dobYear, 10);
@@ -94,13 +113,45 @@ const ClaimInner = ({ link, code }: { link: Resolved; code: string }) => {
     return true;
   }, [kycSpec, dobDay, dobMonth, dobYear, phone, addrLine1, addrCity, addrState, addrCountry, addrPostal, ssnLast4, tosAccepted]);
 
-  const isValid = useMemo(() => {
-    if (name.trim().length < 2) return false;
-    if (rail === "interac") return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-    if (rail === "eft") return /^\d{3}$/.test(inst) && /^\d{5}$/.test(transit) && acct.length >= 4;
-    if (rail === "card_push") return cardComplete && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && kycValid;
-    return false;
-  }, [rail, name, email, inst, transit, acct, cardComplete, kycValid]);
+  const validationHints = useMemo(() => {
+    const hints: string[] = [];
+    if (name.trim().length < 2) hints.push("Enter your full name at the top");
+    if (rail === "interac" || rail === "card_push" || rail === "eft") {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) hints.push("Enter a valid email");
+    }
+    if (rail === "eft") {
+      if (!/^\d{3}$/.test(inst)) hints.push("Institution number must be 3 digits");
+      if (!/^\d{5}$/.test(transit)) hints.push("Transit number must be 5 digits");
+      if (acct.length < 4) hints.push("Enter your account number");
+    }
+    if (rail === "card_push") {
+      if (!cardNumComplete) hints.push("Enter a valid debit card number");
+      if (!cardExpComplete) hints.push("Enter a valid card expiry");
+      if (!cardCvcComplete) hints.push("Enter a valid CVC");
+      if (!kycValid) {
+        const d = parseInt(dobDay, 10), m = parseInt(dobMonth, 10), y = parseInt(dobYear, 10);
+        if (!d || !m || !y) hints.push("Enter your date of birth");
+        else if (!/^\+?\d[\d\s\-()]{7,16}$/.test(phone)) hints.push("Enter a valid phone number");
+        else if (addrLine1.trim().length < 3) hints.push("Enter your street address");
+        else if (addrCity.trim().length < 2) hints.push("Enter your city");
+        else if (kycSpec?.stateLabel && !addrState) hints.push(`Select your ${kycSpec.stateLabel.toLowerCase()}`);
+        else if (kycSpec && !new RegExp(kycSpec.postalRegex).test(addrPostal.trim().toUpperCase().replace(/\s+/g, ""))) {
+          hints.push(
+            link.currency === "USD"
+              ? "ZIP code must be 5 digits (e.g. 98101)"
+              : `Enter a valid ${kycSpec.postalLabel.toLowerCase()}`,
+          );
+        }
+        else if (kycSpec?.personalIdRegex && !new RegExp(kycSpec.personalIdRegex).test(ssnLast4.trim())) {
+          hints.push(`Enter ${kycSpec.personalIdLabel ?? "ID"}`);
+        }
+        else if (!tosAccepted) hints.push("Accept the Stripe & eFinMoney terms");
+      }
+    }
+    return hints;
+  }, [rail, name, email, inst, transit, acct, cardNumComplete, cardExpComplete, cardCvcComplete, kycValid, kycSpec, dobDay, dobMonth, dobYear, phone, addrLine1, addrCity, addrState, addrPostal, ssnLast4, tosAccepted, link.currency]);
+
+  const isValid = useMemo(() => validationHints.length === 0, [validationHints]);
 
   const handleSubmit = async () => {
     if (!link || !code) return;
@@ -148,12 +199,15 @@ const ClaimInner = ({ link, code }: { link: Resolved; code: string }) => {
           payload,
         }),
       });
-      const j = await res.json();
-      if (!res.ok) throw new Error(j?.error || "Claim failed");
+      const j = await res.json() as ClaimErrorBody & { success?: boolean };
+      if (!res.ok) {
+        showClaimError(j);
+        return;
+      }
       setDone({ method: rail });
       toast.success("Payment claimed");
     } catch (e: any) {
-      toast.error(e.message || "Claim failed");
+      showClaimError({ error: e.message || "Claim failed" });
     } finally {
       setSubmitting(false);
     }
@@ -386,6 +440,13 @@ const ClaimInner = ({ link, code }: { link: Resolved; code: string }) => {
         <Button className="w-full" size="lg" disabled={!isValid || submitting} onClick={handleSubmit}>
           {submitting ? "Claiming…" : `Receive ${link.currency} ${Number(link.amount).toFixed(2)}`}
         </Button>
+        {!isValid && validationHints.length > 0 && !submitting && (
+          <ul className="text-xs text-amber-700 dark:text-amber-400 space-y-1 list-disc pl-4">
+            {validationHints.map((h) => (
+              <li key={h}>{h}</li>
+            ))}
+          </ul>
+        )}
         <p className="text-[11px] text-muted-foreground text-center">
           By claiming you confirm the details above are yours. eFinMoney protects payment links with encryption and fraud monitoring.
         </p>

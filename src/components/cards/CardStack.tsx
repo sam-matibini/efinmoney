@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence, PanInfo } from "framer-motion";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import FlipCard from "./FlipCard";
@@ -11,9 +11,10 @@ interface Props {
   onToggleFlip: (id: string) => void;
   renderActions: (card: CardRow) => React.ReactNode;
   onAddCard?: () => void;
+  onActiveCardChange?: (card: CardRow | null) => void;
 }
 
-const CardStack = ({ cards, flipped, onToggleFlip, renderActions, onAddCard }: Props) => {
+const CardStack = ({ cards, flipped, onToggleFlip, renderActions, onAddCard, onActiveCardChange }: Props) => {
   const [active, setActive] = useState(0);
   const total = cards.length + (onAddCard ? 1 : 0);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -34,6 +35,10 @@ const CardStack = ({ cards, flipped, onToggleFlip, renderActions, onAddCard }: P
 
   const activeCard = active < cards.length ? cards[active] : null;
   const isAddSlot = active === cards.length && onAddCard;
+
+  useEffect(() => {
+    onActiveCardChange?.(activeCard);
+  }, [activeCard, onActiveCardChange]);
 
   const networkLabel = (c: CardRow) =>
     c.card_network === "visa" ? "Visa" : "Mastercard";

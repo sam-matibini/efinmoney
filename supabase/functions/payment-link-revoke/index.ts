@@ -2,6 +2,10 @@
 // flips status to 'revoked'.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import {
+  getPendingClaimAccountId,
+  getWalletLiabilityAccountId,
+} from "../_shared/payment-link-ledger.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -33,24 +37,19 @@ Deno.serve(async (req) => {
   if (link.status !== "pending") return json({ error: `Link is ${link.status}` }, 409);
 
   // Reverse escrow: CR wallet liability / DR 2199
-  const { data: walletLiab } = await admin
-    .from("ledger_accounts").select("id")
-    .like("code", "21%").neq("code", "2199")
-    .eq("currency_code", link.currency).limit(1).maybeSingle();
-  const { data: pendingLiab } = await admin
-    .from("ledger_accounts").select("id")
-    .eq("code", "2199").eq("currency_code", link.currency).maybeSingle();
-  if (!walletLiab?.id || !pendingLiab?.id) return json({ error: "Missing ledger accounts" }, 500);
+  const walletLiabId = await getWalletLiabilityAccountId(admin, link.currency);
+  const pendingLiabId = await getPendingClaimAccountId(admin, link.currency);
+  if (!walletLiabId || !pendingLiabId) return json({ error: "Missing ledger accounts" }, 500);
 
   const reversalJournalId = crypto.randomUUID();
   await admin.from("ledger_entries").insert([
     {
-      journal_id: reversalJournalId, account_id: pendingLiab.id, wallet_id: null,
+      journal_id: reversalJournalId, account_id: pendingLiabId, wallet_id: null,
       currency_code: link.currency, debit_amount: link.amount, credit_amount: 0,
       description: `Payment Link revoke [${link.short_code}]`, reference_type: "payment_link", reference_id: link.short_code, created_by: u.user.id,
     },
     {
-      journal_id: reversalJournalId, account_id: walletLiab.id, wallet_id: link.sender_wallet_id,
+      journal_id: reversalJournalId, account_id: walletLiabId, wallet_id: link.sender_wallet_id,
       currency_code: link.currency, debit_amount: 0, credit_amount: link.amount,
       description: `Payment Link revoke [${link.short_code}]`, reference_type: "payment_link", reference_id: link.short_code, created_by: u.user.id,
     },
