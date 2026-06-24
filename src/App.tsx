@@ -103,6 +103,9 @@ const EftrPage = lazyImport(() => import("./pages/admin/EftrPage"));
 const TradeAmlPage = lazyImport(() => import("./pages/admin/TradeAmlPage"));
 const WireTransfersPage = lazyImport(() => import("./pages/admin/WireTransfersPage"));
 const RegulatoryChangesPage = lazyImport(() => import("./pages/admin/RegulatoryChangesPage"));
+const SettlementReconciliationPage = lazyImport(() => import("./pages/admin/SettlementReconciliationPage"));
+const PeriodEndControlsPage = lazyImport(() => import("./pages/admin/PeriodEndControlsPage"));
+const EvidenceRepositoryPage = lazyImport(() => import("./pages/admin/EvidenceRepositoryPage"));
 const InteracCallback = lazyImport(() => import("./pages/InteracCallback"));
 const InteracHubCallback = lazyImport(() => import("./pages/InteracHubCallback"));
 const MorePage = lazyImport(() => import("./pages/MorePage"));
@@ -291,6 +294,9 @@ const AppRoutes = () => {
         <Route path="/admin/trade-aml" element={<AdminAuthProvider><AdminGuard><TradeAmlPage /></AdminGuard></AdminAuthProvider>} />
         <Route path="/admin/wire-transfers" element={<AdminAuthProvider><AdminGuard><WireTransfersPage /></AdminGuard></AdminAuthProvider>} />
         <Route path="/admin/regulatory-changes" element={<AdminAuthProvider><AdminGuard><RegulatoryChangesPage /></AdminGuard></AdminAuthProvider>} />
+        <Route path="/admin/settlement-reconciliation" element={<AdminAuthProvider><AdminGuard><SettlementReconciliationPage /></AdminGuard></AdminAuthProvider>} />
+        <Route path="/admin/period-end-controls" element={<AdminAuthProvider><AdminGuard><PeriodEndControlsPage /></AdminGuard></AdminAuthProvider>} />
+        <Route path="/admin/evidence-repository" element={<AdminAuthProvider><AdminGuard><EvidenceRepositoryPage /></AdminGuard></AdminAuthProvider>} />
         <Route path="/admin/payments/adyen" element={<AdminAuthProvider><AdminGuard><AdminAdyenLinksPage /></AdminGuard></AdminAuthProvider>} />
         <Route path="/admin/payments/adyen/transactions" element={<AdminAuthProvider><AdminGuard><AdminAdyenTransactionsPage /></AdminGuard></AdminAuthProvider>} />
 

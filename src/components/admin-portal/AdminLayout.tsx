@@ -1,6 +1,6 @@
 import { ReactNode, useEffect, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, ShieldCheck, Users, Layers, ScrollText, Settings, Bell, Search, LogOut, ChevronLeft, ChevronRight, Sun, Moon, Activity, ExternalLink, SlidersHorizontal, UserCog, Gauge, AlertCircle, FileText, Eye, ShieldAlert, Shield, ClipboardList, Ban, UserX, Building2, FileWarning, GraduationCap, Landmark, Globe, ArrowLeftRight, Banknote, RefreshCw, TrendingUp, Zap, BookOpen, BarChart2 } from "lucide-react";
+import { LayoutDashboard, ShieldCheck, Users, Layers, ScrollText, Settings, Bell, Search, LogOut, ChevronLeft, ChevronRight, Sun, Moon, Activity, ExternalLink, SlidersHorizontal, UserCog, Gauge, AlertCircle, FileText, Eye, ShieldAlert, Shield, ClipboardList, Ban, UserX, Building2, FileWarning, GraduationCap, Landmark, Globe, ArrowLeftRight, Banknote, RefreshCw, TrendingUp, Zap, BookOpen, BarChart2, Scale, CalendarCheck, Archive } from "lucide-react";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,6 +39,9 @@ const NAV = [
   { to: "/admin/eftr", label: "EFTR", icon: RefreshCw },
   { to: "/admin/wire-transfers", label: "Wire Act", icon: Zap },
   { to: "/admin/regulatory-changes", label: "Reg. Changes", icon: BookOpen },
+  { to: "/admin/settlement-reconciliation", label: "Settlement Rec.", icon: Scale },
+  { to: "/admin/period-end-controls", label: "Period-End", icon: CalendarCheck },
+  { to: "/admin/evidence-repository", label: "Evidence Repo", icon: Archive },
   { to: "/admin/training", label: "Training", icon: GraduationCap },
   { to: "/admin/auditor-portal", label: "Auditor Portal", icon: Eye },
   { to: "/admin/risk-tiers", label: "Risk Tiers", icon: Layers },
