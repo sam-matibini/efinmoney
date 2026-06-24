@@ -79,6 +79,7 @@ export const FinancialStatementsPanel = () => {
     arrangeLatestFirst: false,
   });
   const [tempCompareConfig, setTempCompareConfig] = useState<CompareConfig>(compareConfig);
+  const [selectedCurrency, setSelectedCurrency] = useState<string>('USD');
 
   // Calculate comparison periods based on config
   const getComparisonPeriods = (): DateRange[] => {
@@ -180,8 +181,8 @@ export const FinancialStatementsPanel = () => {
     setExpandedSections(new Set());
   };
 
-  // Fetch balance data for a specific date range
-  const fetchBalances = async (range: DateRange) => {
+  // Fetch balance data for a specific date range, filtered to one currency
+  const fetchBalances = async (range: DateRange, currency: string) => {
     const { data: accounts, error: accountsError } = await supabase
       .from('ledger_accounts')
       .select('id, code, name, account_type, parent_id')
@@ -194,7 +195,8 @@ export const FinancialStatementsPanel = () => {
       .from('ledger_entries')
       .select('account_id, debit_amount, credit_amount, created_at')
       .gte('created_at', range.from.toISOString())
-      .lte('created_at', range.to.toISOString());
+      .lte('created_at', range.to.toISOString())
+      .eq('currency_code', currency);
 
     if (entriesError) throw entriesError;
 
@@ -218,18 +220,18 @@ export const FinancialStatementsPanel = () => {
   };
 
   const { data: accountBalances = [], isLoading } = useQuery({
-    queryKey: ['financial-statements', dateRange],
-    queryFn: () => fetchBalances(dateRange),
+    queryKey: ['financial-statements', dateRange, selectedCurrency],
+    queryFn: () => fetchBalances(dateRange, selectedCurrency),
   });
 
   // Fetch comparison period data
   const { data: comparisonData = [] } = useQuery({
-    queryKey: ['financial-statements-comparison', dateRange, compareConfig],
+    queryKey: ['financial-statements-comparison', dateRange, compareConfig, selectedCurrency],
     queryFn: async () => {
       if (!compareConfig.enabled || comparisonPeriods.length === 0) return [];
-      
+
       const results = await Promise.all(
-        comparisonPeriods.map(period => fetchBalances(period))
+        comparisonPeriods.map(period => fetchBalances(period, selectedCurrency))
       );
       return results;
     },
@@ -288,11 +290,15 @@ export const FinancialStatementsPanel = () => {
   const calculatedEquity = totalAssets - totalLiabilities;
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', { 
-      style: 'currency', 
-      currency: 'USD',
-      minimumFractionDigits: 2,
-    }).format(amount);
+    try {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: selectedCurrency,
+        minimumFractionDigits: 2,
+      }).format(amount);
+    } catch {
+      return `${selectedCurrency} ${amount.toFixed(2)}`;
+    }
   };
 
   // Format period label for comparison columns
@@ -747,6 +753,19 @@ export const FinancialStatementsPanel = () => {
               <CardDescription>Standard financial reports with detailed breakdowns</CardDescription>
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              <Select value={selectedCurrency} onValueChange={setSelectedCurrency}>
+                <SelectTrigger className="w-[100px]">
+                  <SelectValue placeholder="Currency" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="USD">USD</SelectItem>
+                  <SelectItem value="CAD">CAD</SelectItem>
+                  <SelectItem value="NGN">NGN</SelectItem>
+                  <SelectItem value="GBP">GBP</SelectItem>
+                  <SelectItem value="ZMW">ZMW</SelectItem>
+                </SelectContent>
+              </Select>
+
               <Select value={reportPeriod} onValueChange={handlePeriodChange}>
                 <SelectTrigger className="w-[160px]">
                   <SelectValue placeholder="Select period" />
