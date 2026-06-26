@@ -8,7 +8,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Banknote, Plus, CheckCircle2 } from "lucide-react";
+import { Banknote, Plus, FileDown } from "lucide-react";
+import { downloadFintracReport } from "@/lib/fintrac";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
@@ -41,11 +42,22 @@ export default function LctrPage() {
   });
 
   const fileMutation = useMutation({
-    mutationFn: async (id: string) => {
+    mutationFn: async (r: any) => {
+      const reference = downloadFintracReport("LCTR", {
+        report_date: r.report_date,
+        cash_amount: r.cash_amount,
+        currency_code: r.currency_code,
+        transaction_type: r.transaction_type,
+        customer_id: r.customer_id ?? null,
+      });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (supabase as any).from("lctr_reports").update({ status: "filed", filed_at: new Date().toISOString() }).eq("id", id);
+      await (supabase as any).from("lctr_reports")
+        .update({ status: "filed", filed_at: new Date().toISOString(), filing_reference: reference })
+        .eq("id", r.id);
+      return reference;
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["lctr-reports"] }); toast.success("LCTR filed"); },
+    onSuccess: (ref) => { qc.invalidateQueries({ queryKey: ["lctr-reports"] }); toast.success(`LCTR generated & filed — ${ref}`); },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Generation failed"),
   });
 
   const pending = reports.filter((r: any) => r.status === "pending").length;
@@ -81,7 +93,7 @@ export default function LctrPage() {
                     <TableCell className="text-xs">{r.filed_at ? format(new Date(r.filed_at), "MMM d, yyyy") : "—"}</TableCell>
                     <TableCell className="text-xs font-mono text-muted-foreground">{r.filing_reference || "—"}</TableCell>
                     <TableCell className="text-right">
-                      {r.status === "pending" && <Button size="sm" onClick={() => fileMutation.mutate(r.id)}><CheckCircle2 className="w-3.5 h-3.5 mr-1" />File</Button>}
+                      {r.status === "pending" && <Button size="sm" onClick={() => fileMutation.mutate(r)} disabled={fileMutation.isPending}><FileDown className="w-3.5 h-3.5 mr-1" />Generate</Button>}
                     </TableCell>
                   </TableRow>
                 ))}

@@ -3,12 +3,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { RefreshCw, CheckCircle2 } from "lucide-react";
+import { RefreshCw, CheckCircle2, Play, FileDown } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import AdminLayout from "@/components/admin-portal/AdminLayout";
+import { downloadFintracReport } from "@/lib/fintrac";
 
 export default function EftrPage() {
   const qc = useQueryClient();
@@ -23,12 +24,48 @@ export default function EftrPage() {
     refetchInterval: 30_000,
   });
 
-  const fileMutation = useMutation({
+  const detectMutation = useMutation({
+    mutationFn: async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any).rpc("detect_eftr_candidates");
+      if (error) throw error;
+      return (data as number) ?? 0;
+    },
+    onSuccess: (n) => {
+      qc.invalidateQueries({ queryKey: ["eftr-reports"] });
+      toast.success(n > 0 ? `${n} new EFTR candidate${n > 1 ? "s" : ""} detected` : "No new EFTR candidates");
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Detection failed"),
+  });
+
+  // Generate a FINTRAC EFTR document, download it, and mark the report filed.
+  const generateMutation = useMutation({
+    mutationFn: async (r: any) => {
+      const reference = downloadFintracReport("EFTR", {
+        report_date: r.report_date,
+        exchange_amount: r.exchange_amount,
+        from_currency: r.from_currency,
+        to_currency: r.to_currency,
+        exchange_rate: r.exchange_rate,
+        equivalent_cad: r.equivalent_cad,
+        source_transfer_id: r.source_transfer_id ?? null,
+      });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (supabase as any).from("eftr_reports")
+        .update({ status: "filed", filed_at: new Date().toISOString(), filing_reference: reference })
+        .eq("id", r.id);
+      return reference;
+    },
+    onSuccess: (ref) => { qc.invalidateQueries({ queryKey: ["eftr-reports"] }); toast.success(`EFTR generated & filed — ${ref}`); },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Generation failed"),
+  });
+
+  const ackMutation = useMutation({
     mutationFn: async (id: string) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (supabase as any).from("eftr_reports").update({ status: "filed", filed_at: new Date().toISOString() }).eq("id", id);
+      await (supabase as any).from("eftr_reports").update({ status: "acknowledged" }).eq("id", id);
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["eftr-reports"] }); toast.success("EFTR filed"); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["eftr-reports"] }); toast.success("Marked acknowledged"); },
   });
 
   const pending = reports.filter((r: any) => r.status === "pending").length;
@@ -36,7 +73,12 @@ export default function EftrPage() {
   return (
     <AdminLayout>
       <div className="container px-4 py-6 space-y-6">
-      <div><h1 className="text-3xl font-bold tracking-tight">Currency Exchange Reporting (EFTR)</h1><p className="text-muted-foreground">FINTRAC Electronic Funds Transfer Reports — exchanges ≥ $10,000 CAD</p></div>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div><h1 className="text-3xl font-bold tracking-tight">Currency Exchange Reporting (EFTR)</h1><p className="text-muted-foreground">FINTRAC Electronic Funds Transfer Reports — transfers ≥ $10,000 CAD</p></div>
+        <Button onClick={() => detectMutation.mutate()} disabled={detectMutation.isPending} className="gap-1.5">
+          <Play className="w-4 h-4" /> {detectMutation.isPending ? "Detecting…" : "Detect EFTR"}
+        </Button>
+      </div>
 
       <div className="grid sm:grid-cols-3 gap-3">
         <Card><CardContent className="pt-4 pb-3"><div className="text-2xl font-bold">{reports.length}</div><div className="text-xs text-muted-foreground">Total reports</div></CardContent></Card>
@@ -61,7 +103,16 @@ export default function EftrPage() {
                     <TableCell className="text-xs">{format(new Date(r.report_date), "MMM d, yyyy")}</TableCell>
                     <TableCell><Badge className={r.status === "filed" || r.status === "acknowledged" ? "bg-emerald-500/10 text-emerald-600" : "bg-amber-500/10 text-amber-600"}>{r.status}</Badge></TableCell>
                     <TableCell className="text-right">
-                      {r.status === "pending" && <Button size="sm" onClick={() => fileMutation.mutate(r.id)}><CheckCircle2 className="w-3.5 h-3.5 mr-1" />File</Button>}
+                      {r.status === "pending" && (
+                        <Button size="sm" onClick={() => generateMutation.mutate(r)} disabled={generateMutation.isPending} className="gap-1">
+                          <FileDown className="w-3.5 h-3.5" /> Generate
+                        </Button>
+                      )}
+                      {r.status === "filed" && (
+                        <Button size="sm" variant="outline" onClick={() => ackMutation.mutate(r.id)} className="gap-1">
+                          <CheckCircle2 className="w-3.5 h-3.5" /> Ack
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}

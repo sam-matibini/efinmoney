@@ -9,7 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { FileWarning, Plus, CheckCircle2 } from "lucide-react";
+import { FileWarning, Plus, FileDown } from "lucide-react";
+import { downloadFintracReport } from "@/lib/fintrac";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
@@ -48,11 +49,23 @@ export default function StrFilingPage() {
   });
 
   const fileMutation = useMutation({
-    mutationFn: async (id: string) => {
+    mutationFn: async (r: any) => {
+      const reference = downloadFintracReport("STR", {
+        report_type: r.report_type,
+        suspicion_type: r.suspicion_type,
+        amount: r.amount,
+        currency_code: r.currency_code,
+        description: r.description,
+        customer_id: r.customer_id ?? null,
+      });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (supabase as any).from("str_reports").update({ status: "filed", filed_at: new Date().toISOString() }).eq("id", id);
+      await (supabase as any).from("str_reports")
+        .update({ status: "filed", filed_at: new Date().toISOString(), filing_reference: reference })
+        .eq("id", r.id);
+      return reference;
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["str-reports"] }); toast.success("Report filed"); },
+    onSuccess: (ref) => { qc.invalidateQueries({ queryKey: ["str-reports"] }); toast.success(`STR generated & filed — ${ref}`); },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Generation failed"),
   });
 
   const filed = reports.filter((r: any) => r.status === "filed" || r.status === "acknowledged").length;
@@ -87,7 +100,7 @@ export default function StrFilingPage() {
                     <TableCell className="text-xs">{r.filed_at ? format(new Date(r.filed_at), "MMM d, yyyy") : "—"}</TableCell>
                     <TableCell className="text-xs font-mono text-muted-foreground">{r.filing_reference || "—"}</TableCell>
                     <TableCell className="text-right">
-                      {r.status === "draft" && <Button size="sm" onClick={() => fileMutation.mutate(r.id)}><CheckCircle2 className="w-3.5 h-3.5 mr-1" />File</Button>}
+                      {r.status === "draft" && <Button size="sm" onClick={() => fileMutation.mutate(r)} disabled={fileMutation.isPending}><FileDown className="w-3.5 h-3.5 mr-1" />Generate</Button>}
                     </TableCell>
                   </TableRow>
                 ))}
