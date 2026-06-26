@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ArrowLeft, RefreshCw } from "lucide-react";
 import { modifyAdyenPayment } from "@/lib/adyen";
+import AdminLayout from "@/components/admin-portal/AdminLayout";
 
 interface PaymentSession {
   id: string;
@@ -85,7 +86,8 @@ export default function AdminAdyenTransactionsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background p-6">
+    <AdminLayout>
+      <div className="min-h-screen bg-background p-6">
       <div className="max-w-6xl mx-auto space-y-6">
         <Button variant="ghost" size="sm" onClick={() => navigate("/admin")}>
           <ArrowLeft className="w-4 h-4 mr-2" /> Admin
@@ -171,5 +173,6 @@ export default function AdminAdyenTransactionsPage() {
         </Card>
       </div>
     </div>
+    </AdminLayout>
   );
 }

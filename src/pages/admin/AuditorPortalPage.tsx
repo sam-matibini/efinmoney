@@ -12,6 +12,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format, formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
+import AdminLayout from "@/components/admin-portal/AdminLayout";
 
 export default function AuditorPortalPage() {
   const qc = useQueryClient();
@@ -72,7 +73,8 @@ export default function AuditorPortalPage() {
   const active = auditors.filter((a: any) => a.is_active).length;
 
   return (
-    <div className="container px-4 py-6 space-y-6">
+    <AdminLayout>
+      <div className="container px-4 py-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Auditor Portal</h1>
@@ -167,5 +169,6 @@ export default function AuditorPortalPage() {
         </DialogContent>
       </Dialog>
     </div>
+    </AdminLayout>
   );
 }

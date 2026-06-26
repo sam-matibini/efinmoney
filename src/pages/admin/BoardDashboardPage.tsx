@@ -3,6 +3,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ShieldAlert, AlertTriangle, FileWarning, Activity, WifiOff, SearchCheck, ShieldCheck } from "lucide-react";
 import { useBoardDashboard } from "@/hooks/useBoardDashboard";
 import { format } from "date-fns";
+import AdminLayout from "@/components/admin-portal/AdminLayout";
 
 const MetricCard = ({ label, value, icon, color }: { label: string; value: number; icon: React.ReactNode; color: string }) => (
   <Card>
@@ -20,7 +21,8 @@ export default function BoardDashboardPage() {
   const { data: m, isLoading } = useBoardDashboard();
 
   return (
-    <div className="container px-4 py-6 space-y-6">
+    <AdminLayout>
+      <div className="container px-4 py-6 space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Board Compliance Dashboard</h1>
         <p className="text-muted-foreground">
@@ -76,5 +78,6 @@ export default function BoardDashboardPage() {
         <p className="text-muted-foreground">No board data available.</p>
       )}
     </div>
+    </AdminLayout>
   );
 }

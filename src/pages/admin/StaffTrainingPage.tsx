@@ -13,6 +13,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format, isPast } from "date-fns";
 import { toast } from "sonner";
+import AdminLayout from "@/components/admin-portal/AdminLayout";
 
 export default function StaffTrainingPage() {
   const qc = useQueryClient();
@@ -66,6 +67,7 @@ export default function StaffTrainingPage() {
   const expired = records.filter((r: any) => r.expiry_date && isPast(new Date(r.expiry_date))).length;
 
   return (
+    <AdminLayout>
     <div className="container px-4 py-6 space-y-6">
       <div className="flex items-center justify-between">
         <div><h1 className="text-3xl font-bold tracking-tight">Staff Training Records</h1><p className="text-muted-foreground">AML, compliance, sanctions training — completion tracking and expiry monitoring</p></div>
@@ -170,5 +172,6 @@ export default function StaffTrainingPage() {
         </DialogContent>
       </Dialog>
     </div>
+    </AdminLayout>
   );
 }

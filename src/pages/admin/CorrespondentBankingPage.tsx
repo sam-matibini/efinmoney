@@ -13,6 +13,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import AdminLayout from "@/components/admin-portal/AdminLayout";
 
 const riskBadge = (r: string) => {
   const m: Record<string, string> = { low: "bg-emerald-500/10 text-emerald-600", medium: "bg-amber-500/10 text-amber-600", high: "bg-red-500/10 text-red-600", prohibited: "bg-red-700/10 text-red-700 font-bold" };
@@ -56,6 +57,7 @@ export default function CorrespondentBankingPage() {
   const highRisk = banks.filter((b: any) => b.risk_level === "high" || b.risk_level === "prohibited").length;
 
   return (
+    <AdminLayout>
     <div className="container px-4 py-6 space-y-6">
       <div className="flex items-center justify-between">
         <div><h1 className="text-3xl font-bold tracking-tight">Correspondent Banking</h1><p className="text-muted-foreground">Approved bank relationships, due diligence records, and risk ratings</p></div>
@@ -122,5 +124,6 @@ export default function CorrespondentBankingPage() {
         </DialogContent>
       </Dialog>
     </div>
+    </AdminLayout>
   );
 }

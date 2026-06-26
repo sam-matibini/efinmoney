@@ -11,6 +11,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import AdminLayout from "@/components/admin-portal/AdminLayout";
 
 const statusBadge = (s: string) => {
   const m: Record<string, string> = { pending_questionnaire: "bg-amber-500/10 text-amber-600", documents_submitted: "bg-blue-500/10 text-blue-600", under_review: "bg-purple-500/10 text-purple-600", approved: "bg-emerald-500/10 text-emerald-600", rejected: "bg-red-500/10 text-red-600", more_info_needed: "bg-orange-500/10 text-orange-600" };
@@ -40,7 +41,8 @@ export default function EddWorkflowPage() {
   const open = cases.filter((c: any) => c.status !== "approved" && c.status !== "rejected").length;
 
   return (
-    <div className="container px-4 py-6 space-y-6">
+    <AdminLayout>
+      <div className="container px-4 py-6 space-y-6">
       <div><h1 className="text-3xl font-bold tracking-tight">Enhanced Due Diligence (EDD)</h1><p className="text-muted-foreground">High-risk review workflow — questionnaires, documents, and compliance approval</p></div>
 
       <div className="grid sm:grid-cols-3 gap-3">
@@ -78,5 +80,6 @@ export default function EddWorkflowPage() {
         </CardContent>
       </Card>
     </div>
+    </AdminLayout>
   );
 }

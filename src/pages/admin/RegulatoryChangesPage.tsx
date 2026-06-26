@@ -14,6 +14,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import AdminLayout from "@/components/admin-portal/AdminLayout";
 
 const impactBadge = (i: string) => {
   const m: Record<string, string> = { critical: "bg-red-600/10 text-red-600 font-bold", high: "bg-red-500/10 text-red-500", medium: "bg-amber-500/10 text-amber-600", low: "bg-blue-500/10 text-blue-600" };
@@ -57,6 +58,7 @@ export default function RegulatoryChangesPage() {
   const critical = changes.filter((c: any) => c.impact_level === "critical" && c.status !== "implemented").length;
 
   return (
+    <AdminLayout>
     <div className="container px-4 py-6 space-y-6">
       <div className="flex items-center justify-between">
         <div><h1 className="text-3xl font-bold tracking-tight">Regulatory Change Management</h1><p className="text-muted-foreground">Track FINTRAC, RPAA, OSFI regulatory changes and implementation status</p></div>
@@ -133,5 +135,6 @@ export default function RegulatoryChangesPage() {
         </DialogContent>
       </Dialog>
     </div>
+    </AdminLayout>
   );
 }

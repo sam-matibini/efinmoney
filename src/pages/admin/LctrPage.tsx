@@ -13,6 +13,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import AdminLayout from "@/components/admin-portal/AdminLayout";
 
 export default function LctrPage() {
   const qc = useQueryClient();
@@ -51,6 +52,7 @@ export default function LctrPage() {
   const total = reports.reduce((s: number, r: any) => s + Number(r.cash_amount), 0);
 
   return (
+    <AdminLayout>
     <div className="container px-4 py-6 space-y-6">
       <div className="flex items-center justify-between">
         <div><h1 className="text-3xl font-bold tracking-tight">Large Cash Reporting (LCTR)</h1><p className="text-muted-foreground">FINTRAC mandatory reporting — cash transactions ≥ $10,000 CAD</p></div>
@@ -112,5 +114,6 @@ export default function LctrPage() {
         </DialogContent>
       </Dialog>
     </div>
+    </AdminLayout>
   );
 }

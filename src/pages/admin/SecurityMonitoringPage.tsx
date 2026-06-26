@@ -8,6 +8,7 @@ import { ShieldAlert, Lock, Download, Activity } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
+import AdminLayout from "@/components/admin-portal/AdminLayout";
 
 export default function SecurityMonitoringPage() {
   const { data: events, isLoading: eventsLoading } = useQuery({
@@ -39,7 +40,8 @@ export default function SecurityMonitoringPage() {
   });
 
   return (
-    <div className="container px-4 py-6 space-y-6">
+    <AdminLayout>
+      <div className="container px-4 py-6 space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Security Monitoring</h1>
         <p className="text-muted-foreground">Failed logins, privilege escalations, data exports, and suspicious activity</p>
@@ -74,5 +76,6 @@ export default function SecurityMonitoringPage() {
         </CardContent>
       </Card>
     </div>
+    </AdminLayout>
   );
 }

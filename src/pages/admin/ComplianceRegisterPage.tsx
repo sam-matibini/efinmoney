@@ -13,6 +13,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import AdminLayout from "@/components/admin-portal/AdminLayout";
 
 const regulatorLabel = (r: string) => r.replace(/_/g, " ");
 const frequencyLabel = (f: string) => f.charAt(0).toUpperCase() + f.slice(1);
@@ -55,7 +56,8 @@ export default function ComplianceRegisterPage() {
   const overdue = obligations.filter((o: any) => o.status === "overdue" || (o.next_due && new Date(o.next_due) < new Date())).length;
 
   return (
-    <div className="container px-4 py-6 space-y-6">
+    <AdminLayout>
+      <div className="container px-4 py-6 space-y-6">
       <div className="flex items-center justify-between">
         <div><h1 className="text-3xl font-bold tracking-tight">Compliance Register & Calendar</h1><p className="text-muted-foreground">Regulatory obligations by regulator and frequency</p></div>
         <Button onClick={() => setShowAdd(true)}><Plus className="w-4 h-4 mr-1" />Add Obligation</Button>
@@ -106,5 +108,6 @@ export default function ComplianceRegisterPage() {
         </CardContent>
       </Card>
     </div>
+    </AdminLayout>
   );
 }

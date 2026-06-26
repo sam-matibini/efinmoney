@@ -8,6 +8,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import AdminLayout from "@/components/admin-portal/AdminLayout";
 
 export default function EftrPage() {
   const qc = useQueryClient();
@@ -33,7 +34,8 @@ export default function EftrPage() {
   const pending = reports.filter((r: any) => r.status === "pending").length;
 
   return (
-    <div className="container px-4 py-6 space-y-6">
+    <AdminLayout>
+      <div className="container px-4 py-6 space-y-6">
       <div><h1 className="text-3xl font-bold tracking-tight">Currency Exchange Reporting (EFTR)</h1><p className="text-muted-foreground">FINTRAC Electronic Funds Transfer Reports — exchanges ≥ $10,000 CAD</p></div>
 
       <div className="grid sm:grid-cols-3 gap-3">
@@ -69,5 +71,6 @@ export default function EftrPage() {
         </CardContent>
       </Card>
     </div>
+    </AdminLayout>
   );
 }

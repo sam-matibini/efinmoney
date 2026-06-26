@@ -9,6 +9,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import AdminLayout from "@/components/admin-portal/AdminLayout";
 
 export default function TradeAmlPage() {
   const qc = useQueryClient();
@@ -51,7 +52,8 @@ export default function TradeAmlPage() {
   const openAlerts = alerts.filter((a: any) => a.status === "open").length;
 
   return (
-    <div className="container px-4 py-6 space-y-6">
+    <AdminLayout>
+      <div className="container px-4 py-6 space-y-6">
       <div><h1 className="text-3xl font-bold tracking-tight">Trade-Based AML Detection</h1><p className="text-muted-foreground">FX, crypto, and wire trade anomaly detection — rules and triggered alerts</p></div>
 
       <div className="grid sm:grid-cols-3 gap-3">
@@ -116,5 +118,6 @@ export default function TradeAmlPage() {
         </TabsContent>
       </Tabs>
     </div>
+    </AdminLayout>
   );
 }

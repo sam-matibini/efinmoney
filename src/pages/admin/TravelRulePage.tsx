@@ -6,6 +6,7 @@ import { ArrowLeftRight } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
+import AdminLayout from "@/components/admin-portal/AdminLayout";
 
 const statusBadge = (s: string) => {
   const m: Record<string, string> = { pending: "bg-amber-500/10 text-amber-600", transmitted: "bg-blue-500/10 text-blue-600", received: "bg-emerald-500/10 text-emerald-600", failed: "bg-red-500/10 text-red-600" };
@@ -27,7 +28,8 @@ export default function TravelRulePage() {
   const failed = records.filter((r: any) => r.status === "failed").length;
 
   return (
-    <div className="container px-4 py-6 space-y-6">
+    <AdminLayout>
+      <div className="container px-4 py-6 space-y-6">
       <div><h1 className="text-3xl font-bold tracking-tight">Travel Rule Compliance</h1><p className="text-muted-foreground">FATF Travel Rule — originator and beneficiary information for transfers ≥ $1,000</p></div>
 
       <div className="grid sm:grid-cols-3 gap-3">
@@ -65,5 +67,6 @@ export default function TravelRulePage() {
         </CardContent>
       </Card>
     </div>
+    </AdminLayout>
   );
 }

@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
 import { Download, Package, AlertTriangle } from "lucide-react";
+import AdminLayout from "@/components/admin-portal/AdminLayout";
 
 // Full list of public.* tables (kept in sync with DATABASE_SCHEMA.sql)
 const TABLES: string[] = [
@@ -122,7 +123,8 @@ export default function DataExportPage() {
   };
 
   return (
-    <div className="container mx-auto p-6 max-w-5xl space-y-6">
+    <AdminLayout>
+      <div className="container mx-auto p-6 max-w-5xl space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Data Export</h1>
         <p className="text-muted-foreground mt-2">
@@ -173,5 +175,6 @@ export default function DataExportPage() {
         ))}
       </Card>
     </div>
+    </AdminLayout>
   );
 }

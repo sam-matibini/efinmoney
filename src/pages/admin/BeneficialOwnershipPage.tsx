@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Building2, AlertTriangle } from "lucide-react";
 import { useUboComplianceView } from "@/hooks/useBeneficialOwners";
+import AdminLayout from "@/components/admin-portal/AdminLayout";
 
 export default function BeneficialOwnershipPage() {
   const { data: entries = [], isLoading } = useUboComplianceView();
@@ -12,7 +13,8 @@ export default function BeneficialOwnershipPage() {
   const sanctionsHits = entries.filter((e: any) => e.sanctions_hits > 0).length;
 
   return (
-    <div className="container px-4 py-6 space-y-6">
+    <AdminLayout>
+      <div className="container px-4 py-6 space-y-6">
       <div><h1 className="text-3xl font-bold tracking-tight">Beneficial Ownership Registry</h1><p className="text-muted-foreground">25%+ ownership disclosure, PEP screening, and sanctions checks</p></div>
 
       <div className="grid sm:grid-cols-3 gap-3">
@@ -44,5 +46,6 @@ export default function BeneficialOwnershipPage() {
         </CardContent>
       </Card>
     </div>
+    </AdminLayout>
   );
 }

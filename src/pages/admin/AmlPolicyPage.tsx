@@ -13,6 +13,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import AdminLayout from "@/components/admin-portal/AdminLayout";
 
 const statusBadge = (s: string) => {
   const m: Record<string, string> = { active: "bg-emerald-500/10 text-emerald-600", draft: "bg-amber-500/10 text-amber-600", archived: "bg-muted text-muted-foreground" };
@@ -55,6 +56,7 @@ export default function AmlPolicyPage() {
   const active = policies.filter((p: any) => p.status === "active").length;
 
   return (
+    <AdminLayout>
     <div className="container px-4 py-6 space-y-6">
       <div className="flex items-center justify-between">
         <div><h1 className="text-3xl font-bold tracking-tight">AML/CTF Policy Hub</h1><p className="text-muted-foreground">Policy register, version control, and approval workflow</p></div>
@@ -120,5 +122,6 @@ export default function AmlPolicyPage() {
         </DialogContent>
       </Dialog>
     </div>
+    </AdminLayout>
   );
 }

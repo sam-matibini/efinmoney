@@ -8,6 +8,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import AdminLayout from "@/components/admin-portal/AdminLayout";
 
 const statusBadge = (s: string) => {
   const m: Record<string, string> = { complete: "bg-emerald-500/10 text-emerald-600", incomplete: "bg-amber-500/10 text-amber-600", flagged: "bg-red-500/10 text-red-600" };
@@ -39,7 +40,8 @@ export default function WireTransfersPage() {
   const incomplete = wires.filter((w: any) => w.status === "incomplete").length;
 
   return (
-    <div className="container px-4 py-6 space-y-6">
+    <AdminLayout>
+      <div className="container px-4 py-6 space-y-6">
       <div><h1 className="text-3xl font-bold tracking-tight">Wire Transfer Act Compliance</h1><p className="text-muted-foreground">Originator and beneficiary PII — FINTRAC mandatory collection for all wire transfers</p></div>
 
       <div className="grid sm:grid-cols-3 gap-3">
@@ -81,5 +83,6 @@ export default function WireTransfersPage() {
         </CardContent>
       </Card>
     </div>
+    </AdminLayout>
   );
 }

@@ -8,6 +8,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import AdminLayout from "@/components/admin-portal/AdminLayout";
 
 const severityBadge = (s: string) => {
   const m: Record<string, string> = { critical: "bg-red-600/10 text-red-600", high: "bg-orange-500/10 text-orange-600", medium: "bg-amber-500/10 text-amber-600", low: "bg-blue-500/10 text-blue-600" };
@@ -39,7 +40,8 @@ export default function IncidentManagementPage() {
   const critical = incidents.filter((i: any) => i.severity === "critical" && i.status !== "resolved").length;
 
   return (
-    <div className="container px-4 py-6 space-y-6">
+    <AdminLayout>
+      <div className="container px-4 py-6 space-y-6">
       <div><h1 className="text-3xl font-bold tracking-tight">Incident Management</h1><p className="text-muted-foreground">Security, operational, and compliance incidents — tracking and escalation</p></div>
 
       <div className="grid sm:grid-cols-3 gap-3">
@@ -74,5 +76,6 @@ export default function IncidentManagementPage() {
         </CardContent>
       </Card>
     </div>
+    </AdminLayout>
   );
 }

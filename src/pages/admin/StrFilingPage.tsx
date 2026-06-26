@@ -14,6 +14,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import AdminLayout from "@/components/admin-portal/AdminLayout";
 
 const statusBadge = (s: string) => {
   const m: Record<string, string> = { draft: "bg-muted", filed: "bg-blue-500/10 text-blue-600", acknowledged: "bg-emerald-500/10 text-emerald-600", closed: "bg-slate-500/10 text-slate-600" };
@@ -57,6 +58,7 @@ export default function StrFilingPage() {
   const filed = reports.filter((r: any) => r.status === "filed" || r.status === "acknowledged").length;
 
   return (
+    <AdminLayout>
     <div className="container px-4 py-6 space-y-6">
       <div className="flex items-center justify-between">
         <div><h1 className="text-3xl font-bold tracking-tight">STR / SAR Filing</h1><p className="text-muted-foreground">Suspicious Transaction & Activity Reports — FINTRAC filing workflow</p></div>
@@ -131,5 +133,6 @@ export default function StrFilingPage() {
         </DialogContent>
       </Dialog>
     </div>
+    </AdminLayout>
   );
 }

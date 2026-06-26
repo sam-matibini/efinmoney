@@ -6,6 +6,7 @@ import { Ban } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
+import AdminLayout from "@/components/admin-portal/AdminLayout";
 
 const resultBadge = (r: string) => {
   const m: Record<string, string> = { hit: "bg-red-500/10 text-red-600", clear: "bg-emerald-500/10 text-emerald-600", pending: "bg-amber-500/10 text-amber-600", escalated: "bg-orange-500/10 text-orange-600" };
@@ -34,7 +35,8 @@ export default function SanctionsScreeningPage() {
   const pending = screenings.filter((s: any) => s.screening_result === "pending").length;
 
   return (
-    <div className="container px-4 py-6 space-y-6">
+    <AdminLayout>
+      <div className="container px-4 py-6 space-y-6">
       <div><h1 className="text-3xl font-bold tracking-tight">Sanctions Screening</h1><p className="text-muted-foreground">OFAC, UN, OSFI — real-time and batch customer screening results</p></div>
 
       <div className="grid sm:grid-cols-3 gap-3">
@@ -85,5 +87,6 @@ export default function SanctionsScreeningPage() {
         </Card>
       )}
     </div>
+    </AdminLayout>
   );
 }

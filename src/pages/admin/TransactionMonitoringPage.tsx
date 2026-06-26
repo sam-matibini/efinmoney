@@ -8,6 +8,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import AdminLayout from "@/components/admin-portal/AdminLayout";
 
 const statusBadge = (s: string) => {
   const m: Record<string, string> = { open: "bg-red-500/10 text-red-600", reviewed: "bg-blue-500/10 text-blue-600", escalated: "bg-orange-500/10 text-orange-600", closed: "bg-emerald-500/10 text-emerald-600", false_positive: "bg-muted" };
@@ -42,7 +43,8 @@ export default function TransactionMonitoringPage() {
   const escalated = alerts.filter((a: any) => a.status === "escalated").length;
 
   return (
-    <div className="container px-4 py-6 space-y-6">
+    <AdminLayout>
+      <div className="container px-4 py-6 space-y-6">
       <div><h1 className="text-3xl font-bold tracking-tight">Transaction Monitoring</h1><p className="text-muted-foreground">Velocity, threshold, structuring, and geography-based AML alerts</p></div>
 
       <div className="grid sm:grid-cols-3 gap-3">
@@ -84,5 +86,6 @@ export default function TransactionMonitoringPage() {
         </CardContent>
       </Card>
     </div>
+    </AdminLayout>
   );
 }

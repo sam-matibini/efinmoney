@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Shield, Plus, AlertTriangle } from "lucide-react";
 import { useOperationalRisks, useCreateOperationalRisk, useUpdateOperationalRisk } from "@/hooks/useOperationalRisks";
 import { toast } from "sonner";
+import AdminLayout from "@/components/admin-portal/AdminLayout";
 
 const categoryLabel = (c: string) => c.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
 
@@ -38,7 +39,8 @@ export default function OperationalRiskPage() {
   );
 
   return (
-    <div className="container px-4 py-6 space-y-6">
+    <AdminLayout>
+      <div className="container px-4 py-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Operational Risk Register</h1>
@@ -108,6 +110,7 @@ export default function OperationalRiskPage() {
 
       <AddRiskDialog open={showAdd} onClose={() => setShowAdd(false)} onSubmit={(p) => { createRisk.mutate(p, { onSuccess: () => { setShowAdd(false); toast.success("Risk added"); }, onError: (e) => toast.error(e instanceof Error ? e.message : "Failed") }); }} isPending={createRisk.isPending} />
     </div>
+    </AdminLayout>
   );
 }
 

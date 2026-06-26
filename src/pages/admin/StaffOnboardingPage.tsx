@@ -12,6 +12,7 @@ import LoadingSpinner from "@/components/LoadingSpinner";
 import { RoleBadge } from "@/components/admin-portal/Badges";
 import { Clock, CheckCircle2, LogOut } from "lucide-react";
 import { toast } from "sonner";
+import AdminLayout from "@/components/admin-portal/AdminLayout";
 
 const ID_TYPES = [
   { value: "passport", label: "Passport" },
@@ -33,7 +34,8 @@ const StaffOnboardingPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <AdminLayout>
+        <div className="min-h-screen flex items-center justify-center bg-background">
         <LoadingSpinner size={64} />
       </div>
     );
@@ -205,6 +207,7 @@ const StaffOnboardingPage = () => {
         </div>
       </div>
     </div>
+    </AdminLayout>
   );
 };
 

@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Copy, Link as LinkIcon, ArrowLeft } from "lucide-react";
 import { createAdyenPayLink } from "@/lib/adyen";
+import AdminLayout from "@/components/admin-portal/AdminLayout";
 
 interface PayLink {
   id: string;
@@ -77,7 +78,8 @@ export default function AdminAdyenLinksPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background p-6">
+    <AdminLayout>
+      <div className="min-h-screen bg-background p-6">
       <div className="max-w-5xl mx-auto space-y-6">
         <Button variant="ghost" size="sm" onClick={() => navigate("/admin")}>
           <ArrowLeft className="w-4 h-4 mr-2" /> Admin
@@ -168,5 +170,6 @@ export default function AdminAdyenLinksPage() {
         </Card>
       </div>
     </div>
+    </AdminLayout>
   );
 }

@@ -6,6 +6,7 @@ import { UserX } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
+import AdminLayout from "@/components/admin-portal/AdminLayout";
 
 const pepBadge = (s: string) => {
   const m: Record<string, string> = { domestic_pep: "bg-amber-500/10 text-amber-600", foreign_pep: "bg-orange-500/10 text-orange-600", hio: "bg-red-500/10 text-red-600", family_member: "bg-purple-500/10 text-purple-600", close_associate: "bg-blue-500/10 text-blue-600" };
@@ -30,7 +31,8 @@ export default function PepScreeningPage() {
   const sanctionsHits = peps.filter((p: any) => p.sanctions_status === "hit" || p.sanctions_status === "escalated").length;
 
   return (
-    <div className="container px-4 py-6 space-y-6">
+    <AdminLayout>
+      <div className="container px-4 py-6 space-y-6">
       <div><h1 className="text-3xl font-bold tracking-tight">PEP Screening</h1><p className="text-muted-foreground">Politically Exposed Persons — domestic, foreign, HIO, family, close associates</p></div>
 
       <div className="grid sm:grid-cols-3 gap-3">
@@ -63,5 +65,6 @@ export default function PepScreeningPage() {
         </CardContent>
       </Card>
     </div>
+    </AdminLayout>
   );
 }

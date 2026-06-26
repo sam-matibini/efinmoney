@@ -12,6 +12,7 @@ import { Globe, Plus } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import AdminLayout from "@/components/admin-portal/AdminLayout";
 
 const riskBadge = (r: string) => {
   const m: Record<string, string> = { low: "bg-emerald-500/10 text-emerald-600", medium: "bg-amber-500/10 text-amber-600", high: "bg-red-500/10 text-red-600", prohibited: "bg-red-700/10 text-red-700 font-bold" };
@@ -48,6 +49,7 @@ export default function GeographicRiskPage() {
   const sanctioned = countries.filter((c: any) => c.un_sanctions || c.ofac_sanctions).length;
 
   return (
+    <AdminLayout>
     <div className="container px-4 py-6 space-y-6">
       <div className="flex items-center justify-between">
         <div><h1 className="text-3xl font-bold tracking-tight">Geographic Risk</h1><p className="text-muted-foreground">Country risk ratings, FATF status, and sanctions lists</p></div>
@@ -111,5 +113,6 @@ export default function GeographicRiskPage() {
         </DialogContent>
       </Dialog>
     </div>
+    </AdminLayout>
   );
 }
