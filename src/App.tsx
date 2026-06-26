@@ -21,6 +21,7 @@ import KycAppLayout from "@/components/layout/KycAppLayout";
 import ProtectedShell from "@/components/layout/ProtectedShell";
 import ClientShell from "@/components/layout/ClientShell";
 import AdminGuard from "@/components/admin-portal/AdminGuard";
+import AdminLayout from "@/components/admin-portal/AdminLayout";
 import KYCGuard from "@/components/kyc/KYCGuard";
 
 // Lazy-loaded pages
@@ -249,6 +250,11 @@ const AppRoutes = () => {
         <Route element={<RoleShellRoute allowedRoles={["admin", "compliance", "finance"]} />}>
           <Route path="/operations" element={<OperationsDashboard />} />
         </Route>
+
+        {/* Admin-sidebar versions of Finance / Operations / Settings */}
+        <Route path="/admin/finance" element={<AdminAuthProvider><AdminGuard><AdminLayout><FinanceDashboard /></AdminLayout></AdminGuard></AdminAuthProvider>} />
+        <Route path="/admin/operations" element={<AdminAuthProvider><AdminGuard><AdminLayout><OperationsDashboard /></AdminLayout></AdminGuard></AdminAuthProvider>} />
+        <Route path="/admin/settings" element={<AdminAuthProvider><AdminGuard><AdminLayout><SettingsDashboard /></AdminLayout></AdminGuard></AdminAuthProvider>} />
 
         <Route element={<ProtectedShellRoute />}>
           <Route path="/profile" element={<ProfileSettingsPage />} />
