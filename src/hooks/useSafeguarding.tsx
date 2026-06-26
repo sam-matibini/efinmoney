@@ -54,3 +54,43 @@ export const useRunSafeguardingCheck = () => {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["safeguarding-snapshots"] }),
   });
 };
+
+export interface TrustAccount {
+  id: string;
+  account_name: string;
+  bank_name: string;
+  currency_code: string;
+}
+
+// Active trust-type bank accounts — the external accounts holding safeguarded funds.
+export const useTrustAccounts = () =>
+  useQuery({
+    queryKey: ["trust-bank-accounts"],
+    queryFn: async (): Promise<TrustAccount[]> => {
+      const { data, error } = await supabase
+        .from("bank_accounts")
+        .select("id, account_name, bank_name, currency_code")
+        .eq("account_type", "trust")
+        .eq("is_active", true)
+        .order("currency_code");
+      if (error) throw error;
+      return (data || []) as TrustAccount[];
+    },
+  });
+
+// Posts the latest trust-account statement balance and recomputes the snapshot.
+export const useRecordTrustBalance = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (p: { bankAccountId: string; balance: number; asOf: string }) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase as any).rpc("record_trust_balance", {
+        p_bank_account_id: p.bankAccountId,
+        p_balance: p.balance,
+        p_as_of: p.asOf,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["safeguarding-snapshots"] }),
+  });
+};
