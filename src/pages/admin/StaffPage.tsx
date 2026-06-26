@@ -1,19 +1,27 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import AdminLayout from "@/components/admin-portal/AdminLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { RoleBadge, StaffStatusBadge } from "@/components/admin-portal/Badges";
 import InviteStaffModal from "@/components/admin-portal/InviteStaffModal";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
-import { Search, UserPlus, Users as UsersIcon, UserCheck, Clock, ShieldX } from "lucide-react";
+import { Search, UserPlus, Users as UsersIcon, UserCheck, Clock, ShieldX, Pencil, Trash2 } from "lucide-react";
 import { format } from "date-fns";
+import { toast } from "sonner";
+
+const ROLES = ["super_admin", "compliance_officer", "finance_officer", "support_agent", "viewer"];
+const STATUSES = ["active", "invited", "pending_review", "suspended", "rejected"];
 
 interface StaffRow {
   id: string;
@@ -30,9 +38,50 @@ interface StaffRow {
 const StaffPage = () => {
   const navigate = useNavigate();
   const { hasPermission } = useAdminAuth();
+  const qc = useQueryClient();
   const [query, setQuery] = useState("");
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<StaffRow | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<StaffRow | null>(null);
+  const [editForm, setEditForm] = useState({ full_name: "", role: "", status: "", department: "", position: "" });
   const canManage = hasPermission("manage_staff");
+
+  const updateMutation = useMutation({
+    mutationFn: async (fields: typeof editForm) => {
+      const { error } = await supabase.from("admin_users").update(fields).eq("id", editTarget!.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Staff updated");
+      qc.invalidateQueries({ queryKey: ["admin-staff-list"] });
+      setEditTarget(null);
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Update failed"),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from("admin_users").delete().eq("id", deleteTarget!.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Staff removed");
+      qc.invalidateQueries({ queryKey: ["admin-staff-list"] });
+      setDeleteTarget(null);
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Delete failed"),
+  });
+
+  const openEdit = (s: StaffRow, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditForm({ full_name: s.full_name || "", role: s.role, status: s.status, department: s.department || "", position: s.position || "" });
+    setEditTarget(s);
+  };
+
+  const openDelete = (s: StaffRow, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDeleteTarget(s);
+  };
 
   const { data: staff = [], isLoading } = useQuery({
     queryKey: ["admin-staff-list"],
@@ -130,20 +179,21 @@ const StaffPage = () => {
                       <TableHead>Status</TableHead>
                       <TableHead>Department</TableHead>
                       <TableHead>Joined</TableHead>
+                      {canManage && <TableHead className="w-24 text-right">Actions</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filtered.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={5} className="text-center py-10 text-muted-foreground">
+                        <TableCell colSpan={canManage ? 6 : 5} className="text-center py-10 text-muted-foreground">
                           {query ? "No staff match your search" : "No staff yet"}
                         </TableCell>
                       </TableRow>
                     ) : filtered.map((s) => (
                       <TableRow
                         key={s.id}
-                        className={canManage ? "cursor-pointer" : undefined}
-                        onClick={() => canManage && navigate(`/admin/staff/${s.id}`)}
+                        className="cursor-pointer"
+                        onClick={() => navigate(`/admin/staff/${s.id}`)}
                       >
                         <TableCell>
                           <div className="flex items-center gap-3">
@@ -162,6 +212,18 @@ const StaffPage = () => {
                         <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                           {format(new Date(s.created_at), "MMM d, yyyy")}
                         </TableCell>
+                        {canManage && (
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <Button size="icon" variant="ghost" className="h-8 w-8" onClick={(e) => openEdit(s, e)}>
+                                <Pencil className="w-3.5 h-3.5" />
+                              </Button>
+                              <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive" onClick={(e) => openDelete(s, e)}>
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        )}
                       </TableRow>
                     ))}
                   </TableBody>
@@ -173,6 +235,77 @@ const StaffPage = () => {
       </div>
 
       <InviteStaffModal open={inviteOpen} onOpenChange={setInviteOpen} />
+
+      {/* Edit modal */}
+      <Dialog open={!!editTarget} onOpenChange={(o) => !o && setEditTarget(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit staff — {editTarget?.full_name || editTarget?.email}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label>Full name</Label>
+              <Input value={editForm.full_name} onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Role</Label>
+              <Select value={editForm.role} onValueChange={(v) => setEditForm({ ...editForm, role: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {ROLES.map((r) => <SelectItem key={r} value={r}>{r.replace(/_/g, " ")}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Status</Label>
+              <Select value={editForm.status} onValueChange={(v) => setEditForm({ ...editForm, status: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {STATUSES.map((s) => <SelectItem key={s} value={s}>{s.replace(/_/g, " ")}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Department</Label>
+                <Input value={editForm.department} onChange={(e) => setEditForm({ ...editForm, department: e.target.value })} placeholder="e.g. Compliance" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Position</Label>
+                <Input value={editForm.position} onChange={(e) => setEditForm({ ...editForm, position: e.target.value })} placeholder="e.g. Manager" />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditTarget(null)}>Cancel</Button>
+            <Button onClick={() => updateMutation.mutate(editForm)} disabled={updateMutation.isPending}>
+              {updateMutation.isPending ? "Saving…" : "Save changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirm */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove staff member?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete <strong>{deleteTarget?.full_name || deleteTarget?.email}</strong> from the admin team. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deleteMutation.mutate()}
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? "Removing…" : "Remove"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AdminLayout>
   );
 };
