@@ -60,8 +60,8 @@ const StaffPage = () => {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: async () => {
-      const { error } = await supabase.from("admin_users").delete().eq("id", deleteTarget!.id);
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("admin_users").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -298,7 +298,10 @@ const StaffPage = () => {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => deleteMutation.mutate()}
+              onClick={() => {
+                const id = deleteTarget?.id;
+                if (id) deleteMutation.mutate(id);
+              }}
               disabled={deleteMutation.isPending}
             >
               {deleteMutation.isPending ? "Removing…" : "Remove"}
