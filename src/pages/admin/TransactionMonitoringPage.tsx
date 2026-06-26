@@ -3,7 +3,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { BarChart2, CheckCircle2 } from "lucide-react";
+import { BarChart2, CheckCircle2, Play, FileWarning } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
@@ -39,13 +39,57 @@ export default function TransactionMonitoringPage() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["tx-monitoring-alerts"] }); toast.success("Updated"); },
   });
 
+  const runMutation = useMutation({
+    mutationFn: async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any).rpc("run_transaction_monitoring");
+      if (error) throw error;
+      return (data as number) ?? 0;
+    },
+    onSuccess: (n) => {
+      qc.invalidateQueries({ queryKey: ["tx-monitoring-alerts"] });
+      toast.success(n > 0 ? `Monitoring complete — ${n} new alert${n > 1 ? "s" : ""}` : "Monitoring complete — no new alerts");
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Monitoring run failed"),
+  });
+
+  // Escalate an alert into a draft STR report (FINTRAC suspicious-transaction workflow).
+  const escalateMutation = useMutation({
+    mutationFn: async (a: any) => {
+      const uid = (await supabase.auth.getUser()).data.user?.id;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error: strErr } = await (supabase as any).from("str_reports").insert({
+        customer_id: a.customer_id,
+        report_type: "str",
+        suspicion_type: "money_laundering",
+        amount: a.amount,
+        currency_code: a.currency_code,
+        description: `Auto-drafted from monitoring alert: ${a.rule_name} (${a.alert_type}, risk ${a.risk_score}).`,
+        status: "draft",
+      });
+      if (strErr) throw strErr;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (supabase as any).from("tx_monitoring_alerts").update({ status: "escalated", reviewed_by: uid }).eq("id", a.id);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["tx-monitoring-alerts"] });
+      toast.success("STR draft created — see STR / SAR Filing");
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Escalation failed"),
+  });
+
   const open = alerts.filter((a: any) => a.status === "open").length;
   const escalated = alerts.filter((a: any) => a.status === "escalated").length;
 
   return (
     <AdminLayout>
       <div className="container px-4 py-6 space-y-6">
-      <div><h1 className="text-3xl font-bold tracking-tight">Transaction Monitoring</h1><p className="text-muted-foreground">Velocity, threshold, structuring, and geography-based AML alerts</p></div>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div><h1 className="text-3xl font-bold tracking-tight">Transaction Monitoring</h1><p className="text-muted-foreground">Velocity, threshold, structuring, and geography-based AML alerts</p></div>
+        <Button onClick={() => runMutation.mutate()} disabled={runMutation.isPending} className="gap-1.5">
+          <Play className="w-4 h-4" /> {runMutation.isPending ? "Running…" : "Run monitoring"}
+        </Button>
+      </div>
 
       <div className="grid sm:grid-cols-3 gap-3">
         <Card><CardContent className="pt-4 pb-3"><div className="text-2xl font-bold">{alerts.length}</div><div className="text-xs text-muted-foreground">Total alerts</div></CardContent></Card>
@@ -71,9 +115,11 @@ export default function TransactionMonitoringPage() {
                     <TableCell className="text-right">
                       {a.status === "open" && (
                         <div className="flex gap-1 justify-end">
-                          <Button size="sm" variant="outline" onClick={() => resolveMutation.mutate({ id: a.id, status: "escalated" })}>Escalate</Button>
+                          <Button size="sm" variant="outline" className="gap-1" onClick={() => escalateMutation.mutate(a)} disabled={escalateMutation.isPending} title="Create a draft STR report">
+                            <FileWarning className="w-3.5 h-3.5" /> STR
+                          </Button>
                           <Button size="sm" variant="outline" onClick={() => resolveMutation.mutate({ id: a.id, status: "false_positive" })}>FP</Button>
-                          <Button size="sm" variant="outline" onClick={() => resolveMutation.mutate({ id: a.id, status: "closed" })}><CheckCircle2 className="w-3.5 h-3.5" /></Button>
+                          <Button size="sm" variant="outline" onClick={() => resolveMutation.mutate({ id: a.id, status: "closed" })} title="Close as reviewed"><CheckCircle2 className="w-3.5 h-3.5" /></Button>
                         </div>
                       )}
                       {a.status === "escalated" && <Button size="sm" variant="outline" onClick={() => resolveMutation.mutate({ id: a.id, status: "closed" })}>Close</Button>}
