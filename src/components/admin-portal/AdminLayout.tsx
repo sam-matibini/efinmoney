@@ -1,6 +1,6 @@
 import { ReactNode, useEffect, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, ShieldCheck, Users, Layers, ScrollText, Settings, Bell, Search, LogOut, ChevronLeft, ChevronRight, Sun, Moon, Activity, ExternalLink, SlidersHorizontal, UserCog, Gauge, AlertCircle, FileText, Eye, ShieldAlert, Shield, ClipboardList, Ban, UserX, Building2, FileWarning, GraduationCap, Landmark, Globe, ArrowLeftRight, Banknote, RefreshCw, TrendingUp, Zap, BookOpen, BarChart2, Scale, CalendarCheck, Archive, PanelLeft } from "lucide-react";
+import { LayoutDashboard, ShieldCheck, Users, Layers, ScrollText, Settings, Bell, Search, LogOut, ChevronLeft, ChevronRight, Sun, Moon, Activity, ExternalLink, SlidersHorizontal, UserCog, Gauge, AlertCircle, FileText, Eye, ShieldAlert, Shield, ClipboardList, Ban, UserX, Building2, FileWarning, GraduationCap, Landmark, Globe, ArrowLeftRight, Banknote, RefreshCw, TrendingUp, Zap, BookOpen, BarChart2, Scale, CalendarCheck, Archive, PanelLeft, Wallet, Cog } from "lucide-react";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,7 +20,9 @@ const NAV = [
   { to: "/admin/users", label: "Users", icon: Users },
   { to: "/admin/staff", label: "Staff", icon: UserCog, requiresStaffMgmt: true },
   { to: "/admin/board-dashboard", label: "Board", icon: Gauge },
+  { to: "/finance", label: "Finance", icon: Wallet },
   { to: "/operations", label: "Operations", icon: PanelLeft },
+  { to: "/settings", label: "Settings", icon: Cog },
   { to: "/admin/security", label: "Security", icon: ShieldAlert },
   { to: "/admin/incidents", label: "Incidents", icon: AlertCircle },
   { to: "/admin/compliance-register", label: "Compliance Reg.", icon: FileText },

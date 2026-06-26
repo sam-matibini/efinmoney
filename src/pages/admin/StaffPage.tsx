@@ -48,7 +48,7 @@ const StaffPage = () => {
 
   const updateMutation = useMutation({
     mutationFn: async (fields: typeof editForm) => {
-      const { error } = await supabase.from("admin_users").update(fields).eq("id", editTarget!.id);
+      const { error } = await supabase.from("admin_users").update(fields as any).eq("id", editTarget!.id);
       if (error) throw error;
     },
     onSuccess: () => {

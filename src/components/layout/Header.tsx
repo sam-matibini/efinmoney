@@ -66,17 +66,16 @@ const Header = () => {
     { label: 'Cards', href: '/cards' },
   ];
 
-  if (isFinance || isAdmin) {
+  if (!isAdmin && isFinance) {
     navItems.push({ label: 'Finance', href: '/finance' });
   }
 
-  if (isAdmin || isFinance || isCompliance) {
+  if (!isAdmin && (isFinance || isCompliance)) {
     navItems.push({ label: 'Operations', href: '/operations' });
   }
 
   if (isAdmin) {
     navItems.push({ label: 'Admin', href: '/admin' });
-    navItems.push({ label: 'Settings', href: '/settings' });
   }
 
   const [mobileNavOpen, setMobileNavOpen] = useState(false);

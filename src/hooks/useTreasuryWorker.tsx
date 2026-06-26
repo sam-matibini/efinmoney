@@ -68,7 +68,7 @@ export function useTreasuryWorker() {
   const balances = useQuery({
     queryKey: ["treasury-worker", "balances"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("treasury_provider_balances")
         .select("*")
         .order("provider")
@@ -85,7 +85,7 @@ export function useTreasuryWorker() {
       const { data, error } = await supabase
         .from("transfers")
         .select("id, recipient_name, target_amount, target_currency, source_amount, source_currency, recipient_country, created_at, failure_reason")
-        .eq("status", "pending_liquidity")
+        .eq("status", "pending_liquidity" as never)
         .order("created_at", { ascending: true })
         .limit(50);
       if (error) throw error;
@@ -97,7 +97,7 @@ export function useTreasuryWorker() {
   const settlementJobs = useQuery({
     queryKey: ["treasury-worker", "jobs"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("treasury_settlement_jobs")
         .select("*")
         .order("created_at", { ascending: false })
