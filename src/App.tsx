@@ -142,10 +142,11 @@ const RoleProtectedRoute = ({
   allowedRoles: ("admin" | "finance" | "compliance")[];
 }) => {
   const { user, loading } = useAuth();
-  const { roles, isLoading: rolesLoading } = useUserRoles();
+  const { isAdmin, isFinance, isCompliance, isLoading: rolesLoading } = useUserRoles();
   if (loading || rolesLoading) return <FullPageSpinner />;
   if (!user) return <Navigate to="/auth" replace />;
-  const hasAccess = allowedRoles.some((role) => roles.includes(role));
+  const roleMap = { admin: isAdmin, finance: isFinance, compliance: isCompliance };
+  const hasAccess = allowedRoles.some((role) => roleMap[role]);
   if (!hasAccess) return <Navigate to="/" replace />;
   return <>{children}</>;
 };
