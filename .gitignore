@@ -48,3 +48,6 @@ AI_HANDOFF.md
 # TypeScript build info (auto-generated)
 *.tsbuildinfo
 tsconfig.app.tsbuildinfo
+
+# Office temp lock files
+~$*
