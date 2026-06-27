@@ -264,8 +264,8 @@ export const ExpenseClaimsPanel = () => {
             {claims.length === 0 ? (
               <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No expense claims</TableCell></TableRow>
             ) : claims.map((c: any) => (
-              <>
-              <TableRow key={c.id}>
+              <React.Fragment key={c.id}>
+              <TableRow>
                 <TableCell className="font-mono text-xs">{c.claim_number}</TableCell>
                 <TableCell>{c.purpose || "-"}</TableCell>
                 <TableCell className="text-xs">{c.submitted_at ? format(new Date(c.submitted_at), "MMM d") : "-"}</TableCell>
@@ -284,14 +284,15 @@ export const ExpenseClaimsPanel = () => {
                 </TableCell>
               </TableRow>
               {attachFor === c.id && (
-                <TableRow key={c.id + "-att"}>
+                <TableRow>
                   <TableCell colSpan={6} className="bg-muted/20">
                     <AttachmentsPanel parentType="expense_claim" parentId={c.id} />
                   </TableCell>
                 </TableRow>
               )}
-              </>
+              </React.Fragment>
             ))}
+
 
           </TableBody>
         </Table>
