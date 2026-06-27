@@ -300,6 +300,52 @@ export const PurchaseBillsPanel = () => {
                 <DialogTitle>Create Purchase Bill</DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
+                <div
+                  className="border-2 border-dashed border-primary/40 rounded-lg p-4 bg-primary/5 flex items-center justify-between gap-4 cursor-pointer hover:bg-primary/10 transition"
+                  onClick={() => !scanning && fileInputRef.current?.click()}
+                  onDragOver={(e) => { e.preventDefault(); }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const f = e.dataTransfer.files?.[0];
+                    if (f && !scanning) handleScanFile(f);
+                  }}
+                >
+                  <div className="flex items-center gap-3">
+                    {scanning ? (
+                      <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                    ) : (
+                      <ScanLine className="w-5 h-5 text-primary" />
+                    )}
+                    <div className="text-sm">
+                      <div className="font-medium">
+                        {scanning ? "Reading invoice…" : "Scan a receipt or invoice to autofill"}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        Upload an image or PDF, or drag & drop here
+                      </div>
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={scanning}
+                    onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
+                  >
+                    Upload file
+                  </Button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*,application/pdf"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) handleScanFile(f);
+                    }}
+                  />
+                </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Vendor *</Label>
