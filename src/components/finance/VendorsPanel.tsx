@@ -93,7 +93,7 @@ export const VendorsPanel = () => {
   });
 
   const resetForm = () => {
-    setFormData({ name: '', email: '', phone: '', address: '', tax_id: '', payment_terms: 30, currency_code: 'USD', bank_account: '', bank_name: '', notes: '' });
+    setFormData(emptyForm);
     setEditingVendor(null);
     setIsDialogOpen(false);
   };
@@ -111,9 +111,17 @@ export const VendorsPanel = () => {
       bank_account: vendor.bank_account || '',
       bank_name: vendor.bank_name || '',
       notes: vendor.notes || '',
+      vendor_type: vendor.vendor_type || 'supplier',
+      is_subcontractor: !!vendor.is_subcontractor,
+      t4a_eligible: !!vendor.t4a_eligible,
+      business_legal_name: vendor.business_legal_name || '',
+      sin_or_bn: vendor.sin_or_bn || '',
+      service_type: vendor.service_type || '',
+      cra_t4a_box: vendor.cra_t4a_box || '048',
     });
     setIsDialogOpen(true);
   };
+
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
