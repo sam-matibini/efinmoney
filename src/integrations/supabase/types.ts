@@ -2655,6 +2655,13 @@ export type Database = {
             foreignKeyName: "input_tax_credits_vendor_id_fkey"
             columns: ["vendor_id"]
             isOneToOne: false
+            referencedRelation: "t4a_ytd_totals"
+            referencedColumns: ["vendor_id"]
+          },
+          {
+            foreignKeyName: "input_tax_credits_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
             referencedRelation: "vendors"
             referencedColumns: ["id"]
           },
@@ -3766,6 +3773,42 @@ export type Database = {
           },
         ]
       }
+      purchase_attachments: {
+        Row: {
+          created_at: string
+          file_name: string
+          file_path: string
+          id: string
+          mime_type: string | null
+          parent_id: string
+          parent_type: string
+          size_bytes: number | null
+          uploaded_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          file_name: string
+          file_path: string
+          id?: string
+          mime_type?: string | null
+          parent_id: string
+          parent_type: string
+          size_bytes?: number | null
+          uploaded_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          file_path?: string
+          id?: string
+          mime_type?: string | null
+          parent_id?: string
+          parent_type?: string
+          size_bytes?: number | null
+          uploaded_by?: string | null
+        }
+        Relationships: []
+      }
       purchase_bill_items: {
         Row: {
           account_id: string | null
@@ -3906,6 +3949,13 @@ export type Database = {
             foreignKeyName: "purchase_bills_vendor_id_fkey"
             columns: ["vendor_id"]
             isOneToOne: false
+            referencedRelation: "t4a_ytd_totals"
+            referencedColumns: ["vendor_id"]
+          },
+          {
+            foreignKeyName: "purchase_bills_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
             referencedRelation: "vendors"
             referencedColumns: ["id"]
           },
@@ -4027,6 +4077,13 @@ export type Database = {
           vendor_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "purchase_orders_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "t4a_ytd_totals"
+            referencedColumns: ["vendor_id"]
+          },
           {
             foreignKeyName: "purchase_orders_vendor_id_fkey"
             columns: ["vendor_id"]
@@ -4288,6 +4345,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "ledger_accounts"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recurring_bill_templates_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "t4a_ytd_totals"
+            referencedColumns: ["vendor_id"]
           },
           {
             foreignKeyName: "recurring_bill_templates_vendor_id_fkey"
@@ -4955,6 +5019,13 @@ export type Database = {
           vendor_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "tax_form_summaries_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "t4a_ytd_totals"
+            referencedColumns: ["vendor_id"]
+          },
           {
             foreignKeyName: "tax_form_summaries_vendor_id_fkey"
             columns: ["vendor_id"]
@@ -5803,6 +5874,8 @@ export type Database = {
           address: string | null
           bank_account: string | null
           bank_name: string | null
+          business_legal_name: string | null
+          cra_t4a_box: string | null
           created_at: string
           currency_code: string | null
           default_expense_account_id: string | null
@@ -5813,21 +5886,28 @@ export type Database = {
           id: string
           is_1099_t4a: boolean
           is_active: boolean
+          is_subcontractor: boolean
           name: string
           notes: string | null
           outstanding_balance: number
           payment_rail_details: Json | null
           payment_terms: number | null
           phone: string | null
+          service_type: string | null
+          sin_or_bn: string | null
+          t4a_eligible: boolean
           tax_id: string | null
           tax_id_type: string | null
           total_paid_ytd: number
           updated_at: string
+          vendor_type: string
         }
         Insert: {
           address?: string | null
           bank_account?: string | null
           bank_name?: string | null
+          business_legal_name?: string | null
+          cra_t4a_box?: string | null
           created_at?: string
           currency_code?: string | null
           default_expense_account_id?: string | null
@@ -5838,21 +5918,28 @@ export type Database = {
           id?: string
           is_1099_t4a?: boolean
           is_active?: boolean
+          is_subcontractor?: boolean
           name: string
           notes?: string | null
           outstanding_balance?: number
           payment_rail_details?: Json | null
           payment_terms?: number | null
           phone?: string | null
+          service_type?: string | null
+          sin_or_bn?: string | null
+          t4a_eligible?: boolean
           tax_id?: string | null
           tax_id_type?: string | null
           total_paid_ytd?: number
           updated_at?: string
+          vendor_type?: string
         }
         Update: {
           address?: string | null
           bank_account?: string | null
           bank_name?: string | null
+          business_legal_name?: string | null
+          cra_t4a_box?: string | null
           created_at?: string
           currency_code?: string | null
           default_expense_account_id?: string | null
@@ -5863,16 +5950,21 @@ export type Database = {
           id?: string
           is_1099_t4a?: boolean
           is_active?: boolean
+          is_subcontractor?: boolean
           name?: string
           notes?: string | null
           outstanding_balance?: number
           payment_rail_details?: Json | null
           payment_terms?: number | null
           phone?: string | null
+          service_type?: string | null
+          sin_or_bn?: string | null
+          t4a_eligible?: boolean
           tax_id?: string | null
           tax_id_type?: string | null
           total_paid_ytd?: number
           updated_at?: string
+          vendor_type?: string
         }
         Relationships: [
           {
@@ -6113,7 +6205,19 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      t4a_ytd_totals: {
+        Row: {
+          business_legal_name: string | null
+          cra_t4a_box: string | null
+          gross_paid: number | null
+          payment_count: number | null
+          sin_or_bn: string | null
+          tax_year: number | null
+          vendor_id: string | null
+          vendor_name: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       _gen_short_code: { Args: { p_len?: number }; Returns: string }
