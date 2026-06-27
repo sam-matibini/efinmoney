@@ -52,7 +52,7 @@ export const PurchaseBillsPanel = () => {
   const [scanning, setScanning] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const fileToBase64 = (file: File) =>
+  const fileToBase64 = (blob: Blob) =>
     new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => {
@@ -60,7 +60,41 @@ export const PurchaseBillsPanel = () => {
         resolve(result.split(",")[1] || "");
       };
       reader.onerror = () => reject(reader.error);
-      reader.readAsDataURL(file);
+      reader.readAsDataURL(blob);
+    });
+
+  // Downscale large images to keep the JSON payload well under the edge gateway limit.
+  const compressImage = (file: File, maxDim = 1600, quality = 0.8) =>
+    new Promise<Blob>((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          URL.revokeObjectURL(url);
+          return resolve(file);
+        }
+        ctx.drawImage(img, 0, 0, w, h);
+        canvas.toBlob(
+          (blob) => {
+            URL.revokeObjectURL(url);
+            resolve(blob && blob.size < file.size ? blob : file);
+          },
+          "image/jpeg",
+          quality,
+        );
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        reject(new Error("Could not read image"));
+      };
+      img.src = url;
     });
 
   const normalizeDate = (val?: string) => {
@@ -70,18 +104,43 @@ export const PurchaseBillsPanel = () => {
   };
 
   const handleScanFile = async (file: File) => {
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error("File too large — max 10 MB");
+    const isPdf = file.type === "application/pdf";
+    if (isPdf && file.size > 4 * 1024 * 1024) {
+      toast.error("PDF too large — max 4 MB");
+      return;
+    }
+    if (!isPdf && file.size > 8 * 1024 * 1024) {
+      toast.error("File too large — max 8 MB");
       return;
     }
     setScanning(true);
     const tId = toast.loading("Reading invoice…");
     try {
-      const base64 = await fileToBase64(file);
+      let blob: Blob = file;
+      let mime = file.type || "application/octet-stream";
+      if (file.type.startsWith("image/")) {
+        blob = await compressImage(file);
+        mime = "image/jpeg";
+      }
+      const base64 = await fileToBase64(blob);
       const { data, error } = await supabase.functions.invoke("scan-purchase-bill", {
-        body: { file_base64: base64, mime_type: file.type || "application/octet-stream" },
+        body: { file_base64: base64, mime_type: mime },
       });
-      if (error) throw new Error(error.message || "Scan failed");
+      if (error) {
+        let serverMsg = "";
+        try {
+          const ctx: any = (error as any).context;
+          if (ctx && typeof ctx.json === "function") {
+            const j = await ctx.json();
+            serverMsg = j?.error || JSON.stringify(j);
+          } else if (ctx && typeof ctx.text === "function") {
+            serverMsg = await ctx.text();
+          }
+        } catch { /* ignore */ }
+        console.error("scan-purchase-bill error", error, serverMsg);
+        throw new Error(serverMsg || error.message || "Scan failed");
+      }
+
       const result = data?.data;
       if (!result) throw new Error("No data returned");
 
