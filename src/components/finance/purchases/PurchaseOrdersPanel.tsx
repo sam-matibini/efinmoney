@@ -390,9 +390,13 @@ export const PurchaseOrdersPanel = () => {
                     ))}
                   </TableBody>
                 </Table>
+                <div className="border-t pt-3">
+                  <AttachmentsPanel parentType="po" parentId={viewing.id} />
+                </div>
               </div>
             </DialogContent>
           </Dialog>
+
         )}
       </CardContent>
     </Card>
