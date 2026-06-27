@@ -40,6 +40,8 @@ export const ExpenseClaimsPanel = () => {
   const { user } = useAuth();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [attachFor, setAttachFor] = useState<string | null>(null);
+
   const today = format(new Date(), "yyyy-MM-dd");
   const [form, setForm] = useState({ purpose: "", currency_code: "CAD" });
   const [lines, setLines] = useState<ExpLine[]>([
