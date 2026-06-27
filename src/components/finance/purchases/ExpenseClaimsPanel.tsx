@@ -264,6 +264,7 @@ export const ExpenseClaimsPanel = () => {
             {claims.length === 0 ? (
               <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No expense claims</TableCell></TableRow>
             ) : claims.map((c: any) => (
+              <>
               <TableRow key={c.id}>
                 <TableCell className="font-mono text-xs">{c.claim_number}</TableCell>
                 <TableCell>{c.purpose || "-"}</TableCell>
@@ -271,6 +272,9 @@ export const ExpenseClaimsPanel = () => {
                 <TableCell className="text-right font-mono">{c.currency_code} {Number(c.total).toFixed(2)}</TableCell>
                 <TableCell><Badge className={colors[c.status]}>{c.status}</Badge></TableCell>
                 <TableCell className="text-right space-x-1">
+                  <Button size="sm" variant="ghost" onClick={() => setAttachFor(attachFor === c.id ? null : c.id)}>
+                    <Paperclip className="w-3 h-3" />
+                  </Button>
                   {c.status === "draft" && <Button size="sm" variant="outline" onClick={() => actionMut.mutate({ id: c.id, action: "submit" })}>Submit</Button>}
                   {c.status === "submitted" && <>
                     <Button size="sm" variant="outline" onClick={() => actionMut.mutate({ id: c.id, action: "approve" })}><CheckCircle2 className="w-3 h-3 mr-1" />Approve</Button>
@@ -279,7 +283,16 @@ export const ExpenseClaimsPanel = () => {
                   {c.status === "approved" && <Button size="sm" onClick={() => actionMut.mutate({ id: c.id, action: "reimburse" })}><Banknote className="w-3 h-3 mr-1" />Reimburse</Button>}
                 </TableCell>
               </TableRow>
+              {attachFor === c.id && (
+                <TableRow key={c.id + "-att"}>
+                  <TableCell colSpan={6} className="bg-muted/20">
+                    <AttachmentsPanel parentType="expense_claim" parentId={c.id} />
+                  </TableCell>
+                </TableRow>
+              )}
+              </>
             ))}
+
           </TableBody>
         </Table>
       </CardContent>
