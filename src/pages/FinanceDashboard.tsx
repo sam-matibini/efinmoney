@@ -15,6 +15,8 @@ import { FinancialStatementsPanel } from "@/components/finance/FinancialStatemen
 import { VendorsPanel } from "@/components/finance/VendorsPanel";
 import { SalesInvoicesPanel } from "@/components/finance/SalesInvoicesPanel";
 import { PurchaseBillsPanel } from "@/components/finance/PurchaseBillsPanel";
+import { PurchaseOrdersPanel } from "@/components/finance/purchases/PurchaseOrdersPanel";
+import { ExpenseClaimsPanel } from "@/components/finance/purchases/ExpenseClaimsPanel";
 import { ReportsCentrePanel } from "@/components/finance/ReportsCentrePanel";
 import { SalesTaxPanel } from "@/components/finance/SalesTaxPanel";
 import { TreasuryPanel } from "@/components/finance/treasury/TreasuryPanel";
