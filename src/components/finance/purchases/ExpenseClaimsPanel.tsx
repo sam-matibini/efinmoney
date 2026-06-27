@@ -245,7 +245,9 @@ export const ExpenseClaimsPanel = () => {
             </div>
           </DialogContent>
         </Dialog>
+        </div>
       </CardHeader>
+
       <CardContent>
         <Table>
           <TableHeader>
