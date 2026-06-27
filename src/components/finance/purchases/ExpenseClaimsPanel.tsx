@@ -163,10 +163,13 @@ export const ExpenseClaimsPanel = () => {
         <CardTitle className="flex items-center gap-2">
           <Receipt className="w-5 h-5" /> Expense Claims
         </CardTitle>
-        <Dialog open={open} onOpenChange={(o) => (o ? setOpen(true) : reset())}>
-          <DialogTrigger asChild>
-            <Button size="sm"><Plus className="w-4 h-4 mr-2" />New Claim</Button>
-          </DialogTrigger>
+        <div className="flex gap-2">
+          <QuickExpenseDialog />
+          <Dialog open={open} onOpenChange={(o) => (o ? setOpen(true) : reset())}>
+            <DialogTrigger asChild>
+              <Button size="sm" variant="outline"><Plus className="w-4 h-4 mr-2" />New Claim</Button>
+            </DialogTrigger>
+
           <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
             <DialogHeader><DialogTitle>New Expense Claim</DialogTitle></DialogHeader>
             <div className="space-y-3">
