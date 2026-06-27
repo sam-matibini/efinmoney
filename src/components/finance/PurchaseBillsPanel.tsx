@@ -40,6 +40,7 @@ export const PurchaseBillsPanel = () => {
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [viewingBill, setViewingBill] = useState<any>(null);
+  const [payingBill, setPayingBill] = useState<any>(null);
   const [formData, setFormData] = useState({
     vendor_id: '',
     vendor_reference: '',
