@@ -14,6 +14,8 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Trash2, ClipboardList, CheckCircle2, PackageCheck } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { AttachmentsPanel } from "./AttachmentsPanel";
+
 
 interface POLine {
   description: string;
@@ -388,9 +390,13 @@ export const PurchaseOrdersPanel = () => {
                     ))}
                   </TableBody>
                 </Table>
+                <div className="border-t pt-3">
+                  <AttachmentsPanel parentType="po" parentId={viewing.id} />
+                </div>
               </div>
             </DialogContent>
           </Dialog>
+
         )}
       </CardContent>
     </Card>

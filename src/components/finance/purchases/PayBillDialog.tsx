@@ -20,9 +20,11 @@ export const PayBillDialog = ({ bill, onClose }: PayBillDialogProps) => {
   const { data: wallets = [] } = useWallets();
   const outstanding = bill ? Number(bill.total_amount) - Number(bill.amount_paid || 0) : 0;
   const [amount, setAmount] = useState<string>("");
-  const [method, setMethod] = useState<"wallet" | "eft" | "interac" | "cpn" | "pawapay" | "link" | "manual">("wallet");
+  const [method, setMethod] = useState<"wallet" | "eft" | "interac" | "cpn" | "pawapay" | "link" | "card" | "saved_card" | "stellar" | "mpesa" | "flutterwave" | "cheque" | "cash" | "wire" | "manual">("wallet");
   const [walletId, setWalletId] = useState<string>("");
   const [reference, setReference] = useState("");
+  const [extraField, setExtraField] = useState("");
+
   const [notes, setNotes] = useState("");
 
   const { data: payments = [] } = useQuery({
@@ -46,9 +48,11 @@ export const PayBillDialog = ({ bill, onClose }: PayBillDialogProps) => {
           payment_method: method,
           wallet_id: method === "wallet" ? walletId : null,
           rail_reference: reference || null,
+          rail_payload: extraField ? { destination: extraField } : null,
           notes: notes || null,
         },
       });
+
       if (error) {
         const ctx: any = (error as any).context;
         let msg = error.message;
@@ -93,8 +97,16 @@ export const PayBillDialog = ({ bill, onClose }: PayBillDialogProps) => {
                 <SelectItem value="wallet">Wallet (instant)</SelectItem>
                 <SelectItem value="interac">Interac e-Transfer</SelectItem>
                 <SelectItem value="eft">EFT (Canada)</SelectItem>
-                <SelectItem value="cpn">Circle CPN (cross-border)</SelectItem>
-                <SelectItem value="pawapay">PawaPay (Mobile money)</SelectItem>
+                <SelectItem value="cpn">Circle CPN (cross-border USDC)</SelectItem>
+                <SelectItem value="pawapay">PawaPay (Mobile money — Africa)</SelectItem>
+                <SelectItem value="mpesa">M-Pesa B2B</SelectItem>
+                <SelectItem value="flutterwave">Flutterwave (Africa rails)</SelectItem>
+                <SelectItem value="card">Credit / Debit card (Adyen)</SelectItem>
+                <SelectItem value="saved_card">Card on file</SelectItem>
+                <SelectItem value="stellar">Stellar / USDC</SelectItem>
+                <SelectItem value="wire">Bank wire (SWIFT)</SelectItem>
+                <SelectItem value="cheque">Cheque</SelectItem>
+                <SelectItem value="cash">Cash</SelectItem>
                 <SelectItem value="link">Payment Link to vendor</SelectItem>
                 <SelectItem value="manual">Manual / Already paid</SelectItem>
               </SelectContent>
@@ -115,12 +127,37 @@ export const PayBillDialog = ({ bill, onClose }: PayBillDialogProps) => {
               </Select>
             </div>
           )}
-          {method !== "wallet" && method !== "manual" && (
+          {(method === "mpesa" || method === "pawapay") && (
+            <div className="space-y-2">
+              <Label>Mobile number</Label>
+              <Input value={extraField} onChange={(e) => setExtraField(e.target.value)} placeholder="+254712345678" />
+            </div>
+          )}
+          {method === "stellar" && (
+            <div className="space-y-2">
+              <Label>Stellar address</Label>
+              <Input value={extraField} onChange={(e) => setExtraField(e.target.value)} placeholder="G... or muxed M..." />
+            </div>
+          )}
+          {method === "wire" && (
+            <div className="space-y-2">
+              <Label>SWIFT / IBAN</Label>
+              <Input value={extraField} onChange={(e) => setExtraField(e.target.value)} placeholder="SWIFT code + account" />
+            </div>
+          )}
+          {method === "cheque" && (
+            <div className="space-y-2">
+              <Label>Cheque number</Label>
+              <Input value={extraField} onChange={(e) => setExtraField(e.target.value)} />
+            </div>
+          )}
+          {method !== "wallet" && method !== "manual" && method !== "cash" && (
             <div className="space-y-2">
               <Label>Reference / Tracking #</Label>
               <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Optional" />
             </div>
           )}
+
           <div className="space-y-2">
             <Label>Notes</Label>
             <Textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />

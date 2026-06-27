@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -11,9 +11,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Receipt, Trash2, CheckCircle2, X, Banknote } from "lucide-react";
+import { Plus, Receipt, Trash2, CheckCircle2, X, Banknote, Paperclip } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { QuickExpenseDialog } from "./QuickExpenseDialog";
+import { AttachmentsPanel } from "./AttachmentsPanel";
+
 
 const colors: Record<string, string> = {
   draft: "bg-gray-500/10 text-gray-500",
@@ -37,6 +40,8 @@ export const ExpenseClaimsPanel = () => {
   const { user } = useAuth();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [attachFor, setAttachFor] = useState<string | null>(null);
+
   const today = format(new Date(), "yyyy-MM-dd");
   const [form, setForm] = useState({ purpose: "", currency_code: "CAD" });
   const [lines, setLines] = useState<ExpLine[]>([
@@ -158,10 +163,13 @@ export const ExpenseClaimsPanel = () => {
         <CardTitle className="flex items-center gap-2">
           <Receipt className="w-5 h-5" /> Expense Claims
         </CardTitle>
-        <Dialog open={open} onOpenChange={(o) => (o ? setOpen(true) : reset())}>
-          <DialogTrigger asChild>
-            <Button size="sm"><Plus className="w-4 h-4 mr-2" />New Claim</Button>
-          </DialogTrigger>
+        <div className="flex gap-2">
+          <QuickExpenseDialog />
+          <Dialog open={open} onOpenChange={(o) => (o ? setOpen(true) : reset())}>
+            <DialogTrigger asChild>
+              <Button size="sm" variant="outline"><Plus className="w-4 h-4 mr-2" />New Claim</Button>
+            </DialogTrigger>
+
           <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
             <DialogHeader><DialogTitle>New Expense Claim</DialogTitle></DialogHeader>
             <div className="space-y-3">
@@ -237,7 +245,9 @@ export const ExpenseClaimsPanel = () => {
             </div>
           </DialogContent>
         </Dialog>
+        </div>
       </CardHeader>
+
       <CardContent>
         <Table>
           <TableHeader>
@@ -254,13 +264,17 @@ export const ExpenseClaimsPanel = () => {
             {claims.length === 0 ? (
               <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No expense claims</TableCell></TableRow>
             ) : claims.map((c: any) => (
-              <TableRow key={c.id}>
+              <React.Fragment key={c.id}>
+              <TableRow>
                 <TableCell className="font-mono text-xs">{c.claim_number}</TableCell>
                 <TableCell>{c.purpose || "-"}</TableCell>
                 <TableCell className="text-xs">{c.submitted_at ? format(new Date(c.submitted_at), "MMM d") : "-"}</TableCell>
                 <TableCell className="text-right font-mono">{c.currency_code} {Number(c.total).toFixed(2)}</TableCell>
                 <TableCell><Badge className={colors[c.status]}>{c.status}</Badge></TableCell>
                 <TableCell className="text-right space-x-1">
+                  <Button size="sm" variant="ghost" onClick={() => setAttachFor(attachFor === c.id ? null : c.id)}>
+                    <Paperclip className="w-3 h-3" />
+                  </Button>
                   {c.status === "draft" && <Button size="sm" variant="outline" onClick={() => actionMut.mutate({ id: c.id, action: "submit" })}>Submit</Button>}
                   {c.status === "submitted" && <>
                     <Button size="sm" variant="outline" onClick={() => actionMut.mutate({ id: c.id, action: "approve" })}><CheckCircle2 className="w-3 h-3 mr-1" />Approve</Button>
@@ -269,7 +283,17 @@ export const ExpenseClaimsPanel = () => {
                   {c.status === "approved" && <Button size="sm" onClick={() => actionMut.mutate({ id: c.id, action: "reimburse" })}><Banknote className="w-3 h-3 mr-1" />Reimburse</Button>}
                 </TableCell>
               </TableRow>
+              {attachFor === c.id && (
+                <TableRow>
+                  <TableCell colSpan={6} className="bg-muted/20">
+                    <AttachmentsPanel parentType="expense_claim" parentId={c.id} />
+                  </TableCell>
+                </TableRow>
+              )}
+              </React.Fragment>
             ))}
+
+
           </TableBody>
         </Table>
       </CardContent>
