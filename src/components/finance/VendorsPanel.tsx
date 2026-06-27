@@ -197,10 +197,59 @@ export const VendorsPanel = () => {
                   <Input id="bank_account" value={formData.bank_account} onChange={(e) => setFormData({ ...formData, bank_account: e.target.value })} />
                 </div>
               </div>
+              <div className="border-t pt-3 space-y-3">
+                <div className="grid grid-cols-2 gap-4 items-end">
+                  <div className="space-y-2">
+                    <Label>Vendor Type</Label>
+                    <Select value={formData.vendor_type} onValueChange={(v) => setFormData({ ...formData, vendor_type: v, is_subcontractor: v === 'subcontractor', t4a_eligible: v === 'subcontractor' ? true : formData.t4a_eligible })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="supplier">Supplier</SelectItem>
+                        <SelectItem value="subcontractor">Subcontractor (T4A)</SelectItem>
+                        <SelectItem value="employee">Employee-contractor</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-center gap-2 pb-2">
+                    <Switch checked={formData.t4a_eligible} onCheckedChange={(c) => setFormData({ ...formData, t4a_eligible: c })} id="t4a" />
+                    <Label htmlFor="t4a" className="text-sm cursor-pointer flex items-center gap-1">
+                      <FileBadge className="w-3 h-3" /> T4A eligible
+                    </Label>
+                  </div>
+                </div>
+                {(formData.is_subcontractor || formData.t4a_eligible) && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Legal Name</Label>
+                      <Input value={formData.business_legal_name} onChange={(e) => setFormData({ ...formData, business_legal_name: e.target.value })} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>SIN / BN</Label>
+                      <Input value={formData.sin_or_bn} onChange={(e) => setFormData({ ...formData, sin_or_bn: e.target.value })} placeholder="9 digits" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Service Type</Label>
+                      <Input value={formData.service_type} onChange={(e) => setFormData({ ...formData, service_type: e.target.value })} placeholder="e.g. Construction" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>T4A Box</Label>
+                      <Select value={formData.cra_t4a_box} onValueChange={(v) => setFormData({ ...formData, cra_t4a_box: v })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="020">020 — Commissions</SelectItem>
+                          <SelectItem value="048">048 — Fees for services</SelectItem>
+                          <SelectItem value="028">028 — Other income</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                )}
+              </div>
               <div className="space-y-2">
                 <Label htmlFor="notes">Notes</Label>
                 <Textarea id="notes" value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} rows={2} />
               </div>
+
               <div className="flex justify-end gap-2">
                 <Button type="button" variant="outline" onClick={resetForm}>Cancel</Button>
                 <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
