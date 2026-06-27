@@ -56,7 +56,7 @@ const FinanceDashboard = () => {
               <TabsTrigger value="treasury">Treasury</TabsTrigger>
               <TabsTrigger value="reports">Reports</TabsTrigger>
               <TabsTrigger value="sales-tax">Sales Tax</TabsTrigger>
-              <TabsTrigger value="vendors">Vendors</TabsTrigger>
+              
               <TabsTrigger value="invoices">Invoices</TabsTrigger>
               <TabsTrigger value="purchases">Purchases</TabsTrigger>
               <TabsTrigger value="fx">FX</TabsTrigger>
