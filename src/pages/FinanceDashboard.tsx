@@ -152,16 +152,23 @@ const FinanceDashboard = () => {
               <SalesTaxPanel />
             </TabsContent>
 
-            <TabsContent value="vendors" className="space-y-4">
-              <VendorsPanel />
-            </TabsContent>
-
             <TabsContent value="invoices" className="space-y-4">
               <SalesInvoicesPanel />
             </TabsContent>
 
-            <TabsContent value="bills" className="space-y-4">
-              <PurchaseBillsPanel />
+            <TabsContent value="purchases" className="space-y-4">
+              <Tabs defaultValue="vendors" className="space-y-4">
+                <TabsList>
+                  <TabsTrigger value="vendors">Vendors</TabsTrigger>
+                  <TabsTrigger value="pos">Purchase Orders</TabsTrigger>
+                  <TabsTrigger value="bills">Bills</TabsTrigger>
+                  <TabsTrigger value="expenses">Expense Claims</TabsTrigger>
+                </TabsList>
+                <TabsContent value="vendors"><VendorsPanel /></TabsContent>
+                <TabsContent value="pos"><PurchaseOrdersPanel /></TabsContent>
+                <TabsContent value="bills"><PurchaseBillsPanel /></TabsContent>
+                <TabsContent value="expenses"><ExpenseClaimsPanel /></TabsContent>
+              </Tabs>
             </TabsContent>
 
             <TabsContent value="fx" className="space-y-4">
