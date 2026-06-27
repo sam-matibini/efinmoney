@@ -6239,6 +6239,7 @@ export type Database = {
         }
         Returns: string
       }
+      ensure_fx_clearing_account: { Args: { p_ccy: string }; Returns: string }
       execute_fx_swap: {
         Args: {
           p_effective_rate: number
