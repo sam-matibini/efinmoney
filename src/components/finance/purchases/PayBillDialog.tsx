@@ -48,9 +48,11 @@ export const PayBillDialog = ({ bill, onClose }: PayBillDialogProps) => {
           payment_method: method,
           wallet_id: method === "wallet" ? walletId : null,
           rail_reference: reference || null,
+          rail_payload: extraField ? { destination: extraField } : null,
           notes: notes || null,
         },
       });
+
       if (error) {
         const ctx: any = (error as any).context;
         let msg = error.message;
