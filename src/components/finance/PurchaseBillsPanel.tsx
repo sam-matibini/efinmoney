@@ -543,7 +543,12 @@ export const PurchaseBillsPanel = () => {
                           </SelectContent>
                         </Select>
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right space-x-1">
+                        {bill.status !== "paid" && bill.status !== "cancelled" && (
+                          <Button size="sm" variant="outline" onClick={() => setPayingBill(bill)}>
+                            <Banknote className="w-3 h-3 mr-1" />Pay
+                          </Button>
+                        )}
                         <Button size="icon" variant="ghost" onClick={() => setViewingBill(bill)}>
                           <Eye className="w-4 h-4" />
                         </Button>
