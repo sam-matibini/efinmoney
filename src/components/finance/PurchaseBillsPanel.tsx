@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -12,9 +12,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Trash2, Receipt, Eye } from "lucide-react";
+import { Plus, Trash2, Receipt, Eye, ScanLine, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { format, addDays } from "date-fns";
+import { format, addDays, isValid, parseISO } from "date-fns";
+
 
 interface BillLine {
   description: string;
@@ -48,6 +49,101 @@ export const PurchaseBillsPanel = () => {
   const [lines, setLines] = useState<BillLine[]>([
     { description: '', quantity: 1, unit_price: 0, tax_rate: 0, amount: 0 },
   ]);
+  const [scanning, setScanning] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const fileToBase64 = (file: File) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        resolve(result.split(",")[1] || "");
+      };
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+
+  const normalizeDate = (val?: string) => {
+    if (!val) return undefined;
+    const d = parseISO(val);
+    return isValid(d) ? format(d, "yyyy-MM-dd") : undefined;
+  };
+
+  const handleScanFile = async (file: File) => {
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("File too large — max 10 MB");
+      return;
+    }
+    setScanning(true);
+    const tId = toast.loading("Reading invoice…");
+    try {
+      const base64 = await fileToBase64(file);
+      const { data, error } = await supabase.functions.invoke("scan-purchase-bill", {
+        body: { file_base64: base64, mime_type: file.type || "application/octet-stream" },
+      });
+      if (error) throw new Error(error.message || "Scan failed");
+      const result = data?.data;
+      if (!result) throw new Error("No data returned");
+
+      // Vendor match
+      let vendorId = formData.vendor_id;
+      let vendorNotFound = false;
+      if (result.vendor_name) {
+        const match = vendors.find(
+          (v: any) => v.name?.toLowerCase().trim() === result.vendor_name.toLowerCase().trim(),
+        );
+        if (match) vendorId = match.id;
+        else vendorNotFound = true;
+      }
+
+      const issueDate = normalizeDate(result.bill_date) || formData.issue_date;
+      const dueDate =
+        normalizeDate(result.due_date) ||
+        format(addDays(parseISO(issueDate), 30), "yyyy-MM-dd");
+
+      setFormData({
+        vendor_id: vendorId,
+        vendor_reference: result.vendor_reference || formData.vendor_reference,
+        issue_date: issueDate,
+        due_date: dueDate,
+        notes: result.notes || formData.notes,
+      });
+
+      const newLines: BillLine[] = (result.line_items || []).map((li: any) => {
+        const qty = Number(li.quantity) || 1;
+        const price = Number(li.unit_price) || 0;
+        return {
+          description: String(li.description || ""),
+          quantity: qty,
+          unit_price: price,
+          tax_rate: Number(li.tax_percent) || 0,
+          amount: qty * price,
+        };
+      });
+      if (newLines.length === 0 && result.total) {
+        newLines.push({
+          description: "Receipt total",
+          quantity: 1,
+          unit_price: Number(result.total) || 0,
+          tax_rate: 0,
+          amount: Number(result.total) || 0,
+        });
+      }
+      if (newLines.length > 0) setLines(newLines);
+
+      toast.success(
+        vendorNotFound
+          ? `Scanned — vendor "${result.vendor_name}" not found, please select`
+          : "Invoice scanned — review before saving",
+        { id: tId },
+      );
+    } catch (e: any) {
+      toast.error(e?.message || "Could not scan invoice", { id: tId });
+    } finally {
+      setScanning(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
 
   const { data: vendors = [] } = useQuery({
     queryKey: ['vendors-active'],
@@ -204,6 +300,52 @@ export const PurchaseBillsPanel = () => {
                 <DialogTitle>Create Purchase Bill</DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
+                <div
+                  className="border-2 border-dashed border-primary/40 rounded-lg p-4 bg-primary/5 flex items-center justify-between gap-4 cursor-pointer hover:bg-primary/10 transition"
+                  onClick={() => !scanning && fileInputRef.current?.click()}
+                  onDragOver={(e) => { e.preventDefault(); }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const f = e.dataTransfer.files?.[0];
+                    if (f && !scanning) handleScanFile(f);
+                  }}
+                >
+                  <div className="flex items-center gap-3">
+                    {scanning ? (
+                      <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                    ) : (
+                      <ScanLine className="w-5 h-5 text-primary" />
+                    )}
+                    <div className="text-sm">
+                      <div className="font-medium">
+                        {scanning ? "Reading invoice…" : "Scan a receipt or invoice to autofill"}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        Upload an image or PDF, or drag & drop here
+                      </div>
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={scanning}
+                    onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
+                  >
+                    Upload file
+                  </Button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*,application/pdf"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) handleScanFile(f);
+                    }}
+                  />
+                </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Vendor *</Label>

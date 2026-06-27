@@ -1,37 +1,67 @@
-## Problem to fix
+## Goal
+Add a "Scan receipt / invoice" feature to the Create Purchase Bill modal in `src/components/finance/PurchaseBillsPanel.tsx`. The user uploads a photo or PDF of a receipt/invoice, and AI extracts the data and autofills the form (vendor reference, dates, line items, tax, totals, notes).
 
-The app preview is sitting on the branded spinner because the current initial render waits too long before showing the route. The performance profile shows the page eventually loads, but it is heavy for preview/dev mode:
+## UX
+At the top of the modal, above the Vendor field, add a dashed upload zone:
 
-- Full page load is around 13.5s.
-- DOMContentLoaded is around 9.7s.
-- The preview loads about 247 script resources before becoming fully ready.
-- `App.tsx` eagerly imports every page/admin/dashboard/payment module, so even a public landing-page preview downloads code for routes the user is not viewing.
-- `SplashScreen` waits for the full `window.load` event, so slow non-critical resources can keep the spinner visible.
+```
+┌─────────────────────────────────────────────────┐
+│  📄  Scan a receipt or invoice to autofill      │
+│      [Upload image / PDF]    or drag & drop     │
+└─────────────────────────────────────────────────┘
+```
 
-## Plan
+Flow:
+1. User selects an image (jpg/png/webp) or PDF (≤10 MB).
+2. Inline spinner: "Reading invoice…"
+3. On success: form fields populate; toast "Invoice scanned — review and edit before saving".
+4. If a vendor name is extracted and matches an existing vendor (case-insensitive), auto-select it; otherwise show it in the Vendor Reference field and toast "Vendor not found — please select or add".
+5. On failure: toast with the error; form left untouched.
 
-1. **Unblock the splash screen**
-   - Change `SplashScreen` so it hides after React is mounted and a short minimum brand display, instead of waiting for the full browser `load` event.
-   - Keep the branded spinner feature, but add a hard maximum timeout so it cannot trap users on the loading screen.
+The user can still edit every field. Existing manual flow is unchanged.
 
-2. **Make route loading responsive**
-   - Convert heavy route/page imports in `App.tsx` to `React.lazy` with `Suspense`.
-   - Keep the root landing route available immediately, while admin, finance, operations, dashboard, wallets, send, cards, KYC, payment, and settings pages load only when visited.
-   - Use the existing `LoadingSpinner` as the fallback so the visual loading experience remains consistent.
+## Backend
+New edge function `supabase/functions/scan-purchase-bill/index.ts`:
+- Auth-required (verify JWT).
+- Accepts `{ file_base64, mime_type }`.
+- Calls Lovable AI Gateway (`google/gemini-3-flash-preview`) with a multimodal message: text prompt + `image_url` (data URL) for images, or `file` block for PDFs.
+- Uses structured output (`Output.object` + Zod) returning:
+  ```ts
+  {
+    vendor_name?: string,
+    vendor_reference?: string,
+    bill_date?: string,        // YYYY-MM-DD
+    due_date?: string,         // YYYY-MM-DD
+    currency?: string,
+    subtotal?: number,
+    tax_total?: number,
+    total?: number,
+    notes?: string,
+    line_items: Array<{
+      description: string,
+      quantity: number,
+      unit_price: number,
+      tax_percent: number,
+    }>
+  }
+  ```
+- Returns parsed object; handles `429` / `402` from gateway with friendly messages.
+- Registered in `supabase/config.toml` with `verify_jwt = true`.
 
-3. **Avoid auth blocking the public landing page longer than necessary**
-   - Add a brief failsafe around auth initialization so the public route can render instead of showing an indefinite spinner if session restoration is slow in preview.
-   - Preserve protected-route security: authenticated-only pages still redirect or wait as needed.
+## Frontend changes (`PurchaseBillsPanel.tsx` only)
+- Add `scanning` state + hidden `<input type="file" accept="image/*,application/pdf">`.
+- Add `handleScan(file)`:
+  - Reads file as base64, invokes `scan-purchase-bill`.
+  - Maps result into existing form state (vendor lookup by name, lines mapped to current line shape, dates normalized, falls back gracefully when fields are missing).
+- Add the upload zone JSX at the top of the dialog content.
+- Reuse existing vendor list already loaded in the component to match `vendor_name`.
 
-4. **Reduce landing-page main-thread work without removing features**
-   - Lazy-load heavier landing sections/components that are below the first viewport, while keeping the hero, calculator, and market ticker functional.
-   - This preserves the full landing page but improves first preview responsiveness.
+## Out of scope
+- No new DB tables, no storing the uploaded file.
+- No changes to sales invoices or other modals (can be replicated later if desired).
+- No OCR fallback — Gemini multimodal handles both images and PDFs natively.
 
-5. **Validate**
-   - Re-open `/` in preview.
-   - Confirm the spinner disappears quickly and the landing page is interactive.
-   - Re-check console/network/performance signals for errors and obvious regressions.
-
-## Expected result
-
-The app should still show the branded spinner briefly, but it should no longer feel stuck on the spinning banner. The preview should render the landing experience faster, and the rest of the app should remain available through lazy-loaded routes.
+## Files touched
+- `src/components/finance/PurchaseBillsPanel.tsx` (edit)
+- `supabase/functions/scan-purchase-bill/index.ts` (new)
+- `supabase/config.toml` (register function)
