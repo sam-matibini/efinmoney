@@ -12,7 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Trash2, Receipt, Eye, ScanLine, Loader2 } from "lucide-react";
+import { Plus, Trash2, Receipt, Eye, ScanLine, Loader2, Banknote } from "lucide-react";
+import { PayBillDialog } from "@/components/finance/purchases/PayBillDialog";
 import { toast } from "sonner";
 import { format, addDays, isValid, parseISO } from "date-fns";
 
