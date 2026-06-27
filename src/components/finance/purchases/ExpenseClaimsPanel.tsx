@@ -11,9 +11,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Receipt, Trash2, CheckCircle2, X, Banknote } from "lucide-react";
+import { Plus, Receipt, Trash2, CheckCircle2, X, Banknote, Paperclip } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { QuickExpenseDialog } from "./QuickExpenseDialog";
+import { AttachmentsPanel } from "./AttachmentsPanel";
+
 
 const colors: Record<string, string> = {
   draft: "bg-gray-500/10 text-gray-500",
