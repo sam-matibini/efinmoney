@@ -261,34 +261,53 @@ export const VendorsPanel = () => {
         </Dialog>
       </CardHeader>
       <CardContent>
+        <div className="flex gap-2 mb-3 flex-wrap">
+          {(['all','supplier','subcontractor','employee'] as const).map((f) => (
+            <Badge
+              key={f}
+              variant={filter === f ? 'default' : 'outline'}
+              className="cursor-pointer capitalize"
+              onClick={() => setFilter(f)}
+            >
+              {f}
+            </Badge>
+          ))}
+        </div>
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
+                <TableHead>Type</TableHead>
                 <TableHead>Contact</TableHead>
-                <TableHead>Payment Terms</TableHead>
+                <TableHead>Terms</TableHead>
                 <TableHead>Bank Info</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {vendors.length === 0 ? (
+              {vendors.filter((v: any) => filter === 'all' || (v.vendor_type || 'supplier') === filter).length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground">No vendors found</TableCell>
+                  <TableCell colSpan={7} className="text-center text-muted-foreground">No vendors found</TableCell>
                 </TableRow>
               ) : (
-                vendors.map((vendor) => (
+                vendors
+                  .filter((v: any) => filter === 'all' || (v.vendor_type || 'supplier') === filter)
+                  .map((vendor: any) => (
                   <TableRow key={vendor.id} className={!vendor.is_active ? 'opacity-50' : ''}>
-                    <TableCell className="font-medium">{vendor.name}</TableCell>
+                    <TableCell className="font-medium">
+                      {vendor.name}
+                      {vendor.t4a_eligible && <Badge variant="outline" className="ml-2 text-[10px]"><FileBadge className="w-2.5 h-2.5 mr-0.5" />T4A</Badge>}
+                    </TableCell>
+                    <TableCell className="text-xs capitalize">{vendor.vendor_type || 'supplier'}</TableCell>
                     <TableCell>
                       <div className="flex flex-col gap-1 text-sm">
                         {vendor.email && <span className="flex items-center gap-1"><Mail className="w-3 h-3" />{vendor.email}</span>}
                         {vendor.phone && <span className="flex items-center gap-1"><Phone className="w-3 h-3" />{vendor.phone}</span>}
                       </div>
                     </TableCell>
-                    <TableCell>{vendor.payment_terms} days</TableCell>
+                    <TableCell>{vendor.payment_terms}d</TableCell>
                     <TableCell className="text-sm">
                       {vendor.bank_name ? `${vendor.bank_name} - ****${vendor.bank_account?.slice(-4) || ''}` : '-'}
                     </TableCell>
@@ -313,6 +332,7 @@ export const VendorsPanel = () => {
           </Table>
         </div>
       </CardContent>
+
     </Card>
   );
 };
