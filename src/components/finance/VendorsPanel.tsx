@@ -10,25 +10,38 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Edit, Building, Mail, Phone } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Plus, Edit, Building, Mail, Phone, FileBadge } from "lucide-react";
 import { toast } from "sonner";
+
+const emptyForm = {
+  name: '',
+  email: '',
+  phone: '',
+  address: '',
+  tax_id: '',
+  payment_terms: 30,
+  currency_code: 'USD',
+  bank_account: '',
+  bank_name: '',
+  notes: '',
+  vendor_type: 'supplier',
+  is_subcontractor: false,
+  t4a_eligible: false,
+  business_legal_name: '',
+  sin_or_bn: '',
+  service_type: '',
+  cra_t4a_box: '048',
+};
 
 export const VendorsPanel = () => {
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [filter, setFilter] = useState<'all' | 'supplier' | 'subcontractor' | 'employee'>('all');
   const [editingVendor, setEditingVendor] = useState<any>(null);
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    address: '',
-    tax_id: '',
-    payment_terms: 30,
-    currency_code: 'USD',
-    bank_account: '',
-    bank_name: '',
-    notes: '',
-  });
+  const [formData, setFormData] = useState(emptyForm);
+
 
   const { data: vendors = [], isLoading } = useQuery({
     queryKey: ['vendors'],
