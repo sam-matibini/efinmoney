@@ -12,7 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Trash2, Receipt, Eye, ScanLine, Loader2 } from "lucide-react";
+import { Plus, Trash2, Receipt, Eye, ScanLine, Loader2, Banknote } from "lucide-react";
+import { PayBillDialog } from "@/components/finance/purchases/PayBillDialog";
 import { toast } from "sonner";
 import { format, addDays, isValid, parseISO } from "date-fns";
 
@@ -39,6 +40,7 @@ export const PurchaseBillsPanel = () => {
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [viewingBill, setViewingBill] = useState<any>(null);
+  const [payingBill, setPayingBill] = useState<any>(null);
   const [formData, setFormData] = useState({
     vendor_id: '',
     vendor_reference: '',
@@ -541,7 +543,12 @@ export const PurchaseBillsPanel = () => {
                           </SelectContent>
                         </Select>
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right space-x-1">
+                        {bill.status !== "paid" && bill.status !== "cancelled" && (
+                          <Button size="sm" variant="outline" onClick={() => setPayingBill(bill)}>
+                            <Banknote className="w-3 h-3 mr-1" />Pay
+                          </Button>
+                        )}
                         <Button size="icon" variant="ghost" onClick={() => setViewingBill(bill)}>
                           <Eye className="w-4 h-4" />
                         </Button>
@@ -600,6 +607,8 @@ export const PurchaseBillsPanel = () => {
           </DialogContent>
         </Dialog>
       )}
+
+      <PayBillDialog bill={payingBill} onClose={() => setPayingBill(null)} />
     </div>
   );
 };
