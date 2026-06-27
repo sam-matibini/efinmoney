@@ -2260,6 +2260,138 @@ export type Database = {
           },
         ]
       }
+      expense_claim_items: {
+        Row: {
+          amount: number
+          category: string | null
+          claim_id: string
+          created_at: string
+          currency_code: string
+          expense_date: string
+          gl_account_id: string | null
+          id: string
+          merchant: string | null
+          notes: string | null
+          receipt_url: string | null
+          scanned_data: Json | null
+          tax_amount: number
+        }
+        Insert: {
+          amount: number
+          category?: string | null
+          claim_id: string
+          created_at?: string
+          currency_code?: string
+          expense_date: string
+          gl_account_id?: string | null
+          id?: string
+          merchant?: string | null
+          notes?: string | null
+          receipt_url?: string | null
+          scanned_data?: Json | null
+          tax_amount?: number
+        }
+        Update: {
+          amount?: number
+          category?: string | null
+          claim_id?: string
+          created_at?: string
+          currency_code?: string
+          expense_date?: string
+          gl_account_id?: string | null
+          id?: string
+          merchant?: string | null
+          notes?: string | null
+          receipt_url?: string | null
+          scanned_data?: Json | null
+          tax_amount?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expense_claim_items_claim_id_fkey"
+            columns: ["claim_id"]
+            isOneToOne: false
+            referencedRelation: "expense_claims"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expense_claim_items_gl_account_id_fkey"
+            columns: ["gl_account_id"]
+            isOneToOne: false
+            referencedRelation: "ledger_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      expense_claims: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          claim_number: string
+          created_at: string
+          currency_code: string
+          id: string
+          purpose: string | null
+          reimbursed_at: string | null
+          reimbursement_journal_id: string | null
+          reimbursement_method:
+            | Database["public"]["Enums"]["vendor_bill_payment_method"]
+            | null
+          rejected_reason: string | null
+          status: Database["public"]["Enums"]["expense_claim_status"]
+          submitted_at: string | null
+          submitter_user_id: string
+          subtotal: number
+          tax_amount: number
+          total: number
+          updated_at: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          claim_number: string
+          created_at?: string
+          currency_code?: string
+          id?: string
+          purpose?: string | null
+          reimbursed_at?: string | null
+          reimbursement_journal_id?: string | null
+          reimbursement_method?:
+            | Database["public"]["Enums"]["vendor_bill_payment_method"]
+            | null
+          rejected_reason?: string | null
+          status?: Database["public"]["Enums"]["expense_claim_status"]
+          submitted_at?: string | null
+          submitter_user_id: string
+          subtotal?: number
+          tax_amount?: number
+          total?: number
+          updated_at?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          claim_number?: string
+          created_at?: string
+          currency_code?: string
+          id?: string
+          purpose?: string | null
+          reimbursed_at?: string | null
+          reimbursement_journal_id?: string | null
+          reimbursement_method?:
+            | Database["public"]["Enums"]["vendor_bill_payment_method"]
+            | null
+          rejected_reason?: string | null
+          status?: Database["public"]["Enums"]["expense_claim_status"]
+          submitted_at?: string | null
+          submitter_user_id?: string
+          subtotal?: number
+          tax_amount?: number
+          total?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       flw_banks_cache: {
         Row: {
           banks: Json
@@ -3698,6 +3830,9 @@ export type Database = {
           issue_date: string
           journal_id: string | null
           notes: string | null
+          payment_status: Database["public"]["Enums"]["vendor_bill_payment_status"]
+          purchase_order_id: string | null
+          recurring_template_id: string | null
           status: Database["public"]["Enums"]["invoice_status"]
           subtotal: number
           tax_amount: number
@@ -3718,6 +3853,9 @@ export type Database = {
           issue_date?: string
           journal_id?: string | null
           notes?: string | null
+          payment_status?: Database["public"]["Enums"]["vendor_bill_payment_status"]
+          purchase_order_id?: string | null
+          recurring_template_id?: string | null
           status?: Database["public"]["Enums"]["invoice_status"]
           subtotal?: number
           tax_amount?: number
@@ -3738,6 +3876,9 @@ export type Database = {
           issue_date?: string
           journal_id?: string | null
           notes?: string | null
+          payment_status?: Database["public"]["Enums"]["vendor_bill_payment_status"]
+          purchase_order_id?: string | null
+          recurring_template_id?: string | null
           status?: Database["public"]["Enums"]["invoice_status"]
           subtotal?: number
           tax_amount?: number
@@ -3748,10 +3889,226 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "fk_pb_po"
+            columns: ["purchase_order_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_pb_recurring"
+            columns: ["recurring_template_id"]
+            isOneToOne: false
+            referencedRelation: "recurring_bill_templates"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "purchase_bills_vendor_id_fkey"
             columns: ["vendor_id"]
             isOneToOne: false
             referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      purchase_order_items: {
+        Row: {
+          amount: number
+          created_at: string
+          description: string
+          gl_account_id: string | null
+          id: string
+          purchase_order_id: string
+          qty_billed: number
+          qty_received: number
+          quantity: number
+          tax_rate: number
+          unit_price: number
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          description: string
+          gl_account_id?: string | null
+          id?: string
+          purchase_order_id: string
+          qty_billed?: number
+          qty_received?: number
+          quantity?: number
+          tax_rate?: number
+          unit_price?: number
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          description?: string
+          gl_account_id?: string | null
+          id?: string
+          purchase_order_id?: string
+          qty_billed?: number
+          qty_received?: number
+          quantity?: number
+          tax_rate?: number
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_order_items_gl_account_id_fkey"
+            columns: ["gl_account_id"]
+            isOneToOne: false
+            referencedRelation: "ledger_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_order_items_purchase_order_id_fkey"
+            columns: ["purchase_order_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      purchase_orders: {
+        Row: {
+          approved_at: string | null
+          approver_id: string | null
+          closed_at: string | null
+          created_at: string
+          created_by: string | null
+          currency_code: string
+          expected_date: string | null
+          id: string
+          notes: string | null
+          po_number: string
+          sent_at: string | null
+          status: Database["public"]["Enums"]["po_status"]
+          subtotal: number
+          tax_amount: number
+          total_amount: number
+          updated_at: string
+          vendor_id: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approver_id?: string | null
+          closed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency_code?: string
+          expected_date?: string | null
+          id?: string
+          notes?: string | null
+          po_number: string
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["po_status"]
+          subtotal?: number
+          tax_amount?: number
+          total_amount?: number
+          updated_at?: string
+          vendor_id: string
+        }
+        Update: {
+          approved_at?: string | null
+          approver_id?: string | null
+          closed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency_code?: string
+          expected_date?: string | null
+          id?: string
+          notes?: string | null
+          po_number?: string
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["po_status"]
+          subtotal?: number
+          tax_amount?: number
+          total_amount?: number
+          updated_at?: string
+          vendor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_orders_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      purchase_receipt_items: {
+        Row: {
+          created_at: string
+          id: string
+          purchase_order_item_id: string
+          qty_received: number
+          receipt_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          purchase_order_item_id: string
+          qty_received?: number
+          receipt_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          purchase_order_item_id?: string
+          qty_received?: number
+          receipt_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_receipt_items_purchase_order_item_id_fkey"
+            columns: ["purchase_order_item_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_order_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_receipt_items_receipt_id_fkey"
+            columns: ["receipt_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_receipts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      purchase_receipts: {
+        Row: {
+          created_at: string
+          id: string
+          notes: string | null
+          purchase_order_id: string
+          receipt_number: string
+          received_at: string
+          received_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          purchase_order_id: string
+          receipt_number: string
+          received_at?: string
+          received_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          purchase_order_id?: string
+          receipt_number?: string
+          received_at?: string
+          received_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_receipts_purchase_order_id_fkey"
+            columns: ["purchase_order_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
             referencedColumns: ["id"]
           },
         ]
@@ -3840,6 +4197,103 @@ export type Database = {
             columns: ["transfer_id"]
             isOneToOne: false
             referencedRelation: "transfers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recurring_bill_templates: {
+        Row: {
+          amount: number
+          auto_pay: boolean
+          auto_pay_method:
+            | Database["public"]["Enums"]["vendor_bill_payment_method"]
+            | null
+          auto_pay_wallet_id: string | null
+          created_at: string
+          created_by: string | null
+          currency_code: string
+          day_of_month: number | null
+          description: string | null
+          end_date: string | null
+          frequency: Database["public"]["Enums"]["recurring_frequency"]
+          gl_account_id: string | null
+          id: string
+          is_active: boolean
+          last_generated_at: string | null
+          name: string
+          next_run_at: string
+          tax_rate: number
+          updated_at: string
+          vendor_id: string
+        }
+        Insert: {
+          amount: number
+          auto_pay?: boolean
+          auto_pay_method?:
+            | Database["public"]["Enums"]["vendor_bill_payment_method"]
+            | null
+          auto_pay_wallet_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency_code?: string
+          day_of_month?: number | null
+          description?: string | null
+          end_date?: string | null
+          frequency: Database["public"]["Enums"]["recurring_frequency"]
+          gl_account_id?: string | null
+          id?: string
+          is_active?: boolean
+          last_generated_at?: string | null
+          name: string
+          next_run_at: string
+          tax_rate?: number
+          updated_at?: string
+          vendor_id: string
+        }
+        Update: {
+          amount?: number
+          auto_pay?: boolean
+          auto_pay_method?:
+            | Database["public"]["Enums"]["vendor_bill_payment_method"]
+            | null
+          auto_pay_wallet_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency_code?: string
+          day_of_month?: number | null
+          description?: string | null
+          end_date?: string | null
+          frequency?: Database["public"]["Enums"]["recurring_frequency"]
+          gl_account_id?: string | null
+          id?: string
+          is_active?: boolean
+          last_generated_at?: string | null
+          name?: string
+          next_run_at?: string
+          tax_rate?: number
+          updated_at?: string
+          vendor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recurring_bill_templates_auto_pay_wallet_id_fkey"
+            columns: ["auto_pay_wallet_id"]
+            isOneToOne: false
+            referencedRelation: "wallets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recurring_bill_templates_gl_account_id_fkey"
+            columns: ["gl_account_id"]
+            isOneToOne: false
+            referencedRelation: "ledger_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recurring_bill_templates_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
             referencedColumns: ["id"]
           },
         ]
@@ -4459,6 +4913,56 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      tax_form_summaries: {
+        Row: {
+          created_at: string
+          currency_code: string
+          filed_at: string | null
+          form_type: Database["public"]["Enums"]["tax_form_type"]
+          id: string
+          notes: string | null
+          status: string
+          tax_year: number
+          total_paid: number
+          updated_at: string
+          vendor_id: string
+        }
+        Insert: {
+          created_at?: string
+          currency_code?: string
+          filed_at?: string | null
+          form_type: Database["public"]["Enums"]["tax_form_type"]
+          id?: string
+          notes?: string | null
+          status?: string
+          tax_year: number
+          total_paid?: number
+          updated_at?: string
+          vendor_id: string
+        }
+        Update: {
+          created_at?: string
+          currency_code?: string
+          filed_at?: string | null
+          form_type?: Database["public"]["Enums"]["tax_form_type"]
+          id?: string
+          notes?: string | null
+          status?: string
+          tax_year?: number
+          total_paid?: number
+          updated_at?: string
+          vendor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tax_form_summaries_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       tax_rates: {
         Row: {
@@ -5222,6 +5726,78 @@ export type Database = {
         }
         Relationships: []
       }
+      vendor_bill_payments: {
+        Row: {
+          amount: number
+          approver_id: string | null
+          bill_id: string
+          created_at: string
+          created_by: string | null
+          currency_code: string
+          id: string
+          journal_id: string | null
+          notes: string | null
+          paid_at: string | null
+          payment_method: Database["public"]["Enums"]["vendor_bill_payment_method"]
+          rail_payload: Json | null
+          rail_reference: string | null
+          status: Database["public"]["Enums"]["vendor_bill_payment_state"]
+          updated_at: string
+          wallet_id: string | null
+        }
+        Insert: {
+          amount: number
+          approver_id?: string | null
+          bill_id: string
+          created_at?: string
+          created_by?: string | null
+          currency_code?: string
+          id?: string
+          journal_id?: string | null
+          notes?: string | null
+          paid_at?: string | null
+          payment_method: Database["public"]["Enums"]["vendor_bill_payment_method"]
+          rail_payload?: Json | null
+          rail_reference?: string | null
+          status?: Database["public"]["Enums"]["vendor_bill_payment_state"]
+          updated_at?: string
+          wallet_id?: string | null
+        }
+        Update: {
+          amount?: number
+          approver_id?: string | null
+          bill_id?: string
+          created_at?: string
+          created_by?: string | null
+          currency_code?: string
+          id?: string
+          journal_id?: string | null
+          notes?: string | null
+          paid_at?: string | null
+          payment_method?: Database["public"]["Enums"]["vendor_bill_payment_method"]
+          rail_payload?: Json | null
+          rail_reference?: string | null
+          status?: Database["public"]["Enums"]["vendor_bill_payment_state"]
+          updated_at?: string
+          wallet_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendor_bill_payments_bill_id_fkey"
+            columns: ["bill_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_bills"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_bill_payments_wallet_id_fkey"
+            columns: ["wallet_id"]
+            isOneToOne: false
+            referencedRelation: "wallets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vendors: {
         Row: {
           address: string | null
@@ -5229,14 +5805,23 @@ export type Database = {
           bank_name: string | null
           created_at: string
           currency_code: string | null
+          default_expense_account_id: string | null
+          default_payment_method:
+            | Database["public"]["Enums"]["vendor_bill_payment_method"]
+            | null
           email: string | null
           id: string
+          is_1099_t4a: boolean
           is_active: boolean
           name: string
           notes: string | null
+          outstanding_balance: number
+          payment_rail_details: Json | null
           payment_terms: number | null
           phone: string | null
           tax_id: string | null
+          tax_id_type: string | null
+          total_paid_ytd: number
           updated_at: string
         }
         Insert: {
@@ -5245,14 +5830,23 @@ export type Database = {
           bank_name?: string | null
           created_at?: string
           currency_code?: string | null
+          default_expense_account_id?: string | null
+          default_payment_method?:
+            | Database["public"]["Enums"]["vendor_bill_payment_method"]
+            | null
           email?: string | null
           id?: string
+          is_1099_t4a?: boolean
           is_active?: boolean
           name: string
           notes?: string | null
+          outstanding_balance?: number
+          payment_rail_details?: Json | null
           payment_terms?: number | null
           phone?: string | null
           tax_id?: string | null
+          tax_id_type?: string | null
+          total_paid_ytd?: number
           updated_at?: string
         }
         Update: {
@@ -5261,17 +5855,34 @@ export type Database = {
           bank_name?: string | null
           created_at?: string
           currency_code?: string | null
+          default_expense_account_id?: string | null
+          default_payment_method?:
+            | Database["public"]["Enums"]["vendor_bill_payment_method"]
+            | null
           email?: string | null
           id?: string
+          is_1099_t4a?: boolean
           is_active?: boolean
           name?: string
           notes?: string | null
+          outstanding_balance?: number
+          payment_rail_details?: Json | null
           payment_terms?: number | null
           phone?: string | null
           tax_id?: string | null
+          tax_id_type?: string | null
+          total_paid_ytd?: number
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "vendors_default_expense_account_id_fkey"
+            columns: ["default_expense_account_id"]
+            isOneToOne: false
+            referencedRelation: "ledger_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       virtual_accounts: {
         Row: {
@@ -5536,6 +6147,9 @@ export type Database = {
         Returns: string
       }
       generate_account_number: { Args: never; Returns: string }
+      generate_expense_claim_number: { Args: never; Returns: string }
+      generate_grn_number: { Args: never; Returns: string }
+      generate_po_number: { Args: never; Returns: string }
       get_user_wallet_balances: {
         Args: { p_user_id: string }
         Returns: {
@@ -5656,6 +6270,13 @@ export type Database = {
       cardholder_status: "active" | "inactive" | "blocked"
       cardholder_type: "individual" | "company"
       currency_type: "fiat" | "crypto"
+      expense_claim_status:
+        | "draft"
+        | "submitted"
+        | "approved"
+        | "rejected"
+        | "reimbursed"
+        | "cancelled"
       invoice_status:
         | "draft"
         | "sent"
@@ -5695,12 +6316,27 @@ export type Database = {
         | "expired"
         | "revoked"
         | "failed"
+      po_status:
+        | "draft"
+        | "pending_approval"
+        | "approved"
+        | "sent"
+        | "partially_received"
+        | "received"
+        | "closed"
+        | "cancelled"
       reconciliation_status:
         | "pending"
         | "matched"
         | "unmatched"
         | "exception"
         | "resolved"
+      recurring_frequency:
+        | "weekly"
+        | "biweekly"
+        | "monthly"
+        | "quarterly"
+        | "yearly"
       tax_filing_frequency: "monthly" | "quarterly" | "annually"
       tax_filing_status:
         | "draft"
@@ -5708,6 +6344,7 @@ export type Database = {
         | "approved"
         | "filed"
         | "paid"
+      tax_form_type: "T4A" | "1099-NEC" | "1099-MISC"
       tax_type: "GST" | "HST" | "QST" | "PST" | "RST"
       trade_side: "buy" | "sell"
       trade_status: "pending" | "executed" | "cancelled" | "failed"
@@ -5727,6 +6364,21 @@ export type Database = {
         | "bill_payment"
         | "domestic_canada"
       user_risk_tier: "tier_1" | "tier_2" | "tier_3" | "tier_4"
+      vendor_bill_payment_method:
+        | "wallet"
+        | "eft"
+        | "interac"
+        | "cpn"
+        | "pawapay"
+        | "link"
+        | "manual"
+      vendor_bill_payment_state:
+        | "pending"
+        | "processing"
+        | "completed"
+        | "failed"
+        | "cancelled"
+      vendor_bill_payment_status: "unpaid" | "partial" | "paid" | "void"
       virtual_account_status: "active" | "inactive" | "expired"
       wallet_status: "active" | "frozen" | "suspended" | "closed"
     }
@@ -5909,6 +6561,14 @@ export const Constants = {
       cardholder_status: ["active", "inactive", "blocked"],
       cardholder_type: ["individual", "company"],
       currency_type: ["fiat", "crypto"],
+      expense_claim_status: [
+        "draft",
+        "submitted",
+        "approved",
+        "rejected",
+        "reimbursed",
+        "cancelled",
+      ],
       invoice_status: [
         "draft",
         "sent",
@@ -5953,12 +6613,29 @@ export const Constants = {
         "revoked",
         "failed",
       ],
+      po_status: [
+        "draft",
+        "pending_approval",
+        "approved",
+        "sent",
+        "partially_received",
+        "received",
+        "closed",
+        "cancelled",
+      ],
       reconciliation_status: [
         "pending",
         "matched",
         "unmatched",
         "exception",
         "resolved",
+      ],
+      recurring_frequency: [
+        "weekly",
+        "biweekly",
+        "monthly",
+        "quarterly",
+        "yearly",
       ],
       tax_filing_frequency: ["monthly", "quarterly", "annually"],
       tax_filing_status: [
@@ -5968,6 +6645,7 @@ export const Constants = {
         "filed",
         "paid",
       ],
+      tax_form_type: ["T4A", "1099-NEC", "1099-MISC"],
       tax_type: ["GST", "HST", "QST", "PST", "RST"],
       trade_side: ["buy", "sell"],
       trade_status: ["pending", "executed", "cancelled", "failed"],
@@ -5989,6 +6667,23 @@ export const Constants = {
         "domestic_canada",
       ],
       user_risk_tier: ["tier_1", "tier_2", "tier_3", "tier_4"],
+      vendor_bill_payment_method: [
+        "wallet",
+        "eft",
+        "interac",
+        "cpn",
+        "pawapay",
+        "link",
+        "manual",
+      ],
+      vendor_bill_payment_state: [
+        "pending",
+        "processing",
+        "completed",
+        "failed",
+        "cancelled",
+      ],
+      vendor_bill_payment_status: ["unpaid", "partial", "paid", "void"],
       virtual_account_status: ["active", "inactive", "expired"],
       wallet_status: ["active", "frozen", "suspended", "closed"],
     },
