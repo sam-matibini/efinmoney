@@ -20,9 +20,11 @@ export const PayBillDialog = ({ bill, onClose }: PayBillDialogProps) => {
   const { data: wallets = [] } = useWallets();
   const outstanding = bill ? Number(bill.total_amount) - Number(bill.amount_paid || 0) : 0;
   const [amount, setAmount] = useState<string>("");
-  const [method, setMethod] = useState<"wallet" | "eft" | "interac" | "cpn" | "pawapay" | "link" | "manual">("wallet");
+  const [method, setMethod] = useState<"wallet" | "eft" | "interac" | "cpn" | "pawapay" | "link" | "card" | "saved_card" | "stellar" | "mpesa" | "flutterwave" | "cheque" | "cash" | "wire" | "manual">("wallet");
   const [walletId, setWalletId] = useState<string>("");
   const [reference, setReference] = useState("");
+  const [extraField, setExtraField] = useState("");
+
   const [notes, setNotes] = useState("");
 
   const { data: payments = [] } = useQuery({
