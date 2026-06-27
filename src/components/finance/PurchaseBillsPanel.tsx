@@ -607,6 +607,8 @@ export const PurchaseBillsPanel = () => {
           </DialogContent>
         </Dialog>
       )}
+
+      <PayBillDialog bill={payingBill} onClose={() => setPayingBill(null)} />
     </div>
   );
 };
