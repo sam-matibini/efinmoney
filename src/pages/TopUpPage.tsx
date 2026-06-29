@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { useSearchParams } from "react-router-dom";
 import BackToDashboard from "@/components/layout/BackToDashboard";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,7 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { CheckCircle2, XCircle, CreditCard, Smartphone, Building2, Globe } from "lucide-react";
+import { CheckCircle2, XCircle, CreditCard, Smartphone, Building2, Globe, Info } from "lucide-react";
 import { useWallets } from "@/hooks/useWallets";
 import { useAuth } from "@/hooks/useAuth";
 import CardPaymentForm from "@/components/modals/CardPaymentForm";
@@ -21,6 +21,7 @@ import { validateMinAmount, friendlyFlwError, minAmount, type FlwMethod } from "
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { MM_COUNTRIES } from "@/lib/mobileMoneyNetworks";
 import { invokeEdgeFunction } from "@/lib/invokeEdgeFunction";
+import { isStripeTestMode, STRIPE_TEST_CARD_HINT, STRIPE_VIRTUAL_CARD_HINT } from "@/lib/stripeBilling";
 
 const MM_BY_CCY = Object.fromEntries(MM_COUNTRIES.map((c) => [c.currency, c]));
 
@@ -48,6 +49,8 @@ const FLW_METHODS_BY_CCY: Record<string, FlwMethod[]> = {
   ZMW: ["card", "mobilemoney"],
   RWF: ["card", "mobilemoney"],
   TZS: ["card", "mobilemoney"],
+  USD: ["card"],
+  CAD: ["card", "banktransfer"],
 };
 
 const METHOD_LABEL: Record<FlwMethod, string> = {
@@ -85,6 +88,15 @@ const TopUpPage = () => {
       setSelectedWalletId(fromUrl);
       return;
     }
+    const flwTest = params.get("flw") === "1" || import.meta.env.VITE_FLW_WESTERN_TOPUP === "true";
+    const preferCurrency = (params.get("currency") || (flwTest ? "CAD" : "")).toUpperCase();
+    if (preferCurrency && wallets.some((w) => w.currency_code === preferCurrency)) {
+      const match = wallets.find((w) => w.currency_code === preferCurrency);
+      if (match) {
+        setSelectedWalletId(match.wallet_id);
+        return;
+      }
+    }
     if (!selectedWalletId) {
       const def = wallets.find((w) => w.is_default) || wallets[0];
       setSelectedWalletId(def.wallet_id);
@@ -93,7 +105,13 @@ const TopUpPage = () => {
 
   const selectedWallet = wallets?.find((w) => w.wallet_id === selectedWalletId);
   const currency = selectedWallet?.currency_code || "USD";
-  const gateway = routeGateway(currency);
+  /** ?flw=1 or VITE_FLW_WESTERN_TOPUP=true — test USD/CAD collect via Flutterwave instead of Stripe */
+  const flwWesternTest =
+    params.get("flw") === "1" || import.meta.env.VITE_FLW_WESTERN_TOPUP === "true";
+  const gateway: Gateway =
+    flwWesternTest && (currency === "USD" || currency === "CAD")
+      ? "flutterwave"
+      : routeGateway(currency);
   const availableFlwMethods = FLW_METHODS_BY_CCY[currency] || ["card"];
   const mmCountry = method === "mobilemoney" ? MM_BY_CCY[currency] : undefined;
 
@@ -109,6 +127,12 @@ const TopUpPage = () => {
       setNetwork(mmCountry.networks[0]?.value || "");
     }
   }, [mmCountry, network]);
+
+  // Default small test amount when opening the Flutterwave western test link
+  useEffect(() => {
+    if (!flwWesternTest || (currency !== "USD" && currency !== "CAD")) return;
+    if (!amount) setAmount(currency === "CAD" ? "10" : "5");
+  }, [flwWesternTest, currency, amount]);
 
   // Verify Stripe / Flutterwave return callbacks
   useEffect(() => {
@@ -244,10 +268,64 @@ const TopUpPage = () => {
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-xl mx-auto space-y-6">
           <BackToDashboard />
           <div>
-            <h1 className="text-2xl font-display font-bold">Add Money</h1>
-            <p className="text-muted-foreground">Top up your wallet using the best route for your currency.</p>
+            <h1 className="text-2xl font-display font-bold">
+              {flwWesternTest ? "Wallet top-up test" : "Add Money"}
+            </h1>
+            <p className="text-muted-foreground">
+              {flwWesternTest
+                ? "We are testing whether Canadian/US cards can add money through Flutterwave."
+                : "Top up your wallet using the best route for your currency."}
+            </p>
           </div>
 
+          {flwWesternTest && (currency === "USD" || currency === "CAD") && (
+            <Card className="border-orange-500/40 bg-orange-500/5">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Info className="h-5 w-5 text-orange-600 shrink-0" />
+                  {currency === "CAD" ? "Instructions for Canada (CAD test)" : "Instructions for USD card test"}
+                </CardTitle>
+                <CardDescription>
+                  Please read before paying. This uses a <strong>live</strong> payment — your card will be charged the amount you enter.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4 text-sm">
+                <ol className="list-decimal list-inside space-y-2.5 text-foreground leading-relaxed">
+                  {currency === "CAD" ? (
+                    <>
+                      <li>Select your <strong>CAD wallet</strong> in step 1 below (🇨🇦 Canadian Dollar).</li>
+                      <li>Enter a <strong>small test amount</strong> — we suggest <strong>$10 CAD</strong>.</li>
+                      <li>Click <strong>Proceed to Payment</strong>. You will leave eFinMoney and go to <strong>Flutterwave</strong> (secure checkout).</li>
+                      <li>Pay with your <strong>Canadian debit or credit card</strong> (Interac debit cards with Visa/Mastercard logo usually work).</li>
+                      <li>
+                        If Flutterwave asks for <strong>billing address</strong> on the next screen:
+                        <ul className="list-disc list-inside ml-4 mt-1.5 space-y-1 text-muted-foreground">
+                          <li>Name — exactly as it appears on your card</li>
+                          <li>Address, city, province — your real Canadian address</li>
+                          <li>Country — <strong>Canada</strong></li>
+                          <li>Postal code — your real Canadian postal code (e.g. M5H 2N2)</li>
+                        </ul>
+                      </li>
+                      <li>Complete payment. You will be returned to eFinMoney automatically.</li>
+                      <li>Your <strong>CAD wallet balance</strong> should increase within a minute if successful.</li>
+                    </>
+                  ) : (
+                    <>
+                      <li>Select your <strong>USD wallet</strong> in step 1 below.</li>
+                      <li>Enter a small test amount — we suggest <strong>$5 USD</strong>.</li>
+                      <li>Click <strong>Proceed to Payment</strong> and pay on Flutterwave checkout.</li>
+                      <li>If billing address is requested, use details that match your card (US address for US cards).</li>
+                      <li>Some virtual cards (e.g. Grey) may be declined by the bank — that is a card restriction, not an app error.</li>
+                    </>
+                  )}
+                </ol>
+                <div className="rounded-lg border border-orange-500/25 bg-background/80 p-3 text-xs text-muted-foreground">
+                  <strong className="text-foreground">Not Stripe:</strong> this test deliberately uses Flutterwave instead of our usual card processor.
+                  If payment fails, note the exact error message and send a screenshot to the eFinMoney team.
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {verifyState && (
             <Card>
@@ -308,22 +386,19 @@ const TopUpPage = () => {
           {/* Stripe route */}
           {gateway === "stripe" && selectedWallet && (
             <>
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">2. Pay with saved card</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <CardPaymentForm
-                    defaultWalletId={selectedWallet.wallet_id}
-                    showWalletSelect={false}
-                    onSuccess={() => toast.success("Top-up successful")}
-                  />
-                </CardContent>
-              </Card>
+              {isStripeTestMode() ? (
+                <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-sm text-amber-800 dark:text-amber-200">
+                  {STRIPE_TEST_CARD_HINT}
+                </div>
+              ) : (
+                <div className="p-3 rounded-lg bg-muted/60 border border-border text-sm text-muted-foreground">
+                  {STRIPE_VIRTUAL_CARD_HINT}
+                </div>
+              )}
 
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">Or pay Internationally</CardTitle>
+                  <CardTitle className="text-base">Recommended: Stripe Checkout</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div>
@@ -342,13 +417,12 @@ const TopUpPage = () => {
                   </div>
                   <div className="p-3 rounded-lg bg-accent/10 border border-accent/20">
                     <p className="text-xs text-foreground">
-                      Redirects to Stripe Checkout. Pay with Apple Pay, Google Pay, Link, or local methods (iDEAL, Bancontact, SEPA, BACS, cards).
+                      Best for Grey, Wise, and other virtual cards — Stripe handles 3-D Secure and bank approval in a hosted flow.
                     </p>
                   </div>
                   <Button
                     className="w-full"
                     size="lg"
-                    variant="outline"
                     disabled={loading || !Number.isFinite(Number(amount)) || Number(amount) < 5}
                     onClick={async () => {
                       const amt = Number(amount);
@@ -370,6 +444,19 @@ const TopUpPage = () => {
                   >
                     {loading ? "Redirecting…" : "Pay with Stripe Checkout"}
                   </Button>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Or pay with card on this page</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <CardPaymentForm
+                    defaultWalletId={selectedWallet.wallet_id}
+                    showWalletSelect={false}
+                    onSuccess={() => toast.success("Top-up successful")}
+                  />
                 </CardContent>
               </Card>
             </>
@@ -397,12 +484,14 @@ const TopUpPage = () => {
 
                 <div className="p-3 rounded-lg bg-accent/10 border border-accent/20">
                   <p className="text-xs text-foreground">
-                    You will be redirected to Flutterwave's secure checkout to complete your payment via Card, Bank Transfer, Mobile Money, or USSD.
+                    {flwWesternTest
+                      ? "Click the button below to open Flutterwave checkout in a new secure page. Use the steps above before you pay."
+                      : "You will be redirected to Flutterwave's secure checkout to complete your payment via Card, Bank Transfer, Mobile Money, or USSD."}
                   </p>
                 </div>
 
                 <Button className="w-full" size="lg" onClick={handleFlutterwaveTopUp} disabled={loading}>
-                  {loading ? "Redirecting..." : "Proceed to Payment"}
+                  {loading ? "Opening Flutterwave…" : flwWesternTest ? "Continue to Flutterwave checkout" : "Proceed to Payment"}
                 </Button>
               </CardContent>
             </Card>
