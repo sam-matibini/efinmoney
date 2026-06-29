@@ -32,9 +32,6 @@ import { cn } from "@/lib/utils";
 
 const MM_BY_CCY = Object.fromEntries(MM_COUNTRIES.map((c) => [c.currency, c]));
 
-// ZMW deliberately omitted: Elicate direct mobile money, not Flutterwave hosted checkout.
-const ELICATE_CURRENCIES = ["ZMW"];
-
 type Gateway = "flutterwave" | "stripe" | "elicate" | "unsupported";
 
 function initialWesternProvider(params: URLSearchParams): WesternTopupProvider {
