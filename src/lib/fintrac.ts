@@ -30,6 +30,9 @@ export function makeFilingReference(type: FintracType): string {
 }
 
 export function buildFintracReport(type: FintracType, record: Record<string, unknown>, reference: string): FintracReport {
+  if (ENTITY.msb_registration_number === "<FINTRAC_MSB_REG_NO>") {
+    throw new Error("Cannot generate a FINTRAC report: MSB registration number is still a placeholder. Set the real registered number in src/lib/fintrac.ts before filing.");
+  }
   return {
     report_type: type,
     report_reference: reference,
