@@ -10,25 +10,38 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Edit, Building, Mail, Phone } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Plus, Edit, Building, Mail, Phone, FileBadge } from "lucide-react";
 import { toast } from "sonner";
+
+const emptyForm = {
+  name: '',
+  email: '',
+  phone: '',
+  address: '',
+  tax_id: '',
+  payment_terms: 30,
+  currency_code: 'USD',
+  bank_account: '',
+  bank_name: '',
+  notes: '',
+  vendor_type: 'supplier',
+  is_subcontractor: false,
+  t4a_eligible: false,
+  business_legal_name: '',
+  sin_or_bn: '',
+  service_type: '',
+  cra_t4a_box: '048',
+};
 
 export const VendorsPanel = () => {
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [filter, setFilter] = useState<'all' | 'supplier' | 'subcontractor' | 'employee'>('all');
   const [editingVendor, setEditingVendor] = useState<any>(null);
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    address: '',
-    tax_id: '',
-    payment_terms: 30,
-    currency_code: 'USD',
-    bank_account: '',
-    bank_name: '',
-    notes: '',
-  });
+  const [formData, setFormData] = useState(emptyForm);
+
 
   const { data: vendors = [], isLoading } = useQuery({
     queryKey: ['vendors'],
@@ -80,7 +93,7 @@ export const VendorsPanel = () => {
   });
 
   const resetForm = () => {
-    setFormData({ name: '', email: '', phone: '', address: '', tax_id: '', payment_terms: 30, currency_code: 'USD', bank_account: '', bank_name: '', notes: '' });
+    setFormData(emptyForm);
     setEditingVendor(null);
     setIsDialogOpen(false);
   };
@@ -98,9 +111,17 @@ export const VendorsPanel = () => {
       bank_account: vendor.bank_account || '',
       bank_name: vendor.bank_name || '',
       notes: vendor.notes || '',
+      vendor_type: vendor.vendor_type || 'supplier',
+      is_subcontractor: !!vendor.is_subcontractor,
+      t4a_eligible: !!vendor.t4a_eligible,
+      business_legal_name: vendor.business_legal_name || '',
+      sin_or_bn: vendor.sin_or_bn || '',
+      service_type: vendor.service_type || '',
+      cra_t4a_box: vendor.cra_t4a_box || '048',
     });
     setIsDialogOpen(true);
   };
+
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -176,10 +197,59 @@ export const VendorsPanel = () => {
                   <Input id="bank_account" value={formData.bank_account} onChange={(e) => setFormData({ ...formData, bank_account: e.target.value })} />
                 </div>
               </div>
+              <div className="border-t pt-3 space-y-3">
+                <div className="grid grid-cols-2 gap-4 items-end">
+                  <div className="space-y-2">
+                    <Label>Vendor Type</Label>
+                    <Select value={formData.vendor_type} onValueChange={(v) => setFormData({ ...formData, vendor_type: v, is_subcontractor: v === 'subcontractor', t4a_eligible: v === 'subcontractor' ? true : formData.t4a_eligible })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="supplier">Supplier</SelectItem>
+                        <SelectItem value="subcontractor">Subcontractor (T4A)</SelectItem>
+                        <SelectItem value="employee">Employee-contractor</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-center gap-2 pb-2">
+                    <Switch checked={formData.t4a_eligible} onCheckedChange={(c) => setFormData({ ...formData, t4a_eligible: c })} id="t4a" />
+                    <Label htmlFor="t4a" className="text-sm cursor-pointer flex items-center gap-1">
+                      <FileBadge className="w-3 h-3" /> T4A eligible
+                    </Label>
+                  </div>
+                </div>
+                {(formData.is_subcontractor || formData.t4a_eligible) && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Legal Name</Label>
+                      <Input value={formData.business_legal_name} onChange={(e) => setFormData({ ...formData, business_legal_name: e.target.value })} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>SIN / BN</Label>
+                      <Input value={formData.sin_or_bn} onChange={(e) => setFormData({ ...formData, sin_or_bn: e.target.value })} placeholder="9 digits" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Service Type</Label>
+                      <Input value={formData.service_type} onChange={(e) => setFormData({ ...formData, service_type: e.target.value })} placeholder="e.g. Construction" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>T4A Box</Label>
+                      <Select value={formData.cra_t4a_box} onValueChange={(v) => setFormData({ ...formData, cra_t4a_box: v })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="020">020 — Commissions</SelectItem>
+                          <SelectItem value="048">048 — Fees for services</SelectItem>
+                          <SelectItem value="028">028 — Other income</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                )}
+              </div>
               <div className="space-y-2">
                 <Label htmlFor="notes">Notes</Label>
                 <Textarea id="notes" value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} rows={2} />
               </div>
+
               <div className="flex justify-end gap-2">
                 <Button type="button" variant="outline" onClick={resetForm}>Cancel</Button>
                 <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
@@ -191,34 +261,53 @@ export const VendorsPanel = () => {
         </Dialog>
       </CardHeader>
       <CardContent>
+        <div className="flex gap-2 mb-3 flex-wrap">
+          {(['all','supplier','subcontractor','employee'] as const).map((f) => (
+            <Badge
+              key={f}
+              variant={filter === f ? 'default' : 'outline'}
+              className="cursor-pointer capitalize"
+              onClick={() => setFilter(f)}
+            >
+              {f}
+            </Badge>
+          ))}
+        </div>
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
+                <TableHead>Type</TableHead>
                 <TableHead>Contact</TableHead>
-                <TableHead>Payment Terms</TableHead>
+                <TableHead>Terms</TableHead>
                 <TableHead>Bank Info</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {vendors.length === 0 ? (
+              {vendors.filter((v: any) => filter === 'all' || (v.vendor_type || 'supplier') === filter).length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground">No vendors found</TableCell>
+                  <TableCell colSpan={7} className="text-center text-muted-foreground">No vendors found</TableCell>
                 </TableRow>
               ) : (
-                vendors.map((vendor) => (
+                vendors
+                  .filter((v: any) => filter === 'all' || (v.vendor_type || 'supplier') === filter)
+                  .map((vendor: any) => (
                   <TableRow key={vendor.id} className={!vendor.is_active ? 'opacity-50' : ''}>
-                    <TableCell className="font-medium">{vendor.name}</TableCell>
+                    <TableCell className="font-medium">
+                      {vendor.name}
+                      {vendor.t4a_eligible && <Badge variant="outline" className="ml-2 text-[10px]"><FileBadge className="w-2.5 h-2.5 mr-0.5" />T4A</Badge>}
+                    </TableCell>
+                    <TableCell className="text-xs capitalize">{vendor.vendor_type || 'supplier'}</TableCell>
                     <TableCell>
                       <div className="flex flex-col gap-1 text-sm">
                         {vendor.email && <span className="flex items-center gap-1"><Mail className="w-3 h-3" />{vendor.email}</span>}
                         {vendor.phone && <span className="flex items-center gap-1"><Phone className="w-3 h-3" />{vendor.phone}</span>}
                       </div>
                     </TableCell>
-                    <TableCell>{vendor.payment_terms} days</TableCell>
+                    <TableCell>{vendor.payment_terms}d</TableCell>
                     <TableCell className="text-sm">
                       {vendor.bank_name ? `${vendor.bank_name} - ****${vendor.bank_account?.slice(-4) || ''}` : '-'}
                     </TableCell>
@@ -243,6 +332,7 @@ export const VendorsPanel = () => {
           </Table>
         </div>
       </CardContent>
+
     </Card>
   );
 };

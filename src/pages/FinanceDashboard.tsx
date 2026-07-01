@@ -15,6 +15,8 @@ import { FinancialStatementsPanel } from "@/components/finance/FinancialStatemen
 import { VendorsPanel } from "@/components/finance/VendorsPanel";
 import { SalesInvoicesPanel } from "@/components/finance/SalesInvoicesPanel";
 import { PurchaseBillsPanel } from "@/components/finance/PurchaseBillsPanel";
+import { PurchaseOrdersPanel } from "@/components/finance/purchases/PurchaseOrdersPanel";
+import { ExpenseClaimsPanel } from "@/components/finance/purchases/ExpenseClaimsPanel";
 import { ReportsCentrePanel } from "@/components/finance/ReportsCentrePanel";
 import { SalesTaxPanel } from "@/components/finance/SalesTaxPanel";
 import { TreasuryPanel } from "@/components/finance/treasury/TreasuryPanel";
@@ -54,9 +56,9 @@ const FinanceDashboard = () => {
               <TabsTrigger value="treasury">Treasury</TabsTrigger>
               <TabsTrigger value="reports">Reports</TabsTrigger>
               <TabsTrigger value="sales-tax">Sales Tax</TabsTrigger>
-              <TabsTrigger value="vendors">Vendors</TabsTrigger>
+              
               <TabsTrigger value="invoices">Invoices</TabsTrigger>
-              <TabsTrigger value="bills">Bills</TabsTrigger>
+              <TabsTrigger value="purchases">Purchases</TabsTrigger>
               <TabsTrigger value="fx">FX</TabsTrigger>
               <TabsTrigger value="period-close">Period Close</TabsTrigger>
               <TabsTrigger value="settlement">Settlement</TabsTrigger>
@@ -150,16 +152,23 @@ const FinanceDashboard = () => {
               <SalesTaxPanel />
             </TabsContent>
 
-            <TabsContent value="vendors" className="space-y-4">
-              <VendorsPanel />
-            </TabsContent>
-
             <TabsContent value="invoices" className="space-y-4">
               <SalesInvoicesPanel />
             </TabsContent>
 
-            <TabsContent value="bills" className="space-y-4">
-              <PurchaseBillsPanel />
+            <TabsContent value="purchases" className="space-y-4">
+              <Tabs defaultValue="vendors" className="space-y-4">
+                <TabsList>
+                  <TabsTrigger value="vendors">Vendors</TabsTrigger>
+                  <TabsTrigger value="pos">Purchase Orders</TabsTrigger>
+                  <TabsTrigger value="bills">Bills</TabsTrigger>
+                  <TabsTrigger value="expenses">Expense Claims</TabsTrigger>
+                </TabsList>
+                <TabsContent value="vendors"><VendorsPanel /></TabsContent>
+                <TabsContent value="pos"><PurchaseOrdersPanel /></TabsContent>
+                <TabsContent value="bills"><PurchaseBillsPanel /></TabsContent>
+                <TabsContent value="expenses"><ExpenseClaimsPanel /></TabsContent>
+              </Tabs>
             </TabsContent>
 
             <TabsContent value="fx" className="space-y-4">
