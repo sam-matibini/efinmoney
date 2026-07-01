@@ -86,7 +86,14 @@ export const TrialBalancePanel = () => {
   );
 
   const difference = totals.debit - totals.credit;
-  const isBalanced = Math.abs(difference) < 0.01;
+  // Ledger amounts are DECIMAL(20,8) (crypto/FX legs carry sub-cent digits), so a
+  // per-currency total can land up to ~1 cent off purely from rounding — immaterial,
+  // and the DB balance trigger prevents any new structural imbalance. Treat a
+  // rounding-sized residual as balanced, but still flag anything larger in red.
+  const ROUNDING_TOLERANCE = 0.01;
+  const absDiff = Math.abs(difference);
+  const isBalanced = absDiff <= ROUNDING_TOLERANCE + 1e-9;
+  const isRoundingResidual = isBalanced && absDiff > 1e-9;
   const isMixedView = currency === "ALL";
 
   if (isLoading) {
@@ -144,7 +151,9 @@ export const TrialBalancePanel = () => {
                 ? "bg-indigo-500/10 text-indigo-500"
                 : "bg-red-500/10 text-red-500"
             }`}>
-              {isBalanced ? `${currency} Balanced` : `${currency} Unbalanced · Δ ${Math.abs(difference).toFixed(2)}`}
+              {isBalanced
+                ? `${currency} Balanced${isRoundingResidual ? " · rounding ±0.01" : ""}`
+                : `${currency} Unbalanced · Δ ${absDiff.toFixed(2)}`}
             </div>
           )}
         </div>
