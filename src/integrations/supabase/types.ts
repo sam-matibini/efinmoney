@@ -8671,6 +8671,14 @@ export type Database = {
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
       snapshot_board_metrics: { Args: { p_month?: string }; Returns: string }
+      sweep_fx_clearing_to_gain_loss: {
+        Args: never
+        Returns: {
+          posted_to: string
+          swept_amount: number
+          swept_currency: string
+        }[]
+      }
       validate_compliance_parameters: {
         Args: { p_parameters: Json; p_rule_type: string }
         Returns: boolean
