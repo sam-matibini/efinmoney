@@ -5,6 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { RefreshCw, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 
 interface TrialBalanceRow {
@@ -31,7 +33,13 @@ export const TrialBalancePanel = () => {
     },
   });
 
-  const { data: trialBalance = [], isLoading } = useQuery({
+  const { data: trialBalance = [], isLoading, isFetching, refetch } = useQuery({
+    // Financial control screen — always refetch on mount/refocus rather than
+    // trusting the global 60s cache, so this can never silently show stale
+    // balances after a fix is deployed underneath it.
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
     queryKey: ["trial-balance", currency],
     queryFn: async () => {
       const { data: accounts, error: accountsError } = await supabase
@@ -109,17 +117,22 @@ export const TrialBalancePanel = () => {
         </div>
 
         <div className="flex flex-col items-end gap-2">
-          <Select value={currency} onValueChange={setCurrency}>
-            <SelectTrigger className="w-40">
-              <SelectValue placeholder="Currency" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">All currencies</SelectItem>
-              {currencies.map((c) => (
-                <SelectItem key={c} value={c}>{c}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-2">
+            <Select value={currency} onValueChange={setCurrency}>
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="Currency" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All currencies</SelectItem>
+                {currencies.map((c) => (
+                  <SelectItem key={c} value={c}>{c}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button size="icon" variant="outline" onClick={() => refetch()} disabled={isFetching} title="Refresh">
+              {isFetching ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+            </Button>
+          </div>
 
           {isMixedView ? (
             <p className="text-xs text-muted-foreground max-w-xs text-right">
