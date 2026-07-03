@@ -3,6 +3,7 @@ import Header from "@/components/layout/Header";
 import MobileNav from "@/components/layout/MobileNav";
 import PageTransition from "@/components/ui/PageTransition";
 import AdyenReturnHandler from "@/components/payments/AdyenReturnHandler";
+import AliceWidget from "@/components/alice/AliceWidget";
 
 /** Persistent shell — Header stays mounted while only page content swaps. */
 const ClientShell = () => (
@@ -13,6 +14,7 @@ const ClientShell = () => (
       <Outlet />
     </PageTransition>
     <MobileNav />
+    <AliceWidget context="user" />
   </div>
 );
 

@@ -13,6 +13,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
+import AliceWidget from "@/components/alice/AliceWidget";
 
 const NAV = [
   { to: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -329,6 +330,7 @@ const AdminLayout = ({ children }: { children: ReactNode }) => {
 
         <main className="flex-1 p-4 lg:p-6 min-w-0">{children}</main>
       </div>
+      <AliceWidget context="admin" />
     </div>
   );
 };
