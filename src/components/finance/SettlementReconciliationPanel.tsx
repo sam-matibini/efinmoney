@@ -46,32 +46,135 @@ const procLabel = (p: string) => p.replace(/_/g, " ");
 
 const TEMPLATE_HEADERS = ["processor", "processor_settlement_amount", "efinmoney_ledger_amount", "bank_statement_amount", "batch_ref", "settlement_date"];
 
-/* Minimal CSV parse (no embedded commas/quotes — sufficient for the template). */
-function parseCsv(text: string): ReconInput[] {
-  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-  if (lines.length < 2) return [];
-  const headers = lines[0].split(",").map((h) => h.trim().toLowerCase());
+/* RFC-4180 CSV tokenizer — handles quoted fields, embedded commas/newlines,
+   escaped "" quotes and CRLF. Needed for real processor exports (e.g. Stripe). */
+function tokenizeCsv(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = "";
+  let inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"') {
+        if (text[i + 1] === '"') { field += '"'; i++; } else inQuotes = false;
+      } else field += c;
+    } else if (c === '"') {
+      inQuotes = true;
+    } else if (c === ",") {
+      row.push(field); field = "";
+    } else if (c === "\n") {
+      row.push(field); rows.push(row); row = []; field = "";
+    } else if (c !== "\r") {
+      field += c;
+    }
+  }
+  if (field !== "" || row.length > 0) { row.push(field); rows.push(row); }
+  return rows;
+}
+
+/* Parse a numeric cell, tolerating currency symbols / thousands separators. */
+function num(s: string | undefined): number {
+  if (s == null) return 0;
+  const n = Number(String(s).replace(/[^0-9.\-]/g, ""));
+  return Number.isFinite(n) ? n : 0;
+}
+
+/* Reconciliation template format (one row = one settlement batch). */
+function parseTemplate(rows: string[][], headers: string[]): ReconInput[] {
   const idx = (name: string) => headers.indexOf(name);
   const out: ReconInput[] = [];
-  for (let i = 1; i < lines.length; i++) {
-    const cells = lines[i].split(",").map((c) => c.trim());
-    const processor = (cells[idx("processor")] || "other").toLowerCase();
-    const proc = Number(cells[idx("processor_settlement_amount")] || 0);
-    const ledger = Number(cells[idx("efinmoney_ledger_amount")] || 0);
-    const bankCell = idx("bank_statement_amount") >= 0 ? cells[idx("bank_statement_amount")] : "";
-    const batch = idx("batch_ref") >= 0 ? cells[idx("batch_ref")] : "";
-    const date = idx("settlement_date") >= 0 ? cells[idx("settlement_date")] : "";
-    if (!Number.isFinite(proc) || !Number.isFinite(ledger)) continue;
+  for (const cells of rows) {
+    const processor = (cells[idx("processor")] || "other").trim().toLowerCase();
+    const proc = num(cells[idx("processor_settlement_amount")]);
+    const ledger = num(cells[idx("efinmoney_ledger_amount")]);
+    const bankI = idx("bank_statement_amount");
+    const batchI = idx("batch_ref");
+    const dateI = idx("settlement_date");
+    const bankCell = bankI >= 0 ? (cells[bankI] || "").trim() : "";
+    const batch = batchI >= 0 ? (cells[batchI] || "").trim() : "";
+    const date = dateI >= 0 ? (cells[dateI] || "").trim() : "";
     out.push({
       processor: (PROCESSORS as readonly string[]).includes(processor) ? processor : "other",
       processor_settlement_amount: proc,
       efinmoney_ledger_amount: ledger,
-      bank_statement_amount: bankCell ? Number(bankCell) : null,
+      bank_statement_amount: bankCell ? num(bankCell) : null,
       batch_ref: batch || null,
       settlement_date: date || null,
     });
   }
   return out;
+}
+
+/* Stripe "Payments" export → group paid charges into one settlement per payout.
+   processor amount = net (amount − fee − refunds), which is what Stripe pays
+   out to the bank. Failed/declined charges never settle and are skipped. */
+function parseStripeExport(rows: string[][], headers: string[]): ReconInput[] {
+  const col = (name: string) => headers.indexOf(name);
+  const iAmount = col("amount");
+  const iFee = col("fee");
+  const iRefunded = col("amount refunded");
+  const iCurrency = col("currency");
+  const iStatus = col("status");
+  const iCaptured = col("captured");
+  const iTransfer = col("transfer");
+  const iCreated = col("created date (utc)");
+
+  type Group = { net: number; gross: number; currency: string; date: string; count: number };
+  const groups = new Map<string, Group>();
+
+  for (const cells of rows) {
+    const status = (iStatus >= 0 ? cells[iStatus] : "").trim().toLowerCase();
+    const captured = (iCaptured >= 0 ? cells[iCaptured] : "").trim().toLowerCase();
+    const paid = status === "paid" || captured === "true";
+    if (!paid) continue; // skip failed / declined — they never settle
+
+    const amount = num(cells[iAmount]);
+    const fee = iFee >= 0 ? num(cells[iFee]) : 0;
+    const refunded = iRefunded >= 0 ? num(cells[iRefunded]) : 0;
+    const currency = ((iCurrency >= 0 ? cells[iCurrency] : "") || "usd").trim().toUpperCase();
+    const payout = (iTransfer >= 0 ? cells[iTransfer] : "").trim();
+    const created = (iCreated >= 0 ? cells[iCreated] : "").trim().slice(0, 10);
+    const key = `${payout || `PENDING-${created}`}|${currency}`;
+
+    const g = groups.get(key) || { net: 0, gross: 0, currency, date: created, count: 0 };
+    g.net += amount - fee - refunded;
+    g.gross += amount;
+    if (created > g.date) g.date = created;
+    g.count++;
+    groups.set(key, g);
+  }
+
+  const round2 = (n: number) => Math.round(n * 100) / 100;
+  const out: ReconInput[] = [];
+  for (const [key, g] of groups) {
+    const payout = key.split("|")[0];
+    const net = round2(g.net);
+    out.push({
+      processor: "stripe",
+      processor_settlement_amount: net,
+      efinmoney_ledger_amount: net, // provisional: assume booked at settled value; edit + re-run to reconcile
+      bank_statement_amount: null,  // fill in from bank statement, then Run Matching
+      batch_ref: payout.startsWith("PENDING-") ? payout : payout || null,
+      settlement_date: g.date || null,
+      notes: `Auto-imported from Stripe — ${g.count} charge${g.count > 1 ? "s" : ""}, gross ${round2(g.gross)} ${g.currency}, net ${net} ${g.currency}`,
+    });
+  }
+  return out;
+}
+
+/* Detect the CSV shape and dispatch. Throws a clear error on unknown formats. */
+function parseCsv(text: string): ReconInput[] {
+  const table = tokenizeCsv(text.replace(/^﻿/, ""));
+  if (table.length < 2) return [];
+  const headers = table[0].map((h) => h.trim().toLowerCase());
+  const dataRows = table.slice(1).filter((r) => r.some((c) => c.trim() !== ""));
+
+  if (headers.includes("processor_settlement_amount")) return parseTemplate(dataRows, headers);
+  if (headers.includes("id") && headers.includes("amount") && (headers.includes("fee") || headers.includes("status"))) {
+    return parseStripeExport(dataRows, headers);
+  }
+  throw new Error("Unrecognized CSV. Use the reconciliation template or a Stripe payments export.");
 }
 
 /* ── stat card ── */
@@ -190,7 +293,7 @@ export const SettlementReconciliationPanel = () => {
         const text = await file.text();
         const rows = parseCsv(text);
         if (rows.length === 0) {
-          toast.error("No valid rows found in CSV");
+          toast.error("No settlements to import — the file had no rows, or all Stripe charges were failed/declined.");
         } else {
           await createMut.mutateAsync(rows);
           toast.success(`Imported ${rows.length} settlement${rows.length > 1 ? "s" : ""}`);
