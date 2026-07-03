@@ -44,6 +44,17 @@ const fmt = (n: number | string | null | undefined) =>
   n == null || n === "" ? "—" : Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const procLabel = (p: string) => p.replace(/_/g, " ");
 
+/* Surface the real reason — Supabase errors are plain objects, not Error instances. */
+function errMsg(err: unknown, fallback: string): string {
+  if (err instanceof Error) return err.message;
+  if (err && typeof err === "object") {
+    const e = err as { message?: string; details?: string; hint?: string; code?: string };
+    const parts = [e.message, e.details, e.hint].filter(Boolean);
+    if (parts.length) return `${parts.join(" — ")}${e.code ? ` (${e.code})` : ""}`;
+  }
+  return fallback;
+}
+
 const TEMPLATE_HEADERS = ["processor", "processor_settlement_amount", "efinmoney_ledger_amount", "bank_statement_amount", "batch_ref", "settlement_date"];
 
 /* RFC-4180 CSV tokenizer — handles quoted fields, embedded commas/newlines,
@@ -299,7 +310,7 @@ export const SettlementReconciliationPanel = () => {
           toast.success(`Imported ${rows.length} settlement${rows.length > 1 ? "s" : ""}`);
         }
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Import failed");
+        toast.error(errMsg(err, "Import failed"));
       }
     }
     if (fileRef.current) fileRef.current.value = "";
