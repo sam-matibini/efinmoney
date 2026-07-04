@@ -26,6 +26,13 @@ export default function AliceWidget({ context }: { context: "user" | "admin" }) 
   const [open, setOpen] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [input, setInput] = useState("");
+  const [hidden, setHidden] = useState(() => {
+    try { return localStorage.getItem("alice_hidden") === "1"; } catch { return false; }
+  });
+  const setHiddenPersist = (v: boolean) => {
+    setHidden(v);
+    try { localStorage.setItem("alice_hidden", v ? "1" : "0"); } catch { /* ignore */ }
+  };
   const { messages, isSending, send, newChat, loadConversation, conversations } = useAliceChat(context);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -41,24 +48,43 @@ export default function AliceWidget({ context }: { context: "user" | "admin" }) 
 
   return (
     <>
-      {/* Floating launcher — Alice avatar, falls back to the sparkle icon if missing */}
-      <button
-        onClick={() => setOpen(true)}
-        aria-label="Open Alice AI assistant"
-        className={cn(
-          "fixed z-40 right-4 bottom-24 md:bottom-6 h-14 w-14 rounded-full shadow-lg overflow-hidden",
-          "bg-gradient-primary text-primary-foreground flex items-center justify-center ring-2 ring-background",
-          "hover:scale-105 active:scale-95 transition-transform",
-        )}
-      >
-        <Sparkles className="h-6 w-6" />
-        <img
-          src="/alice.png"
-          alt="Alice AI"
-          onError={(e) => { e.currentTarget.style.display = "none"; }}
-          className="absolute inset-0 h-full w-full object-cover object-top"
-        />
-      </button>
+      {/* Floating launcher — dismissible. When hidden, a slim edge handle restores it. */}
+      {hidden ? (
+        <button
+          onClick={() => setHiddenPersist(false)}
+          aria-label="Show Alice AI assistant"
+          className="fixed z-40 right-0 bottom-24 md:bottom-6 h-11 w-7 rounded-l-xl shadow-md flex items-center justify-center bg-gradient-primary/70 text-primary-foreground hover:bg-gradient-primary transition-colors"
+        >
+          <Sparkles className="h-4 w-4" />
+        </button>
+      ) : (
+        <div className="fixed z-40 right-4 bottom-24 md:bottom-6">
+          <button
+            onClick={() => setOpen(true)}
+            aria-label="Open Alice AI assistant"
+            className={cn(
+              "relative h-14 w-14 rounded-full shadow-lg overflow-hidden",
+              "bg-gradient-primary text-primary-foreground flex items-center justify-center ring-2 ring-background",
+              "hover:scale-105 active:scale-95 transition-transform",
+            )}
+          >
+            <Sparkles className="h-6 w-6" />
+            <img
+              src="/alice.png"
+              alt="Alice AI"
+              onError={(e) => { e.currentTarget.style.display = "none"; }}
+              className="absolute inset-0 h-full w-full object-cover object-top"
+            />
+          </button>
+          <button
+            onClick={() => setHiddenPersist(true)}
+            aria-label="Hide Alice"
+            className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-background border border-border shadow flex items-center justify-center text-muted-foreground hover:text-foreground"
+          >
+            <X className="h-3 w-3" />
+          </button>
+        </div>
+      )}
 
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col gap-0">
