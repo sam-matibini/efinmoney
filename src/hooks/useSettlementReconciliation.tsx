@@ -29,9 +29,13 @@ export function classifyRow(r: Pick<ReconRow, "processor_settlement_amount" | "e
   const proc = Number(r.processor_settlement_amount || 0);
   const ledger = Number(r.efinmoney_ledger_amount || 0);
   const bank = r.bank_statement_amount == null ? null : Number(r.bank_statement_amount);
-
-  if (bank == null) return "missing"; // no bank deposit located yet
   const ledgerMatches = Math.abs(proc - ledger) <= TOLERANCE;
+
+  // Bank statement is optional. With no bank amount yet, reconcile the processor
+  // payout against the EfinMoney ledger; entering a bank amount later adds the
+  // third-way check on top.
+  if (bank == null) return ledgerMatches ? "matched" : "variance";
+
   const bankMatches = Math.abs(proc - bank) <= TOLERANCE;
   return ledgerMatches && bankMatches ? "matched" : "variance";
 }
