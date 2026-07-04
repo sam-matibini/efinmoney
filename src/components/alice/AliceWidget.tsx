@@ -41,25 +41,37 @@ export default function AliceWidget({ context }: { context: "user" | "admin" }) 
 
   return (
     <>
-      {/* Floating launcher */}
+      {/* Floating launcher — Alice avatar, falls back to the sparkle icon if missing */}
       <button
         onClick={() => setOpen(true)}
         aria-label="Open Alice AI assistant"
         className={cn(
-          "fixed z-40 right-4 bottom-24 md:bottom-6 h-14 w-14 rounded-full shadow-lg",
-          "bg-gradient-primary text-primary-foreground flex items-center justify-center",
+          "fixed z-40 right-4 bottom-24 md:bottom-6 h-14 w-14 rounded-full shadow-lg overflow-hidden",
+          "bg-gradient-primary text-primary-foreground flex items-center justify-center ring-2 ring-background",
           "hover:scale-105 active:scale-95 transition-transform",
         )}
       >
         <Sparkles className="h-6 w-6" />
+        <img
+          src="/alice.png"
+          alt="Alice AI"
+          onError={(e) => { e.currentTarget.style.display = "none"; }}
+          className="absolute inset-0 h-full w-full object-cover object-top"
+        />
       </button>
 
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col gap-0">
           {/* Header */}
           <div className="flex items-center gap-2 px-4 h-14 border-b shrink-0">
-            <div className="h-8 w-8 rounded-full bg-gradient-primary text-primary-foreground flex items-center justify-center">
+            <div className="relative h-8 w-8 rounded-full bg-gradient-primary text-primary-foreground flex items-center justify-center overflow-hidden">
               <Sparkles className="h-4 w-4" />
+              <img
+                src="/alice.png"
+                alt="Alice"
+                onError={(e) => { e.currentTarget.style.display = "none"; }}
+                className="absolute inset-0 h-full w-full object-cover object-top"
+              />
             </div>
             <div className="leading-tight flex-1">
               <div className="font-semibold text-sm">Alice AI</div>
