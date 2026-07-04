@@ -33,6 +33,60 @@ export default function AliceWidget({ context }: { context: "user" | "admin" }) 
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  /* ── draggable launcher (position persisted per browser) ── */
+  const SIZE = 56;
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  const posRef = useRef<{ x: number; y: number } | null>(null);
+  const dragging = useRef(false);
+  const moved = useRef(false);
+  const start = useRef({ x: 0, y: 0 });
+  const grab = useRef({ x: 0, y: 0 });
+
+  useEffect(() => { posRef.current = pos; }, [pos]);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("alice_pos");
+      if (saved) setPos(JSON.parse(saved));
+    } catch { /* ignore */ }
+  }, []);
+
+  const clamp = (x: number, y: number) => ({
+    x: Math.min(Math.max(8, x), window.innerWidth - SIZE - 8),
+    y: Math.min(Math.max(8, y), window.innerHeight - SIZE - 8),
+  });
+
+  useEffect(() => {
+    const onResize = () => setPos((p) => (p ? clamp(p.x, p.y) : p));
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  const onPointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
+    dragging.current = true;
+    moved.current = false;
+    start.current = { x: e.clientX, y: e.clientY };
+    const rect = btnRef.current!.getBoundingClientRect();
+    grab.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    btnRef.current!.setPointerCapture(e.pointerId);
+  };
+  const onPointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
+    if (!dragging.current) return;
+    if (Math.hypot(e.clientX - start.current.x, e.clientY - start.current.y) > 4) moved.current = true;
+    if (moved.current) setPos(clamp(e.clientX - grab.current.x, e.clientY - grab.current.y));
+  };
+  const onPointerUp = (e: React.PointerEvent<HTMLButtonElement>) => {
+    if (!dragging.current) return;
+    dragging.current = false;
+    try { btnRef.current?.releasePointerCapture(e.pointerId); } catch { /* ignore */ }
+    if (moved.current) {
+      try { if (posRef.current) localStorage.setItem("alice_pos", JSON.stringify(posRef.current)); } catch { /* ignore */ }
+    } else {
+      setOpen((o) => !o); // a tap (no drag) opens/closes the chat
+    }
+  };
+
   const submit = (text: string) => {
     if (!text.trim() || isSending) return;
     setInput("");
@@ -41,22 +95,26 @@ export default function AliceWidget({ context }: { context: "user" | "admin" }) 
 
   return (
     <>
-      {/* Floating launcher — tap to toggle the chat open/closed */}
+      {/* Floating launcher — drag to reposition (saved), tap to open/close the chat */}
       <button
-        onClick={() => setOpen((o) => !o)}
-        aria-label="Toggle Alice AI assistant"
+        ref={btnRef}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        aria-label="Alice AI assistant — drag to move, tap to open"
         className={cn(
-          "fixed z-40 right-4 bottom-24 md:bottom-6 h-14 w-14 rounded-full shadow-lg overflow-hidden",
+          "fixed z-40 h-14 w-14 rounded-full shadow-lg overflow-hidden touch-none select-none cursor-grab active:cursor-grabbing",
           "bg-gradient-primary text-primary-foreground flex items-center justify-center ring-2 ring-background",
-          "hover:scale-105 active:scale-95 transition-transform",
+          pos ? "" : "right-4 bottom-24 md:bottom-6",
         )}
+        style={pos ? { left: pos.x, top: pos.y } : undefined}
       >
         <Sparkles className="h-6 w-6" />
         <img
           src="/alice.png"
           alt="Alice AI"
           onError={(e) => { e.currentTarget.style.display = "none"; }}
-          className="absolute inset-0 h-full w-full object-cover object-top"
+          className="absolute inset-0 h-full w-full object-cover object-top pointer-events-none"
         />
       </button>
 
