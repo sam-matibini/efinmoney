@@ -1,7 +1,10 @@
 // Scan a receipt/invoice (image or PDF) and extract structured purchase bill data
-// using Lovable AI Gateway (Gemini multimodal).
-import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+// using the Anthropic API (Claude — multimodal vision + PDF support).
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { corsPreflightResponse, jsonResponse } from "../_shared/cors.ts";
+
+const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
+const MODEL = "claude-sonnet-5"; // multimodal — reads images and PDFs
 
 interface ScanResult {
   vendor_name?: string;
@@ -32,174 +35,113 @@ Return a JSON object that strictly matches the provided tool schema.
 - currency is a 3-letter ISO code (USD, CAD, EUR, GBP, NGN, KES, BWP, etc.).
 Do not invent data. Leave fields you cannot read out of the JSON entirely (except line_items which must always be an array).`;
 
-const TOOL_SCHEMA = {
-  type: "function",
-  function: {
-    name: "extract_bill",
-    description: "Extract structured purchase bill data from an invoice/receipt.",
-    parameters: {
-      type: "object",
-      properties: {
-        vendor_name: { type: "string" },
-        vendor_reference: { type: "string" },
-        bill_date: { type: "string" },
-        due_date: { type: "string" },
-        currency: { type: "string" },
-        subtotal: { type: "number" },
-        tax_total: { type: "number" },
-        total: { type: "number" },
-        notes: { type: "string" },
-        line_items: {
-          type: "array",
-          items: {
-            type: "object",
-            properties: {
-              description: { type: "string" },
-              quantity: { type: "number" },
-              unit_price: { type: "number" },
-              tax_percent: { type: "number" },
-            },
-            required: ["description", "quantity", "unit_price", "tax_percent"],
-            additionalProperties: false,
+// Anthropic tool schema — Claude is forced to call this to return structured data.
+const EXTRACT_TOOL = {
+  name: "extract_bill",
+  description: "Extract structured purchase bill data from an invoice/receipt.",
+  input_schema: {
+    type: "object",
+    properties: {
+      vendor_name: { type: "string" },
+      vendor_reference: { type: "string" },
+      bill_date: { type: "string" },
+      due_date: { type: "string" },
+      currency: { type: "string" },
+      subtotal: { type: "number" },
+      tax_total: { type: "number" },
+      total: { type: "number" },
+      notes: { type: "string" },
+      line_items: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            description: { type: "string" },
+            quantity: { type: "number" },
+            unit_price: { type: "number" },
+            tax_percent: { type: "number" },
           },
+          required: ["description", "quantity", "unit_price", "tax_percent"],
         },
       },
-      required: ["line_items"],
-      additionalProperties: false,
     },
+    required: ["line_items"],
   },
 };
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  if (req.method === "OPTIONS") return corsPreflightResponse();
 
   try {
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    if (!authHeader?.startsWith("Bearer ")) return jsonResponse({ error: "Unauthorized" }, 401);
+
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_ANON_KEY")!,
       { global: { headers: { Authorization: authHeader } } },
     );
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    if (!user) return jsonResponse({ error: "Unauthorized" }, 401);
 
     const body = await req.json().catch(() => ({}));
     const fileBase64: string = body?.file_base64 || "";
     const mimeType: string = body?.mime_type || "";
-    if (!fileBase64 || !mimeType) {
-      return new Response(JSON.stringify({ error: "file_base64 and mime_type are required" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    if (fileBase64.length > 11_000_000) {
-      return new Response(JSON.stringify({ error: "File too large (max ~8 MB)" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    if (!fileBase64 || !mimeType) return jsonResponse({ error: "file_base64 and mime_type are required" }, 400);
+    if (fileBase64.length > 11_000_000) return jsonResponse({ error: "File too large (max ~8 MB)" }, 400);
 
-    const apiKey = Deno.env.get("LOVABLE_API_KEY");
-    if (!apiKey) {
-      return new Response(JSON.stringify({ error: "AI gateway not configured" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
+    if (!apiKey) return jsonResponse({ error: "Scanning is not configured yet (missing ANTHROPIC_API_KEY)." }, 500);
 
-    const dataUrl = `data:${mimeType};base64,${fileBase64}`;
     const isPdf = mimeType === "application/pdf";
+    const fileBlock = isPdf
+      ? { type: "document", source: { type: "base64", media_type: "application/pdf", data: fileBase64 } }
+      : { type: "image", source: { type: "base64", media_type: mimeType, data: fileBase64 } };
 
-    const userContent: Array<Record<string, unknown>> = [
-      { type: "text", text: "Extract the purchase bill data from this document." },
-    ];
-    if (isPdf) {
-      userContent.push({
-        type: "file",
-        file: { filename: "invoice.pdf", file_data: dataUrl },
-      });
-    } else {
-      userContent.push({ type: "image_url", image_url: { url: dataUrl } });
-    }
-
-    const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const aiRes = await fetch(ANTHROPIC_URL, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
-        "Lovable-API-Key": apiKey,
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: MODEL,
+        max_tokens: 2048,
+        system: SYSTEM_PROMPT,
+        tools: [EXTRACT_TOOL],
+        tool_choice: { type: "tool", name: "extract_bill" },
         messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: userContent },
+          {
+            role: "user",
+            content: [
+              { type: "text", text: "Extract the purchase bill data from this document." },
+              fileBlock,
+            ],
+          },
         ],
-        tools: [TOOL_SCHEMA],
-        tool_choice: { type: "function", function: { name: "extract_bill" } },
       }),
     });
 
-    if (aiRes.status === 429) {
-      return new Response(JSON.stringify({ error: "AI is busy, please try again in a moment." }), {
-        status: 429,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    if (aiRes.status === 402) {
-      return new Response(JSON.stringify({ error: "AI credits exhausted. Please add credits in workspace billing." }), {
-        status: 402,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    if (aiRes.status === 429) return jsonResponse({ error: "AI is busy, please try again in a moment." }, 429);
     if (!aiRes.ok) {
-      const text = await aiRes.text();
-      console.error("AI gateway error", aiRes.status, text);
-      return new Response(JSON.stringify({ error: `AI gateway error (${aiRes.status})` }), {
-        status: 502,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      const errBody = await aiRes.json().catch(() => ({}));
+      const detail = errBody?.error?.message || `HTTP ${aiRes.status}`;
+      console.error("anthropic error", aiRes.status, detail);
+      return jsonResponse({ error: `AI error: ${detail}` }, 502);
     }
 
     const json = await aiRes.json();
-    const toolCall = json?.choices?.[0]?.message?.tool_calls?.[0];
-    const argStr = toolCall?.function?.arguments;
-    if (!argStr) {
-      return new Response(JSON.stringify({ error: "Could not read invoice. Please try a clearer photo." }), {
-        status: 422,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    let parsed: ScanResult;
-    try {
-      parsed = JSON.parse(argStr);
-    } catch {
-      return new Response(JSON.stringify({ error: "Invalid response from AI" }), {
-        status: 502,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    // deno-lint-ignore no-explicit-any
+    const toolUse = (json?.content || []).find((b: any) => b?.type === "tool_use" && b?.name === "extract_bill");
+    if (!toolUse?.input) return jsonResponse({ error: "Could not read invoice. Please try a clearer photo." }, 422);
 
+    const parsed = toolUse.input as ScanResult;
     if (!Array.isArray(parsed.line_items)) parsed.line_items = [];
 
-    return new Response(JSON.stringify({ data: parsed }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return jsonResponse({ data: parsed });
   } catch (err) {
     console.error("scan-purchase-bill error", err);
-    return new Response(JSON.stringify({ error: err instanceof Error ? err.message : "Unknown error" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return jsonResponse({ error: err instanceof Error ? err.message : "Unknown error" }, 500);
   }
 });
