@@ -14,7 +14,7 @@ const ClientShell = () => (
       <Outlet />
     </PageTransition>
     <MobileNav />
-    <AliceWidget context="user" />
+    {import.meta.env.VITE_ALICE_ENABLED !== "false" && <AliceWidget context="user" />}
   </div>
 );
 

@@ -330,7 +330,7 @@ const AdminLayout = ({ children }: { children: ReactNode }) => {
 
         <main className="flex-1 p-4 lg:p-6 min-w-0">{children}</main>
       </div>
-      <AliceWidget context="admin" />
+      {import.meta.env.VITE_ALICE_ENABLED !== "false" && <AliceWidget context="admin" />}
     </div>
   );
 };
