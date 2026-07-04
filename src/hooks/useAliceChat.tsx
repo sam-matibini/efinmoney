@@ -98,7 +98,16 @@ export const useAliceChat = (context: Context) => {
       setMessages([...thread, { role: "assistant", content: reply }]);
       qc.invalidateQueries({ queryKey: ["alice-conversations", context] });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Something went wrong.";
+      let msg = err instanceof Error ? err.message : "Something went wrong.";
+      // Supabase FunctionsHttpError hides the body — read it for the real reason.
+      // deno-lint-ignore no-explicit-any
+      const ctx = (err as any)?.context;
+      if (ctx && typeof ctx.json === "function") {
+        try {
+          const b = await ctx.json();
+          if (b?.error) msg = b.error;
+        } catch { /* ignore */ }
+      }
       setMessages([...thread, { role: "assistant", content: `⚠️ ${msg}` }]);
     } finally {
       setIsSending(false);

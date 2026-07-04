@@ -1,16 +1,17 @@
 // Alice AI — EfinMoney assistant. Answers product questions and, for the signed-in
 // caller, read-only questions about their own data (admins get operational read tools).
-// Reuses the Lovable AI Gateway (LOVABLE_API_KEY), same as scan-purchase-bill.
+// Calls the Anthropic Messages API directly (ANTHROPIC_API_KEY secret).
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { corsPreflightResponse, jsonResponse } from "../_shared/cors.ts";
 import { EFINMONEY_KNOWLEDGE, EFINMONEY_ADMIN_KNOWLEDGE } from "../_shared/alice-knowledge.ts";
 
-const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
-const PRIMARY_MODEL = "anthropic/claude-sonnet-4-5"; // Claude via gateway (per product choice)
-const FALLBACK_MODEL = "google/gemini-3-flash-preview"; // known-good if the gateway rejects the model id
+const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
+const MODEL = "claude-sonnet-5"; // latest, capable, good cost for chat
+const MAX_TOKENS = 1024;
 const MAX_TOOL_ITERATIONS = 4;
 
-type ChatMsg = { role: string; content: string | null; tool_calls?: unknown; tool_call_id?: string };
+// deno-lint-ignore no-explicit-any
+type Any = any;
 
 const GUARDRAILS = `
 You are Alice, the EfinMoney in-app assistant. Rules:
@@ -26,23 +27,20 @@ You are Alice, the EfinMoney in-app assistant. Rules:
 - When a question is about the user's own account (balance, transactions, KYC), use
   the available tools to fetch real data before answering.`;
 
-/* ── tool schemas ── */
+/* ── Anthropic tool schemas ── */
 const USER_TOOLS = [
-  { type: "function", function: { name: "get_my_balances", description: "Get the signed-in user's wallet balances per currency.", parameters: { type: "object", properties: {}, additionalProperties: false } } },
-  { type: "function", function: { name: "get_my_recent_transactions", description: "Get the signed-in user's most recent wallet transactions.", parameters: { type: "object", properties: { limit: { type: "number", description: "How many to return (max 20)." } }, additionalProperties: false } } },
-  { type: "function", function: { name: "get_my_kyc_status", description: "Get the signed-in user's KYC verification status and tier.", parameters: { type: "object", properties: {}, additionalProperties: false } } },
+  { name: "get_my_balances", description: "Get the signed-in user's wallet balances per currency.", input_schema: { type: "object", properties: {} } },
+  { name: "get_my_recent_transactions", description: "Get the signed-in user's most recent wallet transactions.", input_schema: { type: "object", properties: { limit: { type: "number", description: "How many to return (max 20)." } } } },
+  { name: "get_my_kyc_status", description: "Get the signed-in user's KYC verification status and tier.", input_schema: { type: "object", properties: {} } },
 ];
 const ADMIN_TOOLS = [
-  { type: "function", function: { name: "get_pending_kyc_count", description: "Count KYC verifications awaiting review.", parameters: { type: "object", properties: {}, additionalProperties: false } } },
-  { type: "function", function: { name: "get_settlement_summary", description: "Summary of settlement reconciliation rows by status plus total variance.", parameters: { type: "object", properties: {}, additionalProperties: false } } },
-  { type: "function", function: { name: "lookup_user_by_email", description: "Find users whose email matches a search string.", parameters: { type: "object", properties: { email: { type: "string" } }, required: ["email"], additionalProperties: false } } },
-  { type: "function", function: { name: "get_open_incidents_count", description: "Count operational incidents that are not resolved/closed.", parameters: { type: "object", properties: {}, additionalProperties: false } } },
+  { name: "get_pending_kyc_count", description: "Count KYC verifications awaiting review.", input_schema: { type: "object", properties: {} } },
+  { name: "get_settlement_summary", description: "Summary of settlement reconciliation rows by status plus total variance.", input_schema: { type: "object", properties: {} } },
+  { name: "lookup_user_by_email", description: "Find users whose email matches a search string.", input_schema: { type: "object", properties: { email: { type: "string" } }, required: ["email"] } },
+  { name: "get_open_incidents_count", description: "Count operational incidents that are not resolved/closed.", input_schema: { type: "object", properties: {} } },
 ];
 
-// deno-lint-ignore no-explicit-any
-type SB = any;
-
-async function runTool(name: string, args: Record<string, unknown>, sb: SB, userId: string, isStaff: boolean): Promise<unknown> {
+async function runTool(name: string, args: Record<string, unknown>, sb: Any, userId: string, isStaff: boolean): Promise<unknown> {
   switch (name) {
     case "get_my_balances": {
       const { data, error } = await sb.rpc("get_user_wallet_balances", { p_user_id: userId });
@@ -107,11 +105,15 @@ async function runTool(name: string, args: Record<string, unknown>, sb: SB, user
   }
 }
 
-async function callGateway(apiKey: string, model: string, messages: ChatMsg[], tools: unknown[]) {
-  return await fetch(GATEWAY_URL, {
+async function callAnthropic(apiKey: string, system: string, messages: Any[], tools: Any[]) {
+  return await fetch(ANTHROPIC_URL, {
     method: "POST",
-    headers: { "Content-Type": "application/json", "Lovable-API-Key": apiKey },
-    body: JSON.stringify({ model, messages, tools, tool_choice: "auto" }),
+    headers: {
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({ model: MODEL, max_tokens: MAX_TOKENS, system, messages, tools }),
   });
 }
 
@@ -130,11 +132,11 @@ Deno.serve(async (req) => {
     const { data: { user } } = await sb.auth.getUser();
     if (!user) return jsonResponse({ error: "Unauthorized" }, 401);
 
-    const apiKey = Deno.env.get("LOVABLE_API_KEY");
-    if (!apiKey) return jsonResponse({ error: "AI gateway not configured" }, 500);
+    const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
+    if (!apiKey) return jsonResponse({ error: "Alice is not configured yet (missing ANTHROPIC_API_KEY)." }, 500);
 
     const body = await req.json().catch(() => ({}));
-    const history: ChatMsg[] = Array.isArray(body?.messages) ? body.messages : [];
+    const history: { role: string; content: string }[] = Array.isArray(body?.messages) ? body.messages : [];
     const requestedContext: string = body?.context === "admin" ? "admin" : "user";
     if (history.length === 0) return jsonResponse({ error: "messages required" }, 400);
 
@@ -144,7 +146,7 @@ Deno.serve(async (req) => {
     const isStaff = roles.has("admin") || roles.has("finance") || roles.has("compliance");
     const effectiveContext = requestedContext === "admin" && isStaff ? "admin" : "user";
 
-    const systemPrompt = [
+    const system = [
       EFINMONEY_KNOWLEDGE,
       effectiveContext === "admin" ? EFINMONEY_ADMIN_KNOWLEDGE : "",
       GUARDRAILS,
@@ -153,53 +155,52 @@ Deno.serve(async (req) => {
 
     const tools = effectiveContext === "admin" ? [...USER_TOOLS, ...ADMIN_TOOLS] : USER_TOOLS;
 
-    // Keep only role/content/tool fields from client history; cap length.
-    const trimmed = history.slice(-16).map((m) => ({ role: m.role, content: m.content ?? "" }));
-    const messages: ChatMsg[] = [{ role: "system", content: systemPrompt }, ...trimmed];
+    // Build Anthropic messages: only user/assistant text, must start with 'user'.
+    const messages: Any[] = history
+      .slice(-16)
+      .filter((m) => m.role === "user" || m.role === "assistant")
+      .map((m) => ({ role: m.role, content: m.content ?? "" }));
+    while (messages.length && messages[0].role !== "user") messages.shift();
+    if (messages.length === 0) return jsonResponse({ error: "messages required" }, 400);
 
     const toolsUsed: string[] = [];
-    let model = PRIMARY_MODEL;
 
     for (let i = 0; i < MAX_TOOL_ITERATIONS; i++) {
-      let res = await callGateway(apiKey, model, messages, tools);
-      // If the gateway rejects the Claude model id, fall back once to the known-good model.
-      if (!res.ok && (res.status === 400 || res.status === 404) && model === PRIMARY_MODEL) {
-        model = FALLBACK_MODEL;
-        res = await callGateway(apiKey, model, messages, tools);
-      }
+      const res = await callAnthropic(apiKey, system, messages, tools);
       if (res.status === 429) return jsonResponse({ error: "Alice is busy, please try again in a moment." }, 429);
-      if (res.status === 402) return jsonResponse({ error: "AI credits exhausted. Add credits in workspace billing." }, 402);
       if (!res.ok) {
-        const text = await res.text();
-        console.error("gateway error", res.status, text);
-        return jsonResponse({ error: `AI gateway error (${res.status})` }, 502);
+        const errBody = await res.json().catch(() => ({}));
+        const detail = errBody?.error?.message || `HTTP ${res.status}`;
+        console.error("anthropic error", res.status, detail);
+        return jsonResponse({ error: `AI error: ${detail}` }, 502);
       }
 
       const json = await res.json();
-      const msg = json?.choices?.[0]?.message;
-      const calls = msg?.tool_calls;
+      const content: Any[] = json?.content || [];
 
-      if (!calls || calls.length === 0) {
-        return jsonResponse({ reply: msg?.content ?? "", tools_used: toolsUsed, context: effectiveContext });
+      if (json?.stop_reason === "tool_use") {
+        messages.push({ role: "assistant", content }); // echo assistant turn incl. tool_use blocks
+        const results: Any[] = [];
+        for (const block of content) {
+          if (block?.type !== "tool_use") continue;
+          toolsUsed.push(block.name);
+          const result = await runTool(block.name, block.input || {}, sb, user.id, isStaff);
+          results.push({ type: "tool_result", tool_use_id: block.id, content: JSON.stringify(result) });
+        }
+        messages.push({ role: "user", content: results });
+        continue;
       }
 
-      // Execute each requested tool and feed results back.
-      messages.push({ role: "assistant", content: msg.content ?? null, tool_calls: calls });
-      for (const call of calls) {
-        const name = call?.function?.name;
-        let parsedArgs: Record<string, unknown> = {};
-        try { parsedArgs = JSON.parse(call?.function?.arguments || "{}"); } catch { /* ignore */ }
-        toolsUsed.push(name);
-        const result = await runTool(name, parsedArgs, sb, user.id, isStaff);
-        messages.push({ role: "tool", tool_call_id: call.id, content: JSON.stringify(result) });
-      }
+      const text = content.filter((b) => b?.type === "text").map((b) => b.text).join("\n").trim();
+      return jsonResponse({ reply: text, tools_used: toolsUsed, context: effectiveContext });
     }
 
     // Ran out of tool iterations — ask for a final answer with no more tools.
-    const finalRes = await callGateway(apiKey, model, messages, []);
-    if (!finalRes.ok) return jsonResponse({ error: "AI gateway error" }, 502);
+    const finalRes = await callAnthropic(apiKey, system, messages, []);
+    if (!finalRes.ok) return jsonResponse({ error: "AI error (final)" }, 502);
     const finalJson = await finalRes.json();
-    return jsonResponse({ reply: finalJson?.choices?.[0]?.message?.content ?? "", tools_used: toolsUsed, context: effectiveContext });
+    const text = (finalJson?.content || []).filter((b: Any) => b?.type === "text").map((b: Any) => b.text).join("\n").trim();
+    return jsonResponse({ reply: text, tools_used: toolsUsed, context: effectiveContext });
   } catch (err) {
     console.error("alice-chat error", err);
     return jsonResponse({ error: err instanceof Error ? err.message : "Unknown error" }, 500);
