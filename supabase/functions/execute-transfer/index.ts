@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { isGhanaPayConfigured } from "../_shared/ghana-pay.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,14 +14,17 @@ const PAYABLE_BY_CURRENCY: Record<string, string> = {
   ZMW: "2123",
   BIF: "2124",
   NGN: "2125",
+  GHS: "2126",
 };
 
 // Map our internal payout_method codes -> Flutterwave network token used by V3_MM_BANK
 const PAYOUT_METHOD_TO_NETWORK: Record<string, string> = {
   mtn_mobile: "mtn",
   airtel_money: "airtel",
+  airteltigo_money: "airtel",
   zamtel_money: "zamtel",
   vodafone_cash: "vodafone",
+  vodafone_money: "vodafone",
   tigo_pesa: "tigo",
   mpesa: "mpesa",
   bank: "bank",
@@ -331,10 +335,34 @@ Deno.serve(async (req) => {
       !useMtnMomo && !isZambia &&
       (payload.use_stellar === true || transfer.use_stellar === true) &&
       STELLAR_COUNTRIES.has(recipientCountry);
+
+    const isCanada = transfer.transfer_type === "domestic_canada" || transfer.recipient_country === "CA";
+    const isGhana =
+      targetCurrency === "GHS" ||
+      recipientCountry === "GH" ||
+      recipientCountry === "GHANA" ||
+      (recipientCountryHint ?? "").trim().toUpperCase() === "GHANA";
+    const ghanaPayConfigured = isGhanaPayConfigured();
+    const useGhanaPay =
+      ghanaPayConfigured &&
+      isGhana &&
+      !isCanada &&
+      !isZambia &&
+      !usePawapay &&
+      !useMtnMomo &&
+      !useStellar &&
+      transfer.payout_method !== "card_push" &&
+      !(transfer.recipient_account && transfer.recipient_bank_code) &&
+      !(payload.use_fincra === true || transfer.use_fincra === true) &&
+      !(payload.use_pawapay === true || transfer.use_pawapay === true);
+    const useFincra =
+      !useGhanaPay &&
+      (payload.use_fincra === true || transfer.use_fincra === true) &&
+      !isCanada && !isZambia && !usePawapay && !useMtnMomo && !useStellar &&
+      transfer.payout_method !== "card_push";
+
     let payoutResult: any = { stub: true };
     try {
-      const isCanada = transfer.transfer_type === "domestic_canada" || transfer.recipient_country === "CA";
-
       if (isZambia) {
         const res = await fetch(
           `${Deno.env.get("SUPABASE_URL")}/functions/v1/elicate-payout`,
@@ -399,6 +427,11 @@ Deno.serve(async (req) => {
           last4: payload.recipient_last4,
           brand: payload.recipient_brand,
           recipient_email: payload.recipient_email,
+          recipient_kyc: payload.recipient_kyc,
+          recipient_tos: payload.recipient_tos,
+          client_ip: req.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
+            || req.headers.get("cf-connecting-ip")
+            || "0.0.0.0",
         };
         const res = await fetch(
           `${Deno.env.get("SUPABASE_URL")}/functions/v1/stripe-payout`,
@@ -427,6 +460,41 @@ Deno.serve(async (req) => {
               "x-internal-secret": Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "",
             },
             body: JSON.stringify({ transfer_id }),
+          },
+        );
+        payoutResult = await res.json();
+      } else if (useGhanaPay) {
+        const res = await fetch(
+          `${Deno.env.get("SUPABASE_URL")}/functions/v1/ghana-payout`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-internal-secret": Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "",
+            },
+            body: JSON.stringify({ transfer_id }),
+          },
+        );
+        payoutResult = await res.json();
+      } else if (useFincra) {
+        const res = await fetch(
+          `${Deno.env.get("SUPABASE_URL")}/functions/v1/fincra-payout`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-internal-secret": Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "",
+            },
+            body: JSON.stringify({
+              transfer_id,
+              phone_number: transfer.recipient_phone,
+              account_number: transfer.recipient_account,
+              bank_code: transfer.recipient_bank_code,
+              amount: Number(transfer.target_amount ?? transfer.source_amount),
+              currency: transfer.target_currency ?? transfer.source_currency,
+              network: resolveNetwork(transfer.payout_method, transfer.target_currency ?? transfer.source_currency),
+              recipient_name: transfer.recipient_name,
+            }),
           },
         );
         payoutResult = await res.json();

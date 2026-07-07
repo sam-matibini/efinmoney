@@ -1,0 +1,110 @@
+import { FunctionsHttpError } from "@supabase/supabase-js";
+import { supabase } from "@/integrations/supabase/client";
+
+const PENDING_TXN_KEY = "efin_nomba_pending_txn";
+
+export const NOMBA_NIGERIA_CURRENCIES = ["NGN"] as const;
+export const NOMBA_INTERNATIONAL_CURRENCIES = ["USD", "EUR", "GBP"] as const;
+export const NOMBA_PAY_CURRENCIES = [
+  ...NOMBA_NIGERIA_CURRENCIES,
+  ...NOMBA_INTERNATIONAL_CURRENCIES,
+] as const;
+
+async function invokeErrorMessage(error: unknown): Promise<string> {
+  if (error instanceof FunctionsHttpError) {
+    try {
+      const body = await error.context.json();
+      if (body?.error) return String(body.error);
+    } catch {
+      /* ignore */
+    }
+  }
+  return error instanceof Error ? error.message : "Request failed";
+}
+
+export interface NombaCollectionResult {
+  success: boolean;
+  transaction_id: string;
+  order_id?: string;
+  payment_link: string;
+  message: string;
+}
+
+export interface NombaPayStatus {
+  id: string;
+  status: "pending" | "processing" | "completed" | "failed" | "cancelled";
+  amount: number;
+  currency: string;
+  failure_reason: string | null;
+  order_id: string | null;
+}
+
+export function isNombaNigeriaCurrency(currency: string): boolean {
+  return NOMBA_NIGERIA_CURRENCIES.includes(currency.toUpperCase() as typeof NOMBA_NIGERIA_CURRENCIES[number]);
+}
+
+export function isNombaInternationalCurrency(currency: string): boolean {
+  return NOMBA_INTERNATIONAL_CURRENCIES.includes(currency.toUpperCase() as typeof NOMBA_INTERNATIONAL_CURRENCIES[number]);
+}
+
+export function nombaMinAmount(currency: string): number {
+  return isNombaNigeriaCurrency(currency) ? 100 : 1;
+}
+
+export function savePendingNombaTxn(txnId: string) {
+  try {
+    sessionStorage.setItem(PENDING_TXN_KEY, txnId);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function readPendingNombaTxn(): string | null {
+  try {
+    return sessionStorage.getItem(PENDING_TXN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function clearPendingNombaTxn() {
+  try {
+    sessionStorage.removeItem(PENDING_TXN_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+export async function initiateNombaCollection(params: {
+  amount: number;
+  target_wallet_id: string;
+  email?: string;
+  corridor?: "nigeria" | "international";
+  return_url?: string;
+}): Promise<NombaCollectionResult> {
+  const { data, error } = await supabase.functions.invoke("nomba-collection", { body: params });
+  if (error) throw new Error(await invokeErrorMessage(error));
+  const payload = data as NombaCollectionResult & { error?: string };
+  if (payload.error) throw new Error(payload.error);
+  if (!payload.success || !payload.payment_link) {
+    throw new Error(payload.message || "Nomba did not return a checkout link");
+  }
+  return payload;
+}
+
+export async function getNombaPayStatus(txnId: string): Promise<NombaPayStatus | null> {
+  const { data } = await (supabase as any)
+    .from("nomba_pay_transactions")
+    .select("id, status, amount, currency, failure_reason, order_id")
+    .eq("id", txnId)
+    .maybeSingle();
+  if (!data) return null;
+  return {
+    id: data.id,
+    status: data.status,
+    amount: Number(data.amount),
+    currency: data.currency,
+    failure_reason: data.failure_reason,
+    order_id: data.order_id,
+  };
+}

@@ -103,7 +103,16 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { transfer_id, card_token, recipient_email, last4, brand } = body || {};
+    const {
+      transfer_id,
+      card_token,
+      recipient_email,
+      last4,
+      brand,
+      recipient_kyc,
+      recipient_tos,
+      client_ip,
+    } = body || {};
 
     if (!transfer_id) {
       return new Response(JSON.stringify({ error: "transfer_id required" }), {
@@ -145,6 +154,13 @@ Deno.serve(async (req) => {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+    if (corridor.country === "CA" && !recipient_kyc) {
+      return new Response(JSON.stringify({
+        success: false,
+        error: "Recipient identity details are required for Canadian debit-card payouts.",
+        code: "missing_recipient_kyc",
+      }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
     const amountCents = Math.round(Number(transfer.target_amount) * 100);
     const recipientName = transfer.recipient_name || "Recipient";
@@ -152,47 +168,87 @@ Deno.serve(async (req) => {
     const recEmail = recipient_email || transfer.recipient_account || null;
 
     try {
-      // 1. Find or create a Stripe Custom connected account for this (sender, recipient_email)
       let acctId: string | null = null;
       let externalAccountId: string | null = null;
+      const kyc = recipient_kyc;
+      const ip = String(client_ip || "0.0.0.0");
 
-      if (recEmail) {
+      // Reuse vaulted recipient only when we are not supplying fresh KYC (legacy int'l sends).
+      if (recEmail && !kyc) {
         const { data: existing } = await supabase
           .from("stripe_payout_recipients")
           .select("*")
           .eq("user_id", senderId)
           .eq("recipient_email", recEmail)
           .maybeSingle();
-        if (existing) {
-          acctId = existing.stripe_account_id;
-        }
+        if (existing) acctId = existing.stripe_account_id;
       }
 
       if (!acctId) {
+        const acctCountry = String(kyc?.address?.country || corridor.country).toUpperCase();
+        const cleanPostal = kyc?.address?.postal_code
+          ? String(kyc.address.postal_code).toUpperCase().replace(/\s+/g, "")
+          : undefined;
         const acct = await stripe.accounts.create({
           type: "custom",
-          country: corridor.country,
+          country: acctCountry,
           business_type: "individual",
           capabilities: {
-            card_payments: { requested: true },
             transfers: { requested: true },
           },
           individual: {
             first_name: recipientName.split(/\s+/)[0] || "Recipient",
             last_name: recipientName.split(/\s+/).slice(1).join(" ") || recipientName,
             email: recEmail || undefined,
+            ...(kyc ? {
+              phone: String(kyc.phone),
+              dob: { day: kyc.dob.day, month: kyc.dob.month, year: kyc.dob.year },
+              address: {
+                line1: String(kyc.address.line1),
+                city: String(kyc.address.city),
+                ...(kyc.address.state ? { state: String(kyc.address.state).toUpperCase() } : {}),
+                postal_code: cleanPostal!,
+                country: acctCountry,
+              },
+            } : {}),
           },
+          business_profile: kyc ? {
+            mcc: "6012",
+            product_description: "Personal payment received via eFinMoney",
+            url: "https://efin.money",
+          } : undefined,
+          ...(kyc && recipient_tos?.accepted ? {
+            tos_acceptance: {
+              date: Math.floor(Date.now() / 1000),
+              ip,
+            },
+          } : {}),
           metadata: { sender_id: senderId, transfer_id: transfer.id, corridor: corridor.country },
         });
         acctId = acct.id;
       }
 
-      // 2. Attach the debit card as an external account on the connected account
       const ext = await stripe.accounts.createExternalAccount(acctId!, {
         external_account: card_token,
         default_for_currency: true,
       } as any);
       externalAccountId = ext.id;
+
+      if (kyc) {
+        let capActive = false;
+        for (let i = 0; i < 6; i++) {
+          const fresh = await stripe.accounts.retrieve(acctId!);
+          if ((fresh.capabilities as any)?.transfers === "active") { capActive = true; break; }
+          await new Promise((r) => setTimeout(r, 1000));
+        }
+        if (!capActive) {
+          const fresh = await stripe.accounts.retrieve(acctId!);
+          const due = (fresh.requirements as any)?.currently_due || [];
+          throw new Error(due.length
+            ? `Card payouts could not be enabled. Check: ${due.join(", ")}`
+            : "Card payouts could not be enabled for this recipient.");
+        }
+      }
 
       // Persist recipient vault (insert new, or update existing if we reused acct)
       if (recEmail) {

@@ -1,6 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode } from "react";
 import { motion } from "framer-motion";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,6 +40,12 @@ import { usePinGate } from "@/components/send/usePinGate";
 import { RevokePaymentLinkDialog } from "@/components/payment-links/RevokePaymentLinkDialog";
 import { getStripe } from "@/lib/stripe";
 import type { Stripe } from "@stripe/stripe-js";
+import RecipientStripeKycFields, { buildRecipientKycPayload, isRecipientKycValid } from "@/components/send/RecipientStripeKycFields";
+import {
+  INTERAC_ETRANSFER_ENABLED,
+  PAYSAFE_PAYOUTS_ENABLED,
+  STRIPE_CANADA_RAILS_NOTE,
+} from "@/lib/canadaPayoutRails";
 import {
   Elements,
   CardNumberElement,
@@ -101,9 +107,6 @@ const elementWrapperClass =
 
 type DeliveryMethod = "interac" | "eft" | "card_push" | "stripe_connect" | "paylink";
 type FundingSource = "wallet" | "card";
-
-// Feature flag: flip to false instantly if Paysafe Interac e-Transfer is unavailable.
-const INTERAC_ETRANSFER_ENABLED = true;
 
 const DELIVERY_FEES: Record<DeliveryMethod, number> = { interac: 0.5, eft: 0, card_push: 1.0, stripe_connect: 1.0, paylink: 0 };
 const CARD_PROCESSING_FEE = 1.5;
@@ -378,6 +381,7 @@ RecipientCardSection.displayName = "RecipientCardSection";
 
 const CanadaSendFlow = () => {
   const elementStyle = useStripeElementStyle();
+  const navigate = useNavigate();
   const { requirePin, pinGate } = usePinGate();
   const { data: profile } = useProfile();
   const { user } = useAuth();
@@ -385,7 +389,7 @@ const CanadaSendFlow = () => {
   const { data: beneficiaries } = useBeneficiaries();
 
   const [step, setStep] = useState(1);
-  const [method, setMethod] = useState<DeliveryMethod>("eft");
+  const [method, setMethod] = useState<DeliveryMethod>(PAYSAFE_PAYOUTS_ENABLED ? "eft" : "card_push");
   const [funding, setFunding] = useState<FundingSource>("wallet");
   const [amount, setAmount] = useState("");
   const [walletId, setWalletId] = useState("");
@@ -405,6 +409,16 @@ const CanadaSendFlow = () => {
   const [transitNumber, setTransitNumber] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
   const [bankName, setBankName] = useState("");
+  // Recipient — Stripe card-push KYC
+  const [dobDay, setDobDay] = useState("");
+  const [dobMonth, setDobMonth] = useState("");
+  const [dobYear, setDobYear] = useState("");
+  const [recipientPhone, setRecipientPhone] = useState("");
+  const [addrLine1, setAddrLine1] = useState("");
+  const [addrCity, setAddrCity] = useState("");
+  const [addrState, setAddrState] = useState("");
+  const [addrPostal, setAddrPostal] = useState("");
+  const [recipientTosAccepted, setRecipientTosAccepted] = useState(false);
   // Sender card (Stripe Elements completion state)
   const [cardNumComplete, setCardNumComplete] = useState(false);
   const [cardExpComplete, setCardExpComplete] = useState(false);
@@ -465,6 +479,13 @@ const CanadaSendFlow = () => {
     if (method === "paylink" && funding !== "wallet") setFunding("wallet");
   }, [method, funding]);
 
+  // Paysafe rails off during provider test — default to Stripe card push.
+  useEffect(() => {
+    if (!PAYSAFE_PAYOUTS_ENABLED && (method === "eft" || method === "interac")) {
+      setMethod("card_push");
+    }
+  }, [method]);
+
   const applyCanadaBeneficiary = (b: Beneficiary) => {
     setPickedBeneficiaryId(b.id);
     setRecipientName(b.eft_account_holder || b.name);
@@ -507,7 +528,15 @@ const CanadaSendFlow = () => {
     : "none" as const;
 
   const deliveryOptions: DeliveryOption[] = useMemo(() => [
-    { id: "eft", title: "Bank transfer", subtitle: "Direct deposit · 1–3 business days", feeLabel: "Free", icon: Landmark },
+    {
+      id: "eft",
+      title: "Bank transfer",
+      subtitle: PAYSAFE_PAYOUTS_ENABLED ? "Direct deposit · 1–3 business days" : "Paysafe · unavailable in test",
+      feeLabel: "Free",
+      icon: Landmark,
+      disabled: !PAYSAFE_PAYOUTS_ENABLED,
+      badge: PAYSAFE_PAYOUTS_ENABLED ? undefined : "Paysafe test",
+    },
     ...(INTERAC_ETRANSFER_ENABLED ? [{
       id: "interac" as const,
       title: "Interac e-Transfer",
@@ -516,18 +545,43 @@ const CanadaSendFlow = () => {
       icon: Zap,
       badge: "Beta",
     }] : []),
-    { id: "card_push", title: "Instant to debit card", subtitle: "Visa Direct · seconds", feeLabel: "C$1.00", icon: CreditCard },
+    {
+      id: "card_push",
+      title: "Instant to debit card",
+      subtitle: "Visa Direct · seconds",
+      feeLabel: "C$1.00",
+      icon: CreditCard,
+      badge: "Stripe",
+    },
     {
       id: "stripe_connect",
       title: "My Stripe account",
-      subtitle: "Instant payout to your card",
+      subtitle: connectReady ? "Instant payout to your card" : "Finish setup at /stripe-connect",
       feeLabel: "C$1.00",
       icon: Building2,
-      badge: "Test",
-      disabled: !connectState.hasAccount,
+      badge: connectReady ? "Stripe" : "Setup",
     },
-    { id: "paylink", title: "Payment link", subtitle: "Recipient chooses how to claim", feeLabel: "Free", icon: Link2 },
-  ], [connectState.hasAccount]);
+    {
+      id: "paylink",
+      title: "Payment link",
+      subtitle: "Recipient chooses how to claim",
+      feeLabel: "Free",
+      icon: Link2,
+      badge: "Stripe",
+    },
+  ], [connectReady]);
+
+  const handleDeliverySelect = (opt: DeliveryOption) => {
+    if (opt.id === "stripe_connect" && !connectReady) {
+      navigate("/stripe-connect");
+      return;
+    }
+    if (opt.disabled) {
+      toast.info("Bank transfer and Interac need Paysafe, which is still in test. Use a Stripe option instead.");
+      return;
+    }
+    setMethod(opt.id);
+  };
 
   // Any wallet to satisfy the NOT NULL FK on transfers.sender_wallet_id when paying by card
   const fallbackWallet = (wallets || [])[0];
@@ -554,7 +608,19 @@ const CanadaSendFlow = () => {
     : method === "paylink"
       ? true  // recipient details optional for paylink (sender just generates a link)
       : method === "card_push"
-        ? recipientName.trim().length > 1 && recipientCardComplete
+        ? recipientName.trim().length > 1
+            && recipientCardComplete
+            && isRecipientKycValid("CAD", {
+              dobDay,
+              dobMonth,
+              dobYear,
+              phone: recipientPhone,
+              addrLine1,
+              addrCity,
+              addrState,
+              addrPostal,
+              tosAccepted: recipientTosAccepted,
+            })
         : method === "interac"
           ? recipientName.trim().length > 1
               && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail)
@@ -702,6 +768,17 @@ const CanadaSendFlow = () => {
           body.recipient_last4 = recipientTok.last4;
           body.recipient_brand = recipientTok.brand;
           body.recipient_email = recipientEmail || null;
+          body.recipient_kyc = buildRecipientKycPayload("CAD", {
+            dobDay,
+            dobMonth,
+            dobYear,
+            phone: recipientPhone,
+            addrLine1,
+            addrCity,
+            addrState,
+            addrPostal,
+          });
+          body.recipient_tos = { accepted: recipientTosAccepted };
         }
         const { data: execData } = await supabase.functions.invoke("execute-transfer", { body });
         if (execData?.success === false) {
@@ -861,6 +938,12 @@ const CanadaSendFlow = () => {
 
             <div className="space-y-3">
               <Label>How should they receive it?</Label>
+              {STRIPE_CANADA_RAILS_NOTE && (
+                <div className="p-3 rounded-lg bg-primary/5 border border-primary/20 text-xs text-muted-foreground flex items-start gap-2">
+                  <Info className="w-4 h-4 shrink-0 mt-0.5 text-primary" />
+                  <span>{STRIPE_CANADA_RAILS_NOTE}</span>
+                </div>
+              )}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {deliveryOptions.map((opt) => {
                   const Icon = opt.icon;
@@ -870,7 +953,7 @@ const CanadaSendFlow = () => {
                       key={opt.id}
                       type="button"
                       disabled={opt.disabled}
-                      onClick={() => setMethod(opt.id)}
+                      onClick={() => handleDeliverySelect(opt)}
                       className={`relative text-left p-4 rounded-xl border-2 transition-all ${
                         active
                           ? "border-primary bg-primary/5 ring-2 ring-primary/20"
@@ -903,17 +986,19 @@ const CanadaSendFlow = () => {
               </div>
               {(!connectReady || !connectState.hasAccount) && (
                 <p className="text-[11px] text-muted-foreground">
-                  {connectState.hasAccount ? "Stripe Connect needs a status sync." : "Stripe Connect is disabled."}{" "}
+                  {!connectState.hasAccount
+                    ? "Pay yourself via Stripe Connect — one-time setup required."
+                    : connectState.message || "Stripe Connect needs a status sync."}{" "}
                   {connectAcct ? (
                     <>
                       <button type="button" onClick={handleManualRefresh} disabled={refreshingConnect} className="underline">
                         {refreshingConnect ? "Refreshing…" : "Refresh"}
                       </button>
                       {" · "}
-                      <Link to="/stripe-connect" className="underline">Setup</Link>
+                      <Link to="/stripe-connect" className="underline">Open setup</Link>
                     </>
                   ) : (
-                    <Link to="/stripe-connect" className="underline">Finish onboarding</Link>
+                    <Link to="/stripe-connect" className="underline">Set up Stripe Connect</Link>
                   )}
                 </p>
               )}
@@ -997,7 +1082,7 @@ const CanadaSendFlow = () => {
                   <div className="p-4 rounded-xl bg-primary/5 border border-primary/25 text-sm flex items-start gap-3">
                     <Link2 className="w-5 h-5 text-primary shrink-0 mt-0.5" />
                     <div className="space-y-1 text-muted-foreground">
-                      <p>We hold C${parsedAmount.toFixed(2)} in escrow and give you a shareable link. The recipient picks Interac, EFT, or debit card when they claim.</p>
+                      <p>We hold C${parsedAmount.toFixed(2)} in escrow and give you a shareable link. The recipient picks debit card (Stripe){PAYSAFE_PAYOUTS_ENABLED ? ", Interac, or EFT" : ""} when they claim.</p>
                       <p className="text-xs">Expires in 7 days · revocable anytime before claim</p>
                     </div>
                   </div>
@@ -1074,6 +1159,27 @@ const CanadaSendFlow = () => {
                     <Input type="email" value={recipientEmail} onChange={(e) => setRecipientEmail(e.target.value)} placeholder="jane@example.com" />
                   </div>
                   <RecipientCardSection ref={recipientCardRef} onValidityChange={setRecipientCardComplete} elementStyle={elementStyle} />
+                  <RecipientStripeKycFields
+                    currency="CAD"
+                    dobDay={dobDay}
+                    dobMonth={dobMonth}
+                    dobYear={dobYear}
+                    phone={recipientPhone}
+                    addrLine1={addrLine1}
+                    addrCity={addrCity}
+                    addrState={addrState}
+                    addrPostal={addrPostal}
+                    tosAccepted={recipientTosAccepted}
+                    onDobDay={setDobDay}
+                    onDobMonth={setDobMonth}
+                    onDobYear={setDobYear}
+                    onPhone={setRecipientPhone}
+                    onAddrLine1={setAddrLine1}
+                    onAddrCity={setAddrCity}
+                    onAddrState={setAddrState}
+                    onAddrPostal={setAddrPostal}
+                    onTosAccepted={setRecipientTosAccepted}
+                  />
                 </>
               )}
             </div>

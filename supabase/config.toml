@@ -39,6 +39,21 @@ verify_jwt = false
 [functions.elicate-charge]
 verify_jwt = false
 
+[functions.ghana-collection]
+verify_jwt = true
+
+[functions.ghana-payout]
+verify_jwt = false
+
+[functions.ghana-payment-callback]
+verify_jwt = false
+
+[functions.nomba-collection]
+verify_jwt = true
+
+[functions.nomba-payment-callback]
+verify_jwt = false
+
 [functions.mtn-momo-payout]
 verify_jwt = false
 
@@ -108,6 +123,12 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.adyen-modify-payment]
+verify_jwt = false
+
+[functions.fincra-webhook]
+verify_jwt = false
+
+[functions.fincra-payout]
 verify_jwt = false
 
 # Client-called Stripe / Plaid functions: verify_jwt must be false so browser

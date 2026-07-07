@@ -272,75 +272,75 @@ const FxTradingPanel = () => {
           <CardContent className="relative space-y-5 pt-2">
             <div className="space-y-2.5 rounded-xl bg-muted/40 p-4 ring-1 ring-border/60">
               <Label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">You pay</Label>
-              <Select value={fromWalletId || fromWallet?.wallet_id || ""} onValueChange={setFromWalletId}>
+            <Select value={fromWalletId || fromWallet?.wallet_id || ""} onValueChange={setFromWalletId}>
                 <SelectTrigger className="h-11 border-border/60 bg-background/80">
-                  <SelectValue placeholder="Select wallet" />
-                </SelectTrigger>
-                <SelectContent>
-                  {fiatWallets?.filter(w => w.wallet_id !== toWalletId).map((w) => (
-                    <SelectItem key={w.wallet_id} value={w.wallet_id}>
+                <SelectValue placeholder="Select wallet" />
+              </SelectTrigger>
+              <SelectContent>
+                {fiatWallets?.filter(w => w.wallet_id !== toWalletId).map((w) => (
+                  <SelectItem key={w.wallet_id} value={w.wallet_id}>
                       <span className="inline-flex items-center gap-2">
                         <CurrencyFlag code={w.currency_code} size="sm" />
                         {w.currency_code} · {w.symbol}{Number(w.balance).toFixed(2)}
                       </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <div className="relative">
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="relative">
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-medium text-muted-foreground">
                   {fromWallet?.symbol || "$"}
-                </span>
-                <Input
+              </span>
+              <Input
                   type="text"
                   inputMode="decimal"
-                  placeholder="0.00"
+                placeholder="0.00"
                   value={sendAmount}
                   onChange={(e) => onSendChange(e.target.value)}
                   className="h-14 border-border/60 bg-background pl-10 font-display text-2xl font-bold tabular-nums focus-visible:ring-primary/30"
-                />
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Available: {fromWallet?.symbol}{Number(fromWallet?.balance || 0).toFixed(2)}
-              </p>
+              />
             </div>
+              <p className="text-xs text-muted-foreground">
+              Available: {fromWallet?.symbol}{Number(fromWallet?.balance || 0).toFixed(2)}
+            </p>
+          </div>
 
             <div className="-my-1 flex justify-center">
-              <motion.button
-                type="button"
-                onClick={handleSwap}
-                animate={{ rotate: swapRotation }}
-                transition={{ type: "spring", stiffness: 260, damping: 18 }}
-                whileTap={{ scale: 0.9 }}
+            <motion.button
+              type="button"
+              onClick={handleSwap}
+              animate={{ rotate: swapRotation }}
+              transition={{ type: "spring", stiffness: 260, damping: 18 }}
+              whileTap={{ scale: 0.9 }}
                 className="z-10 flex h-11 w-11 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-primary shadow-sm hover:bg-primary/15"
-                aria-label="Swap currencies"
-              >
+              aria-label="Swap currencies"
+            >
                 <ArrowUpDown className="h-4 w-4" />
-              </motion.button>
-            </div>
+            </motion.button>
+          </div>
 
             <div className="space-y-2.5 rounded-xl bg-gradient-to-br from-primary/[0.07] to-muted/30 p-4 ring-1 ring-primary/15">
               <Label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">You receive</Label>
-              <Select value={toWalletId || toWallet?.wallet_id || ""} onValueChange={setToWalletId}>
+            <Select value={toWalletId || toWallet?.wallet_id || ""} onValueChange={setToWalletId}>
                 <SelectTrigger className="h-11 border-border/60 bg-background/80">
-                  <SelectValue placeholder="Select wallet" />
-                </SelectTrigger>
-                <SelectContent>
-                  {destinationOptions.filter(w => w.wallet_id !== fromWalletId).map((w) => (
-                    <SelectItem key={w.wallet_id} value={w.wallet_id}>
+                <SelectValue placeholder="Select wallet" />
+              </SelectTrigger>
+              <SelectContent>
+                {destinationOptions.filter(w => w.wallet_id !== fromWalletId).map((w) => (
+                  <SelectItem key={w.wallet_id} value={w.wallet_id}>
                       <span className="inline-flex items-center gap-2">
                         {w.isStellar ? (
                           <span className="text-base">{w.flag_emoji}</span>
                         ) : (
                           <CurrencyFlag code={w.currency_code} size="sm" />
                         )}
-                        {w.currency_code}
+                      {w.currency_code}
                         {w.isStellar ? " (Stellar)" : ""} · {w.symbol}{Number(w.balance).toFixed(w.isStellar ? 4 : 2)}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
               <div className="relative">
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-medium text-muted-foreground">
                   {toWallet?.symbol || "$"}
@@ -357,46 +357,46 @@ const FxTradingPanel = () => {
               {isCryptoSwap && (
                 <p className="text-xs text-muted-foreground">Delivered on-chain to your Stellar wallet</p>
               )}
-            </div>
+          </div>
 
             {parsedSend > 0 && (
               <div className="space-y-2 rounded-xl border border-border/60 bg-muted/30 p-4 text-sm">
-                <div className="flex justify-between">
+              <div className="flex justify-between">
                   <span className="text-muted-foreground">Exchange rate</span>
                   <span className="font-medium tabular-nums">
-                    {effectiveRate
-                      ? `1 ${fromWallet?.currency_code} = ${effectiveRate.toFixed(4)} ${toWallet?.currency_code}`
-                      : <span className="text-destructive">Rate unavailable</span>}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Fee (0.5%)</span>
+                  {effectiveRate
+                    ? `1 ${fromWallet?.currency_code} = ${effectiveRate.toFixed(4)} ${toWallet?.currency_code}`
+                    : <span className="text-destructive">Rate unavailable</span>}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Fee (0.5%)</span>
                   <span className="tabular-nums">{fromWallet?.symbol}{fee.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between border-t border-border/60 pt-2 font-semibold">
                   <span>You receive</span>
                   <span className="text-primary tabular-nums">{toWallet?.symbol}{fmtRecv(receivedAmount)}</span>
-                </div>
               </div>
-            )}
+            </div>
+          )}
 
-            <Button
+          <Button 
               className="h-12 w-full text-base font-semibold shadow-[0_4px_20px_hsl(var(--primary)/0.25)]"
-              size="lg"
-              onClick={handleExchange}
-              disabled={!isValid || isLoading}
-            >
-              {isLoading ? (
+            size="lg" 
+            onClick={handleExchange}
+            disabled={!isValid || isLoading}
+          >
+            {isLoading ? (
                 <RefreshCw className="h-5 w-5 animate-spin" />
-              ) : (
-                <>
+            ) : (
+              <>
                   <RefreshCw className="mr-2 h-5 w-5" />
-                  Exchange Now
-                </>
-              )}
-            </Button>
-          </CardContent>
-        </Card>
+                Exchange Now
+              </>
+            )}
+          </Button>
+        </CardContent>
+      </Card>
       </div>
 
       <LiveFxRatesCard />

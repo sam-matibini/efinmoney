@@ -82,7 +82,7 @@ function Push-Secrets {
 }
 
 function Deploy-CanadaFunctions {
-  # Deploy one at a time — batch deploy often hits 403 mid-run on Windows CLI.
+  # Deploy one at a time - batch deploy often hits 403 mid-run on Windows CLI.
   $canada = @(
     "execute-transfer",              # routes CAD payouts to Paysafe / Stripe
     "paysafe-payout",                # EFT + Interac e-Transfer
@@ -111,7 +111,7 @@ function Deploy-CanadaFunctions {
       npx supabase functions deploy $fn --project-ref $ProjectRef
       if ($LASTEXITCODE -ne 0) { throw "exit $LASTEXITCODE" }
     } catch {
-      Write-Host "  FAILED: $fn — $_" -ForegroundColor Red
+      Write-Host "  FAILED: $fn - $_" -ForegroundColor Red
       $failed += $fn
     }
   }
@@ -148,6 +148,10 @@ function Deploy-Functions {
     "elicate-payout",
     "elicate-webhook",
     "elicate-reconcile",
+    "fincra-initialize-checkout",
+    "fincra-verify-payment",
+    "fincra-webhook",
+    "fincra-payout",
     "execute-transfer",
     "paysafe-payout",
     "paysafe-webhook",

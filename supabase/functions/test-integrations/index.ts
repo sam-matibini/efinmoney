@@ -2,6 +2,7 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import * as StellarSdk from "npm:stellar-sdk@12";
 import { getElicateConfig } from "../_shared/elicate.ts";
+import { fincraFetch, getFincraConfig } from "../_shared/fincra.ts";
 
 const HORIZON_MAINNET = "https://horizon.stellar.org";
 const USDC_ISSUER_MAINNET = "GA5ZSEJYB37JRC52ZMRITGWQIPG6HSRX3VE3YIPJWZIGWG2XQ5OQ34C6";
@@ -114,6 +115,39 @@ async function checkStripe(): Promise<CheckResult> {
   }
 }
 
+async function checkFincra(): Promise<CheckResult> {
+  try {
+    const cfg = getFincraConfig();
+    if (!cfg.secretKey) return { service: "fincra", status: "failed", message: "FINCRA_SECRET_KEY not configured", details: { mode: cfg.mode } };
+    const { ok, json } = await fincraFetch("/profile/business/me");
+    if (!ok) {
+      return { service: "fincra", status: "failed", message: String(json?.message || json?.error || "Connection failed"), details: { mode: cfg.mode } };
+    }
+    const data = (json?.data ?? {}) as Record<string, unknown>;
+    let ngnBalance: number | null = null;
+    if (cfg.businessId) {
+      const w = await fincraFetch(`/wallets?businessID=${encodeURIComponent(cfg.businessId)}`);
+      if (w.ok && Array.isArray(w.json?.data)) {
+        const ngn = (w.json.data as Array<Record<string, unknown>>).find((x) => x.currency === "NGN");
+        ngnBalance = ngn ? Number(ngn.availableBalance) : null;
+      }
+    }
+    return {
+      service: "fincra",
+      status: "healthy",
+      message: "Connected Successfully",
+      details: {
+        mode: cfg.mode,
+        business: data.name,
+        kycApproved: data.isKYCApproved,
+        ngnAvailableBalance: ngnBalance,
+      },
+    };
+  } catch (e) {
+    return { service: "fincra", status: "failed", message: (e as Error).message };
+  }
+}
+
 async function checkPaysafe(): Promise<CheckResult> {
   try {
     const apiKey = Deno.env.get("PAYSAFE_API_KEY");
@@ -190,6 +224,7 @@ Deno.serve(async (req) => {
     if (target === "all" || target === "elicate") tasks.push(checkElicate());
     if (target === "all" || target === "stripe") tasks.push(checkStripe());
     if (target === "all" || target === "paysafe") tasks.push(checkPaysafe());
+    if (target === "all" || target === "fincra") tasks.push(checkFincra());
 
     const results = await Promise.all(tasks);
 

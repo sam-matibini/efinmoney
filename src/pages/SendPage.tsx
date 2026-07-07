@@ -113,6 +113,7 @@ const SendPage = () => {
   const [ngnResolveError, setNgnResolveError] = useState<string | null>(null);
   const [useStellar, setUseStellar] = useState<boolean>(false);
   const [usePawapay, setUsePawapay] = useState<boolean>(false);
+  const [useFincra, setUseFincra] = useState<boolean>(import.meta.env.VITE_FINCRA_PAYOUT === "true");
   const [fromQuickSend, setFromQuickSend] = useState(false);
 
   // Ghana bank payout state (toggle between Mobile Money and Bank Transfer)
@@ -132,6 +133,9 @@ const SendPage = () => {
 
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    if (searchParams.get("payout") === "fincra") setUseFincra(true);
+  }, [searchParams]);
   const { data: beneficiaries } = useBeneficiaries();
 
   const { data: wallets } = useWallets();
@@ -271,6 +275,7 @@ const SendPage = () => {
 
   const isNGNBank = targetCountry.code === "NGN";
   const isGhanaBank = targetCountry.code === "GHS" && ghPayoutMode === "bank";
+  const canUseFincra = ["NGN", "KES", "GHS", "UGX", "TZS", "RWF"].includes(targetCountry.code);
   const isBankPayout = isNGNBank || isGhanaBank;
 
   // "Send a secure link" is available when the destination currency supports
@@ -577,7 +582,7 @@ const SendPage = () => {
         let data: any = null;
         let invokeErr: any = null;
         try {
-          const res = await supabase.functions.invoke('execute-transfer', { body: { transfer_id: tid, use_stellar: isNGNBank && useStellar, use_pawapay: !isBankPayout && usePawapay, recipient_country_hint: targetCountry.country } });
+          const res = await supabase.functions.invoke('execute-transfer', { body: { transfer_id: tid, use_stellar: isNGNBank && useStellar, use_pawapay: !isBankPayout && usePawapay, use_fincra: useFincra && canUseFincra, recipient_country_hint: targetCountry.country } });
           data = res.data;
           invokeErr = res.error;
         } catch (err) {
@@ -725,7 +730,7 @@ const SendPage = () => {
 
     // Step C: trigger payout via Flutterwave
     try {
-      const { data, error } = await supabase.functions.invoke('execute-transfer', { body: { transfer_id: tid, use_stellar: isNGNBank && useStellar, use_pawapay: !isBankPayout && usePawapay, recipient_country_hint: targetCountry.country, prefunded: true, charge_reference: (chargeData as any)?.payment_intent_id ?? null } });
+      const { data, error } = await supabase.functions.invoke('execute-transfer', { body: { transfer_id: tid, use_stellar: isNGNBank && useStellar, use_pawapay: !isBankPayout && usePawapay, use_fincra: useFincra && canUseFincra, recipient_country_hint: targetCountry.country, prefunded: true, charge_reference: (chargeData as any)?.payment_intent_id ?? null } });
       if (error || (data as any)?.error) throw new Error((data as any)?.error || error?.message || 'Payout failed');
       const payout = (data as any)?.payout;
       if (payout && payout.success === false) throw new Error(payout.error || 'Payout failed');
@@ -1747,6 +1752,22 @@ const SendPage = () => {
                                             />
                                           </div>
                                         </motion.div>
+                                        {canUseFincra && (
+                                          <motion.div custom={2.8} variants={fieldVariants} initial="hidden" animate="show" className="rounded-xl border border-teal-500/30 bg-gradient-to-br from-teal-500/5 via-background to-teal-500/5 p-4">
+                                            <div className="flex items-start justify-between gap-3">
+                                              <div className="flex-1">
+                                                <div className="flex items-center gap-2">
+                                                  <span className="text-sm font-medium">Send via Fincra (Sandbox)</span>
+                                                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-700 dark:text-teal-300 font-mono uppercase">Test</span>
+                                                </div>
+                                                <p className="text-xs text-muted-foreground mt-1">
+                                                  Route this payout through Fincra instead of Flutterwave. Requires funded Fincra sandbox balance for disbursements.
+                                                </p>
+                                              </div>
+                                              <Switch checked={useFincra} onCheckedChange={setUseFincra} aria-label="Use Fincra payout" />
+                                            </div>
+                                          </motion.div>
+                                        )}
                                       </>
                                     ) : isGhanaBank ? (
                                       <>
@@ -1822,6 +1843,22 @@ const SendPage = () => {
                                           />
                                         </div>
                                       </motion.div>
+                                      {canUseFincra && (
+                                        <motion.div custom={2.6} variants={fieldVariants} initial="hidden" animate="show" className="rounded-xl border border-teal-500/30 bg-gradient-to-br from-teal-500/5 via-background to-teal-500/5 p-4">
+                                          <div className="flex items-start justify-between gap-3">
+                                            <div className="flex-1">
+                                              <div className="flex items-center gap-2">
+                                                <span className="text-sm font-medium">Send via Fincra (Sandbox)</span>
+                                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-700 dark:text-teal-300 font-mono uppercase">Test</span>
+                                              </div>
+                                              <p className="text-xs text-muted-foreground mt-1">
+                                                Route this mobile money payout through Fincra instead of the default provider.
+                                              </p>
+                                            </div>
+                                            <Switch checked={useFincra} onCheckedChange={setUseFincra} aria-label="Use Fincra payout" />
+                                          </div>
+                                        </motion.div>
+                                      )}
                                       </>
                                     )}
 

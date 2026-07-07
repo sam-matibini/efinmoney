@@ -94,8 +94,15 @@ Deno.serve(async (req) => {
       const intent = await stripe.paymentIntents.create({
         amount: Math.round(amount * 100),
         currency: currency.toLowerCase(),
-        automatic_payment_methods: { enabled: true, allow_redirects: "never" },
-        metadata: { user_id: userId, wallet_id: walletId },
+        payment_method_types: ["card"],
+        payment_method_options: {
+          card: {
+            // Virtual / international cards (e.g. Grey, Wise) often need 3DS — do not block redirects.
+            request_three_d_secure: "automatic",
+          },
+        },
+        receipt_email: userData.user.email || undefined,
+        metadata: { user_id: userId, wallet_id: walletId, purpose: "wallet_topup" },
       });
 
       return jsonResponse({ clientSecret: intent.client_secret, paymentIntentId: intent.id });

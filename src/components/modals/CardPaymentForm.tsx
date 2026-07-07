@@ -18,6 +18,13 @@ import { useProfile } from "@/hooks/useProfile";
 import { useSavedCards, type SavedCard } from "@/hooks/useSavedCards";
 import { getStripe, getStripeLoadError } from "@/lib/stripe";
 import { invokeEdgeFunction } from "@/lib/invokeEdgeFunction";
+import {
+  billingCountryForWalletCurrency,
+  formatStripePaymentError,
+  isStripeTestMode,
+  STRIPE_TEST_CARD_HINT,
+  STRIPE_VIRTUAL_CARD_HINT,
+} from "@/lib/stripeBilling";
 import { cardBrandClass, cardBrandLabel } from "@/lib/cardBrand";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
@@ -396,6 +403,7 @@ function NewCardTopUp({
   const [selectedWalletId, setSelectedWalletId] = useState<string | undefined>(defaultWalletId);
   const [amount, setAmount] = useState(defaultAmount ? String(defaultAmount) : "");
   const [cardholderName, setCardholderName] = useState("");
+  const [billingLine1, setBillingLine1] = useState("");
   const [postalCode, setPostalCode] = useState("");
   const [numberState, setNumberState] = useState<StripeElementChangeEvent | null>(null);
   const [expiryState, setExpiryState] = useState<StripeElementChangeEvent | null>(null);
@@ -447,18 +455,36 @@ function NewCardTopUp({
       }
 
       setProcessingStage("charge");
-      const { error: confirmError, paymentIntent } = await stripe.confirmCardPayment(createData.clientSecret, {
+      const billingCountry = billingCountryForWalletCurrency(currency);
+      const clientSecret = createData.clientSecret;
+      let { error: confirmError, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
         payment_method: {
           card: cardNumber,
           billing_details: {
             name: cardholderName.trim(),
-            address: { country: "CA", postal_code: postalCode.trim() || undefined },
+            email: profile?.email || undefined,
+            address: {
+              line1: billingLine1.trim() || undefined,
+              country: billingCountry,
+              postal_code: postalCode.trim() || undefined,
+            },
           },
         },
       });
-      if (confirmError) throw new Error(confirmError.message);
+
+      // Some virtual cards return requires_action — run 3DS step explicitly.
+      if (!confirmError && paymentIntent?.status === "requires_action" && clientSecret) {
+        const step = await stripe.confirmCardPayment(clientSecret);
+        confirmError = step.error;
+        paymentIntent = step.paymentIntent;
+      }
+
+      if (confirmError) throw new Error(formatStripePaymentError(confirmError));
       if (paymentIntent?.status !== "succeeded") {
-        throw new Error(`Payment ${paymentIntent?.status ?? "not completed"}`);
+        const lpe = paymentIntent?.last_payment_error;
+        throw new Error(
+          lpe ? formatStripePaymentError(lpe) : `Payment ${paymentIntent?.status ?? "not completed"}`,
+        );
       }
 
       setProcessingStage("credit");
@@ -551,16 +577,41 @@ function NewCardTopUp({
           </FieldShell>
         </div>
 
-        <div className="space-y-1.5">
-          <Label className="text-xs">Postal / ZIP code <span className="text-muted-foreground">(optional)</span></Label>
+        {!isStripeTestMode() && (
+          <div className="p-3 rounded-lg bg-muted/60 border border-border text-xs text-muted-foreground">
+            {STRIPE_VIRTUAL_CARD_HINT}
+          </div>
+        )}
+
+        <div className="space-y-2">
+          <Label className="text-xs">Billing street address <span className="text-muted-foreground">(recommended for virtual cards)</span></Label>
           <Input
-            placeholder="A1A 1A1"
+            placeholder={currency === "USD" ? "651 N Broad St" : "123 Main St"}
+            value={billingLine1}
+            onChange={(e) => setBillingLine1(e.target.value)}
+            autoComplete="address-line1"
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label className="text-xs">Postal / ZIP code <span className="text-muted-foreground">(recommended)</span></Label>
+          <Input
+            placeholder={currency === "USD" ? "10001" : currency === "CAD" ? "A1A 1A1" : "Postal code"}
             value={postalCode}
             onChange={(e) => setPostalCode(e.target.value.toUpperCase())}
             maxLength={10}
             autoComplete="postal-code"
           />
+          <p className="text-[11px] text-muted-foreground">
+            Billing country sent to your bank: {billingCountryForWalletCurrency(currency)} (matches {currency} wallet).
+          </p>
         </div>
+
+        {isStripeTestMode() && (
+          <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-xs text-amber-800 dark:text-amber-200">
+            {STRIPE_TEST_CARD_HINT}
+          </div>
+        )}
 
           <Button type="submit" size="lg" className="w-full" disabled={!canSubmit}>
             {processing ? (

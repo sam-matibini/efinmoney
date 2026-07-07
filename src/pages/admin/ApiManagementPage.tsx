@@ -37,6 +37,7 @@ const EDGE_FUNCTIONS: Array<{ name: string; description: string; jwt: boolean }>
   { name: "fx-engine", description: "FX rate quotes & swap execution", jwt: true },
   { name: "compliance-monitoring", description: "AML rule evaluation", jwt: true },
   { name: "flutterwave-payout", description: "Initiates Flutterwave payouts", jwt: true },
+  { name: "flw-corridor-probe", description: "Tests CAD/USD/NGN collect on FLW merchant account", jwt: true },
   { name: "flutterwave-webhook", description: "Receives Flutterwave events", jwt: false },
   { name: "paysafe-payout", description: "Initiates Paysafe payouts", jwt: true },
   { name: "paysafe-webhook", description: "Receives Paysafe events", jwt: false },
@@ -57,6 +58,32 @@ const EDGE_FUNCTIONS: Array<{ name: string; description: string; jwt: boolean }>
 
 export default function ApiManagementPage() {
   const [selectedPayload, setSelectedPayload] = useState<{ provider: string; event: string; payload: unknown } | null>(null);
+  const [flwProbeOpen, setFlwProbeOpen] = useState(false);
+  const [flwProbeLoading, setFlwProbeLoading] = useState(false);
+  const [flwProbeResult, setFlwProbeResult] = useState<unknown>(null);
+
+  const runFlutterwaveCorridorProbe = async () => {
+    setFlwProbeLoading(true);
+    setFlwProbeResult(null);
+    setFlwProbeOpen(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("flw-corridor-probe", {
+        body: { currencies: ["CAD", "USD", "NGN"], amount: 10 },
+      });
+      if (error) throw error;
+      setFlwProbeResult(data);
+      const probes = (data as { payment_init_probes?: Array<{ currency: string; ok: boolean }> })?.payment_init_probes ?? [];
+      const cad = probes.find((p) => p.currency === "CAD");
+      if (cad?.ok) toast.success("CAD collect: Flutterwave returned a checkout link");
+      else toast.warning("CAD collect probe failed — see results");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Probe failed";
+      setFlwProbeResult({ error: msg, hint: "Deploy flw-corridor-probe edge function, or run scripts/probe-flutterwave-corridors.mjs locally with FLW_SECRET_KEY." });
+      toast.error("Corridor probe failed", { description: msg });
+    } finally {
+      setFlwProbeLoading(false);
+    }
+  };
 
   // Integration health
   const { data: integrations, isLoading: loadingIntegrations, refetch: refetchIntegrations } = useQuery({
@@ -189,9 +216,15 @@ export default function ApiManagementPage() {
                     </div>
                     <Button
                       size="sm" variant="secondary" className="w-full"
-                      onClick={() => toast.success(`${integ.name}: connectivity test queued`, { description: "Live ping not yet wired — placeholder OK response." })}
+                      onClick={() => {
+                        if (integ.key === "flutterwave") {
+                          void runFlutterwaveCorridorProbe();
+                          return;
+                        }
+                        toast.success(`${integ.name}: connectivity test queued`, { description: "Live ping not yet wired — placeholder OK response." });
+                      }}
                     >
-                      Test Connection
+                      {integ.key === "flutterwave" ? "Probe CAD/USD Collect" : "Test Connection"}
                     </Button>
                   </CardContent>
                 </Card>
@@ -304,6 +337,22 @@ export default function ApiManagementPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Flutterwave corridor probe */}
+      <Dialog open={flwProbeOpen} onOpenChange={setFlwProbeOpen}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Flutterwave corridor probe (CAD / USD / NGN)</DialogTitle>
+          </DialogHeader>
+          {flwProbeLoading ? (
+            <p className="text-sm text-muted-foreground py-6">Calling Flutterwave — no charge, init only…</p>
+          ) : (
+            <pre className="bg-muted rounded-md p-4 overflow-auto text-xs font-mono flex-1">
+              <code>{JSON.stringify(flwProbeResult ?? {}, null, 2)}</code>
+            </pre>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Payload viewer */}
       <Dialog open={!!selectedPayload} onOpenChange={(open) => !open && setSelectedPayload(null)}>
