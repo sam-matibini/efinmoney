@@ -211,6 +211,9 @@ verify_jwt = false
 [functions.treasury-worker]
 verify_jwt = false
 
+[functions.flw-reconcile-transfers]
+verify_jwt = false
+
 [functions.persona-webhook]
 verify_jwt = false
 
