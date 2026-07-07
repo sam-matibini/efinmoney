@@ -81,10 +81,11 @@ Deno.serve(async (req) => {
         });
         results.push({ transfer_id: t.id, action: "completed", flw_status: flwStatus });
       } else if (flwStatus === "FAILED") {
+        const reason = String(res?.data?.complete_message || res?.data?.narration || "Provider reported FAILED").slice(0, 500);
         const refunded = await reverseTransferLedger(db, t.id);
         await db.from("transfers").update({
           status: "failed",
-          failure_reason: String(res?.data?.complete_message || "Provider reported FAILED").slice(0, 500),
+          failure_reason: reason,
         }).eq("id", t.id).eq("status", "processing");
         await db.from("notifications").insert({
           user_id: t.sender_id,
@@ -94,7 +95,7 @@ Deno.serve(async (req) => {
             : `Your transfer to ${t.recipient_name} failed.`,
           type: "error",
         });
-        results.push({ transfer_id: t.id, action: "failed", refunded, flw_status: flwStatus });
+        results.push({ transfer_id: t.id, action: "failed", refunded, flw_status: flwStatus, reason });
       } else {
         // NEW / PENDING — genuinely still processing at Flutterwave.
         results.push({ transfer_id: t.id, action: "still_processing", flw_status: flwStatus || "unknown" });
