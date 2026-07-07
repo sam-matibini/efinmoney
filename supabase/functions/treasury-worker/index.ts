@@ -49,6 +49,7 @@ async function invokeFlutterwavePayout(transfer: Record<string, unknown>) {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      "Authorization": `Bearer ${SERVICE_KEY}`,
       "x-internal-secret": SERVICE_KEY,
     },
     body: JSON.stringify(body),
