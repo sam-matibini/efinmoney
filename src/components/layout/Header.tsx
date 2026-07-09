@@ -1,20 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { motion, LayoutGroup } from "framer-motion";
 import {
   Search,
   LogOut,
-  Shield,
-  Wallet,
-  Settings,
-  Cog,
   Menu,
-  LayoutDashboard,
-  Send,
-  Link2,
-  ArrowDownToLine,
-  Users,
-  RefreshCw,
-  CreditCard,
-  type LucideIcon,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -40,6 +29,8 @@ import NotificationsPanel from "@/components/header/NotificationsPanel";
 import QuickActionsPopover from "@/components/layout/QuickActionsPopover";
 import SearchModal from "@/components/header/SearchModal";
 import HeaderNavItem from "@/components/layout/HeaderNavItem";
+import NavIconImage from "@/components/layout/NavIconImage";
+import { navIconImgClassMobile } from "@/components/layout/navIconAssets";
 import { Logo, Wordmark } from "@/components/Logo";
 import ThemeToggle from "@/components/theme/ThemeToggle";
 import { useWallets } from "@/hooks/useWallets";
@@ -52,7 +43,6 @@ import {
   headerIconVariants,
   headerNavTrack,
   headerSearchClass,
-  navIconTint,
   navMobileClass,
   profileBadgeClass,
   profileTriggerClass,
@@ -61,29 +51,9 @@ import {
 type NavItem = {
   label: string;
   href: string;
-  icon: LucideIcon;
 };
 
-const navIcons: Record<string, LucideIcon> = {
-  Dashboard: LayoutDashboard,
-  Send: Send,
-  "Payment links": Link2,
-  "Top up": ArrowDownToLine,
-  Contacts: Users,
-  Exchange: RefreshCw,
-  Wallets: Wallet,
-  Cards: CreditCard,
-  Finance: Wallet,
-  Operations: Settings,
-  Admin: Shield,
-  Settings: Cog,
-};
-
-const buildNavItem = (label: string, href: string): NavItem => ({
-  label,
-  href,
-  icon: navIcons[label],
-});
+const buildNavItem = (label: string, href: string): NavItem => ({ label, href });
 
 const Header = () => {
   const { signOut, user } = useAuth();
@@ -110,10 +80,10 @@ const Header = () => {
   const navItems: NavItem[] = [
     buildNavItem("Dashboard", "/dashboard"),
     buildNavItem("Send", "/send"),
-    buildNavItem("Payment links", "/payment-links"),
+    buildNavItem("Payment Links", "/payment-links"),
     buildNavItem("Top up", "/wallet/topup"),
     buildNavItem("Contacts", "/contacts"),
-    buildNavItem("Exchange", "/exchange"),
+    buildNavItem("Foreign Currency Exchange", "/exchange"),
     buildNavItem("Wallets", "/wallets"),
     buildNavItem("Cards", "/cards"),
   ];
@@ -135,26 +105,51 @@ const Header = () => {
       ? location.pathname === "/" || location.pathname === "/dashboard"
       : location.pathname.startsWith(href) && href !== "#";
 
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 6);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  const navStagger = {
+    hidden: {},
+    show: { transition: { staggerChildren: 0.04, delayChildren: 0.12 } },
+  };
+
   return (
     <TooltipProvider delayDuration={200}>
-      <header className="sticky top-0 z-50 border-b border-border/60 bg-background/85 backdrop-blur-md supports-[backdrop-filter]:bg-background/75">
-        <div className="container flex items-center h-16 px-3 sm:px-4 gap-3 lg:gap-4">
+      <motion.header
+        className={`sticky top-0 z-50 border-b overflow-x-hidden backdrop-blur-md supports-[backdrop-filter]:bg-background/75 transition-[border-color,background-color] duration-300 ${
+          scrolled
+            ? "border-border/80 bg-background/95 shadow-[0_8px_30px_-12px_hsl(var(--primary)/0.18)]"
+            : "border-border/60 bg-background/85"
+        }`}
+        initial={{ y: -20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ type: "spring", stiffness: 380, damping: 32 }}
+      >
+        <div className="container flex items-center h-14 sm:h-16 min-w-0 w-full max-w-full px-3 sm:px-4 gap-2 sm:gap-3">
           {/* Brand */}
-          <div className="flex items-center gap-2 shrink-0 min-w-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 min-w-0">
             <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
               <SheetTrigger asChild>
-                <button
-                  className={`xl:hidden ${headerIconBase} ${headerIconInteractive} ${headerIconVariants.menu}`}
+                <motion.button
+                  whileHover={{ scale: 1.06 }}
+                  whileTap={{ scale: 0.92 }}
+                  transition={{ type: "spring", stiffness: 500, damping: 22 }}
+                  className={`lg:hidden ${headerIconBase} ${headerIconInteractive} ${headerIconVariants.menu}`}
                   aria-label="Open menu"
                 >
                   <Menu className="w-5 h-5" />
-                </button>
+                </motion.button>
               </SheetTrigger>
               <SheetContent side="left" className="w-72 p-0">
                 <SheetHeader className="p-4 border-b border-border">
                   <SheetTitle className="flex items-center gap-2">
-                    <Logo className="w-8 h-8" />
-                    <Wordmark className="font-display font-bold text-lg" />
+                    <Logo static className="w-8 h-8" />
+                    <Wordmark subtle className="font-display font-bold text-lg" />
                   </SheetTitle>
                 </SheetHeader>
                 <nav className="flex flex-col gap-0.5 p-2">
@@ -170,7 +165,7 @@ const Header = () => {
                         onTouchStart={() => warmRoute(item.href)}
                         className={navMobileClass(isActive)}
                       >
-                        <item.icon className={`w-4 h-4 shrink-0 ${navIconTint(item.label)}`} />
+                        <NavIconImage label={item.label} className={navIconImgClassMobile} />
                         {item.label}
                       </Link>
                     );
@@ -179,32 +174,57 @@ const Header = () => {
               </SheetContent>
             </Sheet>
 
-            <Link to="/dashboard" className="flex items-center gap-2 min-w-0">
-              <Logo className="w-8 h-8 shrink-0" />
-              <Wordmark className="font-display font-bold text-lg truncate hidden sm:inline" />
-            </Link>
+            <motion.div
+              initial={{ opacity: 0, x: -8 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.05, type: "spring", stiffness: 400, damping: 28 }}
+            >
+              <Link
+                to="/dashboard"
+                className="flex items-center gap-2 sm:gap-2.5 min-w-0 shrink-0 rounded-lg py-1 pr-1 transition-opacity duration-200 hover:opacity-90"
+              >
+                <Logo static className="w-7 h-7 sm:w-8 sm:h-8" />
+                <Wordmark
+                  subtle
+                  className="font-display font-bold text-base sm:text-lg truncate hidden md:inline"
+                />
+              </Link>
+            </motion.div>
           </div>
 
-          {/* Desktop nav — full-width pill track */}
-          <nav className="hidden xl:flex flex-1 min-w-0">
-            <div className={`${headerNavTrack} flex-1 overflow-x-auto no-scrollbar`}>
-              {navItems.map((item) => (
-                <HeaderNavItem
-                  key={item.label}
-                  label={item.label}
-                  href={item.href}
-                  icon={item.icon}
-                  isActive={isNavActive(item.href)}
-                  onWarmRoute={() => warmRoute(item.href)}
-                />
-              ))}
-            </div>
+          {/* Desktop nav */}
+          <nav className="hidden lg:flex flex-1 min-w-0 mx-1 xl:mx-2">
+            <LayoutGroup id="header-nav">
+              <motion.div
+                className={`${headerNavTrack} flex-1 min-w-0 overflow-x-auto no-scrollbar`}
+                variants={navStagger}
+                initial="hidden"
+                animate="show"
+              >
+                {navItems.map((item) => (
+                  <HeaderNavItem
+                    key={item.label}
+                    label={item.label}
+                    href={item.href}
+                    isActive={isNavActive(item.href)}
+                    onWarmRoute={() => warmRoute(item.href)}
+                  />
+                ))}
+              </motion.div>
+            </LayoutGroup>
           </nav>
 
           {/* Actions */}
-          <div className="flex items-center gap-1.5 lg:gap-2 shrink-0">
-            <div className="relative hidden lg:flex w-48 xl:w-56 2xl:w-64">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+          <motion.div
+            className="flex items-center gap-0.5 sm:gap-1 shrink-0 ml-auto lg:ml-0"
+            initial={{ opacity: 0, x: 16 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.18, type: "spring", stiffness: 380, damping: 30 }}
+          >
+            <motion.div
+              className="relative hidden xl:flex min-w-[10rem] w-40 2xl:w-52 shrink header-search-wrap group"
+            >
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none transition-colors duration-300 group-focus-within:text-primary" />
               <input
                 type="search"
                 value={searchQuery}
@@ -213,28 +233,38 @@ const Header = () => {
                 onKeyDown={(e) => {
                   if (e.key === "Enter") openSearch();
                 }}
-                placeholder="Search transfers, contacts..."
+                placeholder="Search..."
                 aria-label="Search transfers, contacts, wallets"
                 className={headerSearchClass}
               />
-            </div>
-            <button
+            </motion.div>
+            <motion.button
               onClick={openSearch}
-              className={`lg:hidden ${headerIconBase} ${headerIconInteractive} ${headerIconVariants.search}`}
+              whileHover={{ scale: 1.08, y: -1 }}
+              whileTap={{ scale: 0.92 }}
+              transition={{ type: "spring", stiffness: 500, damping: 20 }}
+              className={`xl:hidden ${headerIconBase} ${headerIconInteractive} ${headerIconVariants.search}`}
               aria-label="Search"
             >
               <Search className="w-5 h-5" />
-            </button>
+            </motion.button>
 
-            <span className="hidden lg:block w-px h-8 bg-border/60 mx-0.5" aria-hidden />
+            <span className="hidden xl:block w-px h-7 sm:h-8 bg-border/60 mx-0.5" aria-hidden />
 
             <ThemeToggle />
             <NotificationsPanel />
-            <QuickActionsPopover />
+            <div className="hidden xl:block">
+              <QuickActionsPopover />
+            </div>
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className={profileTriggerClass}>
+                <motion.button
+                  className={profileTriggerClass}
+                  whileHover={{ scale: 1.04, y: -1 }}
+                  whileTap={{ scale: 0.96 }}
+                  transition={{ type: "spring", stiffness: 480, damping: 22 }}
+                >
                   <Avatar className="h-8 w-8 rounded-md border border-border">
                     <AvatarImage src={avatarUrl ?? undefined} alt="Profile" />
                     <AvatarFallback className="rounded-md gradient-primary text-primary-foreground text-xs font-semibold">
@@ -246,7 +276,7 @@ const Header = () => {
                       {localeDisplay}
                     </span>
                   )}
-                </button>
+                </motion.button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
                 <div className="px-3 py-2">
@@ -264,7 +294,7 @@ const Header = () => {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-          </div>
+          </motion.div>
         </div>
         <SearchModal
           open={searchOpen}
@@ -272,7 +302,7 @@ const Header = () => {
           initialQuery={searchQuery}
           onQueryChange={setSearchQuery}
         />
-      </header>
+      </motion.header>
     </TooltipProvider>
   );
 };

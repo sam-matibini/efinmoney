@@ -1,4 +1,5 @@
 import { Bell, Check, Megaphone } from "lucide-react";
+import { motion } from "framer-motion";
 import { formatDistanceToNow } from "date-fns";
 import {
   Popover,
@@ -19,7 +20,10 @@ const NotificationsPanel = () => {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <button
+        <motion.button
+          whileHover={{ scale: 1.08, y: -1 }}
+          whileTap={{ scale: 0.92 }}
+          transition={{ type: "spring", stiffness: 500, damping: 20 }}
           className={cn(
             `relative ${headerIconBase} ${headerIconInteractive} ${headerIconVariants.notifications}`,
             unreadCount > 0 && "animate-bell-shake"
@@ -27,11 +31,15 @@ const NotificationsPanel = () => {
         >
           <Bell className="w-5 h-5" />
           {unreadCount > 0 && (
-            <span className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 text-[10px] font-semibold bg-primary text-primary-foreground rounded-full flex items-center justify-center ring-2 ring-background">
+            <motion.span
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 text-[10px] font-semibold bg-primary text-primary-foreground rounded-full flex items-center justify-center ring-2 ring-background header-nav-dot"
+            >
               {unreadCount > 99 ? '99+' : unreadCount}
-            </span>
+            </motion.span>
           )}
-        </button>
+        </motion.button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80 p-0">
         <div className="flex items-center justify-between p-3 border-b border-border">

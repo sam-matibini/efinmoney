@@ -5,12 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "node --max-http-header-size=65536 ./node_modules/vite/bin/vite.js",
-    "build": "vite build",
-    "build:prod": "node --max-old-space-size=6144 ./node_modules/vite/bin/vite.js build && node scripts/verify-build.mjs",
+    "build": "npm run export-nav-icons && vite build",
+    "build:prod": "npm run export-nav-icons && node --max-old-space-size=6144 ./node_modules/vite/bin/vite.js build && node scripts/verify-build.mjs",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "typecheck": "tsc -b tsconfig.app.json",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "export-nav-icons": "node scripts/export-nav-icons.mjs"
   },
   "dependencies": {
     "@adyen/adyen-web": "^6.39.0",
@@ -102,6 +103,7 @@
     "globals": "^15.15.0",
     "lovable-tagger": "^1.1.13",
     "postcss": "^8.5.6",
+    "sharp": "^0.35.3",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.38.0",

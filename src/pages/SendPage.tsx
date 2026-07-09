@@ -965,8 +965,8 @@ const SendPage = () => {
 
   return (
     <>
-      <main className="container px-4 py-6">
-        <div className="max-w-2xl mx-auto space-y-6">
+      <main className="container px-3 sm:px-4 py-4 sm:py-6">
+        <div className="max-w-2xl mx-auto space-y-5 sm:space-y-6">
           <BackToDashboard />
           {/* Header — slides down with fade */}
           <motion.div
@@ -975,7 +975,7 @@ const SendPage = () => {
             transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
             className="text-center"
           >
-            <h1 className="text-2xl font-display font-bold text-foreground">Send Money</h1>
+            <h1 className="text-xl sm:text-2xl font-display font-bold text-foreground">Send Money</h1>
             <p className="text-muted-foreground">Choose how you'd like to send</p>
           </motion.div>
 
@@ -1011,7 +1011,7 @@ const SendPage = () => {
               }}
               className="w-full"
             >
-              <TabsList className="relative grid w-full grid-cols-3 h-12 overflow-hidden">
+              <TabsList className="relative grid w-full grid-cols-3 h-11 sm:h-12 overflow-hidden">
                 {/* Sliding pill */}
                 <motion.div
                   className="absolute top-1 bottom-1 rounded-sm bg-background shadow-sm"
@@ -1025,17 +1025,17 @@ const SendPage = () => {
                   style={{ width: 'calc(33.333% - 0.5rem)' }}
                   transition={{ type: "spring", stiffness: 380, damping: 30 }}
                 />
-                <TabsTrigger value="international" className="relative z-10 gap-1.5 text-xs sm:text-sm data-[state=active]:bg-transparent data-[state=active]:shadow-none">
+                <TabsTrigger value="international" className="relative z-10 gap-1 px-1 sm:gap-1.5 sm:px-2 text-[11px] sm:text-sm data-[state=active]:bg-transparent data-[state=active]:shadow-none">
                   <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/10 ring-1 ring-border">
                     <Globe2 className="h-2.5 w-2.5 text-primary" aria-hidden />
                   </span>
                   International
                 </TabsTrigger>
-                <TabsTrigger value="efinmoney" className="relative z-10 gap-1.5 text-xs sm:text-sm data-[state=active]:bg-transparent data-[state=active]:shadow-none">
+                <TabsTrigger value="efinmoney" className="relative z-10 gap-1 px-1 sm:gap-1.5 sm:px-2 text-[11px] sm:text-sm data-[state=active]:bg-transparent data-[state=active]:shadow-none">
                   <BrandFlag size="xs" />
                   eFinMoney
                 </TabsTrigger>
-                <TabsTrigger value="canada" className="relative z-10 gap-1.5 text-xs sm:text-sm data-[state=active]:bg-transparent data-[state=active]:shadow-none">
+                <TabsTrigger value="canada" className="relative z-10 gap-1 px-1 sm:gap-1.5 sm:px-2 text-[11px] sm:text-sm data-[state=active]:bg-transparent data-[state=active]:shadow-none">
                   <CountryFlag country="CA" size="xs" />
                   Domestic
                 </TabsTrigger>

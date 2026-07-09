@@ -3,24 +3,22 @@
  */
 
 export const headerNavInteractive =
-  "group/nav relative transition-all duration-200 ease-out header-hover-lift";
+  "group/nav relative transition-[color,transform,box-shadow] duration-300 ease-out header-hover-lift overflow-hidden";
 
 export const headerNavActiveMotion = "header-nav-active-pulse";
 
-export const headerNavIconMotion = "header-nav-icon-rock";
+export const headerNavTrack =
+  "header-nav-track relative flex items-center gap-0.5 rounded-xl border border-border/50 bg-muted/40 p-2 shadow-inner w-full";
 
 export const headerIconInteractive =
-  "transition-all duration-200 ease-out header-hover-lift header-hover-ring";
+  "transition-[transform,box-shadow,background-color] duration-300 ease-out header-hover-lift header-hover-ring header-action-btn";
 
 export const headerIconBreathe = "header-icon-breathe";
 
-export const headerIconBase = "p-2 rounded-lg";
-
-export const headerNavTrack =
-  "flex items-center gap-0.5 rounded-xl border border-border/50 bg-muted/40 p-2 shadow-inner w-full";
+export const headerIconBase = "p-1.5 sm:p-2 rounded-lg";
 
 export const headerSearchClass =
-  "h-10 w-full rounded-lg border border-border/60 bg-muted/30 pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:bg-background transition-colors duration-200";
+  "header-search-input h-9 sm:h-10 w-full min-w-0 rounded-lg border border-border/60 bg-muted/30 pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:bg-background transition-all duration-300 ease-out";
 
 export const headerIconVariants = {
   menu: "bg-primary/12 text-primary hover:bg-primary/20",
@@ -34,10 +32,10 @@ export const headerIconVariants = {
 export const navIconTints: Record<string, string> = {
   Dashboard: "text-primary",
   Send: "text-sky-600 dark:text-sky-400",
-  "Payment links": "text-violet-600 dark:text-violet-400",
+  "Payment Links": "text-violet-600 dark:text-violet-400",
   "Top up": "text-emerald-600 dark:text-emerald-400",
   Contacts: "text-cyan-600 dark:text-cyan-400",
-  Exchange: "text-indigo-600 dark:text-indigo-400",
+  "Foreign Currency Exchange": "text-indigo-600 dark:text-indigo-400",
   Wallets: "text-teal-600 dark:text-teal-400",
   Cards: "text-blue-600 dark:text-blue-400",
   Finance: "text-emerald-600 dark:text-emerald-400",
@@ -53,12 +51,12 @@ export function navIconTint(label: string) {
 export function navDesktopClass(active: boolean, withLabel = false) {
   return [
     withLabel
-      ? "inline-flex items-center justify-center gap-1.5 px-2.5 h-10 rounded-lg flex-1 min-w-0 max-w-[9.5rem]"
-      : "inline-flex items-center justify-center w-10 h-10 rounded-lg flex-1 min-w-[2.5rem] max-w-[3rem]",
+      ? "inline-flex items-center justify-center gap-1 px-1.5 h-10 rounded-lg flex-1 min-w-0 max-w-[8.5rem] overflow-hidden"
+      : "inline-flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-lg flex-1 min-w-[2.25rem] max-w-[2.75rem]",
     headerNavInteractive,
     active
-      ? `bg-background text-foreground shadow-sm ring-1 ring-primary/25 ${headerNavActiveMotion} ${headerNavIconMotion}`
-      : "text-muted-foreground hover:bg-background/70 hover:text-foreground",
+      ? `text-foreground z-10 ${headerNavActiveMotion}`
+      : "text-muted-foreground hover:text-foreground",
   ].join(" ");
 }
 
@@ -73,10 +71,10 @@ export function navMobileClass(active: boolean) {
 }
 
 export const profileTriggerClass =
-  "flex items-center gap-1.5 p-1 pr-2 rounded-lg border border-border/60 bg-background/80 hover:bg-muted/60 transition-all duration-200 header-hover-lift";
+  "flex items-center gap-1.5 p-1 pr-2 rounded-lg border border-border/60 bg-background/80 hover:bg-muted/60 transition-all duration-300 header-hover-lift header-profile-btn";
 
 export const profileBadgeClass =
-  "hidden sm:inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-sky-500/12 text-sky-700 border border-sky-500/20 dark:text-sky-300";
+  "hidden xl:inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-sky-500/12 text-sky-700 border border-sky-500/20 dark:text-sky-300";
 
 export const quickActionTileTones: Record<string, string> = {
   Send: "bg-sky-500/12 text-sky-600 dark:text-sky-400",

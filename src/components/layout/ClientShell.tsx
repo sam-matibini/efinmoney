@@ -8,7 +8,7 @@ import { DeferredAliceWidget, ShellAdyenHandler } from "@/components/layout/Defe
 
 /** Persistent shell — Header stays mounted while only page content swaps. */
 const ClientShell = () => (
-  <div className="min-h-screen bg-background pb-24 md:pb-8">
+  <div className="min-h-screen bg-background overflow-x-hidden pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-8">
     <ShellAdyenHandler />
     <Header />
     <PageTransition>

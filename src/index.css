@@ -415,57 +415,94 @@
 
   /* Header nav + utility micro-interactions */
   @keyframes header-nav-glow {
-    0%, 100% { box-shadow: inset 0 0 0 1px hsl(var(--primary) / 0.08); }
-    50% { box-shadow: inset 0 0 0 1px hsl(var(--primary) / 0.22), 0 2px 10px -4px hsl(var(--primary) / 0.25); }
+    0%, 100% {
+      box-shadow:
+        inset 0 0 0 1px hsl(var(--primary) / 0.12),
+        0 2px 8px -4px hsl(var(--primary) / 0.15);
+    }
+    50% {
+      box-shadow:
+        inset 0 0 0 1px hsl(var(--primary) / 0.28),
+        0 6px 20px -6px hsl(var(--primary) / 0.35);
+    }
+  }
+  @keyframes header-track-shimmer {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
   }
   @keyframes header-icon-breathe-kf {
-    0%, 100% { opacity: 0.88; }
-    50% { opacity: 1; }
+    0%, 100% { opacity: 0.9; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.04); }
   }
-  @keyframes header-nav-icon-rock {
-    0%, 100% { transform: rotate(0deg); }
-    25% { transform: rotate(-2deg); }
-    75% { transform: rotate(2deg); }
+  @keyframes header-nav-dot-pulse {
+    0%, 100% { opacity: 0.7; transform: translateX(-50%) scale(1); box-shadow: 0 0 0 0 hsl(var(--primary) / 0.4); }
+    50% { opacity: 1; transform: translateX(-50%) scale(1.4); box-shadow: 0 0 8px 2px hsl(var(--primary) / 0.35); }
+  }
+
+  .header-nav-track {
+    background-image: linear-gradient(
+      105deg,
+      hsl(var(--muted) / 0.5) 0%,
+      hsl(var(--primary) / 0.06) 45%,
+      hsl(var(--muted) / 0.5) 90%
+    );
+    background-size: 220% 100%;
+    animation: header-track-shimmer 10s ease-in-out infinite;
   }
 
   .header-nav-active-pulse {
-    animation: header-nav-glow 5s ease-in-out infinite;
-  }
-  .header-nav-icon-rock .header-hover-icon,
-  .header-nav-icon-rock > svg {
-    animation: header-nav-icon-rock 6s ease-in-out infinite;
-    transform-origin: center;
+    animation: header-nav-glow 3.5s ease-in-out infinite;
   }
   .header-icon-breathe {
-    animation: header-icon-breathe-kf 7s ease-in-out infinite;
-  }
-  @keyframes header-nav-dot-pulse {
-    0%, 100% { opacity: 0.6; transform: translateX(-50%) scale(1); }
-    50% { opacity: 1; transform: translateX(-50%) scale(1.35); }
+    animation: header-icon-breathe-kf 5s ease-in-out infinite;
   }
   .header-nav-dot {
-    animation: header-nav-dot-pulse 2.5s ease-in-out infinite;
+    animation: header-nav-dot-pulse 2s ease-in-out infinite;
+  }
+
+  .header-nav-icon {
+    transition: filter 280ms ease-out, transform 280ms ease-out;
+    filter: drop-shadow(0 1px 2px hsl(var(--foreground) / 0.08));
+  }
+  .group\/nav:hover .header-nav-icon {
+    filter: drop-shadow(0 3px 8px hsl(var(--primary) / 0.28)) saturate(1.12) brightness(1.06);
+  }
+
+  .header-search-wrap:focus-within .header-search-input {
+    border-color: hsl(var(--primary) / 0.45);
+    box-shadow: 0 0 0 3px hsl(var(--primary) / 0.12), 0 4px 16px -6px hsl(var(--primary) / 0.2);
+  }
+  .header-search-wrap:focus-within svg {
+    color: hsl(var(--primary));
   }
 
   @media (hover: hover) and (pointer: fine) {
     .header-hover-lift {
-      transition: transform 200ms ease-out, box-shadow 200ms ease-out, background-color 200ms ease-out, color 200ms ease-out;
+      transition: transform 280ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 280ms ease-out, background-color 280ms ease-out, color 280ms ease-out;
     }
     .header-hover-lift:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 4px 12px -6px hsl(var(--primary) / 0.2);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 18px -8px hsl(var(--primary) / 0.28);
     }
-    .group\/nav:hover .header-hover-icon,
+    .header-action-btn:hover {
+      transform: translateY(-2px) scale(1.06);
+      box-shadow: 0 6px 16px -6px hsl(var(--primary) / 0.22);
+    }
+    .header-profile-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 0 0 2px hsl(var(--primary) / 0.2), 0 8px 20px -8px hsl(var(--primary) / 0.25);
+    }
+    .header-brand-link:hover .header-nav-icon,
     .header-hover-lift:hover .header-hover-icon {
       filter: saturate(1.15) brightness(1.05);
       transform: translateY(-1px);
-      transition: transform 200ms ease-out, filter 200ms ease-out;
+      transition: transform 280ms ease-out, filter 280ms ease-out;
     }
     .header-hover-ring {
       position: relative;
     }
     .header-hover-ring:hover {
-      box-shadow: 0 0 0 2px hsl(var(--primary) / 0.15), 0 4px 12px -6px hsl(var(--primary) / 0.18);
+      box-shadow: 0 0 0 2px hsl(var(--primary) / 0.18), 0 6px 18px -8px hsl(var(--primary) / 0.22);
     }
   }
 
@@ -479,15 +516,16 @@
     .corridor-globe-glow,
     .corridor-orbit-ring,
     .corridor-flag-chip,
+    .header-nav-track,
     .header-nav-active-pulse,
-    .header-nav-icon-rock .header-hover-icon,
-    .header-nav-icon-rock > svg,
     .header-icon-breathe,
     .header-nav-dot,
     .animate-bell-shake {
       animation: none;
     }
-    .header-hover-lift:hover {
+    .header-hover-lift:hover,
+    .header-action-btn:hover,
+    .header-profile-btn:hover {
       transform: none;
     }
   }

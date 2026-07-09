@@ -1,5 +1,6 @@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { LayoutGrid, Send, Download, RefreshCw, Smartphone, CreditCard, PiggyBank, MapPin, type LucideIcon } from "lucide-react";
+import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import SendMoneyModal from "@/components/modals/SendMoneyModal";
 import ExchangeModal from "@/components/modals/ExchangeModal";
@@ -32,31 +33,47 @@ const QuickActionsPopover = () => {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <button
+        <motion.button
+          whileHover={{ scale: 1.08, y: -1, rotate: 90 }}
+          whileTap={{ scale: 0.9, rotate: 0 }}
+          transition={{ type: "spring", stiffness: 480, damping: 20 }}
           className={`${headerIconBase} ${headerIconInteractive} ${headerIconVariants.quickActions} ${headerIconBreathe}`}
           aria-label="Quick Actions"
         >
           <LayoutGrid className="w-5 h-5" />
-        </button>
+        </motion.button>
       </PopoverTrigger>
       <PopoverContent align="end" sideOffset={8} className="w-64 p-3">
-        <div className="grid grid-cols-4 gap-1">
+        <motion.div
+          className="grid grid-cols-4 gap-1"
+          initial="hidden"
+          animate="show"
+          variants={{ hidden: {}, show: { transition: { staggerChildren: 0.04 } } }}
+        >
           {items.map((item) => {
             const tone = quickActionTileTones[item.label] ?? quickActionTileTones.Send;
+            const tileMotion = {
+              hidden: { opacity: 0, y: 8, scale: 0.9 },
+              show: { opacity: 1, y: 0, scale: 1, transition: { type: "spring" as const, stiffness: 420, damping: 24 } },
+            };
             return item.kind === "modal" ? (
               <item.Modal key={item.label}>
-                <div className="group flex flex-col items-center gap-1 p-2 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer header-hover-lift">
+                <motion.div
+                  variants={tileMotion}
+                  whileHover={{ y: -3, scale: 1.04 }}
+                  className="group flex flex-col items-center gap-1 p-2 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer header-hover-lift"
+                >
                   <div className={`w-9 h-9 rounded-lg flex items-center justify-center transition-colors duration-200 ${tone}`}>
                     <item.icon className="w-4 h-4 header-hover-icon" />
                   </div>
                   <span className="text-[10px] font-medium text-center leading-tight text-[hsl(230,18%,38%)] dark:text-[hsl(230,12%,72%)] group-hover:text-foreground">
                     {item.label}
                   </span>
-                </div>
+                </motion.div>
               </item.Modal>
             ) : (
+              <motion.div key={item.label} variants={tileMotion} whileHover={{ y: -3, scale: 1.04 }}>
               <Link
-                key={item.label}
                 to={item.to}
                 className="group flex flex-col items-center gap-1 p-2 rounded-lg hover:bg-muted/50 transition-colors header-hover-lift"
               >
@@ -67,9 +84,10 @@ const QuickActionsPopover = () => {
                   {item.label}
                 </span>
               </Link>
+              </motion.div>
             );
           })}
-        </div>
+        </motion.div>
       </PopoverContent>
     </Popover>
   );
