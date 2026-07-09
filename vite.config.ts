@@ -15,4 +15,23 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return;
+          if (id.includes("@remotion") || id.includes("remotion")) return "remotion";
+          if (id.includes("@supabase")) return "supabase";
+          if (
+            id.includes("react") ||
+            id.includes("react-dom") ||
+            id.includes("react-router") ||
+            id.includes("@tanstack/react-query")
+          ) {
+            return "vendor";
+          }
+        },
+      },
+    },
+  },
 }));

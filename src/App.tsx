@@ -9,6 +9,7 @@ import { lazyImport } from "@/lib/lazyImport";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { useUserRoles } from "@/hooks/useUserRoles";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
+import { AppBootstrap, useAppSession } from "@/providers/AppBootstrap";
 import Landing from "./pages/Landing";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
@@ -16,16 +17,24 @@ import { AdminAuthProvider } from "@/contexts/AdminAuthContext";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import SplashScreen from "@/components/SplashScreen";
 
+// Core nav pages — eager so tab switches never wait on chunks
+import Index from "./pages/Index";
+import WalletsPage from "./pages/WalletsPage";
+import SendPage from "./pages/SendPage";
+import ExchangePage from "./pages/ExchangePage";
+import CardsPage from "./pages/CardsPage";
+import ContactsPage from "./pages/ContactsPage";
+import TopUpPage from "./pages/TopUpPage";
+import PaymentLinksPage from "./pages/PaymentLinksPage";
+
 // Layout shells (small, used by many routes — keep eager)
 import KycAppLayout from "@/components/layout/KycAppLayout";
 import ProtectedShell from "@/components/layout/ProtectedShell";
 import ClientShell from "@/components/layout/ClientShell";
 import AdminGuard from "@/components/admin-portal/AdminGuard";
 import AdminLayout from "@/components/admin-portal/AdminLayout";
-import KYCGuard from "@/components/kyc/KYCGuard";
 
-// Lazy-loaded pages
-const Index = lazyImport(() => import("./pages/Index"));
+// Lazy-loaded pages (admin, onboarding, legal, rarely-used)
 const PrivacyPolicyPage = lazyImport(() => import("./pages/PrivacyPolicyPage"));
 const TermsPage = lazyImport(() => import("./pages/TermsPage"));
 const CompliancePage = lazyImport(() => import("./pages/CompliancePage"));
@@ -35,11 +44,7 @@ const FinanceDashboard = lazyImport(() => import("./pages/FinanceDashboard"));
 const AdminDashboard = lazyImport(() => import("./pages/AdminDashboard"));
 const OperationsDashboard = lazyImport(() => import("./pages/OperationsDashboard"));
 const SettingsDashboard = lazyImport(() => import("./pages/SettingsDashboard"));
-const WalletsPage = lazyImport(() => import("./pages/WalletsPage"));
-const SendPage = lazyImport(() => import("./pages/SendPage"));
 const SendCpnPage = lazyImport(() => import("./pages/SendCpnPage"));
-const ExchangePage = lazyImport(() => import("./pages/ExchangePage"));
-const CardsPage = lazyImport(() => import("./pages/CardsPage"));
 const EfinCardDetailPage = lazyImport(() => import("./pages/EfinCardDetailPage"));
 const CustomerPortalPage = lazyImport(() => import("./pages/CustomerPortalPage"));
 const ProfileSettingsPage = lazyImport(() => import("./pages/ProfileSettingsPage"));
@@ -51,10 +56,8 @@ const TransferTrackingPage = lazyImport(() => import("./pages/TransferTrackingPa
 const TransfersListPage = lazyImport(() => import("./pages/TransfersListPage"));
 const WalletStatementPage = lazyImport(() => import("./pages/WalletStatementPage"));
 const TransactionDetailPage = lazyImport(() => import("./pages/TransactionDetailPage"));
-const ContactsPage = lazyImport(() => import("./pages/ContactsPage"));
 const CanadaTransferPage = lazyImport(() => import("./pages/CanadaTransferPage"));
 const ReceivePage = lazyImport(() => import("./pages/ReceivePage"));
-const TopUpPage = lazyImport(() => import("./pages/TopUpPage"));
 const PayBillsPage = lazyImport(() => import("./pages/PayBillsPage"));
 const CanadaBillPayPage = lazyImport(() => import("./pages/CanadaBillPayPage"));
 const Welcome = lazyImport(() => import("./pages/onboarding/Welcome"));
@@ -63,7 +66,6 @@ const OnboardingEnhanced = lazyImport(() => import("./pages/onboarding/Enhanced"
 const OnboardingRejected = lazyImport(() => import("./pages/onboarding/Rejected"));
 const ShortLinkResolver = lazyImport(() => import("./pages/ShortLinkResolver"));
 const ClaimPaymentLinkPage = lazyImport(() => import("./pages/ClaimPaymentLinkPage"));
-const PaymentLinksPage = lazyImport(() => import("./pages/PaymentLinksPage"));
 const AdminLogin = lazyImport(() => import("./pages/admin/AdminLogin"));
 const AdminDashboardPage = lazyImport(() => import("./pages/admin/AdminDashboardPage"));
 const KycQueuePage = lazyImport(() => import("./pages/admin/KycQueuePage"));
@@ -117,7 +119,9 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 60_000,
+      gcTime: 30 * 60_000,
       refetchOnWindowFocus: false,
+      placeholderData: (previousData: unknown) => previousData,
     },
   },
 });
@@ -130,7 +134,7 @@ const FullPageSpinner = () => (
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
-  if (loading) return <FullPageSpinner />;
+  if (loading && !user) return <FullPageSpinner />;
   if (!user) return <Navigate to="/auth" replace />;
   return <>{children}</>;
 };
@@ -143,9 +147,11 @@ const RoleProtectedRoute = ({
   allowedRoles: ("admin" | "finance" | "compliance")[];
 }) => {
   const { user, loading } = useAuth();
+  const { isBootstrapped } = useAppSession();
   const { isAdmin, isFinance, isCompliance, isLoading: rolesLoading } = useUserRoles();
-  if (loading || rolesLoading) return <FullPageSpinner />;
+  if (loading && !user) return <FullPageSpinner />;
   if (!user) return <Navigate to="/auth" replace />;
+  if (rolesLoading && !isBootstrapped) return <FullPageSpinner />;
   const roleMap = { admin: isAdmin, finance: isFinance, compliance: isCompliance };
   const hasAccess = allowedRoles.some((role) => roleMap[role]);
   if (!hasAccess) return <Navigate to="/" replace />;
@@ -332,15 +338,17 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider>
       <AuthProvider>
-        <TooltipProvider>
-          <SplashScreen />
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <ScrollToTop />
-            <AppRoutes />
-          </BrowserRouter>
-        </TooltipProvider>
+        <AppBootstrap>
+          <TooltipProvider>
+            <SplashScreen />
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <ScrollToTop />
+              <AppRoutes />
+            </BrowserRouter>
+          </TooltipProvider>
+        </AppBootstrap>
       </AuthProvider>
     </ThemeProvider>
   </QueryClientProvider>

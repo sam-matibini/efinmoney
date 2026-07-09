@@ -111,6 +111,7 @@ const Header = () => {
                       to={item.href}
                       onClick={() => setMobileNavOpen(false)}
                       onMouseEnter={() => warmRoute(item.href)}
+                      onFocus={() => warmRoute(item.href)}
                       onTouchStart={() => warmRoute(item.href)}
                       className={`px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-75 flex items-center gap-2 active:scale-[0.98] active:opacity-80 ${
                         isActive ? 'bg-secondary text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -148,6 +149,7 @@ const Header = () => {
                 key={item.label}
                 to={item.href}
                 onMouseEnter={() => warmRoute(item.href)}
+                onFocus={() => warmRoute(item.href)}
                 onTouchStart={() => warmRoute(item.href)}
                 className={navLinkClass(isActive)}
               >

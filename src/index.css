@@ -355,11 +355,6 @@
     animation: bubble-drift 6s ease-in-out infinite;
   }
 
-  /* Brand loading spinner ring */
-  @keyframes efin-spin {
-    to { transform: rotate(360deg); }
-  }
-
   /* Dashboard corridor globe */
   @keyframes corridor-earth-spin {
     from { background-position: 0% 50%; }

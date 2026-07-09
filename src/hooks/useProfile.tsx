@@ -39,5 +39,7 @@ export const useProfile = () => {
       return (data as Profile) || null;
     },
     enabled: !!user,
+    staleTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
   });
 };

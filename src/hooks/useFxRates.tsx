@@ -44,7 +44,8 @@ export const useFxRates = () => {
       return latest.sort((a, b) => a.from_currency.localeCompare(b.from_currency));
     },
     refetchInterval: 60000,
-    staleTime: 30000,
+    staleTime: 60_000,
+    gcTime: 30 * 60_000,
   });
 };
 

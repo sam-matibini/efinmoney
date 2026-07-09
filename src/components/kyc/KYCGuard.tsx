@@ -2,6 +2,7 @@ import { Navigate, useLocation } from "react-router-dom";
 import { useKyc } from "@/hooks/useKyc";
 import { useUserRoles } from "@/hooks/useUserRoles";
 import { useProfile } from "@/hooks/useProfile";
+import { useAppSession } from "@/providers/AppBootstrap";
 import { ReactNode } from "react";
 
 import LoadingSpinner from "@/components/LoadingSpinner";
@@ -26,12 +27,10 @@ const KYCGuard = ({ children }: { children: ReactNode }) => {
   const { kyc, isLoading, isVerified, hasPassedCoreChecks } = useKyc();
   const { roles, isLoading: rolesLoading } = useUserRoles();
   const { data: profile, isLoading: profileLoading } = useProfile();
+  const { isBootstrapped } = useAppSession();
   const location = useLocation();
 
-  // Wait for profile + roles (cheap, reliable queries). Don't block the entire
-  // app on the KYC query — if it errors or is slow, we still let v2 framework
-  // users through; route-level access never depended on KYC for them.
-  if (rolesLoading || profileLoading) return <Spinner />;
+  if (!isBootstrapped && (rolesLoading || profileLoading)) return <Spinner />;
 
   // Staff roles bypass KYC entirely
   const isStaff = roles?.some((r) => ["admin", "finance", "compliance"].includes(r));

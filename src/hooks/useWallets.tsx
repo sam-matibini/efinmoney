@@ -32,5 +32,7 @@ export const useWallets = () => {
       return (data || []) as Wallet[];
     },
     enabled: !!user,
+    staleTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
   });
 };

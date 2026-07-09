@@ -1,6 +1,9 @@
 import { motion } from "framer-motion";
 import { Home, CreditCard, Activity, MoreHorizontal } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/useAuth";
+import { prefetchRoute } from "@/lib/prefetchRoute";
 
 const navItems = [
   { icon: Home, label: "Home", href: "/dashboard", match: ["/dashboard", "/"] },
@@ -11,6 +14,12 @@ const navItems = [
 
 const MobileNav = () => {
   const location = useLocation();
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  const warmRoute = (href: string) => {
+    if (user?.id) prefetchRoute(queryClient, href, user.id);
+  };
 
   return (
     <nav
@@ -24,7 +33,14 @@ const MobileNav = () => {
           );
 
           return (
-            <Link key={item.label} to={item.href} className="flex-1 flex justify-center">
+            <Link
+              key={item.label}
+              to={item.href}
+              className="flex-1 flex justify-center"
+              onMouseEnter={() => warmRoute(item.href)}
+              onFocus={() => warmRoute(item.href)}
+              onTouchStart={() => warmRoute(item.href)}
+            >
               <motion.div
                 whileTap={{ scale: 0.9 }}
                 className="flex flex-col items-center gap-1 py-1.5 px-2 min-w-[56px]"

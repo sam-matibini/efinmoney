@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import africaHero from "@/assets/landing-africa-hero.jpg";
 
 const CORRIDORS = [
   { from: "Canada", to: "Nigeria", flag: "🇳🇬" },
@@ -16,29 +17,62 @@ interface GlobalCorridorsProps {
 
 export default function GlobalCorridors({ videoSrc }: GlobalCorridorsProps) {
   const [resolvedSrc, setResolvedSrc] = useState<string | undefined>(videoSrc);
+  const [showVideo, setShowVideo] = useState(!!videoSrc);
+  const prefersReducedMotion =
+    typeof window !== "undefined" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   useEffect(() => {
-    if (videoSrc) return;
+    if (videoSrc || prefersReducedMotion) {
+      if (videoSrc) {
+        setResolvedSrc(videoSrc);
+        setShowVideo(true);
+      }
+      return;
+    }
+
     let cancelled = false;
-    (async () => {
-      const { data } = await supabase
-        .storage
+    const loadVideo = async () => {
+      const { data } = await supabase.storage
         .from("assets")
         .createSignedUrl("hero-background.mp4", 60 * 60 * 24);
-      if (!cancelled && data?.signedUrl) setResolvedSrc(data.signedUrl);
-    })();
+      if (!cancelled && data?.signedUrl) {
+        setResolvedSrc(data.signedUrl);
+        setShowVideo(true);
+      }
+    };
+
+    if ("requestIdleCallback" in window) {
+      const id = requestIdleCallback(() => void loadVideo(), { timeout: 3000 });
+      return () => {
+        cancelled = true;
+        cancelIdleCallback(id);
+      };
+    }
+
+    const timer = window.setTimeout(() => void loadVideo(), 500);
     return () => {
       cancelled = true;
+      window.clearTimeout(timer);
     };
-  }, [videoSrc]);
+  }, [videoSrc, prefersReducedMotion]);
 
   return (
     <section
       className="relative w-full overflow-hidden flex flex-col items-center justify-center"
       style={{ minHeight: "90vh", backgroundColor: "#050210" }}
     >
-      {/* Video background */}
-      {resolvedSrc && (
+      {/* Static poster — instant first paint */}
+      <img
+        src={africaHero}
+        alt=""
+        aria-hidden="true"
+        className="absolute inset-0 w-full h-full object-cover pointer-events-none z-0"
+        fetchPriority="high"
+      />
+
+      {/* Video enhancement — loaded after idle, never blocks interaction */}
+      {showVideo && resolvedSrc && (
         <video
           key={resolvedSrc}
           autoPlay
@@ -126,14 +160,15 @@ export default function GlobalCorridors({ videoSrc }: GlobalCorridorsProps) {
                 boxShadow: "0 2px 12px rgba(0,0,0,0.3)",
               }}
             >
-              <span className="text-base drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]" aria-hidden="true">{c.flag}</span>
+              <span className="text-base drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]" aria-hidden="true">
+                {c.flag}
+              </span>
               <span className="text-[13px] font-semibold text-white whitespace-nowrap">
                 {c.from} → {c.to}
               </span>
             </div>
           ))}
         </div>
-
 
         <Link
           to="/auth"

@@ -1,11 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as d3 from "d3";
 import { COUNTRY_CENTROIDS } from "@/lib/flags";
-
-const LAND_GEOJSON =
-  "https://raw.githubusercontent.com/martynafford/natural-earth-geojson/refs/heads/master/110m/physical/ne_110m_land.json";
-
-type GeoFeature = GeoJSON.Feature<GeoJSON.Polygon | GeoJSON.MultiPolygon>;
+import { getGlobeLandCache, loadGlobeLandData, type GlobeDot } from "@/lib/globeLandData";
 
 interface WireframeDottedGlobeProps {
   width?: number;
@@ -19,55 +15,7 @@ interface WireframeDottedGlobeProps {
   interactive?: boolean;
 }
 
-const pointInPolygon = (point: [number, number], polygon: number[][]): boolean => {
-  const [x, y] = point;
-  let inside = false;
-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-    const [xi, yi] = polygon[i];
-    const [xj, yj] = polygon[j];
-    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) {
-      inside = !inside;
-    }
-  }
-  return inside;
-};
-
-const pointInFeature = (point: [number, number], feature: GeoFeature): boolean => {
-  const geometry = feature.geometry;
-  if (geometry.type === "Polygon") {
-    const coordinates = geometry.coordinates;
-    if (!pointInPolygon(point, coordinates[0])) return false;
-    for (let i = 1; i < coordinates.length; i++) {
-      if (pointInPolygon(point, coordinates[i])) return false;
-    }
-    return true;
-  }
-  if (geometry.type === "MultiPolygon") {
-    for (const polygon of geometry.coordinates) {
-      if (pointInPolygon(point, polygon[0])) {
-        for (let i = 1; i < polygon.length; i++) {
-          if (pointInPolygon(point, polygon[i])) return false;
-        }
-        return true;
-      }
-    }
-  }
-  return false;
-};
-
-const generateDotsInPolygon = (feature: GeoFeature, dotSpacing = 16) => {
-  const dots: [number, number][] = [];
-  const bounds = d3.geoBounds(feature);
-  const [[minLng, minLat], [maxLng, maxLat]] = bounds;
-  const stepSize = dotSpacing * 0.08;
-  for (let lng = minLng; lng <= maxLng; lng += stepSize) {
-    for (let lat = minLat; lat <= maxLat; lat += stepSize) {
-      const point: [number, number] = [lng, lat];
-      if (pointInFeature(point, feature)) dots.push(point);
-    }
-  }
-  return dots;
-};
+type GeoFeature = GeoJSON.Feature<GeoJSON.Polygon | GeoJSON.MultiPolygon>;
 
 export default function WireframeDottedGlobe({
   width = 240,
@@ -78,7 +26,7 @@ export default function WireframeDottedGlobe({
   interactive = true,
 }: WireframeDottedGlobeProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(() => !getGlobeLandCache());
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -114,7 +62,11 @@ export default function WireframeDottedGlobe({
     }
 
     const allDots: DotData[] = [];
-    let landFeatures: GeoJSON.FeatureCollection | null = null;
+    let landFeatures: GeoJSON.FeatureCollection | null = getGlobeLandCache()?.landFeatures ?? null;
+    if (getGlobeLandCache()) {
+      allDots.push(...getGlobeLandCache()!.dots);
+      setIsLoading(false);
+    }
 
     const readTheme = () => {
       const root = getComputedStyle(document.documentElement);
@@ -262,16 +214,12 @@ export default function WireframeDottedGlobe({
     };
 
     const loadWorldData = async () => {
+      if (landFeatures) return;
       try {
-        setIsLoading(true);
-        const response = await fetch(LAND_GEOJSON);
-        if (!response.ok) throw new Error("Failed to load land data");
-        landFeatures = await response.json();
-        landFeatures.features.forEach((feature) => {
-          generateDotsInPolygon(feature as GeoFeature, compact ? 20 : 16).forEach(([lng, lat]) => {
-            allDots.push({ lng, lat });
-          });
-        });
+        const data = await loadGlobeLandData(compact);
+        landFeatures = data.landFeatures;
+        allDots.length = 0;
+        data.dots.forEach((dot: GlobeDot) => allDots.push(dot));
         render();
         setIsLoading(false);
       } catch {
@@ -289,6 +237,7 @@ export default function WireframeDottedGlobe({
       rotation[1] = -COUNTRY_CENTROIDS[highlightCountries[0]][1] + 12;
     }
     projection.rotate(rotation);
+    render();
 
     const tick = (elapsed: number) => {
       animTime = elapsed / 1000;
@@ -379,7 +328,7 @@ export default function WireframeDottedGlobe({
         style={{ width, height }}
         aria-label="Interactive wireframe globe showing your send corridors"
       />
-      {isLoading && (
+      {isLoading && !compact && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-full bg-muted/20">
           <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
         </div>
