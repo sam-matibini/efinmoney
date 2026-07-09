@@ -198,7 +198,7 @@ const MorePage = () => {
             rows={[
               { icon: Globe, label: "App Language", onClick: () => {} },
               { icon: Users, label: "Affiliates & Referrals", onClick: () => {} },
-              { icon: MessageSquare, label: "Talk to Support", onClick: () => {} },
+              { icon: MessageSquare, label: "Talk to Support", onClick: () => navigate("/support") },
               { icon: ArrowLeftRight, label: "See our rates", onClick: () => navigate("/exchange") },
             ]}
           />

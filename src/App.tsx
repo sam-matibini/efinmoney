@@ -118,6 +118,8 @@ const MorePage = lazyImport(() => import("./pages/MorePage"));
 const StripeConnectInstantPage = lazyImport(() => import("./pages/StripeConnectInstantPage"));
 const AfricanCardSendPage = lazyImport(() => import("./pages/AfricanCardSendPage"));
 const CommunicationHubPage = lazyImport(() => import("./pages/admin/CommunicationHubPage"));
+const SupportInboxPage = lazyImport(() => import("./pages/admin/SupportInboxPage"));
+const SupportPage = lazyImport(() => import("./pages/SupportPage"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -268,12 +270,14 @@ const AppRoutes = () => {
         <Route path="/admin/finance" element={<AdminAuthProvider><AdminGuard><AdminLayout><FinanceDashboard /></AdminLayout></AdminGuard></AdminAuthProvider>} />
         <Route path="/admin/operations" element={<AdminAuthProvider><AdminGuard><AdminLayout><OperationsDashboard /></AdminLayout></AdminGuard></AdminAuthProvider>} />
         <Route path="/admin/communication" element={<AdminAuthProvider><AdminGuard><AdminLayout><CommunicationHubPage /></AdminLayout></AdminGuard></AdminAuthProvider>} />
+        <Route path="/admin/support" element={<AdminAuthProvider><AdminGuard><AdminLayout><SupportInboxPage /></AdminLayout></AdminGuard></AdminAuthProvider>} />
         <Route path="/admin/settings" element={<AdminAuthProvider><AdminGuard><AdminLayout><SettingsDashboard /></AdminLayout></AdminGuard></AdminAuthProvider>} />
 
         <Route element={<ProtectedShellRoute />}>
           <Route path="/profile" element={<ProfileSettingsPage />} />
           <Route path="/kyc" element={<KYCPage />} />
           <Route path="/security" element={<SecurityPage />} />
+          <Route path="/support" element={<SupportPage />} />
         </Route>
 
         <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
