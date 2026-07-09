@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import * as d3 from "d3";
+import { geoGraticule, geoInterpolate, geoOrthographic, geoPath } from "d3-geo";
+import { timer } from "d3-timer";
 import { COUNTRY_CENTROIDS } from "@/lib/flags";
 import { getGlobeLandCache, loadGlobeLandData, type GlobeDot } from "@/lib/globeLandData";
 
@@ -26,6 +27,7 @@ export default function WireframeDottedGlobe({
   interactive = true,
 }: WireframeDottedGlobeProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [isLoading, setIsLoading] = useState(() => !getGlobeLandCache());
   const [error, setError] = useState<string | null>(null);
 
@@ -48,13 +50,12 @@ export default function WireframeDottedGlobe({
     canvas.style.height = `${containerHeight}px`;
     context.scale(dpr, dpr);
 
-    const projection = d3
-      .geoOrthographic()
+    const projection = geoOrthographic()
       .scale(radius)
       .translate([containerWidth / 2, containerHeight / 2])
       .clipAngle(90);
 
-    const path = d3.geoPath().projection(projection).context(context);
+    const path = geoPath().projection(projection).context(context);
 
     interface DotData {
       lng: number;
@@ -90,7 +91,7 @@ export default function WireframeDottedGlobe({
     let animTime = 0;
 
     const drawArc = (from: [number, number], to: [number, number], phase: number) => {
-      const interpolate = d3.geoInterpolate(from, to);
+      const interpolate = geoInterpolate(from, to);
       const cx = containerWidth / 2;
       const cy = containerHeight / 2;
       const currentScale = projection.scale();
@@ -150,7 +151,7 @@ export default function WireframeDottedGlobe({
       context.stroke();
 
       if (landFeatures) {
-        const graticule = d3.geoGraticule();
+        const graticule = geoGraticule();
         context.beginPath();
         path(graticule());
         context.strokeStyle = theme.graticule;
@@ -240,6 +241,7 @@ export default function WireframeDottedGlobe({
     render();
 
     const tick = (elapsed: number) => {
+      if (document.hidden) return;
       animTime = elapsed / 1000;
       if (autoRotate) {
         rotation[0] += rotationSpeed;
@@ -248,7 +250,24 @@ export default function WireframeDottedGlobe({
       render();
     };
 
-    const rotationTimer = d3.timer(tick);
+    const rotationTimer = timer(tick);
+
+    const visibilityObserver =
+      typeof IntersectionObserver !== "undefined" && containerRef.current
+        ? new IntersectionObserver(
+            ([entry]) => {
+              autoRotate = entry.isIntersecting && !reducedMotion && !document.hidden;
+            },
+            { threshold: 0.1 },
+          )
+        : null;
+    visibilityObserver?.observe(containerRef.current);
+
+    const handleVisibility = () => {
+      if (document.hidden) autoRotate = false;
+      else if (!reducedMotion) autoRotate = true;
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
 
     const handleMouseDown = (event: MouseEvent) => {
       if (!interactive) return;
@@ -303,6 +322,8 @@ export default function WireframeDottedGlobe({
     return () => {
       rotationTimer.stop();
       themeObserver.disconnect();
+      visibilityObserver?.disconnect();
+      document.removeEventListener("visibilitychange", handleVisibility);
       canvas.removeEventListener("mousedown", handleMouseDown);
       canvas.removeEventListener("wheel", handleWheel);
     };
@@ -317,7 +338,7 @@ export default function WireframeDottedGlobe({
   }
 
   return (
-    <div className={`relative ${className}`}>
+    <div ref={containerRef} className={`relative ${className}`}>
       <div
         className="corridor-globe-glow pointer-events-none absolute inset-[-8%] rounded-full bg-[radial-gradient(circle,hsl(var(--primary)/0.22),transparent_68%)]"
         aria-hidden

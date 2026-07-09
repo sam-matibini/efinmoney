@@ -50,10 +50,10 @@ export default function GlobalCorridors({ videoSrc }: GlobalCorridorsProps) {
       };
     }
 
-    const timer = window.setTimeout(() => void loadVideo(), 500);
+    const timer = setTimeout(() => void loadVideo(), 500);
     return () => {
       cancelled = true;
-      window.clearTimeout(timer);
+      clearTimeout(timer);
     };
   }, [videoSrc, prefersReducedMotion]);
 

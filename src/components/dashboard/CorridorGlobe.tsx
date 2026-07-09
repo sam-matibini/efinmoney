@@ -64,7 +64,7 @@ const CorridorGlobeInner = ({ countries }: Props) => {
           height={210}
           highlightCountries={nodes}
           compact
-          interactive
+          interactive={false}
           className="relative z-[2]"
         />
 

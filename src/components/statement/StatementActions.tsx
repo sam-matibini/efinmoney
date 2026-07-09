@@ -8,9 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Download, FileText, FileSpreadsheet, FileType, Mail, Share2 } from "lucide-react";
-import {
-  downloadCSV, downloadPDF, downloadXLSX, emailStatement, type StatementMeta,
-} from "@/lib/statementExport";
+import type { StatementMeta } from "@/lib/statementExport";
 import type { StatementRow } from "@/hooks/useStatement";
 
 interface Props {
@@ -18,6 +16,8 @@ interface Props {
   meta: StatementMeta;
   defaultEmail?: string;
 }
+
+const loadExport = () => import("@/lib/statementExport");
 
 export const StatementActions = ({ rows, meta, defaultEmail }: Props) => {
   const [openEmail, setOpenEmail] = useState(false);
@@ -41,13 +41,28 @@ export const StatementActions = ({ rows, meta, defaultEmail }: Props) => {
         <DropdownMenuContent align="end" className="w-48">
           <DropdownMenuLabel>Choose format</DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => downloadPDF(rows, meta)}>
+          <DropdownMenuItem
+            onClick={async () => {
+              const { downloadPDF } = await loadExport();
+              downloadPDF(rows, meta);
+            }}
+          >
             <FileType className="w-4 h-4 mr-2 text-rose-500" /> PDF
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => downloadXLSX(rows, meta)}>
+          <DropdownMenuItem
+            onClick={async () => {
+              const { downloadXLSX } = await loadExport();
+              downloadXLSX(rows, meta);
+            }}
+          >
             <FileSpreadsheet className="w-4 h-4 mr-2 text-indigo-600" /> Excel (.xlsx)
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => downloadCSV(rows, meta)}>
+          <DropdownMenuItem
+            onClick={async () => {
+              const { downloadCSV } = await loadExport();
+              downloadCSV(rows, meta);
+            }}
+          >
             <FileText className="w-4 h-4 mr-2 text-sky-500" /> CSV
           </DropdownMenuItem>
         </DropdownMenuContent>
@@ -104,6 +119,7 @@ export const StatementActions = ({ rows, meta, defaultEmail }: Props) => {
             <Button
               disabled={!email || !/.+@.+\..+/.test(email)}
               onClick={async () => {
+                const { emailStatement } = await loadExport();
                 await emailStatement(rows, meta, email, fmt);
                 setOpenEmail(false);
               }}

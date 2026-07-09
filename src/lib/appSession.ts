@@ -1,11 +1,14 @@
 import { QueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
+import { fetchDashboardTransfers, dashboardTransfersQueryKey } from "@/hooks/useDashboardTransfers";
+
 export const SESSION_QUERY_KEYS = {
   profile: (userId: string) => ["profile", userId] as const,
   roles: (userId: string) => ["user-roles", userId] as const,
   wallets: (userId: string) => ["wallets", userId] as const,
   fxRates: () => ["fx_rates"] as const,
+  dashboardTransfers: (userId: string) => dashboardTransfersQueryKey(userId),
 };
 
 /** Parallel prefetch of session-stable data after auth. */
@@ -71,6 +74,11 @@ export async function prefetchAppSession(queryClient: QueryClient, userId: strin
         }
         return latest.sort((a, b) => a.from_currency.localeCompare(b.from_currency));
       },
+      staleTime: 60_000,
+    }),
+    queryClient.prefetchQuery({
+      queryKey: SESSION_QUERY_KEYS.dashboardTransfers(userId),
+      queryFn: () => fetchDashboardTransfers(userId),
       staleTime: 60_000,
     }),
   ]);

@@ -98,7 +98,7 @@ export default function GhanaTopUpCard({ walletId, walletCurrency }: Props) {
         target_wallet_id: walletId,
         phone: phone.trim(),
         network,
-        customer_name: profile?.full_name || profile?.first_name || undefined,
+        customer_name: profile?.full_name || undefined,
       });
       toast.message("Check your phone", {
         description: result.message || "Approve the MoMo prompt to complete top-up.",

@@ -1,7 +1,7 @@
 import { motion, useMotionValue, useSpring, useTransform, useMotionTemplate, useReducedMotion } from "framer-motion";
 import { useMemo, useState } from "react";
 import { Globe, PiggyBank, ShieldCheck } from "lucide-react";
-import { useTransfers } from "@/hooks/useTransfers";
+import { useDashboardStats } from "@/hooks/useDashboardStats";
 import { useProfile } from "@/hooks/useProfile";
 import { useSavingsGoals } from "@/hooks/useSavingsGoals";
 import { Link } from "react-router-dom";
@@ -16,15 +16,11 @@ const cardBg: Record<string, string> = {
 };
 
 const MiniStats = () => {
-  const { data: transfers } = useTransfers(500);
+  const { corridorCodes } = useDashboardStats();
   const { data: profile } = useProfile();
   const { data: goals } = useSavingsGoals();
 
-  const corridors = useMemo(() => {
-    const set = new Set<string>();
-    (transfers || []).forEach((t) => t.recipient_country && set.add(t.recipient_country));
-    return Array.from(set);
-  }, [transfers]);
+  const corridors = corridorCodes;
 
   const FlagFor = ({ cc }: { cc: string }) => {
     const code = cc?.toLowerCase();

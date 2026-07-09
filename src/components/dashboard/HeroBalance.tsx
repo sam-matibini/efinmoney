@@ -4,7 +4,7 @@ import { AreaChart, Area, ResponsiveContainer, Tooltip } from "recharts";
 import { TrendingUp, TrendingDown, Wallet as WalletIcon, Activity, CreditCard, Eye, EyeOff } from "lucide-react";
 import { useWallets } from "@/hooks/useWallets";
 import { useWalletCards } from "@/hooks/useWalletCards";
-import { useTransfers } from "@/hooks/useTransfers";
+import { useDashboardTransfers } from "@/hooks/useDashboardTransfers";
 import { useFxRates } from "@/hooks/useFxRates";
 import { Skeleton } from "@/components/ui/skeleton";
 import { flagForCurrency } from "@/lib/flags";
@@ -34,7 +34,7 @@ const HeroBalance = () => {
   const { data: profile } = useProfile();
   const { data: wallets, isLoading: walletsLoading } = useWallets();
   const { totalLinkedCards } = useWalletCards();
-  const { data: transfers } = useTransfers(200);
+  const { data: transfers } = useDashboardTransfers();
   const { data: fxRates } = useFxRates();
   const [hidden, setHidden] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;

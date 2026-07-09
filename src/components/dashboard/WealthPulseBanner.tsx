@@ -1,11 +1,8 @@
-import { memo, useMemo } from "react";
+import { memo } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { Globe2, ArrowUpRight, CheckCircle2, Loader2 } from "lucide-react";
-import { useTransfers } from "@/hooks/useTransfers";
-import { useFxRates } from "@/hooks/useFxRates";
-import { buildUsdRateMap, convertToUsd } from "@/lib/fx";
-import { normalizeCountryCode } from "@/lib/flags";
+import { useDashboardStats } from "@/hooks/useDashboardStats";
 import CorridorGlobe from "@/components/dashboard/CorridorGlobe";
 
 const fmtUsd = (n: number) =>
@@ -13,44 +10,16 @@ const fmtUsd = (n: number) =>
     ? `$${n.toLocaleString("en-US", { maximumFractionDigits: 0 })}`
     : `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-const PENDING = ["initiated", "funded", "processing"];
-
 const WealthPulseBannerInner = () => {
   const reduceMotion = useReducedMotion();
-  const { data: transfers } = useTransfers(500);
-  const { data: fxRates } = useFxRates();
+  const {
+    sentMonthUsd,
+    countryCount,
+    recentCountries,
+    inFlightCount,
+    inFlightUsd,
+  } = useDashboardStats();
   const navigate = useNavigate();
-
-  const stats = useMemo(() => {
-    const rateMap = buildUsdRateMap((fxRates ?? []) as any);
-    const now = new Date();
-    const startMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-    let sentMonthUsd = 0;
-    const countries = new Set<string>();
-    const recentCountries: string[] = [];
-    let inFlightCount = 0;
-    let inFlightUsd = 0;
-
-    for (const t of transfers ?? []) {
-      const ts = new Date(t.created_at).getTime();
-      const usd = convertToUsd(Number(t.source_amount || 0), (t as any).source_currency || "USD", rateMap) ?? 0;
-      if (ts >= startMonth) sentMonthUsd += usd;
-      if (t.recipient_country) {
-        const cc = normalizeCountryCode(t.recipient_country);
-        if (cc) {
-          countries.add(cc);
-          if (recentCountries.length < 6 && !recentCountries.includes(cc)) {
-            recentCountries.push(cc);
-          }
-        }
-      }
-      if (PENDING.includes(t.status)) {
-        inFlightCount += 1;
-        inFlightUsd += usd;
-      }
-    }
-    return { sentMonthUsd, countryCount: countries.size, recentCountries, inFlightCount, inFlightUsd };
-  }, [transfers, fxRates]);
 
   return (
     <motion.section
@@ -68,36 +37,36 @@ const WealthPulseBannerInner = () => {
           <div className="mt-4">
             <p className="text-xs text-muted-foreground">Sent this month</p>
             <p className="font-display text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
-              {fmtUsd(stats.sentMonthUsd)}
+              {fmtUsd(sentMonthUsd)}
             </p>
           </div>
 
           <div className="mt-5 grid max-w-md grid-cols-2 gap-2.5">
             <KpiChip
               label="Countries reached"
-              value={String(stats.countryCount)}
+              value={String(countryCount)}
               icon={<Globe2 className="h-3.5 w-3.5" />}
-              flags={stats.recentCountries}
+              flags={recentCountries}
               onClick={() => navigate("/transfers")}
             />
             <KpiChip
-              label={stats.inFlightCount > 0 ? "In transit now" : "All settled"}
-              value={stats.inFlightCount > 0 ? fmtUsd(stats.inFlightUsd) : "Up to date"}
+              label={inFlightCount > 0 ? "In transit now" : "All settled"}
+              value={inFlightCount > 0 ? fmtUsd(inFlightUsd) : "Up to date"}
               icon={
-                stats.inFlightCount > 0 ? (
+                inFlightCount > 0 ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 ) : (
                   <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
                 )
               }
-              highlight={stats.inFlightCount > 0}
+              highlight={inFlightCount > 0}
               onClick={() => navigate("/transfers")}
             />
           </div>
         </div>
 
         <div className="flex items-center justify-center md:justify-end">
-          <CorridorGlobe countries={stats.recentCountries} />
+          <CorridorGlobe countries={recentCountries} />
         </div>
       </div>
     </motion.section>

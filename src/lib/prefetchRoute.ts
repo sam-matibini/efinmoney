@@ -1,5 +1,6 @@
 import { QueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchDashboardTransfers } from "@/hooks/useDashboardTransfers";
 
 const prefetched = new Set<string>();
 const prefetchedChunks = new Set<string>();
@@ -11,6 +12,7 @@ const ROUTE_CHUNK_LOADERS: Record<string, () => Promise<unknown>> = {
   "/send/cpn": () => import("@/pages/SendCpnPage"),
   "/send/african-card": () => import("@/pages/AfricanCardSendPage"),
   "/wallet/receive": () => import("@/pages/ReceivePage"),
+  "/wallet/topup": () => import("@/pages/TopUpPage"),
   "/pay-bills": () => import("@/pages/PayBillsPage"),
   "/pay-bills/canada": () => import("@/pages/CanadaBillPayPage"),
   "/profile": () => import("@/pages/ProfileSettingsPage"),
@@ -68,6 +70,11 @@ export function prefetchRoute(queryClient: QueryClient, href: string, userId?: s
 
   if (href === "/send" || href === "/" || href === "/dashboard") {
     warm.push(
+      queryClient.prefetchQuery({
+        queryKey: ["dashboard-transfers", userId],
+        queryFn: () => fetchDashboardTransfers(userId),
+        staleTime: 60_000,
+      }),
       queryClient.prefetchQuery({
         queryKey: ["transfers", userId, 200],
         queryFn: async () => {

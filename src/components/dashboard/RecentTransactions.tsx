@@ -15,10 +15,12 @@ const DASHBOARD_LIMIT = 8;
 const fmt = (n: number) =>
   n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+const DASHBOARD_STATEMENT_LIMIT = 100;
+
 const RecentTransactions = () => {
   const { user } = useAuth();
   const { data: profile } = useProfile();
-  const { data: rows = [], isLoading } = useStatement(null, 500);
+  const { data: rows = [], isLoading } = useStatement(null, DASHBOARD_STATEMENT_LIMIT);
 
   if (isLoading) {
     return (

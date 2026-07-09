@@ -6,33 +6,14 @@ import { Shield, ArrowRight, Clock, AlertTriangle, CheckCircle2 } from "lucide-r
 import { useNavigate } from "react-router-dom";
 import { useKyc } from "@/hooks/useKyc";
 import { useProfile } from "@/hooks/useProfile";
-import { useTransfers } from "@/hooks/useTransfers";
-import { useFxRates } from "@/hooks/useFxRates";
-import { useMemo } from "react";
-import { buildUsdRateMap, convertToUsd } from "@/lib/fx";
+import { useDashboardStats } from "@/hooks/useDashboardStats";
 import { nextTier, tierLabel, upgradeRoute, type Tier } from "@/lib/tierLimits";
 
 const TierProgressCard = () => {
   const navigate = useNavigate();
   const { tier, kyc } = useKyc();
   const { data: profile } = useProfile();
-  const { data: transfers } = useTransfers(200);
-  const { data: fxRates } = useFxRates();
-
-  const { dailyUsed, monthlyUsed } = useMemo(() => {
-    const now = new Date();
-    const startDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-    const startMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-    const rateMap = buildUsdRateMap((fxRates ?? []) as any);
-    let d = 0, m = 0;
-    for (const t of transfers ?? []) {
-      const ts = new Date(t.created_at).getTime();
-      const usd = convertToUsd(Number(t.source_amount || 0), (t as any).source_currency || "USD", rateMap) ?? 0;
-      if (ts >= startMonth) m += usd;
-      if (ts >= startDay) d += usd;
-    }
-    return { dailyUsed: d, monthlyUsed: m };
-  }, [transfers, fxRates]);
+  const { dailyUsed, monthlyUsed } = useDashboardStats();
 
   // Only show for new-framework users; legacy users see KYCStatusCard if needed.
   if ((profile?.kyc_framework_version ?? 2) < 2) return null;

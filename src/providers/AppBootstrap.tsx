@@ -49,8 +49,8 @@ export const AppBootstrap = ({ children }: { children: ReactNode }) => {
       const id = requestIdleCallback(run, { timeout: 4000 });
       return () => cancelIdleCallback(id);
     }
-    const timer = window.setTimeout(run, 1500);
-    return () => window.clearTimeout(timer);
+    const timer = setTimeout(run, 1500);
+    return () => clearTimeout(timer);
   }, [user?.id, isBootstrapped]);
 
   return (

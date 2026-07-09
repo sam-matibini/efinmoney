@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode, Suspense, useEffect, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { LayoutDashboard, ShieldCheck, Users, Layers, ScrollText, Settings, Bell, Search, LogOut, ChevronLeft, ChevronRight, Sun, Moon, Activity, ExternalLink, SlidersHorizontal, UserCog, Gauge, AlertCircle, FileText, Eye, ShieldAlert, Shield, ClipboardList, Ban, UserX, Building2, FileWarning, GraduationCap, Landmark, Globe, ArrowLeftRight, Banknote, RefreshCw, TrendingUp, Zap, BookOpen, BarChart2, Scale, CalendarCheck, Archive, PanelLeft, Wallet, Cog } from "lucide-react";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
@@ -13,7 +13,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
-import AliceWidget from "@/components/alice/AliceWidget";
+import { DeferredAliceWidget } from "@/components/layout/DeferredShellWidgets";
+import AdminPageSkeleton from "@/components/admin-portal/AdminPageSkeleton";
 
 const NAV = [
   { to: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -328,9 +329,11 @@ const AdminLayout = ({ children }: { children: ReactNode }) => {
           </div>
         </header>
 
-        <main className="flex-1 p-4 lg:p-6 min-w-0">{children}</main>
+        <main className="flex-1 p-4 lg:p-6 min-w-0">
+          <Suspense fallback={<AdminPageSkeleton />}>{children}</Suspense>
+        </main>
       </div>
-      {import.meta.env.VITE_ALICE_ENABLED !== "false" && <AliceWidget context="admin" />}
+      <DeferredAliceWidget context="admin" />
     </div>
   );
 };
