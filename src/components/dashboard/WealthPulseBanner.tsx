@@ -90,7 +90,7 @@ const KpiChip = ({
 }) => (
   <button
     onClick={onClick}
-    className={`group flex flex-col items-start gap-1 rounded-xl border p-3 text-left transition-[transform,box-shadow,background-color] duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] hover:-translate-y-0.5 hover:shadow-md active:scale-[0.98] motion-reduce:hover:translate-y-0 motion-reduce:active:scale-100 ${
+    className={`group flex flex-col items-start gap-1 rounded-xl border p-3 text-left transition-[transform,box-shadow,background-color] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md active:scale-[0.98] motion-reduce:hover:translate-y-0 motion-reduce:active:scale-100 ${
       highlight
         ? "border-emerald-500/30 bg-emerald-500/5 hover:bg-emerald-500/10"
         : "border-border bg-background/50 hover:bg-background"

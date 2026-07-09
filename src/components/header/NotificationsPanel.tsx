@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useNotifications, useMarkAllRead, useMarkRead } from "@/hooks/useNotifications";
 import { cn } from "@/lib/utils";
+import { headerIconBase, headerIconInteractive, headerIconVariants } from "@/components/layout/headerStyles";
 
 const NotificationsPanel = () => {
   const { data: notifications = [], unreadCount, isLoading } = useNotifications();
@@ -20,13 +21,13 @@ const NotificationsPanel = () => {
       <PopoverTrigger asChild>
         <button
           className={cn(
-            "relative p-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 dark:text-amber-400 transition-all duration-200 hover:scale-110 active:scale-95",
+            `relative ${headerIconBase} ${headerIconInteractive} ${headerIconVariants.notifications}`,
             unreadCount > 0 && "animate-bell-shake"
           )}
         >
-          <Bell className="w-5 h-5 text-amber-500 dark:text-amber-400" />
+          <Bell className="w-5 h-5" />
           {unreadCount > 0 && (
-            <span className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 text-[10px] font-bold bg-rose-500 text-white rounded-full flex items-center justify-center ring-2 ring-background animate-live-pulse">
+            <span className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 text-[10px] font-semibold bg-primary text-primary-foreground rounded-full flex items-center justify-center ring-2 ring-background">
               {unreadCount > 99 ? '99+' : unreadCount}
             </span>
           )}

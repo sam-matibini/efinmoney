@@ -7,7 +7,7 @@ import { useSavingsGoals } from "@/hooks/useSavingsGoals";
 import { Link } from "react-router-dom";
 
 const cardClass =
-  "group relative overflow-hidden rounded-2xl bg-card border border-border p-4 transition-[transform,box-shadow] duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] hover:-translate-y-1 hover:shadow-lg";
+  "group relative overflow-hidden rounded-2xl bg-card border border-border p-4 transition-[transform,box-shadow] duration-200 ease-out hover:-translate-y-1 hover:shadow-lg";
 
 const cardBg: Record<string, string> = {
   corridors: "bg-gradient-to-br from-primary/[0.06] to-transparent",

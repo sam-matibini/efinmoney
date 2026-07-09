@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Search, ArrowRight, Wallet, Send, Users, CreditCard, BookOpen } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -14,6 +14,8 @@ import { useAuth } from "@/hooks/useAuth";
 interface SearchModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  initialQuery?: string;
+  onQueryChange?: (query: string) => void;
 }
 
 type ResultType = "transfer" | "wallet" | "contact" | "card" | "ledger";
@@ -35,19 +37,24 @@ const ICONS: Record<ResultType, typeof Send> = {
   ledger: BookOpen,
 };
 
-const SearchModal = ({ open, onOpenChange }: SearchModalProps) => {
+const SearchModal = ({ open, onOpenChange, initialQuery = "", onQueryChange }: SearchModalProps) => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<ResultItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const wasOpen = useRef(false);
 
   useEffect(() => {
+    if (open && !wasOpen.current) {
+      setQuery(initialQuery);
+    }
     if (!open) {
       setQuery("");
       setResults([]);
     }
-  }, [open]);
+    wasOpen.current = open;
+  }, [open, initialQuery]);
 
   useEffect(() => {
     if (!user || query.trim().length < 2) {
@@ -217,7 +224,10 @@ const SearchModal = ({ open, onOpenChange }: SearchModalProps) => {
             autoFocus
             placeholder="Search transfers, contacts, wallets, cards, ledger..."
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              onQueryChange?.(e.target.value);
+            }}
             className="border-0 focus-visible:ring-0 px-0 text-base"
           />
         </div>
