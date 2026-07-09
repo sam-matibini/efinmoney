@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   ArrowRight, Wallet, Send, Smartphone, Repeat, CreditCard, Receipt,
@@ -10,46 +10,55 @@ import MarketingFooter from "@/components/marketing/MarketingFooter";
 
 const PERSONAL = [
   {
+    id: "wallets",
     icon: Wallet,
     title: "Multi-currency wallets",
     desc: "Hold and manage USD, CAD, NGN, KES, GHS and ZMW side by side in one account. Switch between balances instantly — no need for separate bank accounts per currency.",
   },
   {
+    id: "send",
     icon: Send,
     title: "Cross-border transfers",
     desc: "Send money from Canada and the USA to recipients across Africa. Funds arrive to bank accounts or mobile wallets — settled in minutes, with a receipt and live tracking on every transfer.",
   },
   {
+    id: "mobile-money",
     icon: Smartphone,
     title: "Mobile-money payouts",
     desc: "Pay directly into MTN, Airtel, M-Pesa and Vodafone wallets. Your recipient doesn't need a bank account — just their phone number.",
   },
   {
+    id: "canada",
     icon: Landmark,
     title: "Canada rails & Interac",
     desc: "Fund your account and move money in Canada using Interac e-Transfer and bank (EFT) rails, alongside card top-ups.",
   },
   {
+    id: "exchange",
     icon: Repeat,
     title: "Currency exchange",
     desc: "Convert between the currencies you hold at transparent, live market rates — right inside the app, before you send.",
   },
   {
+    id: "cards",
     icon: CreditCard,
     title: "Cards",
     desc: "Spend from your balance and send funds to cards. Manage your eFinMoney card and card-based transfers in one place.",
   },
   {
+    id: "bills",
     icon: Receipt,
     title: "Bill payments",
     desc: "Top up airtime and data and settle utility bills in Nigeria, plus bill pay in Canada — funded straight from your wallet.",
   },
   {
+    id: "payment-links",
     icon: LinkIcon,
     title: "Payment links & requests",
     desc: "Create a shareable link to get paid. Recipients claim funds securely, even if they're new to eFinMoney.",
   },
   {
+    id: "receive",
     icon: Globe,
     title: "Receive & virtual accounts",
     desc: "Get dedicated account details to receive money into your wallet, and track everything with a full transaction history.",
@@ -72,9 +81,18 @@ const item = {
 };
 
 export default function Features() {
+  const location = useLocation();
+
   useEffect(() => {
     document.title = "Features — eFinMoney";
   }, []);
+
+  // Jump to the section named in the URL hash (e.g. /features#mobile-money).
+  useEffect(() => {
+    if (!location.hash) return;
+    const el = document.getElementById(location.hash.slice(1));
+    if (el) requestAnimationFrame(() => el.scrollIntoView({ behavior: "smooth", block: "start" }));
+  }, [location.hash]);
 
   return (
     <div className="min-h-screen bg-white text-neutral-900 font-sans">
@@ -123,8 +141,8 @@ export default function Features() {
           >
             {PERSONAL.map((f) => (
               <motion.div
-                key={f.title} variants={item}
-                className="group rounded-3xl bg-white border border-neutral-200/80 p-7 hover:border-indigo-300/60 hover:-translate-y-1 hover:shadow-[0_20px_50px_-20px_rgba(79,70,229,0.25)] transition-all duration-300"
+                key={f.title} id={f.id} variants={item}
+                className="group scroll-mt-24 rounded-3xl bg-white border border-neutral-200/80 p-7 hover:border-indigo-300/60 hover:-translate-y-1 hover:shadow-[0_20px_50px_-20px_rgba(79,70,229,0.25)] transition-all duration-300"
               >
                 <div className="w-12 h-12 rounded-2xl bg-[hsl(var(--accent))] flex items-center justify-center text-[hsl(var(--brand-700))] mb-5 group-hover:scale-105 transition-transform">
                   <f.icon className="w-6 h-6" />
@@ -138,7 +156,7 @@ export default function Features() {
       </section>
 
       {/* Business band */}
-      <section className="bg-[hsl(var(--accent))]/30 py-20 md:py-24">
+      <section id="business" className="scroll-mt-24 bg-[hsl(var(--accent))]/30 py-20 md:py-24">
         <div className="max-w-7xl mx-auto px-6">
           <div className="mb-12 max-w-2xl">
             <span className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[hsl(var(--brand-700))]">

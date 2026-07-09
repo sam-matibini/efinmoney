@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { ArrowRight, Globe, Shield, Zap, Wallet, Send, BarChart3, Building2, Layers, Check } from "lucide-react";
 import MarketingHeader from "@/components/marketing/MarketingHeader";
 import MarketingFooter from "@/components/marketing/MarketingFooter";
+import { CountryFlag } from "@/components/ui/FlagImage";
 import africaHero from "@/assets/landing-africa-hero.jpg";
 import africaBand from "@/assets/landing-africa-band.jpg";
 import b2bPhone from "@/assets/landing-b2b-phone.jpg";
@@ -243,18 +244,28 @@ const Landing = () => {
             </motion.div>
           </div>
 
-          {/* RIGHT: calculator centered with sender on one side and receiver on the other */}
-          <div className="relative w-full max-w-[680px] mx-auto lg:ml-auto lg:mr-0">
+          {/* RIGHT: calculator as the hero visual, supporting photos in a clean strip below */}
+          <div className="relative w-full max-w-[440px] mx-auto lg:ml-auto lg:mr-0">
             {/* Soft amber glow anchoring the calculator */}
-            <div className="hidden lg:block absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[440px] h-[440px] bg-[hsl(var(--accent-amber)/0.22)] blur-3xl rounded-full pointer-events-none" />
+            <div className="hidden lg:block absolute left-1/2 top-1/3 -translate-x-1/2 -translate-y-1/2 w-[440px] h-[440px] bg-[hsl(var(--accent-amber)/0.22)] blur-3xl rounded-full pointer-events-none" />
 
+            {/* Calculator — centerpiece */}
             <motion.div
-              initial={{ opacity: 0, scale: 0.96 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.7, delay: 0.3, ease: "easeOut" }}
-              className="relative grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr] gap-3 lg:gap-2 items-center"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, delay: 0.35, ease: "easeOut" }}
+              className="relative z-10"
             >
-              {/* Sender — left on desktop, top on mobile */}
+              <FxCalculator />
+            </motion.div>
+
+            {/* Canada → Africa photo strip (no overlap) */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.6, ease: "easeOut" }}
+              className="relative z-10 mt-4 grid grid-cols-2 gap-3"
+            >
               <div className="relative">
                 <img
                   src={senders}
@@ -262,25 +273,13 @@ const Landing = () => {
                   width={768}
                   height={1024}
                   loading="lazy"
-                  className="w-full h-[200px] lg:h-[380px] object-cover rounded-2xl ring-1 ring-white/10 shadow-xl"
+                  className="w-full h-[120px] sm:h-[140px] object-cover rounded-2xl ring-1 ring-white/10 shadow-xl"
                 />
                 <span className="absolute top-2 left-2 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider bg-black/45 backdrop-blur ring-1 ring-white/20 text-white rounded-full px-2 py-0.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                   Sending · Canada
                 </span>
               </div>
-
-              {/* Calculator — centerpiece */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.5, ease: "easeOut" }}
-                className="relative z-10 lg:-mx-6 my-1 lg:my-0"
-              >
-                <FxCalculator />
-              </motion.div>
-
-              {/* Receiver — right on desktop, bottom on mobile */}
               <div className="relative">
                 <img
                   src={receivers}
@@ -288,7 +287,7 @@ const Landing = () => {
                   width={768}
                   height={1024}
                   loading="lazy"
-                  className="w-full h-[200px] lg:h-[380px] object-cover rounded-2xl ring-1 ring-white/10 shadow-xl"
+                  className="w-full h-[120px] sm:h-[140px] object-cover rounded-2xl ring-1 ring-white/10 shadow-xl"
                 />
                 <span className="absolute top-2 right-2 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider bg-black/45 backdrop-blur ring-1 ring-white/20 text-white rounded-full px-2 py-0.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-[hsl(var(--accent-amber))]" />
@@ -328,9 +327,16 @@ const Landing = () => {
             />
             <div className="absolute inset-0 bg-gradient-to-tr from-[hsl(var(--brand-900))]/40 via-transparent to-[hsl(var(--accent-amber))]/10" />
             <div className="absolute bottom-4 left-4 flex flex-wrap gap-2">
-              {["🇳🇬 Nigeria","🇰🇪 Kenya","🇬🇭 Ghana","🇿🇲 Zambia","🇨🇦 Canada","🇺🇸 USA"].map((c) => (
-                <span key={c} className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-white/90 text-[hsl(var(--brand-900))] backdrop-blur">
-                  {c}
+              {[
+                { country: "Nigeria", label: "Nigeria" },
+                { country: "Kenya", label: "Kenya" },
+                { country: "Ghana", label: "Ghana" },
+                { country: "Zambia", label: "Zambia" },
+                { country: "Canada", label: "Canada" },
+                { country: "United States", label: "USA" },
+              ].map((c) => (
+                <span key={c.label} className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full bg-white/90 text-[hsl(var(--brand-900))] backdrop-blur">
+                  <CountryFlag country={c.country} size="sm" /> {c.label}
                 </span>
               ))}
             </div>

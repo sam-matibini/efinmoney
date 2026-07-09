@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { ArrowRight, Target, Globe, ShieldCheck, Zap, Eye, Mail } from "lucide-react";
 import MarketingHeader from "@/components/marketing/MarketingHeader";
 import MarketingFooter from "@/components/marketing/MarketingFooter";
+import { CountryFlag } from "@/components/ui/FlagImage";
 
 const VALUES = [
   { icon: ShieldCheck, t: "Security first", d: "Bank-grade encryption, multi-factor authentication, and regulated MSB operations with a SOC 2 Type II posture." },
@@ -11,7 +12,14 @@ const VALUES = [
   { icon: Zap, t: "Speed that matters", d: "Transfers that settle in minutes, not days, so the people who depend on you don't wait." },
 ];
 
-const CORRIDORS = ["🇨🇦 Canada", "🇺🇸 USA", "🇳🇬 Nigeria", "🇰🇪 Kenya", "🇬🇭 Ghana", "🇿🇲 Zambia"];
+const CORRIDORS = [
+  { country: "Canada", label: "Canada" },
+  { country: "United States", label: "USA" },
+  { country: "Nigeria", label: "Nigeria" },
+  { country: "Kenya", label: "Kenya" },
+  { country: "Ghana", label: "Ghana" },
+  { country: "Zambia", label: "Zambia" },
+];
 
 export default function About() {
   useEffect(() => {
@@ -66,8 +74,8 @@ export default function About() {
           </span>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             {CORRIDORS.map((c) => (
-              <span key={c} className="text-sm font-bold px-4 py-2 rounded-full bg-white text-[hsl(var(--brand-900))] shadow-sm border border-neutral-200/80">
-                {c}
+              <span key={c.label} className="inline-flex items-center gap-2 text-sm font-bold px-4 py-2 rounded-full bg-white text-[hsl(var(--brand-900))] shadow-sm border border-neutral-200/80">
+                <CountryFlag country={c.country} size="md" /> {c.label}
               </span>
             ))}
           </div>
