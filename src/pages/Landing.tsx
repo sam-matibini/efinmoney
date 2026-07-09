@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from "react";
-import { motion, useInView } from "framer-motion";
+import { useEffect } from "react";
+import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
-import { ArrowRight, Globe, Shield, Zap, Wallet, Send, BarChart3, Star, Building2, Layers, Check } from "lucide-react";
-import { Logo, Wordmark } from "@/components/Logo";
+import { ArrowRight, Globe, Shield, Zap, Wallet, Send, BarChart3, Building2, Layers, Check } from "lucide-react";
+import MarketingHeader from "@/components/marketing/MarketingHeader";
+import MarketingFooter from "@/components/marketing/MarketingFooter";
 import africaHero from "@/assets/landing-africa-hero.jpg";
 import africaBand from "@/assets/landing-africa-band.jpg";
 import b2bPhone from "@/assets/landing-b2b-phone.jpg";
@@ -18,12 +19,6 @@ import GlobalCorridors from "@/components/GlobalCorridors";
 import senders from "@/assets/landing-senders.jpg";
 import receivers from "@/assets/landing-receivers.jpg";
 
-const NAV_LINKS = [
-  { label: "Features", href: "#features" },
-  { label: "How it works", href: "#how" },
-  { label: "About", href: "#trust" },
-];
-
 const FEATURES = [
   { icon: Shield, title: "Bank-Grade Security", desc: "Your funds are protected with 256-bit encryption and multi-factor authentication.", image: featureSecurity },
   { icon: Zap, title: "Instant Transfers", desc: "Send money to Kenya, Nigeria, Uganda in minutes — not days.", image: featureInstant },
@@ -37,10 +32,10 @@ const STEPS: { n: number; title: string; desc?: string }[] = [
 ];
 
 const STATS = [
-  { value: 2, suffix: "M+", prefix: "$", label: "Transferred", icon: Send, caption: "Settled across our rails" },
-  { value: 10000, suffix: "+", prefix: "", label: "Active users", icon: Wallet, caption: "Trust eFinMoney daily" },
-  { value: 50, suffix: "+", prefix: "", label: "Countries", icon: Globe, caption: "Global payout corridors" },
-  { value: 4.9, suffix: "", prefix: "", label: "Customer rating", icon: Star, caption: "Average app store score", decimals: 1, isRating: true },
+  { value: "6", label: "Currencies to hold", icon: Wallet, caption: "USD · CAD · NGN · KES · GHS · ZMW" },
+  { value: "4", label: "Mobile-money networks", icon: Globe, caption: "MTN · Airtel · M-Pesa · Vodafone" },
+  { value: "Minutes", label: "Typical settlement", icon: Zap, caption: "Delivered fast — not in days" },
+  { value: "24/7", label: "Send anytime", icon: Send, caption: "Every day of the year" },
 ];
 
 
@@ -143,29 +138,6 @@ const ExchangeScreen = () => (
   </div>
 );
 
-// ---------- Counter ----------
-const Counter = ({ to, decimals = 0, prefix = "", suffix = "" }: { to: number; decimals?: number; prefix?: string; suffix?: string }) => {
-  const ref = useRef<HTMLDivElement>(null);
-  const inView = useInView(ref, { once: true, margin: "-50px" });
-  const [val, setVal] = useState(0);
-  useEffect(() => {
-    if (!inView) return;
-    const duration = 1600;
-    const start = performance.now();
-    let raf = 0;
-    const tick = (now: number) => {
-      const p = Math.min(1, (now - start) / duration);
-      const eased = 1 - Math.pow(1 - p, 3);
-      setVal(to * eased);
-      if (p < 1) raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [inView, to]);
-  const display = to >= 1000 ? Math.round(val).toLocaleString() : val.toFixed(decimals);
-  return <div ref={ref} className="text-4xl md:text-5xl font-black text-inherit">{prefix}{display}{suffix}</div>;
-};
-
 const HERO_WORDS = ["Send", "money", "across", "borders,", "instantly."];
 
 const Landing = () => {
@@ -180,32 +152,7 @@ const Landing = () => {
   return (
     <div className="min-h-screen bg-white text-neutral-900 font-sans">
       {/* ============ NAVBAR (on dark hero) ============ */}
-      <header className="absolute top-0 inset-x-0 z-50">
-        <nav className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2">
-            <Logo className="w-9 h-9" />
-            <Wordmark className="font-black text-xl tracking-tight" />
-          </Link>
-          <div className="hidden md:flex items-center gap-8">
-            {NAV_LINKS.map((l) => (
-              <a key={l.href} href={l.href} className="text-sm font-medium text-white/70 hover:text-white transition-colors">
-                {l.label}
-              </a>
-            ))}
-          </div>
-          <div className="flex items-center gap-3">
-            <Link to="/auth" className="text-sm font-semibold text-white/90 hover:text-white transition-colors px-3 py-2">
-              Sign in
-            </Link>
-            <Link
-              to="/auth"
-              className="text-sm font-bold bg-[hsl(var(--accent-amber))] text-[hsl(var(--brand-900))] px-5 py-2.5 rounded-full transition-all hover:-translate-y-0.5 shadow-cta-amber"
-            >
-              Get Started
-            </Link>
-          </div>
-        </nav>
-      </header>
+      <MarketingHeader variant="transparent" />
 
       {/* ============ HERO (deep purple, PureVPN-style) ============ */}
       <section className="relative overflow-hidden bg-grid-purple text-white">
@@ -268,29 +215,31 @@ const Landing = () => {
               className="mt-9 flex flex-col sm:flex-row items-center lg:items-start justify-center lg:justify-start gap-3"
             >
               <Link
-                to="/"
+                to="/auth"
                 className="group inline-flex items-center gap-2 bg-[hsl(var(--accent-amber))] hover:brightness-110 text-[hsl(var(--brand-900))] font-bold px-7 py-3.5 rounded-full text-base transition-all hover:-translate-y-0.5 shadow-cta-amber"
               >
                 Get eFinMoney <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </Link>
+              <Link
+                to="/how-it-works"
+                className="inline-flex items-center gap-2 bg-white/10 border border-white/15 text-white font-bold px-7 py-3.5 rounded-full text-base transition-all hover:bg-white/15"
+              >
+                How it works
+              </Link>
             </motion.div>
 
-            {/* Press strip */}
+            {/* Trust strip — factual */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 1.4, duration: 0.6 }}
-              className="mt-12 flex flex-wrap items-center justify-center lg:justify-start gap-x-7 gap-y-3 text-[11px] uppercase tracking-[0.2em] text-white/45 font-semibold"
+              className="mt-12 flex flex-wrap items-center justify-center lg:justify-start gap-x-6 gap-y-3 text-[11px] uppercase tracking-[0.2em] text-white/45 font-semibold"
             >
-              <span>Forbes</span>
+              <span className="inline-flex items-center gap-1.5"><Shield className="w-3.5 h-3.5" /> MSB Licensed</span>
               <span className="opacity-50">·</span>
-              <span>TechCrunch</span>
+              <span>SOC 2 Type II</span>
               <span className="opacity-50">·</span>
-              <span>PCMag</span>
-              <span className="opacity-50">·</span>
-              <span>Mashable</span>
-              <span className="opacity-50">·</span>
-              <span>Yahoo Finance</span>
+              <span>256-bit encryption</span>
             </motion.div>
           </div>
 
@@ -668,13 +617,13 @@ const Landing = () => {
           >
             <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-semibold uppercase tracking-[0.18em] text-[hsl(var(--accent-amber))] bg-white/5 border border-white/10">
               <span className="w-1.5 h-1.5 rounded-full bg-[hsl(var(--accent-amber))]" />
-              Trusted globally
+              Built for cross-border
             </span>
             <h2 className="mt-4 text-3xl md:text-4xl font-black tracking-tight">
-              Numbers that speak for themselves
+              Everything you need to move money
             </h2>
             <p className="mt-3 text-white/60 text-base">
-              Real customers. Real volume. Real reach — every figure below is independently audited.
+              Hold multiple currencies, reach banks and mobile wallets, and settle in minutes.
             </p>
           </motion.div>
 
@@ -698,9 +647,8 @@ const Landing = () => {
                       0{i + 1}
                     </span>
                   </div>
-                  <div className="text-4xl md:text-5xl font-black text-[hsl(var(--accent-amber))] leading-none flex items-baseline gap-1">
-                    <Counter to={s.value} decimals={s.decimals ?? 0} prefix={s.prefix} suffix={s.suffix} />
-                    {s.isRating && <span className="text-[hsl(var(--accent-amber))] text-3xl md:text-4xl">★</span>}
+                  <div className="text-4xl md:text-5xl font-black text-[hsl(var(--accent-amber))] leading-none">
+                    {s.value}
                   </div>
                   <div className="mt-3 text-sm font-semibold text-white">{s.label}</div>
                   <div className="text-xs text-white/50 mt-1">{s.caption}</div>
@@ -727,101 +675,7 @@ const Landing = () => {
 
 
       {/* ============ FOOTER ============ */}
-      <footer className="relative bg-[hsl(var(--brand-900))] text-white/70 overflow-hidden">
-        <div className="absolute inset-0 bg-grid-purple opacity-50 pointer-events-none" />
-        <div className="absolute -top-32 left-1/4 w-96 h-96 rounded-full bg-[hsl(var(--primary)/0.18)] blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-32 right-1/4 w-96 h-96 rounded-full bg-[hsl(var(--accent-amber)/0.08)] blur-3xl pointer-events-none" />
-        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[hsl(var(--accent-amber))]/40 to-transparent" />
-
-        <div className="relative max-w-7xl mx-auto px-6 pt-20 pb-10">
-          {/* Top grid */}
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-12 pb-14 border-b border-white/10">
-            {/* Brand */}
-            <div className="md:col-span-5">
-              <div className="flex items-center gap-2">
-                <Logo className="w-10 h-10" />
-                <Wordmark className="font-black text-2xl" />
-              </div>
-              <p className="mt-5 text-sm text-[hsl(var(--primary)/0.95)] max-w-sm leading-relaxed">
-                The smartest way to move, hold and exchange money across borders. Built for individuals and businesses worldwide.
-              </p>
-              <div className="mt-6 flex flex-wrap gap-2">
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-[0.18em] bg-white/5 border border-white/10 text-white/70">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[hsl(var(--accent-amber))]" />
-                  MSB Licensed
-                </span>
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-[0.18em] bg-white/5 border border-white/10 text-white/70">
-                  <Shield className="w-3 h-3 text-[hsl(var(--accent-amber))]" />
-                  SOC 2 Type II
-                </span>
-              </div>
-            </div>
-
-            {/* Link columns */}
-            {[
-              {
-                title: "Product",
-                links: [
-                  { label: "Send Money", href: "/send" },
-                  { label: "Exchange", href: "/exchange" },
-                  { label: "Wallets", href: "/wallets" },
-                  { label: "Cards", href: "/cards" },
-                ],
-              },
-              {
-                title: "Company",
-                links: [
-                  { label: "About", href: "#" },
-                  { label: "Security", href: "#" },
-                  { label: "Careers", href: "#" },
-                  { label: "Contact", href: "mailto:info@efintax.biz" },
-                ],
-              },
-              {
-                title: "Legal",
-                links: [
-                  { label: "Privacy", href: "/privacy" },
-                  { label: "Terms", href: "/terms" },
-                  { label: "Compliance", href: "/compliance" },
-                  { label: "Cookies", href: "#" },
-                ],
-              },
-            ].map((col) => (
-              <div key={col.title} className="md:col-span-2">
-                <h4 className="text-xs font-bold uppercase tracking-[0.2em] text-[hsl(var(--primary))] mb-4">
-                  {col.title}
-                </h4>
-                <ul className="space-y-3 text-sm">
-                  {col.links.map((l) =>
-                    l.href.startsWith("/") ? (
-                      <li key={l.label}>
-                        <Link to={l.href} className="text-[hsl(var(--primary)/0.80)] hover:text-[hsl(var(--primary))] transition-colors">
-                          {l.label}
-                        </Link>
-                      </li>
-                    ) : (
-                      <li key={l.label}>
-                        <a href={l.href} className="text-[hsl(var(--primary)/0.80)] hover:text-[hsl(var(--primary))] transition-colors">
-                          {l.label}
-                        </a>
-                      </li>
-                    )
-                  )}
-                </ul>
-              </div>
-            ))}
-
-            {/* Newsletter */}
-            <div className="md:col-span-1 md:hidden" />
-          </div>
-
-          {/* Bottom bar */}
-          <div className="pt-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 text-xs text-[hsl(var(--primary))]">
-            <span>© {new Date().getFullYear()} eFinMoney. All rights reserved.</span>
-            <span className="hidden sm:inline">Built with efinmoney.</span>
-          </div>
-        </div>
-      </footer>
+      <MarketingFooter />
     </div>
   );
 };

@@ -38,6 +38,9 @@ import AdminLayout from "@/components/admin-portal/AdminLayout";
 const PrivacyPolicyPage = lazyImport(() => import("./pages/PrivacyPolicyPage"));
 const TermsPage = lazyImport(() => import("./pages/TermsPage"));
 const CompliancePage = lazyImport(() => import("./pages/CompliancePage"));
+const Features = lazyImport(() => import("./pages/Features"));
+const HowItWorks = lazyImport(() => import("./pages/HowItWorks"));
+const About = lazyImport(() => import("./pages/About"));
 const AuthConfirm = lazyImport(() => import("./pages/AuthConfirm"));
 const ResetPasswordPage = lazyImport(() => import("./pages/ResetPasswordPage"));
 const FinanceDashboard = lazyImport(() => import("./pages/FinanceDashboard"));
@@ -220,6 +223,9 @@ const AppRoutes = () => {
         <Route path="/privacy" element={<PrivacyPolicyPage />} />
         <Route path="/terms" element={<TermsPage />} />
         <Route path="/compliance" element={<CompliancePage />} />
+        <Route path="/features" element={<Features />} />
+        <Route path="/how-it-works" element={<HowItWorks />} />
+        <Route path="/about" element={<About />} />
 
         <Route element={<KycShellRoute />}>
           <Route path="/dashboard" element={<Index />} />
