@@ -20,25 +20,10 @@ export default defineConfig(({ mode }) => ({
       output: {
         manualChunks(id) {
           if (!id.includes("node_modules")) return;
+          // Only split libs that are lazy-loaded and do not share React init order with the app shell.
+          // Separate chunks for stripe/recharts/d3/sentry/etc. caused TDZ ReferenceErrors on Vercel prod.
           if (id.includes("@remotion") || id.includes("remotion")) return "remotion";
-          if (id.includes("@supabase")) return "supabase";
-          if (id.includes("@adyen")) return "adyen";
-          if (id.includes("@stripe") || id.includes("stripe-js")) return "stripe";
-          if (id.includes("d3-") || id.includes("/d3/")) return "d3";
-          if (id.includes("@sentry")) return "sentry";
-          if (id.includes("posthog")) return "analytics";
           if (id.includes("jspdf") || id.includes("xlsx")) return "export";
-          // Keep React-dependent UI libs in vendor — separate chunks cause TDZ init errors in prod.
-          if (
-            id.includes("react") ||
-            id.includes("react-dom") ||
-            id.includes("react-router") ||
-            id.includes("@tanstack/react-query") ||
-            id.includes("recharts") ||
-            id.includes("framer-motion")
-          ) {
-            return "vendor";
-          }
         },
       },
     },
