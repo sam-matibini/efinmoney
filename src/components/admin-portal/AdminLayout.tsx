@@ -1,6 +1,6 @@
 import { ReactNode, Suspense, useEffect, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, ShieldCheck, Users, Layers, ScrollText, Settings, Bell, Search, LogOut, ChevronLeft, ChevronRight, Sun, Moon, Activity, ExternalLink, SlidersHorizontal, UserCog, Gauge, AlertCircle, FileText, Eye, ShieldAlert, Shield, ClipboardList, Ban, UserX, Building2, FileWarning, GraduationCap, Landmark, Globe, ArrowLeftRight, Banknote, RefreshCw, TrendingUp, Zap, BookOpen, BarChart2, Scale, CalendarCheck, Archive, PanelLeft, Wallet, Cog } from "lucide-react";
+import { LayoutDashboard, ShieldCheck, Users, Layers, ScrollText, Settings, Bell, Search, LogOut, ChevronLeft, ChevronRight, Sun, Moon, Activity, ExternalLink, SlidersHorizontal, UserCog, Gauge, AlertCircle, FileText, Eye, ShieldAlert, Shield, ClipboardList, Ban, UserX, Building2, FileWarning, GraduationCap, Landmark, Globe, ArrowLeftRight, Banknote, RefreshCw, TrendingUp, Zap, BookOpen, BarChart2, Scale, CalendarCheck, Archive, PanelLeft, Wallet, Cog, Megaphone } from "lucide-react";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,7 @@ const NAV = [
   { to: "/admin/board-dashboard", label: "Board", icon: Gauge },
   { to: "/admin/finance", label: "Finance", icon: Wallet },
   { to: "/admin/operations", label: "Operations", icon: PanelLeft },
+  { to: "/admin/communication", label: "Communication", icon: Megaphone },
   { to: "/admin/settings", label: "Settings", icon: Cog },
   { to: "/admin/security", label: "Security", icon: ShieldAlert },
   { to: "/admin/incidents", label: "Incidents", icon: AlertCircle },

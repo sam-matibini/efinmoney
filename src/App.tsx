@@ -117,6 +117,7 @@ const InteracHubCallback = lazyImport(() => import("./pages/InteracHubCallback")
 const MorePage = lazyImport(() => import("./pages/MorePage"));
 const StripeConnectInstantPage = lazyImport(() => import("./pages/StripeConnectInstantPage"));
 const AfricanCardSendPage = lazyImport(() => import("./pages/AfricanCardSendPage"));
+const CommunicationHubPage = lazyImport(() => import("./pages/admin/CommunicationHubPage"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -266,6 +267,7 @@ const AppRoutes = () => {
         {/* Admin-sidebar versions of Finance / Operations / Settings */}
         <Route path="/admin/finance" element={<AdminAuthProvider><AdminGuard><AdminLayout><FinanceDashboard /></AdminLayout></AdminGuard></AdminAuthProvider>} />
         <Route path="/admin/operations" element={<AdminAuthProvider><AdminGuard><AdminLayout><OperationsDashboard /></AdminLayout></AdminGuard></AdminAuthProvider>} />
+        <Route path="/admin/communication" element={<AdminAuthProvider><AdminGuard><AdminLayout><CommunicationHubPage /></AdminLayout></AdminGuard></AdminAuthProvider>} />
         <Route path="/admin/settings" element={<AdminAuthProvider><AdminGuard><AdminLayout><SettingsDashboard /></AdminLayout></AdminGuard></AdminAuthProvider>} />
 
         <Route element={<ProtectedShellRoute />}>

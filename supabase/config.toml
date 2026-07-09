@@ -214,6 +214,12 @@ verify_jwt = false
 [functions.flw-reconcile-transfers]
 verify_jwt = false
 
+[functions.send-broadcast]
+verify_jwt = false
+
+[functions.unsubscribe]
+verify_jwt = false
+
 [functions.persona-webhook]
 verify_jwt = false
 

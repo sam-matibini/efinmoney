@@ -3,6 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { useProfile } from "@/hooks/useProfile";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -26,6 +27,7 @@ const ProfileSettingsPage = () => {
   const [postalCode, setPostalCode] = useState("");
   const [addressCountry, setAddressCountry] = useState("");
   const [saving, setSaving] = useState(false);
+  const [emailOptOut, setEmailOptOut] = useState(false);
 
   useEffect(() => {
     if (profile) {
@@ -39,8 +41,22 @@ const ProfileSettingsPage = () => {
       setStateProvince(p.state_province || "");
       setPostalCode(p.postal_code || "");
       setAddressCountry(p.address_country || p.country_code || "");
+      setEmailOptOut(!!p.email_opt_out);
     }
   }, [profile, user]);
+
+  const toggleEmailOptOut = async (optOut: boolean) => {
+    if (!user) return;
+    setEmailOptOut(optOut);
+    const { error } = await (supabase.from("profiles") as any).update({ email_opt_out: optOut }).eq("user_id", user.id);
+    if (error) {
+      setEmailOptOut(!optOut);
+      toast.error("Couldn't update email preferences");
+    } else {
+      toast.success(optOut ? "Unsubscribed from announcement emails" : "Subscribed to announcement emails");
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+    }
+  };
 
   const handleSave = async () => {
     if (!user) return;
@@ -263,6 +279,20 @@ const ProfileSettingsPage = () => {
             {saving ? "Saving..." : "Save Changes"}
           </Button>
 
+        </Card>
+
+        {/* Email preferences */}
+        <Card className="p-6 mb-4">
+          <p className="text-xs uppercase tracking-wider text-muted-foreground mb-3">Email preferences</p>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-foreground">Announcement emails</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Product news and updates. Turning this off won't affect important account, security, or transaction emails.
+              </p>
+            </div>
+            <Switch checked={!emailOptOut} onCheckedChange={(on) => toggleEmailOptOut(!on)} disabled={isLoading} />
+          </div>
         </Card>
     </div>
   );

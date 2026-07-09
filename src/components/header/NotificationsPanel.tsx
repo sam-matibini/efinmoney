@@ -1,4 +1,4 @@
-import { Bell, Check } from "lucide-react";
+import { Bell, Check, Megaphone } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import {
   Popover,
@@ -57,21 +57,31 @@ const NotificationsPanel = () => {
             </div>
           ) : (
             <div className="divide-y divide-border">
-              {notifications.map((n) => (
+              {notifications.map((n) => {
+                const isAnnouncement = n.type === "announcement";
+                return (
                 <button
                   key={n.id}
                   onClick={() => !n.is_read && markOne.mutate(n.id)}
                   className={cn(
                     "w-full text-left p-3 hover:bg-muted/50 transition-colors",
-                    !n.is_read && "bg-primary/5"
+                    !n.is_read && "bg-primary/5",
+                    isAnnouncement && "border-l-2 border-amber-500"
                   )}
                 >
                   <div className="flex items-start gap-2">
-                    {!n.is_read && (
+                    {isAnnouncement ? (
+                      <span className="w-6 h-6 rounded-lg bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center flex-shrink-0">
+                        <Megaphone className="w-3.5 h-3.5" />
+                      </span>
+                    ) : !n.is_read ? (
                       <span className="w-2 h-2 mt-1.5 bg-primary rounded-full flex-shrink-0" />
-                    )}
+                    ) : null}
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground">{n.title}</p>
+                      <p className="text-sm font-medium text-foreground">
+                        {isAnnouncement && <span className="text-[10px] font-bold uppercase tracking-wide text-amber-600 dark:text-amber-400 mr-1.5">Announcement</span>}
+                        {n.title}
+                      </p>
                       <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.message}</p>
                       <p className="text-[10px] text-muted-foreground mt-1">
                         {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
@@ -79,7 +89,8 @@ const NotificationsPanel = () => {
                     </div>
                   </div>
                 </button>
-              ))}
+                );
+              })}
             </div>
           )}
         </ScrollArea>
