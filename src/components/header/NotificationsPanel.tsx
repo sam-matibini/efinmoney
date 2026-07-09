@@ -20,13 +20,13 @@ const NotificationsPanel = () => {
       <PopoverTrigger asChild>
         <button
           className={cn(
-            "relative p-2.5 rounded-xl hover:bg-muted transition-colors",
+            "relative p-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 dark:text-amber-400 transition-all duration-200 hover:scale-110 active:scale-95",
             unreadCount > 0 && "animate-bell-shake"
           )}
         >
-          <Bell className="w-5 h-5 text-muted-foreground" />
+          <Bell className="w-5 h-5 text-amber-500 dark:text-amber-400" />
           {unreadCount > 0 && (
-            <span className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 text-[10px] font-bold bg-primary text-primary-foreground rounded-full flex items-center justify-center ring-2 ring-background">
+            <span className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 text-[10px] font-bold bg-rose-500 text-white rounded-full flex items-center justify-center ring-2 ring-background animate-live-pulse">
               {unreadCount > 99 ? '99+' : unreadCount}
             </span>
           )}

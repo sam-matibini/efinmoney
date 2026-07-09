@@ -1,5 +1,22 @@
 import { useState } from "react";
-import { Search, LogOut, Shield, Wallet, Settings, Cog, X, Menu } from "lucide-react";
+import {
+  Search,
+  LogOut,
+  Shield,
+  Wallet,
+  Settings,
+  Cog,
+  X,
+  Menu,
+  LayoutDashboard,
+  Send,
+  Link2,
+  ArrowDownToLine,
+  Users,
+  RefreshCw,
+  CreditCard,
+  type LucideIcon,
+} from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Sheet,
@@ -30,9 +47,99 @@ import { getGreeting } from "@/lib/greeting";
 import { prefetchRoute } from "@/lib/prefetchRoute";
 import { avatarInitials, resolveAvatarUrl } from "@/lib/avatar";
 
-const navLinkClass = (active: boolean) =>
-  `text-sm font-medium transition-colors duration-75 flex items-center gap-1.5 whitespace-nowrap rounded-lg px-2 py-1.5 -mx-2 active:scale-[0.97] active:opacity-80 ${
-    active ? "text-primary bg-primary/5" : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+type NavItem = {
+  label: string;
+  href: string;
+  icon: LucideIcon;
+  tone: string;
+  activeTone: string;
+  hoverTone: string;
+};
+
+const navThemes: Record<string, Omit<NavItem, "label" | "href">> = {
+  Dashboard: {
+    icon: LayoutDashboard,
+    tone: "text-violet-500/80 dark:text-violet-400/80",
+    activeTone: "text-violet-600 dark:text-violet-300 bg-violet-500/15 shadow-[0_2px_12px_-4px_rgba(139,92,246,0.45)]",
+    hoverTone: "hover:text-violet-600 dark:hover:text-violet-300 hover:bg-violet-500/10",
+  },
+  Send: {
+    icon: Send,
+    tone: "text-sky-500/80 dark:text-sky-400/80",
+    activeTone: "text-sky-600 dark:text-sky-300 bg-sky-500/15 shadow-[0_2px_12px_-4px_rgba(14,165,233,0.45)]",
+    hoverTone: "hover:text-sky-600 dark:hover:text-sky-300 hover:bg-sky-500/10",
+  },
+  "Payment links": {
+    icon: Link2,
+    tone: "text-fuchsia-500/80 dark:text-fuchsia-400/80",
+    activeTone: "text-fuchsia-600 dark:text-fuchsia-300 bg-fuchsia-500/15 shadow-[0_2px_12px_-4px_rgba(217,70,239,0.45)]",
+    hoverTone: "hover:text-fuchsia-600 dark:hover:text-fuchsia-300 hover:bg-fuchsia-500/10",
+  },
+  "Top up": {
+    icon: ArrowDownToLine,
+    tone: "text-emerald-500/80 dark:text-emerald-400/80",
+    activeTone: "text-emerald-600 dark:text-emerald-300 bg-emerald-500/15 shadow-[0_2px_12px_-4px_rgba(16,185,129,0.45)]",
+    hoverTone: "hover:text-emerald-600 dark:hover:text-emerald-300 hover:bg-emerald-500/10",
+  },
+  Contacts: {
+    icon: Users,
+    tone: "text-cyan-500/80 dark:text-cyan-400/80",
+    activeTone: "text-cyan-600 dark:text-cyan-300 bg-cyan-500/15 shadow-[0_2px_12px_-4px_rgba(6,182,212,0.45)]",
+    hoverTone: "hover:text-cyan-600 dark:hover:text-cyan-300 hover:bg-cyan-500/10",
+  },
+  Exchange: {
+    icon: RefreshCw,
+    tone: "text-amber-500/80 dark:text-amber-400/80",
+    activeTone: "text-amber-600 dark:text-amber-300 bg-amber-500/15 shadow-[0_2px_12px_-4px_rgba(245,158,11,0.45)]",
+    hoverTone: "hover:text-amber-600 dark:hover:text-amber-300 hover:bg-amber-500/10",
+  },
+  Wallets: {
+    icon: Wallet,
+    tone: "text-teal-500/80 dark:text-teal-400/80",
+    activeTone: "text-teal-600 dark:text-teal-300 bg-teal-500/15 shadow-[0_2px_12px_-4px_rgba(20,184,166,0.45)]",
+    hoverTone: "hover:text-teal-600 dark:hover:text-teal-300 hover:bg-teal-500/10",
+  },
+  Cards: {
+    icon: CreditCard,
+    tone: "text-orange-500/80 dark:text-orange-400/80",
+    activeTone: "text-orange-600 dark:text-orange-300 bg-orange-500/15 shadow-[0_2px_12px_-4px_rgba(249,115,22,0.45)]",
+    hoverTone: "hover:text-orange-600 dark:hover:text-orange-300 hover:bg-orange-500/10",
+  },
+  Finance: {
+    icon: Wallet,
+    tone: "text-emerald-500/80 dark:text-emerald-400/80",
+    activeTone: "text-emerald-600 dark:text-emerald-300 bg-emerald-500/15 shadow-[0_2px_12px_-4px_rgba(16,185,129,0.45)]",
+    hoverTone: "hover:text-emerald-600 dark:hover:text-emerald-300 hover:bg-emerald-500/10",
+  },
+  Operations: {
+    icon: Settings,
+    tone: "text-cyan-500/80 dark:text-cyan-400/80",
+    activeTone: "text-cyan-600 dark:text-cyan-300 bg-cyan-500/15 shadow-[0_2px_12px_-4px_rgba(6,182,212,0.45)]",
+    hoverTone: "hover:text-cyan-600 dark:hover:text-cyan-300 hover:bg-cyan-500/10",
+  },
+  Admin: {
+    icon: Shield,
+    tone: "text-rose-500/80 dark:text-rose-400/80",
+    activeTone: "text-rose-600 dark:text-rose-300 bg-rose-500/15 shadow-[0_2px_12px_-4px_rgba(244,63,94,0.45)]",
+    hoverTone: "hover:text-rose-600 dark:hover:text-rose-300 hover:bg-rose-500/10",
+  },
+  Settings: {
+    icon: Cog,
+    tone: "text-violet-500/80 dark:text-violet-400/80",
+    activeTone: "text-violet-600 dark:text-violet-300 bg-violet-500/15 shadow-[0_2px_12px_-4px_rgba(139,92,246,0.45)]",
+    hoverTone: "hover:text-violet-600 dark:hover:text-violet-300 hover:bg-violet-500/10",
+  },
+};
+
+const buildNavItem = (label: string, href: string): NavItem => ({
+  label,
+  href,
+  ...navThemes[label],
+});
+
+const navLinkClass = (active: boolean, theme: NavItem) =>
+  `text-sm font-semibold transition-all duration-200 flex items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1.5 -mx-2 hover:-translate-y-0.5 active:scale-[0.97] active:opacity-80 ${
+    active ? theme.activeTone : `${theme.tone} ${theme.hoverTone}`
   }`;
 
 const Header = () => {
@@ -55,28 +162,32 @@ const Header = () => {
     if (user?.id) prefetchRoute(queryClient, href, user.id);
   };
 
-  const navItems = [
-    { label: 'Dashboard', href: '/dashboard' },
-    { label: 'Send', href: '/send' },
-    { label: 'Payment links', href: '/payment-links' },
-    { label: 'Top up', href: '/wallet/topup' },
-    { label: 'Contacts', href: '/contacts' },
-    { label: 'Exchange', href: '/exchange' },
-    { label: 'Wallets', href: '/wallets' },
-    { label: 'Cards', href: '/cards' },
+  const navItems: NavItem[] = [
+    buildNavItem('Dashboard', '/dashboard'),
+    buildNavItem('Send', '/send'),
+    buildNavItem('Payment links', '/payment-links'),
+    buildNavItem('Top up', '/wallet/topup'),
+    buildNavItem('Contacts', '/contacts'),
+    buildNavItem('Exchange', '/exchange'),
+    buildNavItem('Wallets', '/wallets'),
+    buildNavItem('Cards', '/cards'),
   ];
 
   if (!isAdmin && isFinance) {
-    navItems.push({ label: 'Finance', href: '/finance' });
+    navItems.push(buildNavItem('Finance', '/finance'));
   }
 
   if (!isAdmin && (isFinance || isCompliance)) {
-    navItems.push({ label: 'Operations', href: '/operations' });
+    navItems.push(buildNavItem('Operations', '/operations'));
   }
 
   if (isAdmin) {
-    navItems.push({ label: 'Admin', href: '/admin' });
+    navItems.push(buildNavItem('Admin', '/admin'));
   }
+
+  const countryBadge = profile?.country_code ?? defaultWallet?.currency_code?.slice(0, 2) ?? null;
+  const walletFlag = defaultWallet?.flag_emoji;
+  const showWalletFlag = Boolean(walletFlag && walletFlag !== countryBadge && !/^[A-Z]{2}$/.test(walletFlag));
 
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
@@ -87,10 +198,10 @@ const Header = () => {
           <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
             <SheetTrigger asChild>
               <button
-                className="xl:hidden p-2 rounded-xl hover:bg-muted transition-colors shrink-0"
+                className="xl:hidden p-2 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary transition-all duration-200 hover:scale-110 active:scale-95 shrink-0"
                 aria-label="Open menu"
               >
-                <Menu className="w-5 h-5 text-muted-foreground" />
+                <Menu className="w-5 h-5 text-primary" />
               </button>
             </SheetTrigger>
             <SheetContent side="left" className="w-72 p-0">
@@ -113,14 +224,11 @@ const Header = () => {
                       onMouseEnter={() => warmRoute(item.href)}
                       onFocus={() => warmRoute(item.href)}
                       onTouchStart={() => warmRoute(item.href)}
-                      className={`px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-75 flex items-center gap-2 active:scale-[0.98] active:opacity-80 ${
-                        isActive ? 'bg-secondary text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                      className={`px-3 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 flex items-center gap-2 hover:-translate-y-0.5 active:scale-[0.98] active:opacity-80 ${
+                        isActive ? item.activeTone : `${item.tone} ${item.hoverTone}`
                       }`}
                     >
-                      {item.label === 'Finance' && <Wallet className="w-4 h-4" />}
-                      {item.label === 'Operations' && <Settings className="w-4 h-4" />}
-                      {item.label === 'Admin' && <Shield className="w-4 h-4" />}
-                      {item.label === 'Settings' && <Cog className="w-4 h-4" />}
+                      <item.icon className="w-4 h-4 shrink-0" />
                       {item.label}
                     </Link>
                   );
@@ -133,9 +241,11 @@ const Header = () => {
             <Logo className="w-9 h-9 shrink-0" />
             <Wordmark className="font-display font-bold text-xl truncate hidden sm:inline" />
           </Link>
-          <span className="hidden 2xl:inline-flex items-center gap-1.5 ml-2 pl-3 border-l border-border text-sm font-medium text-muted-foreground whitespace-nowrap">
-            <span className="text-base">{greeting.emoji}</span>
-            {greeting.text}
+          <span className="hidden 2xl:inline-flex items-center gap-1.5 ml-2 pl-3 border-l border-border text-sm font-semibold whitespace-nowrap bg-gradient-to-r from-indigo-500/10 via-violet-500/10 to-fuchsia-500/10 px-3 py-1 rounded-full">
+            <span className="text-base animate-[wave_2.5s_ease-in-out_infinite]">{greeting.emoji}</span>
+            <span className="bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 dark:from-indigo-300 dark:via-violet-300 dark:to-fuchsia-300 bg-clip-text text-transparent">
+              {greeting.text}
+            </span>
           </span>
         </div>
 
@@ -151,12 +261,9 @@ const Header = () => {
                 onMouseEnter={() => warmRoute(item.href)}
                 onFocus={() => warmRoute(item.href)}
                 onTouchStart={() => warmRoute(item.href)}
-                className={navLinkClass(isActive)}
+                className={navLinkClass(isActive, item)}
               >
-                {item.label === 'Finance' && <Wallet className="w-4 h-4" />}
-                {item.label === 'Operations' && <Settings className="w-4 h-4" />}
-                {item.label === 'Admin' && <Shield className="w-4 h-4" />}
-                {item.label === 'Settings' && <Cog className="w-4 h-4" />}
+                <item.icon className="w-4 h-4 shrink-0" />
                 {item.label}
               </Link>
             );
@@ -183,13 +290,13 @@ const Header = () => {
             )}
             <button
               onClick={() => setSearchExpanded((v) => !v)}
-              className="p-2.5 rounded-xl hover:bg-muted transition-colors"
+              className="p-2.5 rounded-xl bg-sky-500/10 hover:bg-sky-500/20 text-sky-500 dark:text-sky-400 transition-all duration-200 hover:scale-110 active:scale-95"
               aria-label="Search"
             >
               {searchExpanded ? (
-                <X className="w-5 h-5 text-muted-foreground" />
+                <X className="w-5 h-5 text-sky-500 dark:text-sky-400" />
               ) : (
-                <Search className="w-5 h-5 text-muted-foreground" />
+                <Search className="w-5 h-5 text-sky-500 dark:text-sky-400" />
               )}
             </button>
           </div>
@@ -200,16 +307,22 @@ const Header = () => {
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="ml-1 p-1 pr-2 rounded-xl bg-secondary hover:bg-secondary/80 transition-colors group flex items-center gap-1.5">
-                <Avatar className="h-8 w-8 rounded-lg border border-primary/20">
+              <button className="group ml-1 p-1 pr-2.5 rounded-xl bg-gradient-to-r from-primary/10 via-violet-500/10 to-fuchsia-500/10 hover:from-primary/20 hover:via-violet-500/20 hover:to-fuchsia-500/20 border border-primary/15 transition-all duration-200 hover:scale-105 hover:shadow-[0_4px_16px_-6px_hsl(var(--primary)/0.45)] active:scale-95 flex items-center gap-2">
+                <Avatar className="h-8 w-8 rounded-lg border-2 border-primary/30 group-hover:border-primary/60 transition-colors shadow-[0_0_12px_-4px_hsl(var(--primary)/0.5)]">
                   <AvatarImage src={avatarUrl ?? undefined} alt="Profile" />
-                  <AvatarFallback className="rounded-lg gradient-primary text-primary-foreground text-xs font-bold">
+                  <AvatarFallback className="rounded-lg gradient-primary text-primary-foreground text-xs font-bold tracking-wide">
                     {avatarInitial}
                   </AvatarFallback>
                 </Avatar>
-                {defaultWallet?.flag_emoji && (
-                  <span className="text-base leading-none" title={`Default: ${defaultWallet.currency_code}`}>
-                    {defaultWallet.flag_emoji}
+                {(showWalletFlag || countryBadge || walletFlag) && (
+                  <span
+                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-sky-500/15 text-sky-600 dark:text-sky-300 text-[10px] font-bold tracking-wider border border-sky-500/25 transition-transform duration-200 group-hover:scale-110 group-hover:bg-sky-500/25"
+                    title={`Default: ${defaultWallet?.currency_code ?? countryBadge ?? walletFlag}`}
+                  >
+                    {showWalletFlag && (
+                      <span className="text-sm leading-none">{walletFlag}</span>
+                    )}
+                    <span>{countryBadge ?? walletFlag}</span>
                   </span>
                 )}
               </button>

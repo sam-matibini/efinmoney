@@ -8,7 +8,7 @@ const ThemeToggle = () => {
     <button
       onClick={toggleTheme}
       aria-label="Toggle theme"
-      className="relative p-2.5 rounded-xl hover:bg-muted transition-colors overflow-hidden"
+      className="relative p-2.5 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-500 dark:text-indigo-300 transition-all duration-200 overflow-hidden hover:scale-110 active:scale-95"
     >
       <AnimatePresence mode="wait" initial={false}>
         {theme === "light" ? (
@@ -20,7 +20,7 @@ const ThemeToggle = () => {
             transition={{ duration: 0.3 }}
             className="inline-flex"
           >
-            <Moon className="w-5 h-5 text-muted-foreground" />
+            <Moon className="w-5 h-5 text-indigo-500 dark:text-indigo-300" />
           </motion.span>
         ) : (
           <motion.span
@@ -31,7 +31,7 @@ const ThemeToggle = () => {
             transition={{ duration: 0.3 }}
             className="inline-flex"
           >
-            <Sun className="w-5 h-5 text-amber-400" />
+            <Sun className="w-5 h-5 text-amber-400 drop-shadow-[0_0_6px_rgba(251,191,36,0.6)]" />
           </motion.span>
         )}
       </AnimatePresence>
