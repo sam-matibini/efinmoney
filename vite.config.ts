@@ -25,16 +25,17 @@ export default defineConfig(({ mode }) => ({
           if (id.includes("@adyen")) return "adyen";
           if (id.includes("@stripe") || id.includes("stripe-js")) return "stripe";
           if (id.includes("d3-") || id.includes("/d3/")) return "d3";
-          if (id.includes("framer-motion")) return "framer-motion";
-          if (id.includes("recharts")) return "recharts";
           if (id.includes("@sentry")) return "sentry";
           if (id.includes("posthog")) return "analytics";
           if (id.includes("jspdf") || id.includes("xlsx")) return "export";
+          // Keep React-dependent UI libs in vendor — separate chunks cause TDZ init errors in prod.
           if (
             id.includes("react") ||
             id.includes("react-dom") ||
             id.includes("react-router") ||
-            id.includes("@tanstack/react-query")
+            id.includes("@tanstack/react-query") ||
+            id.includes("recharts") ||
+            id.includes("framer-motion")
           ) {
             return "vendor";
           }
