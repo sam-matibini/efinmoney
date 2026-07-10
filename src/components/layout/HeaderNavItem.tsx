@@ -33,7 +33,6 @@ const HeaderNavItem = ({
       onTouchStart={onWarmRoute}
       aria-label={label}
       aria-current={isActive ? "page" : undefined}
-      title={withLabel ? label : undefined}
       className={navDesktopClass(isActive, withLabel)}
     >
       {isActive && (
@@ -107,11 +106,10 @@ const HeaderNavItem = ({
   return (
     <>
       <Tooltip delayDuration={150}>
-        <TooltipTrigger asChild>
-          <span className="contents 2xl:hidden">{iconOnly}</span>
-        </TooltipTrigger>
+        <TooltipTrigger asChild>{iconOnly}</TooltipTrigger>
         <TooltipContent
           side="bottom"
+          sideOffset={8}
           className="text-xs font-medium 2xl:hidden border-primary/20 shadow-lg animate-in fade-in-0 zoom-in-95 duration-200"
         >
           {label}
