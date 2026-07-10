@@ -70,15 +70,15 @@ export default function MarketingHeader({ variant = "solid" }: { variant?: "tran
             onMouseEnter={() => setFeaturesOpen(true)}
             onMouseLeave={() => setFeaturesOpen(false)}
           >
-            <button
-              type="button"
-              onClick={() => setFeaturesOpen((o) => !o)}
+            <Link
+              to="/features"
+              onClick={() => setFeaturesOpen(false)}
               aria-expanded={featuresOpen}
               className="inline-flex items-center gap-1 text-sm font-medium text-white/70 hover:text-white transition-colors"
             >
               Features
               <ChevronDown className={cn("w-4 h-4 transition-transform", featuresOpen && "rotate-180")} />
-            </button>
+            </Link>
 
             {featuresOpen && (
               <div className="absolute left-1/2 -translate-x-1/2 top-full pt-3">
