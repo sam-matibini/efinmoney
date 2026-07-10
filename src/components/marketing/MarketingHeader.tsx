@@ -111,7 +111,7 @@ export default function MarketingHeader({ variant = "solid" }: { variant?: "tran
 
         {/* Desktop CTAs */}
         <div className="hidden md:flex items-center gap-3">
-          <Link to="/auth" className="text-sm font-semibold text-white/90 hover:text-white transition-colors px-3 py-2">
+          <Link to="/auth?mode=signin" className="text-sm font-semibold text-white/90 hover:text-white transition-colors px-3 py-2">
             Sign in
           </Link>
           <Link
@@ -169,7 +169,7 @@ export default function MarketingHeader({ variant = "solid" }: { variant?: "tran
 
           <div className="pt-3 mt-2 border-t border-white/10 flex flex-col gap-2">
             <Link
-              to="/auth"
+              to="/auth?mode=signin"
               onClick={() => setOpen(false)}
               className="text-center text-sm font-semibold text-white/90 py-2.5 rounded-full border border-white/15"
             >

@@ -17,7 +17,7 @@ const Auth = () => {
   const [params] = useSearchParams();
   const modeParam = params.get("mode");
   const redirectTo = params.get("redirect");
-  const [isSignUp, setIsSignUp] = useState(modeParam === "signup");
+  const [isSignUp, setIsSignUp] = useState(modeParam !== "signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
@@ -27,6 +27,14 @@ const Auth = () => {
   const [resending, setResending] = useState(false);
   const { signIn, signUp } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (modeParam) {
+      const newUrl = new URL(window.location.href);
+      newUrl.searchParams.delete("mode");
+      window.history.replaceState({}, "", newUrl.toString());
+    }
+  }, [modeParam]);
 
   useEffect(() => {
     document.title = isSignUp ? "Create account · eFinMoney" : "Sign in · eFinMoney";
