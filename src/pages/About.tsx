@@ -115,9 +115,9 @@ export default function About() {
           <p className="mt-4 text-white/70">
             Questions, partnerships or support — we'd love to hear from you.
           </p>
-          <a href="mailto:support@efin.money" className="mt-8 inline-flex items-center justify-center gap-2 bg-[hsl(var(--accent-amber))] text-[hsl(var(--brand-900))] font-bold px-7 py-3.5 rounded-full transition-all hover:-translate-y-0.5 shadow-cta-amber">
-            support@efin.money
-          </a>
+          <Link to="/contact" className="mt-8 inline-flex items-center justify-center gap-2 bg-[hsl(var(--accent-amber))] text-[hsl(var(--brand-900))] font-bold px-7 py-3.5 rounded-full transition-all hover:-translate-y-0.5 shadow-cta-amber">
+            Contact us
+          </Link>
           <div className="mt-6">
             <Link to="/auth" className="inline-flex items-center gap-2 text-white/80 hover:text-white text-sm font-semibold">
               Or create your account <ArrowRight className="w-4 h-4" />
