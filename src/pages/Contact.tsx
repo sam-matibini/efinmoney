@@ -15,6 +15,15 @@ export default function Contact() {
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
 
+  useEffect(() => {
+    if (!sent) return;
+    const t = setTimeout(() => {
+      setSent(false);
+      setForm({ name: "", email: "", subject: "", message: "", company: "" });
+    }, 6000);
+    return () => clearTimeout(t);
+  }, [sent]);
+
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
 
@@ -105,8 +114,14 @@ export default function Contact() {
             {sent ? (
               <div className="text-center py-10">
                 <div className="mx-auto w-14 h-14 rounded-full bg-emerald-500/15 text-emerald-600 flex items-center justify-center mb-4"><CheckCircle2 className="w-7 h-7" /></div>
-                <h3 className="text-lg font-bold text-[hsl(var(--brand-900))]">Message sent</h3>
+                <h3 className="text-lg font-bold text-[hsl(var(--brand-900))]">Message sent!</h3>
                 <p className="text-sm text-neutral-600 mt-1">Thanks for reaching out — we'll get back to you shortly.</p>
+                <button
+                  onClick={() => { setSent(false); setForm({ name: "", email: "", subject: "", message: "", company: "" }); }}
+                  className="mt-6 text-sm text-[hsl(var(--brand-700))] hover:underline"
+                >
+                  Send another message
+                </button>
               </div>
             ) : (
               <form onSubmit={submit} className="space-y-4">
