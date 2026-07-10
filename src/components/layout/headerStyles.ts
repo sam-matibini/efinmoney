@@ -48,6 +48,26 @@ export function navIconTint(label: string) {
   return navIconTints[label] ?? "text-primary";
 }
 
+/** Compact labels shown under each desktop nav icon so items are self-identifying. */
+export const navShortLabels: Record<string, string> = {
+  Dashboard: "Dashboard",
+  Send: "Send",
+  "Payment Links": "Payments",
+  "Top up": "Top up",
+  Contacts: "Contacts",
+  "Foreign Currency Exchange": "Exchange",
+  Wallets: "Wallets",
+  Cards: "Cards",
+  Finance: "Finance",
+  Operations: "Operations",
+  Admin: "Admin",
+  Settings: "Settings",
+};
+
+export function navShortLabel(label: string) {
+  return navShortLabels[label] ?? label;
+}
+
 export function navDesktopClass(active: boolean, withLabel = false) {
   return [
     withLabel
