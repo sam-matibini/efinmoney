@@ -26,6 +26,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import NotificationsPanel from "@/components/header/NotificationsPanel";
+import SupportLink from "@/components/header/SupportLink";
 import QuickActionsPopover from "@/components/layout/QuickActionsPopover";
 import SearchModal from "@/components/header/SearchModal";
 import HeaderNavItem from "@/components/layout/HeaderNavItem";
@@ -252,6 +253,7 @@ const Header = () => {
             <span className="hidden xl:block w-px h-7 sm:h-8 bg-border/60 mx-0.5" aria-hidden />
 
             <ThemeToggle />
+            <SupportLink />
             <NotificationsPanel />
             <div className="hidden xl:block">
               <QuickActionsPopover />
