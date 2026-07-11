@@ -536,7 +536,7 @@ const Landing = () => {
             </ul>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link
-                to="/auth"
+                to="/contact"
                 className="inline-flex items-center gap-2 bg-[hsl(var(--accent-amber))] hover:brightness-110 text-[hsl(var(--brand-900))] font-bold px-6 py-3 rounded-full text-sm transition-all hover:-translate-y-0.5 shadow-cta-amber"
               >
                 Talk to sales <ArrowRight className="w-4 h-4" />
