@@ -119,7 +119,7 @@ export default function AliceWidget({ context }: { context: "user" | "admin" }) 
       </button>
 
       <Sheet open={open} onOpenChange={setOpen}>
-        <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col gap-0">
+        <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col gap-0" hideClose>
           {/* Header */}
           <div className="flex items-center gap-2 px-4 h-14 border-b shrink-0">
             <div className="relative h-8 w-8 rounded-full bg-gradient-primary text-primary-foreground flex items-center justify-center overflow-hidden">
