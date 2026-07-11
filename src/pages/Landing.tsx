@@ -219,7 +219,7 @@ const Landing = () => {
                 to="/auth"
                 className="group inline-flex items-center gap-2 bg-[hsl(var(--accent-amber))] hover:brightness-110 text-[hsl(var(--brand-900))] font-bold px-7 py-3.5 rounded-full text-base transition-all hover:-translate-y-0.5 shadow-cta-amber"
               >
-                Get eFinMoney <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                Get Started <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </Link>
               <Link
                 to="/how-it-works"
