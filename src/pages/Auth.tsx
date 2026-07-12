@@ -20,6 +20,7 @@ const Auth = () => {
   const [isSignUp, setIsSignUp] = useState(modeParam !== "signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -45,6 +46,10 @@ const Auth = () => {
     setIsLoading(true);
     try {
       if (isSignUp) {
+        if (password !== confirmPassword) {
+          toast.error("Passwords do not match.");
+          return;
+        }
         const { error } = await signUp(email, password, fullName);
         if (error) toast.error(error.message);
         else {
@@ -210,6 +215,31 @@ const Auth = () => {
               </div>
             </div>
 
+            {isSignUp && (
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword" className="text-neutral-700 font-medium">Confirm password</Label>
+                <div className="relative">
+                  <Input
+                    id="confirmPassword"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="••••••••"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="h-12 pr-12 bg-white border-neutral-200 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
+                    required
+                    minLength={6}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-700"
+                  >
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+              </div>
+            )}
+
             <button
               type="submit"
               disabled={isLoading}
@@ -229,7 +259,10 @@ const Auth = () => {
           <p className="mt-8 text-center text-neutral-600">
             {isSignUp ? "Already have an account?" : "Don't have an account?"}
             <button
-              onClick={() => setIsSignUp(!isSignUp)}
+              onClick={() => {
+                setIsSignUp(!isSignUp);
+                setConfirmPassword("");
+              }}
               className="ml-2 text-primary hover:text-primary/80 font-bold"
             >
               {isSignUp ? "Sign in" : "Create one"}
