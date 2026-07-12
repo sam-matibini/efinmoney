@@ -17,6 +17,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { useCancelTransfer, type Transfer } from "@/hooks/useTransfers";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
+import PageHeroBanner from "@/components/common/PageHeroBanner";
+import AppPage from "@/components/layout/AppPage";
+import { ArrowRightLeft, User } from "lucide-react";
 
 const refOf = (id: string) => `EFM-${id.replace(/-/g, "").slice(0, 8).toUpperCase()}`;
 
@@ -258,7 +261,7 @@ const TransferTrackingPage = () => {
   };
 
   return (
-    <main className="container px-4 py-6 max-w-3xl mx-auto space-y-6">
+    <AppPage width="default" innerClassName="space-y-6">
         <Button asChild variant="ghost" size="sm" className="gap-2">
           <Link to="/transfers"><ArrowLeft className="w-4 h-4" /> All transfers</Link>
         </Button>
@@ -276,6 +279,21 @@ const TransferTrackingPage = () => {
           </Card>
         ) : (
           <>
+            <PageHeroBanner
+              icon={ArrowRightLeft}
+              label={`Reference ${refOf(transfer.id)}`}
+              value={`${Number(transfer.target_amount).toLocaleString()} ${transfer.target_currency}`}
+              meta={[
+                { icon: User, text: `To ${transfer.recipient_name}` },
+                { text: statusMeta(transfer.status).label },
+              ]}
+              variant={
+                transfer.status === "completed" ? "emerald"
+                  : transfer.status === "failed" || transfer.status === "reversed" ? "rose"
+                  : "primary"
+              }
+            />
+
             {/* Header */}
             <Card>
               <CardHeader className="flex flex-row items-start justify-between gap-4">
@@ -501,7 +519,7 @@ const TransferTrackingPage = () => {
             )}
           </>
         )}
-      </main>
+      </AppPage>
   );
 };
 

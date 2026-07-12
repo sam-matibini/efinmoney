@@ -9,9 +9,11 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
-import { AtSign, Copy, Hash } from "lucide-react";
+import { AtSign, Copy, Hash, User } from "lucide-react";
 import { AvatarUpload } from "@/components/profile/AvatarUpload";
 import { normalizeToE164 } from "@/lib/phone";
+import PageHeroBanner from "@/components/common/PageHeroBanner";
+import AppPage from "@/components/layout/AppPage";
 
 const ProfileSettingsPage = () => {
   const { user } = useAuth();
@@ -125,8 +127,19 @@ const ProfileSettingsPage = () => {
   };
 
   return (
-    <div className="container max-w-2xl mx-auto px-4 py-8">
-        <h1 className="text-2xl font-bold text-foreground mb-6">Profile Settings</h1>
+    <AppPage width="narrow" className="py-8" innerClassName="space-y-6">
+        <h1 className="text-2xl font-bold text-foreground">Profile Settings</h1>
+
+        <PageHeroBanner
+          icon={User}
+          label="Signed in as"
+          value={fullName || profile?.full_name || user?.email || "Your profile"}
+          meta={[
+            { icon: AtSign, text: (profile as any)?.efin_tag ? `@${(profile as any).efin_tag}` : "Set your eFin tag below" },
+            { icon: Hash, text: (profile as any)?.account_number ? `Acct ${(profile as any).account_number}` : "Account number pending" },
+          ]}
+          variant="primary"
+        />
 
         <Card className="p-6 mb-4">
           <AvatarUpload />
@@ -294,7 +307,7 @@ const ProfileSettingsPage = () => {
             <Switch checked={!emailOptOut} onCheckedChange={(on) => toggleEmailOptOut(!on)} disabled={isLoading} />
           </div>
         </Card>
-    </div>
+    </AppPage>
   );
 };
 

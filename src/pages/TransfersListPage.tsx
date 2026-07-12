@@ -12,6 +12,9 @@ import { useStatement } from "@/hooks/useStatement";
 import { StatementTable } from "@/components/statement/StatementTable";
 import { StatementActions } from "@/components/statement/StatementActions";
 import { currencySymbol } from "@/lib/currency";
+import PageHeroBanner from "@/components/common/PageHeroBanner";
+import AppPage from "@/components/layout/AppPage";
+import { ArrowDownLeft, ArrowUpRight, FileText } from "lucide-react";
 
 const fmt = (n: number) =>
   n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -79,7 +82,7 @@ const TransfersListPage = () => {
   };
 
   return (
-    <main className="container px-4 py-6 max-w-7xl mx-auto space-y-6">
+    <AppPage width="wide" innerClassName="space-y-6">
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl sm:text-3xl font-display font-bold">Account Statement</h1>
@@ -89,6 +92,18 @@ const TransfersListPage = () => {
           </div>
           <StatementActions rows={rows} meta={meta} defaultEmail={user?.email || ""} />
         </motion.div>
+
+        <PageHeroBanner
+          icon={FileText}
+          label="Net balance across wallets"
+          value={renderTotals(netByCurrency, "")}
+          meta={[
+            { icon: ArrowDownLeft, text: `In: ${renderTotals(totalsIn, "+")}` },
+            { icon: ArrowUpRight, text: `Out: ${renderTotals(totalsOut, "-")}` },
+            { icon: FileText, text: `${totalCount} transaction${totalCount === 1 ? "" : "s"} on record` },
+          ]}
+          variant="accent"
+        />
 
         {/* Balance Totals (across the whole statement) */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -157,7 +172,7 @@ const TransfersListPage = () => {
             />
           </CardContent>
         </Card>
-      </main>
+    </AppPage>
   );
 };
 

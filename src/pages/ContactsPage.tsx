@@ -19,6 +19,8 @@ import { Search, Plus, Send, Pencil, Trash2, Users, LayoutGrid, List as ListIcon
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import { productFeatures } from "@/lib/productFeatures";
+import PageHeroBanner from "@/components/common/PageHeroBanner";
+import AppPage from "@/components/layout/AppPage";
 
 const flagFor = (code: string | null) =>
   BENEFICIARY_COUNTRIES.find((c) => c.code === code)?.flag || "🌍";
@@ -73,7 +75,7 @@ const ContactsPage = () => {
 
   return (
     <>
-      <main className="container px-4 py-6 max-w-4xl mx-auto space-y-6">
+      <AppPage width="wide" innerClassName="space-y-6">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
             <h1 className="text-2xl font-display font-bold">Contacts</h1>
@@ -83,6 +85,17 @@ const ContactsPage = () => {
             <Plus className="w-4 h-4" /> Add Contact
           </Button>
         </div>
+
+        <PageHeroBanner
+          icon={Users}
+          label="Saved recipients"
+          value={`${contacts?.length ?? 0} contact${(contacts?.length ?? 0) === 1 ? "" : "s"}`}
+          meta={[
+            { icon: Send, text: "One-tap send to bank or mobile money" },
+            { icon: Search, text: filtered.length !== (contacts?.length ?? 0) ? `${filtered.length} matching search` : "Search by name, tag, or phone" },
+          ]}
+          variant="sky"
+        />
 
         <div className="flex items-center gap-2">
           <div className="relative flex-1">
@@ -231,7 +244,7 @@ const ContactsPage = () => {
             </CardContent>
           </Card>
         )}
-      </main>
+      </AppPage>
 
       <AddBeneficiaryModal open={modalOpen} onOpenChange={setModalOpen} editing={editing} />
 

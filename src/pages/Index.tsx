@@ -7,11 +7,12 @@ import RecentTransactions from "@/components/dashboard/RecentTransactions";
 import ExchangeRates from "@/components/dashboard/ExchangeRates";
 import MiniStats from "@/components/dashboard/MiniStats";
 import TierProgressCard from "@/components/dashboard/TierProgressCard";
+import AppPage from "@/components/layout/AppPage";
 
 
 const Index = () => {
   return (
-    <main className="container px-4 py-4 sm:py-6">
+    <AppPage width="wide" className="py-4 sm:py-6">
 
       <KycPromptBanner />
       <WealthPulseBanner />
@@ -24,7 +25,7 @@ const Index = () => {
       <div className="mt-6">
         <ExchangeRates />
       </div>
-    </main>
+    </AppPage>
   );
 };
 

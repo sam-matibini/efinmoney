@@ -27,6 +27,9 @@ import { UnclaimedFundsPanel } from "@/components/finance/UnclaimedFundsPanel";
 import { SettlementReconciliationPanel } from "@/components/finance/SettlementReconciliationPanel";
 import { PeriodEndControlsPanel } from "@/components/finance/PeriodEndControlsPanel";
 import { EvidenceRepositoryPanel } from "@/components/finance/EvidenceRepositoryPanel";
+import PageHeroBanner from "@/components/common/PageHeroBanner";
+import AppPage from "@/components/layout/AppPage";
+import { PieChart, Landmark, FileSpreadsheet } from "lucide-react";
 
 const FinanceDashboard = () => {
   const [accountingTab, setAccountingTab] = useState("coa");
@@ -37,7 +40,7 @@ const FinanceDashboard = () => {
     setAccountingTab("gl");
   };
   return (
-    <main className="container px-4 py-6 pb-24 md:pb-6">
+    <AppPage width="wide">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -47,6 +50,17 @@ const FinanceDashboard = () => {
             <h1 className="text-3xl font-display font-bold tracking-tight text-foreground">Finance Dashboard</h1>
             <p className="text-muted-foreground">Accounting, banking & financial management</p>
           </div>
+
+          <PageHeroBanner
+            icon={PieChart}
+            label="Finance workspace"
+            value="Ledger & treasury"
+            meta={[
+              { icon: Landmark, text: "Bank accounts, reconciliation & safeguarding" },
+              { icon: FileSpreadsheet, text: "Reports, tax, and period-end controls" },
+            ]}
+            variant="primary"
+          />
 
           <Tabs defaultValue="accounting" className="space-y-4">
             <div className="overflow-x-auto pb-2">
@@ -198,7 +212,7 @@ const FinanceDashboard = () => {
             </TabsContent>
           </Tabs>
         </motion.div>
-    </main>
+    </AppPage>
   );
 };
 

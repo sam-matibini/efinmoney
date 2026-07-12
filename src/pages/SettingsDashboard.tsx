@@ -6,10 +6,13 @@ import { SystemSettingsPanel } from "@/components/settings/SystemSettingsPanel";
 import { IntegrationsPanel } from "@/components/settings/IntegrationsPanel";
 import { CurrencyManagementPanel } from "@/components/settings/CurrencyManagementPanel";
 import { CircleCpnConfigPanel } from "@/components/settings/CircleCpnConfigPanel";
+import PageHeroBanner from "@/components/common/PageHeroBanner";
+import AppPage from "@/components/layout/AppPage";
+import { Settings, Plug, SlidersHorizontal } from "lucide-react";
 
 const SettingsDashboard = () => {
   return (
-    <main className="container px-4 py-6 pb-24 md:pb-6">
+    <AppPage width="wide">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -19,6 +22,17 @@ const SettingsDashboard = () => {
             <h1 className="text-2xl font-display font-bold text-foreground">Settings</h1>
             <p className="text-muted-foreground">System configuration, pricing, and access controls</p>
           </div>
+
+          <PageHeroBanner
+            icon={Settings}
+            label="Platform configuration"
+            value="Admin settings"
+            meta={[
+              { icon: SlidersHorizontal, text: "Pricing, modules & currencies" },
+              { icon: Plug, text: "Payment rails & integration status" },
+            ]}
+            variant="accent"
+          />
 
           <Tabs defaultValue="pricing" className="space-y-4">
             <div className="overflow-x-auto pb-2">
@@ -57,7 +71,7 @@ const SettingsDashboard = () => {
             </TabsContent>
           </Tabs>
         </motion.div>
-    </main>
+    </AppPage>
   );
 };
 

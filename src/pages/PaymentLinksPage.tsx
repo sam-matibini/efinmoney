@@ -15,6 +15,8 @@ import { formatDistanceToNow } from "date-fns";
 import { RevokePaymentLinkDialog } from "@/components/payment-links/RevokePaymentLinkDialog";
 import CreatePaymentLinkModal from "@/components/payment-links/CreatePaymentLinkModal";
 import FeatureGate from "@/components/common/FeatureGate";
+import PageHeroBanner from "@/components/common/PageHeroBanner";
+import AppPage from "@/components/layout/AppPage";
 
 type Row = {
   id: string;
@@ -113,7 +115,7 @@ const PaymentLinksPage = () => {
 
   return (
     <FeatureGate feature="paymentLinks">
-    <main className="container px-4 py-6 max-w-4xl mx-auto space-y-6">
+    <AppPage width="wide" innerClassName="space-y-6">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
             <h1 className="text-2xl font-display font-bold">Payment links</h1>
@@ -123,6 +125,17 @@ const PaymentLinksPage = () => {
             <Plus className="w-4 h-4 mr-2" /> New link
           </Button>
         </div>
+
+        <PageHeroBanner
+          icon={Link2}
+          label="Payment links"
+          value={`${counts.all} link${counts.all === 1 ? "" : "s"} created`}
+          meta={[
+            { icon: Clock, text: `${counts.pending} pending · ${counts.claimed} paid` },
+            { icon: AlertCircle, text: `${counts.expired} expired` },
+          ]}
+          variant="accent"
+        />
 
         <div className="flex items-center gap-2 flex-wrap">
           <div className="relative flex-1 min-w-[200px]">
@@ -233,7 +246,7 @@ const PaymentLinksPage = () => {
           onOpenChange={setCreateOpen}
           onCreated={() => qc.invalidateQueries({ queryKey: ["payment-link-payouts"] })}
         />
-      </main>
+      </AppPage>
     </FeatureGate>
   );
 };

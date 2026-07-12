@@ -10,6 +10,8 @@ import {
   useSupportThreads, useThreadMessages, useCreateThread, useSendMessage, useUpdateThread,
   type SupportThread,
 } from "@/hooks/useSupport";
+import PageHeroBanner from "@/components/common/PageHeroBanner";
+import AppPage from "@/components/layout/AppPage";
 
 const STATUS_LABEL: Record<string, string> = {
   open: "Open", pending: "Pending", resolved: "Resolved", closed: "Closed",
@@ -26,7 +28,7 @@ const SupportPage = () => {
   if (active) return <Conversation thread={active} onBack={() => setActiveId(null)} />;
 
   return (
-    <div className="container max-w-2xl mx-auto px-4 py-8">
+    <AppPage width="narrow" className="py-8">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center"><Headphones className="w-5 h-5" /></div>
@@ -37,6 +39,17 @@ const SupportPage = () => {
         </div>
         <Button onClick={() => setComposingNew(true)} className="gap-2"><Plus className="w-4 h-4" /> New</Button>
       </div>
+
+      <PageHeroBanner
+        icon={Headphones}
+        label="Support center"
+        value={`${threads.length} conversation${threads.length === 1 ? "" : "s"}`}
+        meta={[
+          { icon: MessageSquare, text: "We usually reply within one business day" },
+          { icon: Plus, text: "Start a new thread anytime" },
+        ]}
+        variant="sky"
+      />
 
       {isLoading ? (
         <div className="p-10 text-center"><Loader2 className="w-5 h-5 animate-spin mx-auto text-muted-foreground" /></div>
@@ -69,7 +82,7 @@ const SupportPage = () => {
           ))}
         </div>
       )}
-    </div>
+    </AppPage>
   );
 };
 
@@ -88,7 +101,7 @@ function NewConversation({ onDone, onCancel }: { onDone: (id: string | null) => 
   };
 
   return (
-    <div className="container max-w-2xl mx-auto px-4 py-8">
+    <AppPage width="narrow" className="py-8">
       <Button variant="ghost" onClick={onCancel} className="gap-2 mb-4"><ArrowLeft className="w-4 h-4" /> Back</Button>
       <div className="rounded-2xl border border-border p-6 space-y-4">
         <h1 className="text-lg font-bold">New conversation</h1>
@@ -106,7 +119,7 @@ function NewConversation({ onDone, onCancel }: { onDone: (id: string | null) => 
           </Button>
         </div>
       </div>
-    </div>
+    </AppPage>
   );
 }
 
@@ -135,7 +148,7 @@ function Conversation({ thread, onBack }: { thread: SupportThread; onBack: () =>
   const closed = thread.status === "closed";
 
   return (
-    <div className="container max-w-2xl mx-auto px-4 py-6 flex flex-col h-[calc(100vh-8rem)]">
+    <AppPage width="narrow" className="py-6" innerClassName="flex flex-col h-[calc(100vh-8rem)]">
       <div className="flex items-center gap-3 pb-4 border-b border-border">
         <Button variant="ghost" size="icon" onClick={onBack}><ArrowLeft className="w-4 h-4" /></Button>
         <div className="min-w-0">
@@ -170,7 +183,7 @@ function Conversation({ thread, onBack }: { thread: SupportThread; onBack: () =>
           </Button>
         </form>
       )}
-    </div>
+    </AppPage>
   );
 }
 

@@ -28,6 +28,8 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { productFeatures } from "@/lib/productFeatures";
+import PageHeroBanner from "@/components/common/PageHeroBanner";
+import AppPage from "@/components/layout/AppPage";
 
 interface Row {
   icon: any;
@@ -86,7 +88,7 @@ const MorePage = () => {
   const verified = profile?.kyc_status === "approved" || profile?.kyc_status === "verified";
 
   return (
-    <main className="container max-w-2xl px-4 pt-6 md:pt-8">
+    <AppPage width="narrow" className="pt-6 md:pt-8">
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -103,6 +105,17 @@ const MorePage = () => {
               Contacts
             </button>
           </div>
+
+          <PageHeroBanner
+            icon={UserIcon}
+            label="Your account"
+            value={profile?.full_name || profile?.email || "Welcome back"}
+            meta={[
+              { icon: verified ? ShieldCheck : ShieldQuestion, text: verified ? "Identity verified" : "Complete KYC to unlock limits" },
+              { icon: Stamp, text: `${stamps}/${stampGoal} transfer stamps collected` },
+            ]}
+            variant="primary"
+          />
 
           {/* Rewards */}
           <p className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground mb-3 px-1 flex items-center gap-2">
@@ -237,7 +250,7 @@ const MorePage = () => {
 
           <p className="text-center text-xs text-muted-foreground/70">eFinMoney · v3.10.2</p>
         </motion.div>
-      </main>
+    </AppPage>
   );
 };
 

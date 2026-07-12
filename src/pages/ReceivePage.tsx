@@ -11,6 +11,8 @@ import { toast } from "sonner";
 import { useVirtualAccounts, useCreateVirtualAccount } from "@/hooks/useVirtualAccounts";
 import { useProfile } from "@/hooks/useProfile";
 import { AtSign, Hash } from "lucide-react";
+import PageHeroBanner from "@/components/common/PageHeroBanner";
+import AppPage from "@/components/layout/AppPage";
 
 const AFRICA_CURRENCIES = ["NGN", "KES", "GHS", "ZAR", "UGX", "TZS", "ZMW", "RWF", "USD"];
 
@@ -47,13 +49,24 @@ const ReceivePage = () => {
   };
 
   return (
-    <main className="container px-4 py-6">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 max-w-3xl mx-auto">
+    <AppPage width="default">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
           <BackToDashboard />
           <div>
             <h1 className="text-2xl font-display font-bold">Receive Money</h1>
             <p className="text-muted-foreground">Share your virtual account details to get paid instantly.</p>
           </div>
+
+          <PageHeroBanner
+            icon={WalletIcon}
+            label="Your receive details"
+            value={efinTag ? `@${efinTag}` : efinAcct || "Set up your identity"}
+            meta={[
+              { icon: Hash, text: efinAcct ? `Account ${efinAcct}` : "Account number in profile settings" },
+              { icon: Plus, text: `${accounts?.length ?? 0} virtual account${(accounts?.length ?? 0) === 1 ? "" : "s"} active` },
+            ]}
+            variant="emerald"
+          />
 
 
           {/* In-network identity: account # + @tag */}
@@ -168,7 +181,7 @@ const ReceivePage = () => {
             Funds appear in your wallet automatically once the sender completes the transfer.
           </p>
         </motion.div>
-      </main>
+    </AppPage>
   );
 };
 

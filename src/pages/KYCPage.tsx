@@ -11,6 +11,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useKyc } from "@/hooks/useKyc";
 import { cn } from "@/lib/utils";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import PageHeroBanner from "@/components/common/PageHeroBanner";
+import AppPage from "@/components/layout/AppPage";
 
 type TierKey = "tier_1" | "tier_2" | "tier_3";
 const VISIBLE_TIERS: TierKey[] = ["tier_1", "tier_2", "tier_3"];
@@ -55,8 +57,20 @@ const KYCPage = () => {
   const Icon = cfg.icon;
 
   return (
-    <div className="container max-w-4xl mx-auto px-4 py-8">
-        <h1 className="text-2xl font-bold text-foreground mb-6">KYC Verification</h1>
+    <AppPage width="default" className="py-8" innerClassName="space-y-6">
+        <h1 className="text-2xl font-bold text-foreground">KYC Verification</h1>
+
+        <PageHeroBanner
+          icon={Shield}
+          label="Verification status"
+          value={cfg.label}
+          meta={[
+            { icon: Icon, text: `Current tier: ${tier.replace("_", " ").toUpperCase()}` },
+            { icon: Lock, text: isVerified ? "Full send & receive unlocked" : "Complete verification to raise limits" },
+          ]}
+          variant="cta"
+        />
+
         <KycPromptBanner />
         {isLoading ? (
           <Card className="p-6">Loading...</Card>
@@ -241,7 +255,7 @@ const KYCPage = () => {
 
           </div>
         )}
-    </div>
+    </AppPage>
   );
 };
 

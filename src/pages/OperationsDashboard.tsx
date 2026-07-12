@@ -12,10 +12,13 @@ import { CommunicationsPanel } from "@/components/operations/CommunicationsPanel
 import { MakerCheckerPanel } from "@/components/operations/MakerCheckerPanel";
 import { ProviderStatusPanel } from "@/components/operations/ProviderStatusPanel";
 import { CircleCpnHealthCard } from "@/components/operations/CircleCpnHealthCard";
+import PageHeroBanner from "@/components/common/PageHeroBanner";
+import AppPage from "@/components/layout/AppPage";
+import { Activity, Users, AlertTriangle } from "lucide-react";
 
 const OperationsDashboard = () => {
   return (
-    <main className="container px-4 py-6 pb-24 md:pb-6">
+    <AppPage width="wide">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -25,6 +28,17 @@ const OperationsDashboard = () => {
             <h1 className="text-3xl font-display font-bold tracking-tight text-foreground">Operations Dashboard</h1>
             <p className="text-muted-foreground">CRM, transaction monitoring, disputes, compliance & operational controls</p>
           </div>
+
+          <PageHeroBanner
+            icon={Activity}
+            label="Operations hub"
+            value="Monitor & respond"
+            meta={[
+              { icon: Users, text: "CRM, wallet ops & customer comms" },
+              { icon: AlertTriangle, text: "Incidents, fraud signals & disputes" },
+            ]}
+            variant="hero"
+          />
 
 
           <div className="grid lg:grid-cols-2 gap-4">
@@ -89,7 +103,7 @@ const OperationsDashboard = () => {
             </TabsContent>
           </Tabs>
         </motion.div>
-    </main>
+    </AppPage>
   );
 };
 

@@ -19,6 +19,8 @@ import { useSavedCards, useDeleteSavedCard } from "@/hooks/useSavedCards";
 import { getCardKindLabel, isFundableIssuedCard } from "@/lib/cardDisplay";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import PageHeroBanner from "@/components/common/PageHeroBanner";
+import AppPage from "@/components/layout/AppPage";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -201,7 +203,7 @@ const CardsPage = () => {
         background:
           "radial-gradient(ellipse 80% 60% at 20% 0%, hsl(var(--primary) / 0.10), transparent 60%), radial-gradient(ellipse 70% 50% at 90% 30%, rgba(99,102,241,0.10), transparent 65%), hsl(var(--background))",
       }}>
-      <main className="container relative z-0 px-4 py-6">
+      <AppPage width="wide" className="relative z-0">
         <motion.div
           initial="hidden"
           animate="show"
@@ -232,6 +234,17 @@ const CardsPage = () => {
               </Button>
             </motion.div>
           </motion.div>
+
+          <PageHeroBanner
+            icon={CreditCard}
+            label="Card portfolio"
+            value={isLoading ? "Loading…" : `${cards.length} card${cards.length === 1 ? "" : "s"}`}
+            meta={[
+              { icon: Wallet, text: "Virtual & linked debit cards" },
+              { icon: Plus, text: "Issue new or link existing cards" },
+            ]}
+            variant="rose"
+          />
 
           <motion.div
             variants={{ hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 180, damping: 22 } } }}
@@ -391,7 +404,7 @@ const CardsPage = () => {
             onSpendingLimits={handleFeatureLimits}
           />
         </motion.div>
-      </main>
+      </AppPage>
 
       <AddCardModal isOpen={addOpen} onClose={() => setAddOpen(false)} defaultMode={addMode} />
 

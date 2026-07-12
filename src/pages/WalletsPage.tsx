@@ -16,6 +16,8 @@ import EditWalletModal from "@/components/modals/EditWalletModal";
 import DeleteWalletModal from "@/components/modals/DeleteWalletModal";
 import { flagForCurrency } from "@/lib/flags";
 import StellarNetworkCard from "@/components/wallets/StellarNetworkCard";
+import PageHeroBanner from "@/components/common/PageHeroBanner";
+import AppPage from "@/components/layout/AppPage";
 
 type WalletModalData = {
   walletId: string;
@@ -72,7 +74,7 @@ const WalletsPage = () => {
 
   return (
     <>
-      <main className="container px-4 py-6">
+      <AppPage width="wide">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -102,39 +104,30 @@ const WalletsPage = () => {
           </div>
 
           {/* Total Balance Card */}
-          <Card className="gradient-primary text-primary-foreground">
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3 mb-2">
-                <Wallet className="w-6 h-6" />
-                <span className="text-primary-foreground/70">Total Balance (USD Equivalent)</span>
-                {excludedCount > 0 && (
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <AlertTriangle className="w-4 h-4 text-yellow-300" />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        {excludedCount} wallet{excludedCount === 1 ? "" : "s"} excluded — exchange rate unavailable
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                )}
-              </div>
-              <p className="text-4xl font-display font-bold">
-                ${totalUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
-              </p>
-              <div className="flex items-center gap-2 mt-2 text-primary-foreground/70">
-                <TrendingUp className="w-4 h-4" />
-                <span className="text-sm">Across {wallets?.length || 0} wallets</span>
-              </div>
-              {totalLinkedCards > 0 && (
-                <div className="flex items-center gap-2 mt-1 text-primary-foreground/60">
-                  <CreditCard className="w-3.5 h-3.5" />
-                  <span className="text-xs">{totalLinkedCards} linked card{totalLinkedCards === 1 ? "" : "s"}</span>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <PageHeroBanner
+            icon={Wallet}
+            label="Total Balance (USD Equivalent)"
+            value={`$${totalUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`}
+            hint={excludedCount > 0 ? (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <AlertTriangle className="w-4 h-4 text-yellow-300" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {excludedCount} wallet{excludedCount === 1 ? "" : "s"} excluded — exchange rate unavailable
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            ) : undefined}
+            meta={[
+              { icon: TrendingUp, text: `Across ${wallets?.length || 0} wallets` },
+              ...(totalLinkedCards > 0
+                ? [{ icon: CreditCard, text: `${totalLinkedCards} linked card${totalLinkedCards === 1 ? "" : "s"}` }]
+                : []),
+            ]}
+            variant="primary"
+          />
 
           {/* Stellar Network (Testnet) */}
           <StellarNetworkCard />
@@ -193,7 +186,7 @@ const WalletsPage = () => {
             </Card>
           )}
         </motion.div>
-      </main>
+      </AppPage>
 
       {/* Edit Wallet Modal */}
       <EditWalletModal

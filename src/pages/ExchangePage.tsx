@@ -19,6 +19,8 @@ import { resolveEffectiveRate } from "@/lib/fx";
 import { getNombaExchangeRate, isNgnPair } from "@/lib/nombaNigeria";
 import { CurrencyFlag } from "@/components/ui/FlagImage";
 import FeatureGate from "@/components/common/FeatureGate";
+import PageHeroBanner from "@/components/common/PageHeroBanner";
+import AppPage from "@/components/layout/AppPage";
 import { productFeatures } from "@/lib/productFeatures";
 
 // Synthetic wallet id used to represent the on-chain USDC option.
@@ -488,11 +490,11 @@ const LiveFxRatesCard = () => {
 
 const ExchangePage = () => {
   return (
-    <main className="container px-4 py-6">
+    <AppPage width="default">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="max-w-2xl mx-auto space-y-6"
+          className="space-y-6"
         >
           <div className="text-center">
             <h1 className="text-2xl font-display font-bold text-foreground">Exchange</h1>
@@ -500,6 +502,17 @@ const ExchangePage = () => {
               {productFeatures.crypto ? "Trade currencies and crypto instantly" : "Convert between the currencies you hold at live rates"}
             </p>
           </div>
+
+          <PageHeroBanner
+            icon={ArrowUpDown}
+            label="Instant conversion"
+            value="Live FX rates"
+            meta={[
+              { icon: TrendingUp, text: "0.5% spread on wallet swaps" },
+              { icon: Sparkles, text: productFeatures.crypto ? "Fiat & on-chain USDC" : "Nomba rates for NGN pairs" },
+            ]}
+            variant="cta"
+          />
 
           <Tabs defaultValue="fx" className="space-y-6">
             <TabsList className={productFeatures.crypto ? "grid w-full grid-cols-2" : "grid w-full grid-cols-1"}>
@@ -528,7 +541,7 @@ const ExchangePage = () => {
             )}
           </Tabs>
         </motion.div>
-      </main>
+    </AppPage>
   );
 };
 

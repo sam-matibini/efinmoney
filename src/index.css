@@ -53,6 +53,9 @@
     --gradient-card-dark: linear-gradient(135deg, hsl(232 45% 12%) 0%, hsl(258 55% 22%) 100%);
     --gradient-hero: linear-gradient(135deg, hsl(244 75% 57%) 0%, hsl(280 70% 55%) 100%);
     --gradient-hero-deep: linear-gradient(135deg, hsl(256 65% 10%) 0%, hsl(256 60% 18%) 40%, hsl(258 70% 32%) 100%);
+    --gradient-banner-emerald: linear-gradient(135deg, hsl(152 55% 38%) 0%, hsl(160 50% 32%) 100%);
+    --gradient-banner-sky: linear-gradient(135deg, hsl(199 85% 48%) 0%, hsl(210 75% 42%) 100%);
+    --gradient-banner-rose: linear-gradient(135deg, hsl(350 72% 52%) 0%, hsl(330 65% 48%) 100%);
 
     --shadow-glow: 0 0 30px -8px hsl(244 75% 57% / 0.40);
     --shadow-card: 0 1px 3px hsl(230 35% 12% / 0.06), 0 1px 2px hsl(230 35% 12% / 0.03);
@@ -137,6 +140,26 @@
 
   .gradient-accent {
     background: var(--gradient-accent);
+  }
+
+  .gradient-hero {
+    background: var(--gradient-hero);
+  }
+
+  .gradient-cta {
+    background: var(--gradient-cta);
+  }
+
+  .gradient-banner-emerald {
+    background: var(--gradient-banner-emerald);
+  }
+
+  .gradient-banner-sky {
+    background: var(--gradient-banner-sky);
+  }
+
+  .gradient-banner-rose {
+    background: var(--gradient-banner-rose);
   }
 
   .gradient-card {

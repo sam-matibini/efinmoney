@@ -14,6 +14,9 @@ import { useStatement } from "@/hooks/useStatement";
 import { StatementTable } from "@/components/statement/StatementTable";
 import { StatementActions } from "@/components/statement/StatementActions";
 import { flagForCurrency } from "@/lib/flags";
+import PageHeroBanner from "@/components/common/PageHeroBanner";
+import AppPage from "@/components/layout/AppPage";
+import { TrendingUp } from "lucide-react";
 
 const fmt = (n: number) =>
   n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -63,7 +66,7 @@ const WalletStatementPage = () => {
   const flag = wallet ? (flagForCurrency(wallet.currency_code) !== "🌍" ? flagForCurrency(wallet.currency_code) : wallet.flag_emoji || "💰") : "💰";
 
   return (
-    <main className="container px-4 py-6 max-w-7xl mx-auto space-y-6">
+    <AppPage width="wide" innerClassName="space-y-6">
         <Button
           variant="ghost"
           size="sm"
@@ -79,34 +82,23 @@ const WalletStatementPage = () => {
           <ArrowLeft className="w-4 h-4 mr-1.5" /> Back to dashboard
         </Button>
 
-        {/* Hero */}
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-          <Card className="gradient-primary text-primary-foreground overflow-hidden relative">
-            <CardContent className="pt-6">
-              <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2 text-primary-foreground/80 text-xs uppercase tracking-wider">
-                    <Wallet className="w-3.5 h-3.5" /> Wallet Statement
-                  </div>
-                  <h1 className="text-2xl sm:text-3xl font-display font-bold flex items-center gap-3">
-                    <span className="text-3xl">{flag}</span>
-                    {wallet?.currency_name || wallet?.currency_code || "Wallet"}
-                  </h1>
-                  <p className="text-primary-foreground/70 text-sm">
-                    Current balance: <span className="font-semibold">{wallet ? `${fmt(Number(wallet.balance))} ${wallet.currency_code}` : "—"}</span>
-                  </p>
-                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-primary-foreground/80 pt-1">
-                    <span><strong>Holder:</strong> {accountHolder}</span>
-                    {profile?.account_number && <span><strong>Acct:</strong> {profile.account_number}</span>}
-                    {profile?.efin_tag && <span><strong>Tag:</strong> @{profile.efin_tag}</span>}
-                  </div>
-                </div>
-                <div className="shrink-0">
-                  <StatementActions rows={rows} meta={meta} defaultEmail={user?.email || ""} />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+          <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+            <PageHeroBanner
+              icon={Wallet}
+              label="Wallet statement"
+              value={wallet ? `${fmt(Number(wallet.balance))} ${wallet.currency_code}` : "—"}
+              meta={[
+                { text: `${flag} ${wallet?.currency_name || wallet?.currency_code || "Wallet"}` },
+                { icon: TrendingUp, text: `Holder: ${accountHolder}` },
+              ]}
+              variant="primary"
+              className="flex-1"
+            />
+            <div className="shrink-0">
+              <StatementActions rows={rows} meta={meta} defaultEmail={user?.email || ""} />
+            </div>
+          </div>
         </motion.div>
 
         {/* Balance Totals (whole wallet history) */}
@@ -164,7 +156,7 @@ const WalletStatementPage = () => {
             />
           </CardContent>
         </Card>
-      </main>
+      </AppPage>
   );
 };
 

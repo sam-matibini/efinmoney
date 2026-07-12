@@ -42,7 +42,7 @@ import { resolveEffectiveRate } from "@/lib/fx";
 import { currencySymbol, countryToCurrency } from "@/lib/currency";
 import { useProfile } from "@/hooks/useProfile";
 import { toast } from "sonner";
-import { ArrowRight, CheckCircle, Users, Clock, Shield, Wallet, Landmark, CreditCard, AlertCircle, X, Search, Globe2 } from "lucide-react";
+import { ArrowRight, CheckCircle, Users, Clock, Shield, Wallet, Landmark, CreditCard, AlertCircle, X, Search, Globe2, Send } from "lucide-react";
 import { BrandFlag, CountryFlag } from "@/components/ui/FlagImage";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import CanadaSendFlow from "@/components/send/CanadaSendFlow";
@@ -57,6 +57,8 @@ import { parseAmount } from "@/components/fx/liveFxUtils";
 import { clearSendHandoff, readSendHandoff } from "@/lib/sendHandoff";
 import { productFeatures } from "@/lib/productFeatures";
 import ComingSoon from "@/components/common/ComingSoon";
+import PageHeroBanner from "@/components/common/PageHeroBanner";
+import AppPage from "@/components/layout/AppPage";
 import TransferSuccess from "@/components/send/TransferSuccess";
 import { findCountryById, findCountryByCode, COUNTRIES } from "@/lib/countries";
 import {
@@ -1002,8 +1004,7 @@ const SendPage = () => {
 
   return (
     <>
-      <main className="container px-3 sm:px-4 py-4 sm:py-6">
-        <div className="max-w-2xl mx-auto space-y-5 sm:space-y-6">
+      <AppPage width="default" innerClassName="space-y-5 sm:space-y-6">
           <BackToDashboard />
           {/* Header — slides down with fade */}
           <motion.div
@@ -1015,6 +1016,17 @@ const SendPage = () => {
             <h1 className="text-xl sm:text-2xl font-display font-bold text-foreground">Send Money</h1>
             <p className="text-muted-foreground">Choose how you'd like to send</p>
           </motion.div>
+
+          <PageHeroBanner
+            icon={Send}
+            label="Cross-border transfers"
+            value="Send to bank & mobile money"
+            meta={[
+              { icon: Globe2, text: "NGN, GHS, KES & more corridors" },
+              { icon: Users, text: `${beneficiaries?.length ?? 0} saved contacts ready` },
+            ]}
+            variant="hero"
+          />
 
           {productFeatures.crypto && (
           <Link
@@ -2087,8 +2099,7 @@ const SendPage = () => {
               </div>
             </Tabs>
           </motion.div>
-        </div>
-      </main>
+      </AppPage>
 
       <ContactsPickerModal
         open={pickerOpen}

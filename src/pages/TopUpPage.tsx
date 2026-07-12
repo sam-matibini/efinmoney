@@ -12,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { CheckCircle2, XCircle, CreditCard, Smartphone, Building2, Globe } from "lucide-react";
+import { CheckCircle2, XCircle, CreditCard, Smartphone, Building2, Globe, Wallet } from "lucide-react";
 import { useWallets } from "@/hooks/useWallets";
 import { useAuth } from "@/hooks/useAuth";
 import CardPaymentForm from "@/components/modals/CardPaymentForm";
@@ -38,6 +38,9 @@ import { clearPendingNombaTxn } from "@/lib/nombaPay";
 import { cn } from "@/lib/utils";
 import ComingSoon from "@/components/common/ComingSoon";
 import { isLiveTopupCurrency, productFeatures } from "@/lib/productFeatures";
+import PageHeroBanner from "@/components/common/PageHeroBanner";
+import AppPage from "@/components/layout/AppPage";
+import { currencySymbol } from "@/lib/currency";
 
 const MM_BY_CCY = Object.fromEntries(MM_COUNTRIES.map((c) => [c.currency, c]));
 
@@ -357,13 +360,28 @@ const TopUpPage = () => {
   }, [gateway]);
 
   return (
-    <main className="container px-4 py-6">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-xl mx-auto space-y-6">
+    <AppPage width="default">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
           <BackToDashboard />
           <div>
             <h1 className="text-2xl font-display font-bold">Add Money</h1>
             <p className="text-muted-foreground">Top up your wallet using the best route for your currency.</p>
           </div>
+
+          <PageHeroBanner
+            icon={Wallet}
+            label={selectedWallet ? `${currency} wallet balance` : "Wallet top-up"}
+            value={
+              selectedWallet
+                ? `${currencySymbol(currency)}${Number(selectedWallet.balance).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`
+                : "Select a wallet to fund"
+            }
+            meta={[
+              { icon: CreditCard, text: liveTopup ? `${nombaGatewayLabel(currency)} · card & bank routes` : "Choose a supported currency" },
+              { icon: Globe, text: `${wallets?.length ?? 0} wallets available` },
+            ]}
+            variant="emerald"
+          />
 
           {gateway === "flutterwave" && (currency === "USD" || currency === "CAD") && (
             <FlutterwaveWesternTopUpHints currency={currency} />
@@ -725,7 +743,7 @@ const TopUpPage = () => {
             <ElicateTopUpCard walletId={selectedWallet.wallet_id} walletCurrency={currency} />
           )}
         </motion.div>
-      </main>
+    </AppPage>
   );
 };
 

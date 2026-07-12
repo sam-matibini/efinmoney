@@ -8,7 +8,9 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Lock, Smartphone } from "lucide-react";
+import { Lock, Smartphone, Shield } from "lucide-react";
+import PageHeroBanner from "@/components/common/PageHeroBanner";
+import AppPage from "@/components/layout/AppPage";
 
 const SecurityPage = () => {
   const navigate = useNavigate();
@@ -57,8 +59,20 @@ const SecurityPage = () => {
   };
 
   return (
-    <div className="container max-w-2xl mx-auto px-4 py-8">
-        <h1 className="text-2xl font-bold text-foreground mb-6">Security</h1>
+    <AppPage width="narrow" className="py-8" innerClassName="space-y-6">
+        <h1 className="text-2xl font-bold text-foreground">Security</h1>
+
+        <PageHeroBanner
+          icon={Shield}
+          label="Account protection"
+          value="Keep your account secure"
+          meta={[
+            { icon: Lock, text: "Update password regularly" },
+            { icon: Smartphone, text: twoFA ? "Two-factor authentication on" : "Two-factor authentication coming soon" },
+          ]}
+          variant="accent"
+        />
+
         <div className="space-y-4">
           <Card className="p-6">
             <div className="flex items-center gap-3 mb-4">
@@ -115,7 +129,7 @@ const SecurityPage = () => {
             </div>
           </Card>
         </div>
-    </div>
+    </AppPage>
   );
 };
 
