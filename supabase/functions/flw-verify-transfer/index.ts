@@ -92,6 +92,21 @@ Deno.serve(async (req) => {
       return json({ success: true, status: transfer.status, changed: false });
     }
 
+    const { data: nombaPayout } = await supabase
+      .from("nomba_payout_transactions")
+      .select("id")
+      .eq("transfer_id", transfer_id)
+      .limit(1)
+      .maybeSingle();
+    if (nombaPayout) {
+      return json({
+        success: true,
+        status: transfer.status,
+        changed: false,
+        note: "nomba_transfer_use_nomba_verify",
+      });
+    }
+
     // Queued for payout — retry automatically when provider balance covers this transfer.
     if (transfer.status === "pending_liquidity") {
       const amt = Number(transfer.target_amount ?? 0);

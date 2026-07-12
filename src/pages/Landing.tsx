@@ -22,19 +22,19 @@ import receivers from "@/assets/landing-receivers.jpg";
 
 const FEATURES = [
   { icon: Shield, title: "Bank-Grade Security", desc: "Your funds are protected with 256-bit encryption and multi-factor authentication.", image: featureSecurity },
-  { icon: Zap, title: "Instant Transfers", desc: "Send money to Kenya, Nigeria, Uganda in minutes — not days.", image: featureInstant },
-  { icon: Globe, title: "50+ Currency Corridors", desc: "Hold USD, CAD, NGN, KES, GHS, ZMW and more in one app.", image: featureCorridors },
+  { icon: Zap, title: "Instant Transfers", desc: "Send to Nigeria bank accounts and Ghana mobile money in minutes — not days.", image: featureInstant },
+  { icon: Globe, title: "Multi-Currency Wallets", desc: "Hold NGN, GHS, USD, EUR, GBP and more — with live FX when you need to convert.", image: featureCorridors },
 ];
 
 const STEPS: { n: number; title: string; desc?: string }[] = [
   { n: 1, title: "Create your account" },
-  { n: 2, title: "Add funds via card or bank" },
-  { n: 3, title: "Send money anywhere in Africa" },
+  { n: 2, title: "Add funds via bank or Nomba" },
+  { n: 3, title: "Send to Nigeria or Ghana" },
 ];
 
 const STATS = [
-  { value: "6", label: "Currencies to hold", icon: Wallet, caption: "USD · CAD · NGN · KES · GHS · ZMW" },
-  { value: "4", label: "Mobile-money networks", icon: Globe, caption: "MTN · Airtel · M-Pesa · Vodafone" },
+  { value: "2", label: "Live corridors", icon: Globe, caption: "Nigeria bank · Ghana MoMo" },
+  { value: "6+", label: "Currencies to hold", icon: Wallet, caption: "NGN · GHS · USD · EUR · GBP · more" },
   { value: "Minutes", label: "Typical settlement", icon: Zap, caption: "Delivered fast — not in days" },
   { value: "24/7", label: "Send anytime", icon: Send, caption: "Every day of the year" },
 ];
@@ -145,7 +145,7 @@ const Landing = () => {
   useEffect(() => {
     document.title = "eFinMoney — Send money across borders, instantly.";
     const meta = document.querySelector('meta[name="description"]');
-    if (meta) meta.setAttribute("content", "Multi-currency wallets, FX trading, crypto, and mobile money transfers to Africa. Bank-grade security and instant settlement.");
+    if (meta) meta.setAttribute("content", "Multi-currency wallets, live FX, and bank-grade transfers to Nigeria and Ghana. Link your bank with Plaid and send in minutes.");
     document.documentElement.style.scrollBehavior = "smooth";
     return () => { document.documentElement.style.scrollBehavior = ""; };
   }, []);
@@ -206,7 +206,7 @@ const Landing = () => {
               transition={{ delay: 0.85, duration: 0.55 }}
               className="mt-7 max-w-xl text-base md:text-lg text-white/70 mx-auto lg:mx-0"
             >
-              Multi-currency wallets, FX, crypto and mobile money across Canada, USA, Nigeria, Kenya, Ghana, Zambia and 50+ corridors — settled in minutes, not days.
+              Multi-currency wallets and live FX — with Nigeria bank transfers and Ghana mobile money live today. More corridors, cards, and Canada rails are on the way.
             </motion.p>
 
             <motion.div
@@ -277,7 +277,7 @@ const Landing = () => {
                 />
                 <span className="absolute top-2 left-2 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider bg-black/45 backdrop-blur ring-1 ring-white/20 text-white rounded-full px-2 py-0.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                  Sending · Canada
+                  Sending · Diaspora
                 </span>
               </div>
               <div className="relative">
@@ -356,15 +356,15 @@ const Landing = () => {
               Built for the African continent.
             </h2>
             <p className="mt-5 text-[15px] md:text-base text-neutral-600 leading-relaxed max-w-xl">
-              From Lagos to Nairobi, Accra to Lusaka — eFinMoney is engineered for the
-              way Africa moves money. Direct mobile-money payouts via MTN, Airtel,
-              M-Pesa and Vodafone, paired with bank rails into Canada and the USA.
+              Nigeria bank payouts and Ghana mobile money are live today — with multi-currency
+              wallets, live FX, and Plaid bank linking. More African corridors and Canada rails
+              are on the roadmap.
             </p>
             <ul className="mt-7 space-y-3">
               {[
-                "12+ African mobile-money corridors, live",
-                "Multi-currency wallets: NGN, KES, GHS, ZMW, USD, CAD",
-                "Compliant payouts with full audit trail and receipts",
+                "Nigeria bank transfers via Nomba",
+                "Ghana MoMo top-up and payouts",
+                "Multi-currency wallets with live FX",
               ].map((t) => (
                 <li key={t} className="flex items-start gap-3 text-sm text-neutral-700">
                   <span className="mt-0.5 w-5 h-5 rounded-full bg-[hsl(var(--accent-amber))]/15 text-[hsl(var(--brand-700))] flex items-center justify-center flex-shrink-0">

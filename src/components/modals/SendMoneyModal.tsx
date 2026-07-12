@@ -19,6 +19,7 @@ import { useFxRates } from "@/hooks/useFxRates";
 import { usePricingConfig } from "@/hooks/usePricingConfig";
 import { findCountryByCode, COUNTRIES } from "@/lib/countries";
 import { saveSendHandoff } from "@/lib/sendHandoff";
+import { productFeatures } from "@/lib/productFeatures";
 import { toast } from "sonner";
 
 const PAYOUT_CODES = COUNTRIES.map((c) => c.code);
@@ -220,6 +221,7 @@ const SendMoneyModal = ({ children }: SendMoneyModalProps) => {
                   Balance too low for this amount — you can top up on the next screen
                 </p>
               )}
+              {productFeatures.canadaDomestic && (
               <button
                 type="button"
                 onClick={() => {
@@ -231,6 +233,7 @@ const SendMoneyModal = ({ children }: SendMoneyModalProps) => {
                 <MapPin className="h-3.5 w-3.5" />
                 Sending within Canada? Use Domestic CA
               </button>
+              )}
             </>
           }
         />

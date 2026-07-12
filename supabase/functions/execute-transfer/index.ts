@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { isGhanaPayConfigured } from "../_shared/ghana-pay.ts";
+import { isNombaNigeriaConfigured } from "../_shared/nomba-nigeria.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -361,6 +362,20 @@ Deno.serve(async (req) => {
       !isCanada && !isZambia && !usePawapay && !useMtnMomo && !useStellar &&
       transfer.payout_method !== "card_push";
 
+    const isNigeriaBank =
+      targetCurrency === "NGN" &&
+      transfer.payout_method === "bank" &&
+      !!transfer.recipient_account &&
+      !!transfer.recipient_bank_code;
+    // DEBUG: Nomba-only for NGN bank — Flutterwave fallback disabled to surface lenhub errors.
+    const nombaNigeriaOnly = true;
+
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+    const internalHeaders = {
+      "Content-Type": "application/json",
+      "x-internal-secret": serviceKey,
+    };
+
     let payoutResult: any = { stub: true };
     try {
       if (isZambia) {
@@ -481,10 +496,7 @@ Deno.serve(async (req) => {
           `${Deno.env.get("SUPABASE_URL")}/functions/v1/fincra-payout`,
           {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-internal-secret": Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "",
-            },
+            headers: internalHeaders,
             body: JSON.stringify({
               transfer_id,
               phone_number: transfer.recipient_phone,
@@ -498,15 +510,41 @@ Deno.serve(async (req) => {
           },
         );
         payoutResult = await res.json();
+      } else if (isNigeriaBank && nombaNigeriaOnly) {
+        if (!isNombaNigeriaConfigured()) {
+          payoutResult = {
+            success: false,
+            error: "Nomba Nigeria is not configured (set NOMBA_PAY_API_URL + NOMBA_PAY_USER on Supabase)",
+            code: "nomba_not_configured",
+            rail: "nomba",
+          };
+        } else if (useStellar || useFincra || usePawapay || useMtnMomo) {
+          payoutResult = {
+            success: false,
+            error: "NGN bank payout blocked: another rail flag is set (stellar/fincra/pawapay/mtn)",
+            code: "nomba_rail_conflict",
+            rail: "nomba",
+          };
+        } else {
+          const nombaRes = await fetch(
+            `${Deno.env.get("SUPABASE_URL")}/functions/v1/nomba-payout`,
+            { method: "POST", headers: internalHeaders, body: JSON.stringify({ transfer_id }) },
+          );
+          payoutResult = await nombaRes.json().catch(() => ({
+            success: false,
+            error: `nomba-payout returned HTTP ${nombaRes.status}`,
+            code: "nomba_http_error",
+            rail: "nomba",
+          }));
+          // Flutterwave fallback disabled while debugging Nomba:
+          // if (payoutResult?.success === false) { ... flutterwave-payout ... }
+        }
       } else {
         const res = await fetch(
           `${Deno.env.get("SUPABASE_URL")}/functions/v1/flutterwave-payout`,
           {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: req.headers.get("Authorization") || "",
-            },
+            headers: internalHeaders,
             body: JSON.stringify({
               transfer_id,
               phone_number: transfer.recipient_phone,
@@ -528,8 +566,11 @@ Deno.serve(async (req) => {
     if (payoutResult && payoutResult.success === false && !payoutResult.pending_liquidity && !payoutResult.queued) {
       return new Response(JSON.stringify({
         success: false,
-        error: payoutResult.error || "Payout failed",
+        error: payoutResult.error || payoutResult.provider_message || "Payout failed",
         code: payoutResult.code,
+        rail: payoutResult.rail || (isNigeriaBank ? "nomba" : undefined),
+        provider_message: payoutResult.provider_message ?? null,
+        nomba_raw: payoutResult.raw_response ?? payoutResult.nomba_raw ?? null,
         refunded: payoutResult.refunded,
         payout: payoutResult,
       }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });

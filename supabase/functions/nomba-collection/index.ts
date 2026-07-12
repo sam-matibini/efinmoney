@@ -7,6 +7,12 @@ import {
   nombaCollectionFetch,
   type NombaCorridor,
 } from "../_shared/nomba-pay.ts";
+import {
+  quoteCadWalletViaNombaUsd,
+  quoteSameCurrencyTopup,
+  resolveFxRate,
+  type FxRateRow,
+} from "../_shared/nomba-topup-quote.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -26,6 +32,16 @@ function resolveCorridor(currency: string): NombaCorridor | null {
   if (c === "NGN") return "nigeria";
   if (["USD", "EUR", "GBP"].includes(c)) return "international";
   return null;
+}
+
+async function fetchFxRates(admin: ReturnType<typeof createClient>): Promise<FxRateRow[]> {
+  const { data } = await admin
+    .from("fx_rates")
+    .select("from_currency, to_currency, effective_rate")
+    .or(`valid_until.is.null,valid_until.gt.${new Date().toISOString()}`)
+    .order("valid_from", { ascending: false })
+    .limit(500);
+  return (data ?? []) as FxRateRow[];
 }
 
 Deno.serve(async (req) => {
@@ -53,10 +69,19 @@ Deno.serve(async (req) => {
     if (authErr || !userId) return json({ error: "Unauthorized" }, 401);
 
     const body = await req.json().catch(() => ({}));
-    const { amount, target_wallet_id, email, corridor: corridorHint, return_url } = body as Record<string, unknown>;
+    const {
+      amount,
+      credit_amount,
+      target_wallet_id,
+      email,
+      corridor: corridorHint,
+      return_url,
+    } = body as Record<string, unknown>;
 
-    const amt = Number(amount);
-    if (!Number.isFinite(amt) || amt < 1) return json({ error: "Amount must be at least 1" }, 400);
+    const requestedCredit = Number(credit_amount ?? amount);
+    if (!Number.isFinite(requestedCredit) || requestedCredit < 1) {
+      return json({ error: "Amount must be at least 1" }, 400);
+    }
     if (!target_wallet_id || typeof target_wallet_id !== "string") {
       return json({ error: "Target wallet required" }, 400);
     }
@@ -75,18 +100,52 @@ Deno.serve(async (req) => {
       .maybeSingle();
     if (!wallet || wallet.user_id !== userId) return json({ error: "Invalid wallet" }, 403);
 
-    const currency = String(wallet.currency_code).toUpperCase();
-    const corridor = (typeof corridorHint === "string" && corridorHint === "international")
-      ? "international" as NombaCorridor
-      : resolveCorridor(currency);
-    if (!corridor) {
-      return json({ error: `Nomba checkout does not support ${currency}` }, 400);
+    const walletCurrency = String(wallet.currency_code).toUpperCase();
+    const customerEmail = String(email || userEmail || "").trim();
+    if (!customerEmail || !customerEmail.includes("@")) {
+      return json({ error: "A valid email is required for checkout" }, 400);
     }
-    if (corridor === "nigeria" && currency !== "NGN") {
-      return json({ error: "Nigeria checkout requires an NGN wallet" }, 400);
-    }
-    if (corridor === "international" && !["USD", "EUR", "GBP"].includes(currency)) {
-      return json({ error: "International Nomba checkout supports USD, EUR, and GBP only" }, 400);
+
+    let corridor: NombaCorridor;
+    let checkoutCurrency: string;
+    let checkoutAmount: number;
+    let creditAmount: number;
+    let creditCurrency: string;
+    let platformFee: number;
+    let fxRate: number | null = null;
+
+    if (walletCurrency === "CAD") {
+      const rates = await fetchFxRates(admin);
+      const cadToUsd = resolveFxRate("CAD", "USD", rates);
+      if (!cadToUsd || cadToUsd <= 0) {
+        return json({ error: "CAD/USD exchange rate unavailable. Try again shortly." }, 503);
+      }
+      const quote = quoteCadWalletViaNombaUsd(requestedCredit, cadToUsd);
+      corridor = "international";
+      checkoutCurrency = quote.checkoutCurrency;
+      checkoutAmount = quote.checkoutAmount;
+      creditAmount = quote.creditAmount;
+      creditCurrency = quote.creditCurrency;
+      platformFee = quote.feeAmount;
+      fxRate = quote.fxRateCadToUsd;
+    } else {
+      creditCurrency = walletCurrency;
+      creditAmount = requestedCredit;
+      const same = quoteSameCurrencyTopup(requestedCredit, walletCurrency);
+      platformFee = same.feeAmount;
+      checkoutAmount = same.checkoutAmount;
+      checkoutCurrency = walletCurrency;
+
+      corridor = (typeof corridorHint === "string" && corridorHint === "international")
+        ? "international" as NombaCorridor
+        : resolveCorridor(walletCurrency) ?? "international";
+
+      if (corridor === "nigeria" && walletCurrency !== "NGN") {
+        return json({ error: "Nigeria checkout requires an NGN wallet" }, 400);
+      }
+      if (corridor === "international" && !["USD", "EUR", "GBP"].includes(walletCurrency)) {
+        return json({ error: `Nomba checkout does not support ${walletCurrency} directly` }, 400);
+      }
     }
 
     if (!isNombaPayConfigured()) {
@@ -94,12 +153,7 @@ Deno.serve(async (req) => {
     }
     const cfg = getNombaPayConfig();
 
-    const customerEmail = String(email || userEmail || "").trim();
-    if (!customerEmail || !customerEmail.includes("@")) {
-      return json({ error: "A valid email is required for checkout" }, 400);
-    }
-
-    const amountRounded = Math.round(amt * 100) / 100;
+    const amountRounded = Math.round(checkoutAmount * 100) / 100;
     const internalRef = `efin-nomba-${corridor}-${userId.slice(0, 8)}-${Date.now()}`;
     const returnUrl = typeof return_url === "string" && return_url.startsWith("http")
       ? return_url.trim()
@@ -112,14 +166,24 @@ Deno.serve(async (req) => {
         corridor,
         reference: internalRef,
         amount: amountRounded,
-        currency,
+        currency: checkoutCurrency,
+        credit_amount: creditAmount,
+        credit_currency: creditCurrency,
+        checkout_amount: amountRounded,
+        checkout_currency: checkoutCurrency,
+        platform_fee: platformFee,
+        fx_rate: fxRate,
         email: customerEmail,
         target_wallet_id,
         status: "pending",
         raw_request: {
           corridor,
-          amount: amountRounded,
-          currency,
+          credit_amount: creditAmount,
+          credit_currency: creditCurrency,
+          checkout_amount: amountRounded,
+          checkout_currency: checkoutCurrency,
+          platform_fee: platformFee,
+          fx_rate: fxRate,
           email: customerEmail,
           return_url: returnUrl,
         },
@@ -130,7 +194,7 @@ Deno.serve(async (req) => {
     if (insErr) return json({ error: "Could not record collection", detail: insErr.message }, 500);
 
     const payload = {
-      currency,
+      currency: checkoutCurrency,
       amount: String(amountRounded),
       user: cfg.merchantUser,
       callback: buildNombaCallbackUrl(),
@@ -138,7 +202,7 @@ Deno.serve(async (req) => {
     };
 
     const url = collectionUrlForCorridor(corridor);
-    console.log("Nomba COLLECTION:", { corridor, url, payload });
+    console.log("Nomba COLLECTION:", { corridor, url, payload, walletCurrency, creditAmount, creditCurrency });
 
     const result = await nombaCollectionFetch(url, payload);
 
@@ -167,7 +231,17 @@ Deno.serve(async (req) => {
       transaction_id: txn.id,
       order_id: result.orderId,
       payment_link: result.checkoutUrl,
-      message: "Redirecting to secure Nomba checkout…",
+      message: walletCurrency === "CAD"
+        ? `Pay $${amountRounded.toFixed(2)} USD on Nomba — your CAD wallet will be credited C$${creditAmount.toFixed(2)}`
+        : "Redirecting to secure Nomba checkout…",
+      quote: {
+        credit_amount: creditAmount,
+        credit_currency: creditCurrency,
+        checkout_amount: amountRounded,
+        checkout_currency: checkoutCurrency,
+        platform_fee: platformFee,
+        fx_rate: fxRate,
+      },
       provider_response: result.json,
     });
   } catch (err) {

@@ -11,12 +11,15 @@ import { useFxRates, useFxRatesLastUpdated } from "@/hooks/useFxRates";
 import { useStellarWallet } from "@/hooks/useStellarWallet";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { RefreshCw, ArrowUpDown, TrendingUp, CheckCircle, Bitcoin, DollarSign, ExternalLink, Sparkles } from "lucide-react";
 import { CryptoTradingPanel } from "@/components/crypto/CryptoTradingPanel";
 import { flagForCurrency } from "@/lib/flags";
 import { resolveEffectiveRate } from "@/lib/fx";
+import { getNombaExchangeRate, isNgnPair } from "@/lib/nombaNigeria";
 import { CurrencyFlag } from "@/components/ui/FlagImage";
+import FeatureGate from "@/components/common/FeatureGate";
+import { productFeatures } from "@/lib/productFeatures";
 
 // Synthetic wallet id used to represent the on-chain USDC option.
 const STELLAR_USDC_ID = "stellar-usdc";
@@ -67,14 +70,27 @@ const FxTradingPanel = () => {
   const toWallet = destinationOptions.find(w => w.wallet_id === toWalletId) ?? destinationOptions[1];
   const isCryptoSwap = toWallet && "isStellar" in toWallet && toWallet.isStellar;
 
+  const fromCode = fromWallet?.currency_code ?? "";
+  const toCode = toWallet?.currency_code ?? "";
+  const { data: nombaQuote } = useQuery({
+    queryKey: ["exchange-page-nomba", fromCode, toCode],
+    queryFn: () => getNombaExchangeRate(fromCode, toCode),
+    enabled: !!fromCode && !!toCode && fromCode !== toCode && !isCryptoSwap && isNgnPair(fromCode, toCode),
+    staleTime: 60_000,
+  });
+
   const effectiveRate = useMemo(() => {
-    if (!fromWallet?.currency_code || !toWallet?.currency_code) return null;
+    if (!fromCode || !toCode) return null;
     if (isCryptoSwap) {
-      if (fromWallet.currency_code === "USD") return 1;
-      return resolveEffectiveRate(fromWallet.currency_code, "USD", fxRates ?? []);
+      if (fromCode === "USD") return 1;
+      return resolveEffectiveRate(fromCode, "USD", fxRates ?? []);
     }
-    return resolveEffectiveRate(fromWallet.currency_code, toWallet.currency_code, fxRates ?? []);
-  }, [fromWallet?.currency_code, toWallet?.currency_code, isCryptoSwap, fxRates]);
+    if (nombaQuote?.effective_rate && nombaQuote.effective_rate > 0) {
+      return nombaQuote.effective_rate;
+    }
+    return resolveEffectiveRate(fromCode, toCode, fxRates ?? []);
+  }, [fromCode, toCode, isCryptoSwap, fxRates, nombaQuote?.effective_rate]);
+  const rateFromNomba = !!nombaQuote?.effective_rate;
   const recvDecimals = isCryptoSwap ? 4 : 2;
 
   const quoteReceive = useCallback(
@@ -363,9 +379,16 @@ const FxTradingPanel = () => {
               <div className="space-y-2 rounded-xl border border-border/60 bg-muted/30 p-4 text-sm">
               <div className="flex justify-between">
                   <span className="text-muted-foreground">Exchange rate</span>
-                  <span className="font-medium tabular-nums">
+                  <span className="font-medium tabular-nums flex items-center gap-2">
                   {effectiveRate
-                    ? `1 ${fromWallet?.currency_code} = ${effectiveRate.toFixed(4)} ${toWallet?.currency_code}`
+                    ? (
+                      <>
+                        {`1 ${fromWallet?.currency_code} = ${effectiveRate.toFixed(4)} ${toWallet?.currency_code}`}
+                        {rateFromNomba && (
+                          <span className="text-[10px] uppercase tracking-wide text-emerald-600 font-semibold">Nomba</span>
+                        )}
+                      </>
+                    )
                     : <span className="text-destructive">Rate unavailable</span>}
                 </span>
               </div>
@@ -419,6 +442,11 @@ const formatRelative = (iso: string | null) => {
 const LiveFxRatesCard = () => {
   const { data: fxRates } = useFxRates();
   const { data: lastUpdated } = useFxRatesLastUpdated();
+  const { data: nombaUsdNgn } = useQuery({
+    queryKey: ["exchange-live-nomba-usd-ngn"],
+    queryFn: () => getNombaExchangeRate("USD", "NGN"),
+    staleTime: 60_000,
+  });
   return (
     <Card>
       <CardHeader>
@@ -434,6 +462,15 @@ const LiveFxRatesCard = () => {
       </CardHeader>
       <CardContent>
         <div className="space-y-3">
+          {nombaUsdNgn?.effective_rate ? (
+            <div className="flex justify-between items-center text-sm">
+              <span>{flagForCurrency("USD")} USD → {flagForCurrency("NGN")} NGN</span>
+              <span className="font-mono flex items-center gap-2">
+                {Number(nombaUsdNgn.effective_rate).toFixed(4)}
+                <span className="text-[10px] uppercase text-emerald-600 font-semibold">Nomba</span>
+              </span>
+            </div>
+          ) : null}
           {fxRates?.slice(0, 4).map((rate) => (
               <div key={rate.id} className="flex justify-between items-center text-sm">
                 <span>{flagForCurrency(rate.from_currency)} {rate.from_currency} → {flagForCurrency(rate.to_currency)} {rate.to_currency}</span>
@@ -459,28 +496,36 @@ const ExchangePage = () => {
         >
           <div className="text-center">
             <h1 className="text-2xl font-display font-bold text-foreground">Exchange</h1>
-            <p className="text-muted-foreground">Trade currencies and crypto instantly</p>
+            <p className="text-muted-foreground">
+              {productFeatures.crypto ? "Trade currencies and crypto instantly" : "Convert between the currencies you hold at live rates"}
+            </p>
           </div>
 
           <Tabs defaultValue="fx" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className={productFeatures.crypto ? "grid w-full grid-cols-2" : "grid w-full grid-cols-1"}>
               <TabsTrigger value="fx" className="flex items-center gap-2">
                 <DollarSign className="w-4 h-4" />
                 Currency
               </TabsTrigger>
+              {productFeatures.crypto && (
               <TabsTrigger value="crypto" className="flex items-center gap-2">
                 <Bitcoin className="w-4 h-4" />
                 Crypto
               </TabsTrigger>
+              )}
             </TabsList>
 
             <TabsContent value="fx">
               <FxTradingPanel />
             </TabsContent>
 
+            {productFeatures.crypto && (
             <TabsContent value="crypto">
-              <CryptoTradingPanel />
+              <FeatureGate feature="crypto">
+                <CryptoTradingPanel />
+              </FeatureGate>
             </TabsContent>
+            )}
           </Tabs>
         </motion.div>
       </main>

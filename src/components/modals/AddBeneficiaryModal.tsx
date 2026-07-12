@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import CountryPicker from "@/components/ui/CountryPicker";
 import { COUNTRIES, findCountryById, findCountryByCode } from "@/lib/countries";
 import { ChevronDown, ChevronUp } from "lucide-react";
+import { getNigeriaBanks, resolveNigeriaAccount } from "@/lib/nombaNigeria";
 
 interface Props {
   open: boolean;
@@ -41,7 +42,11 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
   const [method, setMethod] = useState<"mobile" | "bank" | "eft" | "interac" | "none">("none");
   const [phone, setPhone] = useState("");
   const [bankName, setBankName] = useState("");
+  const [bankCode, setBankCode] = useState("");
   const [bankAccount, setBankAccount] = useState("");
+  const [ngnBanks, setNgnBanks] = useState<{ code: string; name: string }[]>([]);
+  const [resolvingAccount, setResolvingAccount] = useState(false);
+  const [resolvedAccountName, setResolvedAccountName] = useState<string | null>(null);
   // Canadian EFT
   const [eftInst, setEftInst] = useState("");
   const [eftTransit, setEftTransit] = useState("");
@@ -69,7 +74,9 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
     );
     setPhone(editing?.phone || "");
     setBankName(editing?.bank_name || "");
+    setBankCode(editing?.bank_code || "");
     setBankAccount(editing?.bank_account || "");
+    setResolvedAccountName(null);
     setEftInst(editing?.eft_institution || "");
     setEftTransit(editing?.eft_transit || "");
     setEftAcct(editing?.eft_account || "");
@@ -81,6 +88,57 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
   }, [open, editing, defaultCategory, defaultMethod]);
 
   const country = findCountryById(countryId) || COUNTRIES[0];
+  const isNigeriaBank = method === "bank" && country.code === "NGN";
+
+  useEffect(() => {
+    if (!open || !isNigeriaBank || ngnBanks.length > 0) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { banks } = await getNigeriaBanks();
+        if (!cancelled) setNgnBanks(banks.map((b) => ({ code: b.code, name: b.name })));
+      } catch {
+        /* non-fatal */
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [open, isNigeriaBank, ngnBanks.length]);
+
+  useEffect(() => {
+    if (!isNigeriaBank) {
+      setResolvedAccountName(null);
+      return;
+    }
+    const acct = bankAccount.replace(/\D/g, "");
+    if (!bankCode || acct.length !== 10) {
+      setResolvedAccountName(null);
+      return;
+    }
+    let cancelled = false;
+    setResolvingAccount(true);
+    (async () => {
+      try {
+        const data = await resolveNigeriaAccount(acct, bankCode);
+        if (cancelled) return;
+        if (data?.resolved && data.account_name) {
+          setResolvedAccountName(data.account_name);
+          if (!name.trim()) setName(data.account_name);
+        } else {
+          setResolvedAccountName(null);
+        }
+      } catch {
+        if (!cancelled) setResolvedAccountName(null);
+      } finally {
+        if (!cancelled) setResolvingAccount(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isNigeriaBank, bankCode, bankAccount, name]);
+
+  const selectedBankName = useMemo(() => {
+    if (!isNigeriaBank) return bankName;
+    return ngnBanks.find((b) => b.code === bankCode)?.name || bankName;
+  }, [isNigeriaBank, bankCode, bankName, ngnBanks]);
 
   const handleSave = async () => {
     if (!name.trim()) { toast.error("Please enter a name"); return; }
@@ -102,8 +160,9 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
       currency_code: country.code,
       payout_method: method === "mobile" ? country.payout : method === "bank" ? "bank" : method === "eft" ? "eft" : method === "interac" ? "interac" : null,
       phone: method === "mobile" ? phone.trim() : null,
-      bank_name: method === "bank" ? bankName.trim() : null,
+      bank_name: method === "bank" ? selectedBankName.trim() : null,
       bank_account: method === "bank" ? bankAccount.trim() : null,
+      bank_code: method === "bank" && isNigeriaBank ? bankCode.trim() || null : null,
       eft_institution: method === "eft" ? eftInst : null,
       eft_transit: method === "eft" ? eftTransit : null,
       eft_account: method === "eft" ? eftAcct : null,
@@ -188,13 +247,45 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
           )}
           {method === "bank" && (
             <>
-              <div className="space-y-2">
-                <Label>Bank Name</Label>
-                <Input value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder="Bank name" />
-              </div>
+              {isNigeriaBank ? (
+                <div className="space-y-2">
+                  <Label>Bank</Label>
+                  <Select
+                    value={bankCode}
+                    onValueChange={(code) => {
+                      setBankCode(code);
+                      const match = ngnBanks.find((b) => b.code === code);
+                      if (match) setBankName(match.name);
+                    }}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Select bank" /></SelectTrigger>
+                    <SelectContent className="max-h-60">
+                      {ngnBanks.map((b) => (
+                        <SelectItem key={b.code} value={b.code}>{b.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label>Bank Name</Label>
+                  <Input value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder="Bank name" />
+                </div>
+              )}
               <div className="space-y-2">
                 <Label>Account Number</Label>
-                <Input value={bankAccount} onChange={(e) => setBankAccount(e.target.value)} placeholder="Account number" />
+                <Input
+                  value={bankAccount}
+                  onChange={(e) => setBankAccount(e.target.value)}
+                  placeholder={isNigeriaBank ? "10-digit NUBAN" : "Account number"}
+                  inputMode="numeric"
+                />
+                {isNigeriaBank && resolvingAccount && (
+                  <p className="text-xs text-muted-foreground">Verifying account…</p>
+                )}
+                {isNigeriaBank && resolvedAccountName && (
+                  <p className="text-xs text-emerald-600">Verified: {resolvedAccountName}</p>
+                )}
               </div>
             </>
           )}

@@ -14,6 +14,7 @@ export interface Beneficiary {
   network: string | null;
   bank_name: string | null;
   bank_account: string | null;
+  bank_code: string | null;
   currency_code: string | null;
   nickname: string | null;
   avatar_initials: string | null;
@@ -73,6 +74,7 @@ export const useCreateBeneficiary = () => {
         network: input.network ?? null,
         bank_name: input.bank_name ?? null,
         bank_account: input.bank_account ?? null,
+        bank_code: input.bank_code ?? null,
         currency_code: input.currency_code ?? null,
         nickname: input.nickname ?? null,
         avatar_initials: input.avatar_initials ?? initialsOf(input.name),
@@ -144,6 +146,7 @@ export const recordTransferRecipient = async (params: {
   currency_code?: string | null;
   bank_name?: string | null;
   bank_account?: string | null;
+  bank_code?: string | null;
   email?: string | null;
   eft_institution?: string | null;
   eft_transit?: string | null;
@@ -181,6 +184,7 @@ export const recordTransferRecipient = async (params: {
     if (!found.payout_method && params.payout_method) patch.payout_method = params.payout_method;
     if (!found.bank_name && params.bank_name) patch.bank_name = params.bank_name;
     if (!found.bank_account && params.bank_account) patch.bank_account = params.bank_account;
+    if (!found.bank_code && params.bank_code) patch.bank_code = params.bank_code;
     if (!found.country_code && params.country_code) patch.country_code = params.country_code;
     if (!found.email && params.email) patch.email = params.email;
     if (!found.eft_institution && params.eft_institution) patch.eft_institution = params.eft_institution;

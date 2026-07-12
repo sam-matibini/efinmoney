@@ -27,6 +27,7 @@ import {
   Stamp,
   ExternalLink,
 } from "lucide-react";
+import { productFeatures } from "@/lib/productFeatures";
 
 interface Row {
   icon: any;
@@ -175,7 +176,7 @@ const MorePage = () => {
           <ListCard
             rows={[
               { icon: Wallet, label: "My Wallets", onClick: () => navigate("/wallets") },
-              { icon: CreditCard, label: "Cards", onClick: () => navigate("/cards") },
+              ...(productFeatures.cards ? [{ icon: CreditCard, label: "Cards", onClick: () => navigate("/cards") }] : []),
               { icon: ArrowLeftRight, label: "Exchange Currency", onClick: () => navigate("/exchange") },
               { icon: PieChart, label: "Transaction Limits", onClick: () => navigate("/kyc") },
             ]}

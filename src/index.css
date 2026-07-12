@@ -191,6 +191,32 @@
     background-size: 40px 40px;
   }
 
+  /* Marketing footer — corridor marquee + pill hovers */
+  @keyframes footer-marquee {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+  .footer-marquee-track {
+    animation: footer-marquee 38s linear infinite;
+  }
+  .footer-marquee-mask {
+    mask-image: linear-gradient(to right, transparent, black 8%, black 92%, transparent);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .footer-pill:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px -8px hsl(var(--primary) / 0.45);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .footer-marquee-track {
+      animation: none;
+    }
+    .footer-pill:hover {
+      transform: none;
+    }
+  }
+
   .bg-payout-waves {
     background-color: hsl(0 0% 100%);
     background-image:

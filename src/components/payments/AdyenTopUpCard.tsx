@@ -10,6 +10,7 @@ import { Sparkles } from "lucide-react";
 import { createAdyenSession, storeAdyenCheckoutConfig, confirmAdyenSession, type AdyenSessionResult } from "@/lib/adyen";
 import AdyenDropIn from "./AdyenDropIn";
 import { useQueryClient } from "@tanstack/react-query";
+import { productFeatures } from "@/lib/productFeatures";
 
 interface Props {
   walletId: string;
@@ -17,6 +18,8 @@ interface Props {
 }
 
 export default function AdyenTopUpCard({ walletId, walletCurrency }: Props) {
+  if (!productFeatures.adyen) return null;
+
   const queryClient = useQueryClient();
   const [amount, setAmount] = useState("");
   const [loading, setLoading] = useState(false);

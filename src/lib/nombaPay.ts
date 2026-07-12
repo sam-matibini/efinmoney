@@ -8,6 +8,7 @@ export const NOMBA_INTERNATIONAL_CURRENCIES = ["USD", "EUR", "GBP"] as const;
 export const NOMBA_PAY_CURRENCIES = [
   ...NOMBA_NIGERIA_CURRENCIES,
   ...NOMBA_INTERNATIONAL_CURRENCIES,
+  "CAD",
 ] as const;
 
 async function invokeErrorMessage(error: unknown): Promise<string> {
@@ -35,6 +36,8 @@ export interface NombaPayStatus {
   status: "pending" | "processing" | "completed" | "failed" | "cancelled";
   amount: number;
   currency: string;
+  credit_amount: number | null;
+  credit_currency: string | null;
   failure_reason: string | null;
   order_id: string | null;
 }
@@ -45,6 +48,15 @@ export function isNombaNigeriaCurrency(currency: string): boolean {
 
 export function isNombaInternationalCurrency(currency: string): boolean {
   return NOMBA_INTERNATIONAL_CURRENCIES.includes(currency.toUpperCase() as typeof NOMBA_INTERNATIONAL_CURRENCIES[number]);
+}
+
+export function isNombaCadViaUsdCurrency(currency: string): boolean {
+  return currency.toUpperCase() === "CAD";
+}
+
+export function isNombaTopupCurrency(currency: string): boolean {
+  const c = currency.toUpperCase();
+  return isNombaNigeriaCurrency(c) || isNombaInternationalCurrency(c) || isNombaCadViaUsdCurrency(c);
 }
 
 export function nombaMinAmount(currency: string): number {
@@ -77,11 +89,12 @@ export function clearPendingNombaTxn() {
 
 export async function initiateNombaCollection(params: {
   amount: number;
+  credit_amount?: number;
   target_wallet_id: string;
   email?: string;
   corridor?: "nigeria" | "international";
   return_url?: string;
-}): Promise<NombaCollectionResult> {
+}): Promise<NombaCollectionResult & { quote?: Record<string, unknown> }> {
   const { data, error } = await supabase.functions.invoke("nomba-collection", { body: params });
   if (error) throw new Error(await invokeErrorMessage(error));
   const payload = data as NombaCollectionResult & { error?: string };
@@ -95,7 +108,7 @@ export async function initiateNombaCollection(params: {
 export async function getNombaPayStatus(txnId: string): Promise<NombaPayStatus | null> {
   const { data } = await (supabase as any)
     .from("nomba_pay_transactions")
-    .select("id, status, amount, currency, failure_reason, order_id")
+    .select("id, status, amount, currency, credit_amount, credit_currency, failure_reason, order_id")
     .eq("id", txnId)
     .maybeSingle();
   if (!data) return null;
@@ -104,6 +117,8 @@ export async function getNombaPayStatus(txnId: string): Promise<NombaPayStatus |
     status: data.status,
     amount: Number(data.amount),
     currency: data.currency,
+    credit_amount: data.credit_amount != null ? Number(data.credit_amount) : null,
+    credit_currency: data.credit_currency,
     failure_reason: data.failure_reason,
     order_id: data.order_id,
   };

@@ -16,7 +16,6 @@ import { CheckCircle2, XCircle, CreditCard, Smartphone, Building2, Globe } from 
 import { useWallets } from "@/hooks/useWallets";
 import { useAuth } from "@/hooks/useAuth";
 import CardPaymentForm from "@/components/modals/CardPaymentForm";
-import AdyenTopUpCard from "@/components/payments/AdyenTopUpCard";
 import ElicateTopUpCard from "@/components/payments/ElicateTopUpCard";
 import GhanaTopUpCard from "@/components/payments/GhanaTopUpCard";
 import NombaTopUpCard from "@/components/payments/NombaTopUpCard";
@@ -37,6 +36,8 @@ import FlutterwaveWesternTopUpHints from "@/components/wallets/FlutterwaveWester
 import { buildFincraTopupRedirectUrl, parseFincraReturnReference, isFincraCheckoutCurrency } from "@/lib/fincraTopup";
 import { clearPendingNombaTxn } from "@/lib/nombaPay";
 import { cn } from "@/lib/utils";
+import ComingSoon from "@/components/common/ComingSoon";
+import { isLiveTopupCurrency, productFeatures } from "@/lib/productFeatures";
 
 const MM_BY_CCY = Object.fromEntries(MM_COUNTRIES.map((c) => [c.currency, c]));
 
@@ -131,6 +132,7 @@ const TopUpPage = () => {
   const showWesternProviderChoice = supportsWesternProviderChoice(currency);
   const showAfricanProviderChoice = supportsAfricanProviderChoice(currency);
   const gateway: Gateway = routeWalletTopupGateway(currency, westernProvider, africanProvider);
+  const liveTopup = isLiveTopupCurrency(currency);
   const availableFlwMethods = FLW_METHODS_BY_CCY[currency] || ["card"];
   const mmCountry = method === "mobilemoney" ? MM_BY_CCY[currency] : undefined;
 
@@ -413,7 +415,7 @@ const TopUpPage = () => {
             </CardContent>
           </Card>
 
-          {showWesternProviderChoice && selectedWallet && (
+          {showWesternProviderChoice && selectedWallet && (productFeatures.stripe || productFeatures.flutterwave) && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">2. Choose how to pay</CardTitle>
@@ -480,7 +482,7 @@ const TopUpPage = () => {
             </Card>
           )}
 
-          {showAfricanProviderChoice && selectedWallet && (
+          {showAfricanProviderChoice && selectedWallet && productFeatures.flutterwave && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">2. Choose how to pay</CardTitle>
@@ -529,7 +531,16 @@ const TopUpPage = () => {
             </Card>
           )}
 
-          {gateway === "unsupported" && selectedWallet && (
+          {!liveTopup && selectedWallet && (
+            <ComingSoon
+              title="Top-up coming soon for this currency"
+              description={`${currency} wallet funding is on the roadmap. Nigeria (NGN), Ghana (GHS), USD, EUR, GBP, and CAD (via Nomba USD checkout) are live today.`}
+              backHref="/wallets"
+              backLabel="View wallets"
+            />
+          )}
+
+          {liveTopup && gateway === "unsupported" && selectedWallet && (
             <Card>
               <CardContent className="pt-6">
                 <p className="text-sm text-muted-foreground">
@@ -539,8 +550,8 @@ const TopUpPage = () => {
             </Card>
           )}
 
-          {/* Stripe route */}
-          {gateway === "stripe" && selectedWallet && (
+          {/* Legacy gateways hidden unless feature flags enabled */}
+          {productFeatures.stripe && gateway === "stripe" && selectedWallet && liveTopup && (
             <>
               {isStripeTestMode() ? (
                 <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-sm text-amber-800 dark:text-amber-200">
@@ -621,7 +632,7 @@ const TopUpPage = () => {
           )}
 
           {/* Flutterwave route — hosted checkout (Card, Bank Transfer, USSD, Mobile Money) */}
-          {gateway === "flutterwave" && selectedWallet && (
+          {productFeatures.flutterwave && gateway === "flutterwave" && selectedWallet && liveTopup && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">
@@ -657,7 +668,7 @@ const TopUpPage = () => {
           )}
 
           {/* Fincra route — hosted checkout */}
-          {gateway === "fincra" && selectedWallet && (
+          {productFeatures.flutterwave && gateway === "fincra" && selectedWallet && liveTopup && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">
@@ -694,7 +705,7 @@ const TopUpPage = () => {
           )}
 
           {/* Nomba — NGN hosted card checkout */}
-          {gateway === "nomba_pay" && selectedWallet && (
+          {liveTopup && gateway === "nomba_pay" && selectedWallet && (
             <NombaTopUpCard
               walletId={selectedWallet.wallet_id}
               walletCurrency={currency}
@@ -705,18 +716,13 @@ const TopUpPage = () => {
           )}
 
           {/* Ghana Pay — direct MoMo collection for GHS */}
-          {gateway === "ghana_pay" && selectedWallet && (
+          {liveTopup && gateway === "ghana_pay" && selectedWallet && (
             <GhanaTopUpCard walletId={selectedWallet.wallet_id} walletCurrency={currency} />
           )}
 
           {/* Elicate route — direct mobile-money top-up for Zambia (ZMW) */}
-          {gateway === "elicate" && selectedWallet && (
+          {productFeatures.flutterwave && liveTopup && gateway === "elicate" && selectedWallet && (
             <ElicateTopUpCard walletId={selectedWallet.wallet_id} walletCurrency={currency} />
-          )}
-
-          {/* Adyen route — available for all currencies as alternative */}
-          {selectedWallet && gateway !== "unsupported" && (
-            <AdyenTopUpCard walletId={selectedWallet.wallet_id} walletCurrency={currency} />
           )}
         </motion.div>
       </main>

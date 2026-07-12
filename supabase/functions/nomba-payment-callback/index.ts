@@ -17,6 +17,7 @@ const SETTLEMENT_BY_CURRENCY: Record<string, string> = {
 const LIABILITY_BY_CURRENCY: Record<string, string> = {
   NGN: "2102",
   USD: "2100",
+  CAD: "2101",
   EUR: "2104",
   GBP: "2105",
 };
@@ -100,7 +101,11 @@ async function completeNombaCollection(
 
   if (!txn.target_wallet_id) return { ok: false, error: "Collection has no target wallet" };
 
-  const currency = String(txn.currency).toUpperCase();
+  const creditCurrency = String(txn.credit_currency ?? txn.currency).toUpperCase();
+  const creditAmount = txn.credit_amount != null ? Number(txn.credit_amount) : Number(txn.amount);
+  const checkoutCurrency = String(txn.checkout_currency ?? txn.currency).toUpperCase();
+  const checkoutAmount = txn.checkout_amount != null ? Number(txn.checkout_amount) : Number(txn.amount);
+
   const idempotencyRef = orderId || String(txn.reference);
 
   const { data: existing } = await supabase.from("ledger_entries").select("id")
@@ -112,25 +117,32 @@ async function completeNombaCollection(
     return { ok: true, duplicate: true };
   }
 
-  const assetCode = SETTLEMENT_BY_CURRENCY[currency];
-  const liabCode = LIABILITY_BY_CURRENCY[currency];
-  if (!assetCode || !liabCode) return { ok: false, error: `Missing ledger mapping for ${currency}` };
+  const settlementByCurrency: Record<string, string> = {
+    ...SETTLEMENT_BY_CURRENCY,
+    CAD: "1261", // CAD wallet funded via USD Nomba settlement
+  };
+  const assetCode = settlementByCurrency[checkoutCurrency];
+  const liabCode = LIABILITY_BY_CURRENCY[creditCurrency];
+  if (!assetCode || !liabCode) {
+    return { ok: false, error: `Missing ledger mapping for checkout ${checkoutCurrency} / credit ${creditCurrency}` };
+  }
 
   const { data: asset } = await supabase.from("ledger_accounts").select("id").eq("code", assetCode).maybeSingle();
   const { data: liab } = await supabase.from("ledger_accounts").select("id").eq("code", liabCode).maybeSingle();
   if (!asset || !liab) return { ok: false, error: `Missing ledger accounts (${assetCode}/${liabCode})` };
 
-  const amount = Number(txn.amount);
   const journalId = crypto.randomUUID();
-  const desc = `Nomba top-up (${idempotencyRef})`;
+  const desc = creditCurrency !== checkoutCurrency
+    ? `Nomba top-up (${idempotencyRef}) — ${checkoutAmount} ${checkoutCurrency} → ${creditAmount} ${creditCurrency}`
+    : `Nomba top-up (${idempotencyRef})`;
 
   const { error: leErr } = await supabase.from("ledger_entries").insert([
     {
       journal_id: journalId,
       account_id: asset.id,
       wallet_id: null,
-      currency_code: currency,
-      debit_amount: amount,
+      currency_code: checkoutCurrency,
+      debit_amount: checkoutAmount,
       credit_amount: 0,
       description: desc,
       reference_type: "nomba_pay_topup",
@@ -142,9 +154,9 @@ async function completeNombaCollection(
       journal_id: journalId,
       account_id: liab.id,
       wallet_id: txn.target_wallet_id,
-      currency_code: currency,
+      currency_code: creditCurrency,
       debit_amount: 0,
-      credit_amount: amount,
+      credit_amount: creditAmount,
       description: desc,
       reference_type: "nomba_pay_topup",
       reference_id: txn.id,
@@ -160,11 +172,15 @@ async function completeNombaCollection(
     provider_reference: idempotencyRef,
   }).eq("id", txn.id);
 
-  const symbol = currency === "NGN" ? "₦" : currency === "GBP" ? "£" : currency === "EUR" ? "€" : "$";
+  const symbol = creditCurrency === "NGN" ? "₦"
+    : creditCurrency === "GBP" ? "£"
+    : creditCurrency === "EUR" ? "€"
+    : creditCurrency === "CAD" ? "C$"
+    : "$";
   await supabase.from("notifications").insert({
     user_id: txn.user_id,
     title: "Wallet topped up",
-    message: `Your ${currency} wallet has been credited ${symbol}${amount.toLocaleString()}.`,
+    message: `Your ${creditCurrency} wallet has been credited ${symbol}${creditAmount.toLocaleString()}.`,
     type: "wallet",
   }).then(() => null, () => null);
 

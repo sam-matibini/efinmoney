@@ -55,7 +55,7 @@ const NAV = [
   { to: "/admin/kyc-config", label: "KYC Config", icon: SlidersHorizontal },
   { to: "/admin/audit-log", label: "Audit Log", icon: ScrollText },
   { to: "/admin/diagnostics", label: "Diagnostics", icon: Activity },
-  { to: "/admin/settings", label: "Settings", icon: Settings },
+  { to: "/admin/api", label: "API Management", icon: Settings },
 ];
 
 const AdminLayout = ({ children }: { children: ReactNode }) => {

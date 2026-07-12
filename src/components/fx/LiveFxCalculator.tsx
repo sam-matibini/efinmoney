@@ -8,6 +8,7 @@ import { usePricingConfig } from "@/hooks/usePricingConfig";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { WORLD_CURRENCIES, WORLD_CURRENCY_MAP } from "@/lib/worldCurrencies";
+import { getNombaExchangeRate, isNgnPair } from "@/lib/nombaNigeria";
 import {
   BENCHMARK_A_FLAT_FEE_USD,
   BENCHMARK_A_MARGIN,
@@ -148,17 +149,26 @@ const LiveFxCalculator = ({
     return () => clearInterval(id);
   }, []);
 
+  const { data: nombaQuote } = useQuery({
+    queryKey: ["nomba-fx-calc", from, to],
+    queryFn: () => getNombaExchangeRate(from, to),
+    enabled: from !== to && isNgnPair(from, to),
+    staleTime: 60_000,
+  });
+
   const usdMapEffective = useMemo(() => buildUsdMap(data?.fiat ?? [], "price"), [data]);
   const usdMapMarket = useMemo(() => buildUsdMap(data?.fiat ?? [], "market_price"), [data]);
   const marketRate = useMemo(() => midRateFromUsdMap(from, to, usdMapEffective), [from, to, usdMapEffective]);
   const marketMidRate = useMemo(() => midRateFromUsdMap(from, to, usdMapMarket), [from, to, usdMapMarket]);
 
-  /** Rate used for quotes — parent DB rate wins, then live market cross-rate. */
+  /** Rate used for quotes — parent DB rate wins, then Nomba NGN, then live market cross-rate. */
   const resolvedQuoteRate = useMemo(() => {
     if (displayRate != null && displayRate > 0) return displayRate;
+    if (nombaQuote?.effective_rate && nombaQuote.effective_rate > 0) return nombaQuote.effective_rate;
     if (marketRate != null && marketRate > 0) return marketRate;
     return null;
-  }, [displayRate, marketRate]);
+  }, [displayRate, nombaQuote?.effective_rate, marketRate]);
+  const usingNombaRate = !displayRate && !!nombaQuote?.effective_rate;
 
   const flatFeeInFrom = (usdFee: number): number => {
     if (!usdFee) return 0;
@@ -461,6 +471,9 @@ const LiveFxCalculator = ({
 
                 <div className={`mt-2.5 flex flex-wrap gap-1 ${embedded ? "gap-1" : "gap-1.5"}`}>
                   <Badge compact={embedded} shell={shell}>Mid-market rate</Badge>
+                  {usingNombaRate && (
+                    <Badge compact={embedded} shell={shell}>Nomba live</Badge>
+                  )}
                   <Badge compact={embedded} shell={shell}>No hidden fees</Badge>
                   <Badge compact={embedded} shell={shell}>{isApp ? "Live rate" : "60s rate lock"}</Badge>
                 </div>

@@ -31,6 +31,19 @@ function resolveNetwork(payoutMethod: string | null | undefined, currency: strin
   return defaults[currency] || "mpesa";
 }
 
+async function invokeNombaPayout(transferId: string) {
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/nomba-payout`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${SERVICE_KEY}`,
+      "x-internal-secret": SERVICE_KEY,
+    },
+    body: JSON.stringify({ transfer_id: transferId }),
+  });
+  return res.json();
+}
+
 async function invokeFlutterwavePayout(transfer: Record<string, unknown>) {
   const body = {
     transfer_id: transfer.id,
@@ -170,6 +183,35 @@ Deno.serve(async (req) => {
         results.settlement = { existing, active: true };
       }
     }
+
+    // 4. Retry failed Nomba NGN bank payouts (primary rail)
+    const { data: failedNomba } = await db
+      .from("nomba_payout_transactions")
+      .select("transfer_id, reference, updated_at")
+      .eq("status", "failed")
+      .order("updated_at", { ascending: true })
+      .limit(10);
+
+    const nombaRetries: unknown[] = [];
+    for (const row of failedNomba ?? []) {
+      const { data: t } = await db
+        .from("transfers")
+        .select("id, status, target_currency, payout_method, recipient_account, recipient_bank_code")
+        .eq("id", row.transfer_id)
+        .maybeSingle();
+      if (!t || t.status !== "funded") continue;
+      if (String(t.target_currency).toUpperCase() !== "NGN") continue;
+      if (t.payout_method !== "bank" || !t.recipient_account || !t.recipient_bank_code) continue;
+      const payout = await invokeNombaPayout(t.id);
+      nombaRetries.push({
+        transfer_id: t.id,
+        reference: row.reference,
+        action: payout?.success ? "nomba_retry_sent" : "nomba_retry_failed",
+        error: payout?.error ?? null,
+        payout,
+      });
+    }
+    results.nomba_retries = nombaRetries;
 
     return json({ ok: true, ...results });
   } catch (e) {

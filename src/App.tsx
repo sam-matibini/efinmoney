@@ -16,6 +16,7 @@ import NotFound from "./pages/NotFound";
 import { AdminAuthProvider } from "@/contexts/AdminAuthContext";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import SplashScreen from "@/components/SplashScreen";
+import GatedPage from "@/components/common/GatedPage";
 
 // Core nav pages — eager so tab switches never wait on chunks
 import Index from "./pages/Index";
@@ -223,7 +224,7 @@ const AppRoutes = () => {
       <Routes location={location}>
         <Route path="/" element={<RootRoute />} />
         <Route path="/s/:code" element={<ShortLinkResolver />} />
-        <Route path="/claim/:code" element={<ClaimPaymentLinkPage />} />
+        <Route path="/claim/:code" element={<GatedPage feature="paymentLinks"><ClaimPaymentLinkPage /></GatedPage>} />
         <Route path="/privacy" element={<PrivacyPolicyPage />} />
         <Route path="/terms" element={<TermsPage />} />
         <Route path="/compliance" element={<CompliancePage />} />
@@ -237,24 +238,24 @@ const AppRoutes = () => {
           <Route path="/wallets" element={<WalletsPage />} />
           <Route path="/wallets/:walletId/statement" element={<WalletStatementPage />} />
           <Route path="/send" element={<SendPage />} />
-          <Route path="/send/cpn" element={<SendCpnPage />} />
-          <Route path="/send/african-card" element={<AfricanCardSendPage />} />
+          <Route path="/send/cpn" element={<GatedPage feature="crypto"><SendCpnPage /></GatedPage>} />
+          <Route path="/send/african-card" element={<GatedPage feature="stripe"><AfricanCardSendPage /></GatedPage>} />
           <Route path="/exchange" element={<ExchangePage />} />
-          <Route path="/cards" element={<CardsPage />} />
-          <Route path="/cards/efin/:id" element={<EfinCardDetailPage />} />
+          <Route path="/cards" element={<GatedPage feature="cards"><CardsPage /></GatedPage>} />
+          <Route path="/cards/efin/:id" element={<GatedPage feature="cards"><EfinCardDetailPage /></GatedPage>} />
           <Route path="/more" element={<MorePage />} />
           <Route path="/transfers" element={<TransfersListPage />} />
           <Route path="/transfers/:id" element={<TransferTrackingPage />} />
           <Route path="/transactions/:journalId" element={<TransactionDetailPage />} />
           <Route path="/contacts" element={<ContactsPage />} />
           <Route path="/payees" element={<ContactsPage />} />
-          <Route path="/payment-links" element={<PaymentLinksPage />} />
-          <Route path="/transfers/canada" element={<CanadaTransferPage />} />
+          <Route path="/payment-links" element={<GatedPage feature="paymentLinks"><PaymentLinksPage /></GatedPage>} />
+          <Route path="/transfers/canada" element={<GatedPage feature="canadaDomestic"><CanadaTransferPage /></GatedPage>} />
           <Route path="/wallet/receive" element={<ReceivePage />} />
           <Route path="/wallet/topup" element={<TopUpPage />} />
-          <Route path="/pay-bills" element={<PayBillsPage />} />
-          <Route path="/pay-bills/canada" element={<CanadaBillPayPage />} />
-          <Route path="/stripe-connect" element={<StripeConnectInstantPage />} />
+          <Route path="/pay-bills" element={<GatedPage feature="billPay"><PayBillsPage /></GatedPage>} />
+          <Route path="/pay-bills/canada" element={<GatedPage feature="billPay"><CanadaBillPayPage /></GatedPage>} />
+          <Route path="/stripe-connect" element={<GatedPage feature="stripe"><StripeConnectInstantPage /></GatedPage>} />
         </Route>
 
         <Route element={<RoleShellRoute allowedRoles={["admin", "finance"]} />}>
@@ -291,7 +292,7 @@ const AppRoutes = () => {
         <Route path="/admin/users/:id" element={<AdminAuthProvider><AdminGuard><UserDetailPage /></AdminGuard></AdminAuthProvider>} />
         <Route path="/admin/risk-tiers" element={<AdminAuthProvider><AdminGuard><RiskTiersPage /></AdminGuard></AdminAuthProvider>} />
         <Route path="/admin/audit-log" element={<AdminAuthProvider><AdminGuard><AuditLogPage /></AdminGuard></AdminAuthProvider>} />
-        <Route path="/admin/settings" element={<AdminAuthProvider><AdminGuard><ApiManagementPage /></AdminGuard></AdminAuthProvider>} />
+        <Route path="/admin/api" element={<AdminAuthProvider><AdminGuard><ApiManagementPage /></AdminGuard></AdminAuthProvider>} />
         <Route path="/admin/kyc-config" element={<AdminAuthProvider><AdminGuard><KycConfigPage /></AdminGuard></AdminAuthProvider>} />
         <Route path="/admin/diagnostics" element={<AdminAuthProvider><AdminGuard><SystemDiagnosticsPage /></AdminGuard></AdminAuthProvider>} />
         <Route path="/admin/data-export" element={<AdminAuthProvider><AdminGuard><DataExportPage /></AdminGuard></AdminAuthProvider>} />

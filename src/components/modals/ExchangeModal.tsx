@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { RefreshCw, ChevronDown, ArrowRight, AlertCircle, CheckCircle } from "lucide-react";
 import LoadingSpinner from "@/components/LoadingSpinner";
@@ -8,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { useWallets } from "@/hooks/useWallets";
 import { useFxRates } from "@/hooks/useFxRates";
 import { resolveEffectiveRate } from "@/lib/fx";
+import { getNombaExchangeRate, isNgnPair } from "@/lib/nombaNigeria";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -61,10 +63,22 @@ const ExchangeModal = ({ children }: ExchangeModalProps) => {
   const fromWallet = wallets?.find(w => w.wallet_id === fromWalletId) || wallets?.[0];
   const toWallet = wallets?.find(w => w.wallet_id === toWalletId) || wallets?.[1];
 
-  // Get FX rate (direct, inverse, or USD cross)
-  const effectiveRate = fromWallet?.currency_code && toWallet?.currency_code
-    ? resolveEffectiveRate(fromWallet.currency_code, toWallet.currency_code, fxRates ?? []) ?? 1
-    : 1;
+  const fromCode = fromWallet?.currency_code ?? "";
+  const toCode = toWallet?.currency_code ?? "";
+  const { data: nombaQuote } = useQuery({
+    queryKey: ["exchange-modal-nomba", fromCode, toCode],
+    queryFn: () => getNombaExchangeRate(fromCode, toCode),
+    enabled: !!fromCode && !!toCode && fromCode !== toCode && isNgnPair(fromCode, toCode),
+    staleTime: 60_000,
+  });
+
+  const dbRate = fromCode && toCode
+    ? resolveEffectiveRate(fromCode, toCode, fxRates ?? [])
+    : null;
+  const effectiveRate = nombaQuote?.effective_rate && nombaQuote.effective_rate > 0
+    ? nombaQuote.effective_rate
+    : (dbRate ?? 1);
+  const rateFromNomba = !!nombaQuote?.effective_rate;
 
   const fee = parseFloat(amount) > 0 ? parseFloat(amount) * 0.005 : 0;
   const receivedAmount = parseFloat(amount) > 0 
@@ -274,8 +288,11 @@ const ExchangeModal = ({ children }: ExchangeModalProps) => {
                 <div className="p-4 rounded-xl bg-muted/50 space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Exchange rate</span>
-                    <span className="text-foreground">
+                    <span className="text-foreground flex items-center gap-2">
                       1 {fromWallet?.currency_code} = {formatNumber(effectiveRate, 4)} {toWallet?.currency_code}
+                      {rateFromNomba && (
+                        <span className="text-[10px] uppercase tracking-wide text-emerald-600 font-semibold">Nomba</span>
+                      )}
                     </span>
                   </div>
                   <div className="flex justify-between text-sm">

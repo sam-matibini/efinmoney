@@ -31,6 +31,13 @@ import { useSavedCards } from "@/hooks/useSavedCards";
 import { usePricingConfig } from "@/hooks/usePricingConfig";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchFxRate, cardChargeCurrency, initializeFlwPayment } from "@/lib/flutterwave";
+import {
+  getNigeriaBanks,
+  resolveNigeriaAccount,
+  getNombaExchangeRate,
+  previewNigeriaConversion,
+  isNgnPair,
+} from "@/lib/nombaNigeria";
 import { resolveEffectiveRate } from "@/lib/fx";
 import { currencySymbol, countryToCurrency } from "@/lib/currency";
 import { useProfile } from "@/hooks/useProfile";
@@ -48,6 +55,8 @@ import FxTicker from "@/components/send/FxTicker";
 import LiveFxCalculator from "@/components/fx/LiveFxCalculator";
 import { parseAmount } from "@/components/fx/liveFxUtils";
 import { clearSendHandoff, readSendHandoff } from "@/lib/sendHandoff";
+import { productFeatures } from "@/lib/productFeatures";
+import ComingSoon from "@/components/common/ComingSoon";
 import TransferSuccess from "@/components/send/TransferSuccess";
 import { findCountryById, findCountryByCode, COUNTRIES } from "@/lib/countries";
 import {
@@ -83,7 +92,7 @@ const fieldVariants: Variants = {
 const SendPage = () => {
   const [step, setStep] = useState(1);
   const [direction, setDirection] = useState(1);
-  const [fundingSource, setFundingSource] = useState<FundingSource>('card');
+  const [fundingSource, setFundingSource] = useState<FundingSource>(productFeatures.stripe ? 'card' : 'wallet');
   const [amount, setAmount] = useState("");
   const [selectedWalletId, setSelectedWalletId] = useState("");
   const [targetCountryId, setTargetCountryId] = useState<string>("Kenya");
@@ -282,30 +291,18 @@ const SendPage = () => {
   // recipient claims (CAD/USD/GBP/EUR) and the sender holds a wallet in it to
   // escrow from. The recipient picks how to receive it on the claim page.
   const linkWallet = (wallets || []).find((w) => w.currency_code === targetCountry.code);
-  const linkEligible = isClaimCardCurrency(targetCountry.code) && !!linkWallet;
+  const linkEligible = productFeatures.paymentLinks && isClaimCardCurrency(targetCountry.code) && !!linkWallet;
   const useLink = linkEligible && intlLinkMode;
 
-  // Fetch Nigerian banks list when NGN destination is selected
+  // Fetch Nigerian banks list when NGN destination is selected (Nomba primary, FLW fallback)
   useEffect(() => {
     if (!isNGNBank || ngnBanks.length > 0) return;
     let cancelled = false;
     (async () => {
       try {
-        // supabase-js .invoke() doesn't support GET query params, so call directly
-        const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/flw-get-banks?country=NG`;
-        const { data: { session } } = await supabase.auth.getSession();
-        const res = await fetch(url, {
-          headers: {
-            Authorization: `Bearer ${session?.access_token || ""}`,
-            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-          },
-        });
-        const json = await res.json();
+        const { banks } = await getNigeriaBanks();
         if (cancelled) return;
-        const list = Array.isArray(json?.banks)
-          ? json.banks.map((b: any) => ({ code: String(b.code || b.bank_code), name: String(b.name || b.bank_name) })).filter((b: any) => b.code && b.name)
-          : [];
-        setNgnBanks(list);
+        setNgnBanks(banks.map((b) => ({ code: b.code, name: b.name })));
       } catch (e) {
         console.error("Failed to load NG banks", e);
       }
@@ -350,22 +347,20 @@ const SendPage = () => {
     setNgnResolving(true);
     (async () => {
       try {
-        const { data, error } = await supabase.functions.invoke("flw-resolve-account", {
-          body: { bankCode: ngnBankCode, accountNumber: ngnAccountNumber.replace(/\D/g, "") },
-        });
+        const data = await resolveNigeriaAccount(
+          ngnAccountNumber.replace(/\D/g, ""),
+          ngnBankCode,
+        );
         if (cancelled) return;
-        if (error) {
-          setNgnResolveError("Could not verify account");
-        } else if ((data as any)?.resolved) {
-          const name = (data as any).account_name as string;
+        if (data?.resolved && data.account_name) {
+          const name = data.account_name;
           setNgnResolvedName(name);
           setRecipientName(name);
-        } else if ((data as any)?.unverified) {
-          // Flutterwave verification temporarily unavailable — allow continue using typed name
-          setNgnResolveError((data as any)?.error || "Name verification unavailable. Double-check the account number.");
+        } else if (data?.unverified) {
+          setNgnResolveError(data?.error || "Name verification unavailable. Double-check the account number.");
           setNgnResolvedName(recipientName?.trim() ? recipientName.trim() : "Unverified recipient");
         } else {
-          setNgnResolveError((data as any)?.error || "Could not verify account");
+          setNgnResolveError(data?.error || "Could not verify account");
         }
       } catch (e: any) {
         if (!cancelled) setNgnResolveError(e?.message || "Could not verify account");
@@ -391,20 +386,50 @@ const SendPage = () => {
     enabled: !isSameCurrency && !resolvedDbRate && !!sourceCurrency && !!targetCountry.code,
     staleTime: 60_000,
   });
-  const directDbRate =
-    fxRate && Number(fxRate.effective_rate) > 0 ? Number(fxRate.effective_rate) : null;
-  const derivedRate = derivedFxRate && Number(derivedFxRate) > 0 ? Number(derivedFxRate) : null;
-  const effectiveRate = isSameCurrency
-    ? 1
-    : resolvedDbRate ?? directDbRate ?? derivedRate ?? 0;
-  const rateAvailable = isSameCurrency || effectiveRate > 0;
+  const { data: nombaFxQuote } = useQuery({
+    queryKey: ["nomba-fx", sourceCurrency, targetCountry.code],
+    queryFn: () => getNombaExchangeRate(sourceCurrency, targetCountry.code),
+    enabled: !isSameCurrency && isNgnPair(sourceCurrency, targetCountry.code),
+    staleTime: 60_000,
+  });
+  const nombaRate = nombaFxQuote?.effective_rate && nombaFxQuote.effective_rate > 0
+    ? nombaFxQuote.effective_rate
+    : null;
 
   const parsedAmount = Math.max(0, parseAmount(amount));
   const baseFee = pricing?.transfer_base_fee ?? 0;
   const cardFee = fundingSource === 'card' ? (pricing?.transfer_card_surcharge ?? 0) : 0;
   const fee = parsedAmount > 0 ? baseFee + cardFee : 0;
+
+  const directDbRate =
+    fxRate && Number(fxRate.effective_rate) > 0 ? Number(fxRate.effective_rate) : null;
+  const derivedRate = derivedFxRate && Number(derivedFxRate) > 0 ? Number(derivedFxRate) : null;
+  const effectiveRate = isSameCurrency
+    ? 1
+    : nombaRate ?? resolvedDbRate ?? directDbRate ?? derivedRate ?? 0;
+  const rateAvailable = isSameCurrency || effectiveRate > 0;
+  const rateSource = nombaRate ? "nomba" : (resolvedDbRate || directDbRate ? "internal" : "market");
+
+  const { data: nombaConversion } = useQuery({
+    queryKey: ["nomba-conversion", sourceCurrency, targetCountry.code, parsedAmount, fee],
+    queryFn: async () => {
+      const net = Math.max(0, parsedAmount - fee);
+      if (net <= 0) return null;
+      const preview = await previewNigeriaConversion(net, sourceCurrency, targetCountry.code);
+      return preview.success ? preview.converted_amount : null;
+    },
+    enabled:
+      isNGNBank &&
+      sourceCurrency !== "NGN" &&
+      parsedAmount > 0 &&
+      rateAvailable,
+    staleTime: 30_000,
+  });
+
   const receivedAmount = parsedAmount > 0 && rateAvailable
-    ? Math.max(0, (parsedAmount - fee) * effectiveRate)
+    ? (nombaConversion != null && nombaConversion > 0
+      ? nombaConversion
+      : Math.max(0, (parsedAmount - fee) * effectiveRate))
     : 0;
 
   const noLinkedSource = fundingSource === 'bank' && activeSources.length === 0;
@@ -527,6 +552,7 @@ const SendPage = () => {
           currency_code: targetCountry.code,
           bank_name: isBankPayout ? bankName : null,
           bank_account: isBankPayout ? bankAcct : null,
+          bank_code: isNGNBank ? ngnBankCode : null,
         } as any);
         if (isNew && !pickedBeneficiaryId) setSavePromptOpen(true);
       } catch { /* non-fatal */ }
@@ -808,7 +834,9 @@ const SendPage = () => {
       if (b.bank_account && !ngnAccountNumber) {
         setNgnAccountNumber(b.bank_account);
       }
-      if (b.bank_name && !ngnBankCode) {
+      if (b.bank_code && !ngnBankCode) {
+        setNgnBankCode(b.bank_code);
+      } else if (b.bank_name && !ngnBankCode) {
         if (ngnBanks.length === 0) {
           allApplied = false; // wait for banks list
         } else {
@@ -954,7 +982,16 @@ const SendPage = () => {
     : (recipientName.length > 2 && recipientPhone.length > 8 && !!effectivePayoutMethod && receivedAmount > 0);
 
   const modeParam = searchParams.get('mode');
-  const activeTab = modeParam === 'canada' ? 'canada' : modeParam === 'efinmoney' ? 'efinmoney' : 'international';
+  const canadaLive = productFeatures.canadaDomestic;
+  const activeTab =
+    modeParam === 'canada' ? 'canada'
+    : modeParam === 'efinmoney' ? 'efinmoney'
+    : 'international';
+  const fundingOptions = ([
+    { v: 'wallet' as const, icon: Wallet, label: 'Wallet' },
+    ...(productFeatures.plaid ? [{ v: 'bank' as const, icon: Landmark, label: 'Bank' }] : []),
+    ...(productFeatures.stripe ? [{ v: 'card' as const, icon: CreditCard, label: 'Card' }] : []),
+  ]);
 
   // Step transitions
   const stepVariants = {
@@ -979,6 +1016,7 @@ const SendPage = () => {
             <p className="text-muted-foreground">Choose how you'd like to send</p>
           </motion.div>
 
+          {productFeatures.crypto && (
           <Link
             to="/send/cpn"
             className="block rounded-xl border border-primary/30 bg-gradient-to-r from-primary/10 to-primary/5 px-4 py-3 hover:from-primary/15 hover:to-primary/10 transition-colors"
@@ -992,6 +1030,7 @@ const SendPage = () => {
               <ArrowRight className="h-4 w-4 text-primary shrink-0" />
             </div>
           </Link>
+          )}
 
 
           {/* Tabs — spring bounce in */}
@@ -1038,6 +1077,9 @@ const SendPage = () => {
                 <TabsTrigger value="canada" className="relative z-10 gap-1 px-1 sm:gap-1.5 sm:px-2 text-[11px] sm:text-sm data-[state=active]:bg-transparent data-[state=active]:shadow-none">
                   <CountryFlag country="CA" size="xs" />
                   Domestic
+                  {!canadaLive && (
+                    <span className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">Soon</span>
+                  )}
                 </TabsTrigger>
               </TabsList>
 
@@ -1053,7 +1095,16 @@ const SendPage = () => {
                       transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
                     >
                       <TabsContent value="canada" forceMount className="mt-0">
-                        <CanadaSendFlow />
+                        {canadaLive ? (
+                          <CanadaSendFlow />
+                        ) : (
+                          <ComingSoon
+                            title="Canada domestic — coming soon"
+                            description="Interac, EFT, and CAD domestic transfers are on the roadmap. Nigeria and Ghana are live today."
+                            backHref="/send"
+                            backLabel="Back to international send"
+                          />
+                        )}
                       </TabsContent>
                     </motion.div>
                   ) : activeTab === 'efinmoney' ? (
@@ -1172,12 +1223,8 @@ const SendPage = () => {
                                   <CardContent className="space-y-6">
                                     <motion.div custom={0} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
                                       <Label>Pay From</Label>
-                                      <div className="grid grid-cols-3 gap-2">
-                                        {([
-                                          { v: 'wallet', icon: Wallet, label: 'Wallet' },
-                                          { v: 'bank', icon: Landmark, label: 'Bank' },
-                                          { v: 'card', icon: CreditCard, label: 'Card' },
-                                        ] as const).map(({ v, icon: Icon, label }) => (
+                                      <div className={`grid gap-2 ${fundingOptions.length === 3 ? 'grid-cols-3' : fundingOptions.length === 2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                                        {fundingOptions.map(({ v, icon: Icon, label }) => (
                                           <Button
                                             key={v}
                                             type="button"
@@ -1257,7 +1304,7 @@ const SendPage = () => {
                                       </motion.div>
                                     )}
 
-                                    {fundingSource === 'card' && (
+                                    {fundingSource === 'card' && productFeatures.stripe && (
                                       <motion.div custom={1} variants={fieldVariants} initial="hidden" animate="show" className="space-y-3">
                                         <div className="flex items-center justify-between">
                                           <Label>Pay with card</Label>
@@ -1734,6 +1781,7 @@ const SendPage = () => {
                                           )}
                                           <p className="text-xs text-muted-foreground">Funds will be deposited directly to the bank account above.</p>
                                         </motion.div>
+                                        {productFeatures.crypto && (
                                         <motion.div custom={2.7} variants={fieldVariants} initial="hidden" animate="show" className="rounded-xl border border-primary/30 bg-gradient-to-br from-primary/5 via-background to-accent/5 p-4 space-y-2">
                                           <div className="flex items-start justify-between gap-3">
                                             <div className="flex-1">
@@ -1752,7 +1800,8 @@ const SendPage = () => {
                                             />
                                           </div>
                                         </motion.div>
-                                        {canUseFincra && (
+                                        )}
+                                        {productFeatures.flutterwave && canUseFincra && (
                                           <motion.div custom={2.8} variants={fieldVariants} initial="hidden" animate="show" className="rounded-xl border border-teal-500/30 bg-gradient-to-br from-teal-500/5 via-background to-teal-500/5 p-4">
                                             <div className="flex items-start justify-between gap-3">
                                               <div className="flex-1">
@@ -1826,6 +1875,7 @@ const SendPage = () => {
                                         </p>
                                       </motion.div>
                                       <motion.div custom={2.5} variants={fieldVariants} initial="hidden" animate="show" className="rounded-xl border border-indigo-500/30 bg-gradient-to-br from-indigo-500/5 via-background to-indigo-500/5 p-4">
+                                        {productFeatures.flutterwave ? (
                                         <div className="flex items-start justify-between gap-3">
                                           <div className="flex-1">
                                             <div className="flex items-center gap-2">
@@ -1833,7 +1883,7 @@ const SendPage = () => {
                                               <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/20 text-primary font-mono uppercase">Beta</span>
                                             </div>
                                             <p className="text-xs text-muted-foreground mt-1">
-                                              Route this mobile money payout through PawaPay's pan-African network instead of the default provider. Supports SN, CM, CI, BF, BJ, KE, UG, TZ, RW, ZM, GH, MW.
+                                              Route this mobile money payout through PawaPay&apos;s pan-African network instead of the default provider.
                                             </p>
                                           </div>
                                           <Switch
@@ -1842,8 +1892,13 @@ const SendPage = () => {
                                             aria-label="Use PawaPay network"
                                           />
                                         </div>
+                                        ) : (
+                                          <p className="text-xs text-muted-foreground">
+                                            Additional mobile-money corridors are coming soon. Ghana and Nigeria bank transfers are live today.
+                                          </p>
+                                        )}
                                       </motion.div>
-                                      {canUseFincra && (
+                                      {productFeatures.flutterwave && canUseFincra && (
                                         <motion.div custom={2.6} variants={fieldVariants} initial="hidden" animate="show" className="rounded-xl border border-teal-500/30 bg-gradient-to-br from-teal-500/5 via-background to-teal-500/5 p-4">
                                           <div className="flex items-start justify-between gap-3">
                                             <div className="flex-1">

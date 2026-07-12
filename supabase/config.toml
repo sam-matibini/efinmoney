@@ -54,6 +54,24 @@ verify_jwt = true
 [functions.nomba-payment-callback]
 verify_jwt = false
 
+[functions.nomba-get-banks]
+verify_jwt = true
+
+[functions.nomba-resolve-account]
+verify_jwt = true
+
+[functions.nomba-exchange-rate]
+verify_jwt = false
+
+[functions.nomba-transfer-conversion]
+verify_jwt = true
+
+[functions.nomba-payout]
+verify_jwt = false
+
+[functions.nomba-verify-transfer]
+verify_jwt = true
+
 [functions.mtn-momo-payout]
 verify_jwt = false
 

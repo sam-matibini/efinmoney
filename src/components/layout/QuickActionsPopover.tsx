@@ -22,11 +22,7 @@ const items: Item[] = [
   { kind: "modal", Modal: SendMoneyModal, icon: Send, label: "Send" },
   { kind: "link", to: "/wallet/topup", icon: Download, label: "Add Money" },
   { kind: "link", to: "/wallet/receive", icon: Smartphone, label: "Receive" },
-  { kind: "link", to: "/pay-bills", icon: CreditCard, label: "Pay Bills" },
-  { kind: "link", to: "/send?mode=canada", icon: MapPin, label: "Domestic" },
   { kind: "modal", Modal: ExchangeModal, icon: RefreshCw, label: "Exchange" },
-  { kind: "modal", Modal: MobileMoneyModal, icon: Smartphone, label: "Mobile Money" },
-  { kind: "modal", Modal: SavingsModal, icon: PiggyBank, label: "Savings" },
 ];
 
 const QuickActionsPopover = () => {

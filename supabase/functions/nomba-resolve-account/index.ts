@@ -1,0 +1,93 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { fetchNombaAccountLookup, isNombaNigeriaConfigured } from "../_shared/nomba-nigeria.ts";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
+};
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  try {
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: authHeader } } },
+    );
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    let accountNumber = "";
+    let bankCode = "";
+    if (req.method === "GET") {
+      const url = new URL(req.url);
+      accountNumber = String(url.searchParams.get("accountNumber") || url.searchParams.get("account_number") || "").trim();
+      bankCode = String(url.searchParams.get("bankCode") || url.searchParams.get("bankcode") || "").trim();
+    } else {
+      const body = await req.json().catch(() => ({}));
+      accountNumber = String(body?.accountNumber || body?.account_number || "").trim();
+      bankCode = String(body?.bankCode || body?.bankcode || "").trim();
+    }
+
+    if (!accountNumber || !bankCode) {
+      return new Response(JSON.stringify({ error: "accountNumber and bankCode required" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { data: rl } = await supabase.rpc("check_rate_limit", {
+      p_key: `nomba_resolve:${user.id}`,
+      p_max_requests: 30,
+      p_window_seconds: 60,
+    });
+    if (rl === false) {
+      return new Response(JSON.stringify({ error: "Too many requests" }), {
+        status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (!isNombaNigeriaConfigured()) {
+      return new Response(JSON.stringify({
+        error: "Nomba Nigeria not configured (NOMBA_PAY_API_URL / NOMBA_PAY_USER)",
+        source: "nomba",
+      }), { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const { accountName, result } = await fetchNombaAccountLookup(accountNumber, bankCode);
+    if (accountName) {
+      return new Response(JSON.stringify({
+        resolved: true,
+        account_name: accountName,
+        account_number: accountNumber,
+        source: "nomba",
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    return new Response(JSON.stringify({
+      resolved: false,
+      account_number: accountNumber,
+      error: result.message || "Nomba account lookup failed",
+      code: result.code,
+      source: "nomba",
+      nomba_raw: result.json,
+    }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+    // Flutterwave fallback disabled while debugging Nomba:
+    // const { ok, json } = await flwV3Fetch("/accounts/resolve", ...);
+  } catch (err) {
+    return new Response(JSON.stringify({ error: err instanceof Error ? err.message : "Unknown" }), {
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+});

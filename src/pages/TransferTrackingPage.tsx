@@ -145,7 +145,15 @@ const TransferTrackingPage = () => {
         || transfer.transfer_type === "domestic_canada"
         || transfer.payout_method === "interac"
         || transfer.payout_method === "eft";
-      const fn = isPaysafe ? "paysafe-verify-transfer" : "flw-verify-transfer";
+      const isNombaNgnBank =
+        transfer.target_currency === "NGN"
+        && (transfer.payout_method === "bank" || transfer.transfer_type === "bank")
+        && !!transfer.recipient_bank_code;
+      const fn = isPaysafe
+        ? "paysafe-verify-transfer"
+        : isNombaNgnBank
+          ? "nomba-verify-transfer"
+          : "flw-verify-transfer";
       const { data, error } = await supabase.functions.invoke(fn, { body: { transfer_id: id } });
       if (error) throw error;
       if (data?.changed && data?.status) {

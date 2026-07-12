@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { fetchNombaExchangeRate, isNombaNigeriaConfigured } from "../_shared/nomba-nigeria.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -68,6 +69,35 @@ Deno.serve(async (req) => {
           markup_rate: MARKUP,
           effective_rate: effective,
           source,
+          valid_from: now.toISOString(),
+          valid_until: validUntil,
+        });
+      }
+    }
+
+    if (isNombaNigeriaConfigured()) {
+      for (const pair of [["USD", "NGN"], ["CAD", "NGN"], ["GBP", "NGN"], ["EUR", "NGN"]] as const) {
+        const [from, to] = pair;
+        const { rates: nombaRates } = await fetchNombaExchangeRate(from, to);
+        const mid = nombaRates[0]?.midRateNumeric;
+        if (!mid || mid <= 0) continue;
+        rows.push({
+          from_currency: from,
+          to_currency: to,
+          rate: mid,
+          markup_rate: 0,
+          effective_rate: mid,
+          source: "nomba",
+          valid_from: now.toISOString(),
+          valid_until: validUntil,
+        });
+        rows.push({
+          from_currency: to,
+          to_currency: from,
+          rate: 1 / mid,
+          markup_rate: 0,
+          effective_rate: 1 / mid,
+          source: "nomba",
           valid_from: now.toISOString(),
           valid_until: validUntil,
         });

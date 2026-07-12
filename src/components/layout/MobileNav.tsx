@@ -1,16 +1,19 @@
 import { motion } from "framer-motion";
-import { Home, CreditCard, Activity, MoreHorizontal } from "lucide-react";
+import { Home, Send, CreditCard, Activity, MoreHorizontal } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { prefetchRoute } from "@/lib/prefetchRoute";
+import { productFeatures } from "@/lib/productFeatures";
 
 const navItems = [
   { icon: Home, label: "Home", href: "/dashboard", match: ["/dashboard", "/"] },
-  { icon: CreditCard, label: "Cards", href: "/cards", match: ["/cards"] },
+  ...(productFeatures.cards
+    ? [{ icon: CreditCard, label: "Cards", href: "/cards", match: ["/cards"] }]
+    : [{ icon: Send, label: "Send", href: "/send", match: ["/send"] }]),
   { icon: Activity, label: "History", href: "/transfers", match: ["/transfers", "/transactions"] },
   { icon: MoreHorizontal, label: "More", href: "/more", match: ["/more", "/profile", "/security", "/kyc", "/contacts", "/settings"] },
-];
+] as const;
 
 const MobileNav = () => {
   const location = useLocation();

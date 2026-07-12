@@ -146,6 +146,7 @@ export default function ApiManagementPage() {
           </h1>
           <p className="text-muted-foreground mt-1">
             Monitor integration health, inspect webhook traffic, and audit edge functions.
+            Flutterwave and Stripe probes below are legacy — not exposed in the user-facing app.
           </p>
         </div>
       </div>

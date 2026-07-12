@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { RevokePaymentLinkDialog } from "@/components/payment-links/RevokePaymentLinkDialog";
 import CreatePaymentLinkModal from "@/components/payment-links/CreatePaymentLinkModal";
+import FeatureGate from "@/components/common/FeatureGate";
 
 type Row = {
   id: string;
@@ -111,6 +112,7 @@ const PaymentLinksPage = () => {
   };
 
   return (
+    <FeatureGate feature="paymentLinks">
     <main className="container px-4 py-6 max-w-4xl mx-auto space-y-6">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
@@ -232,6 +234,7 @@ const PaymentLinksPage = () => {
           onCreated={() => qc.invalidateQueries({ queryKey: ["payment-link-payouts"] })}
         />
       </main>
+    </FeatureGate>
   );
 };
 

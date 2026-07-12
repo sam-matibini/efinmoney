@@ -32,6 +32,7 @@ import SearchModal from "@/components/header/SearchModal";
 import HeaderNavItem from "@/components/layout/HeaderNavItem";
 import NavIconImage from "@/components/layout/NavIconImage";
 import { navIconImgClassMobile } from "@/components/layout/navIconAssets";
+import { productFeatures } from "@/lib/productFeatures";
 import { Logo, Wordmark } from "@/components/Logo";
 import ThemeToggle from "@/components/theme/ThemeToggle";
 import { useWallets } from "@/hooks/useWallets";
@@ -81,12 +82,12 @@ const Header = () => {
   const navItems: NavItem[] = [
     buildNavItem("Dashboard", "/dashboard"),
     buildNavItem("Send", "/send"),
-    buildNavItem("Payment Links", "/payment-links"),
+    ...(productFeatures.paymentLinks ? [buildNavItem("Payment Links", "/payment-links")] : []),
     buildNavItem("Top up", "/wallet/topup"),
     buildNavItem("Contacts", "/contacts"),
     buildNavItem("Foreign Currency Exchange", "/exchange"),
     buildNavItem("Wallets", "/wallets"),
-    buildNavItem("Cards", "/cards"),
+    ...(productFeatures.cards ? [buildNavItem("Cards", "/cards")] : []),
   ];
 
   if (!isAdmin && isFinance) navItems.push(buildNavItem("Finance", "/finance"));
