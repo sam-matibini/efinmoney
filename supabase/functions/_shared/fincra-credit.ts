@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { sendTopupEmail } from "./topup-email.ts";
 
 type Admin = ReturnType<typeof createClient>;
 
@@ -78,6 +79,8 @@ export async function creditWalletViaFincra(
       type: "transfer",
     });
   } catch { /* best-effort */ }
+
+  sendTopupEmail(admin, userId, currency, amount, idempotencyRef).catch(() => {});
 
   return { wallet_id: walletId, already: false };
 }

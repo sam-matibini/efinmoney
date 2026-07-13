@@ -1,6 +1,7 @@
 // V3 charge verification: GET /v3/transactions/verify_by_reference?tx_ref=...
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { flwV3Fetch } from "../_shared/flw-v3.ts";
+import { sendTopupEmail } from "../_shared/topup-email.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -165,6 +166,9 @@ Deno.serve(async (req) => {
       const walletIdFromMeta = meta.wallet_id ? String(meta.wallet_id) : undefined;
       const { already } = await creditWalletViaLedger(admin, userId, currency, amount, flwId, ref, walletIdFromMeta);
       credited = !already;
+      if (credited) {
+        sendTopupEmail(admin, userId, currency, amount, flwId || ref).catch(() => {});
+      }
     }
 
     return new Response(JSON.stringify({

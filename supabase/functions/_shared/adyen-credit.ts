@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
+import { sendTopupEmail } from './topup-email.ts'
 
 type Admin = ReturnType<typeof createClient>
 
@@ -103,6 +104,8 @@ export async function creditAdyenTopup(
     type: 'wallet',
     is_read: false,
   })
+
+  sendTopupEmail(admin, session.user_id, currency, amountMajor, pspReference).catch(() => {});
 
   return { credited: true, amount: amountMajor, currency }
 }

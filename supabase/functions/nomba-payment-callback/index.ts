@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { getNombaPayConfig } from "../_shared/nomba-pay.ts";
+import { sendTopupEmail } from "../_shared/topup-email.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -183,6 +184,8 @@ async function completeNombaCollection(
     message: `Your ${creditCurrency} wallet has been credited ${symbol}${creditAmount.toLocaleString()}.`,
     type: "wallet",
   }).then(() => null, () => null);
+
+  sendTopupEmail(supabase, txn.user_id, creditCurrency, creditAmount, idempotencyRef).catch(() => {});
 
   return { ok: true };
 }

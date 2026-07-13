@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { sendTopupEmail } from "../_shared/topup-email.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -164,10 +165,13 @@ Deno.serve(async (req) => {
 
           // Idempotency keyed on FLW transaction_id (falls back to tx_ref)
           const idempotencyRef = flwId || String(reference);
-          await creditWallet(
+          const credited = await creditWallet(
             supabase, userIdMeta, walletId, currency, amount,
             idempotencyRef, `Top-up via Flutterwave (txn ${flwId}, ref ${reference})`,
           );
+          if (credited) {
+            sendTopupEmail(supabase, userIdMeta, currency, amount, idempotencyRef).catch(() => {});
+          }
         }
         // Virtual account credit
         else {

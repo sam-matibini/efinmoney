@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { getGhanaPayConfig } from "../_shared/ghana-pay.ts";
+import { sendTopupEmail } from "../_shared/topup-email.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -195,6 +196,8 @@ Deno.serve(async (req) => {
         message: `Your GHS wallet has been credited GH₵${amount.toLocaleString()}.`,
         type: "wallet",
       }).then(() => null, () => null);
+
+      sendTopupEmail(supabase, txn.user_id, "GHS", amount, idempotencyRef).catch(() => {});
 
       return new Response(JSON.stringify({ received: true, outcome: "collection_completed" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },

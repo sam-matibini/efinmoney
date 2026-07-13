@@ -7,6 +7,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import Stripe from "https://esm.sh/stripe@17.3.1?target=denonext";
+import { sendTopupEmail } from "../_shared/topup-email.ts";
 
 const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY")!, {
   apiVersion: "2024-11-20.acacia",
@@ -146,6 +147,8 @@ Deno.serve(async (req) => {
         message: `Your wallet was credited with ${currency} ${creditAmount.toFixed(2)}.`,
         type: "transfer",
       });
+
+      sendTopupEmail(admin, payin.user_id, currency, creditAmount, externalRef).catch(() => {});
 
       return ok();
     }
