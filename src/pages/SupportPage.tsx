@@ -98,7 +98,9 @@ function ShareButton({ thread, messages }: { thread: SupportThread; messages: im
   const body = `Hi,\n\nI wanted to share this eFinMoney support conversation with you:\n\nSubject: ${thread.subject}\nStatus: ${thread.status}\n\nView it at: https://efin.money/support\n\n— Sent via eFinMoney`;
 
   const shareEmail = () => {
-    window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    const a = document.createElement("a");
+    a.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    a.click();
   };
 
   const shareWhatsApp = () => {
@@ -108,7 +110,9 @@ function ShareButton({ thread, messages }: { thread: SupportThread; messages: im
 
   const shareSMS = () => {
     const text = `eFinMoney Support — "${thread.subject}" (${thread.status}). Visit: https://efin.money/support`;
-    window.location.href = `sms:?&body=${encodeURIComponent(text)}`;
+    const a = document.createElement("a");
+    a.href = `sms:?&body=${encodeURIComponent(text)}`;
+    a.click();
   };
 
   const savePDF = () => {
