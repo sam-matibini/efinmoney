@@ -144,12 +144,12 @@ Deno.serve(async (req) => {
         return json({ error: "Nigeria checkout requires an NGN wallet" }, 400);
       }
       if (corridor === "international" && !["USD", "EUR", "GBP"].includes(walletCurrency)) {
-        return json({ error: `Nomba checkout does not support ${walletCurrency} directly` }, 400);
+        return json({ error: `Card checkout does not support ${walletCurrency} directly` }, 400);
       }
     }
 
     if (!isNombaPayConfigured()) {
-      return json({ error: "Nomba Pay is not configured", code: "provider_not_configured" }, 500);
+      return json({ error: "Card checkout is not configured", code: "provider_not_configured" }, 500);
     }
     const cfg = getNombaPayConfig();
 
@@ -232,8 +232,8 @@ Deno.serve(async (req) => {
       order_id: result.orderId,
       payment_link: result.checkoutUrl,
       message: walletCurrency === "CAD"
-        ? `Pay $${amountRounded.toFixed(2)} USD on Nomba — your CAD wallet will be credited C$${creditAmount.toFixed(2)}`
-        : "Redirecting to secure Nomba checkout…",
+        ? `Pay $${amountRounded.toFixed(2)} USD at checkout — your CAD wallet will be credited C$${creditAmount.toFixed(2)}`
+        : "Redirecting to secure checkout…",
       quote: {
         credit_amount: creditAmount,
         credit_currency: creditCurrency,

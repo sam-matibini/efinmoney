@@ -291,7 +291,7 @@ const ExchangeModal = ({ children }: ExchangeModalProps) => {
                     <span className="text-foreground flex items-center gap-2">
                       1 {fromWallet?.currency_code} = {formatNumber(effectiveRate, 4)} {toWallet?.currency_code}
                       {rateFromNomba && (
-                        <span className="text-[10px] uppercase tracking-wide text-emerald-600 font-semibold">Nomba</span>
+                        <span className="text-[10px] uppercase tracking-wide text-emerald-600 font-semibold">Live</span>
                       )}
                     </span>
                   </div>

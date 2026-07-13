@@ -17,7 +17,7 @@ const defaultCopy: Partial<Record<ProductFeatureKey, ComingSoonProps>> = {
   },
   stripe: {
     title: "Card payments — coming soon",
-    description: "We're simplifying card funding while we expand Nomba corridors.",
+    description: "We're simplifying card funding while we expand payment corridors.",
   },
   flutterwave: {
     title: "Coming soon",
@@ -41,7 +41,7 @@ const defaultCopy: Partial<Record<ProductFeatureKey, ComingSoonProps>> = {
   },
   adyen: {
     title: "Card checkout — coming soon",
-    description: "Embedded card payments are disabled while we focus on Nomba and Ghana rails.",
+    description: "Embedded card payments are disabled while we focus on Nigeria and Ghana rails.",
   },
   otherAfricanCorridors: {
     title: "Corridor coming soon",

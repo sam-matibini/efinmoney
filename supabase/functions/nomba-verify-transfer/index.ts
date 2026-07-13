@@ -91,7 +91,7 @@ Deno.serve(async (req) => {
         .from("transfers")
         .update({
           status: "failed",
-          failure_reason: payoutTxn.failure_reason ?? "Nomba payout failed",
+          failure_reason: payoutTxn.failure_reason ?? "Bank payout failed",
         })
         .eq("id", transfer_id);
 

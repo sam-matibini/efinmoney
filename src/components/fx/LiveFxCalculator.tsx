@@ -472,7 +472,7 @@ const LiveFxCalculator = ({
                 <div className={`mt-2.5 flex flex-wrap gap-1 ${embedded ? "gap-1" : "gap-1.5"}`}>
                   <Badge compact={embedded} shell={shell}>Mid-market rate</Badge>
                   {usingNombaRate && (
-                    <Badge compact={embedded} shell={shell}>Nomba live</Badge>
+                    <Badge compact={embedded} shell={shell}>Live rate</Badge>
                   )}
                   <Badge compact={embedded} shell={shell}>No hidden fees</Badge>
                   <Badge compact={embedded} shell={shell}>{isApp ? "Live rate" : "60s rate lock"}</Badge>

@@ -152,14 +152,14 @@ const TopUpPage = () => {
     const nombaStatus = params.get("nomba");
     if (nombaStatus === "success") {
       clearPendingNombaTxn();
-      setVerifyState({ status: "success", message: "Nomba payment received — your wallet should update shortly." });
-      toast.success("Nomba top-up complete");
+      setVerifyState({ status: "success", message: "Payment received — your wallet should update shortly." });
+      toast.success("Top-up complete");
       void queryClient.invalidateQueries({ queryKey: ["wallets"] });
       return;
     }
     if (nombaStatus === "failed") {
       clearPendingNombaTxn();
-      setVerifyState({ status: "failed", message: "Nomba payment could not be completed." });
+      setVerifyState({ status: "failed", message: "Payment could not be completed." });
       return;
     }
 
@@ -467,7 +467,7 @@ const TopUpPage = () => {
           {!liveTopup && selectedWallet && (
             <ComingSoon
               title="Top-up coming soon for this currency"
-              description={`${currency} wallet funding is on the roadmap. Nigeria (NGN), Ghana (GHS), USD, EUR, GBP, and CAD (via Nomba USD checkout) are live today.`}
+              description={`${currency} wallet funding is on the roadmap. Nigeria (NGN), Ghana (GHS), USD, EUR, GBP, and CAD (USD card checkout) are live today.`}
               backHref="/wallets"
               backLabel="View wallets"
             />

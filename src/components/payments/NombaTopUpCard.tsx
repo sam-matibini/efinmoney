@@ -119,7 +119,7 @@ export default function NombaTopUpCard({ walletId, walletCurrency, onComplete }:
         return_url: `${window.location.origin}/wallet/topup?walletId=${walletId}`,
       });
       savePendingNombaTxn(result.transaction_id);
-      toast.message("Opening Nomba checkout", {
+      toast.message("Opening secure checkout", {
         description: isCadViaUsd
           ? `Pay $${quote?.checkoutAmount.toFixed(2)} USD — CAD cards accepted`
           : "Complete payment on the secure checkout page.",
@@ -132,16 +132,16 @@ export default function NombaTopUpCard({ walletId, walletCurrency, onComplete }:
   };
 
   const title = isCadViaUsd
-    ? "Top up CAD via Nomba (USD checkout)"
+    ? "Top up CAD (USD card checkout)"
     : isInternational
-      ? "International checkout (Nomba)"
-      : "Nigeria checkout (Nomba)";
+      ? "International checkout"
+      : "Nigeria checkout";
 
   const subtitle = isCadViaUsd
-    ? "Enter how much CAD you want in your wallet. You'll pay the USD equivalent on Nomba — Canadian debit/credit cards work on the international checkout."
+    ? "Enter how much CAD you want in your wallet. You'll pay the USD equivalent at checkout — Canadian debit/credit cards are accepted."
     : isInternational
-      ? `Pay with card in ${currency} via secure Nomba hosted checkout (USD, EUR, GBP).`
-      : "Pay with Nigerian debit/credit card via secure Nomba hosted checkout.";
+      ? `Pay with card in ${currency} via our secure hosted checkout (USD, EUR, GBP).`
+      : "Pay with Nigerian debit/credit card via our secure hosted checkout.";
 
   return (
     <Card className={
@@ -189,11 +189,11 @@ export default function NombaTopUpCard({ walletId, walletCurrency, onComplete }:
             {isCadViaUsd && quote.fxRate && (
               <>
                 <div className="flex justify-between gap-2">
-                  <span className="text-muted-foreground">Nomba checkout (approx.)</span>
+                  <span className="text-muted-foreground">Checkout total (approx.)</span>
                   <span className="font-semibold tabular-nums">${quote.checkoutAmount.toFixed(2)} USD</span>
                 </div>
                 <p className="text-[11px] text-muted-foreground pt-1">
-                  Rate: 1 CAD ≈ {quote.fxRate.toFixed(4)} USD · You pay USD on Nomba; your CAD wallet is credited after confirmation.
+                  Rate: 1 CAD ≈ {quote.fxRate.toFixed(4)} USD · You pay USD at checkout; your CAD wallet is credited after confirmation.
                 </p>
               </>
             )}
@@ -219,8 +219,8 @@ export default function NombaTopUpCard({ walletId, walletCurrency, onComplete }:
             <>
               <ExternalLink className="h-4 w-4 mr-2" />
               {isCadViaUsd && quote
-                ? `Continue — pay $${quote.checkoutAmount.toFixed(2)} USD on Nomba`
-                : "Continue to Nomba checkout"}
+                ? `Continue — pay $${quote.checkoutAmount.toFixed(2)} USD`
+                : "Continue to secure checkout"}
             </>
           )}
         </Button>

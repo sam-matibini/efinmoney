@@ -133,8 +133,8 @@ async function completeNombaCollection(
 
   const journalId = crypto.randomUUID();
   const desc = creditCurrency !== checkoutCurrency
-    ? `Nomba top-up (${idempotencyRef}) — ${checkoutAmount} ${checkoutCurrency} → ${creditAmount} ${creditCurrency}`
-    : `Nomba top-up (${idempotencyRef})`;
+    ? `eFinMoney top-up (${idempotencyRef}) — ${checkoutAmount} ${checkoutCurrency} → ${creditAmount} ${creditCurrency}`
+    : `eFinMoney top-up (${idempotencyRef})`;
 
   const { error: leErr } = await supabase.from("ledger_entries").insert([
     {

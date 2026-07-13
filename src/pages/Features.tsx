@@ -19,7 +19,7 @@ const LIVE = [
     id: "send",
     icon: Send,
     title: "Nigeria & Ghana transfers",
-    desc: "Send to Nigerian bank accounts (Nomba) or Ghana mobile money. Every transfer includes a receipt and live tracking.",
+    desc: "Send to Nigerian bank accounts or Ghana mobile money. Every transfer includes a receipt and live tracking.",
   },
   {
     id: "mobile-money",
@@ -31,7 +31,7 @@ const LIVE = [
     id: "exchange",
     icon: Repeat,
     title: "Currency exchange",
-    desc: "Convert between the currencies you hold at transparent, live market rates — including NGN pairs via Nomba.",
+    desc: "Convert between the currencies you hold at transparent, live market rates — including NGN pairs.",
   },
   {
     id: "receive",

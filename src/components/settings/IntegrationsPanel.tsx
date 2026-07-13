@@ -48,7 +48,7 @@ interface Integration {
 const integrations: Integration[] = [
   {
     id: "nomba",
-    name: "Nomba (Nigeria)",
+    name: "Nigeria (bank & card)",
     description: "NGN bank payouts, FX, and international collection — live user-facing rail",
     category: "payments",
     icon: <Globe className="h-6 w-6" />,

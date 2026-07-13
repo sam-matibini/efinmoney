@@ -28,7 +28,7 @@ const FEATURES = [
 
 const STEPS: { n: number; title: string; desc?: string }[] = [
   { n: 1, title: "Create your account" },
-  { n: 2, title: "Add funds via bank or Nomba" },
+  { n: 2, title: "Add funds via bank or card" },
   { n: 3, title: "Send to Nigeria or Ghana" },
 ];
 
@@ -362,7 +362,7 @@ const Landing = () => {
             </p>
             <ul className="mt-7 space-y-3">
               {[
-                "Nigeria bank transfers via Nomba",
+                "Nigeria bank transfers",
                 "Ghana MoMo top-up and payouts",
                 "Multi-currency wallets with live FX",
               ].map((t) => (

@@ -387,7 +387,7 @@ const FxTradingPanel = () => {
                       <>
                         {`1 ${fromWallet?.currency_code} = ${effectiveRate.toFixed(4)} ${toWallet?.currency_code}`}
                         {rateFromNomba && (
-                          <span className="text-[10px] uppercase tracking-wide text-emerald-600 font-semibold">Nomba</span>
+                          <span className="text-[10px] uppercase tracking-wide text-emerald-600 font-semibold">Live</span>
                         )}
                       </>
                     )
@@ -469,7 +469,7 @@ const LiveFxRatesCard = () => {
               <span>{flagForCurrency("USD")} USD → {flagForCurrency("NGN")} NGN</span>
               <span className="font-mono flex items-center gap-2">
                 {Number(nombaUsdNgn.effective_rate).toFixed(4)}
-                <span className="text-[10px] uppercase text-emerald-600 font-semibold">Nomba</span>
+                <span className="text-[10px] uppercase text-emerald-600 font-semibold">Live</span>
               </span>
             </div>
           ) : null}
@@ -509,7 +509,7 @@ const ExchangePage = () => {
             value="Live FX rates"
             meta={[
               { icon: TrendingUp, text: "0.5% spread on wallet swaps" },
-              { icon: Sparkles, text: productFeatures.crypto ? "Fiat & on-chain USDC" : "Nomba rates for NGN pairs" },
+              { icon: Sparkles, text: productFeatures.crypto ? "Fiat & on-chain USDC" : "Live rates for NGN pairs" },
             ]}
             variant="cta"
           />

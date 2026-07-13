@@ -46,8 +46,8 @@ export function routeWalletTopupGateway(
 
 export function nombaGatewayLabel(currency: string): string {
   const c = currency.toUpperCase();
-  if (c === "CAD") return "Nomba (USD checkout)";
+  if (c === "CAD") return "USD card checkout";
   return NOMBA_INTERNATIONAL_CURRENCIES.includes(c)
-    ? "Nomba (International)"
-    : "Nomba (Nigeria)";
+    ? "International checkout"
+    : "Nigeria checkout";
 }

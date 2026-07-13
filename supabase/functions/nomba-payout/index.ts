@@ -171,7 +171,7 @@ Deno.serve(async (req) => {
     });
 
     if (!result.ok) {
-      const reason = result.message || "Nomba payout failed";
+      const reason = result.message || "Bank payout failed";
       await supabase.from("nomba_payout_transactions").update({
         status: "failed",
         failure_reason: reason.slice(0, 500),

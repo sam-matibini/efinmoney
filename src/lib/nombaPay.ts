@@ -100,7 +100,7 @@ export async function initiateNombaCollection(params: {
   const payload = data as NombaCollectionResult & { error?: string };
   if (payload.error) throw new Error(payload.error);
   if (!payload.success || !payload.payment_link) {
-    throw new Error(payload.message || "Nomba did not return a checkout link");
+    throw new Error(payload.message || "Checkout link unavailable");
   }
   return payload;
 }

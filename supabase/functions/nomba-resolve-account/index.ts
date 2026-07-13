@@ -77,7 +77,7 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({
       resolved: false,
       account_number: accountNumber,
-      error: result.message || "Nomba account lookup failed",
+      error: result.message || "Account lookup failed",
       code: result.code,
       source: "nomba",
       nomba_raw: result.json,
