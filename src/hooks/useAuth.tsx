@@ -20,12 +20,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let settled = false;
+    // Clear the loading gate exactly once, no matter which path resolves first.
+    const stopLoading = () => { if (!settled) { settled = true; setLoading(false); } };
+
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
-        setLoading(false);
+        stopLoading();
         if (session?.user) {
           identifyUser(session.user.id, { email: session.user.email });
         } else if (event === 'SIGNED_OUT') {
@@ -34,14 +38,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     );
 
-    // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
+    // THEN check for existing session. Guard against a rejected/hanging
+    // getSession() (e.g. a stale token) trapping the app on the spinner.
+    supabase.auth.getSession()
+      .then(({ data: { session } }) => {
+        setSession(session);
+        setUser(session?.user ?? null);
+      })
+      .catch((e) => console.warn('getSession failed', e))
+      .finally(stopLoading);
 
-    return () => subscription.unsubscribe();
+    // Safety net: never leave the user stuck on the loading spinner if auth
+    // initialization stalls for any reason.
+    const timeout = window.setTimeout(stopLoading, 8000);
+
+    return () => {
+      subscription.unsubscribe();
+      window.clearTimeout(timeout);
+    };
   }, []);
 
   const signUp = async (email: string, password: string, fullName: string) => {

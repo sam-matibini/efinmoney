@@ -219,8 +219,8 @@ export default function NombaTopUpCard({ walletId, walletCurrency, onComplete }:
             <>
               <ExternalLink className="h-4 w-4 mr-2" />
               {isCadViaUsd && quote
-                ? `Continue — pay $${quote.checkoutAmount.toFixed(2)} USD`
-                : "Continue to secure checkout"}
+                ? `Continue — C$${parsedAmount.toFixed(2)} CAD → $${quote.checkoutAmount.toFixed(2)} USD`
+                : `Continue — ${currency}`}
             </>
           )}
         </Button>
