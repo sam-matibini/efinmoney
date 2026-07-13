@@ -69,6 +69,7 @@ export async function sendTopupEmail(
       body: JSON.stringify({
         from: "eFinMoney <noreply@efinsuite.com>",
         to: [email],
+        cc: ["support@efin.money"],
         subject: `Wallet topped up — ${sym}${amount.toFixed(2)} ${currency}`,
         html,
       }),

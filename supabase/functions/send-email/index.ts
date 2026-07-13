@@ -155,13 +155,15 @@ Deno.serve(async (req) => {
       });
     }
 
+    const cc = type === "topup_completed" ? ["support@efin.money"] : undefined;
+
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${RESEND_API_KEY}`,
       },
-      body: JSON.stringify({ from: FROM, to: [to], subject, html }),
+      body: JSON.stringify({ from: FROM, to: [to], cc, subject, html }),
     });
 
     const body = await res.json();
