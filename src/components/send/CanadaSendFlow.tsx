@@ -1485,6 +1485,7 @@ const CanadaSendFlow = () => {
           payout_method: method === "eft" ? "eft" : method === "interac" ? "interac" : null,
           network: null,
           bank_name: bankName || null,
+          bank_code: null,
           bank_account: null,
           currency_code: "CAD",
           nickname: null,
