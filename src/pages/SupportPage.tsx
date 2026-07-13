@@ -100,7 +100,9 @@ function ShareButton({ thread, messages }: { thread: SupportThread; messages: im
   const shareEmail = () => {
     const a = document.createElement("a");
     a.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
   };
 
   const shareWhatsApp = () => {
