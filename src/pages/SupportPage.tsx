@@ -93,20 +93,47 @@ function AttachmentItem({ a }: { a: Attachment }) {
 }
 
 /* ── Share dropdown ─────────────────────────────────────────────────────── */
-function ShareButton({ thread }: { thread: SupportThread }) {
-  const text = `Support thread: "${thread.subject}" — efin.money/support`;
+function ShareButton({ thread, messages }: { thread: SupportThread; messages: import("@/hooks/useSupport").SupportMessage[] }) {
+  const subject = `Support: ${thread.subject}`;
+  const body = `Hi,\n\nI wanted to share this eFinMoney support conversation with you:\n\nSubject: ${thread.subject}\nStatus: ${thread.status}\n\nView it at: https://efin.money/support\n\n— Sent via eFinMoney`;
 
   const shareEmail = () => {
-    window.open(`mailto:?subject=${encodeURIComponent(`Support: ${thread.subject}`)}&body=${encodeURIComponent(text)}`);
+    window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   };
+
   const shareWhatsApp = () => {
-    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`);
+    const text = `eFinMoney Support — "${thread.subject}"\nStatus: ${thread.status}\nhttps://efin.money/support`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
   };
+
   const shareSMS = () => {
-    window.open(`sms:?body=${encodeURIComponent(text)}`);
+    const text = `eFinMoney Support — "${thread.subject}" (${thread.status}). Visit: https://efin.money/support`;
+    window.location.href = `sms:?&body=${encodeURIComponent(text)}`;
   };
-  const sharePDF = () => {
-    window.print();
+
+  const savePDF = () => {
+    const win = window.open("", "_blank");
+    if (!win) { toast.error("Allow pop-ups to save as PDF"); return; }
+    const rows = messages.map((m) => `
+      <div style="margin-bottom:16px;display:flex;justify-content:${m.sender_role === "user" ? "flex-end" : "flex-start"}">
+        <div style="max-width:70%;background:${m.sender_role === "user" ? "#4f46e5" : "#f3f4f6"};color:${m.sender_role === "user" ? "#fff" : "#111"};border-radius:16px;padding:10px 14px;font-size:13px;white-space:pre-wrap">
+          ${m.sender_role === "staff" ? '<div style="font-size:10px;font-weight:700;color:#4f46e5;margin-bottom:4px">Support</div>' : ""}
+          ${m.body.replace(/</g, "&lt;")}
+          <div style="font-size:10px;margin-top:6px;opacity:0.6">${new Date(m.created_at).toLocaleString()}</div>
+        </div>
+      </div>`).join("");
+
+    win.document.write(`<!doctype html><html><head><title>Support — ${thread.subject}</title>
+      <style>body{font-family:-apple-system,sans-serif;padding:32px;max-width:680px;margin:0 auto;color:#111}
+      h1{font-size:20px;margin:0 0 4px}p{margin:0 0 24px;color:#666;font-size:13px}
+      @media print{button{display:none!important}}</style></head>
+      <body>
+        <h1>${thread.subject}</h1>
+        <p>Status: ${thread.status} · Exported ${new Date().toLocaleString()}</p>
+        <button onclick="window.print()" style="margin-bottom:24px;padding:8px 20px;background:#4f46e5;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px">Print / Save as PDF</button>
+        ${rows}
+      </body></html>`);
+    win.document.close();
   };
 
   return (
@@ -128,7 +155,7 @@ function ShareButton({ thread }: { thread: SupportThread }) {
         <DropdownMenuItem onClick={shareSMS} className="gap-2">
           <Smartphone className="w-4 h-4 text-emerald-500" /> SMS
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={sharePDF} className="gap-2">
+        <DropdownMenuItem onClick={savePDF} className="gap-2">
           <FileText className="w-4 h-4 text-rose-500" /> Save as PDF
         </DropdownMenuItem>
       </DropdownMenuContent>
@@ -294,7 +321,7 @@ function Conversation({ thread, onBack }: { thread: SupportThread; onBack: () =>
             <h1 className="font-semibold truncate">{thread.subject}</h1>
             <p className="text-xs text-muted-foreground capitalize">{thread.status}</p>
           </div>
-          <ShareButton thread={thread} />
+          <ShareButton thread={thread} messages={messages} />
         </div>
 
         {/* Print header (hidden on screen) */}
