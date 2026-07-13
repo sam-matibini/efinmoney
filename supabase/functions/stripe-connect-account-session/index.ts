@@ -6,6 +6,9 @@ const corsHeaders = {
 };
 
 Deno.serve(async (req) => {
+  const { isStripeEnabled, stripeDisabledResponse } = await import("../_shared/stripe-guard.ts");
+  if (!isStripeEnabled()) return stripeDisabledResponse();
+
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {
     const auth = req.headers.get("Authorization");

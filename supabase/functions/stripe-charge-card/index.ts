@@ -35,6 +35,8 @@ function friendlyChargeError(err: any): { reason: string; code: string } {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  const { isStripeEnabled, stripeDisabledResponse } = await import("../_shared/stripe-guard.ts");
+  if (!isStripeEnabled()) return stripeDisabledResponse();
 
   const expectedSecret = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
   if (!expectedSecret || req.headers.get("x-internal-secret") !== expectedSecret) {

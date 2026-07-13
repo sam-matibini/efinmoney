@@ -9,6 +9,9 @@ const corsHeaders = {
 // Move funds from a user wallet into the "card float" via double-entry ledger.
 // Dr. Customer wallet liability  /  Cr. Card-Float liability (sub-account per card)
 Deno.serve(async (req) => {
+  const { isStripeEnabled, stripeDisabledResponse } = await import("../_shared/stripe-guard.ts");
+  if (!isStripeEnabled()) return stripeDisabledResponse();
+
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {

@@ -3,6 +3,9 @@ import Stripe from "npm:stripe@14";
 
 // Public endpoint — verifies Stripe signature in code.
 Deno.serve(async (req) => {
+  const { isStripeEnabled, stripeDisabledResponse } = await import("../_shared/stripe-guard.ts");
+  if (!isStripeEnabled()) return stripeDisabledResponse();
+
   if (req.method !== "POST") return new Response("Method not allowed", { status: 405 });
 
   const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");

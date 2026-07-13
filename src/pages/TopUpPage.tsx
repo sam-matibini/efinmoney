@@ -15,15 +15,12 @@ import { toast } from "sonner";
 import { CheckCircle2, XCircle, CreditCard, Smartphone, Building2, Globe, Wallet } from "lucide-react";
 import { useWallets } from "@/hooks/useWallets";
 import { useAuth } from "@/hooks/useAuth";
-import CardPaymentForm from "@/components/modals/CardPaymentForm";
 import ElicateTopUpCard from "@/components/payments/ElicateTopUpCard";
 import GhanaTopUpCard from "@/components/payments/GhanaTopUpCard";
 import NombaTopUpCard from "@/components/payments/NombaTopUpCard";
 import { validateMinAmount, friendlyFlwError, minAmount, type FlwMethod } from "@/lib/flutterwave";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { MM_COUNTRIES } from "@/lib/mobileMoneyNetworks";
-import { invokeEdgeFunction } from "@/lib/invokeEdgeFunction";
-import { isStripeTestMode, STRIPE_TEST_CARD_HINT, STRIPE_VIRTUAL_CARD_HINT } from "@/lib/stripeBilling";
 import {
   routeWalletTopupGateway,
   supportsWesternProviderChoice,
@@ -44,17 +41,15 @@ import { currencySymbol } from "@/lib/currency";
 
 const MM_BY_CCY = Object.fromEntries(MM_COUNTRIES.map((c) => [c.currency, c]));
 
-type Gateway = "flutterwave" | "stripe" | "elicate" | "fincra" | "ghana_pay" | "nomba_pay" | "unsupported";
+type Gateway = "flutterwave" | "elicate" | "fincra" | "ghana_pay" | "nomba_pay" | "unsupported";
 
 function initialWesternProvider(params: URLSearchParams): WesternTopupProvider {
   const fromQuery = params.get("provider")?.toLowerCase();
   if (fromQuery === "fincra") return "fincra";
   if (fromQuery === "flutterwave" || fromQuery === "flw") return "flutterwave";
-  if (fromQuery === "stripe") return "stripe";
   if (params.get("flw") === "1") return "flutterwave";
   if (import.meta.env.VITE_FINCRA_TOPUP === "true") return "fincra";
-  if (import.meta.env.VITE_FLW_WESTERN_TOPUP === "true") return "flutterwave";
-  return "stripe";
+  return "flutterwave";
 }
 
 function initialAfricanProvider(params: URLSearchParams): AfricanTopupProvider {
@@ -168,67 +163,6 @@ const TopUpPage = () => {
       return;
     }
 
-    const stripeStatus = params.get("stripe");
-    const stripeSessionId = params.get("session_id");
-
-    if (stripeStatus === "success") {
-      setVerifyState({ status: "verifying", message: "Confirming your Stripe payment…" });
-      let cancelled = false;
-      let attempts = 0;
-
-      const pollStripeSession = async () => {
-        if (cancelled) return;
-        if (stripeSessionId) {
-          const { data, error } = await supabase
-            .from("stripe_payin_sessions")
-            .select("status, credit_amount, credit_currency, failure_reason")
-            .eq("stripe_session_id", stripeSessionId)
-            .maybeSingle();
-
-          if (!cancelled && !error && data?.status === "succeeded") {
-            const amt = Number(data.credit_amount);
-            const ccy = data.credit_currency ?? "USD";
-            setVerifyState({
-              status: "success",
-              message: `Wallet credited with ${ccy} ${Number.isFinite(amt) ? amt.toFixed(2) : data.credit_amount}`,
-            });
-            toast.success("Stripe top-up complete");
-            return;
-          }
-          if (!cancelled && data?.status === "failed") {
-            setVerifyState({
-              status: "failed",
-              message: data.failure_reason || "Stripe payment could not be completed",
-            });
-            return;
-          }
-        }
-
-        attempts += 1;
-        if (attempts < 20 && !cancelled) {
-          window.setTimeout(pollStripeSession, 2000);
-          return;
-        }
-
-        if (!cancelled) {
-          setVerifyState({
-            status: "success",
-            message: "Payment received. Your wallet should update within a minute.",
-          });
-          toast.success("Stripe payment received");
-        }
-      };
-
-      void pollStripeSession();
-      return () => {
-        cancelled = true;
-      };
-    }
-    if (stripeStatus === "cancelled") {
-      setVerifyState({ status: "failed", message: "Stripe payment was cancelled" });
-      return;
-    }
-
     const fincraRef = parseFincraReturnReference(window.location.search);
     if (fincraRef && (fincraRef.startsWith("topup-fincra-") || fincraRef.startsWith("efm_fincra_"))) {
       setVerifyState({ status: "verifying", message: "Verifying your Fincra payment…" });
@@ -317,7 +251,7 @@ const TopUpPage = () => {
     const minErr = validateMinAmount(currency, amt);
     if (minErr) { toast.error(minErr); return; }
     if (!isFincraCheckoutCurrency(currency)) {
-      toast.error(`Fincra checkout does not support ${currency}. Use Stripe or Flutterwave for this wallet.`);
+      toast.error(`Fincra checkout does not support ${currency}. Use Flutterwave for this wallet.`);
       return;
     }
     setLoading(true);
@@ -355,7 +289,6 @@ const TopUpPage = () => {
     if (gateway === "elicate") return { label: "Mobile Money", icon: Smartphone, color: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30" };
     if (gateway === "fincra") return { label: "Fincra", icon: Globe, color: "bg-teal-500/10 text-teal-600 border-teal-500/30" };
     if (gateway === "flutterwave") return { label: "Flutterwave", icon: Globe, color: "bg-orange-500/10 text-orange-500 border-orange-500/30" };
-    if (gateway === "stripe") return { label: "Stripe", icon: CreditCard, color: "bg-indigo-500/10 text-indigo-500 border-indigo-500/30" };
     return { label: "Unavailable", icon: XCircle, color: "bg-muted text-muted-foreground" };
   }, [gateway]);
 
@@ -433,33 +366,15 @@ const TopUpPage = () => {
             </CardContent>
           </Card>
 
-          {showWesternProviderChoice && selectedWallet && (productFeatures.stripe || productFeatures.flutterwave) && (
+          {showWesternProviderChoice && selectedWallet && productFeatures.flutterwave && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">2. Choose how to pay</CardTitle>
                 <CardDescription>
-                  Stripe is best for virtual cards (Grey, Wise). Flutterwave and Fincra offer hosted checkout for US/Canadian cards — Fincra is experimental for USD/CAD.
+                  Flutterwave and Fincra offer hosted checkout for US/Canadian cards — Fincra is experimental for USD/CAD.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="grid gap-3 sm:grid-cols-3">
-                <button
-                  type="button"
-                  onClick={() => setWesternProvider("stripe")}
-                  className={cn(
-                    "rounded-lg border p-4 text-left transition-colors",
-                    westernProvider === "stripe"
-                      ? "border-indigo-500 bg-indigo-500/10 ring-1 ring-indigo-500/40"
-                      : "border-border hover:border-indigo-500/40",
-                  )}
-                >
-                  <div className="flex items-center gap-2 font-medium">
-                    <CreditCard className="h-4 w-4 text-indigo-500" />
-                    Stripe
-                  </div>
-                  <p className="mt-1.5 text-xs text-muted-foreground">
-                    Checkout or card on this page. Best for virtual cards and 3-D Secure.
-                  </p>
-                </button>
+              <CardContent className="grid gap-3 sm:grid-cols-2">
                 <button
                   type="button"
                   onClick={() => setWesternProvider("flutterwave")}
@@ -568,87 +483,6 @@ const TopUpPage = () => {
             </Card>
           )}
 
-          {/* Legacy gateways hidden unless feature flags enabled */}
-          {productFeatures.stripe && gateway === "stripe" && selectedWallet && liveTopup && (
-            <>
-              {isStripeTestMode() ? (
-                <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-sm text-amber-800 dark:text-amber-200">
-                  {STRIPE_TEST_CARD_HINT}
-                </div>
-              ) : (
-                <div className="p-3 rounded-lg bg-muted/60 border border-border text-sm text-muted-foreground">
-                  {STRIPE_VIRTUAL_CARD_HINT}
-                </div>
-              )}
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">
-                    {showWesternProviderChoice ? "3. Pay with Stripe" : "Recommended: Stripe Checkout"}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <Label>Amount ({currency})</Label>
-                    <Input
-                      type="number"
-                      inputMode="decimal"
-                      value={amount}
-                      onChange={(e) => setAmount(e.target.value)}
-                      placeholder="0.00"
-                      className="h-12 text-lg"
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Min: 5 {currency} · Max: 5,000 {currency} · Fee: 1.9% + 0.30 {currency}
-                    </p>
-                  </div>
-                  <div className="p-3 rounded-lg bg-accent/10 border border-accent/20">
-                    <p className="text-xs text-foreground">
-                      Best for Grey, Wise, and other virtual cards — Stripe handles 3-D Secure and bank approval in a hosted flow.
-                    </p>
-                  </div>
-                  <Button
-                    className="w-full"
-                    size="lg"
-                    disabled={loading || !Number.isFinite(Number(amount)) || Number(amount) < 5}
-                    onClick={async () => {
-                      const amt = Number(amount);
-                      if (!Number.isFinite(amt) || amt < 5) { toast.error("Minimum 5"); return; }
-                      setLoading(true);
-                      try {
-                        const data = await invokeEdgeFunction<{ url?: string }>(
-                          "stripe-create-checkout-session",
-                          { wallet_id: selectedWallet.wallet_id, amount: amt, currency },
-                        );
-                        if (!data.url) throw new Error("No checkout URL returned");
-                        window.location.href = data.url;
-                      } catch (e) {
-                        toast.error(e instanceof Error ? e.message : "Could not start checkout");
-                      } finally {
-                        setLoading(false);
-                      }
-                    }}
-                  >
-                    {loading ? "Redirecting…" : "Pay with Stripe Checkout"}
-                  </Button>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Or pay with card on this page</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <CardPaymentForm
-                    defaultWalletId={selectedWallet.wallet_id}
-                    showWalletSelect={false}
-                    onSuccess={() => toast.success("Top-up successful")}
-                  />
-                </CardContent>
-              </Card>
-            </>
-          )}
-
           {/* Flutterwave route — hosted checkout (Card, Bank Transfer, USSD, Mobile Money) */}
           {productFeatures.flutterwave && gateway === "flutterwave" && selectedWallet && liveTopup && (
             <Card>
@@ -710,7 +544,7 @@ const TopUpPage = () => {
                 <div className="p-3 rounded-lg bg-teal-500/10 border border-teal-500/20">
                   <p className="text-xs text-foreground">
                     {currency === "USD" || currency === "CAD"
-                      ? `Experimental: Fincra ${currency} checkout. If it fails, switch back to Stripe or Flutterwave.`
+                      ? `Experimental: Fincra ${currency} checkout. If it fails, switch back to Flutterwave.`
                       : "You will be redirected to Fincra's secure sandbox checkout. Use Fincra test cards or bank transfer where available."}
                   </p>
                 </div>

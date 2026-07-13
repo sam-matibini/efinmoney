@@ -17,6 +17,7 @@ import { useWallets } from "@/hooks/useWallets";
 import { useProfile } from "@/hooks/useProfile";
 import { useSavedCards, type SavedCard } from "@/hooks/useSavedCards";
 import { getStripe, getStripeLoadError } from "@/lib/stripe";
+import { STRIPE_PAYMENTS_ENABLED, STRIPE_DISABLED_MESSAGE } from "@/lib/stripeDisabled";
 import { invokeEdgeFunction } from "@/lib/invokeEdgeFunction";
 import {
   billingCountryForWalletCurrency,
@@ -667,6 +668,17 @@ function CardPaymentFormInner(props: Props) {
 }
 
 export default function CardPaymentForm(props: Props) {
+  if (!STRIPE_PAYMENTS_ENABLED) {
+    return (
+      <div className="rounded-lg border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
+        {STRIPE_DISABLED_MESSAGE}
+      </div>
+    );
+  }
+  return <CardPaymentFormStripe {...props} />;
+}
+
+function CardPaymentFormStripe(props: Props) {
   const [stripeReady, setStripeReady] = useState<Awaited<ReturnType<typeof getStripe>> | null>(null);
   const [stripeFailed, setStripeFailed] = useState(false);
 

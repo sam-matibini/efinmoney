@@ -46,6 +46,9 @@ async function refundWallet(supabase: any, transfer: any) {
 }
 
 Deno.serve(async (req) => {
+  const { isStripeEnabled, stripeDisabledResponse } = await import("../_shared/stripe-guard.ts");
+  if (!isStripeEnabled()) return stripeDisabledResponse();
+
   if (req.method !== "POST") {
     return new Response("Method not allowed", { status: 405 });
   }

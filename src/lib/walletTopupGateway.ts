@@ -1,5 +1,4 @@
 export const FLUTTERWAVE_CURRENCIES = ["NGN", "KES", "UGX", "RWF", "GHS", "TZS"];
-export const STRIPE_CURRENCIES = ["CAD"];
 export const FLW_WESTERN_TOPUP_CURRENCIES = ["USD", "CAD"];
 export const FINCRA_WESTERN_TOPUP_CURRENCIES = ["USD", "CAD"];
 export const ELICATE_CURRENCIES = ["ZMW"];
@@ -12,8 +11,8 @@ export const NOMBA_CAD_VIA_USD_CURRENCIES = ["CAD"];
 export const NOMBA_PAY_CURRENCIES = [...NOMBA_NIGERIA_CURRENCIES, ...NOMBA_INTERNATIONAL_CURRENCIES, ...NOMBA_CAD_VIA_USD_CURRENCIES];
 export const AFRICAN_TOPUP_PROVIDER_CURRENCIES = [...FLUTTERWAVE_CURRENCIES];
 
-export type WalletTopupGateway = "flutterwave" | "stripe" | "elicate" | "fincra" | "ghana_pay" | "nomba_pay" | "unsupported";
-export type WesternTopupProvider = "stripe" | "flutterwave" | "fincra";
+export type WalletTopupGateway = "flutterwave" | "elicate" | "fincra" | "ghana_pay" | "nomba_pay" | "unsupported";
+export type WesternTopupProvider = "flutterwave" | "fincra";
 export type AfricanTopupProvider = "flutterwave" | "fincra";
 
 export function supportsWesternProviderChoice(currency: string): boolean {
@@ -42,7 +41,6 @@ export function routeWalletTopupGateway(
   if (FLUTTERWAVE_CURRENCIES.includes(c) && africanProvider !== "fincra") return "flutterwave";
   if (supportsWesternProviderChoice(c) && westernProvider === "fincra") return "fincra";
   if (supportsWesternProviderChoice(c) && westernProvider === "flutterwave") return "flutterwave";
-  if (STRIPE_CURRENCIES.includes(c)) return "stripe";
   return "unsupported";
 }
 

@@ -15,7 +15,7 @@ export const productFeatures = {
   ghanaPay: envFlag("VITE_FEATURE_GHANA_PAY", true),
   plaid: envFlag("VITE_FEATURE_PLAID", true),
   canadaDomestic: envFlag("VITE_FEATURE_CANADA_DOMESTIC", false),
-  stripe: envFlag("VITE_FEATURE_STRIPE", false),
+  stripe: false,
   flutterwave: envFlag("VITE_FEATURE_FLUTTERWAVE", false),
   crypto: envFlag("VITE_FEATURE_CRYPTO", false),
   billPay: envFlag("VITE_FEATURE_BILL_PAY", false),

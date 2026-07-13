@@ -40,7 +40,6 @@ const WalletFundingPanel = ({
   const [receiveOpen, setReceiveOpen] = useState(false);
 
   const legacyGatewayVisible =
-    (gateway === "stripe" && productFeatures.stripe) ||
     (gateway === "flutterwave" && productFeatures.flutterwave) ||
     (gateway === "fincra" && productFeatures.flutterwave) ||
     (gateway === "elicate" && productFeatures.flutterwave);

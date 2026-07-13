@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
-import { Check, ChevronsUpDown, Smartphone, Wallet, CreditCard, Landmark, AlertCircle, ArrowRight } from "lucide-react";
+import { Check, ChevronsUpDown, Smartphone, Wallet, Landmark, AlertCircle, ArrowRight } from "lucide-react";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -20,11 +20,10 @@ import { MOBILE_MONEY_CURRENCY, fetchFxRate, friendlyFlwError, initializeFlwPaym
 import { MM_COUNTRIES, POPULAR_MM_CODES, findCountry } from "@/lib/mobileMoneyNetworks";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useBeneficiaries, useCreateBeneficiary, initialsOf, type Beneficiary } from "@/hooks/useBeneficiaries";
-import { useSavedCards } from "@/hooks/useSavedCards";
 import ContactsPickerModal from "@/components/modals/ContactsPickerModal";
 import { Users, UserPlus } from "lucide-react";
 
-type FundingSource = 'wallet' | 'card' | 'bank' | 'flutterwave';
+type FundingSource = 'wallet' | 'bank' | 'flutterwave';
 
 const getErrorMessage = (error: unknown, fallback: string) => {
   if (error instanceof Error && error.message) return error.message;
@@ -66,12 +65,10 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
   const [saveContact, setSaveContact] = useState(true);
   const [pickedBeneficiaryId, setPickedBeneficiaryId] = useState<string | null>(null);
   const [fundingSource, setFundingSource] = useState<FundingSource>('wallet');
-  const [selectedCardId, setSelectedCardId] = useState<string>("");
 
   const navigate = useNavigate();
   const { data: wallets } = useWallets();
   const { data: contacts } = useBeneficiaries();
-  const { data: savedCards = [] } = useSavedCards();
   const { user } = useAuth();
   const createTransfer = useCreateTransfer();
   const createBeneficiary = useCreateBeneficiary();
@@ -164,7 +161,7 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
     } catch { /* non-fatal */ }
   };
 
-  const buildTransferPayload = (fs: 'wallet' | 'card' | 'bank') => ({
+  const buildTransferPayload = (fs: 'wallet' | 'bank') => ({
     sender_wallet_id: wallet!.wallet_id,
     recipient_name: recipientName.trim(),
     recipient_phone: phone.trim(),
@@ -206,41 +203,6 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
         resetForm();
       } catch (e) {
         toast.error(getErrorMessage(e, 'Transfer failed'));
-      } finally { setIsLoading(false); }
-      return;
-    }
-
-    // ── CARD: charge Stripe → create transfer → payout ─────────────────
-    if (fundingSource === 'card') {
-      const pmId = selectedCardId
-        || savedCards.find(c => c.is_default)?.stripe_payment_method_id
-        || savedCards[0]?.stripe_payment_method_id;
-      if (!pmId) {
-        toast.error('No saved cards. Add a card on the Cards page.');
-        setIsLoading(false);
-        return;
-      }
-      try {
-        const { data: charge, error: chErr } = await supabase.functions.invoke('stripe-charge-saved-card', {
-          body: { payment_method_id: pmId, amount: parsedAmount, currency: walletCurrency, purpose: 'transfer_funding' },
-        });
-        if (chErr || !(charge as any)?.success) {
-          throw new Error((charge as any)?.error || chErr?.message || 'Card charge failed');
-        }
-        const transfer = await createTransfer.mutateAsync(buildTransferPayload('card') as any);
-        const { data, error } = await supabase.functions.invoke('execute-transfer', { body: { transfer_id: transfer.id } });
-        if (error || (data as any)?.error) {
-          await supabase.from('transfers').update({ status: 'processing', failure_reason: 'Payout queued' }).eq('id', transfer.id);
-          await maybeSaveContact();
-          toast.success('Card charged — payout is being processed.');
-        } else {
-          await maybeSaveContact();
-          toast.success('Card charged — transfer sent!');
-        }
-        setOpen(false);
-        resetForm();
-      } catch (e) {
-        toast.error(getErrorMessage(e, 'Card payment failed'));
       } finally { setIsLoading(false); }
       return;
     }
@@ -450,10 +412,9 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
             <Label>Pay with</Label>
             <div className="grid grid-cols-3 gap-2 mt-1.5">
               {([
-                { v: 'wallet', icon: Wallet, label: 'Wallet' },
-                { v: 'card', icon: CreditCard, label: 'Card' },
-                { v: 'bank', icon: Landmark, label: 'Bank' },
-              ] as const).map(({ v, icon: Icon, label }) => (
+                { v: 'wallet' as const, icon: Wallet, label: 'Wallet' },
+                { v: 'bank' as const, icon: Landmark, label: 'Bank' },
+              ]).map(({ v, icon: Icon, label }) => (
                 <Button
                   key={v}
                   type="button"
@@ -481,38 +442,6 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-          )}
-
-          {fundingSource === 'card' && (
-            <div>
-              <Label>Saved card</Label>
-              {savedCards.length === 0 ? (
-                <div className="p-3 rounded-lg border border-dashed border-border bg-muted/40 space-y-2">
-                  <div className="flex items-start gap-2">
-                    <AlertCircle className="w-4 h-4 mt-0.5 text-muted-foreground shrink-0" />
-                    <p className="text-sm text-muted-foreground">No saved cards yet.</p>
-                  </div>
-                  <Button type="button" variant="secondary" size="sm" className="w-full" onClick={() => { setOpen(false); navigate('/cards'); }}>
-                    Go to Cards <ArrowRight className="w-4 h-4 ml-1" />
-                  </Button>
-                </div>
-              ) : (
-                <Select
-                  value={selectedCardId || savedCards.find(c => c.is_default)?.stripe_payment_method_id || savedCards[0].stripe_payment_method_id}
-                  onValueChange={setSelectedCardId}
-                >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {savedCards.map((c) => (
-                      <SelectItem key={c.id} value={c.stripe_payment_method_id}>
-                        {(c.card_brand || 'Card')} •••• {c.last_four} {c.is_default ? '· default' : ''}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-              <p className="text-xs text-muted-foreground mt-1.5">Card charged in {walletCurrency}; funds routed via your wallet.</p>
             </div>
           )}
 
@@ -559,14 +488,12 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
           <Button
             className="w-full"
             onClick={handlePay}
-            disabled={createTransfer.isPending || isLoading || (fundingSource === 'card' && savedCards.length === 0)}
+            disabled={createTransfer.isPending || isLoading}
           >
             {createTransfer.isPending || isLoading ? (
               <><LoadingSpinner size={16} className="mr-2" />Processing…</>
             ) : fundingSource === 'wallet' ? (
               "Send from wallet"
-            ) : fundingSource === 'card' ? (
-              "Charge card & send"
             ) : (
               "Initiate bank transfer"
             )}

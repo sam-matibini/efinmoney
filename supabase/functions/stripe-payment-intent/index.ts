@@ -23,6 +23,8 @@ function publishableKeyResponse() {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return corsPreflightResponse();
+  const { isStripeEnabled, stripeDisabledResponse } = await import("../_shared/stripe-guard.ts");
+  if (!isStripeEnabled()) return stripeDisabledResponse();
 
   try {
     const url = new URL(req.url);

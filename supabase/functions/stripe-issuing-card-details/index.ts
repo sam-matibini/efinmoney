@@ -10,6 +10,9 @@ const corsHeaders = {
 // Returns an ephemeral key + Stripe card id so the browser can use
 // Stripe Issuing Elements to display PAN/CVV without us ever touching them.
 Deno.serve(async (req) => {
+  const { isStripeEnabled, stripeDisabledResponse } = await import("../_shared/stripe-guard.ts");
+  if (!isStripeEnabled()) return stripeDisabledResponse();
+
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {

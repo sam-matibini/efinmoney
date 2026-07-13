@@ -94,7 +94,7 @@ const fieldVariants: Variants = {
 const SendPage = () => {
   const [step, setStep] = useState(1);
   const [direction, setDirection] = useState(1);
-  const [fundingSource, setFundingSource] = useState<FundingSource>(productFeatures.stripe ? 'card' : 'wallet');
+  const [fundingSource, setFundingSource] = useState<FundingSource>('wallet');
   const [amount, setAmount] = useState("");
   const [selectedWalletId, setSelectedWalletId] = useState("");
   const [targetCountryId, setTargetCountryId] = useState<string>("Kenya");
@@ -687,116 +687,10 @@ const SendPage = () => {
       return;
     }
 
-    // ── Card: charge Stripe FIRST, then create transfer + payout ────────
-    const pmId = selectedSavedCardId
-      || savedCards.find(c => c.is_default)?.stripe_payment_method_id
-      || savedCards[0]?.stripe_payment_method_id;
-    if (!pmId) {
-      toast.error("No saved cards. Go to Cards page to link a card first.");
-      setConfirming(false);
-      return;
-    }
-
-    // Step A: charge the card
-    const totalCharge = Math.round((parsedAmount + fee) * 100) / 100;
-    let chargeData: any;
-    try {
-      const { data, error: chargeErr } = await supabase.functions.invoke('stripe-charge-saved-card', {
-        body: {
-          payment_method_id: pmId,
-          amount: totalCharge,
-          currency: sourceCurrency,
-          purpose: 'transfer_funding',
-        },
-      });
-      // Non-2xx responses populate `error` (FunctionsHttpError) and leave `data` null.
-      // Read the actual JSON body so we can surface Stripe's decline reason.
-      if (chargeErr) {
-        let serverMsg = chargeErr.message || 'Card charge failed';
-        try {
-          const ctx: any = (chargeErr as any).context;
-          if (ctx?.json) serverMsg = ctx.json.error || serverMsg;
-          else if (typeof ctx?.text === 'function') {
-            const body = await ctx.text();
-            try { serverMsg = JSON.parse(body)?.error || serverMsg; } catch { /* ignore */ }
-          } else if (ctx instanceof Response) {
-            const body = await ctx.clone().text();
-            try { serverMsg = JSON.parse(body)?.error || serverMsg; } catch { /* ignore */ }
-          }
-        } catch { /* ignore */ }
-        throw new Error(serverMsg);
-      }
-      if (!(data as any)?.success) {
-        const code = (data as any)?.code as string | undefined;
-        const friendly: Record<string, string> = {
-          insufficient_funds: "Your card has insufficient funds. Try another card or top up your bank account.",
-          card_declined: "Your bank declined this charge. Contact your bank or try another card.",
-          incorrect_number: "The card number is incorrect. Please re-link the card.",
-          incorrect_cvc: "The card's security code is incorrect.",
-          expired_card: "This card has expired. Please link a new one.",
-          processing_error: "Your bank had a temporary issue. Please try again in a moment.",
-          authentication_required: "Your bank requires extra authentication for this card. Try a different card.",
-        };
-        throw new Error(friendly[code ?? ""] || (data as any)?.error || 'Card charge failed');
-      }
-      chargeData = data;
-    } catch (e: any) {
-      toast.error(e?.message || 'Card payment failed. Please try another card.', { duration: 8000 });
-      setConfirming(false);
-      return;
-    }
-
-    // Step B: card succeeded → create transfer record (funding_source='card' bypasses wallet balance check)
-    let tid: string;
-    try {
-      tid = await createTransferRecord({ funding_source: 'card' });
-    } catch (e: any) {
-      toast.error(`Payment received, but we could not create the transfer: ${e?.message || ''}. Funds remain in your wallet.`);
-      setConfirming(false);
-      return;
-    }
-
-    // Step C: trigger payout via Flutterwave
-    try {
-      const { data, error } = await supabase.functions.invoke('execute-transfer', { body: { transfer_id: tid, use_stellar: isNGNBank && useStellar, use_pawapay: !isBankPayout && usePawapay, use_fincra: useFincra && canUseFincra, recipient_country_hint: targetCountry.country, prefunded: true, charge_reference: (chargeData as any)?.payment_intent_id ?? null } });
-      if (error || (data as any)?.error) throw new Error((data as any)?.error || error?.message || 'Payout failed');
-      const payout = (data as any)?.payout;
-      if (payout && payout.success === false) throw new Error(payout.error || 'Payout failed');
-      const redirectUrl = payout?.redirect_url;
-      goToStep(4);
-      if (redirectUrl) {
-        window.open(redirectUrl, '_blank', 'noopener,noreferrer');
-        toast.success('Please complete the verification on the payment page to finalize your transfer.', { duration: 10000 });
-      } else {
-        toast.success(
-          data?.pending_liquidity || data?.queued || payout?.queued || payout?.pending_liquidity
-            ? 'Card charged — completing delivery to your recipient'
-            : 'Transfer sent successfully!',
-        );
-      }
-    } catch (e: any) {
-      const msg = String(e?.message ?? 'orchestration pending');
-      // If the payout truly failed (refund issued or partner declined), mark
-      // the row failed so the tracking page reflects reality. Otherwise leave
-      // it processing so a later webhook can resolve it.
-      const looksTerminal = /refund|payout failed|unavailable|provider setup|declined/i.test(msg);
-      try {
-        await supabase.from('transfers')
-          .update({
-            status: looksTerminal ? 'failed' : 'processing',
-            failure_reason: looksTerminal ? msg.slice(0, 500) : `Payout queued — ${msg}`.slice(0, 500),
-          })
-          .eq('id', tid);
-      } catch { /* ignore */ }
-      if (looksTerminal) {
-        toast.error(`Payment received but payout failed: ${msg}`, { duration: 10000 });
-      } else {
-        toast.success('Payment received! Payout to recipient is being processed.', { duration: 8000 });
-      }
-      goToStep(4);
-    } finally {
-      setConfirming(false);
-    }
+    // Card funding removed — use wallet top-up (Nomba / Ghana Pay) first.
+    toast.error("Card payments are disabled. Top up your wallet, then send from your balance.");
+    setConfirming(false);
+    return;
   };
 
   const handleCancelTransfer = async () => {
@@ -903,7 +797,7 @@ const SendPage = () => {
     const funding =
       intent?.fundingSource ??
       (searchParams.get("fundingSource") as FundingSource | null);
-    if (funding === "wallet" || funding === "bank" || funding === "card") {
+    if (funding === "wallet" || funding === "bank") {
       setFundingSource(funding);
     }
 
@@ -992,7 +886,6 @@ const SendPage = () => {
   const fundingOptions = ([
     { v: 'wallet' as const, icon: Wallet, label: 'Wallet' },
     ...(productFeatures.plaid ? [{ v: 'bank' as const, icon: Landmark, label: 'Bank' }] : []),
-    ...(productFeatures.stripe ? [{ v: 'card' as const, icon: CreditCard, label: 'Card' }] : []),
   ]);
 
   // Step transitions
@@ -1315,153 +1208,6 @@ const SendPage = () => {
                                         )}
                                       </motion.div>
                                     )}
-
-                                    {fundingSource === 'card' && productFeatures.stripe && (
-                                      <motion.div custom={1} variants={fieldVariants} initial="hidden" animate="show" className="space-y-3">
-                                        <div className="flex items-center justify-between">
-                                          <Label>Pay with card</Label>
-                                          <Button type="button" variant="ghost" size="sm" className="h-auto py-1 px-2 text-xs" onClick={() => setAddCardOpen(true)}>
-                                            <CreditCard className="w-3.5 h-3.5 mr-1" />Add new card
-                                          </Button>
-                                        </div>
-
-                                        {(() => {
-                                          const allCards: {
-                                            key: string;
-                                            isSaved: boolean;
-                                            brand: string | null;
-                                            lastFour: string | null;
-                                            currencyCode: string | null;
-                                            linkedWalletId: string | null;
-                                            stripePaymentMethodId: string | null;
-                                          }[] = [
-                                            ...savedCards.map(c => ({
-                                              key: `saved:${c.id}`,
-                                              isSaved: true,
-                                              brand: c.card_brand,
-                                              lastFour: c.last_four,
-                                              currencyCode: c.currency_code,
-                                              linkedWalletId: null,
-                                              stripePaymentMethodId: c.stripe_payment_method_id,
-                                            })),
-                                            ...internalCards.map(c => ({
-                                              key: `internal:${c.id}`,
-                                              isSaved: false,
-                                              brand: c.card_network,
-                                              lastFour: c.last_four,
-                                              currencyCode: null,
-                                              linkedWalletId: c.wallet_id,
-                                              stripePaymentMethodId: null,
-                                            })),
-                                          ];
-
-                                          if (allCards.length === 0) {
-                                            return (
-                                              <div className="p-4 rounded-xl border border-dashed border-border bg-muted/40 space-y-3">
-                                                <div className="flex items-start gap-2">
-                                                  <AlertCircle className="w-4 h-4 mt-0.5 text-muted-foreground shrink-0" />
-                                                  <p className="text-sm text-muted-foreground">No cards yet. Add one securely via Stripe to pay instantly.</p>
-                                                </div>
-                                                <Button type="button" size="sm" className="w-full" onClick={() => setAddCardOpen(true)}>
-                                                  <CreditCard className="w-4 h-4 mr-2" />Add a card
-                                                </Button>
-                                              </div>
-                                            );
-                                          }
-
-                                          return (
-                                            <div className="space-y-2">
-                                              {allCards.map((card) => {
-                                                if (card.isSaved) {
-                                                  const c = savedCards.find(x => x.stripe_payment_method_id === card.stripePaymentMethodId)!;
-                                                  const id = card.stripePaymentMethodId!;
-                                                  const checked = (selectedSavedCardId ?? savedCards.find(x => x.is_default)?.stripe_payment_method_id ?? savedCards[0].stripe_payment_method_id) === id;
-                                                  return (
-                                                    <button
-                                                      key={card.key}
-                                                      type="button"
-                                                      onClick={() => setSelectedSavedCardId(checked ? "" : id)}
-                                                      className={`w-full text-left flex items-center gap-3 p-3 rounded-xl border-2 transition ${checked ? 'border-primary bg-primary/5 shadow-sm' : 'border-border hover:bg-muted/40'}`}
-                                                    >
-                                                      <div className={`w-12 h-8 rounded-md bg-gradient-to-br ${cardBrandClass(c.card_brand)} flex items-center justify-center text-white text-[10px] font-bold uppercase tracking-wider shrink-0`}>
-                                                        {cardBrandLabel(c.card_brand).slice(0, 4)}
-                                                      </div>
-                                                      <div className="flex-1 min-w-0">
-                                                        <p className="text-sm font-medium">
-                                                          {cardBrandLabel(c.card_brand)} •••• {c.last_four}
-                                                          {c.is_default && <span className="ml-2 text-[10px] uppercase tracking-wider text-primary">Default</span>}
-                                                        </p>
-                                                        <p className="text-xs text-muted-foreground">
-                                                          Exp: {String(c.exp_month ?? '').padStart(2, '0')}/{String(c.exp_year ?? '').slice(-2)}
-                                                          {c.currency_code ? ` • ${c.currency_code}` : ''}
-                                                        </p>
-                                                      </div>
-                                                      {checked && <CheckCircle className="w-5 h-5 text-primary shrink-0" />}
-                                                    </button>
-                                                  );
-                                                }
-
-                                                const c = internalCards.find(x => x.id === card.key.replace('internal:', ''))!;
-                                                const linkedWallet = wallets?.find(w => w.wallet_id === c.wallet_id);
-                                                const isExternal = c.funding_source === 'external';
-                                                return (
-                                                  <button
-                                                    key={card.key}
-                                                    type="button"
-                                                    onClick={() => {
-                                                      if (linkedWallet) {
-                                                        setFundingSource('wallet');
-                                                        setSelectedWalletId(linkedWallet.wallet_id);
-                                                      }
-                                                    }}
-                                                    className="w-full text-left flex items-center gap-3 p-3 rounded-xl border-2 border-border hover:bg-muted/40 hover:border-primary/40 transition"
-                                                  >
-                                                    <div className={`w-12 h-8 rounded-md bg-gradient-to-br ${cardBrandClass(c.card_network)} flex items-center justify-center text-white text-[10px] font-bold uppercase tracking-wider shrink-0`}>
-                                                      {c.card_network === 'mastercard' ? 'MC' : 'VISA'}
-                                                    </div>
-                                                    <div className="flex-1 min-w-0">
-                                                      <p className="text-sm font-medium">
-                                                        {isExternal ? '' : 'Wallet '}Card •••• {c.last_four}
-                                                      </p>
-                                                      <p className="text-xs text-muted-foreground">
-                                                        {isExternal ? 'Linked card' : linkedWallet ? `Linked to ${linkedWallet.currency_code} wallet` : 'Wallet card'}
-                                                      </p>
-                                                    </div>
-                                                    {linkedWallet && (
-                                                      <span className="text-xs font-medium text-primary shrink-0">Use {linkedWallet.currency_code} →</span>
-                                                    )}
-                                                  </button>
-                                                );
-                                              })}
-                                            </div>
-                                          );
-                                        })()}
-
-                                        <Alert className="bg-accent/10 border-accent/30">
-                                          <AlertCircle className="h-4 w-4 text-accent" />
-                                          <AlertDescription className="text-xs space-y-2">
-                                            <p>
-                                              Using a local African card (e.g. Naira)? We don't support local cards directly yet.
-                                              Please top up your wallet first using our local gateway.
-                                            </p>
-                                            <div className="flex gap-2 pt-1">
-                                              <Button
-                                                type="button"
-                                                size="sm"
-                                                variant="secondary"
-                                                onClick={() => {
-                                                  setFundingSource('wallet');
-                                                  setTopUpOpen(true);
-                                                }}
-                                              >
-                                                <Wallet className="w-3.5 h-3.5 mr-1.5" />Top Up Wallet
-                                              </Button>
-                                            </div>
-                                          </AlertDescription>
-                                        </Alert>
-                                      </motion.div>
-                                    )}
-
 
                                     <motion.div custom={2} variants={fieldVariants} initial="hidden" animate="show" className="flex justify-center py-1">
                                       <LiveFxCalculator
@@ -1996,15 +1742,9 @@ const SendPage = () => {
                                       <div className="flex justify-between"><span className="text-muted-foreground">Fee</span><span className="font-medium">{sourceSymbol}{fee.toFixed(2)}</span></div>
                                       <div className="flex justify-between"><span className="text-muted-foreground">Rate</span><span className="font-medium">1 {sourceCurrency} = {effectiveRate.toFixed(4)} {targetCountry.code}</span></div>
                                       <div className="flex justify-between text-base pt-2 border-t border-border"><span>They receive</span><span className="font-bold">{targetSymbol} {receivedAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
-                                      {fundingSource === 'card' && usdRate !== null && sourceCurrency !== cardCurrency && (
-                                        <div className="flex justify-between text-xs text-muted-foreground pt-2 border-t border-border"><span>Card charge</span><span>{cardCurrency} {cardChargeAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
-                                      )}
                                     </div>
                                     {fundingSource === 'bank' && (
                                       <p className="text-xs text-muted-foreground text-center">Bank transfer — funds will be debited within 1-2 business days.</p>
-                                    )}
-                                    {fundingSource === 'card' && (
-                                      <p className="text-xs text-muted-foreground text-center">You'll be redirected to a secure card checkout in {cardCurrency}.</p>
                                     )}
                                     <div className="flex gap-3">
                                       <Button variant="outline" className="flex-1" onClick={() => goToStep(2)} disabled={confirming || creatingLink}>Back</Button>
@@ -2017,7 +1757,7 @@ const SendPage = () => {
                                         ) : (
                                           <span className="inline-flex items-center gap-2">
                                             <Shield className="w-4 h-4" />
-                                            {useLink ? 'Send secure link' : fundingSource === 'card' ? 'Pay with Card' : 'Confirm Transfer'}
+                                            {useLink ? 'Send secure link' : 'Confirm Transfer'}
                                           </span>
                                         )}
                                       </Button>

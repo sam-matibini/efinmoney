@@ -71,6 +71,9 @@ async function refundWallet(supabase: any, transfer: any) {
 }
 
 Deno.serve(async (req) => {
+  const { isStripeEnabled, stripeDisabledResponse } = await import("../_shared/stripe-guard.ts");
+  if (!isStripeEnabled()) return stripeDisabledResponse();
+
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   if (req.headers.get("x-internal-secret") !== SUPABASE_SERVICE_ROLE_KEY) {

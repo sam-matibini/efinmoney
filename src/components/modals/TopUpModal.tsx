@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,8 +10,9 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useWallets } from "@/hooks/useWallets";
-import CardPaymentForm from "./CardPaymentForm";
 import { validateMinAmount, friendlyFlwError, minAmount } from "@/lib/flutterwave";
+import { isLiveTopupCurrency } from "@/lib/productFeatures";
+import { STRIPE_DISABLED_MESSAGE } from "@/lib/stripeDisabled";
 
 const FLUTTERWAVE_CURRENCIES = ["NGN", "KES", "UGX", "ZMW", "RWF", "GHS", "TZS"];
 
@@ -26,6 +28,7 @@ const TopUpModal = ({ children, open: openProp, onOpenChange, defaultWalletId, t
   const [internalOpen, setInternalOpen] = useState(false);
   const open = openProp ?? internalOpen;
   const setOpen = onOpenChange ?? setInternalOpen;
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { data: wallets } = useWallets();
 
@@ -106,8 +109,35 @@ const TopUpModal = ({ children, open: openProp, onOpenChange, defaultWalletId, t
                 {loading ? <><LoadingSpinner size={16} className="mr-2" /> Redirecting…</> : "Proceed to Payment"}
               </Button>
             </div>
+          ) : isLiveTopupCurrency(currency) ? (
+            <div className="space-y-4 pt-2">
+              <p className="text-sm text-muted-foreground">{STRIPE_DISABLED_MESSAGE}</p>
+              <Button
+                className="w-full"
+                onClick={() => {
+                  setOpen(false);
+                  navigate(`/wallet/topup?walletId=${defaultWalletId || ""}&currency=${currency}`);
+                }}
+              >
+                Go to top-up page
+              </Button>
+            </div>
           ) : (
-            <CardPaymentForm defaultWalletId={defaultWalletId} />
+            <div className="space-y-4 pt-2">
+              <p className="text-sm text-muted-foreground">
+                Top-up for {currency} is not available in this modal. Open the top-up page for supported currencies.
+              </p>
+              <Button
+                className="w-full"
+                variant="outline"
+                onClick={() => {
+                  setOpen(false);
+                  navigate(`/wallet/topup?walletId=${defaultWalletId || ""}&currency=${currency}`);
+                }}
+              >
+                Open top-up page
+              </Button>
+            </div>
           )}
         </div>
       </DialogContent>

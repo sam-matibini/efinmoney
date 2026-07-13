@@ -3,6 +3,7 @@ import { CardElement, Elements, useElements, useStripe } from "@stripe/react-str
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { STRIPE_PAYMENTS_ENABLED, STRIPE_DISABLED_MESSAGE } from "@/lib/stripeDisabled";
 import { getStripe } from "@/lib/stripe";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -189,6 +190,17 @@ function InnerForm({ onSuccess, onCancel, ctaLabel }: Props) {
 }
 
 export default function SaveCardForm(props: Props) {
+  if (!STRIPE_PAYMENTS_ENABLED) {
+    return (
+      <div className="rounded-lg border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
+        {STRIPE_DISABLED_MESSAGE}
+      </div>
+    );
+  }
+  return <SaveCardFormStripe {...props} />;
+}
+
+function SaveCardFormStripe(props: Props) {
   const [stripeReady, setStripeReady] = useState<Awaited<ReturnType<typeof getStripe>> | null>(null);
 
   useEffect(() => { getStripe().then(setStripeReady); }, []);
