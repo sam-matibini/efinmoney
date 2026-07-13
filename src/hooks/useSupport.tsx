@@ -89,12 +89,27 @@ export const useCreateThread = () => {
       const { data: auth } = await supabase.auth.getUser();
       const uid = auth.user?.id;
       if (!uid) throw new Error("Not signed in");
+
+      const { data: profile } = await supabase.from("profiles").select("full_name, email").eq("user_id", uid).single();
+
       const { data: thread, error } = await db.from("support_threads")
         .insert({ user_id: uid, subject }).select("*").single();
       if (error) throw error;
       const { error: mErr } = await db.from("support_messages")
         .insert({ thread_id: thread.id, sender_role: "user", sender_id: uid, body });
       if (mErr) throw mErr;
+
+      // Fire-and-forget: email the support team
+      supabase.functions.invoke("notify-staff", {
+        body: {
+          type: "new_thread",
+          thread_id: thread.id,
+          subject,
+          preview: body.slice(0, 300),
+          sender_name: (profile as any)?.full_name || (profile as any)?.email || "A customer",
+        },
+      }).catch(() => { /* non-blocking */ });
+
       return thread as SupportThread;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["support-threads"] }),
@@ -111,6 +126,23 @@ export const useSendMessage = () => {
       const { error } = await db.from("support_messages")
         .insert({ thread_id: threadId, sender_role: role, sender_id: uid, body });
       if (error) throw error;
+
+      // Email staff when a user (not staff) sends a reply
+      if (role === "user") {
+        const [{ data: thread }, { data: profile }] = await Promise.all([
+          db.from("support_threads").select("subject").eq("id", threadId).single(),
+          supabase.from("profiles").select("full_name, email").eq("user_id", uid).single(),
+        ]);
+        supabase.functions.invoke("notify-staff", {
+          body: {
+            type: "reply",
+            thread_id: threadId,
+            subject: (thread as any)?.subject || "Support ticket",
+            preview: body.slice(0, 300),
+            sender_name: (profile as any)?.full_name || (profile as any)?.email || "A customer",
+          },
+        }).catch(() => { /* non-blocking */ });
+      }
     },
     onSuccess: (_d, v) => {
       qc.invalidateQueries({ queryKey: ["support-messages", v.threadId] });
