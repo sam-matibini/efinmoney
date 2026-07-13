@@ -6,6 +6,29 @@ const db = supabase as unknown as { from: (t: string) => any };
 
 export type ThreadStatus = "open" | "pending" | "resolved" | "closed";
 
+export interface Attachment {
+  path: string;
+  name: string;
+  size: number;
+  type: string;
+}
+
+async function uploadSupportFiles(uid: string, files: File[]): Promise<Attachment[]> {
+  const results: Attachment[] = [];
+  for (const file of files) {
+    const ext = file.name.split(".").pop() ?? "bin";
+    const path = `${uid}/${crypto.randomUUID()}.${ext}`;
+    const { error } = await supabase.storage.from("support-attachments").upload(path, file);
+    if (!error) results.push({ path, name: file.name, size: file.size, type: file.type });
+  }
+  return results;
+}
+
+export async function getAttachmentUrl(path: string): Promise<string | null> {
+  const { data } = await supabase.storage.from("support-attachments").createSignedUrl(path, 3600);
+  return data?.signedUrl ?? null;
+}
+
 export interface SupportThread {
   id: string;
   user_id: string;
@@ -25,6 +48,7 @@ export interface SupportMessage {
   sender_role: "user" | "staff";
   sender_id: string;
   body: string;
+  attachments: Attachment[];
   created_at: string;
 }
 
@@ -85,7 +109,7 @@ export const useThreadMessages = (threadId: string | null) => {
 export const useCreateThread = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ subject, body }: { subject: string; body: string }) => {
+    mutationFn: async ({ subject, body, files = [] }: { subject: string; body: string; files?: File[] }) => {
       const { data: auth } = await supabase.auth.getUser();
       const uid = auth.user?.id;
       if (!uid) throw new Error("Not signed in");
@@ -95,8 +119,9 @@ export const useCreateThread = () => {
       const { data: thread, error } = await db.from("support_threads")
         .insert({ user_id: uid, subject }).select("*").single();
       if (error) throw error;
+      const attachments = files.length ? await uploadSupportFiles(uid, files) : [];
       const { error: mErr } = await db.from("support_messages")
-        .insert({ thread_id: thread.id, sender_role: "user", sender_id: uid, body });
+        .insert({ thread_id: thread.id, sender_role: "user", sender_id: uid, body, attachments });
       if (mErr) throw mErr;
 
       // Fire-and-forget: email the support team
@@ -119,12 +144,13 @@ export const useCreateThread = () => {
 export const useSendMessage = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ threadId, body, role }: { threadId: string; body: string; role: "user" | "staff" }) => {
+    mutationFn: async ({ threadId, body, role, files = [] }: { threadId: string; body: string; role: "user" | "staff"; files?: File[] }) => {
       const { data: auth } = await supabase.auth.getUser();
       const uid = auth.user?.id;
       if (!uid) throw new Error("Not signed in");
+      const attachments = files.length ? await uploadSupportFiles(uid, files) : [];
       const { error } = await db.from("support_messages")
-        .insert({ thread_id: threadId, sender_role: role, sender_id: uid, body });
+        .insert({ thread_id: threadId, sender_role: role, sender_id: uid, body, attachments });
       if (error) throw error;
 
       // Email staff when a user (not staff) sends a reply
