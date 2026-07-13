@@ -112,28 +112,62 @@ function ShareButton({ thread, messages }: { thread: SupportThread; messages: im
   };
 
   const savePDF = () => {
-    const win = window.open("", "_blank");
-    if (!win) { toast.error("Allow pop-ups to save as PDF"); return; }
+    const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const rows = messages.map((m) => `
-      <div style="margin-bottom:16px;display:flex;justify-content:${m.sender_role === "user" ? "flex-end" : "flex-start"}">
-        <div style="max-width:70%;background:${m.sender_role === "user" ? "#4f46e5" : "#f3f4f6"};color:${m.sender_role === "user" ? "#fff" : "#111"};border-radius:16px;padding:10px 14px;font-size:13px;white-space:pre-wrap">
-          ${m.sender_role === "staff" ? '<div style="font-size:10px;font-weight:700;color:#4f46e5;margin-bottom:4px">Support</div>' : ""}
-          ${m.body.replace(/</g, "&lt;")}
-          <div style="font-size:10px;margin-top:6px;opacity:0.6">${new Date(m.created_at).toLocaleString()}</div>
+      <div class="msg ${m.sender_role}">
+        <div class="bubble">
+          ${m.sender_role === "staff" ? '<div class="label">Support</div>' : ""}
+          <div class="body">${esc(m.body)}</div>
+          <div class="time">${new Date(m.created_at).toLocaleString()}</div>
         </div>
       </div>`).join("");
 
-    win.document.write(`<!doctype html><html><head><title>Support — ${thread.subject}</title>
-      <style>body{font-family:-apple-system,sans-serif;padding:32px;max-width:680px;margin:0 auto;color:#111}
-      h1{font-size:20px;margin:0 0 4px}p{margin:0 0 24px;color:#666;font-size:13px}
-      @media print{button{display:none!important}}</style></head>
-      <body>
-        <h1>${thread.subject}</h1>
-        <p>Status: ${thread.status} · Exported ${new Date().toLocaleString()}</p>
-        <button onclick="window.print()" style="margin-bottom:24px;padding:8px 20px;background:#4f46e5;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px">Print / Save as PDF</button>
-        ${rows}
-      </body></html>`);
-    win.document.close();
+    const html = `<!doctype html><html><head><meta charset="utf-8">
+<title>Support — ${esc(thread.subject)}</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f8fafc;color:#111;padding:40px 24px}
+  .header{max-width:680px;margin:0 auto 32px;padding-bottom:16px;border-bottom:2px solid #e2e8f0}
+  .header h1{font-size:22px;font-weight:700;color:#1e293b}
+  .header p{font-size:13px;color:#64748b;margin-top:6px}
+  .logo{font-size:13px;font-weight:800;color:#4f46e5;margin-bottom:12px}
+  .messages{max-width:680px;margin:0 auto;display:flex;flex-direction:column;gap:12px}
+  .msg{display:flex}
+  .msg.user{justify-content:flex-end}
+  .msg.staff{justify-content:flex-start}
+  .bubble{max-width:72%;padding:10px 14px;border-radius:18px;font-size:13px;line-height:1.5}
+  .msg.user .bubble{background:#4f46e5;color:#fff;border-bottom-right-radius:4px}
+  .msg.staff .bubble{background:#fff;color:#111;border:1px solid #e2e8f0;border-bottom-left-radius:4px}
+  .label{font-size:10px;font-weight:700;color:#4f46e5;margin-bottom:4px}
+  .msg.user .label{color:rgba(255,255,255,0.8)}
+  .body{white-space:pre-wrap;word-break:break-word}
+  .time{font-size:10px;margin-top:6px;opacity:0.55}
+  .print-btn{display:block;max-width:680px;margin:0 auto 28px;padding:10px 24px;background:#4f46e5;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;width:fit-content}
+  @media print{.print-btn{display:none!important}body{background:#fff;padding:24px}}
+</style></head>
+<body>
+  <div class="header">
+    <div class="logo">eFinMoney Support</div>
+    <h1>${esc(thread.subject)}</h1>
+    <p>Status: ${thread.status} &nbsp;·&nbsp; Exported ${new Date().toLocaleString()}</p>
+  </div>
+  <button class="print-btn" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <div class="messages">${rows}</div>
+  <script>window.addEventListener('load', function(){ setTimeout(function(){ window.print(); }, 400); });<\/script>
+</body></html>`;
+
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const win = window.open(url, "_blank");
+    if (!win) {
+      // Popup blocked — download instead
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `support-${thread.subject.slice(0, 40).replace(/\s+/g, "-")}.html`;
+      a.click();
+      toast.info("Open the downloaded file and press Ctrl+P to save as PDF");
+    }
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
   };
 
   return (
