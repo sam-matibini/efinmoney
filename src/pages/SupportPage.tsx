@@ -2,15 +2,16 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import {
   ArrowLeft, Plus, Send, Loader2, MessageSquare, Headphones,
   Paperclip, X, FileText, Share2, Mail, Smartphone, Download,
+  Trash2, Square, CheckSquare,
 } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import {
-  useSupportThreads, useThreadMessages, useCreateThread, useSendMessage, useUpdateThread,
+  useSupportThreads, useThreadMessages, useCreateThread, useSendMessage, useUpdateThread, useDeleteThreads,
   getAttachmentUrl,
   type SupportThread, type Attachment,
 } from "@/hooks/useSupport";
@@ -205,8 +206,32 @@ const SupportPage = () => {
   const { data: threads = [], isLoading } = useSupportThreads();
   const [activeId, setActiveId] = useState<string | null>(null);
   const [composingNew, setComposingNew] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const deleteThreads = useDeleteThreads();
 
   const active = threads.find((t) => t.id === activeId) || null;
+
+  const toggleThread = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    if (selected.size === threads.length) setSelected(new Set());
+    else setSelected(new Set(threads.map((t) => t.id)));
+  };
+
+  const handleDelete = async () => {
+    if (selected.size === 0) return;
+    try {
+      await deleteThreads.mutateAsync([...selected]);
+      toast.success(`Deleted ${selected.size} conversation${selected.size === 1 ? "" : "s"}`);
+      setSelected(new Set());
+    } catch (e) { toast.error((e as Error).message); }
+  };
 
   if (composingNew) return <NewConversation onDone={(id) => { setComposingNew(false); if (id) setActiveId(id); }} onCancel={() => setComposingNew(false)} />;
   if (active) return <Conversation thread={active} onBack={() => setActiveId(null)} />;
@@ -221,7 +246,15 @@ const SupportPage = () => {
             <p className="text-sm text-muted-foreground">Message our team — we usually reply within a day</p>
           </div>
         </div>
-        <Button onClick={() => setComposingNew(true)} className="gap-2"><Plus className="w-4 h-4" /> New</Button>
+        <div className="flex items-center gap-2">
+          {selected.size > 0 && (
+            <Button variant="destructive" size="sm" onClick={handleDelete} disabled={deleteThreads.isPending} className="gap-1.5">
+              {deleteThreads.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+              Delete {selected.size > 1 ? `(${selected.size})` : ""}
+            </Button>
+          )}
+          <Button onClick={() => setComposingNew(true)} className="gap-2"><Plus className="w-4 h-4" /> New</Button>
+        </div>
       </div>
 
       <PageHeroBanner
@@ -245,24 +278,38 @@ const SupportPage = () => {
         </div>
       ) : (
         <div className="rounded-2xl border border-border divide-y divide-border overflow-hidden">
-          {threads.map((t) => (
-            <button key={t.id} onClick={() => setActiveId(t.id)} className="w-full text-left p-4 hover:bg-muted/40 transition-colors flex items-start gap-3">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="font-medium truncate">{t.subject}</span>
-                  {t.unread_for_user && <span className="w-2 h-2 rounded-full bg-primary shrink-0" />}
-                </div>
-                <p className="text-xs text-muted-foreground truncate mt-0.5">{t.last_message_preview}</p>
-              </div>
-              <div className="text-right shrink-0">
-                <span className={cn("text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full",
-                  t.status === "open" ? "bg-emerald-500/15 text-emerald-600" :
-                  t.status === "pending" ? "bg-amber-500/15 text-amber-600" : "bg-muted text-muted-foreground")}>
-                  {STATUS_LABEL[t.status]}
-                </span>
-                <div className="text-[10px] text-muted-foreground mt-1">{formatDistanceToNow(new Date(t.last_message_at), { addSuffix: true })}</div>
-              </div>
+          {threads.length > 0 && (
+            <button onClick={toggleAll} className="w-full text-left px-4 py-2.5 hover:bg-muted/40 transition-colors flex items-center gap-3 text-xs text-muted-foreground">
+              {selected.size === threads.length ? <CheckSquare className="w-4 h-4 text-primary" /> : <Square className="w-4 h-4" />}
+              {selected.size > 0 ? `${selected.size} selected` : "Select all"}
             </button>
+          )}
+          {threads.map((t) => (
+            <div key={t.id} className="flex items-start gap-2 px-4 py-3 hover:bg-muted/40 transition-colors">
+              <button onClick={(e) => { e.stopPropagation(); toggleThread(t.id); }} className="pt-0.5 shrink-0" title="Select">
+                {selected.has(t.id) ? <CheckSquare className="w-4 h-4 text-primary" /> : <Square className="w-4 h-4 text-muted-foreground/40" />}
+              </button>
+              <button onClick={() => setActiveId(t.id)} className="flex-1 min-w-0 text-left flex items-start gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium truncate">{t.subject}</span>
+                    {t.unread_for_user && <span className="w-2 h-2 rounded-full bg-primary shrink-0" />}
+                  </div>
+                  <p className="text-xs text-muted-foreground truncate mt-0.5">{t.last_message_preview}</p>
+                </div>
+                <div className="text-right shrink-0">
+                  <span className={cn("text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full",
+                    t.status === "open" ? "bg-emerald-500/15 text-emerald-600" :
+                    t.status === "pending" ? "bg-amber-500/15 text-amber-600" : "bg-muted text-muted-foreground")}>
+                    {STATUS_LABEL[t.status]}
+                  </span>
+                  <div className="text-[10px] text-muted-foreground mt-1">
+                    <p>{formatDistanceToNow(new Date(t.last_message_at), { addSuffix: true })}</p>
+                    <p className="opacity-70">{format(new Date(t.last_message_at), "MMM d, yyyy")}</p>
+                  </div>
+                </div>
+              </button>
+            </div>
           ))}
         </div>
       )}
@@ -380,7 +427,7 @@ function Conversation({ thread, onBack }: { thread: SupportThread; onBack: () =>
                   </div>
                 )}
                 <div className={cn("text-[10px] mt-1", m.sender_role === "user" ? "text-primary-foreground/70" : "text-muted-foreground")}>
-                  {formatDistanceToNow(new Date(m.created_at), { addSuffix: true })}
+                  {format(new Date(m.created_at), "MMM d, yyyy 'at' h:mm a")} · {formatDistanceToNow(new Date(m.created_at), { addSuffix: true })}
                 </div>
               </div>
             </div>

@@ -188,6 +188,17 @@ export const useUpdateThread = () => {
   });
 };
 
+export const useDeleteThreads = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      const { error } = await db.from("support_threads").delete().in("id", ids);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["support-threads"] }),
+  });
+};
+
 export interface MiniProfile { user_id: string; full_name: string | null; email: string | null; avatar_url: string | null; }
 
 /** Staff-side: resolve customer display info for a set of threads. */
