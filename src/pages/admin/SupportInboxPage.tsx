@@ -11,6 +11,7 @@ import {
   useSupportThreads, useThreadMessages, useSendMessage, useUpdateThread, useProfilesByIds,
   type SupportThread, type ThreadStatus,
 } from "@/hooks/useSupport";
+import AttachmentItem from "@/components/support/AttachmentItem";
 
 const STATUS_STYLE: Record<ThreadStatus, string> = {
   open: "bg-emerald-500/15 text-emerald-600",
@@ -143,6 +144,11 @@ function Conversation({ thread, customerName }: { thread: SupportThread; custome
             <div className={cn("max-w-[75%] rounded-2xl px-3.5 py-2 text-sm whitespace-pre-wrap break-words",
               m.sender_role === "staff" ? "bg-primary text-primary-foreground" : "bg-muted")}>
               {m.body}
+              {(m.attachments || []).length > 0 && (
+                <div className="mt-1.5 space-y-1">
+                  {m.attachments.map((a, i) => <AttachmentItem key={i} a={a} />)}
+                </div>
+              )}
               <div className={cn("text-[10px] mt-1", m.sender_role === "staff" ? "text-primary-foreground/70" : "text-muted-foreground")}>
                 {formatDistanceToNow(new Date(m.created_at), { addSuffix: true })}
               </div>
