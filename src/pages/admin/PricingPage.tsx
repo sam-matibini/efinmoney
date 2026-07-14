@@ -110,7 +110,7 @@ export default function PricingPage() {
         </div>
       </div>
       <p className="text-xs text-muted-foreground mt-3">
-        Fees and markup are stored per corridor. Wiring these into live transfer quotes is a separate step.
+        Live corridors are active — fees and FX markup apply immediately to user transfer quotes. Toggle Live off to revert a corridor to global defaults.
       </p>
     </div>
   );
