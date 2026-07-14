@@ -87,7 +87,7 @@ export const AdminAuthProvider = ({ children }: { children: ReactNode }) => {
 
     let departmentPermissions: AdminAction[] = [];
     if (data.department) {
-      const { data: dept } = await supabase
+      const { data: dept } = await (supabase as any)
         .from("departments")
         .select("permissions")
         .eq("name", data.department)

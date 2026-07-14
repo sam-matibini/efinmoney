@@ -37,7 +37,7 @@ const InviteStaffModal = ({ open, onOpenChange }: Props) => {
   const { data: departments = [] } = useQuery({
     queryKey: ["admin-departments"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("departments").select("id, name").order("name");
+      const { data, error } = await (supabase as any).from("departments").select("id, name").order("name");
       if (error) throw error;
       return (data || []) as { id: string; name: string }[];
     },

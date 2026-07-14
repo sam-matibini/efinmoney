@@ -121,6 +121,7 @@ const StripeConnectInstantPage = lazyImport(() => import("./pages/StripeConnectI
 const AfricanCardSendPage = lazyImport(() => import("./pages/AfricanCardSendPage"));
 const CommunicationHubPage = lazyImport(() => import("./pages/admin/CommunicationHubPage"));
 const SupportInboxPage = lazyImport(() => import("./pages/admin/SupportInboxPage"));
+const PricingPage = lazyImport(() => import("./pages/admin/PricingPage"));
 const SupportPage = lazyImport(() => import("./pages/SupportPage"));
 
 const queryClient = new QueryClient({
@@ -275,6 +276,7 @@ const AppRoutes = () => {
         <Route path="/admin/communication" element={<AdminAuthProvider><AdminGuard><AdminLayout><CommunicationHubPage /></AdminLayout></AdminGuard></AdminAuthProvider>} />
         <Route path="/admin/support" element={<AdminAuthProvider><AdminGuard><AdminLayout><SupportInboxPage /></AdminLayout></AdminGuard></AdminAuthProvider>} />
         <Route path="/admin/settings" element={<AdminAuthProvider><AdminGuard><AdminLayout><SettingsDashboard /></AdminLayout></AdminGuard></AdminAuthProvider>} />
+        <Route path="/admin/pricing" element={<AdminAuthProvider><AdminGuard><AdminLayout><PricingPage /></AdminLayout></AdminGuard></AdminAuthProvider>} />
 
         <Route element={<ProtectedShellRoute />}>
           <Route path="/profile" element={<ProfileSettingsPage />} />

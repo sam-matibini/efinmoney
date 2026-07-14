@@ -224,7 +224,7 @@ export default function ApiManagementPage() {
                       <div>
                         <CardTitle className="flex items-center gap-2 text-base">
                           <Activity className={cn("h-4 w-4", enabled ? "text-indigo-500" : "text-primary")} />
-                          {isPlaid && <Zap className="h-4 w-4 text-amber-500" title="Most effective integration" />}
+                          {isPlaid && <span title="Most effective integration"><Zap className="h-4 w-4 text-amber-500" /></span>}
                           {integ.name}
                         </CardTitle>
                         <CardDescription className="mt-1">{integ.description}</CardDescription>
