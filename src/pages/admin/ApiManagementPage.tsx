@@ -1,19 +1,22 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import {
   Activity, CheckCircle2, AlertTriangle, Plug, Webhook, Code2,
   Eye, RefreshCw, Lock, Globe, Server, ShieldCheck, ArrowRight,
+  XCircle, Zap,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
+import { cn } from "@/lib/utils";
 import AdminLayout from "@/components/admin-portal/AdminLayout";
 
 type IntegrationKey = "flutterwave" | "stripe" | "paysafe" | "plaid" | "persona" | "mpesa";
@@ -61,6 +64,7 @@ export default function ApiManagementPage() {
   const [flwProbeOpen, setFlwProbeOpen] = useState(false);
   const [flwProbeLoading, setFlwProbeLoading] = useState(false);
   const [flwProbeResult, setFlwProbeResult] = useState<unknown>(null);
+  const queryClient = useQueryClient();
 
   const runFlutterwaveCorridorProbe = async () => {
     setFlwProbeLoading(true);
@@ -128,11 +132,30 @@ export default function ApiManagementPage() {
     },
   });
 
-  const integrationStatus = (key: IntegrationKey) => {
+  const integrationStatus = (key: IntegrationKey): { label: string; healthy: boolean } => {
     const row = (integrations ?? []).find((r: any) => r.key === key);
     if (row?.is_enabled) return { label: "Connected", healthy: true };
-    if (row) return { label: "Action Required", healthy: false };
+    if (row && !row.is_enabled) return { label: "Disabled", healthy: false };
     return { label: "Not Configured", healthy: false };
+  };
+
+  const toggleIntegration = useMutation({
+    mutationFn: async ({ key, enabled }: { key: string; enabled: boolean }) => {
+      const { error } = await supabase
+        .from("integration_settings")
+        .upsert({ key, is_enabled: enabled }, { onConflict: "key" });
+      if (error) throw error;
+    },
+    onSuccess: (_d, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["admin-integration-settings"] });
+      toast.success(`${vars.key} ${vars.enabled ? "enabled" : "disabled"}`);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const isActiveInteg = (key: IntegrationKey): boolean => {
+    const row = (integrations ?? []).find((r: any) => r.key === key);
+    return row?.is_enabled === true;
   };
 
   return (
@@ -189,44 +212,74 @@ export default function ApiManagementPage() {
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {INTEGRATIONS.map((integ) => {
               const status = integrationStatus(integ.key);
+              const enabled = isActiveInteg(integ.key);
+              const isPlaid = integ.key === "plaid";
               return (
-                <Card key={integ.key} className="hover:border-primary/40 transition-colors">
-                  <CardHeader>
+                <Card key={integ.key} className={cn(
+                  "hover:border-primary/40 transition-colors",
+                  enabled && "border-indigo-500/30 bg-indigo-500/[0.03]",
+                )}>
+                  <CardHeader className="pb-2">
                     <div className="flex items-start justify-between gap-2">
                       <div>
-                        <CardTitle className="flex items-center gap-2">
-                          <Activity className="h-4 w-4 text-primary" />
+                        <CardTitle className="flex items-center gap-2 text-base">
+                          <Activity className={cn("h-4 w-4", enabled ? "text-indigo-500" : "text-primary")} />
+                          {isPlaid && <Zap className="h-4 w-4 text-amber-500" title="Most effective integration" />}
                           {integ.name}
                         </CardTitle>
                         <CardDescription className="mt-1">{integ.description}</CardDescription>
                       </div>
-                      {status.healthy ? (
-                        <Badge className="bg-indigo-500/15 text-indigo-500 hover:bg-indigo-500/20 border-indigo-500/30 gap-1">
-                          <CheckCircle2 className="h-3 w-3" /> {status.label}
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="bg-yellow-500/15 text-yellow-500 border-yellow-500/30 gap-1">
-                          <AlertTriangle className="h-3 w-3" /> {status.label}
-                        </Badge>
-                      )}
+                      <div className="flex items-center gap-2 shrink-0">
+                        {status.healthy ? (
+                          <Badge className="bg-indigo-500/15 text-indigo-500 hover:bg-indigo-500/20 border-indigo-500/30 gap-1">
+                            <CheckCircle2 className="h-3 w-3" /> {status.label}
+                          </Badge>
+                        ) : status.label === "Disabled" ? (
+                          <Badge variant="outline" className="bg-muted text-muted-foreground gap-1">
+                            <XCircle className="h-3 w-3" /> {status.label}
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="bg-yellow-500/15 text-yellow-500 border-yellow-500/30 gap-1">
+                            <AlertTriangle className="h-3 w-3" /> {status.label}
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                   </CardHeader>
-                  <CardContent>
-                    <div className="text-xs text-muted-foreground mb-3 font-mono">
+                  <CardContent className="space-y-3">
+                    <div className="text-xs text-muted-foreground font-mono">
                       {integ.envHints.join(" · ")}
                     </div>
-                    <Button
-                      size="sm" variant="secondary" className="w-full"
-                      onClick={() => {
-                        if (integ.key === "flutterwave") {
-                          void runFlutterwaveCorridorProbe();
-                          return;
-                        }
-                        toast.success(`${integ.name}: connectivity test queued`, { description: "Live ping not yet wired — placeholder OK response." });
-                      }}
-                    >
-                      {integ.key === "flutterwave" ? "Probe CAD/USD Collect" : "Test Connection"}
-                    </Button>
+                    <div className="flex items-center justify-between gap-2 pt-1">
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={enabled}
+                          onCheckedChange={(checked) =>
+                            toggleIntegration.mutate({ key: integ.key, enabled: checked })
+                          }
+                          disabled={toggleIntegration.isPending}
+                        />
+                        <span className="text-xs text-muted-foreground">{enabled ? "Enabled" : "Disabled"}</span>
+                      </div>
+                      <Button
+                        size="sm" variant="secondary"
+                        onClick={() => {
+                          if (integ.key === "flutterwave") {
+                            void runFlutterwaveCorridorProbe();
+                            return;
+                          }
+                          toast.success(`${integ.name}: connectivity test queued`, { description: "Live ping not yet wired — placeholder OK response." });
+                        }}
+                      >
+                        {integ.key === "flutterwave" ? "Probe CAD/USD Collect" : "Test Connection"}
+                      </Button>
+                    </div>
+                    {isPlaid && (
+                      <p className="text-[11px] text-amber-600 bg-amber-500/10 rounded-md px-2.5 py-1.5 mt-1">
+                        <Zap className="h-3 w-3 inline mr-1" />
+                        Plaid is the most effective active integration. Bank linking for Canada domestic transfers is live in production.
+                      </p>
+                    )}
                   </CardContent>
                 </Card>
               );
