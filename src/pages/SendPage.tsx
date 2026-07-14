@@ -399,16 +399,43 @@ const SendPage = () => {
     : null;
 
   const parsedAmount = Math.max(0, parseAmount(amount));
-  const baseFee = pricing?.transfer_base_fee ?? 0;
+
+  // --- Corridor pricing rule (from admin Pricing page) ---
+  const destPayoutMethod = isBankPayout ? 'bank' : 'mobile_money';
+  const { data: corridorRule } = useQuery({
+    queryKey: ['pricing_rule', sourceCurrency, targetCountry.code, destPayoutMethod],
+    queryFn: async () => {
+      const { data } = await (supabase as any)
+        .from('pricing_rules')
+        .select('fee_percent,fee_fixed,fx_markup_percent,min_amount,max_amount')
+        .eq('source_currency', sourceCurrency)
+        .eq('dest_currency', targetCountry.code)
+        .eq('payout_method', destPayoutMethod)
+        .eq('enabled', true)
+        .maybeSingle();
+      return data as { fee_percent: number; fee_fixed: number; fx_markup_percent: number; min_amount: number; max_amount: number } | null;
+    },
+    enabled: !isSameCurrency && !!sourceCurrency && !!targetCountry.code,
+    staleTime: 120_000,
+  });
+
+  // Fee: use corridor rule (percent + fixed) when available, fall back to global pricing_config
+  const baseFee = corridorRule && parsedAmount > 0
+    ? (parsedAmount * Number(corridorRule.fee_percent) / 100) + Number(corridorRule.fee_fixed)
+    : (pricing?.transfer_base_fee ?? 0);
   const cardFee = fundingSource === 'card' ? (pricing?.transfer_card_surcharge ?? 0) : 0;
   const fee = parsedAmount > 0 ? baseFee + cardFee : 0;
 
   const directDbRate =
     fxRate && Number(fxRate.effective_rate) > 0 ? Number(fxRate.effective_rate) : null;
   const derivedRate = derivedFxRate && Number(derivedFxRate) > 0 ? Number(derivedFxRate) : null;
-  const effectiveRate = isSameCurrency
+  const rawRate = isSameCurrency
     ? 1
     : nombaRate ?? resolvedDbRate ?? directDbRate ?? derivedRate ?? 0;
+  // Apply FX markup from corridor rule (reduces effective rate by markup %)
+  const effectiveRate = rawRate > 0 && corridorRule?.fx_markup_percent
+    ? rawRate * (1 - Number(corridorRule.fx_markup_percent) / 100)
+    : rawRate;
   const rateAvailable = isSameCurrency || effectiveRate > 0;
   const rateSource = nombaRate ? "nomba" : (resolvedDbRate || directDbRate ? "internal" : "market");
 
