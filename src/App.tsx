@@ -122,6 +122,7 @@ const AfricanCardSendPage = lazyImport(() => import("./pages/AfricanCardSendPage
 const CommunicationHubPage = lazyImport(() => import("./pages/admin/CommunicationHubPage"));
 const SupportInboxPage = lazyImport(() => import("./pages/admin/SupportInboxPage"));
 const PricingPage = lazyImport(() => import("./pages/admin/PricingPage"));
+const RevenuePage = lazyImport(() => import("./pages/admin/RevenuePage"));
 const SupportPage = lazyImport(() => import("./pages/SupportPage"));
 
 const queryClient = new QueryClient({
@@ -277,6 +278,7 @@ const AppRoutes = () => {
         <Route path="/admin/support" element={<AdminAuthProvider><AdminGuard><AdminLayout><SupportInboxPage /></AdminLayout></AdminGuard></AdminAuthProvider>} />
         <Route path="/admin/settings" element={<AdminAuthProvider><AdminGuard><AdminLayout><SettingsDashboard /></AdminLayout></AdminGuard></AdminAuthProvider>} />
         <Route path="/admin/pricing" element={<AdminAuthProvider><AdminGuard><AdminLayout><PricingPage /></AdminLayout></AdminGuard></AdminAuthProvider>} />
+        <Route path="/admin/revenue" element={<AdminAuthProvider><AdminGuard><AdminLayout><RevenuePage /></AdminLayout></AdminGuard></AdminAuthProvider>} />
 
         <Route element={<ProtectedShellRoute />}>
           <Route path="/profile" element={<ProfileSettingsPage />} />

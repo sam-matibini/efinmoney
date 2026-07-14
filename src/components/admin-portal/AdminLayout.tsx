@@ -23,6 +23,7 @@ const NAV = [
   { to: "/admin/staff", label: "Staff", icon: UserCog, requiresStaffMgmt: true },
   { to: "/admin/board-dashboard", label: "Board", icon: Gauge },
   { to: "/admin/finance", label: "Finance", icon: Wallet },
+  { to: "/admin/revenue", label: "Revenue", icon: TrendingUp },
   { to: "/admin/pricing", label: "Pricing", icon: Tags },
   { to: "/admin/operations", label: "Operations", icon: PanelLeft },
   { to: "/admin/communication", label: "Communication", icon: Megaphone },
