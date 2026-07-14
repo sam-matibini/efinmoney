@@ -35,28 +35,184 @@ const INTEGRATIONS: Array<{
   { key: "mpesa", name: "M-Pesa", description: "Mobile money (Kenya)", envHints: ["MPESA_CONSUMER_KEY"] },
 ];
 
-const EDGE_FUNCTIONS: Array<{ name: string; description: string; jwt: boolean }> = [
-  { name: "execute-transfer", description: "Cross-border transfer execution", jwt: true },
-  { name: "fx-engine", description: "FX rate quotes & swap execution", jwt: true },
-  { name: "compliance-monitoring", description: "AML rule evaluation", jwt: true },
-  { name: "flutterwave-payout", description: "Initiates Flutterwave payouts", jwt: true },
-  { name: "flw-corridor-probe", description: "Tests CAD/USD/NGN collect on FLW merchant account", jwt: true },
-  { name: "flutterwave-webhook", description: "Receives Flutterwave events", jwt: false },
-  { name: "paysafe-payout", description: "Initiates Paysafe payouts", jwt: true },
-  { name: "paysafe-webhook", description: "Receives Paysafe events", jwt: false },
-  { name: "stripe-payout", description: "Visa Direct push payouts", jwt: true },
-  { name: "stripe-webhook", description: "Receives Stripe events", jwt: false },
-  { name: "stripe-payout-webhook", description: "Receives Stripe payout events", jwt: false },
-  { name: "persona-webhook", description: "Receives Persona KYC events", jwt: false },
-  { name: "approve-kyc", description: "Admin KYC approval", jwt: true },
-  { name: "reject-kyc", description: "Admin KYC rejection", jwt: true },
-  { name: "admin-create-user", description: "Admin user provisioning", jwt: true },
-  { name: "admin-delete-user", description: "Admin user deletion", jwt: true },
-  { name: "generate-receipt", description: "PDF transfer receipts", jwt: true },
-  { name: "send-email", description: "Transactional email via Resend", jwt: false },
-  { name: "refresh-fx-rates", description: "Cron-style FX rate refresh", jwt: false },
-  { name: "crypto-trading", description: "Fiat ⇄ Crypto execution", jwt: true },
-  { name: "bank-reconciliation", description: "Match imported bank txns", jwt: true },
+const EDGE_FUNCTIONS: Array<{ name: string; description: string; jwt: boolean; category: string }> = [
+  // Transfers
+  { name: "execute-transfer",          description: "Cross-border transfer execution",            jwt: true,  category: "Transfers" },
+  { name: "cancel-transfer",           description: "Cancel a pending transfer",                  jwt: true,  category: "Transfers" },
+  { name: "internal-transfer",         description: "Between-wallet internal transfer",            jwt: true,  category: "Transfers" },
+  { name: "intra-ca-transfer-create",  description: "Canada domestic Interac / EFT transfer",     jwt: false, category: "Transfers" },
+  // FX
+  { name: "fx-engine",                 description: "FX rate quotes & swap execution",            jwt: true,  category: "FX" },
+  { name: "circle-quote",              description: "Quote via Circle USDC corridor",             jwt: true,  category: "FX" },
+  { name: "market-rates",              description: "Public live FX market rates",                jwt: false, category: "FX" },
+  { name: "refresh-fx-rates",          description: "Cron-style FX rate refresh",                jwt: false, category: "FX" },
+  // Flutterwave
+  { name: "flutterwave-payout",        description: "Initiates Flutterwave NGN payouts",         jwt: true,  category: "Flutterwave" },
+  { name: "flutterwave-webhook",       description: "Receives Flutterwave events",               jwt: false, category: "Flutterwave" },
+  { name: "flw-corridor-probe",        description: "Tests CAD/USD/NGN collect on FLW account",  jwt: true,  category: "Flutterwave" },
+  { name: "flw-create-virtual-account",description: "Create FLW virtual bank account",           jwt: true,  category: "Flutterwave" },
+  { name: "flw-get-banks",             description: "Fetch bank list via Flutterwave",           jwt: true,  category: "Flutterwave" },
+  { name: "flw-get-billers",           description: "Fetch biller categories via Flutterwave",   jwt: false, category: "Flutterwave" },
+  { name: "flw-initialize-payment",    description: "Initialize FLW payment session",            jwt: true,  category: "Flutterwave" },
+  { name: "flw-bill-payment",          description: "Execute bill payment via Flutterwave",      jwt: false, category: "Flutterwave" },
+  { name: "flw-validate-bill",         description: "Validate bill reference via Flutterwave",   jwt: false, category: "Flutterwave" },
+  { name: "flw-resolve-account",       description: "Validate bank account via Flutterwave",     jwt: true,  category: "Flutterwave" },
+  { name: "flw-reconcile-transfers",   description: "Reconcile FLW transfer records",            jwt: false, category: "Flutterwave" },
+  { name: "flw-verify-payment",        description: "Verify FLW payment status",                 jwt: true,  category: "Flutterwave" },
+  { name: "flw-verify-transfer",       description: "Verify FLW transfer status",                jwt: true,  category: "Flutterwave" },
+  // Paysafe
+  { name: "paysafe-payout",            description: "Initiates Paysafe EFT/Interac payouts",    jwt: false, category: "Paysafe" },
+  { name: "paysafe-verify-transfer",   description: "Verify Paysafe transfer status",            jwt: false, category: "Paysafe" },
+  { name: "paysafe-webhook",           description: "Receives Paysafe events",                   jwt: false, category: "Paysafe" },
+  // Stripe
+  { name: "stripe-payout",             description: "Visa Direct push payouts",                  jwt: false, category: "Stripe" },
+  { name: "stripe-payout-webhook",     description: "Receives Stripe payout events",             jwt: false, category: "Stripe" },
+  { name: "stripe-webhook",            description: "Receives Stripe card events",               jwt: false, category: "Stripe" },
+  { name: "stripe-payin-webhook",      description: "Receives Stripe pay-in events",             jwt: false, category: "Stripe" },
+  { name: "stripe-payment-intent",     description: "Create Stripe payment intent",              jwt: false, category: "Stripe" },
+  { name: "stripe-create-checkout-session", description: "Create Stripe checkout session",      jwt: false, category: "Stripe" },
+  { name: "stripe-save-card",          description: "Save card to Stripe customer",              jwt: false, category: "Stripe" },
+  { name: "stripe-save-card-confirm",  description: "Confirm saved-card setup intent",           jwt: false, category: "Stripe" },
+  { name: "stripe-charge-card",        description: "Charge card via Stripe",                    jwt: false, category: "Stripe" },
+  { name: "stripe-charge-saved-card",  description: "Charge a stored card",                     jwt: false, category: "Stripe" },
+  { name: "stripe-mode-check",         description: "Check Stripe live/test mode",               jwt: false, category: "Stripe" },
+  { name: "stripe-config-status",      description: "Check Stripe config completeness",          jwt: false, category: "Stripe" },
+  { name: "stripe-connect-account-session",  description: "Create Stripe Connect session",      jwt: false, category: "Stripe" },
+  { name: "stripe-connect-create-account",   description: "Create Stripe Connect account",      jwt: false, category: "Stripe" },
+  { name: "stripe-connect-instant-payout",   description: "Stripe Connect instant payout",      jwt: false, category: "Stripe" },
+  { name: "stripe-connect-refresh-status",   description: "Refresh Stripe Connect status",      jwt: false, category: "Stripe" },
+  { name: "stripe-issuing-balance",    description: "Stripe Issuing card balance",               jwt: false, category: "Stripe" },
+  { name: "stripe-issuing-card-details",     description: "Reveal issuing card details",        jwt: false, category: "Stripe" },
+  { name: "stripe-issuing-create-card",      description: "Create virtual issuing card",        jwt: false, category: "Stripe" },
+  { name: "stripe-issuing-fund-card",        description: "Fund a Stripe issuing card",         jwt: false, category: "Stripe" },
+  { name: "stripe-issuing-update-card",      description: "Update issuing card status",         jwt: false, category: "Stripe" },
+  { name: "stripe-issuing-webhook",          description: "Receives Stripe Issuing events",     jwt: false, category: "Stripe" },
+  // Adyen
+  { name: "adyen-create-session",      description: "Create Adyen drop-in session",             jwt: false, category: "Adyen" },
+  { name: "adyen-create-paylink",      description: "Create Adyen payment link",                jwt: false, category: "Adyen" },
+  { name: "adyen-confirm-session",     description: "Confirm Adyen payment session",            jwt: false, category: "Adyen" },
+  { name: "adyen-modify-payment",      description: "Modify or cancel Adyen payment",           jwt: false, category: "Adyen" },
+  { name: "adyen-webhook",             description: "Receives Adyen events",                    jwt: false, category: "Adyen" },
+  // Plaid
+  { name: "plaid-create-link-token",   description: "Create Plaid Link token",                  jwt: false, category: "Plaid" },
+  { name: "plaid-exchange-token",      description: "Exchange Plaid public token",               jwt: false, category: "Plaid" },
+  // Interac
+  { name: "interac-start",             description: "Start Interac e-Transfer request",         jwt: true,  category: "Interac" },
+  { name: "interac-exchange",          description: "Exchange Interac tokens",                  jwt: true,  category: "Interac" },
+  { name: "interac-callback",          description: "Receives Interac callbacks",               jwt: false, category: "Interac" },
+  { name: "interac-jwks",              description: "Interac JWKS public key endpoint",         jwt: true,  category: "Interac" },
+  // Circle
+  { name: "circle-reconcile",          description: "Reconcile Circle USDC transactions",       jwt: false, category: "Circle" },
+  { name: "circle-webhook",            description: "Receives Circle events",                   jwt: false, category: "Circle" },
+  // Yellowcard
+  { name: "yellowcard-payout",         description: "Initiates Yellowcard Africa payouts",      jwt: false, category: "Yellowcard" },
+  { name: "yellowcard-webhook",        description: "Receives Yellowcard events",               jwt: false, category: "Yellowcard" },
+  // Elicate
+  { name: "elicate-payout",            description: "Initiates Elicate payouts",                jwt: false, category: "Elicate" },
+  { name: "elicate-charge",            description: "Elicate charge execution",                 jwt: false, category: "Elicate" },
+  { name: "elicate-reconcile",         description: "Reconcile Elicate transactions",           jwt: true,  category: "Elicate" },
+  { name: "elicate-webhook",           description: "Receives Elicate events",                  jwt: false, category: "Elicate" },
+  // MTN MoMo
+  { name: "mtn-momo-payout",           description: "Initiates MTN Mobile Money payouts",      jwt: false, category: "MTN MoMo" },
+  { name: "mtn-momo-webhook",          description: "Receives MTN MoMo events",                jwt: false, category: "MTN MoMo" },
+  // PawaPay
+  { name: "pawapay-payout",            description: "Initiates PawaPay mobile money payouts",  jwt: true,  category: "PawaPay" },
+  { name: "pawapay-webhook",           description: "Receives PawaPay events",                 jwt: false, category: "PawaPay" },
+  // Fincra
+  { name: "fincra-initialize-checkout",description: "Initialize Fincra checkout",              jwt: true,  category: "Fincra" },
+  { name: "fincra-payout",             description: "Initiates Fincra payouts",                jwt: false, category: "Fincra" },
+  { name: "fincra-verify-payment",     description: "Verify Fincra payment status",            jwt: true,  category: "Fincra" },
+  { name: "fincra-webhook",            description: "Receives Fincra events",                  jwt: false, category: "Fincra" },
+  // Ghana
+  { name: "ghana-collection",          description: "Ghana GHS collection initiation",         jwt: true,  category: "Ghana" },
+  { name: "ghana-payout",              description: "Ghana GHS payout",                        jwt: false, category: "Ghana" },
+  { name: "ghana-payment-callback",    description: "Receives Ghana payment callbacks",        jwt: false, category: "Ghana" },
+  // Nomba
+  { name: "nomba-collection",          description: "Nomba NGN collection",                    jwt: true,  category: "Nomba" },
+  { name: "nomba-exchange-rate",       description: "Nomba FX rates",                          jwt: false, category: "Nomba" },
+  { name: "nomba-get-banks",           description: "Fetch bank list via Nomba",               jwt: true,  category: "Nomba" },
+  { name: "nomba-payment-callback",    description: "Receives Nomba payment callbacks",        jwt: false, category: "Nomba" },
+  { name: "nomba-payout",              description: "Initiates Nomba NGN payouts",             jwt: false, category: "Nomba" },
+  { name: "nomba-resolve-account",     description: "Validate bank account via Nomba",         jwt: true,  category: "Nomba" },
+  { name: "nomba-transfer-conversion", description: "Nomba transfer conversion",               jwt: true,  category: "Nomba" },
+  { name: "nomba-verify-transfer",     description: "Verify Nomba transfer status",            jwt: true,  category: "Nomba" },
+  // Stellar
+  { name: "generate-stellar-wallet",   description: "Generate Stellar wallet keypair",         jwt: true,  category: "Stellar" },
+  { name: "stellar-add-trustline",     description: "Add Stellar trustline",                   jwt: true,  category: "Stellar" },
+  { name: "stellar-anchor-discovery",  description: "SEP-1 anchor info discovery",             jwt: true,  category: "Stellar" },
+  { name: "stellar-anchor-transfer",   description: "SEP-6/24 anchor transfer",                jwt: true,  category: "Stellar" },
+  { name: "stellar-send-payment",      description: "Stellar XLM payment",                     jwt: true,  category: "Stellar" },
+  { name: "stellar-sep31-payout",      description: "SEP-31 cross-border payment",             jwt: true,  category: "Stellar" },
+  // Crossmint
+  { name: "crossmint-create-order",    description: "Create Crossmint crypto order",           jwt: true,  category: "Crossmint" },
+  { name: "crossmint-webhook",         description: "Receives Crossmint events",               jwt: false, category: "Crossmint" },
+  // Treasury
+  { name: "treasury-create-fa",        description: "Create Treasury financial account",       jwt: true,  category: "Treasury" },
+  { name: "treasury-inbound-transfer", description: "Treasury inbound transfer",               jwt: true,  category: "Treasury" },
+  { name: "treasury-list",             description: "List Treasury accounts",                  jwt: true,  category: "Treasury" },
+  { name: "treasury-outbound-payment", description: "Treasury outbound payment",               jwt: true,  category: "Treasury" },
+  { name: "treasury-outbound-transfer",description: "Treasury outbound transfer",              jwt: true,  category: "Treasury" },
+  { name: "treasury-reveal-account-numbers", description: "Reveal Treasury account numbers",  jwt: true,  category: "Treasury" },
+  { name: "treasury-sync-balances",    description: "Sync Treasury balances",                  jwt: false, category: "Treasury" },
+  { name: "treasury-webhook",          description: "Receives Treasury events",                jwt: false, category: "Treasury" },
+  { name: "treasury-worker",           description: "Treasury background worker",              jwt: false, category: "Treasury" },
+  // Sumsub KYC
+  { name: "sumsub-create-applicant",   description: "Create Sumsub KYC applicant",             jwt: true,  category: "KYC" },
+  { name: "sumsub-get-applicant-status",description: "Check Sumsub applicant status",          jwt: true,  category: "KYC" },
+  { name: "sumsub-refresh-token",      description: "Refresh Sumsub access token",             jwt: true,  category: "KYC" },
+  { name: "sumsub-webhook",            description: "Receives Sumsub KYC events",              jwt: false, category: "KYC" },
+  { name: "create-persona-inquiry",    description: "Create Persona KYC inquiry",              jwt: true,  category: "KYC" },
+  { name: "persona-self-approve",      description: "Persona self-approval flow",              jwt: true,  category: "KYC" },
+  { name: "persona-webhook",           description: "Receives Persona KYC events",             jwt: false, category: "KYC" },
+  { name: "get-persona-inquiry-status",description: "Check Persona inquiry status",            jwt: true,  category: "KYC" },
+  { name: "approve-kyc",               description: "Admin KYC approval",                      jwt: true,  category: "KYC" },
+  { name: "reject-kyc",                description: "Admin KYC rejection",                     jwt: true,  category: "KYC" },
+  // Compliance
+  { name: "compliance-monitoring",     description: "AML rule evaluation",                     jwt: true,  category: "Compliance" },
+  { name: "safeguarding-check",        description: "Safeguarding compliance check",           jwt: false, category: "Compliance" },
+  { name: "sanctions-sync",            description: "Sync sanctions watchlist",                jwt: true,  category: "Compliance" },
+  { name: "incident-management",       description: "Compliance incident management",          jwt: true,  category: "Compliance" },
+  { name: "bank-reconciliation",       description: "Match imported bank transactions",        jwt: true,  category: "Compliance" },
+  // Cards
+  { name: "virtual-card-ops",          description: "Virtual card operations (freeze/activate)",jwt: false, category: "Cards" },
+  { name: "backfill-card-currency",    description: "Backfill card transaction currency",      jwt: true,  category: "Cards" },
+  { name: "initiate-cpn-payout",       description: "CPN card payout initiation",              jwt: true,  category: "Cards" },
+  // Payment Links
+  { name: "payment-link-create",       description: "Create shareable payment link",           jwt: false, category: "Payment Links" },
+  { name: "payment-link-resolve",      description: "Resolve payment link details",            jwt: false, category: "Payment Links" },
+  { name: "payment-link-claim",        description: "Claim a payment link",                   jwt: false, category: "Payment Links" },
+  { name: "payment-link-revoke",       description: "Revoke a payment link",                  jwt: false, category: "Payment Links" },
+  // Finance & Operations
+  { name: "generate-receipt",          description: "PDF transfer receipts",                   jwt: true,  category: "Finance" },
+  { name: "send-statement-email",      description: "Email account statement PDF",             jwt: true,  category: "Finance" },
+  { name: "expense-claim-process",     description: "Process expense claim",                   jwt: true,  category: "Finance" },
+  { name: "vendor-bill-pay",           description: "Vendor bill payment",                     jwt: true,  category: "Finance" },
+  { name: "recurring-bills-run",       description: "Execute recurring bill payments",         jwt: true,  category: "Finance" },
+  { name: "ca-bill-payment",           description: "Canada bill payment",                     jwt: true,  category: "Finance" },
+  // Crypto
+  { name: "crypto-trading",            description: "Fiat ⇄ Crypto execution",                jwt: true,  category: "Crypto" },
+  { name: "execute-crypto-swap",       description: "Execute crypto swap",                     jwt: true,  category: "Crypto" },
+  // Admin
+  { name: "admin-create-user",         description: "Admin user provisioning",                 jwt: true,  category: "Admin" },
+  { name: "admin-delete-user",         description: "Admin user deletion",                     jwt: true,  category: "Admin" },
+  { name: "admin-invite-staff",        description: "Invite and onboard staff member",         jwt: true,  category: "Admin" },
+  { name: "admin-review-staff",        description: "Review staff KYC document",               jwt: true,  category: "Admin" },
+  { name: "admin-staff-doc-url",       description: "Generate signed staff document URL",      jwt: true,  category: "Admin" },
+  // Communication
+  { name: "send-email",                description: "Transactional email via Resend",          jwt: false, category: "Communication" },
+  { name: "auth-send-email",           description: "Custom Supabase auth email hook",         jwt: false, category: "Communication" },
+  { name: "notify-user",               description: "Push notification to user",               jwt: true,  category: "Communication" },
+  { name: "notify-staff",              description: "Email notification to staff",             jwt: false, category: "Communication" },
+  { name: "send-broadcast",            description: "Bulk broadcast email",                    jwt: false, category: "Communication" },
+  { name: "contact-message",           description: "Contact form submission",                 jwt: false, category: "Communication" },
+  { name: "unsubscribe",               description: "Email unsubscribe handler",               jwt: false, category: "Communication" },
+  // AI
+  { name: "alice-chat",                description: "Alice AI assistant chat",                 jwt: true,  category: "AI" },
+  { name: "scan-purchase-bill",        description: "AI-powered bill scanner",                 jwt: true,  category: "AI" },
+  // Diagnostics
+  { name: "test-integration",          description: "Test provider API connectivity",          jwt: false, category: "Diagnostics" },
+  { name: "test-integrations",         description: "Bulk integration health check",           jwt: false, category: "Diagnostics" },
+  { name: "flw-corridor-probe",        description: "Tests CAD/USD/NGN collect on FLW",        jwt: true,  category: "Diagnostics" },
 ];
 
 export default function ApiManagementPage() {
@@ -383,7 +539,7 @@ export default function ApiManagementPage() {
               <CardDescription>Deployed serverless functions powering eFinMoney</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="rounded-md border">
+              <div className="rounded-md border overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -394,22 +550,39 @@ export default function ApiManagementPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {EDGE_FUNCTIONS.map((fn) => (
-                      <TableRow key={fn.name}>
-                        <TableCell className="font-mono text-sm">{fn.name}</TableCell>
-                        <TableCell className="text-muted-foreground">{fn.description}</TableCell>
-                        <TableCell>
-                          {fn.jwt ? (
-                            <Badge variant="outline" className="gap-1"><Lock className="h-3 w-3" /> JWT</Badge>
-                          ) : (
-                            <Badge variant="outline" className="gap-1 bg-blue-500/10 text-blue-500 border-blue-500/30"><Globe className="h-3 w-3" /> Public</Badge>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Badge className="bg-indigo-500/15 text-indigo-500 border-indigo-500/30">Active</Badge>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {(() => {
+                      const rows: React.ReactNode[] = [];
+                      let lastCategory = "";
+                      EDGE_FUNCTIONS.forEach((fn) => {
+                        if (fn.category !== lastCategory) {
+                          lastCategory = fn.category;
+                          rows.push(
+                            <TableRow key={`cat-${fn.category}`} className="bg-muted/40 hover:bg-muted/40">
+                              <TableCell colSpan={4} className="py-1.5 px-4 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                {fn.category}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        }
+                        rows.push(
+                          <TableRow key={fn.name}>
+                            <TableCell className="font-mono text-sm pl-6">{fn.name}</TableCell>
+                            <TableCell className="text-muted-foreground">{fn.description}</TableCell>
+                            <TableCell>
+                              {fn.jwt ? (
+                                <Badge variant="outline" className="gap-1"><Lock className="h-3 w-3" /> JWT</Badge>
+                              ) : (
+                                <Badge variant="outline" className="gap-1 bg-blue-500/10 text-blue-500 border-blue-500/30"><Globe className="h-3 w-3" /> Public</Badge>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Badge className="bg-indigo-500/15 text-indigo-500 border-indigo-500/30">Active</Badge>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      });
+                      return rows;
+                    })()}
                   </TableBody>
                 </Table>
               </div>
