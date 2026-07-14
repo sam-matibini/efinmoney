@@ -61,31 +61,56 @@ const EDGE_FUNCTIONS: Array<{ name: string; description: string; jwt: boolean }>
 
 export default function ApiManagementPage() {
   const [selectedPayload, setSelectedPayload] = useState<{ provider: string; event: string; payload: unknown } | null>(null);
-  const [flwProbeOpen, setFlwProbeOpen] = useState(false);
-  const [flwProbeLoading, setFlwProbeLoading] = useState(false);
-  const [flwProbeResult, setFlwProbeResult] = useState<unknown>(null);
+  const [probeOpen, setProbeOpen] = useState(false);
+  const [probeTitle, setProbeTitle] = useState("");
+  const [probeLoading, setProbeLoading] = useState(false);
+  const [probeResult, setProbeResult] = useState<unknown>(null);
   const queryClient = useQueryClient();
 
   const runFlutterwaveCorridorProbe = async () => {
-    setFlwProbeLoading(true);
-    setFlwProbeResult(null);
-    setFlwProbeOpen(true);
+    setProbeLoading(true);
+    setProbeResult(null);
+    setProbeTitle("Flutterwave corridor probe (CAD / USD / NGN)");
+    setProbeOpen(true);
     try {
       const { data, error } = await supabase.functions.invoke("flw-corridor-probe", {
         body: { currencies: ["CAD", "USD", "NGN"], amount: 10 },
       });
       if (error) throw error;
-      setFlwProbeResult(data);
+      setProbeResult(data);
       const probes = (data as { payment_init_probes?: Array<{ currency: string; ok: boolean }> })?.payment_init_probes ?? [];
       const cad = probes.find((p) => p.currency === "CAD");
       if (cad?.ok) toast.success("CAD collect: Flutterwave returned a checkout link");
       else toast.warning("CAD collect probe failed — see results");
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Probe failed";
-      setFlwProbeResult({ error: msg, hint: "Deploy flw-corridor-probe edge function, or run scripts/probe-flutterwave-corridors.mjs locally with FLW_SECRET_KEY." });
+      setProbeResult({ error: msg, hint: "Deploy flw-corridor-probe edge function, or run scripts/probe-flutterwave-corridors.mjs locally with FLW_SECRET_KEY." });
       toast.error("Corridor probe failed", { description: msg });
     } finally {
-      setFlwProbeLoading(false);
+      setProbeLoading(false);
+    }
+  };
+
+  const runTestConnection = async (key: IntegrationKey, name: string) => {
+    setProbeLoading(true);
+    setProbeResult(null);
+    setProbeTitle(`${name} — connection test`);
+    setProbeOpen(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("test-integration", {
+        body: { provider: key },
+      });
+      if (error) throw error;
+      setProbeResult(data);
+      const result = data as { ok: boolean; message: string };
+      if (result.ok) toast.success(`${name}: connected`);
+      else toast.warning(`${name}: ${result.message}`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Test failed";
+      setProbeResult({ error: msg });
+      toast.error(`${name} test failed`, { description: msg });
+    } finally {
+      setProbeLoading(false);
     }
   };
 
@@ -263,12 +288,13 @@ export default function ApiManagementPage() {
                       </div>
                       <Button
                         size="sm" variant="secondary"
+                        disabled={probeLoading}
                         onClick={() => {
                           if (integ.key === "flutterwave") {
                             void runFlutterwaveCorridorProbe();
-                            return;
+                          } else {
+                            void runTestConnection(integ.key, integ.name);
                           }
-                          toast.success(`${integ.name}: connectivity test queued`, { description: "Live ping not yet wired — placeholder OK response." });
                         }}
                       >
                         {integ.key === "flutterwave" ? "Probe CAD/USD Collect" : "Test Connection"}
@@ -392,17 +418,17 @@ export default function ApiManagementPage() {
         </TabsContent>
       </Tabs>
 
-      {/* Flutterwave corridor probe */}
-      <Dialog open={flwProbeOpen} onOpenChange={setFlwProbeOpen}>
+      {/* Integration probe / test dialog */}
+      <Dialog open={probeOpen} onOpenChange={setProbeOpen}>
         <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
           <DialogHeader>
-            <DialogTitle>Flutterwave corridor probe (CAD / USD / NGN)</DialogTitle>
+            <DialogTitle>{probeTitle}</DialogTitle>
           </DialogHeader>
-          {flwProbeLoading ? (
-            <p className="text-sm text-muted-foreground py-6">Calling Flutterwave — no charge, init only…</p>
+          {probeLoading ? (
+            <p className="text-sm text-muted-foreground py-6">Testing connection — please wait…</p>
           ) : (
             <pre className="bg-muted rounded-md p-4 overflow-auto text-xs font-mono flex-1">
-              <code>{JSON.stringify(flwProbeResult ?? {}, null, 2)}</code>
+              <code>{JSON.stringify(probeResult ?? {}, null, 2)}</code>
             </pre>
           )}
         </DialogContent>
