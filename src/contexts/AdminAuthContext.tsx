@@ -18,6 +18,8 @@ export interface AdminRecord {
   status: AdminStatus;
   full_name: string | null;
   email: string | null;
+  department: string | null;
+  departmentPermissions: AdminAction[];
   permissions: Record<string, unknown>;
 }
 
@@ -75,19 +77,36 @@ export const AdminAuthProvider = ({ children }: { children: ReactNode }) => {
   const fetchAdmin = useCallback(async (uid: string) => {
     const { data, error } = await supabase
       .from("admin_users")
-      .select("id, role, status, full_name, email, permissions")
+      .select("id, role, status, full_name, email, department, permissions")
       .eq("id", uid)
       .maybeSingle();
     if (error || !data) {
       setAdmin(null);
       return null;
     }
+
+    let departmentPermissions: AdminAction[] = [];
+    if (data.department) {
+      const { data: dept } = await supabase
+        .from("departments")
+        .select("permissions")
+        .eq("name", data.department)
+        .maybeSingle();
+      if (dept?.permissions && Array.isArray(dept.permissions)) {
+        departmentPermissions = dept.permissions.filter(
+          (p): p is AdminAction => typeof p === "string"
+        );
+      }
+    }
+
     const rec: AdminRecord = {
       id: data.id,
       role: data.role as AdminRole,
       status: (data.status as AdminStatus) ?? "active",
       full_name: data.full_name,
       email: (data as { email?: string | null }).email ?? null,
+      department: (data as { department?: string | null }).department ?? null,
+      departmentPermissions,
       permissions: (data.permissions as Record<string, unknown>) || {},
     };
     setAdmin(rec);
@@ -174,7 +193,11 @@ export const AdminAuthProvider = ({ children }: { children: ReactNode }) => {
 
   const hasPermission = useCallback((action: AdminAction) => {
     if (!admin || admin.status !== "active") return false;
-    return ROLE_PERMISSIONS[admin.role]?.includes(action) ?? false;
+    // Role-based permissions
+    if (ROLE_PERMISSIONS[admin.role]?.includes(action)) return true;
+    // Department-level permissions (union with role-based)
+    if (admin.departmentPermissions?.includes(action)) return true;
+    return false;
   }, [admin]);
 
   const requirePermission = useCallback((action: AdminAction) => {

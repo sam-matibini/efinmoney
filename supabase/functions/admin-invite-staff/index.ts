@@ -43,6 +43,7 @@ Deno.serve(async (req) => {
     const email = (body?.email || "").trim().toLowerCase();
     const fullName = (body?.full_name || "").trim();
     const role = body?.role;
+    const department = (body?.department || "").trim() || null;
     const appUrl = Deno.env.get("APP_URL") || "https://efin.money";
     const redirectTo = body?.redirect_to || `${appUrl}/admin/onboarding`;
 
@@ -80,6 +81,7 @@ Deno.serve(async (req) => {
         role,
         full_name: fullName,
         email,
+        department,
         status: "invited",
         document_status: "pending",
         invited_by: caller.id,
@@ -93,7 +95,7 @@ Deno.serve(async (req) => {
       actor_id: caller.id,
       target_admin_id: userId,
       action: "invited",
-      details: { email, role, full_name: fullName },
+      details: { email, role, full_name: fullName, department },
     });
 
     return json(200, { ok: true, staff_id: userId });

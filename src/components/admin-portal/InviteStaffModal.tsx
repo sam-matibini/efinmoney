@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
@@ -32,6 +32,16 @@ const InviteStaffModal = ({ open, onOpenChange }: Props) => {
   const [email, setEmail] = useState("");
   const [fullName, setFullName] = useState("");
   const [role, setRole] = useState<AdminRole>("compliance_officer");
+  const [department, setDepartment] = useState("");
+
+  const { data: departments = [] } = useQuery({
+    queryKey: ["admin-departments"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("departments").select("id, name").order("name");
+      if (error) throw error;
+      return (data || []) as { id: string; name: string }[];
+    },
+  });
 
   const invite = useMutation({
     mutationFn: async () => {
@@ -40,6 +50,7 @@ const InviteStaffModal = ({ open, onOpenChange }: Props) => {
           email: email.trim().toLowerCase(),
           full_name: fullName.trim(),
           role,
+          department: department || undefined,
           redirect_to: `${import.meta.env.VITE_APP_URL || window.location.origin}/admin/onboarding`,
         },
       });
@@ -53,6 +64,7 @@ const InviteStaffModal = ({ open, onOpenChange }: Props) => {
       setEmail("");
       setFullName("");
       setRole("compliance_officer");
+      setDepartment("");
       onOpenChange(false);
     },
     onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Failed to invite staff"),
@@ -105,6 +117,20 @@ const InviteStaffModal = ({ open, onOpenChange }: Props) => {
             <p className="text-xs text-muted-foreground">
               {ROLE_OPTIONS.find((r) => r.value === role)?.hint}
             </p>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Department</Label>
+            <Select value={department} onValueChange={setDepartment}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select department" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No department</SelectItem>
+                {departments.map((d) => (
+                  <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
 

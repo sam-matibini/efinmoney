@@ -16,7 +16,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { RoleBadge, StaffStatusBadge } from "@/components/admin-portal/Badges";
 import InviteStaffModal from "@/components/admin-portal/InviteStaffModal";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
-import { Search, UserPlus, Users as UsersIcon, UserCheck, Clock, ShieldX, Pencil, Trash2 } from "lucide-react";
+import { Search, UserPlus, Users as UsersIcon, UserCheck, Clock, ShieldX, Pencil, Trash2, Building2 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 
@@ -95,15 +95,26 @@ const StaffPage = () => {
     },
   });
 
+  const { data: departments = [] } = useQuery({
+    queryKey: ["admin-departments"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("departments").select("id, name, description, permissions").order("name");
+      if (error) throw error;
+      return (data || []) as { id: string; name: string; description: string | null; permissions: unknown }[];
+    },
+  });
+
+  const [deptFilter, setDeptFilter] = useState("");
+
   const filtered = staff.filter((s) => {
-    if (!query) return true;
-    const q = query.toLowerCase();
-    return (
-      s.full_name?.toLowerCase().includes(q) ||
-      s.email?.toLowerCase().includes(q) ||
-      s.role.toLowerCase().includes(q) ||
-      s.department?.toLowerCase().includes(q)
+    const matchQuery = !query || (
+      s.full_name?.toLowerCase().includes(query.toLowerCase()) ||
+      s.email?.toLowerCase().includes(query.toLowerCase()) ||
+      s.role.toLowerCase().includes(query.toLowerCase()) ||
+      s.department?.toLowerCase().includes(query.toLowerCase())
     );
+    const matchDept = !deptFilter || s.department === deptFilter;
+    return matchQuery && matchDept;
   });
 
   const stats = {
@@ -154,14 +165,27 @@ const StaffPage = () => {
         <Card>
           <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <CardTitle className="text-base">All staff ({filtered.length})</CardTitle>
-            <div className="relative w-full sm:w-72">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search name, email, role, department"
-                className="pl-9"
-              />
+            <div className="flex items-center gap-2">
+              <Select value={deptFilter} onValueChange={(v) => setDeptFilter(v === "all" ? "" : v)}>
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="All depts" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All departments</SelectItem>
+                  {departments.map((d) => (
+                    <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <div className="relative w-full sm:w-64">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search name, email, role, department"
+                  className="pl-9"
+                />
+              </div>
             </div>
           </CardHeader>
           <CardContent>
@@ -232,6 +256,36 @@ const StaffPage = () => {
             )}
           </CardContent>
         </Card>
+
+        {canManage && (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-primary" /> Departments
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {departments.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No departments configured yet. Run the departments migration to seed defaults.</p>
+              ) : (
+                <div className="space-y-1">
+                  {departments.map((d) => (
+                    <div key={d.id} className="flex items-center gap-3 py-2.5 px-3 rounded-lg hover:bg-muted/40 transition-colors text-sm">
+                      <Building2 className="w-4 h-4 text-muted-foreground shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium">{d.name}</div>
+                        <div className="text-xs text-muted-foreground truncate">{d.description || "—"}</div>
+                      </div>
+                      <span className="text-xs text-muted-foreground tabular-nums shrink-0">
+                        {staff.filter((s) => s.department === d.name).length} staff
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       <InviteStaffModal open={inviteOpen} onOpenChange={setInviteOpen} />
@@ -268,7 +322,15 @@ const StaffPage = () => {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Department</Label>
-                <Input value={editForm.department} onChange={(e) => setEditForm({ ...editForm, department: e.target.value })} placeholder="e.g. Compliance" />
+                <Select value={editForm.department} onValueChange={(v) => setEditForm({ ...editForm, department: v === "none" ? "" : v })}>
+                  <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No department</SelectItem>
+                    {departments.map((d) => (
+                      <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-1.5">
                 <Label>Position</Label>
