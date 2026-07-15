@@ -34,6 +34,8 @@ export interface SupportThread {
   user_id: string;
   subject: string;
   status: ThreadStatus;
+  priority?: "low" | "normal" | "high" | "urgent";
+  escalated_at?: string | null;
   assigned_to: string | null;
   last_message_at: string;
   last_message_preview: string | null;
@@ -202,6 +204,32 @@ export const useDeleteThreads = () => {
 export interface MiniProfile { user_id: string; full_name: string | null; email: string | null; avatar_url: string | null; }
 
 /** Staff-side: resolve customer display info for a set of threads. */
+export const useEscalateThread = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id }: { id: string }) => {
+      const { data: thread } = await db.from("support_threads")
+        .select("subject").eq("id", id).single();
+
+      const { error } = await db.from("support_threads")
+        .update({ priority: "urgent", escalated_at: new Date().toISOString() })
+        .eq("id", id);
+      if (error) throw error;
+
+      supabase.functions.invoke("notify-staff", {
+        body: {
+          type: "escalation",
+          thread_id: id,
+          subject: `[URGENT] ${(thread as any)?.subject ?? "Support ticket"}`,
+          preview: "The customer has flagged this conversation as urgent.",
+          sender_name: "Customer",
+        },
+      }).catch(() => {});
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["support-threads"] }),
+  });
+};
+
 export const useProfilesByIds = (ids: string[]) =>
   useQuery({
     queryKey: ["support-profiles", [...ids].sort().join(",")],

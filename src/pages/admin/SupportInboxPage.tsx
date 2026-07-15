@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Send, Loader2, Headphones, UserCheck, Inbox } from "lucide-react";
+import { Send, Loader2, Headphones, UserCheck, Inbox, AlertTriangle } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,15 @@ const STATUS_STYLE: Record<ThreadStatus, string> = {
   closed: "bg-muted text-muted-foreground",
 };
 
+const PRIORITY_STYLE: Record<string, string> = {
+  low: "bg-muted text-muted-foreground",
+  normal: "bg-blue-500/15 text-blue-600",
+  high: "bg-amber-500/15 text-amber-600",
+  urgent: "bg-red-500/15 text-red-600",
+};
+
+const PRIO_ORDER: Record<string, number> = { urgent: 0, high: 1, normal: 2, low: 3 };
+
 export default function SupportInboxPage() {
   const { data: threads = [], isLoading } = useSupportThreads();
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -28,8 +37,13 @@ export default function SupportInboxPage() {
   const ids = useMemo(() => Array.from(new Set(threads.map((t) => t.user_id))), [threads]);
   const { data: profiles = {} } = useProfilesByIds(ids);
 
-  const filtered = threads.filter((t) =>
-    filter === "all" ? true : filter === "unread" ? t.unread_for_staff : t.status === "open" || t.status === "pending");
+  const filtered = useMemo(() =>
+    threads
+      .filter((t) =>
+        filter === "all" ? true : filter === "unread" ? t.unread_for_staff : t.status === "open" || t.status === "pending"
+      )
+      .sort((a, b) => (PRIO_ORDER[a.priority ?? "normal"] ?? 2) - (PRIO_ORDER[b.priority ?? "normal"] ?? 2)),
+    [threads, filter]);
 
   const active = threads.find((t) => t.id === activeId) || null;
 
@@ -67,12 +81,16 @@ export default function SupportInboxPage() {
                   className={cn("w-full text-left p-3 hover:bg-muted/40 transition-colors", activeId === t.id && "bg-muted/60")}>
                   <div className="flex items-center gap-2">
                     <span className="font-medium text-sm truncate flex-1">{p?.full_name || p?.email || "User"}</span>
+                    {t.priority === "urgent" && <AlertTriangle className="w-3.5 h-3.5 text-red-500 shrink-0" />}
                     {t.unread_for_staff && <span className="w-2 h-2 rounded-full bg-primary shrink-0" />}
                   </div>
                   <div className="text-xs font-medium truncate text-foreground/80">{t.subject}</div>
                   <div className="text-xs text-muted-foreground truncate">{t.last_message_preview}</div>
                   <div className="flex items-center gap-2 mt-1">
                     <span className={cn("text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded-full", STATUS_STYLE[t.status])}>{t.status}</span>
+                    {t.priority && t.priority !== "normal" && (
+                      <span className={cn("text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded-full", PRIORITY_STYLE[t.priority])}>{t.priority}</span>
+                    )}
                     <span className="text-[10px] text-muted-foreground">{formatDistanceToNow(new Date(t.last_message_at), { addSuffix: true })}</span>
                   </div>
                 </button>
@@ -126,6 +144,29 @@ function Conversation({ thread, customerName }: { thread: SupportThread; custome
           disabled={thread.assigned_to === user?.id}>
           <UserCheck className="w-3.5 h-3.5" /> {thread.assigned_to === user?.id ? "Assigned to you" : "Assign to me"}
         </Button>
+        <Select
+          value={thread.priority ?? "normal"}
+          onValueChange={(v) =>
+            update.mutate({
+              id: thread.id,
+              patch: {
+                priority: v as "low" | "normal" | "high" | "urgent",
+                ...(v === "urgent" ? { escalated_at: new Date().toISOString() } : {}),
+              },
+            })
+          }>
+          <SelectTrigger className={cn("w-28 h-8",
+            thread.priority === "urgent" && "border-red-500 text-red-600",
+            thread.priority === "high" && "border-amber-500 text-amber-600")}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="low">Low</SelectItem>
+            <SelectItem value="normal">Normal</SelectItem>
+            <SelectItem value="high">High</SelectItem>
+            <SelectItem value="urgent">Urgent</SelectItem>
+          </SelectContent>
+        </Select>
         <Select value={thread.status} onValueChange={(v) => update.mutate({ id: thread.id, patch: { status: v as ThreadStatus } })}>
           <SelectTrigger className="w-32 h-8"><SelectValue /></SelectTrigger>
           <SelectContent>

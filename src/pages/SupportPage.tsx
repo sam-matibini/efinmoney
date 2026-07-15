@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import {
   ArrowLeft, Plus, Send, Loader2, MessageSquare, Headphones,
   Paperclip, X, FileText, Share2, Mail, Smartphone, Download,
-  Trash2, Square, CheckSquare,
+  Trash2, Square, CheckSquare, AlertTriangle,
 } from "lucide-react";
 import { formatDistanceToNow, format } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import {
   useSupportThreads, useThreadMessages, useCreateThread, useSendMessage, useUpdateThread, useDeleteThreads,
-  getAttachmentUrl,
+  useEscalateThread, getAttachmentUrl,
   type SupportThread, type Attachment,
 } from "@/hooks/useSupport";
 import PageHeroBanner from "@/components/common/PageHeroBanner";
@@ -298,11 +298,16 @@ const SupportPage = () => {
                   <p className="text-xs text-muted-foreground truncate mt-0.5">{t.last_message_preview}</p>
                 </div>
                 <div className="text-right shrink-0">
-                  <span className={cn("text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full",
-                    t.status === "open" ? "bg-emerald-500/15 text-emerald-600" :
-                    t.status === "pending" ? "bg-amber-500/15 text-amber-600" : "bg-muted text-muted-foreground")}>
-                    {STATUS_LABEL[t.status]}
-                  </span>
+                  <div className="flex items-center gap-1.5 justify-end flex-wrap">
+                    {t.priority === "urgent" && (
+                      <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-red-500/15 text-red-600">Urgent</span>
+                    )}
+                    <span className={cn("text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full",
+                      t.status === "open" ? "bg-emerald-500/15 text-emerald-600" :
+                      t.status === "pending" ? "bg-amber-500/15 text-amber-600" : "bg-muted text-muted-foreground")}>
+                      {STATUS_LABEL[t.status]}
+                    </span>
+                  </div>
                   <div className="text-[10px] text-muted-foreground mt-1">
                     <p>{formatDistanceToNow(new Date(t.last_message_at), { addSuffix: true })}</p>
                     <p className="opacity-70">{format(new Date(t.last_message_at), "MMM d, yyyy")}</p>
@@ -362,6 +367,7 @@ function Conversation({ thread, onBack }: { thread: SupportThread; onBack: () =>
   const { data: messages = [] } = useThreadMessages(thread.id);
   const send = useSendMessage();
   const update = useUpdateThread();
+  const escalate = useEscalateThread();
   const [text, setText] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -405,6 +411,21 @@ function Conversation({ thread, onBack }: { thread: SupportThread; onBack: () =>
             <h1 className="font-semibold truncate">{thread.subject}</h1>
             <p className="text-xs text-muted-foreground capitalize">{thread.status}</p>
           </div>
+          {thread.priority === "urgent" && (
+            <span className="text-[10px] font-bold uppercase px-2 py-1 rounded-full bg-red-500/15 text-red-600 shrink-0">Urgent</span>
+          )}
+          {(thread.status === "open" || thread.status === "pending") && thread.priority !== "urgent" && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5 h-8 border-amber-500 text-amber-600 hover:bg-amber-500/10 shrink-0"
+              disabled={escalate.isPending}
+              onClick={() => escalate.mutate({ id: thread.id })}
+            >
+              {escalate.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <AlertTriangle className="w-3.5 h-3.5" />}
+              Mark urgent
+            </Button>
+          )}
           <ShareButton thread={thread} messages={messages} />
         </div>
 
