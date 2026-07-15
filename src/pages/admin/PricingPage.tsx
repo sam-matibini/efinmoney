@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Tags, Plus, Trash2, Loader2, Save, X } from "lucide-react";
+import { Tags, Plus, Trash2, Loader2, Save, X, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -21,6 +21,40 @@ import {
 } from "@/hooks/usePricingRules";
 
 const PAYOUT_METHODS = ["bank", "mobile_money", "interac", "cash", "wallet"];
+
+const PAYOUT_LABELS: Record<string, string> = {
+  bank: "Bank transfer",
+  mobile_money: "Mobile money",
+  interac: "Interac e-Transfer",
+  cash: "Cash pickup",
+  wallet: "Wallet",
+};
+
+const SOURCE_CURRENCIES = [
+  { code: "CAD", shortName: "Canada", label: "CAD — Canadian Dollar" },
+  { code: "USD", shortName: "USA",    label: "USD — US Dollar" },
+  { code: "GBP", shortName: "UK",     label: "GBP — British Pound" },
+  { code: "EUR", shortName: "Europe", label: "EUR — Euro" },
+];
+
+const DEST_COUNTRIES = [
+  { code: "NG", name: "Nigeria",        currency: "NGN", flag: "🇳🇬" },
+  { code: "GH", name: "Ghana",          currency: "GHS", flag: "🇬🇭" },
+  { code: "ZM", name: "Zambia",         currency: "ZMW", flag: "🇿🇲" },
+  { code: "KE", name: "Kenya",          currency: "KES", flag: "🇰🇪" },
+  { code: "UG", name: "Uganda",         currency: "UGX", flag: "🇺🇬" },
+  { code: "TZ", name: "Tanzania",       currency: "TZS", flag: "🇹🇿" },
+  { code: "SN", name: "Senegal",        currency: "XOF", flag: "🇸🇳" },
+  { code: "CI", name: "Côte d'Ivoire",  currency: "XOF", flag: "🇨🇮" },
+  { code: "CM", name: "Cameroon",       currency: "XAF", flag: "🇨🇲" },
+];
+
+function genLabel(src: string, country: string, payout: string): string {
+  const srcData = SOURCE_CURRENCIES.find((c) => c.code === src);
+  const dest = DEST_COUNTRIES.find((d) => d.code === country);
+  if (!srcData || !dest || !payout) return "";
+  return `${srcData.shortName} → ${dest.name} (${PAYOUT_LABELS[payout] ?? payout})`;
+}
 
 const EMPTY: NewPricingRule = {
   name: "", source_currency: "CAD", dest_country: "NG", dest_currency: "NGN",
@@ -72,7 +106,7 @@ export default function PricingPage() {
           </DialogTrigger>
           <DialogContent className="max-w-lg">
             <DialogHeader><DialogTitle>New pricing rule</DialogTitle></DialogHeader>
-            <RuleForm value={draft} onChange={setDraft} />
+            <RuleForm value={draft} onChange={setDraft} existingRules={rules} />
             <DialogFooter>
               <Button variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
               <Button onClick={submitNew} disabled={create.isPending} className="gap-2">
@@ -227,32 +261,115 @@ function RuleRow({ rule, onDelete }: { rule: PricingRule; onDelete: () => void }
 }
 
 /* ── Add form ───────────────────────────────────────────────────────────── */
-function RuleForm({ value, onChange }: { value: NewPricingRule; onChange: (v: NewPricingRule) => void }) {
-  const set = (k: keyof NewPricingRule) => (e: React.ChangeEvent<HTMLInputElement>) =>
-    onChange({ ...value, [k]: e.target.value });
+function RuleForm({
+  value,
+  onChange,
+  existingRules = [],
+}: {
+  value: NewPricingRule;
+  onChange: (v: NewPricingRule) => void;
+  existingRules?: PricingRule[];
+}) {
   const setNum = (k: keyof NewPricingRule) => (e: React.ChangeEvent<HTMLInputElement>) =>
     onChange({ ...value, [k]: e.target.value === "" ? 0 : Number(e.target.value) });
 
   const Field = ({ label, children }: { label: string; children: React.ReactNode }) => (
-    <div className="space-y-1.5"><label className="text-xs font-medium text-muted-foreground">{label}</label>{children}</div>
+    <div className="space-y-1.5">
+      <label className="text-xs font-medium text-muted-foreground">{label}</label>
+      {children}
+    </div>
+  );
+
+  const autoUpdateLabel = (next: Partial<NewPricingRule>) => {
+    const merged = { ...value, ...next };
+    const currentAuto = genLabel(value.source_currency, value.dest_country, value.payout_method);
+    const name = !value.name || value.name === currentAuto
+      ? genLabel(merged.source_currency, merged.dest_country, merged.payout_method)
+      : value.name;
+    return { ...merged, name };
+  };
+
+  const handleSourceChange = (src: string) =>
+    onChange(autoUpdateLabel({ source_currency: src }));
+
+  const handleDestChange = (code: string) => {
+    const dest = DEST_COUNTRIES.find((d) => d.code === code);
+    if (!dest) return;
+    onChange(autoUpdateLabel({ dest_country: code, dest_currency: dest.currency }));
+  };
+
+  const handlePayoutChange = (payout: string) =>
+    onChange(autoUpdateLabel({ payout_method: payout }));
+
+  const destInfo = DEST_COUNTRIES.find((d) => d.code === value.dest_country);
+
+  const isDuplicate = existingRules.some(
+    (r) =>
+      r.source_currency === value.source_currency &&
+      r.dest_country === value.dest_country &&
+      r.payout_method === value.payout_method,
   );
 
   return (
     <div className="space-y-4">
       <Field label="Label (optional)">
-        <Input value={value.name ?? ""} onChange={set("name")} placeholder="e.g. Canada → Nigeria (bank)" />
+        <Input
+          value={value.name ?? ""}
+          onChange={(e) => onChange({ ...value, name: e.target.value })}
+          placeholder={genLabel(value.source_currency, value.dest_country, value.payout_method) || "e.g. Canada → Nigeria (bank)"}
+        />
       </Field>
-      <div className="grid grid-cols-3 gap-3">
-        <Field label="Source currency"><Input value={value.source_currency} onChange={set("source_currency")} placeholder="CAD" /></Field>
-        <Field label="Dest. country"><Input value={value.dest_country} onChange={set("dest_country")} placeholder="NG" maxLength={2} /></Field>
-        <Field label="Dest. currency"><Input value={value.dest_currency} onChange={set("dest_currency")} placeholder="NGN" /></Field>
+
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Source currency">
+          <Select value={value.source_currency} onValueChange={handleSourceChange}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {SOURCE_CURRENCIES.map((c) => (
+                <SelectItem key={c.code} value={c.code}>{c.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
+
+        <Field label="Destination country">
+          <Select value={value.dest_country} onValueChange={handleDestChange}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {DEST_COUNTRIES.map((d) => (
+                <SelectItem key={d.code} value={d.code}>
+                  {d.flag} {d.name} ({d.currency})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
       </div>
+
+      {destInfo && (
+        <p className="text-xs text-muted-foreground -mt-1">
+          Payout currency: <span className="font-semibold text-foreground">{destInfo.currency}</span> — set automatically from country
+        </p>
+      )}
+
       <Field label="Payout method">
-        <Select value={value.payout_method} onValueChange={(v) => onChange({ ...value, payout_method: v })}>
+        <Select value={value.payout_method} onValueChange={handlePayoutChange}>
           <SelectTrigger><SelectValue /></SelectTrigger>
-          <SelectContent>{PAYOUT_METHODS.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
+          <SelectContent>
+            {PAYOUT_METHODS.map((m) => (
+              <SelectItem key={m} value={m}>{PAYOUT_LABELS[m] ?? m}</SelectItem>
+            ))}
+          </SelectContent>
         </Select>
       </Field>
+
+      {isDuplicate && (
+        <div className="flex items-start gap-2 rounded-lg border border-destructive/50 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+          A rule for this exact corridor + payout method already exists. Adding another may cause conflicts.
+        </div>
+      )}
+
       <div className="grid grid-cols-3 gap-3">
         <Field label="Fee %"><Input type="number" step="0.01" value={String(value.fee_percent)} onChange={setNum("fee_percent")} /></Field>
         <Field label="Fee $"><Input type="number" step="0.01" value={String(value.fee_fixed)} onChange={setNum("fee_fixed")} /></Field>
