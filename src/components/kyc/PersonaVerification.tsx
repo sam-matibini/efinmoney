@@ -1,10 +1,12 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Persona from "persona";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { ShieldCheck } from "lucide-react";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { toast } from "sonner";
+
+const PERSONA_POLL_MS = 3000;
 
 interface Props {
   userId: string;
@@ -18,13 +20,86 @@ interface Props {
 export const PersonaVerification = ({ userId, onComplete, onError, className, label = "Start ID Verification", autoStart = false }: Props) => {
   const [loading, setLoading] = useState(false);
   const autoStartedRef = useRef(false);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const stopPolling = useCallback(() => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => stopPolling();
+  }, [stopPolling]);
+
+  const openInNewWindow = useCallback(
+    (sessionToken: string, inquiryId: string, environment: string) => {
+      const baseUrl =
+        environment === "sandbox"
+          ? "https://sandbox.inquiry.withpersona.com"
+          : "https://inquiry.withpersona.com";
+      const url = `${baseUrl}/?session_token=${encodeURIComponent(sessionToken)}`;
+      const personaWindow = window.open(
+        url,
+        "persona-verification",
+        "width=600,height=800,scrollbars=yes,resizable=yes",
+      );
+
+      if (!personaWindow) {
+        setLoading(false);
+        toast.error("Pop-up was blocked. Please allow pop-ups for this site and try again.");
+        return;
+      }
+
+      pollingRef.current = setInterval(async () => {
+        if (personaWindow.closed) {
+          stopPolling();
+          setLoading(false);
+          try {
+            const { data } = await supabase.functions.invoke("get-persona-inquiry-status", {
+              body: { inquiryId },
+            });
+            const status = data?.status || data?.persona_inquiry_status;
+            if (status === "approved" || status === "completed" || status === "needs_review") {
+              toast.success("Identity check submitted");
+              onComplete?.({ inquiryId, status });
+            } else {
+              toast.message("Verification window closed", {
+                description: "If you completed the verification, we'll process it shortly.",
+              });
+            }
+          } catch {
+            toast.message("Verification window closed", {
+              description: "If you completed the verification, we'll process it shortly.",
+            });
+          }
+          return;
+        }
+
+        try {
+          const { data } = await supabase.functions.invoke("get-persona-inquiry-status", {
+            body: { inquiryId },
+          });
+          const status = data?.status || data?.persona_inquiry_status;
+          if (status === "approved" || status === "completed" || status === "needs_review") {
+            stopPolling();
+            personaWindow.close();
+            setLoading(false);
+            toast.success("Identity check submitted");
+            onComplete?.({ inquiryId, status });
+          }
+        } catch {
+          /* polling error — retry next tick */
+        }
+      }, PERSONA_POLL_MS);
+    },
+    [onComplete, stopPolling],
+  );
 
   const startVerification = async () => {
     setLoading(true);
     try {
-      // Guard: ensure we still have a VALID session before invoking the edge function.
-      // getSession() can return a cached session whose token was already revoked
-      // server-side, so we proactively refresh and verify with getUser().
       let { data: sessionData } = await supabase.auth.getSession();
       if (sessionData?.session) {
         const { data: refreshed } = await supabase.auth.refreshSession();
@@ -38,7 +113,6 @@ export const PersonaVerification = ({ userId, onComplete, onError, className, la
         if (typeof window !== "undefined") window.location.assign("/auth");
         return;
       }
-
 
       const { data, error } = await supabase.functions.invoke("create-persona-inquiry", {
         body: { userId },
@@ -55,7 +129,7 @@ export const PersonaVerification = ({ userId, onComplete, onError, className, la
         error: error?.message,
         origin: typeof window !== "undefined" ? window.location.origin : "n/a",
       });
-      // Handle expired/invalid auth from the edge function
+
       if (error && /401|unauthor/i.test(error.message || "")) {
         setLoading(false);
         toast.error("Your session has expired. Please sign in again.");
@@ -81,10 +155,25 @@ export const PersonaVerification = ({ userId, onComplete, onError, className, la
             : errorMessage,
         );
       }
-      if (error || (!data?.sessionToken && data?.mode !== "client" && !data?.templateId)) {
+      if (!data?.sessionToken && data?.mode !== "client" && !data?.templateId) {
         throw new Error(data?.error || "Failed to initialize verification");
       }
 
+      // Server-created inquiry with session token → open in a new window.
+      // The Persona inquiry page sets X-Frame-Options: sameorigin, so it cannot
+      // be embedded in a cross-origin iframe (the SDK's default). Opening in a
+      // popup avoids the restriction entirely.
+      if (data.sessionToken) {
+        setLoading(false);
+        openInNewWindow(
+          data.sessionToken,
+          data.inquiryId,
+          data.environment || "production",
+        );
+        return;
+      }
+
+      // Client-side flow (no API key): fall back to the embedded SDK.
       const clientConfig: Record<string, unknown> = {
         onReady: () => {
           console.log("[Persona] SDK ready — opening overlay");
@@ -123,23 +212,11 @@ export const PersonaVerification = ({ userId, onComplete, onError, className, la
         clientConfig.environment = data.environment || "sandbox";
       }
 
-      // Client-side flow: template + referenceId (no server-created inquiry).
-      if (data.mode === "client" || (!data.sessionToken && data.templateId)) {
-        clientConfig.templateId = data.templateId;
-        clientConfig.referenceId = userId;
-      } else if (data.sessionToken) {
-        // IMPORTANT: When resuming via sessionToken, do NOT pass templateId.
-        // Passing both causes the SDK to create a brand-new inquiry from the
-        // template (without our referenceId), producing orphan "Needs Review"
-        // inquiries that can never be linked back to the user.
-        clientConfig.sessionToken = data.sessionToken;
-        if (data.inquiryId) clientConfig.inquiryId = data.inquiryId;
-      } else if (data.templateId) {
+      if (data.templateId) {
         clientConfig.templateId = data.templateId;
         clientConfig.referenceId = userId;
       }
       const client = new (Persona as any).Client(clientConfig);
-
     } catch (err) {
       setLoading(false);
       console.error(err);
