@@ -649,7 +649,10 @@ const SendPage = () => {
         }
         if (data?.success === false || data?.error) {
           const refunded = data.refunded === true || data?.payout?.refunded === true;
-          const msg = data.error || data?.payout?.error || 'Payout failed';
+          const rawMsg = data.error || data?.payout?.error || 'Payout failed';
+          const msg = /trade region|trade context|not found for trade/i.test(String(rawMsg))
+            ? 'This currency pair isn\'t supported for this corridor yet. Please switch to a CAD wallet or contact support.'
+            : rawMsg;
           // Defensive: if the edge function reports a refund or payout failure
           // but didn't already mark the row failed, do it client-side so the
           // user isn't stuck on "processing".

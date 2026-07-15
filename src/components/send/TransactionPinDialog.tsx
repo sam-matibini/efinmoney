@@ -7,7 +7,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-type Mode = "loading" | "set" | "set-confirm" | "verify" | "locked";
+type Mode = "loading" | "set" | "set-confirm" | "verify" | "locked" | "forgot-confirm";
 
 interface Props {
   open: boolean;
@@ -102,6 +102,20 @@ const TransactionPinDialog = ({ open, onOpenChange, onVerified, amountLabel, ver
     finishVerified(finalPin, { created: true });
   };
 
+  const submitForgot = async () => {
+    if (busy) return;
+    setBusy(true);
+    const { error: rpcErr } = await supabase.rpc("reset_transaction_pin" as any);
+    setBusy(false);
+    if (rpcErr) {
+      toast.error("Couldn't reset your PIN. Please try again.");
+      return;
+    }
+    toast.success("PIN cleared — create your new PIN now");
+    reset();
+    setMode("set");
+  };
+
   const submitVerify = async (finalPin: string) => {
     if (submitLockRef.current || busy || completedRef.current) return;
     submitLockRef.current = true;
@@ -179,12 +193,14 @@ const TransactionPinDialog = ({ open, onOpenChange, onVerified, amountLabel, ver
     mode === "set" ? "Create a transaction PIN"
     : mode === "set-confirm" ? "Confirm your PIN"
     : mode === "locked" ? "Too many attempts"
+    : mode === "forgot-confirm" ? "Reset your PIN"
     : "Enter your PIN";
 
   const subtitle =
     mode === "set" ? "Choose a 4-digit PIN you'll use to approve transfers. You only set this once."
     : mode === "set-confirm" ? "Re-enter the 4-digit PIN to confirm."
     : mode === "locked" ? "Your PIN is temporarily locked for security."
+    : mode === "forgot-confirm" ? "Your current PIN will be permanently removed. You'll set a new one immediately after."
     : verifyDescription
       ?? (amountLabel
         ? `Authorize sending ${amountLabel}`
@@ -220,6 +236,31 @@ const TransactionPinDialog = ({ open, onOpenChange, onVerified, amountLabel, ver
                 {new Date(lockedUntil).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
               </span>)</>
             )}.
+          </div>
+        ) : mode === "forgot-confirm" ? (
+          <div className="flex flex-col gap-4 py-2">
+            <p className="text-center text-sm text-muted-foreground">
+              Your current PIN will be permanently removed. You'll create a new one right after.
+            </p>
+            <motion.button
+              type="button"
+              whileTap={{ scale: 0.97 }}
+              onClick={submitForgot}
+              disabled={busy}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-destructive px-4 py-3 text-sm font-semibold text-destructive-foreground transition-opacity disabled:opacity-60"
+            >
+              {busy && <Loader2 className="h-4 w-4 animate-spin" />}
+              Reset PIN
+            </motion.button>
+            <motion.button
+              type="button"
+              whileTap={{ scale: 0.97 }}
+              onClick={() => { setPin(""); setMode("verify"); }}
+              disabled={busy}
+              className="w-full rounded-xl border border-border px-4 py-3 text-sm font-semibold transition-colors hover:bg-muted disabled:opacity-60"
+            >
+              Cancel
+            </motion.button>
           </div>
         ) : (
           <div className="flex flex-col items-center gap-6 py-2">
@@ -283,6 +324,15 @@ const TransactionPinDialog = ({ open, onOpenChange, onVerified, amountLabel, ver
               </KeypadButton>
             </div>
 
+            {mode === "verify" && (
+              <button
+                type="button"
+                onClick={() => { setError(null); setPin(""); setMode("forgot-confirm"); }}
+                className="text-xs text-muted-foreground hover:text-foreground underline-offset-2 hover:underline transition-colors"
+              >
+                Forgot PIN?
+              </button>
+            )}
             <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
               <Lock className="h-3 w-3" /> Encrypted &amp; never stored in plain text
             </p>
