@@ -40,6 +40,14 @@ export const PersonaVerification = ({ userId, onComplete, onError, className, la
           ? "https://sandbox.inquiry.withpersona.com"
           : "https://inquiry.withpersona.com";
       const url = `${baseUrl}/verify?inquiry-id=${encodeURIComponent(inquiryId)}`;
+
+      const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+      if (isMobile) {
+        // Full-page redirect — no popup, no fixed dimensions, natural mobile viewport
+        window.location.href = url;
+        return;
+      }
+      
       const personaWindow = window.open(
         url,
         "persona-verification",
