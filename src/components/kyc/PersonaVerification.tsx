@@ -42,16 +42,14 @@ export const PersonaVerification = ({ userId, onComplete, onError, className, la
       const url = `${baseUrl}/verify?inquiry-id=${encodeURIComponent(inquiryId)}`;
 
       const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-      if (isMobile) {
-        // Full-page redirect — no popup, no fixed dimensions, natural mobile viewport
-        window.location.href = url;
-        return;
-      }
+      const features = isMobile
+        ? ""
+        : "width=600,height=800,scrollbars=yes,resizable=yes";
       
       const personaWindow = window.open(
         url,
         "persona-verification",
-        "width=600,height=800,scrollbars=yes,resizable=yes",
+        features
       );
 
       if (!personaWindow) {
