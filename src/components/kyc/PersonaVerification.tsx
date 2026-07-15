@@ -40,7 +40,6 @@ export const PersonaVerification = ({ userId, onComplete, onError, className, la
           ? "https://sandbox.inquiry.withpersona.com"
           : "https://inquiry.withpersona.com";
       const url = `${baseUrl}/verify?inquiry-id=${encodeURIComponent(inquiryId)}`;
-      
       const personaWindow = window.open(
         url,
         "persona-verification",
@@ -160,22 +159,21 @@ export const PersonaVerification = ({ userId, onComplete, onError, className, la
         throw new Error(data?.error || "Failed to initialize verification");
       }
 
-      let fallbackTried = false;
-      const fallbackToPopup = (reason: unknown) => {
-        if (fallbackTried) return; // never double-fire
-        fallbackTried = true;
-        console.warn("[Persona] SDK failed, falling back to popup", reason);
-        if (data.inquiryId) {
-          openInNewWindow(data.sessionToken, data.inquiryId, data.environment || "production");
-        } else {
-          setLoading(false);
-          toast.error("Could not start verification. Please try again.");
-          onError?.(reason);
-        }
-      };
+      // Server-created inquiry with session token → open in a new window.
+      // The Persona inquiry page sets X-Frame-Options: sameorigin, so it cannot
+      // be embedded in a cross-origin iframe (the SDK's default). Opening in a
+      // popup avoids the restriction entirely.
+      if (data.sessionToken) {
+        setLoading(false);
+        openInNewWindow(
+          data.sessionToken,
+          data.inquiryId,
+          data.environment || "production",
+        );
+        return;
+      }
 
-      // Build SDK config: prefer resuming the pre-created inquiry (inquiryId + sessionToken)
-      // over creating a new one from templateId, since the inquiry already exists server-side.
+      // Client-side flow (no API key): fall back to the embedded SDK.
       const clientConfig: Record<string, unknown> = {
         onReady: () => {
           console.log("[Persona] SDK ready — opening overlay");
@@ -201,8 +199,10 @@ export const PersonaVerification = ({ userId, onComplete, onError, className, la
           });
         },
         onError: (e: unknown) => {
+          setLoading(false);
           console.error("[Persona] onError", e);
-          fallbackToPopup(e);
+          toast.error("Verification was interrupted. Please try again.");
+          onError?.(e);
         },
       };
 
@@ -212,25 +212,11 @@ export const PersonaVerification = ({ userId, onComplete, onError, className, la
         clientConfig.environment = data.environment || "sandbox";
       }
 
-      if (data.inquiryId && data.sessionToken) {
-        // Resume the inquiry we already created server-side
-        clientConfig.inquiryId = data.inquiryId;
-        clientConfig.sessionToken = data.sessionToken;
-      } else if (data.templateId) {
-        // No pre-created inquiry — let the SDK create one client-side
+      if (data.templateId) {
         clientConfig.templateId = data.templateId;
         clientConfig.referenceId = userId;
-      } else {
-        fallbackToPopup(new Error("No inquiryId/sessionToken or templateId available"));
-        return;
       }
-
-      let client: any;
-      try {
-        client = new (Persona as any).Client(clientConfig);
-      } catch (e) {
-        fallbackToPopup(e);
-      }
+      const client = new (Persona as any).Client(clientConfig);
     } catch (err) {
       setLoading(false);
       console.error(err);
