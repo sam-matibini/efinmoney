@@ -39,7 +39,7 @@ export const PersonaVerification = ({ userId, onComplete, onError, className, la
         environment === "sandbox"
           ? "https://sandbox.withpersona.com"
           : "https://withpersona.com";
-      const url = `${baseUrl}/verify?session_token=${encodeURIComponent(sessionToken)}`;
+      const url = `${baseUrl}/verify?session-token=${encodeURIComponent(sessionToken)}`;
       const personaWindow = window.open(
         url,
         "persona-verification",
