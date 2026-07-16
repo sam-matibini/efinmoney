@@ -1,5 +1,7 @@
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
+
+const MotionLink = motion(Link);
 import { ArrowRight, Mail, Shield, Sparkles } from "lucide-react";
 import { Logo, Wordmark } from "@/components/Logo";
 
@@ -107,8 +109,8 @@ export default function MarketingFooter() {
               </div>
             </motion.div>
 
-            <motion.a
-              href="mailto:support@efin.money"
+            <MotionLink
+              to="/contact"
               initial={{ opacity: 0, y: 24 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: "-40px" }}
@@ -121,7 +123,7 @@ export default function MarketingFooter() {
                 <Mail className="w-4 h-4 shrink-0" />
                 support@efin.money
               </span>
-            </motion.a>
+            </MotionLink>
           </div>
         </div>
 

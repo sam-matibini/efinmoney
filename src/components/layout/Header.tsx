@@ -287,6 +287,8 @@ const Header = () => {
                   <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
                 </div>
                 <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => navigate("/")}>Home Page</DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => navigate("/profile")}>Profile Settings</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigate("/kyc")}>KYC Verification</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigate("/security")}>Security</DropdownMenuItem>

@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
 import { ArrowRight, Globe, Shield, Zap, Wallet, Send, BarChart3, Building2, Layers, Check } from "lucide-react";
 import MarketingHeader from "@/components/marketing/MarketingHeader";
 import MarketingFooter from "@/components/marketing/MarketingFooter";
@@ -142,6 +143,8 @@ const ExchangeScreen = () => (
 const HERO_WORDS = ["Send", "money", "across", "borders,", "instantly."];
 
 const Landing = () => {
+  const { user } = useAuth();
+
   useEffect(() => {
     document.title = "eFinMoney — Send money across borders, instantly.";
     const meta = document.querySelector('meta[name="description"]');
@@ -216,10 +219,11 @@ const Landing = () => {
               className="mt-9 flex flex-col sm:flex-row items-center lg:items-start justify-center lg:justify-start gap-3"
             >
               <Link
-                to="/auth"
+                to={user ? "/dashboard" : "/auth"}
                 className="group inline-flex items-center gap-2 bg-[hsl(var(--accent-amber))] hover:brightness-110 text-[hsl(var(--brand-900))] font-bold px-7 py-3.5 rounded-full text-base transition-all hover:-translate-y-0.5 shadow-cta-amber"
               >
-                Get Started <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                {user ? "Go to Dashboard" : "Get Started"}
+                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </Link>
               <Link
                 to="/how-it-works"

@@ -172,7 +172,7 @@ const RoleProtectedRoute = ({
 const PublicRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
   if (loading) return <FullPageSpinner />;
-  if (user) return <Navigate to="/" replace />;
+  if (user) return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
 };
 
@@ -199,7 +199,7 @@ const RoleShellRoute = ({
 );
 
 const RootRoute = () => {
-  const { user, loading } = useAuth();
+  const { loading } = useAuth();
   if (loading) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
@@ -207,8 +207,7 @@ const RootRoute = () => {
       </div>
     );
   }
-  if (!user) return <Landing />;
-  return <Navigate to="/dashboard" replace />;
+  return <Landing />;
 };
 
 const AppRoutes = () => {
