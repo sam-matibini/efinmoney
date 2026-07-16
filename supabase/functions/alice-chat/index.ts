@@ -1,13 +1,13 @@
 // Alice AI — EfinMoney assistant. Answers product questions and, for the signed-in
 // caller, read-only questions about their own data (admins get operational read tools).
-// Calls the Anthropic Messages API directly (ANTHROPIC_API_KEY secret).
+// Calls the Google Gemini API directly (GEMINI_API_KEY secret), native generateContent.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { corsPreflightResponse, jsonResponse } from "../_shared/cors.ts";
 import { EFINMONEY_KNOWLEDGE, EFINMONEY_ADMIN_KNOWLEDGE } from "../_shared/alice-knowledge.ts";
 
-const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
-const MODEL = "claude-sonnet-5"; // latest, capable, good cost for chat
-const MAX_TOKENS = 1024;
+const MODEL = "gemini-2.5-flash"; // latest, capable, good cost/latency for chat
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
+const MAX_OUTPUT_TOKENS = 1024;
 const MAX_TOOL_ITERATIONS = 4;
 
 // deno-lint-ignore no-explicit-any
@@ -27,17 +27,17 @@ You are Alice, the EfinMoney in-app assistant. Rules:
 - When a question is about the user's own account (balance, transactions, KYC), use
   the available tools to fetch real data before answering.`;
 
-/* ── Anthropic tool schemas ── */
+/* ── Gemini functionDeclarations (no-arg tools omit `parameters`) ── */
 const USER_TOOLS = [
-  { name: "get_my_balances", description: "Get the signed-in user's wallet balances per currency.", input_schema: { type: "object", properties: {} } },
-  { name: "get_my_recent_transactions", description: "Get the signed-in user's most recent wallet transactions.", input_schema: { type: "object", properties: { limit: { type: "number", description: "How many to return (max 20)." } } } },
-  { name: "get_my_kyc_status", description: "Get the signed-in user's KYC verification status and tier.", input_schema: { type: "object", properties: {} } },
+  { name: "get_my_balances", description: "Get the signed-in user's wallet balances per currency." },
+  { name: "get_my_recent_transactions", description: "Get the signed-in user's most recent wallet transactions.", parameters: { type: "object", properties: { limit: { type: "number", description: "How many to return (max 20)." } } } },
+  { name: "get_my_kyc_status", description: "Get the signed-in user's KYC verification status and tier." },
 ];
 const ADMIN_TOOLS = [
-  { name: "get_pending_kyc_count", description: "Count KYC verifications awaiting review.", input_schema: { type: "object", properties: {} } },
-  { name: "get_settlement_summary", description: "Summary of settlement reconciliation rows by status plus total variance.", input_schema: { type: "object", properties: {} } },
-  { name: "lookup_user_by_email", description: "Find users whose email matches a search string.", input_schema: { type: "object", properties: { email: { type: "string" } }, required: ["email"] } },
-  { name: "get_open_incidents_count", description: "Count operational incidents that are not resolved/closed.", input_schema: { type: "object", properties: {} } },
+  { name: "get_pending_kyc_count", description: "Count KYC verifications awaiting review." },
+  { name: "get_settlement_summary", description: "Summary of settlement reconciliation rows by status plus total variance." },
+  { name: "lookup_user_by_email", description: "Find users whose email matches a search string.", parameters: { type: "object", properties: { email: { type: "string" } }, required: ["email"] } },
+  { name: "get_open_incidents_count", description: "Count operational incidents that are not resolved/closed." },
 ];
 
 async function runTool(name: string, args: Record<string, unknown>, sb: Any, userId: string, isStaff: boolean): Promise<unknown> {
@@ -105,15 +105,16 @@ async function runTool(name: string, args: Record<string, unknown>, sb: Any, use
   }
 }
 
-async function callAnthropic(apiKey: string, system: string, messages: Any[], tools: Any[]) {
-  return await fetch(ANTHROPIC_URL, {
+async function callGemini(apiKey: string, systemInstruction: string, contents: Any[], tools: Any[]) {
+  return await fetch(GEMINI_URL, {
     method: "POST",
-    headers: {
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({ model: MODEL, max_tokens: MAX_TOKENS, system, messages, tools }),
+    headers: { "content-type": "application/json", "x-goog-api-key": apiKey },
+    body: JSON.stringify({
+      systemInstruction: { parts: [{ text: systemInstruction }] },
+      contents,
+      tools: tools.length ? [{ functionDeclarations: tools }] : undefined,
+      generationConfig: { maxOutputTokens: MAX_OUTPUT_TOKENS },
+    }),
   });
 }
 
@@ -132,8 +133,8 @@ Deno.serve(async (req) => {
     const { data: { user } } = await sb.auth.getUser();
     if (!user) return jsonResponse({ error: "Unauthorized" }, 401);
 
-    const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
-    if (!apiKey) return jsonResponse({ error: "Alice is not configured yet (missing ANTHROPIC_API_KEY)." }, 500);
+    const apiKey = Deno.env.get("GEMINI_API_KEY");
+    if (!apiKey) return jsonResponse({ error: "Alice is not configured yet (missing GEMINI_API_KEY)." }, 500);
 
     const body = await req.json().catch(() => ({}));
     const history: { role: string; content: string }[] = Array.isArray(body?.messages) ? body.messages : [];
@@ -146,7 +147,7 @@ Deno.serve(async (req) => {
     const isStaff = roles.has("admin") || roles.has("finance") || roles.has("compliance");
     const effectiveContext = requestedContext === "admin" && isStaff ? "admin" : "user";
 
-    const system = [
+    const systemInstruction = [
       EFINMONEY_KNOWLEDGE,
       effectiveContext === "admin" ? EFINMONEY_ADMIN_KNOWLEDGE : "",
       GUARDRAILS,
@@ -155,52 +156,61 @@ Deno.serve(async (req) => {
 
     const tools = effectiveContext === "admin" ? [...USER_TOOLS, ...ADMIN_TOOLS] : USER_TOOLS;
 
-    // Build Anthropic messages: only user/assistant text, must start with 'user'.
-    const messages: Any[] = history
+    // Build Gemini contents: only user/assistant text, assistant→model, must start with 'user'.
+    const contents: Any[] = history
       .slice(-16)
       .filter((m) => m.role === "user" || m.role === "assistant")
-      .map((m) => ({ role: m.role, content: m.content ?? "" }));
-    while (messages.length && messages[0].role !== "user") messages.shift();
-    if (messages.length === 0) return jsonResponse({ error: "messages required" }, 400);
+      .map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content ?? "" }] }));
+    while (contents.length && contents[0].role !== "user") contents.shift();
+    if (contents.length === 0) return jsonResponse({ error: "messages required" }, 400);
 
     const toolsUsed: string[] = [];
 
     for (let i = 0; i < MAX_TOOL_ITERATIONS; i++) {
-      const res = await callAnthropic(apiKey, system, messages, tools);
+      const res = await callGemini(apiKey, systemInstruction, contents, tools);
       if (res.status === 429) return jsonResponse({ error: "Alice is busy, please try again in a moment." }, 429);
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({}));
         const detail = errBody?.error?.message || `HTTP ${res.status}`;
-        console.error("anthropic error", res.status, detail);
+        console.error("gemini error", res.status, detail);
         return jsonResponse({ error: `AI error: ${detail}` }, 502);
       }
 
       const json = await res.json();
-      const content: Any[] = json?.content || [];
+      const parts: Any[] = json?.candidates?.[0]?.content?.parts || [];
+      const calls = parts.filter((p) => p?.functionCall);
 
-      if (json?.stop_reason === "tool_use") {
-        messages.push({ role: "assistant", content }); // echo assistant turn incl. tool_use blocks
-        const results: Any[] = [];
-        for (const block of content) {
-          if (block?.type !== "tool_use") continue;
-          toolsUsed.push(block.name);
-          const result = await runTool(block.name, block.input || {}, sb, user.id, isStaff);
-          results.push({ type: "tool_result", tool_use_id: block.id, content: JSON.stringify(result) });
+      if (calls.length) {
+        // Echo the model's turn (incl. functionCall parts), then answer each call.
+        contents.push({ role: "model", parts });
+        const responseParts: Any[] = [];
+        for (const p of calls) {
+          const fnName = p.functionCall.name;
+          toolsUsed.push(fnName);
+          const result = await runTool(fnName, p.functionCall.args || {}, sb, user.id, isStaff);
+          responseParts.push({ functionResponse: { name: fnName, response: { result } } });
         }
-        messages.push({ role: "user", content: results });
+        contents.push({ role: "user", parts: responseParts });
         continue;
       }
 
-      const text = content.filter((b) => b?.type === "text").map((b) => b.text).join("\n").trim();
-      return jsonResponse({ reply: text, tools_used: toolsUsed, context: effectiveContext });
+      const text = parts.filter((p) => typeof p?.text === "string").map((p) => p.text).join("\n").trim();
+      if (text) return jsonResponse({ reply: text, tools_used: toolsUsed, context: effectiveContext });
+      // No text and no tool call (e.g. safety stop) — fall through to a final plain call.
+      break;
     }
 
-    // Ran out of tool iterations — ask for a final answer with no more tools.
-    const finalRes = await callAnthropic(apiKey, system, messages, []);
+    // Ran out of tool iterations (or empty turn) — ask for a final answer with no tools.
+    const finalRes = await callGemini(apiKey, systemInstruction, contents, []);
     if (!finalRes.ok) return jsonResponse({ error: "AI error (final)" }, 502);
     const finalJson = await finalRes.json();
-    const text = (finalJson?.content || []).filter((b: Any) => b?.type === "text").map((b: Any) => b.text).join("\n").trim();
-    return jsonResponse({ reply: text, tools_used: toolsUsed, context: effectiveContext });
+    const finalParts: Any[] = finalJson?.candidates?.[0]?.content?.parts || [];
+    const text = finalParts.filter((p: Any) => typeof p?.text === "string").map((p: Any) => p.text).join("\n").trim();
+    return jsonResponse({
+      reply: text || "Sorry, I couldn't answer that. Please try rephrasing.",
+      tools_used: toolsUsed,
+      context: effectiveContext,
+    });
   } catch (err) {
     console.error("alice-chat error", err);
     return jsonResponse({ error: err instanceof Error ? err.message : "Unknown error" }, 500);
