@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ShieldCheck, Lock, Loader2, Delete } from "lucide-react";
+import { ShieldCheck, Lock, Loader2, Delete, Mail } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-type Mode = "loading" | "set" | "set-confirm" | "verify" | "locked" | "forgot-confirm";
+type Mode = "loading" | "set" | "set-confirm" | "verify" | "locked" | "forgot-confirm" | "forgot-sent";
 
 interface Props {
   open: boolean;
@@ -33,6 +33,7 @@ const TransactionPinDialog = ({ open, onOpenChange, onVerified, amountLabel, ver
   const [firstPin, setFirstPin] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [resetEmail, setResetEmail] = useState("");
   const [attemptsLeft, setAttemptsLeft] = useState<number | null>(null);
   const [lockedUntil, setLockedUntil] = useState<string | null>(null);
   const shakeRef = useRef(0);
@@ -105,15 +106,14 @@ const TransactionPinDialog = ({ open, onOpenChange, onVerified, amountLabel, ver
   const submitForgot = async () => {
     if (busy) return;
     setBusy(true);
-    const { error: rpcErr } = await supabase.rpc("reset_transaction_pin" as any);
+    const { data, error: fnErr } = await supabase.functions.invoke("pin-reset-request");
     setBusy(false);
-    if (rpcErr) {
-      toast.error("Couldn't reset your PIN. Please try again.");
+    if (fnErr || !data?.ok) {
+      toast.error("Couldn't send reset email. Please try again.");
       return;
     }
-    toast.success("PIN cleared — create your new PIN now");
-    reset();
-    setMode("set");
+    setResetEmail(data.email ?? "your email");
+    setMode("forgot-sent");
   };
 
   const submitVerify = async (finalPin: string) => {
@@ -193,14 +193,16 @@ const TransactionPinDialog = ({ open, onOpenChange, onVerified, amountLabel, ver
     mode === "set" ? "Create a transaction PIN"
     : mode === "set-confirm" ? "Confirm your PIN"
     : mode === "locked" ? "Too many attempts"
-    : mode === "forgot-confirm" ? "Reset your PIN"
+    : mode === "forgot-confirm" ? "Forgot your PIN?"
+    : mode === "forgot-sent" ? "Check your email"
     : "Enter your PIN";
 
   const subtitle =
     mode === "set" ? "Choose a 4-digit PIN you'll use to approve transfers. You only set this once."
     : mode === "set-confirm" ? "Re-enter the 4-digit PIN to confirm."
     : mode === "locked" ? "Your PIN is temporarily locked for security."
-    : mode === "forgot-confirm" ? "Your current PIN will be permanently removed. You'll set a new one immediately after."
+    : mode === "forgot-confirm" ? "We'll send a secure reset link to your email address."
+    : mode === "forgot-sent" ? `A reset link is on its way to ${resetEmail}. Tap it to clear your PIN, then come back to set a new one.`
     : verifyDescription
       ?? (amountLabel
         ? `Authorize sending ${amountLabel}`
@@ -218,6 +220,8 @@ const TransactionPinDialog = ({ open, onOpenChange, onVerified, amountLabel, ver
           >
             {mode === "locked"
               ? <Lock className="h-7 w-7 text-destructive" />
+              : mode === "forgot-sent"
+              ? <Mail className="h-7 w-7 text-primary" />
               : <ShieldCheck className="h-7 w-7 text-primary" />}
           </motion.div>
           <DialogTitle className="font-display text-xl">{title}</DialogTitle>
@@ -239,18 +243,15 @@ const TransactionPinDialog = ({ open, onOpenChange, onVerified, amountLabel, ver
           </div>
         ) : mode === "forgot-confirm" ? (
           <div className="flex flex-col gap-4 py-2">
-            <p className="text-center text-sm text-muted-foreground">
-              Your current PIN will be permanently removed. You'll create a new one right after.
-            </p>
             <motion.button
               type="button"
               whileTap={{ scale: 0.97 }}
               onClick={submitForgot}
               disabled={busy}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-destructive px-4 py-3 text-sm font-semibold text-destructive-foreground transition-opacity disabled:opacity-60"
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition-opacity disabled:opacity-60"
             >
-              {busy && <Loader2 className="h-4 w-4 animate-spin" />}
-              Reset PIN
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+              {busy ? "Sending…" : "Send reset link"}
             </motion.button>
             <motion.button
               type="button"
@@ -260,6 +261,20 @@ const TransactionPinDialog = ({ open, onOpenChange, onVerified, amountLabel, ver
               className="w-full rounded-xl border border-border px-4 py-3 text-sm font-semibold transition-colors hover:bg-muted disabled:opacity-60"
             >
               Cancel
+            </motion.button>
+          </div>
+        ) : mode === "forgot-sent" ? (
+          <div className="flex flex-col gap-4 py-2">
+            <p className="text-center text-xs text-muted-foreground leading-relaxed">
+              The link expires in 30 minutes. Once you tap it, your PIN will be cleared and you can create a new one.
+            </p>
+            <motion.button
+              type="button"
+              whileTap={{ scale: 0.97 }}
+              onClick={() => onOpenChange(false)}
+              className="w-full rounded-xl border border-border px-4 py-3 text-sm font-semibold transition-colors hover:bg-muted"
+            >
+              Close
             </motion.button>
           </div>
         ) : (

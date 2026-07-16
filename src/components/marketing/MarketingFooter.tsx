@@ -15,7 +15,7 @@ const NAV_PILLS: { label: string; href: string; external?: boolean }[] = [
   { label: "Privacy", href: "/privacy" },
   { label: "Terms", href: "/terms" },
   { label: "Compliance", href: "/compliance" },
-  { label: "Contact", href: "mailto:info@efintax.biz", external: true },
+  { label: "Contact", href: "/contact" },
 ];
 
 const spring = { type: "spring" as const, stiffness: 380, damping: 28 };
@@ -108,7 +108,7 @@ export default function MarketingFooter() {
             </motion.div>
 
             <motion.a
-              href="mailto:info@efintax.biz"
+              href="mailto:support@efin.money"
               initial={{ opacity: 0, y: 24 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: "-40px" }}
@@ -119,7 +119,7 @@ export default function MarketingFooter() {
               <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-white/40 mb-2">Say hello</p>
               <span className="flex items-center gap-2 text-base sm:text-lg font-semibold text-white group-hover:text-[hsl(var(--accent-amber))] transition-colors">
                 <Mail className="w-4 h-4 shrink-0" />
-                info@efintax.biz
+                support@efin.money
               </span>
             </motion.a>
           </div>

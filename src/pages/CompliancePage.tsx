@@ -461,7 +461,7 @@ export default function CompliancePage() {
                 <Mail className="h-4 w-4 mt-0.5 text-primary" />
                 <div>
                   <p className="font-medium text-foreground">General</p>
-                  <a className="text-primary underline" href="mailto:info@efintax.biz">info@efintax.biz</a>
+                  <a className="text-primary underline" href="mailto:support@efin.money">support@efin.money</a>
                 </div>
               </div>
             </div>

@@ -124,6 +124,7 @@ const SupportInboxPage = lazyImport(() => import("./pages/admin/SupportInboxPage
 const PricingPage = lazyImport(() => import("./pages/admin/PricingPage"));
 const RevenuePage = lazyImport(() => import("./pages/admin/RevenuePage"));
 const SupportPage = lazyImport(() => import("./pages/SupportPage"));
+const ResetPinPage = lazyImport(() => import("./pages/ResetPinPage"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -335,6 +336,7 @@ const AppRoutes = () => {
         <Route path="/auth" element={<PublicRoute><Auth /></PublicRoute>} />
         <Route path="/auth/confirm" element={<AuthConfirm />} />
         <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/reset-pin" element={<ResetPinPage />} />
         <Route path="/portal" element={<CustomerPortalPage />} />
         <Route path="/deposit/complete" element={<DepositComplete />} />
         <Route path="/payment-callback" element={<PaymentCallback />} />

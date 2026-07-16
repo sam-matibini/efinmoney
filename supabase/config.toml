@@ -257,6 +257,13 @@ verify_jwt = false
 [functions.payment-link-claim]
 verify_jwt = false
 
+# PIN reset: request verifies JWT manually; confirm is public (link may open unauthenticated).
+[functions.pin-reset-request]
+verify_jwt = false
+
+[functions.pin-reset-confirm]
+verify_jwt = false
+
 [functions.payment-link-create]
 verify_jwt = false
 

@@ -126,7 +126,7 @@ const SECTIONS: Array<{ id: string; title: string; body: React.ReactNode }> = [
           <li>Withdraw consent where processing is based on consent.</li>
           <li>Lodge a complaint with your local data protection authority.</li>
         </ul>
-        <p className="mt-3">To exercise any of these rights, contact us at <a className="text-primary underline" href="mailto:info@efintax.biz">info@efintax.biz</a>.</p>
+        <p className="mt-3">To exercise any of these rights, contact us at <a className="text-primary underline" href="mailto:support@efin.money">support@efin.money</a>.</p>
       </>
     ),
   },
@@ -169,7 +169,7 @@ const SECTIONS: Array<{ id: string; title: string; body: React.ReactNode }> = [
     body: (
       <p>
         For privacy questions or requests, contact our Data Protection Officer at{" "}
-        <a className="text-primary underline" href="mailto:info@efintax.biz">info@efintax.biz</a>.
+        <a className="text-primary underline" href="mailto:support@efin.money">support@efin.money</a>.
       </p>
     ),
   },
@@ -234,7 +234,7 @@ export default function PrivacyPolicyPage() {
 
             <div className="border-t border-border pt-6 flex items-center gap-2 text-sm text-muted-foreground">
               <Mail className="h-4 w-4" />
-              Questions? <a href="mailto:info@efintax.biz" className="text-primary underline">info@efintax.biz</a>
+              Questions? <a href="mailto:support@efin.money" className="text-primary underline">support@efin.money</a>
             </div>
           </CardContent>
         </Card>
