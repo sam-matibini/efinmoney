@@ -95,10 +95,10 @@ export default function SwychrTopUpCard({ walletId, walletCurrency, onComplete }
       <CardHeader className="pb-3">
         <CardTitle className="text-base flex items-center gap-2">
           <Globe className="h-4 w-4 text-violet-400" />
-          Swychr secure checkout
+          International checkout
         </CardTitle>
         <p className="text-sm text-muted-foreground">
-          Pay via Swychr hosted checkout for your {currency} wallet (not Nomba).
+          Pay via secure hosted checkout for your {currency} wallet.
         </p>
       </CardHeader>
       <CardContent className="space-y-4">

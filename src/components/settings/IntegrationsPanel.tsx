@@ -73,13 +73,14 @@ const integrations: Integration[] = [
   {
     id: "swychr",
     name: "Swychr Connect",
-    description: "Secondary payin, payout, virtual cards, and airtime — sandbox only until enabled",
+    description: "Primary international payin, payout, virtual cards, and airtime",
     category: "payments",
     icon: <Globe className="h-6 w-6" />,
-    status: "disconnected",
-    enabled: false,
-    apiKeyConfigured: false,
-    environment: "sandbox"
+    status: "connected",
+    enabled: true,
+    lastSync: "Live",
+    apiKeyConfigured: true,
+    environment: "production"
   },
   {
     id: "stripe",

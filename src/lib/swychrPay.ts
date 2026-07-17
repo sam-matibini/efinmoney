@@ -11,7 +11,7 @@ export interface SwychrCollectionResult {
   error?: string;
 }
 
-export const SWYCHR_TOPUP_CURRENCIES = ["XAF", "KES", "XOF", "UGX", "USD", "CAD"];
+export const SWYCHR_TOPUP_CURRENCIES = ["XAF", "KES", "XOF", "UGX", "USD", "CAD", "EUR", "GBP"];
 
 export function isSwychrTopupCurrency(currency: string): boolean {
   return SWYCHR_TOPUP_CURRENCIES.includes(currency.toUpperCase());

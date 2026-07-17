@@ -27,11 +27,11 @@ export function countryCodeForCurrency(currency: string): string {
   const map: Record<string, string> = {
     NGN: "NG",
     GHS: "GH",
-    // US/CA country codes rejected on this merchant; use KE corridor for USD/CAD collection
+    // US/CA/EU/GB country codes may be rejected; use KE corridor for international collection until Swychr enables them
     USD: "KE",
     CAD: "KE",
-    EUR: "DE",
-    GBP: "GB",
+    EUR: "KE",
+    GBP: "KE",
     KES: "KE",
     XAF: "CM",
     XOF: "SN",

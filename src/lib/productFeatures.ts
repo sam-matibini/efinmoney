@@ -18,11 +18,11 @@ export const productFeatures = {
   stripe: false,
   flutterwave: envFlag("VITE_FEATURE_FLUTTERWAVE", false),
   crypto: envFlag("VITE_FEATURE_CRYPTO", false),
-  billPay: envFlag("VITE_FEATURE_BILL_PAY", false),
+  billPay: envFlag("VITE_FEATURE_BILL_PAY", true),
   paymentLinks: envFlag("VITE_FEATURE_PAYMENT_LINKS", false),
   otherAfricanCorridors: envFlag("VITE_FEATURE_OTHER_AFRICA", false),
-  cards: envFlag("VITE_FEATURE_CARDS", false),
-  swychr: envFlag("VITE_FEATURE_SWYCHR", false),
+  cards: envFlag("VITE_FEATURE_CARDS", true),
+  swychr: envFlag("VITE_FEATURE_SWYCHR", true),
   adyen: envFlag("VITE_FEATURE_ADYEN", false),
 } as const;
 
@@ -32,12 +32,14 @@ export function isFeatureEnabled(key: ProductFeatureKey): boolean {
   return productFeatures[key];
 }
 
-/** Live lenhub corridors: Nigeria + Ghana */
+/** Live top-up corridors */
 export function isLiveTopupCurrency(currency: string): boolean {
   const c = currency.toUpperCase();
-  if (productFeatures.nombaNigeria && ["NGN", "USD", "EUR", "GBP", "CAD"].includes(c)) return true;
+  if (productFeatures.swychr && ["XAF", "KES", "XOF", "UGX", "USD", "CAD", "EUR", "GBP"].includes(c)) return true;
+  if (productFeatures.nombaNigeria && c === "NGN") return true;
   if (productFeatures.ghanaPay && c === "GHS") return true;
-  if (productFeatures.swychr && ["XAF", "KES", "XOF", "UGX", "USD", "CAD"].includes(c)) return true;
+  // Legacy Nomba international only if Swychr is off
+  if (!productFeatures.swychr && productFeatures.nombaNigeria && ["USD", "EUR", "GBP", "CAD"].includes(c)) return true;
   return false;
 }
 

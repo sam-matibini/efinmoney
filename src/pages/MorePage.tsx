@@ -26,6 +26,7 @@ import {
   CreditCard,
   Stamp,
   ExternalLink,
+  Receipt,
 } from "lucide-react";
 import { productFeatures } from "@/lib/productFeatures";
 import PageHeroBanner from "@/components/common/PageHeroBanner";
@@ -190,6 +191,7 @@ const MorePage = () => {
             rows={[
               { icon: Wallet, label: "My Wallets", onClick: () => navigate("/wallets") },
               ...(productFeatures.cards ? [{ icon: CreditCard, label: "Cards", onClick: () => navigate("/cards") }] : []),
+              ...(productFeatures.billPay ? [{ icon: Receipt, label: "Pay Bills & Airtime", onClick: () => navigate("/pay-bills") }] : []),
               { icon: ArrowLeftRight, label: "Exchange Currency", onClick: () => navigate("/exchange") },
               { icon: PieChart, label: "Transaction Limits", onClick: () => navigate("/kyc") },
             ]}

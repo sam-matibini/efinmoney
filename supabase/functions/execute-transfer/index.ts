@@ -511,14 +511,7 @@ Deno.serve(async (req) => {
         );
         payoutResult = await res.json();
       } else if (isNigeriaBank && nombaNigeriaOnly) {
-        if (!isNombaNigeriaConfigured()) {
-          payoutResult = {
-            success: false,
-            error: "Nomba Nigeria is not configured (set NOMBA_PAY_API_URL + NOMBA_PAY_USER on Supabase)",
-            code: "nomba_not_configured",
-            rail: "nomba",
-          };
-        } else if (useStellar || useFincra || usePawapay || useMtnMomo) {
+        if (useStellar || useFincra || usePawapay || useMtnMomo) {
           payoutResult = {
             success: false,
             error: "NGN bank payout blocked: another rail flag is set (stellar/fincra/pawapay/mtn)",
@@ -526,27 +519,52 @@ Deno.serve(async (req) => {
             rail: "nomba",
           };
         } else {
-          const nombaRes = await fetch(
-            `${Deno.env.get("SUPABASE_URL")}/functions/v1/nomba-payout`,
-            { method: "POST", headers: internalHeaders, body: JSON.stringify({ transfer_id }) },
-          );
-          payoutResult = await nombaRes.json().catch(() => ({
-            success: false,
-            error: `nomba-payout returned HTTP ${nombaRes.status}`,
-            code: "nomba_http_error",
-            rail: "nomba",
-          }));
-          if (payoutResult?.success === false && Deno.env.get("SWYCHR_PAYOUT_FALLBACK") === "true") {
+          const useSwychrPrimary = Deno.env.get("SWYCHR_ENABLED") === "true"
+            && Deno.env.get("SWYCHR_PAYOUT_PRIMARY") !== "false";
+          const trySwychr = async () => {
             const swychrRes = await fetch(
               `${Deno.env.get("SUPABASE_URL")}/functions/v1/swychr-payout`,
               { method: "POST", headers: internalHeaders, body: JSON.stringify({ transfer_id }) },
             );
-            const swychrJson = await swychrRes.json().catch(() => ({
+            return swychrRes.json().catch(() => ({
               success: false,
               error: `swychr-payout returned HTTP ${swychrRes.status}`,
               rail: "swychr",
             }));
-            if (swychrJson?.success) payoutResult = swychrJson;
+          };
+          const tryNomba = async () => {
+            if (!isNombaNigeriaConfigured()) {
+              return {
+                success: false,
+                error: "Nomba Nigeria is not configured (set NOMBA_PAY_API_URL + NOMBA_PAY_USER on Supabase)",
+                code: "nomba_not_configured",
+                rail: "nomba",
+              };
+            }
+            const nombaRes = await fetch(
+              `${Deno.env.get("SUPABASE_URL")}/functions/v1/nomba-payout`,
+              { method: "POST", headers: internalHeaders, body: JSON.stringify({ transfer_id }) },
+            );
+            return nombaRes.json().catch(() => ({
+              success: false,
+              error: `nomba-payout returned HTTP ${nombaRes.status}`,
+              code: "nomba_http_error",
+              rail: "nomba",
+            }));
+          };
+
+          if (useSwychrPrimary) {
+            payoutResult = await trySwychr();
+            if (payoutResult?.success === false) {
+              const nombaJson = await tryNomba();
+              if (nombaJson?.success) payoutResult = nombaJson;
+            }
+          } else {
+            payoutResult = await tryNomba();
+            if (payoutResult?.success === false && Deno.env.get("SWYCHR_PAYOUT_FALLBACK") === "true") {
+              const swychrJson = await trySwychr();
+              if (swychrJson?.success) payoutResult = swychrJson;
+            }
           }
         }
       } else {

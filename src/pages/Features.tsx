@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
-  ArrowRight, Wallet, Send, Smartphone, Repeat, Globe, Shield, Zap, Receipt,
+  ArrowRight, Wallet, Send, Smartphone, Repeat, Globe, Shield, Zap, Receipt, CreditCard,
 } from "lucide-react";
 import MarketingHeader from "@/components/marketing/MarketingHeader";
 import MarketingFooter from "@/components/marketing/MarketingFooter";
@@ -43,6 +43,20 @@ const FEATURES = [
     title: "Receive & bank link",
     desc: "Get account details to receive money. Link external banks with Plaid.",
     accent: "from-fuchsia-500/15 to-pink-500/5",
+  },
+  {
+    id: "cards",
+    icon: CreditCard,
+    title: "Virtual cards",
+    desc: "Issue virtual cards, top them up from your wallet, freeze or unfreeze anytime.",
+    accent: "from-rose-500/15 to-orange-500/5",
+  },
+  {
+    id: "bills",
+    icon: Receipt,
+    title: "Airtime & bills",
+    desc: "Buy airtime and pay bills from your wallet balance in supported countries.",
+    accent: "from-lime-500/15 to-emerald-500/5",
   },
 ];
 

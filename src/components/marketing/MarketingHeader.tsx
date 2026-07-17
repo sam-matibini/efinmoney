@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  Menu, X, ChevronDown, Wallet, Send, Smartphone, Repeat, ArrowRight,
+  Menu, X, ChevronDown, Wallet, Send, Smartphone, Repeat, ArrowRight, CreditCard, Receipt,
 } from "lucide-react";
 import { Logo, Wordmark } from "@/components/Logo";
 import { cn } from "@/lib/utils";
@@ -30,6 +30,18 @@ const LIVE_ITEMS = [
     label: "Currency exchange",
     blurb: "Live rates, transparent FX",
     to: "/features#exchange",
+  },
+  {
+    icon: CreditCard,
+    label: "Virtual cards",
+    blurb: "Issue and manage cards",
+    to: "/features#cards",
+  },
+  {
+    icon: Receipt,
+    label: "Airtime & bills",
+    blurb: "Top up phones from wallet",
+    to: "/features#bills",
   },
 ];
 
@@ -89,7 +101,7 @@ export default function MarketingHeader({ variant = "solid" }: { variant?: "tran
 
             {featuresOpen && (
               <div className="absolute left-1/2 -translate-x-1/2 top-full pt-3">
-                <div className="w-[480px] overflow-hidden rounded-2xl border border-white/15 bg-[hsl(var(--brand-900))] shadow-[0_24px_80px_-20px_rgba(0,0,0,0.65)] ring-1 ring-[hsl(var(--accent-amber)/0.15)]">
+                <div className="w-[520px] overflow-hidden rounded-2xl border border-white/15 bg-[hsl(var(--brand-900))] shadow-[0_24px_80px_-20px_rgba(0,0,0,0.65)] ring-1 ring-[hsl(var(--accent-amber)/0.15)]">
                   <div className="relative p-3">
                     <div className="pointer-events-none absolute -top-16 right-0 h-40 w-40 rounded-full bg-[hsl(var(--accent-amber)/0.18)] blur-3xl" />
                     <div className="relative grid grid-cols-2 gap-1.5">
@@ -116,7 +128,7 @@ export default function MarketingHeader({ variant = "solid" }: { variant?: "tran
                     </div>
                   </div>
                   <div className="flex items-center justify-between gap-3 border-t border-white/10 bg-black/20 px-4 py-3">
-                    <p className="text-xs text-white/45">Wallets · FX · transfers · MoMo</p>
+                    <p className="text-xs text-white/45">Wallets · FX · cards · airtime</p>
                     <Link
                       to="/features"
                       onClick={() => setFeaturesOpen(false)}
