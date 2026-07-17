@@ -65,7 +65,7 @@ const Auth = () => {
         if (error) toast.error(error.message);
         else {
           toast.success("Welcome back!");
-          navigate(isSafeRedirect(redirectTo) ? redirectTo : "/");
+          navigate(isSafeRedirect(redirectTo) ? redirectTo : "/dashboard");
         }
       }
     } finally {

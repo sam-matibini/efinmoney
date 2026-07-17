@@ -5,7 +5,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { corsPreflightResponse, jsonResponse } from "../_shared/cors.ts";
 import { EFINMONEY_KNOWLEDGE, EFINMONEY_ADMIN_KNOWLEDGE } from "../_shared/alice-knowledge.ts";
 
-const MODEL = "gemini-2.5-flash"; // latest, capable, good cost/latency for chat
+const MODEL = "gemini-3.5-flash";
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
 const MAX_OUTPUT_TOKENS = 1024;
 const MAX_TOOL_ITERATIONS = 4;
@@ -120,6 +120,7 @@ async function callGemini(apiKey: string, systemInstruction: string, contents: A
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return corsPreflightResponse();
+
 
   try {
     const authHeader = req.headers.get("Authorization");
