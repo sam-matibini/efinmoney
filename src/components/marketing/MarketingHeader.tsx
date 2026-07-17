@@ -1,16 +1,36 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  Menu, X, ChevronDown, Wallet, Send, Smartphone, Repeat,
+  Menu, X, ChevronDown, Wallet, Send, Smartphone, Repeat, ArrowRight,
 } from "lucide-react";
 import { Logo, Wordmark } from "@/components/Logo";
 import { cn } from "@/lib/utils";
 
 const LIVE_ITEMS = [
-  { icon: Wallet, label: "Multi-currency wallets", to: "/features#wallets" },
-  { icon: Send, label: "International transfers", to: "/features#send" },
-  { icon: Smartphone, label: "Mobile money", to: "/features#mobile-money" },
-  { icon: Repeat, label: "Currency exchange", to: "/features#exchange" },
+  {
+    icon: Wallet,
+    label: "Multi-currency wallets",
+    blurb: "Hold USD, CAD, NGN & more",
+    to: "/features#wallets",
+  },
+  {
+    icon: Send,
+    label: "International transfers",
+    blurb: "Bank & mobile money sends",
+    to: "/features#send",
+  },
+  {
+    icon: Smartphone,
+    label: "Mobile money",
+    blurb: "Pay with a phone number",
+    to: "/features#mobile-money",
+  },
+  {
+    icon: Repeat,
+    label: "Currency exchange",
+    blurb: "Live rates, transparent FX",
+    to: "/features#exchange",
+  },
 ];
 
 export default function MarketingHeader({ variant = "solid" }: { variant?: "transparent" | "solid" }) {
@@ -58,30 +78,52 @@ export default function MarketingHeader({ variant = "solid" }: { variant?: "tran
               to="/features"
               onClick={() => setFeaturesOpen(false)}
               aria-expanded={featuresOpen}
-              className="inline-flex items-center gap-1 text-sm font-medium text-white/70 hover:text-white transition-colors"
+              className={cn(
+                "inline-flex items-center gap-1 text-sm font-medium transition-colors",
+                featuresOpen ? "text-white" : "text-white/70 hover:text-white",
+              )}
             >
               Features
-              <ChevronDown className={cn("w-4 h-4 transition-transform", featuresOpen && "rotate-180")} />
+              <ChevronDown className={cn("w-4 h-4 transition-transform duration-200", featuresOpen && "rotate-180")} />
             </Link>
 
             {featuresOpen && (
               <div className="absolute left-1/2 -translate-x-1/2 top-full pt-3">
-                <div className="w-[440px] rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 p-2">
-                  <p className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-neutral-400">Live</p>
-                  <div className="grid grid-cols-2 gap-1">
-                    {LIVE_ITEMS.map((f) => (
-                      <Link
-                        key={f.to}
-                        to={f.to}
-                        onClick={() => setFeaturesOpen(false)}
-                        className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 hover:bg-[hsl(var(--accent))]/60 transition-colors group"
-                      >
-                        <span className="w-8 h-8 rounded-lg bg-[hsl(var(--accent))] text-[hsl(var(--brand-700))] flex items-center justify-center shrink-0 group-hover:bg-[hsl(var(--brand-900))] group-hover:text-white transition-colors">
-                          <f.icon className="w-4 h-4" />
-                        </span>
-                        <span className="text-sm font-semibold text-[hsl(var(--brand-900))]">{f.label}</span>
-                      </Link>
-                    ))}
+                <div className="w-[480px] overflow-hidden rounded-2xl border border-white/15 bg-[hsl(var(--brand-900))] shadow-[0_24px_80px_-20px_rgba(0,0,0,0.65)] ring-1 ring-[hsl(var(--accent-amber)/0.15)]">
+                  <div className="relative p-3">
+                    <div className="pointer-events-none absolute -top-16 right-0 h-40 w-40 rounded-full bg-[hsl(var(--accent-amber)/0.18)] blur-3xl" />
+                    <div className="relative grid grid-cols-2 gap-1.5">
+                      {LIVE_ITEMS.map((f) => (
+                        <Link
+                          key={f.to}
+                          to={f.to}
+                          onClick={() => setFeaturesOpen(false)}
+                          className="group flex items-start gap-3 rounded-xl border border-transparent px-3 py-3 transition-all hover:border-white/10 hover:bg-white/[0.07]"
+                        >
+                          <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[hsl(var(--accent-amber)/0.15)] text-[hsl(var(--accent-amber))] ring-1 ring-[hsl(var(--accent-amber)/0.25)] transition-transform group-hover:scale-105">
+                            <f.icon className="h-4.5 w-4.5 h-[18px] w-[18px]" />
+                          </span>
+                          <span className="min-w-0 pt-0.5">
+                            <span className="block text-sm font-semibold text-white group-hover:text-[hsl(var(--accent-amber))] transition-colors">
+                              {f.label}
+                            </span>
+                            <span className="mt-0.5 block text-xs text-white/50 leading-snug">
+                              {f.blurb}
+                            </span>
+                          </span>
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between gap-3 border-t border-white/10 bg-black/20 px-4 py-3">
+                    <p className="text-xs text-white/45">Wallets · FX · transfers · MoMo</p>
+                    <Link
+                      to="/features"
+                      onClick={() => setFeaturesOpen(false)}
+                      className="inline-flex items-center gap-1.5 text-xs font-bold text-[hsl(var(--accent-amber))] hover:gap-2.5 transition-all"
+                    >
+                      Explore all <ArrowRight className="h-3.5 w-3.5" />
+                    </Link>
                   </div>
                 </div>
               </div>
@@ -128,16 +170,21 @@ export default function MarketingHeader({ variant = "solid" }: { variant?: "tran
             <ChevronDown className={cn("w-4 h-4 transition-transform", mobileFeatures && "rotate-180")} />
           </button>
           {mobileFeatures && (
-            <div className="pl-2 pb-2 space-y-0.5">
+            <div className="pl-1 pb-3 space-y-1">
               {LIVE_ITEMS.map((f) => (
                 <Link
                   key={f.to}
                   to={f.to}
                   onClick={() => { setOpen(false); setMobileFeatures(false); }}
-                  className="flex items-center gap-2.5 py-2 text-sm text-white/70 hover:text-white transition-colors"
+                  className="flex items-start gap-3 rounded-xl px-3 py-2.5 hover:bg-white/5 transition-colors"
                 >
-                  <f.icon className="w-4 h-4 text-[hsl(var(--accent-amber))]" />
-                  {f.label}
+                  <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--accent-amber)/0.15)] text-[hsl(var(--accent-amber))]">
+                    <f.icon className="w-4 h-4" />
+                  </span>
+                  <span>
+                    <span className="block text-sm font-semibold text-white">{f.label}</span>
+                    <span className="block text-xs text-white/45">{f.blurb}</span>
+                  </span>
                 </Link>
               ))}
             </div>
