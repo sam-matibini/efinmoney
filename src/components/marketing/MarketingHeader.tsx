@@ -8,8 +8,8 @@ import { cn } from "@/lib/utils";
 
 const LIVE_ITEMS = [
   { icon: Wallet, label: "Multi-currency wallets", to: "/features#wallets" },
-  { icon: Send, label: "Nigeria & Ghana send", to: "/features#send" },
-  { icon: Smartphone, label: "Ghana mobile money", to: "/features#mobile-money" },
+  { icon: Send, label: "International transfers", to: "/features#send" },
+  { icon: Smartphone, label: "Mobile money", to: "/features#mobile-money" },
   { icon: Repeat, label: "Currency exchange", to: "/features#exchange" },
 ];
 

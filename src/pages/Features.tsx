@@ -17,14 +17,14 @@ const LIVE = [
   {
     id: "send",
     icon: Send,
-    title: "Nigeria & Ghana transfers",
-    desc: "Send to Nigerian bank accounts or Ghana mobile money. Every transfer includes a receipt and live tracking.",
+    title: "International transfers",
+    desc: "Send to bank accounts and mobile money wallets across supported corridors. Every transfer includes a receipt and live tracking.",
   },
   {
     id: "mobile-money",
     icon: Smartphone,
-    title: "Ghana mobile money",
-    desc: "Pay directly into Ghana MoMo wallets. Your recipient needs only their phone number.",
+    title: "Mobile money",
+    desc: "Pay directly into mobile money wallets. Your recipient needs only their phone number.",
   },
   {
     id: "exchange",
@@ -74,7 +74,7 @@ export default function Features() {
             className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/15 text-xs font-semibold text-white/90 mb-6"
           >
             <span className="w-1.5 h-1.5 rounded-full bg-[hsl(var(--accent-amber))]" />
-            Live today: Nigeria + Ghana
+            Live today: wallets, FX & transfers
           </motion.span>
           <motion.h1
             initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
@@ -86,7 +86,7 @@ export default function Features() {
             initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
             className="mt-6 text-base md:text-lg text-white/70 max-w-2xl mx-auto"
           >
-            Multi-currency wallets, live FX, Nigeria bank transfers, and Ghana mobile money.
+            Multi-currency wallets, live FX, international bank transfers, and mobile money — in one account.
           </motion.p>
         </div>
         <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-white to-transparent pointer-events-none" />

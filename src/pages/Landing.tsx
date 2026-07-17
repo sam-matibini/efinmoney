@@ -23,18 +23,18 @@ import receivers from "@/assets/landing-receivers.jpg";
 
 const FEATURES = [
   { icon: Shield, title: "Bank-Grade Security", desc: "Your funds are protected with 256-bit encryption and multi-factor authentication.", image: featureSecurity },
-  { icon: Zap, title: "Instant Transfers", desc: "Send to Nigeria bank accounts and Ghana mobile money in minutes — not days.", image: featureInstant },
+  { icon: Zap, title: "Instant Transfers", desc: "Send to bank accounts and mobile money wallets in minutes — not days.", image: featureInstant },
   { icon: Globe, title: "Multi-Currency Wallets", desc: "Hold NGN, GHS, USD, EUR, GBP and more — with live FX when you need to convert.", image: featureCorridors },
 ];
 
 const STEPS: { n: number; title: string; desc?: string }[] = [
   { n: 1, title: "Create your account" },
   { n: 2, title: "Add funds via bank or card" },
-  { n: 3, title: "Send to Nigeria or Ghana" },
+  { n: 3, title: "Send internationally" },
 ];
 
 const STATS = [
-  { value: "2", label: "Live corridors", icon: Globe, caption: "Nigeria bank · Ghana MoMo" },
+  { value: "Global", label: "Supported corridors", icon: Globe, caption: "Bank & mobile money rails" },
   { value: "6+", label: "Currencies to hold", icon: Wallet, caption: "NGN · GHS · USD · EUR · GBP · more" },
   { value: "Minutes", label: "Typical settlement", icon: Zap, caption: "Delivered fast — not in days" },
   { value: "24/7", label: "Send anytime", icon: Send, caption: "Every day of the year" },
@@ -148,7 +148,7 @@ const Landing = () => {
   useEffect(() => {
     document.title = "eFinMoney — Send money across borders, instantly.";
     const meta = document.querySelector('meta[name="description"]');
-    if (meta) meta.setAttribute("content", "Multi-currency wallets, live FX, and bank-grade transfers to Nigeria and Ghana. Link your bank with Plaid and send in minutes.");
+    if (meta) meta.setAttribute("content", "Multi-currency wallets, live FX, and bank-grade international transfers. Link your bank with Plaid and send in minutes.");
     document.documentElement.style.scrollBehavior = "smooth";
     return () => { document.documentElement.style.scrollBehavior = ""; };
   }, []);
@@ -209,7 +209,7 @@ const Landing = () => {
               transition={{ delay: 0.85, duration: 0.55 }}
               className="mt-7 max-w-xl text-base md:text-lg text-white/70 mx-auto lg:mx-0"
             >
-              Multi-currency wallets and live FX — with Nigeria bank transfers and Ghana mobile money live today.
+              Multi-currency wallets and live FX — with international bank transfers and mobile money live today.
             </motion.p>
 
             <motion.div
@@ -354,19 +354,19 @@ const Landing = () => {
           >
             <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-semibold uppercase tracking-[0.18em] text-[hsl(var(--brand-700))] bg-[hsl(var(--accent))]">
               <span className="w-1.5 h-1.5 rounded-full bg-[hsl(var(--accent-amber))]" />
-              Africa-first marketplace
+              Built for the diaspora
             </span>
             <h2 className="mt-4 text-4xl md:text-5xl font-black tracking-tight text-[hsl(var(--brand-900))]">
-              Built for the African continent.
+              Move money across borders with confidence.
             </h2>
             <p className="mt-5 text-[15px] md:text-base text-neutral-600 leading-relaxed max-w-xl">
-              Nigeria bank payouts and Ghana mobile money are live today — with multi-currency
+              International bank payouts and mobile money — with multi-currency
               wallets, live FX, and Plaid bank linking.
             </p>
             <ul className="mt-7 space-y-3">
               {[
-                "Nigeria bank transfers",
-                "Ghana MoMo top-up and payouts",
+                "Bank transfers to supported countries",
+                "Mobile money top-up and payouts",
                 "Multi-currency wallets with live FX",
               ].map((t) => (
                 <li key={t} className="flex items-start gap-3 text-sm text-neutral-700">
