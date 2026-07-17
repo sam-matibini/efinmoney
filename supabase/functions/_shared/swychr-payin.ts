@@ -25,18 +25,11 @@ export interface SwychrPaymentLinkResult {
 /** ISO country from wallet currency (best-effort). */
 export function countryCodeForCurrency(currency: string): string {
   const map: Record<string, string> = {
-    NGN: "NG",
-    GHS: "GH",
-    // US/CA/EU/GB country codes may be rejected; use KE corridor for international collection until Swychr enables them
-    USD: "KE",
-    CAD: "KE",
-    EUR: "KE",
-    GBP: "KE",
+    // Live payin corridors on this merchant (US/UK/EU/CAD top-ups use Nomba, not Swychr)
     KES: "KE",
     XAF: "CM",
     XOF: "SN",
     UGX: "UG",
-    ZAR: "ZA",
   };
   return map[currency.toUpperCase()] ?? currency.slice(0, 2).toUpperCase();
 }

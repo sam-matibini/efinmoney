@@ -32,14 +32,12 @@ export function isFeatureEnabled(key: ProductFeatureKey): boolean {
   return productFeatures[key];
 }
 
-/** Live top-up corridors */
+/** Live top-up corridors — Nomba (NGN/USD/EUR/GBP/CAD) + Swychr (XAF/KES/XOF/UGX) + Ghana Pay */
 export function isLiveTopupCurrency(currency: string): boolean {
   const c = currency.toUpperCase();
-  if (productFeatures.swychr && ["XAF", "KES", "XOF", "UGX", "USD", "CAD", "EUR", "GBP"].includes(c)) return true;
-  if (productFeatures.nombaNigeria && c === "NGN") return true;
+  if (productFeatures.nombaNigeria && ["NGN", "USD", "EUR", "GBP", "CAD"].includes(c)) return true;
+  if (productFeatures.swychr && ["XAF", "KES", "XOF", "UGX"].includes(c)) return true;
   if (productFeatures.ghanaPay && c === "GHS") return true;
-  // Legacy Nomba international only if Swychr is off
-  if (!productFeatures.swychr && productFeatures.nombaNigeria && ["USD", "EUR", "GBP", "CAD"].includes(c)) return true;
   return false;
 }
 

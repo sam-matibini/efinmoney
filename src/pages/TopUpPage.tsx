@@ -29,6 +29,7 @@ import {
   type WesternTopupProvider,
   type AfricanTopupProvider,
   nombaGatewayLabel,
+  swychrGatewayLabel,
 } from "@/lib/walletTopupGateway";
 import { clearPendingSwychrTxn } from "@/lib/swychrPay";
 import FlutterwaveWesternTopUpHints from "@/components/wallets/FlutterwaveWesternTopUpHints";
@@ -131,12 +132,12 @@ const TopUpPage = () => {
   const currency = selectedWallet?.currency_code || "USD";
   const showWesternProviderChoice = supportsWesternProviderChoice(currency);
   const showAfricanProviderChoice = supportsAfricanProviderChoice(currency);
-  // Swychr is primary international payin (USD/CAD/EUR/GBP + African FX). NGN stays Nomba; GHS stays Ghana Pay.
+  // Nomba: NGN + USD/EUR/GBP/CAD. Swychr: XAF/KES/XOF/UGX. Ghana Pay: GHS.
   const wantSwychr =
     productFeatures.swychr
     || params.get("provider")?.toLowerCase() === "swychr"
     || params.get("rail")?.toLowerCase() === "swychr";
-  const forceSwychr = wantSwychr && ["XAF", "KES", "XOF", "UGX", "USD", "CAD", "EUR", "GBP"].includes(currency.toUpperCase());
+  const forceSwychr = wantSwychr && ["XAF", "KES", "XOF", "UGX"].includes(currency.toUpperCase());
   const gateway: Gateway = routeWalletTopupGateway(currency, westernProvider, africanProvider, forceSwychr);
   const liveTopup = isLiveTopupCurrency(currency);
   const availableFlwMethods = FLW_METHODS_BY_CCY[currency] || ["card"];
@@ -306,7 +307,7 @@ const TopUpPage = () => {
   };
 
   const gatewayBadge = useMemo(() => {
-    if (gateway === "swychr_pay") return { label: "International checkout", icon: Globe, color: "bg-violet-500/10 text-violet-700 border-violet-500/30" };
+    if (gateway === "swychr_pay") return { label: swychrGatewayLabel(currency), icon: Globe, color: "bg-violet-500/10 text-violet-700 border-violet-500/30" };
     if (gateway === "nomba_pay") return { label: nombaGatewayLabel(currency), icon: CreditCard, color: "bg-green-600/10 text-green-700 border-green-600/30" };
     if (gateway === "ghana_pay") return { label: "Ghana MoMo", icon: Smartphone, color: "bg-yellow-500/10 text-yellow-700 border-yellow-500/30" };
     if (gateway === "elicate") return { label: "Mobile Money", icon: Smartphone, color: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30" };

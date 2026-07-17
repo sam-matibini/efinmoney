@@ -60,7 +60,11 @@ export function isNombaTopupCurrency(currency: string): boolean {
 }
 
 export function nombaMinAmount(currency: string): number {
-  return isNombaNigeriaCurrency(currency) ? 100 : 1;
+  const c = currency.toUpperCase();
+  if (c === "NGN") return 100;
+  // CAD is charged in USD after fees — keep headroom so checkout clears ~$2
+  if (c === "CAD") return 5;
+  return 2;
 }
 
 export function savePendingNombaTxn(txnId: string) {
@@ -97,8 +101,28 @@ export async function initiateNombaCollection(params: {
 }): Promise<NombaCollectionResult & { quote?: Record<string, unknown> }> {
   const { data, error } = await supabase.functions.invoke("nomba-collection", { body: params });
   if (error) throw new Error(await invokeErrorMessage(error));
-  const payload = data as NombaCollectionResult & { error?: string };
-  if (payload.error) throw new Error(payload.error);
+  const payload = data as NombaCollectionResult & {
+    error?: string;
+    message?: string;
+    provider_response?: Record<string, unknown>;
+    code?: string;
+  };
+  if (payload.error) {
+    const providerMsg = String(
+      payload.provider_response?.message
+      ?? (payload.provider_response as { Data?: { message?: string } })?.Data?.message
+      ?? "",
+    ).trim();
+    const data = (payload.provider_response as { Data?: { link?: string; order_id?: string } })?.Data;
+    const emptyCheckout = data && !String(data.link || "").trim() && !String(data.order_id || "").trim();
+    if (emptyCheckout || /collection failed/i.test(payload.error)) {
+      throw new Error(
+        "International card checkout is temporarily unavailable from our payment partner. "
+        + "Try charging in NGN (Nigeria card checkout), or top up your wallet first and send from balance.",
+      );
+    }
+    throw new Error(providerMsg || payload.error);
+  }
   if (!payload.success || !payload.payment_link) {
     throw new Error(payload.message || "Checkout link unavailable");
   }

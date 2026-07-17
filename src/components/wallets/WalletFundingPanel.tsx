@@ -33,7 +33,7 @@ const WalletFundingPanel = ({
   className,
 }: WalletFundingPanelProps) => {
   const navigate = useNavigate();
-  const gateway = routeWalletTopupGateway(currency);
+  const gateway = routeWalletTopupGateway(currency, undefined, undefined, productFeatures.swychr);
   const liveTopup = isLiveTopupCurrency(currency);
 
   const [paymentLinkOpen, setPaymentLinkOpen] = useState(false);

@@ -8,8 +8,12 @@ export const NOMBA_NIGERIA_CURRENCIES = ["NGN"];
 export const NOMBA_INTERNATIONAL_CURRENCIES = ["USD", "EUR", "GBP"];
 /** CAD wallet funded via Nomba international USD checkout */
 export const NOMBA_CAD_VIA_USD_CURRENCIES = ["CAD"];
-export const SWYCHR_TOPUP_CURRENCIES = ["XAF", "KES", "XOF", "UGX", "USD", "CAD", "EUR", "GBP"];
-/** Swychr is primary international payin. Nomba remains NGN; Ghana Pay remains GHS. */
+/**
+ * Swychr Connect payin corridors that work on this merchant account.
+ * US/UK/CA/EU stay on Nomba (hosted international checkout).
+ */
+export const SWYCHR_TOPUP_CURRENCIES = ["XAF", "KES", "XOF", "UGX"];
+/** Nomba: NGN + USD/EUR/GBP international + CAD via USD checkout */
 export const NOMBA_PAY_CURRENCIES = [...NOMBA_NIGERIA_CURRENCIES, ...NOMBA_INTERNATIONAL_CURRENCIES, ...NOMBA_CAD_VIA_USD_CURRENCIES];
 export const AFRICAN_TOPUP_PROVIDER_CURRENCIES = [...FLUTTERWAVE_CURRENCIES];
 
@@ -27,6 +31,7 @@ export function supportsAfricanProviderChoice(currency: string): boolean {
   const c = currency.toUpperCase();
   if (GHANA_PAY_CURRENCIES.includes(c)) return false;
   if (NOMBA_PAY_CURRENCIES.includes(c)) return false;
+  if (SWYCHR_TOPUP_CURRENCIES.includes(c)) return false;
   return AFRICAN_TOPUP_PROVIDER_CURRENCIES.includes(c);
 }
 
@@ -37,14 +42,12 @@ export function routeWalletTopupGateway(
   preferSwychr = false,
 ): WalletTopupGateway {
   const c = currency.toUpperCase();
-  // Ghana MoMo primary (unless explicitly forcing Swychr)
-  if (GHANA_PAY_CURRENCIES.includes(c) && !preferSwychr) return "ghana_pay";
-  // Swychr = primary international / multi-currency payin
-  if (preferSwychr && SWYCHR_TOPUP_CURRENCIES.includes(c)) return "swychr_pay";
+  // Ghana MoMo (Ghana Pay) — Swychr does not offer GHS payin on this account
   if (GHANA_PAY_CURRENCIES.includes(c)) return "ghana_pay";
-  // Nomba: NGN Nigeria rail (and legacy international only when Swychr not preferred)
-  if (c === "NGN") return "nomba_pay";
-  if (!preferSwychr && NOMBA_PAY_CURRENCIES.includes(c)) return "nomba_pay";
+  // Nomba: everything Nomba can do (NGN + US/UK/EU/CAD international)
+  if (NOMBA_PAY_CURRENCIES.includes(c)) return "nomba_pay";
+  // Swychr: CM/KE/SN|CI/UG corridors (gated by feature flag via preferSwychr)
+  if (preferSwychr && SWYCHR_TOPUP_CURRENCIES.includes(c)) return "swychr_pay";
   if (ELICATE_CURRENCIES.includes(c)) return "elicate";
   if (supportsAfricanProviderChoice(c) && africanProvider === "fincra") return "fincra";
   if (FLUTTERWAVE_CURRENCIES.includes(c) && africanProvider !== "fincra") return "flutterwave";
@@ -55,9 +58,11 @@ export function routeWalletTopupGateway(
 
 export function swychrGatewayLabel(currency: string): string {
   const c = currency.toUpperCase();
-  if (c === "NGN") return "Nigeria checkout";
-  if (c === "GHS") return "Ghana checkout";
-  return "International checkout";
+  if (c === "XAF") return "Cameroon checkout";
+  if (c === "KES") return "Kenya checkout";
+  if (c === "XOF") return "West Africa checkout";
+  if (c === "UGX") return "Uganda checkout";
+  return "Mobile money checkout";
 }
 
 export function nombaGatewayLabel(currency: string): string {
