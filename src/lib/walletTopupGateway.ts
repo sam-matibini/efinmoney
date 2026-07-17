@@ -8,10 +8,12 @@ export const NOMBA_NIGERIA_CURRENCIES = ["NGN"];
 export const NOMBA_INTERNATIONAL_CURRENCIES = ["USD", "EUR", "GBP"];
 /** CAD wallet funded via Nomba international USD checkout */
 export const NOMBA_CAD_VIA_USD_CURRENCIES = ["CAD"];
+export const SWYCHR_TOPUP_CURRENCIES = ["XAF", "KES", "XOF", "UGX", "USD", "CAD"];
+/** Currencies Swychr payin accepts (USD/CAD via KE corridor). NGN/GHS not enabled yet. */
 export const NOMBA_PAY_CURRENCIES = [...NOMBA_NIGERIA_CURRENCIES, ...NOMBA_INTERNATIONAL_CURRENCIES, ...NOMBA_CAD_VIA_USD_CURRENCIES];
 export const AFRICAN_TOPUP_PROVIDER_CURRENCIES = [...FLUTTERWAVE_CURRENCIES];
 
-export type WalletTopupGateway = "flutterwave" | "elicate" | "fincra" | "ghana_pay" | "nomba_pay" | "unsupported";
+export type WalletTopupGateway = "flutterwave" | "elicate" | "fincra" | "ghana_pay" | "nomba_pay" | "swychr_pay" | "unsupported";
 export type WesternTopupProvider = "flutterwave" | "fincra";
 export type AfricanTopupProvider = "flutterwave" | "fincra";
 
@@ -32,8 +34,13 @@ export function routeWalletTopupGateway(
   currency: string,
   westernProvider?: WesternTopupProvider,
   africanProvider?: AfricanTopupProvider,
+  preferSwychr = false,
 ): WalletTopupGateway {
   const c = currency.toUpperCase();
+  // Ghana MoMo stays primary when Swychr is not forced for that currency
+  if (GHANA_PAY_CURRENCIES.includes(c) && !preferSwychr) return "ghana_pay";
+  // When Swychr feature flag is on, prefer it over Nomba for overlapping currencies
+  if (preferSwychr && SWYCHR_TOPUP_CURRENCIES.includes(c)) return "swychr_pay";
   if (GHANA_PAY_CURRENCIES.includes(c)) return "ghana_pay";
   if (NOMBA_PAY_CURRENCIES.includes(c)) return "nomba_pay";
   if (ELICATE_CURRENCIES.includes(c)) return "elicate";
@@ -42,6 +49,13 @@ export function routeWalletTopupGateway(
   if (supportsWesternProviderChoice(c) && westernProvider === "fincra") return "fincra";
   if (supportsWesternProviderChoice(c) && westernProvider === "flutterwave") return "flutterwave";
   return "unsupported";
+}
+
+export function swychrGatewayLabel(currency: string): string {
+  const c = currency.toUpperCase();
+  if (c === "NGN") return "Nigeria checkout";
+  if (c === "GHS") return "Ghana checkout";
+  return "International checkout";
 }
 
 export function nombaGatewayLabel(currency: string): string {

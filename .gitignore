@@ -16,6 +16,7 @@ dist-ssr
 .env
 .env.*
 !.env.example
+scripts/.swychr.env
 
 # Exported data snapshot (PII / large)
 database-export/

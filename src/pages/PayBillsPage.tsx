@@ -16,6 +16,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { findCountryById } from "@/lib/countries";
 import { BILL_PAYMENT_COUNTRIES, getCountryIso2 } from "@/lib/countryIso";
+import { productFeatures } from "@/lib/productFeatures";
+import SwychrAirtimePanel from "@/components/bills/SwychrAirtimePanel";
 import { useWallets } from "@/hooks/useWallets";
 import type { LucideIcon } from "lucide-react";
 
@@ -349,7 +351,7 @@ const PayBillsPage = () => {
                 <p>
                   Instant bill catalog is not available for {country?.country || "this country"} yet.
                   {countryId === "United States" || countryId === "United Kingdom"
-                    ? " US/UK bill pay is coming soon."
+                    ? " US/UK bill pay is not available."
                     : " Try Nigeria, Kenya, Ghana, South Africa, Uganda, or Canada (EFT)."}
                 </p>
               </div>
@@ -479,6 +481,10 @@ const PayBillsPage = () => {
               </Button>
             </CardContent>
           </Card>
+        )}
+
+        {productFeatures.swychr && !isCanada && (
+          <SwychrAirtimePanel countryId={countryId} currency={currency} />
         )}
       </motion.div>
     </main>

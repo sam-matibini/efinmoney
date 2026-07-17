@@ -139,7 +139,7 @@ const MorePage = () => {
                 </div>
                 <p className="text-[11px] text-muted-foreground mt-1.5">
                   {stamps >= stampGoal
-                    ? "Goal reached — more rewards coming soon."
+                    ? "Goal reached — keep earning rewards."
                     : `${stampGoal - stamps} more completed transfers to fill your card.`}
                 </p>
               </div>

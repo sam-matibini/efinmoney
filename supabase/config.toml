@@ -75,6 +75,36 @@ verify_jwt = false
 [functions.nomba-verify-transfer]
 verify_jwt = true
 
+[functions.swychr-collection]
+verify_jwt = true
+
+[functions.swychr-payin-webhook]
+verify_jwt = false
+
+[functions.swychr-payin-verify]
+verify_jwt = true
+
+[functions.swychr-payout]
+verify_jwt = false
+
+[functions.swychr-verify-transfer]
+verify_jwt = true
+
+[functions.swychr-get-banks]
+verify_jwt = true
+
+[functions.swychr-card-issue]
+verify_jwt = true
+
+[functions.swychr-card-ops]
+verify_jwt = true
+
+[functions.swychr-airtime-catalog]
+verify_jwt = true
+
+[functions.swychr-airtime-recharge]
+verify_jwt = true
+
 [functions.mtn-momo-payout]
 verify_jwt = false
 

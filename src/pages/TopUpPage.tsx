@@ -18,6 +18,7 @@ import { useAuth } from "@/hooks/useAuth";
 import ElicateTopUpCard from "@/components/payments/ElicateTopUpCard";
 import GhanaTopUpCard from "@/components/payments/GhanaTopUpCard";
 import NombaTopUpCard from "@/components/payments/NombaTopUpCard";
+import SwychrTopUpCard from "@/components/payments/SwychrTopUpCard";
 import { validateMinAmount, friendlyFlwError, minAmount, type FlwMethod } from "@/lib/flutterwave";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { MM_COUNTRIES } from "@/lib/mobileMoneyNetworks";
@@ -29,6 +30,7 @@ import {
   type AfricanTopupProvider,
   nombaGatewayLabel,
 } from "@/lib/walletTopupGateway";
+import { clearPendingSwychrTxn } from "@/lib/swychrPay";
 import FlutterwaveWesternTopUpHints from "@/components/wallets/FlutterwaveWesternTopUpHints";
 import { buildFincraTopupRedirectUrl, parseFincraReturnReference, isFincraCheckoutCurrency } from "@/lib/fincraTopup";
 import { clearPendingNombaTxn } from "@/lib/nombaPay";
@@ -41,7 +43,7 @@ import { currencySymbol } from "@/lib/currency";
 
 const MM_BY_CCY = Object.fromEntries(MM_COUNTRIES.map((c) => [c.currency, c]));
 
-type Gateway = "flutterwave" | "elicate" | "fincra" | "ghana_pay" | "nomba_pay" | "unsupported";
+type Gateway = "flutterwave" | "elicate" | "fincra" | "ghana_pay" | "nomba_pay" | "swychr_pay" | "unsupported";
 
 function initialWesternProvider(params: URLSearchParams): WesternTopupProvider {
   const fromQuery = params.get("provider")?.toLowerCase();
@@ -129,7 +131,14 @@ const TopUpPage = () => {
   const currency = selectedWallet?.currency_code || "USD";
   const showWesternProviderChoice = supportsWesternProviderChoice(currency);
   const showAfricanProviderChoice = supportsAfricanProviderChoice(currency);
-  const gateway: Gateway = routeWalletTopupGateway(currency, westernProvider, africanProvider);
+  // Force Swychr via ?provider=swychr only when currency is on Swychr payin allowlist.
+  // NGN stays on Nomba — this Swychr account returns "Country not supported" for NG.
+  const wantSwychr =
+    productFeatures.swychr
+    || params.get("provider")?.toLowerCase() === "swychr"
+    || params.get("rail")?.toLowerCase() === "swychr";
+  const forceSwychr = wantSwychr && ["XAF", "KES", "XOF", "UGX", "USD", "CAD"].includes(currency.toUpperCase());
+  const gateway: Gateway = routeWalletTopupGateway(currency, westernProvider, africanProvider, forceSwychr);
   const liveTopup = isLiveTopupCurrency(currency);
   const availableFlwMethods = FLW_METHODS_BY_CCY[currency] || ["card"];
   const mmCountry = method === "mobilemoney" ? MM_BY_CCY[currency] : undefined;
@@ -149,6 +158,20 @@ const TopUpPage = () => {
 
   // Verify Stripe / Flutterwave / Nomba return callbacks
   useEffect(() => {
+    const swychrStatus = params.get("swychr");
+    if (swychrStatus === "success") {
+      clearPendingSwychrTxn();
+      setVerifyState({ status: "success", message: "Payment received — your wallet should update shortly." });
+      toast.success("Top-up complete");
+      void queryClient.invalidateQueries({ queryKey: ["wallets"] });
+      return;
+    }
+    if (swychrStatus === "failed") {
+      clearPendingSwychrTxn();
+      setVerifyState({ status: "failed", message: "Payment could not be completed." });
+      return;
+    }
+
     const nombaStatus = params.get("nomba");
     if (nombaStatus === "success") {
       clearPendingNombaTxn();
@@ -284,13 +307,14 @@ const TopUpPage = () => {
   };
 
   const gatewayBadge = useMemo(() => {
+    if (gateway === "swychr_pay") return { label: "Swychr checkout", icon: Globe, color: "bg-violet-500/10 text-violet-700 border-violet-500/30" };
     if (gateway === "nomba_pay") return { label: nombaGatewayLabel(currency), icon: CreditCard, color: "bg-green-600/10 text-green-700 border-green-600/30" };
     if (gateway === "ghana_pay") return { label: "Ghana MoMo", icon: Smartphone, color: "bg-yellow-500/10 text-yellow-700 border-yellow-500/30" };
     if (gateway === "elicate") return { label: "Mobile Money", icon: Smartphone, color: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30" };
     if (gateway === "fincra") return { label: "Fincra", icon: Globe, color: "bg-teal-500/10 text-teal-600 border-teal-500/30" };
     if (gateway === "flutterwave") return { label: "Flutterwave", icon: Globe, color: "bg-orange-500/10 text-orange-500 border-orange-500/30" };
     return { label: "Unavailable", icon: XCircle, color: "bg-muted text-muted-foreground" };
-  }, [gateway]);
+  }, [gateway, currency]);
 
   return (
     <AppPage width="default">
@@ -466,8 +490,8 @@ const TopUpPage = () => {
 
           {!liveTopup && selectedWallet && (
             <ComingSoon
-              title="Top-up coming soon for this currency"
-              description={`${currency} wallet funding is on the roadmap. Nigeria (NGN), Ghana (GHS), USD, EUR, GBP, and CAD (USD card checkout) are live today.`}
+              title="Top-up not available for this currency"
+              description={`${currency} wallet funding is not available. Try NGN, GHS, USD, EUR, GBP, or CAD.`}
               backHref="/wallets"
               backLabel="View wallets"
             />
@@ -556,7 +580,18 @@ const TopUpPage = () => {
             </Card>
           )}
 
-          {/* Nomba — NGN hosted card checkout */}
+          {/* Swychr — secondary hosted checkout (feature-flagged) */}
+          {liveTopup && gateway === "swychr_pay" && selectedWallet && (
+            <SwychrTopUpCard
+              walletId={selectedWallet.wallet_id}
+              walletCurrency={currency}
+              onComplete={() => {
+                void queryClient.invalidateQueries({ queryKey: ["wallets"] });
+              }}
+            />
+          )}
+
+          {/* Nomba — NGN hosted card checkout (skipped when Swychr is preferred) */}
           {liveTopup && gateway === "nomba_pay" && selectedWallet && (
             <NombaTopUpCard
               walletId={selectedWallet.wallet_id}

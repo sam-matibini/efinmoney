@@ -56,7 +56,6 @@ import LiveFxCalculator from "@/components/fx/LiveFxCalculator";
 import { parseAmount } from "@/components/fx/liveFxUtils";
 import { clearSendHandoff, readSendHandoff } from "@/lib/sendHandoff";
 import { productFeatures } from "@/lib/productFeatures";
-import ComingSoon from "@/components/common/ComingSoon";
 import PageHeroBanner from "@/components/common/PageHeroBanner";
 import AppPage from "@/components/layout/AppPage";
 import TransferSuccess from "@/components/send/TransferSuccess";
@@ -1009,13 +1008,12 @@ const SendPage = () => {
                   <BrandFlag size="xs" />
                   eFinMoney
                 </TabsTrigger>
-                <TabsTrigger value="canada" className="relative z-10 gap-1 px-1 sm:gap-1.5 sm:px-2 text-[11px] sm:text-sm data-[state=active]:bg-transparent data-[state=active]:shadow-none">
-                  <CountryFlag country="CA" size="xs" />
-                  Domestic
-                  {!canadaLive && (
-                    <span className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">Soon</span>
-                  )}
-                </TabsTrigger>
+                {canadaLive && (
+                  <TabsTrigger value="canada" className="relative z-10 gap-1 px-1 sm:gap-1.5 sm:px-2 text-[11px] sm:text-sm data-[state=active]:bg-transparent data-[state=active]:shadow-none">
+                    <CountryFlag country="CA" size="xs" />
+                    Domestic
+                  </TabsTrigger>
+                )}
               </TabsList>
 
               {/* Animated tab content swap */}
@@ -1032,14 +1030,7 @@ const SendPage = () => {
                       <TabsContent value="canada" forceMount className="mt-0">
                         {canadaLive ? (
                           <CanadaSendFlow />
-                        ) : (
-                          <ComingSoon
-                            title="Canada domestic — coming soon"
-                            description="Interac, EFT, and CAD domestic transfers are on the roadmap. Nigeria and Ghana are live today."
-                            backHref="/send"
-                            backLabel="Back to international send"
-                          />
-                        )}
+                        ) : null}
                       </TabsContent>
                     </motion.div>
                   ) : activeTab === 'efinmoney' ? (
@@ -1682,7 +1673,7 @@ const SendPage = () => {
                                         </div>
                                         ) : (
                                           <p className="text-xs text-muted-foreground">
-                                            Additional mobile-money corridors are coming soon. Ghana and Nigeria bank transfers are live today.
+                                            Ghana mobile money and Nigeria bank transfers are available today.
                                           </p>
                                         )}
                                       </motion.div>

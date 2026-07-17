@@ -641,7 +641,7 @@ export const TransactionRulesPanel = () => {
             </div>
             <Button variant="outline" disabled>
               <Brain className="h-4 w-4 mr-2" />
-              Generate Rules (Coming Soon)
+              Generate Rules
             </Button>
           </div>
         </CardContent>

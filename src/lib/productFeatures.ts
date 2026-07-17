@@ -22,6 +22,7 @@ export const productFeatures = {
   paymentLinks: envFlag("VITE_FEATURE_PAYMENT_LINKS", false),
   otherAfricanCorridors: envFlag("VITE_FEATURE_OTHER_AFRICA", false),
   cards: envFlag("VITE_FEATURE_CARDS", false),
+  swychr: envFlag("VITE_FEATURE_SWYCHR", false),
   adyen: envFlag("VITE_FEATURE_ADYEN", false),
 } as const;
 
@@ -36,6 +37,7 @@ export function isLiveTopupCurrency(currency: string): boolean {
   const c = currency.toUpperCase();
   if (productFeatures.nombaNigeria && ["NGN", "USD", "EUR", "GBP", "CAD"].includes(c)) return true;
   if (productFeatures.ghanaPay && c === "GHS") return true;
+  if (productFeatures.swychr && ["XAF", "KES", "XOF", "UGX", "USD", "CAD"].includes(c)) return true;
   return false;
 }
 

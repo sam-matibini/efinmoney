@@ -152,11 +152,18 @@ const TransferTrackingPage = () => {
         transfer.target_currency === "NGN"
         && (transfer.payout_method === "bank" || transfer.transfer_type === "bank")
         && !!transfer.recipient_bank_code;
+      const { data: swychrPayout } = await supabase
+        .from("swychr_payout_transactions")
+        .select("id")
+        .eq("transfer_id", id)
+        .maybeSingle();
       const fn = isPaysafe
         ? "paysafe-verify-transfer"
-        : isNombaNgnBank
-          ? "nomba-verify-transfer"
-          : "flw-verify-transfer";
+        : swychrPayout
+          ? "swychr-verify-transfer"
+          : isNombaNgnBank
+            ? "nomba-verify-transfer"
+            : "flw-verify-transfer";
       const { data, error } = await supabase.functions.invoke(fn, { body: { transfer_id: id } });
       if (error) throw error;
       if (data?.changed && data?.status) {

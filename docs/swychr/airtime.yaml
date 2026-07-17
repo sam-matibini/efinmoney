@@ -1,0 +1,939 @@
+---
+openapi: 3.0.3
+info:
+  title: SwychrConnect Airtime / Mobile Recharge API (Production)
+  version: v1
+  description: |
+    API for mobile airtime top-ups via mobile network (v2).
+    All endpoints except `/auth/login` require a Bearer JWT token obtained from the login endpoint.
+  contact:
+    name: SwychrConnect Support
+    email: support@swychrconnect.com
+    url: https://app.swychrconnect.com
+  license:
+    name: Proprietary
+servers:
+- url: https://api.accountpe.com/api/airtime/prod
+  description: Production
+tags:
+- name: Auth
+  description: Authentication â€” obtain the JWT bearer token
+- name: Catalog
+  description: Browse the PrepayNation product catalog
+- name: Operators
+  description: Mobile operator lookup per country
+- name: Mobile Lookup
+  description: Identify the carrier for a mobile number
+- name: Recharge
+  description: Initiate and inspect recharge transactions
+components:
+  securitySchemes:
+    AuthToken:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Bearer token obtained from POST /auth/login (valid 24 hours)
+  schemas:
+    ErrorResponse:
+      type: object
+      required:
+      - status
+      - message
+      properties:
+        status:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Provide Correct Information.
+    AuthRequest:
+      type: object
+      required:
+      - email
+      - password
+      properties:
+        email:
+          type: string
+          format: email
+          example: admin@example.com
+        password:
+          type: string
+          format: password
+          example: secret123
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: JWT bearer token valid for 24 hours
+          example: eyJhbGciOiJIUzI1NiJ9.eyJhZG1pbl9pZCI6MX0.abc123
+        message:
+          type: string
+          description: Token expiry timestamp in MM-DD-YYYY HH:MM format
+          example: 05-17-2026 14:32
+        email:
+          type: string
+          format: email
+          example: admin@example.com
+    AmountRange:
+      type: object
+      description: Min or max denomination details for a PrepayNation product
+      properties:
+        faceValue:
+          type: number
+          format: double
+          description: Face value in the local currency of the destination country
+          example: 100.0
+        faceValueCurrency:
+          type: string
+          description: ISO 4217 currency code of the face value
+          example: NGN
+        deliveredAmount:
+          type: number
+          format: double
+          description: Amount actually credited to the handset
+          example: 100.0
+        deliveryCurrencyCode:
+          type: string
+          description: Currency code of the delivered amount
+          example: NGN
+        cost:
+          type: number
+          format: double
+          description: Cost in USD charged to the admin wallet
+          example: 0.2625
+        costCurrency:
+          type: string
+          description: Currency of the cost field (always USD)
+          example: USD
+    PrepayNationProduct:
+      type: object
+      description: A single PrepayNation RTR (real-time recharge) product
+      properties:
+        skuId:
+          type: string
+          description: Unique SKU identifier â€” pass this to POST /recharges/create
+          example: NG_MTN_100
+        productId:
+          type: string
+          example: PN-001234
+        productName:
+          type: string
+          example: MTN Nigeria 100 NGN
+        min:
+          "$ref": "#/components/schemas/AmountRange"
+        max:
+          "$ref": "#/components/schemas/AmountRange"
+        category:
+          type: string
+          description: Product category (always "Rtr" for these endpoints)
+          example: Rtr
+        isSalesTaxCharged:
+          type: boolean
+        salesTax:
+          type: number
+          format: double
+          nullable: true
+        countryCode:
+          type: string
+          description: ISO 2-letter destination country code
+          example: NG
+        benefitType:
+          type: string
+          nullable: true
+          example: Airtime
+        validity:
+          type: string
+          nullable: true
+          example: 30 days
+        productDescription:
+          type: string
+          nullable: true
+          example: MTN Nigeria prepaid top-up
+        localPhoneNumberLength:
+          type: integer
+          nullable: true
+          description: Expected digit count of the local (non-prefixed) number
+          example: 10
+        internationalCountryCode:
+          type: string
+          nullable: true
+          description: International dialing code (without leading +)
+          example: '234'
+        allowDecimal:
+          type: boolean
+          description: Whether a fractional face value is accepted
+        fee:
+          type: number
+          format: double
+          nullable: true
+        operatorId:
+          type: string
+          example: MTN_NG
+        operatorName:
+          type: string
+          example: MTN Nigeria
+        imageUrl:
+          type: string
+          format: uri
+          nullable: true
+          example: https://cdn.swychrconnect.com/operators/mtn_ng.png
+        variable_amount_allowed:
+          type: boolean
+          description: True when min.faceValue â‰  max.faceValue (open-range / variable
+            product)
+          example: false
+        additionalInformation:
+          type: string
+          nullable: true
+    Operator:
+      type: object
+      description: A mobile network operator available for a given country
+      properties:
+        operatorId:
+          type: string
+          example: MTN_NG
+        operatorName:
+          type: string
+          example: MTN Nigeria
+        imageUrl:
+          type: string
+          format: uri
+          nullable: true
+          example: https://cdn.swychrconnect.com/operators/mtn_ng.png
+    MobileLookupPayload:
+      type: object
+      description: Carrier information returned by the SwychrConnect v2 lookup service
+      properties:
+        mobile:
+          type: string
+          description: The queried international phone number
+          example: '2348012345678'
+        operator:
+          type: string
+          example: MTN Nigeria
+        operatorId:
+          type: string
+          example: MTN_NG
+        countryCode:
+          type: string
+          example: NG
+    RechargeHistoryItem:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1042
+        user_id:
+          type: integer
+          nullable: true
+          description: Internal user ID associated with this transaction
+        sku_id:
+          type: string
+          example: NG_MTN_100
+        mobile:
+          type: string
+          example: '2348012345678'
+        transaction_id:
+          type: string
+          example: Recharge_42_a1b2c3d4e5f6g7h8_1715957600
+        recharge_amount:
+          type: number
+          format: double
+          example: 100.0
+        recharge_currency:
+          type: string
+          example: NGN
+        mobile_wallet_id:
+          type: integer
+          nullable: true
+          description: ID of the MobileWallet debit entry
+        status:
+          type: integer
+          description: 1 = success
+          example: 1
+        created_at:
+          type: string
+          format: date-time
+          example: '2026-05-17T10:20:30.000Z'
+        country:
+          type: string
+          description: Defaults to "IN" when not stored
+          example: NG
+    RechargeOrderRequest:
+      type: object
+      required:
+      - country
+      - skuId
+      - amount
+      - mobile
+      properties:
+        country:
+          type: string
+          description: ISO 2-letter destination country code
+          example: NG
+        skuId:
+          type: string
+          description: PrepayNation SKU identifier (from /products/by-country or /products/by-operator)
+          example: NG_MTN_100
+        amount:
+          type: number
+          format: double
+          description: |
+            Face value to top-up in the product's local currency.
+            For fixed products (`variable_amount_allowed = false`) use the product's exact faceValue.
+            For variable products any value within the minâ€“max faceValue range is accepted.
+          example: 100.0
+        mobile:
+          type: string
+          description: Recipient's international mobile number (E.164 format recommended)
+          example: '2348012345678'
+        user_id:
+          type: integer
+          nullable: true
+          description: Optional internal user ID to associate with the transaction
+            record
+        purchaseCurrency:
+          type: string
+          nullable: true
+          description: Currency code recorded on the transaction (e.g. NGN). Blank
+            if omitted.
+          example: NGN
+    RechargeOrderResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Recharge was successful.
+        status:
+          type: integer
+          example: 200
+    RechargeStatusResponse:
+      type: object
+      properties:
+        resp:
+          type: object
+          description: Raw status payload returned by SwychrConnect v2
+          additionalProperties: true
+        message:
+          type: string
+          example: Successfully retrieved recharge status.
+        status:
+          type: integer
+          example: 200
+security:
+- AuthToken: []
+paths:
+  "/auth/login":
+    post:
+      tags:
+      - Auth
+      summary: Admin login â€” obtain JWT token
+      description: |
+        Authenticates an `AppAdmin` user by email and password.
+        Returns a JWT bearer token valid for **24 hours**.
+        Pass this token as `Authorization: Bearer <token>` on all subsequent requests.
+      operationId: airtimeProdLogin
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/AuthRequest"
+            example:
+              email: admin@example.com
+              password: secret123
+      responses:
+        '200':
+          description: Login successful â€” token returned
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/AuthResponse"
+              example:
+                token: eyJhbGciOiJIUzI1NiJ9.eyJhZG1pbl9pZCI6MX0.abc123
+                message: 05-18-2026 14:32
+                email: admin@example.com
+        '401':
+          description: Invalid email or password
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Password does not match
+                  email:
+                    type: string
+                    nullable: true
+                    example: admin@example.com
+  "/products/by-country":
+    post:
+      tags:
+      - Catalog
+      summary: List all RTR products for a country
+      description: |
+        Returns every PrepayNation **RTR (real-time recharge)** product for the given
+        country code.  Call `/operators/list` first to discover available carriers, then
+        use this endpoint (or `/products/by-operator`) to browse the catalog.
+
+        All `cost` fields are in USD.
+      operationId: productsByCountry
+      security:
+      - AuthToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - country
+              properties:
+                country:
+                  type: string
+                  description: ISO 2-letter country code
+                  example: NG
+            example:
+              country: NG
+      responses:
+        '200':
+          description: Product list retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  prepay_list:
+                    type: array
+                    items:
+                      "$ref": "#/components/schemas/PrepayNationProduct"
+                  message:
+                    type: string
+                    example: Successfully got the data.
+                  status:
+                    type: integer
+                    example: 200
+        '400':
+          description: Missing or blank `country` parameter
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  prepay_list:
+                    type: array
+                    items: {}
+                    example: []
+                  message:
+                    type: string
+                    example: Provide Correct Information.
+                  status:
+                    type: integer
+                    example: 400
+  "/products/by-operator":
+    post:
+      tags:
+      - Catalog
+      summary: List RTR products filtered by country and operator
+      description: |
+        Returns PrepayNation RTR products scoped to a specific operator within a country.
+        Pair `country` with an `operator_id` from `/operators/list` to narrow the catalog
+        to a single carrier.
+
+        All `cost` fields are in USD.
+      operationId: productsByOperator
+      security:
+      - AuthToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - country
+              properties:
+                country:
+                  type: string
+                  description: ISO 2-letter country code
+                  example: NG
+                operator_id:
+                  type: string
+                  description: Operator ID from /operators/list
+                  example: MTN_NG
+            example:
+              country: NG
+              operator_id: MTN_NG
+      responses:
+        '200':
+          description: Filtered product list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  prepay_list:
+                    type: array
+                    items:
+                      "$ref": "#/components/schemas/PrepayNationProduct"
+                  message:
+                    type: string
+                    example: Successfully got the data.
+                  status:
+                    type: integer
+                    example: 200
+        '400':
+          description: Missing or blank `country` parameter
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  prepay_list:
+                    type: array
+                    items: {}
+                    example: []
+                  message:
+                    type: string
+                    example: Provide Correct Information.
+                  status:
+                    type: integer
+                    example: 400
+  "/operators/list":
+    post:
+      tags:
+      - Operators
+      summary: List unique mobile operators for a country
+      description: |
+        Returns a deduplicated list of mobile network operators available for the given
+        country.  Use the `operatorId` values to filter the catalog via
+        `/products/by-operator`.
+      operationId: operatorsList
+      security:
+      - AuthToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - country
+              properties:
+                country:
+                  type: string
+                  description: ISO 2-letter country code
+                  example: NG
+            example:
+              country: NG
+      responses:
+        '200':
+          description: Operator list retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  operator_list:
+                    type: array
+                    items:
+                      "$ref": "#/components/schemas/Operator"
+                  message:
+                    type: string
+                    example: Successfully got the data.
+                  status:
+                    type: integer
+                    example: 200
+              example:
+                operator_list:
+                - operatorId: MTN_NG
+                  operatorName: MTN Nigeria
+                  imageUrl: https://cdn.swychrconnect.com/operators/mtn_ng.png
+                - operatorId: AIRTEL_NG
+                  operatorName: Airtel Nigeria
+                  imageUrl: https://cdn.swychrconnect.com/operators/airtel_ng.png
+                message: Successfully got the data.
+                status: 200
+        '400':
+          description: Missing or blank `country` parameter
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  operator_list:
+                    type: array
+                    items: {}
+                    example: []
+                  message:
+                    type: string
+                    example: Provide Correct Information.
+                  status:
+                    type: integer
+                    example: 400
+  "/mobile/lookup":
+    post:
+      tags:
+      - Mobile Lookup
+      summary: Identify carrier for a mobile number
+      description: |
+        Proxies **Swychrconnect v2 `/lookup/mobile/{mobile}`** to identify the
+        mobile network operator for an international phone number.
+
+        Use this before recharging to pre-populate the correct `skuId` / `operator_id`
+        for the subscriber's carrier.
+
+        **Note:** when the mobile parameter is missing, the JSON body returns `status: 402`
+        (though the HTTP response code is `400`).
+      operationId: mobileLookup
+      security:
+      - AuthToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - mobile
+              properties:
+                mobile:
+                  type: string
+                  description: International phone number (E.164 format recommended)
+                  example: '2348012345678'
+            example:
+              mobile: '2348012345678'
+      responses:
+        '200':
+          description: Carrier identified
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  payload:
+                    type: array
+                    items:
+                      "$ref": "#/components/schemas/MobileLookupPayload"
+                  message:
+                    type: string
+                    example: Successfully Retrieved the data.
+                  status:
+                    type: integer
+                    example: 200
+        '400':
+          description: |
+            One of:
+            - Missing `mobile` parameter (body `status` will be `402`)
+            - Upstream returned non-200 (body includes raw `resp` string)
+            - Carrier not found by the upstream provider
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  payload:
+                    type: array
+                    items: {}
+                    example: []
+                  resp:
+                    type: string
+                    nullable: true
+                    description: Raw upstream response body (present only when the
+                      upstream call fails)
+                  message:
+                    type: string
+                    example: Unable to find the mobile provider.
+                  status:
+                    type: integer
+                    description: 402 when mobile param is missing, 400 otherwise
+                    example: 400
+        '500':
+          description: Unexpected error calling the upstream lookup service
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  payload:
+                    type: array
+                    items: {}
+                    example: []
+                  message:
+                    type: string
+                    example: An error occurred.
+                  status:
+                    type: integer
+                    example: 500
+  "/recharges/history":
+    post:
+      tags:
+      - Recharge
+      summary: Recharge history for a mobile number
+      description: |
+        Returns all recharge records for the given mobile number scoped to the
+        authenticated admin account, ordered newest-first.
+      operationId: rechargesList
+      security:
+      - AuthToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - mobile
+              properties:
+                mobile:
+                  type: string
+                  description: International phone number whose history to retrieve
+                  example: '2348012345678'
+            example:
+              mobile: '2348012345678'
+      responses:
+        '200':
+          description: Recharge history retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  recharge_history:
+                    type: array
+                    items:
+                      "$ref": "#/components/schemas/RechargeHistoryItem"
+                  message:
+                    type: string
+                    example: Successfully retrieved the data.
+                  status:
+                    type: integer
+                    example: 200
+        '400':
+          description: Missing or blank `mobile` parameter
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  recharge_history:
+                    type: array
+                    items: {}
+                    example: []
+                  message:
+                    type: string
+                    example: Please provide correct information.
+                  status:
+                    type: integer
+                    example: 400
+  "/recharges/create":
+    post:
+      tags:
+      - Recharge
+      summary: Initiate a mobile recharge
+      description: "End-to-end recharge flow:\n\n1. **Validates parameters** â€” `country`,
+        `skuId`, `amount`, `mobile` are required.\n2. **Checks rate limits** per destination
+        mobile number:\n   - Max **5 successful** recharges per calendar day.\n   -
+        Max **2 successful** recharges per rolling hour.\n3. **Pre-flight balance
+        check** â€” admin wallet USD balance must cover the product\n   cost \n4. **Calls
+        SwychrConnect v2** `POST /transaction/topup` to deliver the airtime.\n5. **Atomic
+        commit** â€” re-verifies wallet balance with a row-level lock, then creates\n
+        \  `RechargeHistory` and `MobileWallet` (debit) records in one transaction.\n\nA
+        `correlationId` of the form `Recharge_{adminId}_{hex}_{epoch}` is generated\nserver-side
+        and stored as `transaction_id`.\n\n**Accepted provider response codes:** `000`
+        (success) and `852` (queued/pending).\nAll other codes are treated as failures.\n\n**Wallet
+        deduction formula:**\n- Fixed product: `min_cost`\n- Variable product: `(min_cost
+        / min_faceValue) Ã— amount`\n"
+      operationId: postRechargeOrder
+      security:
+      - AuthToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/RechargeOrderRequest"
+            examples:
+              fixed_product:
+                summary: Fixed-value product
+                value:
+                  country: NG
+                  skuId: NG_MTN_100
+                  amount: 100
+                  mobile: '2348012345678'
+                  purchaseCurrency: NGN
+              variable_product:
+                summary: Variable-amount product
+                value:
+                  country: KE
+                  skuId: KE_SAFARICOM_OPEN
+                  amount: 50
+                  mobile: '254712345678'
+                  purchaseCurrency: KES
+      responses:
+        '200':
+          description: Recharge delivered successfully and wallet debited
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RechargeOrderResponse"
+              example:
+                message: Recharge was successful.
+                status: 200
+        '400':
+          description: |
+            One of:
+            - Missing required parameters
+            - Admin account (`MobileCompanySignup`) not found
+            - Product `skuId` not in the catalog
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: 'Missing required parameters: country, skuId.'
+                  status:
+                    type: integer
+                    example: 400
+        '402':
+          description: Insufficient wallet balance (pre-flight check or post-provider
+            lock check)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Wallet Balance is not sufficient. Please recharge your
+                      wallet.
+                  status:
+                    type: integer
+                    example: 400
+        '422':
+          description: |
+            SwychrConnect accepted the request but returned a response code other than `000` or `852`
+            (e.g. invalid mobile number, operator rejection).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    description: Error message from the upstream provider
+                    example: Invalid destination number.
+                  status:
+                    type: integer
+                    example: 400
+        '429':
+          description: Rate limit exceeded (5/day or 2/hour per mobile number)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Recharge limit reached. Maximum 5 recharges per day are
+                      allowed for this number.
+                  status:
+                    type: integer
+                    example: 400
+        '502':
+          description: SwychrConnect API returned a non-200 HTTP status (provider
+            unavailable)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Payment provider unavailable. Please try again.
+                  status:
+                    type: integer
+                    example: 400
+        '500':
+          description: Unexpected server-side error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: An error occurred. Please try again.
+                  status:
+                    type: integer
+                    example: 500
+  "/recharges/status":
+    post:
+      tags:
+      - Recharge
+      summary: Check status of a recharge transaction
+      description: |
+        Proxies **SwychrConnect v2 `GET /transaction/status/{transaction_id}`** to retrieve
+        the current status of a previously submitted recharge.
+
+        Use the `transaction_id` returned from `/recharges/history` or generated
+        server-side during `/recharges/create` (`Recharge_{adminId}_{hex}_{epoch}`).
+      operationId: rechargeStatus
+      security:
+      - AuthToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - transaction_id
+              properties:
+                transaction_id:
+                  type: string
+                  description: Transaction ID to look up (correlationId sent to SwychrConnect)
+                  example: Recharge_42_a1b2c3d4e5f6g7h8_1715957600
+            example:
+              transaction_id: Recharge_42_a1b2c3d4e5f6g7h8_1715957600
+      responses:
+        '200':
+          description: Transaction status retrieved
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RechargeStatusResponse"
+              example:
+                resp:
+                  responseCode: '000'
+                  responseMessage: Success
+                  transactionId: Recharge_42_a1b2c3d4e5f6g7h8_1715957600
+                  status: completed
+                message: Successfully retrieved recharge status.
+                status: 200
+        '400':
+          description: |
+            One of:
+            - Missing or blank `transaction_id` parameter
+            - Upstream returned a non-200 HTTP status (body includes raw `resp` string)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  resp:
+                    type: string
+                    nullable: true
+                    description: Raw upstream response body (present only when the
+                      upstream call fails)
+                  message:
+                    type: string
+                    example: Provide Correct Information.
+                  status:
+                    type: integer
+                    example: 400

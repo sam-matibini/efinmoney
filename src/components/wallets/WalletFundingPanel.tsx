@@ -82,8 +82,8 @@ const WalletFundingPanel = ({
         </div>
       ) : (
         <ComingSoon
-          title={`${currency} top-up — coming soon`}
-          description="We're expanding corridors — Nigeria and Ghana are live today."
+          title={`${currency} top-up is not available`}
+          description="Choose an NGN, GHS, USD, EUR, GBP, or CAD wallet to add money."
           backHref={returnPath}
           backLabel="Back"
           className="border-solid"

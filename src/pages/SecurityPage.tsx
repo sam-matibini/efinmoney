@@ -5,7 +5,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Lock, Smartphone, Shield } from "lucide-react";
@@ -68,7 +67,7 @@ const SecurityPage = () => {
           value="Keep your account secure"
           meta={[
             { icon: Lock, text: "Update password regularly" },
-            { icon: Smartphone, text: twoFA ? "Two-factor authentication on" : "Two-factor authentication coming soon" },
+            { icon: Smartphone, text: twoFA ? "Two-factor authentication on" : "Authenticator app security" },
           ]}
           variant="accent"
         />
@@ -112,7 +111,6 @@ const SecurityPage = () => {
                 <div>
                   <div className="flex items-center gap-2">
                     <h2 className="font-semibold text-foreground">Two-Factor Authentication</h2>
-                    <Badge variant="outline" className="text-[10px]">Coming Soon</Badge>
                   </div>
                   <p className="text-sm text-muted-foreground mt-1">
                     Add an extra layer of security with an authenticator app.
@@ -123,7 +121,7 @@ const SecurityPage = () => {
                 checked={twoFA}
                 onCheckedChange={(v) => {
                   setTwoFA(v);
-                  toast.info("2FA setup will be available soon");
+                  toast.info("2FA setup is not available yet");
                 }}
               />
             </div>

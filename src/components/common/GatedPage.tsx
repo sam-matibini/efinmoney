@@ -1,21 +1,17 @@
 import type { ReactNode } from "react";
-import FeatureGate from "@/components/common/FeatureGate";
-import type { ComingSoonProps } from "@/components/common/ComingSoon";
-import type { ProductFeatureKey } from "@/lib/productFeatures";
+import { Navigate } from "react-router-dom";
+import { isFeatureEnabled, type ProductFeatureKey } from "@/lib/productFeatures";
 
 type GatedPageProps = {
   feature: ProductFeatureKey;
   children: ReactNode;
-  comingSoon?: Partial<ComingSoonProps>;
+  comingSoon?: unknown;
 };
 
-/** Full-page feature gate for routed screens */
-const GatedPage = ({ feature, children, comingSoon }: GatedPageProps) => (
-  <main className="container px-4 py-6 max-w-2xl mx-auto">
-    <FeatureGate feature={feature} comingSoon={comingSoon}>
-      {children}
-    </FeatureGate>
-  </main>
-);
+/** Full-page gate: disabled features redirect home (no "coming soon" UI). */
+const GatedPage = ({ feature, children }: GatedPageProps) => {
+  if (!isFeatureEnabled(feature)) return <Navigate to="/" replace />;
+  return <>{children}</>;
+};
 
 export default GatedPage;

@@ -2,8 +2,7 @@ import { useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
-  ArrowRight, Wallet, Send, Smartphone, Repeat, CreditCard, Receipt,
-  LinkIcon, Landmark, Building2, ShieldCheck, Globe, Clock,
+  ArrowRight, Wallet, Send, Smartphone, Repeat, Globe,
 } from "lucide-react";
 import MarketingHeader from "@/components/marketing/MarketingHeader";
 import MarketingFooter from "@/components/marketing/MarketingFooter";
@@ -39,39 +38,6 @@ const LIVE = [
     title: "Receive & bank link",
     desc: "Get dedicated account details to receive money into your wallet. Link external bank accounts with Plaid.",
   },
-];
-
-const ROADMAP = [
-  {
-    id: "canada",
-    icon: Landmark,
-    title: "Canada rails & Interac",
-    desc: "Fund your account and move money in Canada using Interac e-Transfer and EFT — coming soon.",
-  },
-  {
-    id: "cards",
-    icon: CreditCard,
-    title: "Cards",
-    desc: "Virtual cards and card-based funding — coming soon.",
-  },
-  {
-    id: "bills",
-    icon: Receipt,
-    title: "Bill payments",
-    desc: "Airtime, utilities, and cable payments — coming soon.",
-  },
-  {
-    id: "payment-links",
-    icon: LinkIcon,
-    title: "Payment links & requests",
-    desc: "Shareable payment requests — being redesigned.",
-  },
-];
-
-const BUSINESS = [
-  { icon: Send, t: "Bulk payouts & approvals", d: "Pay suppliers, contractors and staff across multiple corridors, with an approval flow." },
-  { icon: Building2, t: "Multi-entity wallets", d: "Run separate balances per entity or currency under one organisation." },
-  { icon: ShieldCheck, t: "Compliance & audit trail", d: "KYC/AML controls, full audit logging and receipts on every movement." },
 ];
 
 const container = {
@@ -120,8 +86,7 @@ export default function Features() {
             initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
             className="mt-6 text-base md:text-lg text-white/70 max-w-2xl mx-auto"
           >
-            Multi-currency wallets, live FX, Nigeria bank transfers, and Ghana mobile money —
-            with more corridors and Canada rails on the roadmap.
+            Multi-currency wallets, live FX, Nigeria bank transfers, and Ghana mobile money.
           </motion.p>
         </div>
         <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-white to-transparent pointer-events-none" />
@@ -152,66 +117,6 @@ export default function Features() {
               </motion.div>
             ))}
           </motion.div>
-        </div>
-      </section>
-
-      <section className="bg-[hsl(var(--accent))]/20 py-20 md:py-24">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="mb-12">
-            <span className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[hsl(var(--brand-700))]">
-              <Clock className="w-3 h-3" /> Coming soon
-            </span>
-            <h2 className="mt-2 text-3xl md:text-4xl font-black tracking-tight text-[hsl(var(--brand-900))]">
-              On the roadmap
-            </h2>
-            <p className="mt-3 text-neutral-600 max-w-2xl">
-              Cards, bill pay, Canada domestic rails, and additional African corridors are in development.
-            </p>
-          </div>
-          <motion.div
-            variants={container} initial="hidden" whileInView="show" viewport={{ once: true, margin: "-80px" }}
-            className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6"
-          >
-            {ROADMAP.map((f) => (
-              <motion.div
-                key={f.title} id={f.id} variants={item}
-                className="scroll-mt-24 rounded-3xl bg-white/80 border border-dashed border-neutral-300 p-6"
-              >
-                <div className="w-11 h-11 rounded-xl bg-muted flex items-center justify-center text-muted-foreground mb-4">
-                  <f.icon className="w-5 h-5" />
-                </div>
-                <h3 className="text-base font-bold text-[hsl(var(--brand-900))] mb-2">{f.title}</h3>
-                <p className="text-sm text-neutral-600 leading-relaxed">{f.desc}</p>
-              </motion.div>
-            ))}
-          </motion.div>
-        </div>
-      </section>
-
-      <section id="business" className="scroll-mt-24 bg-[hsl(var(--accent))]/30 py-20 md:py-24">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="mb-12 max-w-2xl">
-            <span className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[hsl(var(--brand-700))]">
-              <Building2 className="w-3 h-3" /> For business
-            </span>
-            <h2 className="mt-2 text-3xl md:text-4xl font-black tracking-tight text-[hsl(var(--brand-900))]">
-              Treasury, payouts and FX in one platform
-            </h2>
-            <p className="mt-4 text-[15px] md:text-base text-neutral-600 leading-relaxed">
-              Pay across Africa with the controls and reporting your finance team expects.
-            </p>
-          </div>
-          <div className="grid md:grid-cols-3 gap-6">
-            {BUSINESS.map((b) => (
-              <div key={b.t} className="rounded-3xl bg-white border border-neutral-200/80 p-7">
-                <div className="w-11 h-11 rounded-xl bg-[hsl(var(--brand-900))] text-white flex items-center justify-center mb-5">
-                  <b.icon className="w-5 h-5" />
-                </div>
-                <h3 className="text-base font-bold text-[hsl(var(--brand-900))] mb-2">{b.t}</h3>
-                <p className="text-sm text-neutral-600 leading-relaxed">{b.d}</p>
-              </div>
-            ))}
-          </div>
         </div>
       </section>
 

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  Menu, X, ChevronDown, Wallet, Send, Smartphone, Landmark, Repeat, CreditCard, Receipt, Building2, Clock,
+  Menu, X, ChevronDown, Wallet, Send, Smartphone, Repeat,
 } from "lucide-react";
 import { Logo, Wordmark } from "@/components/Logo";
 import { cn } from "@/lib/utils";
@@ -12,14 +12,6 @@ const LIVE_ITEMS = [
   { icon: Smartphone, label: "Ghana mobile money", to: "/features#mobile-money" },
   { icon: Repeat, label: "Currency exchange", to: "/features#exchange" },
 ];
-
-const ROADMAP_ITEMS = [
-  { icon: Landmark, label: "Canada & Interac (soon)", to: "/features#canada" },
-  { icon: CreditCard, label: "Cards (soon)", to: "/features#cards" },
-  { icon: Receipt, label: "Bill payments (soon)", to: "/features#bills" },
-];
-
-const FEATURE_ITEMS = [...LIVE_ITEMS, ...ROADMAP_ITEMS, { icon: Building2, label: "For business", to: "/features#business" }];
 
 export default function MarketingHeader({ variant = "solid" }: { variant?: "transparent" | "solid" }) {
   const [open, setOpen] = useState(false);
@@ -76,7 +68,7 @@ export default function MarketingHeader({ variant = "solid" }: { variant?: "tran
               <div className="absolute left-1/2 -translate-x-1/2 top-full pt-3">
                 <div className="w-[440px] rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 p-2">
                   <p className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-neutral-400">Live</p>
-                  <div className="grid grid-cols-2 gap-1 mb-2">
+                  <div className="grid grid-cols-2 gap-1">
                     {LIVE_ITEMS.map((f) => (
                       <Link
                         key={f.to}
@@ -90,34 +82,6 @@ export default function MarketingHeader({ variant = "solid" }: { variant?: "tran
                         <span className="text-sm font-semibold text-[hsl(var(--brand-900))]">{f.label}</span>
                       </Link>
                     ))}
-                  </div>
-                  <p className="px-3 pt-1 pb-1 text-[10px] font-semibold uppercase tracking-wider text-neutral-400 flex items-center gap-1">
-                    <Clock className="w-3 h-3" /> Coming soon
-                  </p>
-                  <div className="grid grid-cols-2 gap-1">
-                    {ROADMAP_ITEMS.map((f) => (
-                      <Link
-                        key={f.to}
-                        to={f.to}
-                        onClick={() => setFeaturesOpen(false)}
-                        className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 hover:bg-neutral-50 transition-colors group"
-                      >
-                        <span className="w-8 h-8 rounded-lg bg-neutral-100 text-neutral-500 flex items-center justify-center shrink-0">
-                          <f.icon className="w-4 h-4" />
-                        </span>
-                        <span className="text-sm font-medium text-neutral-600">{f.label}</span>
-                      </Link>
-                    ))}
-                    <Link
-                      to="/features#business"
-                      onClick={() => setFeaturesOpen(false)}
-                      className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 hover:bg-[hsl(var(--accent))]/60 transition-colors group col-span-2"
-                    >
-                      <span className="w-8 h-8 rounded-lg bg-[hsl(var(--accent))] text-[hsl(var(--brand-700))] flex items-center justify-center shrink-0">
-                        <Building2 className="w-4 h-4" />
-                      </span>
-                      <span className="text-sm font-semibold text-[hsl(var(--brand-900))]">For business</span>
-                    </Link>
                   </div>
                 </div>
               </div>
@@ -165,7 +129,7 @@ export default function MarketingHeader({ variant = "solid" }: { variant?: "tran
           </button>
           {mobileFeatures && (
             <div className="pl-2 pb-2 space-y-0.5">
-              {FEATURE_ITEMS.map((f) => (
+              {LIVE_ITEMS.map((f) => (
                 <Link
                   key={f.to}
                   to={f.to}

@@ -12,8 +12,8 @@ export type ComingSoonProps = {
 };
 
 const ComingSoon = ({
-  title = "Coming soon",
-  description = "We're building this next. Nigeria and Ghana transfers are live today.",
+  title = "Not available",
+  description = "This option is not available right now.",
   backHref = "/dashboard",
   backLabel = "Back to dashboard",
   className = "",

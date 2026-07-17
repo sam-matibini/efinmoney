@@ -209,7 +209,7 @@ const Landing = () => {
               transition={{ delay: 0.85, duration: 0.55 }}
               className="mt-7 max-w-xl text-base md:text-lg text-white/70 mx-auto lg:mx-0"
             >
-              Multi-currency wallets and live FX — with Nigeria bank transfers and Ghana mobile money live today. More corridors, cards, and Canada rails are on the way.
+              Multi-currency wallets and live FX — with Nigeria bank transfers and Ghana mobile money live today.
             </motion.p>
 
             <motion.div
@@ -361,8 +361,7 @@ const Landing = () => {
             </h2>
             <p className="mt-5 text-[15px] md:text-base text-neutral-600 leading-relaxed max-w-xl">
               Nigeria bank payouts and Ghana mobile money are live today — with multi-currency
-              wallets, live FX, and Plaid bank linking. More African corridors and Canada rails
-              are on the roadmap.
+              wallets, live FX, and Plaid bank linking.
             </p>
             <ul className="mt-7 space-y-3">
               {[

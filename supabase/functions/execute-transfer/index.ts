@@ -536,8 +536,18 @@ Deno.serve(async (req) => {
             code: "nomba_http_error",
             rail: "nomba",
           }));
-          // Flutterwave fallback disabled while debugging Nomba:
-          // if (payoutResult?.success === false) { ... flutterwave-payout ... }
+          if (payoutResult?.success === false && Deno.env.get("SWYCHR_PAYOUT_FALLBACK") === "true") {
+            const swychrRes = await fetch(
+              `${Deno.env.get("SUPABASE_URL")}/functions/v1/swychr-payout`,
+              { method: "POST", headers: internalHeaders, body: JSON.stringify({ transfer_id }) },
+            );
+            const swychrJson = await swychrRes.json().catch(() => ({
+              success: false,
+              error: `swychr-payout returned HTTP ${swychrRes.status}`,
+              rail: "swychr",
+            }));
+            if (swychrJson?.success) payoutResult = swychrJson;
+          }
         }
       } else {
         const res = await fetch(
