@@ -6,7 +6,7 @@ const DepositComplete = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const t = setTimeout(() => navigate("/"), 3000);
+    const t = setTimeout(() => navigate("/dashboard"), 3000);
     return () => clearTimeout(t);
   }, [navigate]);
 

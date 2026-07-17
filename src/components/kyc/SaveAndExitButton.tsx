@@ -42,7 +42,7 @@ const SaveAndExitButton = ({ onSaveDraft, className }: Props) => {
     toast.success("Progress saved. Resume anytime from your dashboard.");
     setBusy(null);
     setOpen(false);
-    navigate("/");
+    navigate("/dashboard");
   };
 
   const signOut = async () => {

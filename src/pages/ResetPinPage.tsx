@@ -69,7 +69,7 @@ export default function ResetPinPage() {
             </div>
             <h1 className="text-xl font-bold">Link invalid</h1>
             <p className="text-muted-foreground text-sm">{errorMsg}</p>
-            <Button variant="outline" className="w-full" onClick={() => navigate("/")}>
+            <Button variant="outline" className="w-full" onClick={() => navigate("/dashboard")}>
               Back to app
             </Button>
           </>

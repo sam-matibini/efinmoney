@@ -169,7 +169,7 @@ const PayBillsPage = () => {
 
   useEffect(() => {
     if (!paymentSuccess) return;
-    const t = setTimeout(() => navigate("/"), 2500);
+    const t = setTimeout(() => navigate("/dashboard"), 2500);
     return () => clearTimeout(t);
   }, [paymentSuccess, navigate]);
 
