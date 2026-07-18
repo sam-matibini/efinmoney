@@ -1,18 +1,11 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import {
-  buildNombaCallbackUrl,
-  collectionUrlForCorridor,
-  getNombaPayConfig,
-  isNombaPayConfigured,
-  nombaCollectionFetch,
-  type NombaCorridor,
-} from "../_shared/nomba-pay.ts";
-import {
-  quoteCadWalletViaNombaUsd,
-  quoteSameCurrencyTopup,
-  resolveFxRate,
-  type FxRateRow,
-} from "../_shared/nomba-topup-quote.ts";
+  buildPaytotaWebhookUrl,
+  createPaytotaPurchase,
+  getPaytotaConfig,
+  isPaytotaConfigured,
+} from "../_shared/paytota.ts";
+import { quoteSameCurrencyTopup } from "../_shared/nomba-topup-quote.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -20,28 +13,13 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+const PAYTOTA_CURRENCIES = ["USD", "EUR", "GBP", "CAD"];
+
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
-}
-
-function resolveCorridor(currency: string): NombaCorridor | null {
-  const c = currency.toUpperCase();
-  if (c === "NGN") return "nigeria";
-  if (["USD", "EUR", "GBP"].includes(c)) return "international";
-  return null;
-}
-
-async function fetchFxRates(admin: ReturnType<typeof createClient>): Promise<FxRateRow[]> {
-  const { data } = await admin
-    .from("fx_rates")
-    .select("from_currency, to_currency, effective_rate")
-    .or(`valid_until.is.null,valid_until.gt.${new Date().toISOString()}`)
-    .order("valid_from", { ascending: false })
-    .limit(500);
-  return (data ?? []) as FxRateRow[];
 }
 
 Deno.serve(async (req) => {
@@ -68,14 +46,23 @@ Deno.serve(async (req) => {
     const userEmail = userData?.user?.email;
     if (authErr || !userId) return json({ error: "Unauthorized" }, 401);
 
+    if (!isPaytotaConfigured()) {
+      return json({ error: "Card checkout is not configured", code: "provider_not_configured" }, 500);
+    }
+
     const body = await req.json().catch(() => ({}));
     const {
       amount,
       credit_amount,
       target_wallet_id,
       email,
-      corridor: corridorHint,
       return_url,
+      phone,
+      country,
+      city,
+      street,
+      zip,
+      state,
     } = body as Record<string, unknown>;
 
     const requestedCredit = Number(credit_amount ?? amount);
@@ -87,7 +74,7 @@ Deno.serve(async (req) => {
     }
 
     const { data: rl } = await admin.rpc("check_rate_limit", {
-      p_key: `nomba_pay_collection:${userId}`,
+      p_key: `paytota_collection:${userId}`,
       p_max_requests: 10,
       p_window_seconds: 60,
     });
@@ -101,12 +88,15 @@ Deno.serve(async (req) => {
     if (!wallet || wallet.user_id !== userId) return json({ error: "Invalid wallet" }, 403);
 
     const walletCurrency = String(wallet.currency_code).toUpperCase();
+    if (!PAYTOTA_CURRENCIES.includes(walletCurrency)) {
+      return json({ error: `Paytota top-up does not support ${walletCurrency}` }, 400);
+    }
+
     const customerEmail = String(email || userEmail || "").trim();
     if (!customerEmail || !customerEmail.includes("@")) {
       return json({ error: "A valid email is required for checkout" }, 400);
     }
 
-    let corridor: NombaCorridor;
     let checkoutCurrency: string;
     let checkoutAmount: number;
     let creditAmount: number;
@@ -114,69 +104,51 @@ Deno.serve(async (req) => {
     let platformFee: number;
     let fxRate: number | null = null;
 
-    if (walletCurrency === "CAD") {
-      const rates = await fetchFxRates(admin);
-      const cadToUsd = resolveFxRate("CAD", "USD", rates);
-      if (!cadToUsd || cadToUsd <= 0) {
-        return json({ error: "CAD/USD exchange rate unavailable. Try again shortly." }, 503);
-      }
-      const quote = quoteCadWalletViaNombaUsd(requestedCredit, cadToUsd);
-      corridor = "international";
-      checkoutCurrency = quote.checkoutCurrency;
-      checkoutAmount = quote.checkoutAmount;
-      creditAmount = quote.creditAmount;
-      creditCurrency = quote.creditCurrency;
-      platformFee = quote.feeAmount;
-      fxRate = quote.fxRateCadToUsd;
-    } else {
-      creditCurrency = walletCurrency;
-      creditAmount = requestedCredit;
-      const same = quoteSameCurrencyTopup(requestedCredit, walletCurrency);
-      platformFee = same.feeAmount;
-      checkoutAmount = same.checkoutAmount;
-      checkoutCurrency = walletCurrency;
-
-      corridor = (typeof corridorHint === "string" && corridorHint === "international")
-        ? "international" as NombaCorridor
-        : resolveCorridor(walletCurrency) ?? "international";
-
-      if (corridor === "nigeria" && walletCurrency !== "NGN") {
-        return json({ error: "Nigeria checkout requires an NGN wallet" }, 400);
-      }
-      if (corridor === "international" && !["USD", "EUR", "GBP"].includes(walletCurrency)) {
-        return json({ error: `Card checkout does not support ${walletCurrency} directly` }, 400);
-      }
-    }
-
-    if (!isNombaPayConfigured()) {
-      return json({ error: "Card checkout is not configured", code: "provider_not_configured" }, 500);
-    }
-    const cfg = getNombaPayConfig();
+    // Paytota supports CAD/USD/EUR/GBP natively — same-currency checkout (no CAD→USD hack).
+    creditCurrency = walletCurrency;
+    creditAmount = requestedCredit;
+    const same = quoteSameCurrencyTopup(requestedCredit, walletCurrency);
+    platformFee = same.feeAmount;
+    checkoutAmount = same.checkoutAmount;
+    checkoutCurrency = walletCurrency;
 
     const amountRounded = Math.round(checkoutAmount * 100) / 100;
-    if (corridor === "international" && amountRounded < 1) {
+    if (amountRounded < 1) {
       return json({
-        error: `Card checkout minimum is $1.00 (you’re at $${amountRounded.toFixed(2)}). Increase the send amount and try again.`,
-        code: "amount_too_small",
-      }, 400);
-    }
-    if (corridor === "nigeria" && amountRounded < 100) {
-      return json({
-        error: "Naira card checkout minimum is ₦100. Increase the amount and try again.",
+        error: `Card checkout minimum is 1.00 ${checkoutCurrency}. Increase the amount and try again.`,
         code: "amount_too_small",
       }, 400);
     }
 
-    const internalRef = `efin-nomba-${corridor}-${userId.slice(0, 8)}-${Date.now()}`;
+    const internalRef = `efin-paytota-${userId.slice(0, 8)}-${Date.now()}`;
     const returnUrl = typeof return_url === "string" && return_url.startsWith("http")
       ? return_url.trim()
       : null;
+    const appBase = (Deno.env.get("APP_URL") || "https://www.efin.money").replace(/\/+$/, "");
+    const successRedirect = returnUrl
+      ? (() => {
+          const u = new URL(returnUrl);
+          u.searchParams.set("paytota", "success");
+          u.searchParams.set("walletId", target_wallet_id);
+          return u.toString();
+        })()
+      : `${appBase}/wallet/topup?paytota=success&walletId=${target_wallet_id}`;
+    const failureRedirect = returnUrl
+      ? (() => {
+          const u = new URL(returnUrl);
+          u.searchParams.set("paytota", "failed");
+          u.searchParams.set("walletId", target_wallet_id);
+          return u.toString();
+        })()
+      : `${appBase}/wallet/topup?paytota=failed&walletId=${target_wallet_id}`;
+
+    const webhookUrl = buildPaytotaWebhookUrl();
+    const cfg = getPaytotaConfig();
 
     const { data: txn, error: insErr } = await admin
-      .from("nomba_pay_transactions")
+      .from("paytota_payin_transactions")
       .insert({
         user_id: userId,
-        corridor,
         reference: internalRef,
         amount: amountRounded,
         currency: checkoutCurrency,
@@ -184,13 +156,10 @@ Deno.serve(async (req) => {
         credit_currency: creditCurrency,
         checkout_amount: amountRounded,
         checkout_currency: checkoutCurrency,
-        platform_fee: platformFee,
-        fx_rate: fxRate,
         email: customerEmail,
         target_wallet_id,
         status: "pending",
         raw_request: {
-          corridor,
           credit_amount: creditAmount,
           credit_currency: creditCurrency,
           checkout_amount: amountRounded,
@@ -199,28 +168,40 @@ Deno.serve(async (req) => {
           fx_rate: fxRate,
           email: customerEmail,
           return_url: returnUrl,
+          brand_id: cfg.brandId,
         },
       })
       .select("id")
       .single();
 
-    if (insErr) return json({ error: "Could not record collection", detail: insErr.message }, 500);
+    if (insErr) {
+      console.error("paytota insert failed:", insErr);
+      return json({
+        error: insErr.message || "Could not record collection",
+        detail: insErr.message,
+        code: insErr.code,
+      }, 500);
+    }
 
-    const payload = {
-      currency: checkoutCurrency,
-      amount: String(amountRounded),
-      user: cfg.merchantUser,
-      callback: buildNombaCallbackUrl(),
+    const result = await createPaytotaPurchase({
       email: customerEmail,
-    };
-
-    const url = collectionUrlForCorridor(corridor);
-    console.log("Nomba COLLECTION:", { corridor, url, payload, walletCurrency, creditAmount, creditCurrency });
-
-    const result = await nombaCollectionFetch(url, payload);
+      currency: checkoutCurrency,
+      amountMajor: amountRounded,
+      productName: `eFinMoney ${creditCurrency} wallet top-up`,
+      reference: internalRef,
+      country: typeof country === "string" ? country : undefined,
+      city: typeof city === "string" ? city : undefined,
+      street: typeof street === "string" ? street : undefined,
+      zip: typeof zip === "string" ? zip : undefined,
+      state: typeof state === "string" ? state : undefined,
+      phone: typeof phone === "string" ? phone : undefined,
+      successRedirect,
+      failureRedirect,
+      successCallback: webhookUrl,
+    });
 
     if (!result.ok) {
-      await admin.from("nomba_pay_transactions").update({
+      await admin.from("paytota_payin_transactions").update({
         status: "failed",
         failure_reason: result.message,
         raw_response: result.json,
@@ -231,22 +212,20 @@ Deno.serve(async (req) => {
       }, 200);
     }
 
-    await admin.from("nomba_pay_transactions").update({
+    await admin.from("paytota_payin_transactions").update({
       status: "processing",
-      order_id: result.orderId,
+      purchase_id: result.purchaseId,
       checkout_url: result.checkoutUrl,
-      provider_reference: result.orderId,
+      provider_reference: result.purchaseId,
       raw_response: result.json,
     }).eq("id", txn.id);
 
     return json({
       success: true,
       transaction_id: txn.id,
-      order_id: result.orderId,
+      purchase_id: result.purchaseId,
       payment_link: result.checkoutUrl,
-      message: walletCurrency === "CAD"
-        ? `Pay $${amountRounded.toFixed(2)} USD at checkout — your CAD wallet will be credited C$${creditAmount.toFixed(2)}`
-        : "Redirecting to secure checkout…",
+      message: "Redirecting to secure checkout…",
       quote: {
         credit_amount: creditAmount,
         credit_currency: creditCurrency,
@@ -258,7 +237,7 @@ Deno.serve(async (req) => {
       provider_response: result.json,
     });
   } catch (err) {
-    console.error("nomba-collection error:", err);
+    console.error("paytota-collection error:", err);
     return json({ error: err instanceof Error ? err.message : "Unknown error" }, 500);
   }
 });

@@ -90,7 +90,7 @@ export default function NombaTopUpCard({ walletId, walletCurrency, onComplete }:
 
   if (!isNombaTopupCurrency(currency)) return null;
 
-  const min = isCadViaUsd ? 2 : nombaMinAmount(currency);
+  const min = nombaMinAmount(currency);
   const corridor = isNigeria ? "nigeria" as const : "international" as const;
 
   const handleSubmit = async () => {

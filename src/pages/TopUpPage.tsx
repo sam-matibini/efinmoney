@@ -18,6 +18,7 @@ import { useAuth } from "@/hooks/useAuth";
 import ElicateTopUpCard from "@/components/payments/ElicateTopUpCard";
 import GhanaTopUpCard from "@/components/payments/GhanaTopUpCard";
 import NombaTopUpCard from "@/components/payments/NombaTopUpCard";
+import PaytotaTopUpCard from "@/components/payments/PaytotaTopUpCard";
 import SwychrTopUpCard from "@/components/payments/SwychrTopUpCard";
 import { validateMinAmount, friendlyFlwError, minAmount, type FlwMethod } from "@/lib/flutterwave";
 import LoadingSpinner from "@/components/LoadingSpinner";
@@ -29,12 +30,14 @@ import {
   type WesternTopupProvider,
   type AfricanTopupProvider,
   nombaGatewayLabel,
+  paytotaGatewayLabel,
   swychrGatewayLabel,
 } from "@/lib/walletTopupGateway";
 import { clearPendingSwychrTxn } from "@/lib/swychrPay";
 import FlutterwaveWesternTopUpHints from "@/components/wallets/FlutterwaveWesternTopUpHints";
 import { buildFincraTopupRedirectUrl, parseFincraReturnReference, isFincraCheckoutCurrency } from "@/lib/fincraTopup";
 import { clearPendingNombaTxn } from "@/lib/nombaPay";
+import { clearPendingPaytotaTxn, confirmPaytotaPayment, readPendingPaytotaTxn } from "@/lib/paytotaPay";
 import { cn } from "@/lib/utils";
 import ComingSoon from "@/components/common/ComingSoon";
 import { isLiveTopupCurrency, productFeatures } from "@/lib/productFeatures";
@@ -44,7 +47,7 @@ import { currencySymbol } from "@/lib/currency";
 
 const MM_BY_CCY = Object.fromEntries(MM_COUNTRIES.map((c) => [c.currency, c]));
 
-type Gateway = "flutterwave" | "elicate" | "fincra" | "ghana_pay" | "nomba_pay" | "swychr_pay" | "unsupported";
+type Gateway = "flutterwave" | "elicate" | "fincra" | "ghana_pay" | "nomba_pay" | "swychr_pay" | "paytota_pay" | "unsupported";
 
 function initialWesternProvider(params: URLSearchParams): WesternTopupProvider {
   const fromQuery = params.get("provider")?.toLowerCase();
@@ -132,13 +135,24 @@ const TopUpPage = () => {
   const currency = selectedWallet?.currency_code || "USD";
   const showWesternProviderChoice = supportsWesternProviderChoice(currency);
   const showAfricanProviderChoice = supportsAfricanProviderChoice(currency);
-  // Nomba: NGN + USD/EUR/GBP/CAD. Swychr: XAF/KES/XOF/UGX. Ghana Pay: GHS.
+  // Paytota: USD/EUR/GBP/CAD. Nomba: NGN. Swychr: XAF/KES/XOF/UGX. Ghana Pay: GHS.
   const wantSwychr =
     productFeatures.swychr
     || params.get("provider")?.toLowerCase() === "swychr"
     || params.get("rail")?.toLowerCase() === "swychr";
   const forceSwychr = wantSwychr && ["XAF", "KES", "XOF", "UGX"].includes(currency.toUpperCase());
-  const gateway: Gateway = routeWalletTopupGateway(currency, westernProvider, africanProvider, forceSwychr);
+  const wantPaytota =
+    productFeatures.paytota
+    || params.get("provider")?.toLowerCase() === "paytota"
+    || params.get("rail")?.toLowerCase() === "paytota";
+  const forcePaytota = wantPaytota && ["USD", "EUR", "GBP", "CAD"].includes(currency.toUpperCase());
+  const gateway: Gateway = routeWalletTopupGateway(
+    currency,
+    westernProvider,
+    africanProvider,
+    forceSwychr,
+    forcePaytota,
+  );
   const liveTopup = isLiveTopupCurrency(currency);
   const availableFlwMethods = FLW_METHODS_BY_CCY[currency] || ["card"];
   const mmCountry = method === "mobilemoney" ? MM_BY_CCY[currency] : undefined;
@@ -182,6 +196,48 @@ const TopUpPage = () => {
     }
     if (nombaStatus === "failed") {
       clearPendingNombaTxn();
+      setVerifyState({ status: "failed", message: "Payment could not be completed." });
+      return;
+    }
+
+    const paytotaStatus = params.get("paytota");
+    if (paytotaStatus === "success") {
+      setVerifyState({ status: "verifying", message: "Confirming your card payment…" });
+      (async () => {
+        try {
+          const pendingId = readPendingPaytotaTxn();
+          const purchaseId = params.get("purchase_id") || params.get("purchaseId") || undefined;
+          const result = await confirmPaytotaPayment({
+            transaction_id: pendingId || undefined,
+            purchase_id: purchaseId,
+          });
+          if (result.status === "completed") {
+            clearPendingPaytotaTxn();
+            setVerifyState({ status: "success", message: "Payment received — your wallet has been credited." });
+            toast.success("Top-up complete");
+            void queryClient.invalidateQueries({ queryKey: ["wallets"] });
+          } else if (result.status === "failed") {
+            clearPendingPaytotaTxn();
+            setVerifyState({ status: "failed", message: result.error || "Payment could not be completed." });
+          } else {
+            setVerifyState({
+              status: "success",
+              message: "Payment submitted — your wallet should update shortly.",
+            });
+            toast.success("Payment received");
+            void queryClient.invalidateQueries({ queryKey: ["wallets"] });
+          }
+        } catch (e) {
+          setVerifyState({
+            status: "failed",
+            message: e instanceof Error ? e.message : "Could not confirm payment",
+          });
+        }
+      })();
+      return;
+    }
+    if (paytotaStatus === "failed") {
+      clearPendingPaytotaTxn();
       setVerifyState({ status: "failed", message: "Payment could not be completed." });
       return;
     }
@@ -308,6 +364,7 @@ const TopUpPage = () => {
 
   const gatewayBadge = useMemo(() => {
     if (gateway === "swychr_pay") return { label: swychrGatewayLabel(currency), icon: Globe, color: "bg-violet-500/10 text-violet-700 border-violet-500/30" };
+    if (gateway === "paytota_pay") return { label: paytotaGatewayLabel(currency), icon: CreditCard, color: "bg-sky-500/10 text-sky-700 border-sky-500/30" };
     if (gateway === "nomba_pay") return { label: nombaGatewayLabel(currency), icon: CreditCard, color: "bg-green-600/10 text-green-700 border-green-600/30" };
     if (gateway === "ghana_pay") return { label: "Ghana MoMo", icon: Smartphone, color: "bg-yellow-500/10 text-yellow-700 border-yellow-500/30" };
     if (gateway === "elicate") return { label: "Mobile Money", icon: Smartphone, color: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30" };
@@ -591,7 +648,18 @@ const TopUpPage = () => {
             />
           )}
 
-          {/* Nomba — NGN hosted card checkout (skipped when Swychr is preferred) */}
+          {/* Paytota — USD/EUR/GBP/CAD card checkout */}
+          {liveTopup && gateway === "paytota_pay" && selectedWallet && (
+            <PaytotaTopUpCard
+              walletId={selectedWallet.wallet_id}
+              walletCurrency={currency}
+              onComplete={() => {
+                void queryClient.invalidateQueries({ queryKey: ["wallets"] });
+              }}
+            />
+          )}
+
+          {/* Nomba — NGN hosted card checkout (intl when Paytota off) */}
           {liveTopup && gateway === "nomba_pay" && selectedWallet && (
             <NombaTopUpCard
               walletId={selectedWallet.wallet_id}

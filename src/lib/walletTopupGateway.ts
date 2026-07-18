@@ -15,15 +15,21 @@ export const NOMBA_CAD_VIA_USD_CURRENCIES = ["CAD"];
 export const SWYCHR_TOPUP_CURRENCIES = ["XAF", "KES", "XOF", "UGX"];
 /** Nomba: NGN + USD/EUR/GBP international + CAD via USD checkout */
 export const NOMBA_PAY_CURRENCIES = [...NOMBA_NIGERIA_CURRENCIES, ...NOMBA_INTERNATIONAL_CURRENCIES, ...NOMBA_CAD_VIA_USD_CURRENCIES];
+/**
+ * Paytota hosted card checkout — used for USD/EUR/GBP/CAD while Nomba international is disabled.
+ * NGN stays on Nomba.
+ */
+export const PAYTOTA_TOPUP_CURRENCIES = ["USD", "EUR", "GBP", "CAD"];
 export const AFRICAN_TOPUP_PROVIDER_CURRENCIES = [...FLUTTERWAVE_CURRENCIES];
 
-export type WalletTopupGateway = "flutterwave" | "elicate" | "fincra" | "ghana_pay" | "nomba_pay" | "swychr_pay" | "unsupported";
+export type WalletTopupGateway = "flutterwave" | "elicate" | "fincra" | "ghana_pay" | "nomba_pay" | "swychr_pay" | "paytota_pay" | "unsupported";
 export type WesternTopupProvider = "flutterwave" | "fincra";
 export type AfricanTopupProvider = "flutterwave" | "fincra";
 
 export function supportsWesternProviderChoice(currency: string): boolean {
   const c = currency.toUpperCase();
   if (NOMBA_INTERNATIONAL_CURRENCIES.includes(c)) return false;
+  if (PAYTOTA_TOPUP_CURRENCIES.includes(c)) return false;
   return FLW_WESTERN_TOPUP_CURRENCIES.includes(c);
 }
 
@@ -31,6 +37,7 @@ export function supportsAfricanProviderChoice(currency: string): boolean {
   const c = currency.toUpperCase();
   if (GHANA_PAY_CURRENCIES.includes(c)) return false;
   if (NOMBA_PAY_CURRENCIES.includes(c)) return false;
+  if (PAYTOTA_TOPUP_CURRENCIES.includes(c)) return false;
   if (SWYCHR_TOPUP_CURRENCIES.includes(c)) return false;
   return AFRICAN_TOPUP_PROVIDER_CURRENCIES.includes(c);
 }
@@ -40,12 +47,16 @@ export function routeWalletTopupGateway(
   westernProvider?: WesternTopupProvider,
   africanProvider?: AfricanTopupProvider,
   preferSwychr = false,
+  preferPaytota = false,
 ): WalletTopupGateway {
   const c = currency.toUpperCase();
   // Ghana MoMo (Ghana Pay) — Swychr does not offer GHS payin on this account
   if (GHANA_PAY_CURRENCIES.includes(c)) return "ghana_pay";
-  // Nomba: everything Nomba can do (NGN + US/UK/EU/CAD international)
-  if (NOMBA_PAY_CURRENCIES.includes(c)) return "nomba_pay";
+  // Paytota: international card collect (USD/EUR/GBP/CAD) when enabled
+  if (preferPaytota && PAYTOTA_TOPUP_CURRENCIES.includes(c)) return "paytota_pay";
+  // Nomba: NGN always; international only when Paytota is off
+  if (c === "NGN") return "nomba_pay";
+  if (!preferPaytota && NOMBA_PAY_CURRENCIES.includes(c)) return "nomba_pay";
   // Swychr: CM/KE/SN|CI/UG corridors (gated by feature flag via preferSwychr)
   if (preferSwychr && SWYCHR_TOPUP_CURRENCIES.includes(c)) return "swychr_pay";
   if (ELICATE_CURRENCIES.includes(c)) return "elicate";
@@ -54,6 +65,10 @@ export function routeWalletTopupGateway(
   if (supportsWesternProviderChoice(c) && westernProvider === "fincra") return "fincra";
   if (supportsWesternProviderChoice(c) && westernProvider === "flutterwave") return "flutterwave";
   return "unsupported";
+}
+
+export function paytotaGatewayLabel(_currency: string): string {
+  return "Paytota invoice";
 }
 
 export function swychrGatewayLabel(currency: string): string {

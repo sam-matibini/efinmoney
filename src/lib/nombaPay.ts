@@ -60,11 +60,7 @@ export function isNombaTopupCurrency(currency: string): boolean {
 }
 
 export function nombaMinAmount(currency: string): number {
-  const c = currency.toUpperCase();
-  if (c === "NGN") return 100;
-  // CAD is charged in USD after fees — keep headroom so checkout clears ~$2
-  if (c === "CAD") return 5;
-  return 2;
+  return isNombaNigeriaCurrency(currency) ? 100 : 1;
 }
 
 export function savePendingNombaTxn(txnId: string) {
@@ -113,14 +109,6 @@ export async function initiateNombaCollection(params: {
       ?? (payload.provider_response as { Data?: { message?: string } })?.Data?.message
       ?? "",
     ).trim();
-    const data = (payload.provider_response as { Data?: { link?: string; order_id?: string } })?.Data;
-    const emptyCheckout = data && !String(data.link || "").trim() && !String(data.order_id || "").trim();
-    if (emptyCheckout || /collection failed/i.test(payload.error)) {
-      throw new Error(
-        "International card checkout is temporarily unavailable from our payment partner. "
-        + "Try charging in NGN (Nigeria card checkout), or top up your wallet first and send from balance.",
-      );
-    }
     throw new Error(providerMsg || payload.error);
   }
   if (!payload.success || !payload.payment_link) {

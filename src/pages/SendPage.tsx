@@ -540,20 +540,17 @@ const SendPage = () => {
     return null;
   }, [fundingSource, parsedAmount, sourceCurrency, fxRates]);
 
-  // When paying by card, prefer NGN for Nigeria sends (international USD/CAD checkout is currently empty-link from partner)
+  // When paying by card, pick a Nomba charge wallet + keep NG/GH payout destinations
   useEffect(() => {
     if (fundingSource !== "card") return;
     if (nombaWallets.length === 0) return;
     const currentOk = nombaWallets.some((w) => w.wallet_id === selectedWalletId);
     if (!currentOk) {
       const preferred =
-        (cardPayoutCodes.includes(targetCountry.code) && targetCountry.code === "NGN"
-          ? nombaWallets.find((w) => w.currency_code === "NGN")
-          : null)
-        || nombaWallets.find((w) => w.currency_code === "NGN")
-        || nombaWallets.find((w) => w.currency_code === "USD")
+        nombaWallets.find((w) => w.currency_code === "USD")
         || nombaWallets.find((w) => w.currency_code === "CAD")
         || nombaWallets.find((w) => w.currency_code === (profileCurrency || ""))
+        || nombaWallets.find((w) => w.currency_code === "NGN")
         || nombaWallets[0];
       if (preferred) setSelectedWalletId(preferred.wallet_id);
     }
@@ -1699,11 +1696,6 @@ const SendPage = () => {
                                           <p className="text-xs text-muted-foreground leading-relaxed">
                                             You’ll enter your card on our secure checkout. Once charged, we send to Nigeria (bank) or Ghana (mobile money).
                                           </p>
-                                          {sourceCurrency !== "NGN" && (
-                                            <p className="text-xs text-amber-700 dark:text-amber-400 leading-relaxed">
-                                              USD/CAD/EUR/GBP card checkout is temporarily down on our payment partner. For a working test, switch charge currency to <strong>NGN</strong>.
-                                            </p>
-                                          )}
                                         </div>
                                         {nombaWallets.length > 0 ? (
                                           <div className="space-y-2">

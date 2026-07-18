@@ -58,6 +58,8 @@ const purposeFromRefType = (rt?: string | null) => {
     case "manual_topup":
     case "wallet_topup":
     case "nomba_pay_topup":
+    case "swychr_payin_topup":
+    case "paytota_pay_topup":
       return "Wallet top-up";
     case "fx": return "FX exchange";
     case "crypto_trade": return "Crypto trade";

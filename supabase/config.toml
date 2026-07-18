@@ -57,6 +57,12 @@ verify_jwt = true
 [functions.nomba-payment-callback]
 verify_jwt = false
 
+[functions.paytota-collection]
+verify_jwt = true
+
+[functions.paytota-webhook]
+verify_jwt = false
+
 [functions.nomba-get-banks]
 verify_jwt = true
 
