@@ -4681,6 +4681,41 @@ export type Database = {
         }
         Relationships: []
       }
+      staff_audit_log: {
+        Row: {
+          action: string
+          actor_id: string | null
+          created_at: string
+          details: Json
+          id: string
+          target_admin_id: string | null
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          created_at?: string
+          details?: Json
+          id?: string
+          target_admin_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          created_at?: string
+          details?: Json
+          id?: string
+          target_admin_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_audit_log_target_admin_id_fkey"
+            columns: ["target_admin_id"]
+            isOneToOne: false
+            referencedRelation: "admin_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stripe_connected_accounts: {
         Row: {
           capabilities: Json
@@ -4899,6 +4934,294 @@ export type Database = {
           signature_valid?: boolean
         }
         Relationships: []
+      }
+      swychr_airtime_transactions: {
+        Row: {
+          amount: number
+          cost_usd: number | null
+          country_code: string
+          created_at: string
+          currency: string
+          failure_reason: string | null
+          id: string
+          mobile: string
+          raw_request: Json | null
+          raw_response: Json | null
+          sku_id: string
+          status: string
+          transaction_id: string
+          updated_at: string
+          user_id: string
+          wallet_id: string | null
+        }
+        Insert: {
+          amount: number
+          cost_usd?: number | null
+          country_code: string
+          created_at?: string
+          currency: string
+          failure_reason?: string | null
+          id?: string
+          mobile: string
+          raw_request?: Json | null
+          raw_response?: Json | null
+          sku_id: string
+          status?: string
+          transaction_id: string
+          updated_at?: string
+          user_id: string
+          wallet_id?: string | null
+        }
+        Update: {
+          amount?: number
+          cost_usd?: number | null
+          country_code?: string
+          created_at?: string
+          currency?: string
+          failure_reason?: string | null
+          id?: string
+          mobile?: string
+          raw_request?: Json | null
+          raw_response?: Json | null
+          sku_id?: string
+          status?: string
+          transaction_id?: string
+          updated_at?: string
+          user_id?: string
+          wallet_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "swychr_airtime_transactions_wallet_id_fkey"
+            columns: ["wallet_id"]
+            isOneToOne: false
+            referencedRelation: "wallets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      swychr_cardholders: {
+        Row: {
+          created_at: string
+          email: string | null
+          id: string
+          raw_profile: Json | null
+          swychr_user_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          raw_profile?: Json | null
+          swychr_user_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          raw_profile?: Json | null
+          swychr_user_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      swychr_cards: {
+        Row: {
+          card_type: string | null
+          cardholder_id: string | null
+          created_at: string
+          id: string
+          last_four: string | null
+          raw_response: Json | null
+          status: string
+          swychr_card_id: string
+          updated_at: string
+          user_id: string
+          wallet_id: string | null
+        }
+        Insert: {
+          card_type?: string | null
+          cardholder_id?: string | null
+          created_at?: string
+          id?: string
+          last_four?: string | null
+          raw_response?: Json | null
+          status?: string
+          swychr_card_id: string
+          updated_at?: string
+          user_id: string
+          wallet_id?: string | null
+        }
+        Update: {
+          card_type?: string | null
+          cardholder_id?: string | null
+          created_at?: string
+          id?: string
+          last_four?: string | null
+          raw_response?: Json | null
+          status?: string
+          swychr_card_id?: string
+          updated_at?: string
+          user_id?: string
+          wallet_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "swychr_cards_cardholder_id_fkey"
+            columns: ["cardholder_id"]
+            isOneToOne: false
+            referencedRelation: "swychr_cardholders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "swychr_cards_wallet_id_fkey"
+            columns: ["wallet_id"]
+            isOneToOne: false
+            referencedRelation: "wallets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      swychr_payin_transactions: {
+        Row: {
+          amount: number
+          country_code: string
+          created_at: string
+          currency: string
+          email: string
+          failure_reason: string | null
+          id: string
+          last_event: Json | null
+          payment_link: string | null
+          provider_id: number | null
+          provider_reference: string | null
+          raw_request: Json | null
+          raw_response: Json | null
+          reference: string
+          status: string
+          target_wallet_id: string | null
+          transaction_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          country_code: string
+          created_at?: string
+          currency: string
+          email: string
+          failure_reason?: string | null
+          id?: string
+          last_event?: Json | null
+          payment_link?: string | null
+          provider_id?: number | null
+          provider_reference?: string | null
+          raw_request?: Json | null
+          raw_response?: Json | null
+          reference: string
+          status?: string
+          target_wallet_id?: string | null
+          transaction_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          country_code?: string
+          created_at?: string
+          currency?: string
+          email?: string
+          failure_reason?: string | null
+          id?: string
+          last_event?: Json | null
+          payment_link?: string | null
+          provider_id?: number | null
+          provider_reference?: string | null
+          raw_request?: Json | null
+          raw_response?: Json | null
+          reference?: string
+          status?: string
+          target_wallet_id?: string | null
+          transaction_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "swychr_payin_transactions_target_wallet_id_fkey"
+            columns: ["target_wallet_id"]
+            isOneToOne: false
+            referencedRelation: "wallets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      swychr_payout_transactions: {
+        Row: {
+          amount: number
+          country_code: string
+          created_at: string
+          currency: string
+          failure_reason: string | null
+          id: string
+          payment_method: string | null
+          provider_reference: string | null
+          raw_request: Json | null
+          raw_response: Json | null
+          status: string
+          transaction_id: string
+          transfer_id: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          amount: number
+          country_code: string
+          created_at?: string
+          currency: string
+          failure_reason?: string | null
+          id?: string
+          payment_method?: string | null
+          provider_reference?: string | null
+          raw_request?: Json | null
+          raw_response?: Json | null
+          status?: string
+          transaction_id: string
+          transfer_id: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          amount?: number
+          country_code?: string
+          created_at?: string
+          currency?: string
+          failure_reason?: string | null
+          id?: string
+          payment_method?: string | null
+          provider_reference?: string | null
+          raw_request?: Json | null
+          raw_response?: Json | null
+          status?: string
+          transaction_id?: string
+          transfer_id?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "swychr_payout_transactions_transfer_id_fkey"
+            columns: ["transfer_id"]
+            isOneToOne: false
+            referencedRelation: "transfers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       tax_filings: {
         Row: {
@@ -6321,6 +6644,14 @@ export type Database = {
       set_transaction_pin: { Args: { p_pin: string }; Returns: boolean }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
+      sweep_fx_clearing_to_gain_loss: {
+        Args: never
+        Returns: {
+          posted_to: string
+          swept_amount: number
+          swept_currency: string
+        }[]
+      }
       validate_compliance_parameters: {
         Args: { p_parameters: Json; p_rule_type: string }
         Returns: boolean

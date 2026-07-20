@@ -1503,6 +1503,8 @@ const CanadaSendFlow = () => {
           interac_email: method === "interac" ? recipientEmail : null,
           notes: null,
           tags: [],
+          address: null,
+          tel: null,
         }}
       />
 
