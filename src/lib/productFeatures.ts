@@ -25,9 +25,9 @@ export const productFeatures = {
   swychr: envFlag("VITE_FEATURE_SWYCHR", true),
   /** Zambia MoMo via Elicate Pay (ZMW top-up + send + payment links). */
   elicate: envFlag("VITE_FEATURE_ELICATE", true),
-  /** Paytota invoice top-up for USD/EUR/GBP/CAD (shown alongside Nomba when both on). */
+  /** Paytota invoice top-up for USD/EUR/GBP/CAD + East Africa MoMo (UGX/KES/RWF). */
   paytota: envFlag("VITE_FEATURE_PAYTOTA", true),
-  /** Paytota UGX MoMo payout test toggle on Send. */
+  /** Paytota UGX/KES/RWF MoMo payout toggle on Send. */
   paytotaPayout: envFlag("VITE_FEATURE_PAYTOTA_PAYOUT", true),
   /** Fincra hosted checkout (USD/EUR/GBP/CAD) — white-labeled as Card or bank transfer. */
   fincra: envFlag("VITE_FEATURE_FINCRA", true),
@@ -51,6 +51,7 @@ export function isLiveTopupCurrency(currency: string): boolean {
   }
   if (productFeatures.fincraInterac && c === "CAD") return true;
   if (productFeatures.swychr && ["XAF", "KES", "XOF", "UGX"].includes(c)) return true;
+  if (productFeatures.paytota && ["UGX", "KES", "RWF"].includes(c)) return true;
   if (productFeatures.ghanaPay && c === "GHS") return true;
   if (productFeatures.elicate && c === "ZMW") return true;
   return false;
@@ -61,6 +62,9 @@ export function isLiveSendCorridor(countryCode: string): boolean {
   if (productFeatures.nombaNigeria && (code === "NGN" || code === "NG")) return true;
   if (productFeatures.ghanaPay && (code === "GHS" || code === "GH")) return true;
   if (productFeatures.elicate && (code === "ZMW" || code === "ZM")) return true;
+  if (productFeatures.paytotaPayout && ["UGX", "UG", "KES", "KE", "RWF", "RW"].includes(code)) {
+    return true;
+  }
   if (productFeatures.otherAfricanCorridors) {
     return ["KES", "UGX", "TZS", "RWF", "ZMW", "KE", "UG", "TZ", "RW", "ZM"].includes(code);
   }

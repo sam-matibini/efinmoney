@@ -3,9 +3,13 @@ import {
   createPaytotaPayout,
   executePaytotaMobilePayout,
   getPaytotaPayout,
+  isPaytotaAfricaCurrency,
   isPaytotaConfigured,
+  isPaytotaZeroDecimal,
   mapPaytotaPayoutStatus,
-  resolvePaytotaUgNetwork,
+  normalizeAfricaPhone,
+  paytotaCountryForCurrency,
+  resolvePaytotaNetwork,
 } from "../_shared/paytota.ts";
 
 const corsHeaders = {
@@ -65,10 +69,10 @@ Deno.serve(async (req) => {
     if (tErr || !transfer) return json({ success: false, error: "Transfer not found", rail: "paytota" }, 404);
 
     const targetCurrency = String(transfer.target_currency || transfer.source_currency || "UGX").toUpperCase();
-    if (targetCurrency !== "UGX") {
+    if (!isPaytotaAfricaCurrency(targetCurrency)) {
       return json({
         success: false,
-        error: "Paytota payout currently supports UGX mobile money only",
+        error: "Paytota payout supports UGX, KES, and RWF mobile money only",
         code: "unsupported_currency",
         rail: "paytota",
       }, 400);
@@ -80,16 +84,17 @@ Deno.serve(async (req) => {
     }
 
     const payoutAmountRaw = Number(transfer.target_amount ?? transfer.source_amount ?? 0);
-    // UGX has no minor units — round before sending to Paytota
-    const payoutAmount = targetCurrency === "UGX"
+    const payoutAmount = isPaytotaZeroDecimal(targetCurrency)
       ? Math.max(1, Math.round(payoutAmountRaw))
-      : payoutAmountRaw;
+      : Math.round(payoutAmountRaw * 100) / 100;
     if (!Number.isFinite(payoutAmount) || payoutAmount < 1) {
       return json({ success: false, error: "Invalid payout amount", rail: "paytota" }, 400);
     }
 
     const reference = `efin-paytota-payout-${transfer_id}`;
-    const network = resolvePaytotaUgNetwork(phone, transfer.payout_method);
+    const country = paytotaCountryForCurrency(targetCurrency);
+    const network = resolvePaytotaNetwork(phone, targetCurrency, transfer.payout_method);
+    const { e164 } = normalizeAfricaPhone(phone, targetCurrency);
 
     const { data: profile } = await supabase
       .from("profiles")
@@ -104,26 +109,27 @@ Deno.serve(async (req) => {
       reference,
       amount: payoutAmount,
       currency: targetCurrency,
-      phone,
-      country_code: "UG",
+      phone: e164,
+      country_code: country,
       network,
       status: "pending",
       raw_request: {
-        phone,
+        phone: e164,
         network,
         amount: payoutAmount,
+        currency: targetCurrency,
         payout_method: transfer.payout_method,
       },
     }, { onConflict: "reference" });
 
     const initiated = await createPaytotaPayout({
       email,
-      phone,
+      phone: e164,
       currency: targetCurrency,
       amountMajor: payoutAmount,
       reference,
-      description: String(transfer.description || "eFinMoney UGX payout").slice(0, 120),
-      country: "UG",
+      description: String(transfer.description || `eFinMoney ${targetCurrency} payout`).slice(0, 120),
+      country,
       fullName: String(transfer.recipient_name || "").trim() || undefined,
     });
 
@@ -153,14 +159,15 @@ Deno.serve(async (req) => {
     const executed = await executePaytotaMobilePayout({
       payoutId: initiated.payoutId,
       executionUrl: initiated.executionUrl,
-      phone,
+      phone: e164,
+      currency: targetCurrency,
       network,
       payoutMethod: transfer.payout_method,
     });
 
     if (!executed.ok) {
       const friendly = /terminal disabled/i.test(executed.message)
-        ? "Paytota mobile payout is not enabled on this merchant yet (terminal disabled). Ask Paytota to enable MTN/Airtel payout terminals."
+        ? "Paytota mobile payout is not enabled on this merchant yet (terminal disabled). Ask Paytota to enable the MoMo payout terminal for this currency."
         : executed.message;
 
       await supabase.from("paytota_payout_transactions").update({
@@ -180,7 +187,6 @@ Deno.serve(async (req) => {
       }, 502);
     }
 
-    // Confirm via GET when possible
     let mapped = mapPaytotaPayoutStatus(executed.status);
     const statusPoll = await getPaytotaPayout(initiated.payoutId);
     if (statusPoll.ok) {

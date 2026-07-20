@@ -3,7 +3,12 @@ import {
   buildPaytotaWebhookUrl,
   createPaytotaPurchase,
   getPaytotaConfig,
+  isPaytotaAfricaCurrency,
   isPaytotaConfigured,
+  isPaytotaZeroDecimal,
+  normalizeAfricaPhone,
+  PAYTOTA_SUPPORTED_CURRENCIES,
+  paytotaCountryForCurrency,
 } from "../_shared/paytota.ts";
 import { quoteSameCurrencyTopup } from "../_shared/nomba-topup-quote.ts";
 
@@ -13,7 +18,7 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const PAYTOTA_CURRENCIES = ["USD", "EUR", "GBP", "CAD"];
+const PAYTOTA_CURRENCIES = [...PAYTOTA_SUPPORTED_CURRENCIES];
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -88,13 +93,26 @@ Deno.serve(async (req) => {
     if (!wallet || wallet.user_id !== userId) return json({ error: "Invalid wallet" }, 403);
 
     const walletCurrency = String(wallet.currency_code).toUpperCase();
-    if (!PAYTOTA_CURRENCIES.includes(walletCurrency)) {
+    if (!(PAYTOTA_CURRENCIES as string[]).includes(walletCurrency)) {
       return json({ error: `Paytota top-up does not support ${walletCurrency}` }, 400);
     }
 
+    const africa = isPaytotaAfricaCurrency(walletCurrency);
     const customerEmail = String(email || userEmail || "").trim();
     if (!customerEmail || !customerEmail.includes("@")) {
       return json({ error: "A valid email is required for checkout" }, 400);
+    }
+
+    let phoneNormalized: string | undefined;
+    if (africa) {
+      const rawPhone = typeof phone === "string" ? phone.trim() : "";
+      if (!rawPhone) {
+        return json({
+          error: "A mobile money phone number is required for this currency",
+          code: "phone_required",
+        }, 400);
+      }
+      phoneNormalized = normalizeAfricaPhone(rawPhone, walletCurrency).e164;
     }
 
     let checkoutCurrency: string;
@@ -104,18 +122,22 @@ Deno.serve(async (req) => {
     let platformFee: number;
     let fxRate: number | null = null;
 
-    // Paytota supports CAD/USD/EUR/GBP natively — same-currency checkout (no CAD→USD hack).
+    // Same-currency checkout for Western invoice + East Africa MoMo.
     creditCurrency = walletCurrency;
-    creditAmount = requestedCredit;
-    const same = quoteSameCurrencyTopup(requestedCredit, walletCurrency);
+    creditAmount = isPaytotaZeroDecimal(walletCurrency)
+      ? Math.max(1, Math.round(requestedCredit))
+      : requestedCredit;
+    const same = quoteSameCurrencyTopup(creditAmount, walletCurrency);
     platformFee = same.feeAmount;
     checkoutAmount = same.checkoutAmount;
     checkoutCurrency = walletCurrency;
 
-    const amountRounded = Math.round(checkoutAmount * 100) / 100;
+    const amountRounded = isPaytotaZeroDecimal(checkoutCurrency)
+      ? Math.max(1, Math.round(checkoutAmount))
+      : Math.round(checkoutAmount * 100) / 100;
     if (amountRounded < 1) {
       return json({
-        error: `Card checkout minimum is 1.00 ${checkoutCurrency}. Increase the amount and try again.`,
+        error: `Checkout minimum is 1 ${checkoutCurrency}. Increase the amount and try again.`,
         code: "amount_too_small",
       }, 400);
     }
@@ -167,8 +189,10 @@ Deno.serve(async (req) => {
           platform_fee: platformFee,
           fx_rate: fxRate,
           email: customerEmail,
+          phone: phoneNormalized ?? null,
           return_url: returnUrl,
           brand_id: cfg.brandId,
+          africa_momo: africa,
         },
       })
       .select("id")
@@ -187,14 +211,16 @@ Deno.serve(async (req) => {
       email: customerEmail,
       currency: checkoutCurrency,
       amountMajor: amountRounded,
-      productName: `eFinMoney ${creditCurrency} wallet top-up`,
+      productName: africa
+        ? `eFinMoney ${creditCurrency} mobile money top-up`
+        : `eFinMoney ${creditCurrency} wallet top-up`,
       reference: internalRef,
-      country: typeof country === "string" ? country : undefined,
+      country: typeof country === "string" ? country : paytotaCountryForCurrency(checkoutCurrency),
       city: typeof city === "string" ? city : undefined,
       street: typeof street === "string" ? street : undefined,
       zip: typeof zip === "string" ? zip : undefined,
       state: typeof state === "string" ? state : undefined,
-      phone: typeof phone === "string" ? phone : undefined,
+      phone: phoneNormalized ?? (typeof phone === "string" ? phone : undefined),
       successRedirect,
       failureRedirect,
       successCallback: webhookUrl,

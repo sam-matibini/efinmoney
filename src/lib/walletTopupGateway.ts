@@ -17,13 +17,21 @@ export const SWYCHR_TOPUP_CURRENCIES = ["XAF", "KES", "XOF", "UGX"];
 export const NOMBA_PAY_CURRENCIES = [...NOMBA_NIGERIA_CURRENCIES, ...NOMBA_INTERNATIONAL_CURRENCIES, ...NOMBA_CAD_VIA_USD_CURRENCIES];
 /**
  * Paytota hosted invoice — USD/EUR/GBP/CAD.
+ * East Africa MoMo — UGX/KES/RWF (multi-rail alongside Swychr where both apply).
  * NGN stays on Nomba.
  */
-export const PAYTOTA_TOPUP_CURRENCIES = ["USD", "EUR", "GBP", "CAD"];
+export const PAYTOTA_WESTERN_TOPUP_CURRENCIES = ["USD", "EUR", "GBP", "CAD"];
+export const PAYTOTA_AFRICA_TOPUP_CURRENCIES = ["UGX", "KES", "RWF"];
+export const PAYTOTA_TOPUP_CURRENCIES = [
+  ...PAYTOTA_WESTERN_TOPUP_CURRENCIES,
+  ...PAYTOTA_AFRICA_TOPUP_CURRENCIES,
+];
 /** Fincra hosted checkout corridors. CAD uses USD charge → credit CAD wallet (same pattern as Nomba). */
 export const FINCRA_TOPUP_CURRENCIES = ["USD", "EUR", "GBP", "CAD"];
 /** Currencies that can offer multiple western/intl rails for the user to pick */
 export const MULTI_RAIL_TOPUP_CURRENCIES = ["USD", "EUR", "GBP", "CAD"];
+/** East Africa currencies that can offer Swychr + Paytota MoMo */
+export const AFRICA_MOMO_MULTI_RAIL_CURRENCIES = ["KES", "UGX", "RWF"];
 export const AFRICAN_TOPUP_PROVIDER_CURRENCIES = [...FLUTTERWAVE_CURRENCIES];
 
 export type WalletTopupGateway =
@@ -41,11 +49,13 @@ export type WesternTopupProvider = "flutterwave" | "fincra";
 export type AfricanTopupProvider = "flutterwave" | "fincra";
 /** User-facing intl/CAD method pick (internal keys; UI uses white-label labels). */
 export type IntlTopupMethod = "nomba" | "paytota" | "fincra" | "interac";
+/** East Africa MoMo method pick when both Swychr and Paytota are live. */
+export type AfricaMomoTopupMethod = "swychr" | "paytota";
 
 export function supportsWesternProviderChoice(currency: string): boolean {
   const c = currency.toUpperCase();
   if (NOMBA_INTERNATIONAL_CURRENCIES.includes(c)) return false;
-  if (PAYTOTA_TOPUP_CURRENCIES.includes(c)) return false;
+  if (PAYTOTA_WESTERN_TOPUP_CURRENCIES.includes(c)) return false;
   if (FINCRA_TOPUP_CURRENCIES.includes(c)) return false;
   return FLW_WESTERN_TOPUP_CURRENCIES.includes(c);
 }
@@ -54,7 +64,7 @@ export function supportsAfricanProviderChoice(currency: string): boolean {
   const c = currency.toUpperCase();
   if (GHANA_PAY_CURRENCIES.includes(c)) return false;
   if (NOMBA_PAY_CURRENCIES.includes(c)) return false;
-  if (PAYTOTA_TOPUP_CURRENCIES.includes(c)) return false;
+  if (PAYTOTA_AFRICA_TOPUP_CURRENCIES.includes(c)) return false;
   if (SWYCHR_TOPUP_CURRENCIES.includes(c)) return false;
   return AFRICAN_TOPUP_PROVIDER_CURRENCIES.includes(c);
 }
@@ -75,15 +85,18 @@ export function routeWalletTopupGateway(
   if (preferInterac && c === "CAD") return "fincra_interac";
   // Explicit Fincra hosted checkout
   if (preferFincra && FINCRA_TOPUP_CURRENCIES.includes(c)) return "fincra";
-  // Explicit Paytota when user picked invoice method
+  // Explicit Paytota when user picked invoice / Africa MoMo checkout
   if (preferPaytota && PAYTOTA_TOPUP_CURRENCIES.includes(c)) return "paytota_pay";
+  // Explicit Swychr
+  if (preferSwychr && SWYCHR_TOPUP_CURRENCIES.includes(c)) return "swychr_pay";
   // Nomba: NGN always; intl/CAD when not on another selected rail
   if (c === "NGN") return "nomba_pay";
   if (NOMBA_PAY_CURRENCIES.includes(c) && !preferPaytota && !preferInterac && !preferFincra) {
     return "nomba_pay";
   }
-  // Swychr corridors
-  if (preferSwychr && SWYCHR_TOPUP_CURRENCIES.includes(c)) return "swychr_pay";
+  // Default Africa MoMo: Swychr first where available, else Paytota (RWF)
+  if (SWYCHR_TOPUP_CURRENCIES.includes(c)) return "swychr_pay";
+  if (PAYTOTA_AFRICA_TOPUP_CURRENCIES.includes(c)) return "paytota_pay";
   if (ELICATE_CURRENCIES.includes(c)) return "elicate";
   if (supportsAfricanProviderChoice(c) && africanProvider === "fincra") return "fincra";
   if (FLUTTERWAVE_CURRENCIES.includes(c) && africanProvider !== "fincra") return "flutterwave";
@@ -93,7 +106,9 @@ export function routeWalletTopupGateway(
 }
 
 /** White-label labels — never expose PSP vendor names in user UI. */
-export function paytotaGatewayLabel(_currency: string): string {
+export function paytotaGatewayLabel(currency: string): string {
+  const c = currency.toUpperCase();
+  if (PAYTOTA_AFRICA_TOPUP_CURRENCIES.includes(c)) return "MoMo checkout";
   return "Pay by invoice";
 }
 
@@ -138,4 +153,16 @@ export function intlMethodDescription(method: IntlTopupMethod, currency: string)
     return "Fast card payment — pay USD equivalent, credit CAD wallet.";
   }
   return `Fast card payment in ${currency.toUpperCase()}.`;
+}
+
+export function africaMomoMethodLabel(method: AfricaMomoTopupMethod): string {
+  if (method === "paytota") return "MoMo checkout";
+  return "Mobile money";
+}
+
+export function africaMomoMethodDescription(method: AfricaMomoTopupMethod, currency: string): string {
+  if (method === "paytota") {
+    return `Hosted mobile money payment for your ${currency.toUpperCase()} wallet.`;
+  }
+  return `Pay with mobile money to fund your ${currency.toUpperCase()} wallet.`;
 }

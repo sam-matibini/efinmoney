@@ -10,7 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Check, Search, Wallet } from "lucide-react";
 import { toast } from "sonner";
 
-const POPULAR_CODES = ["NGN", "USD", "CAD", "KES", "GBP", "EUR", "GHS", "UGX", "TZS", "ZMW"];
+const POPULAR_CODES = ["NGN", "USD", "CAD", "KES", "GBP", "EUR", "GHS", "UGX", "RWF", "TZS", "ZMW"];
 
 interface CreateWalletModalProps {
   children: React.ReactNode;

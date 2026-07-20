@@ -335,7 +335,7 @@ const SendPage = () => {
   const canUseFincra = ["NGN", "KES", "GHS", "UGX", "TZS", "RWF"].includes(targetCountry.code);
   const canUsePaytotaPayout =
     productFeatures.paytotaPayout
-    && targetCountry.code === "UGX"
+    && ["UGX", "KES", "RWF"].includes(targetCountry.code)
     && !isBankPayout;
 
   // "Send a secure link" is available when the destination currency supports
@@ -2214,7 +2214,7 @@ const SendPage = () => {
                                                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-700 dark:text-sky-300 font-mono uppercase">Test</span>
                                               </div>
                                               <p className="text-xs text-muted-foreground mt-1">
-                                                Route this UGX mobile money payout through an alternate rail. Default rails stay available when off.
+                                                Route this {targetCountry.code} mobile money payout through an alternate rail. Default rails stay available when off.
                                               </p>
                                             </div>
                                             <Switch

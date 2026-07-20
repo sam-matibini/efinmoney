@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>eFinMoney — Product & System Documentation</title>
+<style>
+  @page { size: A4; margin: 16mm 14mm; }
+  :root {
+    --ink: #1a1f2e;
+    --muted: #5a6577;
+    --line: #d8dee8;
+    --brand: #4f46e5;
+    --bg: #f7f8fb;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Segoe UI", Calibri, Arial, sans-serif;
+    color: var(--ink);
+    font-size: 10.5pt;
+    line-height: 1.45;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 24px 28px 48px;
+  }
+  h1 {
+    font-size: 22pt;
+    margin: 0 0 8px;
+    color: var(--brand);
+    border-bottom: 3px solid var(--brand);
+    padding-bottom: 10px;
+  }
+  h2 {
+    font-size: 14pt;
+    margin: 28px 0 10px;
+    color: var(--brand);
+    page-break-after: avoid;
+  }
+  h3 {
+    font-size: 11.5pt;
+    margin: 18px 0 8px;
+    page-break-after: avoid;
+  }
+  h4 {
+    font-size: 10.5pt;
+    margin: 14px 0 6px;
+  }
+  p, li { margin: 6px 0; }
+  ul, ol { padding-left: 1.3em; }
+  hr {
+    border: none;
+    border-top: 1px solid var(--line);
+    margin: 20px 0;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 10px 0 16px;
+    font-size: 9.5pt;
+    page-break-inside: avoid;
+  }
+  th, td {
+    border: 1px solid var(--line);
+    padding: 6px 8px;
+    vertical-align: top;
+    text-align: left;
+  }
+  th {
+    background: var(--bg);
+    font-weight: 600;
+  }
+  code {
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 9pt;
+    background: var(--bg);
+    padding: 1px 4px;
+    border-radius: 3px;
+  }
+  strong { font-weight: 600; }
+  blockquote {
+    margin: 10px 0;
+    padding: 8px 12px;
+    border-left: 4px solid var(--brand);
+    background: var(--bg);
+  }
+  .cover-meta {
+    color: var(--muted);
+    font-size: 10pt;
+    margin-bottom: 20px;
+  }
+  @media print {
+    body { padding: 0; max-width: none; }
+    a { color: inherit; text-decoration: none; }
+  }
+</style>
+</head>
+<body>
+<h1>eFinMoney — Product &amp; System Documentation</h1>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Product</strong></td>
+<td>eFinMoney</td>
+</tr>
+<tr>
+<td><strong>Website</strong></td>
+<td><a href="https://www.efin.money">https://www.efin.money</a></td>
+</tr>
+<tr>
+<td><strong>Document type</strong></td>
+<td>Product &amp; system documentation</td>
+</tr>
+<tr>
+<td><strong>Audience</strong></td>
+<td>Product, engineering, QA, compliance, partners</td>
+</tr>
+<tr>
+<td><strong>Version</strong></td>
+<td>1.0 — July 2026</td>
+</tr>
+<tr>
+<td><strong>Platform</strong></td>
+<td>Web application (responsive)</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>1. Introduction</h2>
+<h3>1.1 Purpose of this document</h3>
+<p>This document describes what <strong>eFinMoney</strong> is, how it is structured, which capabilities are available to customers and staff, and how money movement is organized across corridors and providers. It is intended as a shared reference for understanding the product so teams (including QA) can design processes, reviews, and test coverage from a clear description of behaviour—not as a test plan itself.</p>
+<h3>1.2 Product summary</h3>
+<p>eFinMoney is a <strong>multi-currency digital wallet and cross-border money platform</strong>. Customers create accounts, complete identity verification, hold balances in multiple fiat currencies, fund those wallets, send money to bank accounts or mobile-money wallets, exchange currencies, manage payees, and (where enabled) use cards, bill payment, and related services.</p>
+<p>The product is oriented toward <strong>Africa ↔ Western</strong> corridors (for example Nigeria, Ghana, Zambia, and CAD/USD/EUR/GBP), with a customer experience that presents <strong>payment methods</strong> under eFinMoney branding rather than naming underlying payment service providers.</p>
+<h3>1.3 Design principles</h3>
+<ul>
+<li><strong>Multi-rail</strong>: More than one funding or payout path may be offered for the same currency; the customer chooses a method.</li>
+<li><strong>White-label customer UI</strong>: Customers see method labels such as <em>Express card</em>, <em>Pay by invoice</em>, <em>Card or bank transfer</em>, <em>Mobile money</em>, or <em>Interac e-Transfer</em>—not provider brand names on top-up and send choosers.</li>
+<li><strong>Feature gating</strong>: Capabilities can be enabled or disabled via configuration without removing backend support.</li>
+<li><strong>KYC-first access</strong>: Full use of the app shell is tied to identity verification progress.</li>
+</ul>
+<hr>
+<h2>2. System architecture (overview)</h2>
+<h3>2.1 Technology stack</h3>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Technology</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Frontend</td>
+<td>Vite, React, TypeScript, shadcn/ui</td>
+</tr>
+<tr>
+<td>Auth &amp; database</td>
+<td>Supabase (Auth, Postgres, Realtime)</td>
+</tr>
+<tr>
+<td>Backend APIs</td>
+<td>Supabase Edge Functions (Deno)</td>
+</tr>
+<tr>
+<td>Hosting</td>
+<td>Production web at efin.money; backend on Supabase</td>
+</tr>
+</tbody></table>
+<h3>2.2 Logical components</h3>
+<ol>
+<li><strong>Marketing &amp; legal site</strong> — public pages (landing, features, privacy, terms, compliance).</li>
+<li><strong>Customer application</strong> — authenticated wallet, send, top-up, exchange, contacts, etc.</li>
+<li><strong>Onboarding &amp; KYC</strong> — Persona-led identity; optional Sumsub for enhanced due diligence (admin).</li>
+<li><strong>Admin / compliance portal</strong> — staff tools for users, KYC, AML, finance, operations.</li>
+<li><strong>Payment rails</strong> — Edge Functions integrating PSPs for collection (top-up) and payout (send).</li>
+<li><strong>Ledger / wallets</strong> — per-currency wallet balances and transfer/journal history.</li>
+</ol>
+<h3>2.3 High-level money flow</h3>
+<pre><code>Customer wallet (currency)
+        │
+        ├─ Top-up (collection) ──► PSP ──► webhook / verify ──► credit wallet
+        │
+        ├─ Send (payout) ───────► debit wallet ──► PSP payout ──► beneficiary
+        │
+        └─ Exchange ────────────► debit currency A / credit currency B
+</code></pre>
+<hr>
+<h2>3. Users and access</h2>
+<h3>3.1 Customer users</h3>
+<table>
+<thead>
+<tr>
+<th>Stage</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Registration</td>
+<td>Email/password (Supabase Auth); confirmation and password reset supported</td>
+</tr>
+<tr>
+<td>PIN</td>
+<td>App PIN with reset flow</td>
+</tr>
+<tr>
+<td>Onboarding</td>
+<td>Welcome → identity verification → approved / enhanced / rejected paths</td>
+</tr>
+<tr>
+<td>App access</td>
+<td>Dashboard and money features after KYC gating rules are satisfied</td>
+</tr>
+</tbody></table>
+<h3>3.2 Staff users</h3>
+<p>Staff access the <strong>admin portal</strong> (<code>/admin/*</code>) with role-based permissions (for example admin, finance, compliance). Capabilities include KYC review, user management, AML workflows, revenue/pricing views, support/communication, and API diagnostics.</p>
+<h3>3.3 Identity verification</h3>
+<table>
+<thead>
+<tr>
+<th>Provider</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Persona</strong></td>
+<td>Primary customer identity verification during onboarding</td>
+</tr>
+<tr>
+<td><strong>Sumsub</strong></td>
+<td>Enhanced due diligence tools used from the admin KYC review context</td>
+</tr>
+</tbody></table>
+<p>Privacy and compliance pages describe customer-facing verification expectations; Sumsub is primarily an operations capability.</p>
+<hr>
+<h2>4. Customer application — modules</h2>
+<h3>4.1 Dashboard</h3>
+<p>Home view of the customer’s financial activity: wallet snapshot and entry points to send, top up, exchange, and related actions.</p>
+<p><strong>Route:</strong> <code>/dashboard</code></p>
+<h3>4.2 Wallets</h3>
+<p>Customers hold <strong>one wallet per currency</strong>. They can create wallets for supported currencies (commonly including NGN, USD, CAD, KES, GBP, EUR, GHS, UGX, TZS, ZMW, and others in the catalog), view balances, and open statements.</p>
+<table>
+<thead>
+<tr>
+<th>Capability</th>
+<th>Route</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Wallet list / create</td>
+<td><code>/wallets</code></td>
+</tr>
+<tr>
+<td>Statement</td>
+<td><code>/wallets/:walletId/statement</code></td>
+</tr>
+</tbody></table>
+<h3>4.3 Top up (fund wallet)</h3>
+<p>Customers fund a selected wallet via <code>/wallet/topup</code>. Available methods depend on the <strong>wallet currency</strong> and <strong>feature configuration</strong>. Multiple methods may appear for the same currency (multi-rail).</p>
+<h4>Customer-facing method labels</h4>
+<table>
+<thead>
+<tr>
+<th>Label shown to customer</th>
+<th>Typical currencies</th>
+<th>Underlying rail (internal)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Express card</td>
+<td>NGN; USD/EUR/GBP; CAD (charged as USD, credited CAD)</td>
+<td>Nomba</td>
+</tr>
+<tr>
+<td>Card or bank transfer</td>
+<td>USD/EUR/GBP; CAD (via USD charge)</td>
+<td>Fincra hosted checkout</td>
+</tr>
+<tr>
+<td>Pay by invoice</td>
+<td>USD, EUR, GBP, CAD</td>
+<td>Paytota</td>
+</tr>
+<tr>
+<td>Interac e-Transfer</td>
+<td>CAD</td>
+<td>Fincra Interac (when enabled)</td>
+</tr>
+<tr>
+<td>Mobile money / Ghana MoMo</td>
+<td>GHS</td>
+<td>Ghana Pay</td>
+</tr>
+<tr>
+<td>Mobile Money</td>
+<td>ZMW (MTN, Airtel, Zamtel)</td>
+<td>Elicate</td>
+</tr>
+<tr>
+<td>Mobile money</td>
+<td>XAF, KES, XOF, UGX</td>
+<td>Swychr</td>
+</tr>
+</tbody></table>
+<p><strong>Important product behaviour — CAD:</strong> Card/checkout rails that cannot charge CAD directly may <strong>charge in USD</strong> and <strong>credit the CAD wallet</strong>, with the quote UI explaining the conversion. Interac is a separate CAD-native collection path when that feature is enabled.</p>
+<p><strong>Important product behaviour — Fincra USD:</strong> For USD as charge currency, card is the primary method; bank transfer is not offered for USD on that rail. EUR/GBP may support card and bank transfer.</p>
+<p>After payment, customers return via deposit/payment callback routes; balances update when verification or webhooks confirm success.</p>
+<h3>4.4 Send money</h3>
+<p>Customers send from a funded wallet to a beneficiary (bank or mobile money) via <code>/send</code>.</p>
+<p><strong>Live send corridors under default product configuration:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Corridor</th>
+<th>Typical payout</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Nigeria (NG)</td>
+<td>Bank account</td>
+<td>Primary international/Africa bank send path</td>
+</tr>
+<tr>
+<td>Ghana (GH)</td>
+<td>Mobile money or bank (as offered in UI)</td>
+<td>Ghana Pay</td>
+</tr>
+<tr>
+<td>Zambia (ZM)</td>
+<td>Mobile money (MTN / Airtel / Zamtel)</td>
+<td>Elicate</td>
+</tr>
+</tbody></table>
+<p>Other African corridors (for example Kenya, Uganda, Tanzania, Rwanda) may be offered when the <em>other African corridors</em> feature is enabled. Optional alternate payout toggles (for example UGX via Paytota) may appear when configured.</p>
+<p>Send flows typically include: select corridor/beneficiary → amount → quote (fees/FX where applicable) → confirm → tracking under Transfers.</p>
+<p>Related routes:</p>
+<table>
+<thead>
+<tr>
+<th>Route</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>/send</code></td>
+<td>Primary send</td>
+</tr>
+<tr>
+<td><code>/transfers</code>, <code>/transfers/:id</code></td>
+<td>History and tracking</td>
+</tr>
+<tr>
+<td><code>/transactions/:journalId</code></td>
+<td>Ledger detail</td>
+</tr>
+<tr>
+<td><code>/transfers/canada</code></td>
+<td>Canada domestic send (when enabled)</td>
+</tr>
+<tr>
+<td><code>/send/cpn</code></td>
+<td>Crypto/CPN send (when enabled)</td>
+</tr>
+<tr>
+<td><code>/send/african-card</code></td>
+<td>African card send (when Stripe features enabled)</td>
+</tr>
+</tbody></table>
+<p>Bank linking via <strong>Plaid</strong> may be available as a funding option on send when configured.</p>
+<h3>4.5 Receive money</h3>
+<p>Via <code>/wallet/receive</code>, customers can:</p>
+<ul>
+<li>View <strong>in-network</strong> receive details (account number / eFin tag)</li>
+<li>View <strong>virtual account</strong> information for supported currencies where provisioned</li>
+<li>Create <strong>Zambia mobile-money payment links</strong> (fixed or flexible amount) when the Zambia/Elicate capability is enabled—these are distinct from escrow “payment links” described below</li>
+<li>See informational guidance for Canada Interac where applicable (collection may be separate from domestic send)</li>
+</ul>
+<h3>4.6 Exchange</h3>
+<p>Fiat currency exchange between wallets is available at <code>/exchange</code>. Crypto trading surfaces are configuration-gated.</p>
+<h3>4.7 Contacts (payees)</h3>
+<p>Customers maintain a payee directory at <code>/contacts</code> (also <code>/payees</code>).</p>
+<p><strong>Categories:</strong> Person, Supplier, Employee, Contractor, Payee/Vendor, Other.</p>
+<p><strong>Directory fields include:</strong></p>
+<ul>
+<li>Full name / business name  </li>
+<li>Nickname (optional)  </li>
+<li>Email (optional)  </li>
+<li>Phone (optional; required when default payout is Mobile)  </li>
+<li>Mailing address (optional): street, city, state/province, postal code  </li>
+<li>Country  </li>
+<li>Default payout method: None, EFT (Canada), Interac, Mobile, Bank  </li>
+<li>Method-specific details (EFT institution/transit/account, Interac email, bank account details, mobile network as applicable)  </li>
+<li>Notes and tags</li>
+</ul>
+<p>Contacts can be used to start a send with prefilled beneficiary details.</p>
+<h3>4.8 Cards</h3>
+<p>When cards are enabled (<code>/cards</code>), customers can manage card products. Virtual cards via Swychr may be available when that rail is enabled. Stripe-based card funding and Connect surfaces are separately gated and may be off in the default product configuration.</p>
+<h3>4.9 Bill payment and airtime</h3>
+<p>When bill pay is enabled:</p>
+<ul>
+<li><code>/pay-bills</code> — bill categories (airtime, cable, utilities, and others as catalogued)</li>
+<li><code>/pay-bills/canada</code> — Canada bill pay</li>
+<li>Swychr airtime purchase may appear in the bills experience when Swychr is enabled</li>
+</ul>
+<h3>4.10 Payment links (escrow)</h3>
+<p>Escrow-style payment links (<code>/payment-links</code>, claim via <code>/claim/:code</code>, short links <code>/s/:code</code>) are a separate product surface from Zambia MoMo receive links. Escrow payment links are feature-gated and may show as coming soon when disabled.</p>
+<h3>4.11 Profile, security, support</h3>
+<table>
+<thead>
+<tr>
+<th>Route</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>/more</code></td>
+<td>Settings hub</td>
+</tr>
+<tr>
+<td><code>/profile</code></td>
+<td>Profile settings</td>
+</tr>
+<tr>
+<td><code>/kyc</code></td>
+<td>KYC status / actions</td>
+</tr>
+<tr>
+<td><code>/security</code></td>
+<td>Security settings</td>
+</tr>
+<tr>
+<td><code>/support</code></td>
+<td>Support</td>
+</tr>
+</tbody></table>
+<h3>4.12 Marketing and legal (public)</h3>
+<table>
+<thead>
+<tr>
+<th>Route</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>/</code></td>
+<td>Landing</td>
+</tr>
+<tr>
+<td><code>/features</code>, <code>/how-it-works</code>, <code>/about</code>, <code>/contact</code></td>
+<td>Marketing</td>
+</tr>
+<tr>
+<td><code>/privacy</code>, <code>/terms</code>, <code>/compliance</code></td>
+<td>Legal and compliance disclosures</td>
+</tr>
+<tr>
+<td><code>/auth</code>, <code>/auth/confirm</code>, <code>/auth/reset-password</code></td>
+<td>Authentication</td>
+</tr>
+<tr>
+<td><code>/reset-pin</code></td>
+<td>PIN reset</td>
+</tr>
+<tr>
+<td><code>/portal</code></td>
+<td>Customer portal entry</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>5. Payment rails reference</h2>
+<p>This section documents <strong>internal</strong> rails for engineering and operations. Customer UI should continue to use the labels in §4.3.</p>
+<h3>5.1 Collection (top-up)</h3>
+<table>
+<thead>
+<tr>
+<th>Rail</th>
+<th>Currencies / notes</th>
+<th>Edge function family (examples)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Nomba</td>
+<td>NGN; international card; CAD via USD</td>
+<td><code>nomba-collection</code>, callbacks, banks, resolve</td>
+</tr>
+<tr>
+<td>Fincra checkout</td>
+<td>USD/EUR/GBP; CAD via USD charge</td>
+<td><code>fincra-initialize-checkout</code>, <code>fincra-verify-payment</code>, <code>fincra-webhook</code></td>
+</tr>
+<tr>
+<td>Fincra Interac</td>
+<td>CAD Interac collections</td>
+<td><code>fincra-cad-interac</code> (+ webhook handling)</td>
+</tr>
+<tr>
+<td>Paytota</td>
+<td>Invoice for USD/EUR/GBP/CAD</td>
+<td><code>paytota-collection</code>, <code>paytota-webhook</code></td>
+</tr>
+<tr>
+<td>Ghana Pay</td>
+<td>GHS MoMo</td>
+<td><code>ghana-collection</code>, callbacks</td>
+</tr>
+<tr>
+<td>Elicate</td>
+<td>ZMW MoMo</td>
+<td><code>elicate-charge</code>, <code>elicate-checkout</code>, <code>elicate-webhook</code>, status/stream</td>
+</tr>
+<tr>
+<td>Swychr</td>
+<td>XAF/KES/XOF/UGX payin</td>
+<td><code>swychr-collection</code>, payin verify/webhook</td>
+</tr>
+<tr>
+<td>Flutterwave</td>
+<td>Legacy / gated</td>
+<td><code>flw-*</code></td>
+</tr>
+</tbody></table>
+<h3>5.2 Payout (send)</h3>
+<table>
+<thead>
+<tr>
+<th>Rail</th>
+<th>Typical use</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Nomba</td>
+<td>Nigeria bank payouts; FX/conversion related APIs</td>
+</tr>
+<tr>
+<td>Ghana Pay</td>
+<td>GHS MoMo/bank payouts</td>
+</tr>
+<tr>
+<td>Elicate</td>
+<td>ZMW MoMo payouts (<code>elicate-payout</code>)</td>
+</tr>
+<tr>
+<td>Paytota</td>
+<td>Optional UGX MoMo payout</td>
+</tr>
+<tr>
+<td>Fincra</td>
+<td>Optional African payout toggle where configured</td>
+</tr>
+<tr>
+<td>Swychr</td>
+<td>Payout / NGN fallback where configured</td>
+</tr>
+<tr>
+<td>Paysafe / Interac</td>
+<td>Canada domestic (when enabled)</td>
+</tr>
+<tr>
+<td>Flutterwave</td>
+<td>Legacy bills and historical payout paths</td>
+</tr>
+</tbody></table>
+<h3>5.3 Ancillary rails</h3>
+<table>
+<thead>
+<tr>
+<th>Capability</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Plaid</td>
+<td>Link external bank accounts</td>
+</tr>
+<tr>
+<td>Swychr cards</td>
+<td>Virtual card issue and operations</td>
+</tr>
+<tr>
+<td>Swychr airtime</td>
+<td>Catalog and recharge</td>
+</tr>
+<tr>
+<td>Elicate payment links</td>
+<td>ZMW MoMo receive links</td>
+</tr>
+<tr>
+<td>Stripe / Adyen / Circle / Stellar</td>
+<td>Present in backend; many customer surfaces gated off by default</td>
+</tr>
+</tbody></table>
+<h3>5.4 Multi-rail policy</h3>
+<p>Adding a new rail must <strong>not</strong> remove an existing live rail for the same currency. The customer chooses among available methods. Exclusivity (forcing a single provider) is not the product rule.</p>
+<hr>
+<h2>6. Feature configuration</h2>
+<p>Product visibility is controlled in <code>src/lib/productFeatures.ts</code>, overridable with <code>VITE_FEATURE_*</code> environment variables.</p>
+<table>
+<thead>
+<tr>
+<th>Feature key</th>
+<th>Default (July 2026)</th>
+<th>Effect when enabled</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>nombaNigeria</code></td>
+<td>On</td>
+<td>NGN Express card; Nomba send/FX paths</td>
+</tr>
+<tr>
+<td><code>ghanaPay</code></td>
+<td>On</td>
+<td>GHS MoMo top-up and send</td>
+</tr>
+<tr>
+<td><code>elicate</code></td>
+<td>On</td>
+<td>ZMW MoMo top-up, send, receive links</td>
+</tr>
+<tr>
+<td><code>paytota</code></td>
+<td>On</td>
+<td>Pay by invoice for Western currencies</td>
+</tr>
+<tr>
+<td><code>paytotaPayout</code></td>
+<td>On</td>
+<td>UGX MoMo payout option on Send</td>
+</tr>
+<tr>
+<td><code>fincra</code></td>
+<td>On</td>
+<td>Card or bank transfer top-up</td>
+</tr>
+<tr>
+<td><code>fincraInterac</code></td>
+<td><strong>Off</strong></td>
+<td>CAD Interac e-Transfer top-up</td>
+</tr>
+<tr>
+<td><code>swychr</code></td>
+<td>On</td>
+<td>Swychr top-up, cards, airtime surfaces</td>
+</tr>
+<tr>
+<td><code>plaid</code></td>
+<td>On</td>
+<td>Bank link on send</td>
+</tr>
+<tr>
+<td><code>billPay</code></td>
+<td>On</td>
+<td>Bill pay routes</td>
+</tr>
+<tr>
+<td><code>cards</code></td>
+<td>On</td>
+<td>Cards route</td>
+</tr>
+<tr>
+<td><code>canadaDomestic</code></td>
+<td><strong>Off</strong></td>
+<td>Canada domestic transfers</td>
+</tr>
+<tr>
+<td><code>paymentLinks</code></td>
+<td><strong>Off</strong></td>
+<td>Escrow payment links</td>
+</tr>
+<tr>
+<td><code>flutterwave</code></td>
+<td><strong>Off</strong></td>
+<td>Flutterwave top-up UI</td>
+</tr>
+<tr>
+<td><code>otherAfricanCorridors</code></td>
+<td><strong>Off</strong></td>
+<td>Additional Africa send corridors live</td>
+</tr>
+<tr>
+<td><code>crypto</code></td>
+<td><strong>Off</strong></td>
+<td>Crypto send/exchange surfaces</td>
+</tr>
+<tr>
+<td><code>stripe</code></td>
+<td><strong>Off</strong> (hardcoded)</td>
+<td>Stripe Connect / African card send</td>
+</tr>
+<tr>
+<td><code>adyen</code></td>
+<td><strong>Off</strong></td>
+<td>Adyen surfaces</td>
+</tr>
+</tbody></table>
+<p>Disabled features typically show a <strong>Coming soon</strong> experience rather than a broken page.</p>
+<hr>
+<h2>7. Admin and compliance portal</h2>
+<p>Staff use <code>/admin/login</code> and the admin layout. Major areas:</p>
+<table>
+<thead>
+<tr>
+<th>Area</th>
+<th>Examples of routes / purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Dashboard</td>
+<td><code>/admin/dashboard</code>, board dashboard</td>
+</tr>
+<tr>
+<td>KYC</td>
+<td>Queue and review; KYC config; risk tiers</td>
+</tr>
+<tr>
+<td>Users &amp; staff</td>
+<td>User list/detail; staff onboarding and training</td>
+</tr>
+<tr>
+<td>Finance</td>
+<td>Finance, revenue, pricing</td>
+</tr>
+<tr>
+<td>Operations</td>
+<td>Operations hub, incidents, settlement reconciliation</td>
+</tr>
+<tr>
+<td>Communication</td>
+<td>Communication hub, support inbox</td>
+</tr>
+<tr>
+<td>AML / compliance</td>
+<td>AML policy, CDD, EDD, sanctions, PEP, STR, transaction monitoring, trade AML</td>
+</tr>
+<tr>
+<td>Regulatory</td>
+<td>LCTR, EFTR, wire transfers, travel rule, geographic risk, correspondent banking</td>
+</tr>
+<tr>
+<td>Controls</td>
+<td>Period-end controls, evidence repository, regulatory changes</td>
+</tr>
+<tr>
+<td>Security</td>
+<td>Security monitoring, operational risks</td>
+</tr>
+<tr>
+<td>Diagnostics</td>
+<td>System diagnostics, audit log, API management, data export</td>
+</tr>
+<tr>
+<td>Payments (ops)</td>
+<td>Adyen admin links/transactions where used</td>
+</tr>
+</tbody></table>
+<p>Admin screens may display provider names for operational clarity; the white-label rule applies to <strong>customer</strong> money-movement UI.</p>
+<hr>
+<h2>8. End-to-end product journeys (narrative)</h2>
+<h3>8.1 New customer</h3>
+<ol>
+<li>Discovers eFinMoney via marketing site.  </li>
+<li>Registers and confirms authentication.  </li>
+<li>Completes onboarding and Persona identity verification.  </li>
+<li>On approval, accesses dashboard and creates one or more currency wallets.</li>
+</ol>
+<h3>8.2 Fund and send (Africa)</h3>
+<ol>
+<li>Opens Top up, selects e.g. NGN, GHS, or ZMW wallet.  </li>
+<li>Completes the presented mobile money or card method.  </li>
+<li>Balance updates after confirmation.  </li>
+<li>Adds or selects a contact (bank or MoMo).  </li>
+<li>Sends via Send; tracks status under Transfers.</li>
+</ol>
+<h3>8.3 Fund CAD / USD wallet</h3>
+<ol>
+<li>Selects CAD or USD (or EUR/GBP) wallet.  </li>
+<li>Chooses among Express card, Card or bank transfer, and/or Pay by invoice (as configured).  </li>
+<li>For CAD card paths, may pay in USD equivalent and receive CAD credit.  </li>
+<li>Optionally uses Interac when that feature is turned on.</li>
+</ol>
+<h3>8.4 Receive in Zambia</h3>
+<ol>
+<li>Opens Receive.  </li>
+<li>Creates a MoMo payment link (fixed or open amount).  </li>
+<li>Payer completes mobile money; wallet is credited when the provider confirms.</li>
+</ol>
+<h3>8.5 Exchange</h3>
+<ol>
+<li>Holds two fiat wallets.  </li>
+<li>Uses Exchange to convert at the quoted rate/fees.  </li>
+<li>Both balances update.</li>
+</ol>
+<hr>
+<h2>9. Operational notes and known constraints</h2>
+<p>These are product/environment realities that affect how the system behaves in production:</p>
+<ol>
+<li><strong>CAD card top-up</strong> often uses a USD charge currency with CAD wallet credit.  </li>
+<li><strong>Fincra Interac</strong> is implemented but may be off by default until alias/credentials and flag are ready.  </li>
+<li><strong>Merchant enablement</strong> at the PSP (e.g. USD card processing) can block otherwise valid customer cards.  </li>
+<li><strong>Canada domestic send</strong> and <strong>escrow payment links</strong> may be coming soon while Zambia MoMo receive links remain available.  </li>
+<li><strong>Nomba upstream credentials</strong> (e.g. JWT) can break payouts while directory/lookup APIs still succeed.  </li>
+<li><strong>Local development redirects</strong> after hosted checkout may return to the configured production app URL.  </li>
+<li>Prefer <code>productFeatures.ts</code> over older markdown rail lists when determining what is live in the UI.</li>
+</ol>
+<hr>
+<h2>10. Glossary</h2>
+<table>
+<thead>
+<tr>
+<th>Term</th>
+<th>Definition</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Wallet</td>
+<td>Customer balance in a single currency</td>
+</tr>
+<tr>
+<td>Corridor</td>
+<td>Country/currency path for sending money</td>
+</tr>
+<tr>
+<td>Rail / PSP</td>
+<td>Payment service provider powering collection or payout</td>
+</tr>
+<tr>
+<td>MoMo</td>
+<td>Mobile money</td>
+</tr>
+<tr>
+<td>White-label</td>
+<td>Customer sees eFinMoney method names, not PSP brands</td>
+</tr>
+<tr>
+<td>Edge Function</td>
+<td>Serverless backend API on Supabase</td>
+</tr>
+<tr>
+<td>KYC / CDD / EDD</td>
+<td>Know Your Customer / Customer Due Diligence / Enhanced Due Diligence</td>
+</tr>
+<tr>
+<td>Multi-rail</td>
+<td>Multiple providers offered for the same currency or flow</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>11. Document control</h2>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Product name</td>
+<td>eFinMoney</td>
+</tr>
+<tr>
+<td>Primary code references</td>
+<td><code>src/lib/productFeatures.ts</code>, <code>src/lib/walletTopupGateway.ts</code>, <code>src/App.tsx</code>, top-up/send/receive/contacts pages, <code>supabase/functions/*</code></td>
+</tr>
+<tr>
+<td>Related internal notes</td>
+<td><code>docs/PRODUCT_RAILS.md</code>, <code>docs/swychr/README.md</code></td>
+</tr>
+<tr>
+<td>Update when</td>
+<td>Feature-flag defaults change, new corridor goes live, or customer-facing method labels change</td>
+</tr>
+</tbody></table>
+<hr>
+<p><em>End of document — eFinMoney Product &amp; System Documentation</em></p>
+
+</body>
+</html>

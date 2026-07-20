@@ -4,19 +4,21 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { FileText, Loader2 } from "lucide-react";
+import { FileText, Loader2, Smartphone } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import {
   clearPendingPaytotaTxn,
   confirmPaytotaPayment,
   getPaytotaPayStatus,
   initiatePaytotaCollection,
+  isPaytotaAfricaTopupCurrency,
   isPaytotaTopupCurrency,
   paytotaMinAmount,
   readPendingPaytotaTxn,
   savePendingPaytotaTxn,
 } from "@/lib/paytotaPay";
 import { quoteDirectNombaTopup } from "@/lib/nombaTopupQuote";
+import { currencySymbol } from "@/lib/currency";
 
 interface Props {
   walletId: string;
@@ -26,15 +28,46 @@ interface Props {
 
 function formatCredited(amount: number, currency: string): string {
   const c = currency.toUpperCase();
-  const sym = c === "GBP" ? "£" : c === "EUR" ? "€" : c === "CAD" ? "C$" : "$";
-  return `${sym}${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${c}`;
+  const zeroDec = c === "UGX" || c === "RWF";
+  const digits = zeroDec ? 0 : 2;
+  const sym = currencySymbol(c) || (c === "GBP" ? "£" : c === "EUR" ? "€" : c === "CAD" ? "C$" : "$");
+  return `${sym}${amount.toLocaleString(undefined, {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  })} ${c}`;
+}
+
+function phonePlaceholder(currency: string): string {
+  const c = currency.toUpperCase();
+  if (c === "KES") return "2547…";
+  if (c === "RWF") return "2507…";
+  return "2567…";
+}
+
+function expectedDial(currency: string): string {
+  const c = currency.toUpperCase();
+  if (c === "KES") return "254";
+  if (c === "RWF") return "250";
+  return "256";
+}
+
+function phoneLooksValidForCurrency(phone: string, currency: string): boolean {
+  const dial = expectedDial(currency);
+  const digits = phone.replace(/\D/g, "");
+  if (digits.startsWith(dial)) return digits.length >= dial.length + 8;
+  // Allow national numbers starting with 0 / 7
+  if (digits.startsWith("0") && digits.length >= 9) return true;
+  if (digits.startsWith("7") && digits.length >= 9) return true;
+  return false;
 }
 
 export default function PaytotaTopUpCard({ walletId, walletCurrency, onComplete }: Props) {
   const { user } = useAuth();
   const currency = walletCurrency.toUpperCase();
+  const africa = isPaytotaAfricaTopupCurrency(currency);
   const [amount, setAmount] = useState("");
   const [email, setEmail] = useState(user?.email ?? "");
+  const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -90,6 +123,8 @@ export default function PaytotaTopUpCard({ walletId, walletCurrency, onComplete 
   if (!isPaytotaTopupCurrency(currency)) return null;
 
   const min = paytotaMinAmount(currency);
+  const TitleIcon = africa ? Smartphone : FileText;
+  const title = africa ? "MoMo checkout" : "Pay by invoice";
 
   const handleConfirm = async () => {
     const amt = parsedAmount;
@@ -98,7 +133,15 @@ export default function PaytotaTopUpCard({ walletId, walletCurrency, onComplete 
       return;
     }
     if (!email.trim() || !email.includes("@")) {
-      toast.error("Enter a valid email for the invoice");
+      toast.error("Enter a valid email");
+      return;
+    }
+    if (africa && !phone.trim()) {
+      toast.error("Enter the mobile money phone number");
+      return;
+    }
+    if (africa && !phoneLooksValidForCurrency(phone, currency)) {
+      toast.error(`Use a ${currency} number (starts with ${expectedDial(currency)})`);
       return;
     }
 
@@ -109,15 +152,16 @@ export default function PaytotaTopUpCard({ walletId, walletCurrency, onComplete 
         amount: amt,
         target_wallet_id: walletId,
         email: email.trim(),
+        phone: africa ? phone.trim() : undefined,
         return_url: `${window.location.origin}/wallet/topup?walletId=${walletId}`,
       });
       savePendingPaytotaTxn(result.transaction_id);
-      toast.message("Opening invoice", {
+      toast.message(africa ? "Opening mobile money checkout" : "Opening invoice", {
         description: `Confirm ${formatCredited(quote?.checkoutAmount ?? amt, currency)}.`,
       });
       window.location.href = result.payment_link;
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not create invoice");
+      toast.error(e instanceof Error ? e.message : "Could not start checkout");
       setLoading(false);
     }
   };
@@ -126,11 +170,13 @@ export default function PaytotaTopUpCard({ walletId, walletCurrency, onComplete 
     <Card className="border-sky-500/30 bg-gradient-to-br from-sky-950/15 to-background">
       <CardHeader className="pb-3">
         <CardTitle className="text-base flex items-center gap-2">
-          <FileText className="h-4 w-4 text-sky-500" />
-          Pay by invoice
+          <TitleIcon className="h-4 w-4 text-sky-500" />
+          {title}
         </CardTitle>
         <p className="text-sm text-muted-foreground">
-          Confirm the amount to open a secure payment invoice. Your {currency} wallet credits when the invoice is paid.
+          {africa
+            ? `Confirm the amount to open a secure mobile money checkout. Your ${currency} wallet credits when payment succeeds.`
+            : `Confirm the amount to open a secure payment invoice. Your ${currency} wallet credits when the invoice is paid.`}
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -139,7 +185,7 @@ export default function PaytotaTopUpCard({ walletId, walletCurrency, onComplete 
           <Input
             type="number"
             min={min}
-            step="0.01"
+            step={currency === "UGX" || currency === "RWF" ? "1" : "0.01"}
             placeholder="e.g. 25"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
@@ -160,14 +206,26 @@ export default function PaytotaTopUpCard({ walletId, walletCurrency, onComplete 
               <span className="font-medium tabular-nums">{formatCredited(quote.feeAmount, quote.creditCurrency)}</span>
             </div>
             <div className="flex justify-between gap-2">
-              <span className="text-muted-foreground">Invoice total</span>
+              <span className="text-muted-foreground">{africa ? "Checkout total" : "Invoice total"}</span>
               <span className="font-semibold tabular-nums">{formatCredited(quote.checkoutAmount, quote.checkoutCurrency)}</span>
             </div>
           </div>
         )}
 
+        {africa && (
+          <div className="space-y-2">
+            <Label>Mobile money phone</Label>
+            <Input
+              type="tel"
+              placeholder={phonePlaceholder(currency)}
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+            />
+          </div>
+        )}
+
         <div className="space-y-2">
-          <Label>Email for invoice</Label>
+          <Label>{africa ? "Email" : "Email for invoice"}</Label>
           <Input
             type="email"
             placeholder="you@email.com"
@@ -180,11 +238,11 @@ export default function PaytotaTopUpCard({ walletId, walletCurrency, onComplete 
           {loading ? (
             <>
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Creating invoice…
+              {africa ? "Opening checkout…" : "Creating invoice…"}
             </>
           ) : (
             <>
-              <FileText className="h-4 w-4 mr-2" />
+              <TitleIcon className="h-4 w-4 mr-2" />
               {quote
                 ? `Confirm — ${formatCredited(quote.checkoutAmount, quote.checkoutCurrency)}`
                 : "Confirm"}

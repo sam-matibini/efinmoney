@@ -32,14 +32,20 @@ import {
   type WesternTopupProvider,
   type AfricanTopupProvider,
   type IntlTopupMethod,
+  type AfricaMomoTopupMethod,
   type WalletTopupGateway,
   MULTI_RAIL_TOPUP_CURRENCIES,
+  AFRICA_MOMO_MULTI_RAIL_CURRENCIES,
+  PAYTOTA_AFRICA_TOPUP_CURRENCIES,
+  SWYCHR_TOPUP_CURRENCIES,
   nombaGatewayLabel,
   paytotaGatewayLabel,
   fincraGatewayLabel,
   swychrGatewayLabel,
   intlMethodLabel,
   intlMethodDescription,
+  africaMomoMethodLabel,
+  africaMomoMethodDescription,
 } from "@/lib/walletTopupGateway";
 import { clearPendingSwychrTxn } from "@/lib/swychrPay";
 import FlutterwaveWesternTopUpHints from "@/components/wallets/FlutterwaveWesternTopUpHints";
@@ -71,6 +77,15 @@ function availableIntlMethods(currency: string): IntlTopupMethod[] {
   return methods;
 }
 
+function availableAfricaMomoMethods(currency: string): AfricaMomoTopupMethod[] {
+  const c = currency.toUpperCase();
+  if (!AFRICA_MOMO_MULTI_RAIL_CURRENCIES.includes(c)) return [];
+  const methods: AfricaMomoTopupMethod[] = [];
+  if (productFeatures.swychr && SWYCHR_TOPUP_CURRENCIES.includes(c)) methods.push("swychr");
+  if (productFeatures.paytota && PAYTOTA_AFRICA_TOPUP_CURRENCIES.includes(c)) methods.push("paytota");
+  return methods;
+}
+
 function initialIntlMethod(params: URLSearchParams, currency: string): IntlTopupMethod | null {
   const methods = availableIntlMethods(currency);
   if (methods.length === 0) return null;
@@ -79,6 +94,17 @@ function initialIntlMethod(params: URLSearchParams, currency: string): IntlTopup
   if ((fromQuery === "fincra" || fromQuery === "bank") && methods.includes("fincra")) return "fincra";
   if ((fromQuery === "paytota" || fromQuery === "invoice") && methods.includes("paytota")) return "paytota";
   if ((fromQuery === "nomba" || fromQuery === "card" || fromQuery === "express") && methods.includes("nomba")) return "nomba";
+  return methods[0];
+}
+
+function initialAfricaMomoMethod(params: URLSearchParams, currency: string): AfricaMomoTopupMethod | null {
+  const methods = availableAfricaMomoMethods(currency);
+  if (methods.length === 0) return null;
+  const fromQuery = params.get("method")?.toLowerCase() || params.get("provider")?.toLowerCase() || params.get("rail")?.toLowerCase();
+  if ((fromQuery === "paytota" || fromQuery === "invoice" || fromQuery === "momo-checkout") && methods.includes("paytota")) {
+    return "paytota";
+  }
+  if ((fromQuery === "swychr" || fromQuery === "mobile") && methods.includes("swychr")) return "swychr";
   return methods[0];
 }
 
@@ -142,6 +168,7 @@ const TopUpPage = () => {
   const [westernProvider, setWesternProvider] = useState<WesternTopupProvider>(() => initialWesternProvider(params));
   const [africanProvider, setAfricanProvider] = useState<AfricanTopupProvider>(() => initialAfricanProvider(params));
   const [intlMethod, setIntlMethod] = useState<IntlTopupMethod | null>(null);
+  const [africaMomoMethod, setAfricaMomoMethod] = useState<AfricaMomoTopupMethod | null>(null);
   const [verifyState, setVerifyState] = useState<{ status: "verifying" | "success" | "failed"; message: string } | null>(null);
 
   // Initialize wallet from URL or default
@@ -172,6 +199,8 @@ const TopUpPage = () => {
   const showAfricanProviderChoice = supportsAfricanProviderChoice(currency);
   const intlMethods = useMemo(() => availableIntlMethods(currency), [currency]);
   const showIntlMethodChoice = intlMethods.length > 1;
+  const africaMomoMethods = useMemo(() => availableAfricaMomoMethods(currency), [currency]);
+  const showAfricaMomoChoice = africaMomoMethods.length > 1;
 
   // Keep intl method valid when wallet/currency changes
   useEffect(() => {
@@ -186,20 +215,48 @@ const TopUpPage = () => {
     });
   }, [currency, intlMethods, params]);
 
-  // Paytota: USD/EUR/GBP/CAD. Nomba: NGN + intl. Swychr: XAF/KES/XOF/UGX. Ghana Pay: GHS. Interac: CAD.
-  const wantSwychr =
-    productFeatures.swychr
-    || params.get("provider")?.toLowerCase() === "swychr"
-    || params.get("rail")?.toLowerCase() === "swychr";
-  const forceSwychr = wantSwychr && ["XAF", "KES", "XOF", "UGX"].includes(currency.toUpperCase());
-  const preferPaytota = intlMethod === "paytota";
+  useEffect(() => {
+    if (africaMomoMethods.length === 0) {
+      setAfricaMomoMethod(null);
+      return;
+    }
+    const preferred = initialAfricaMomoMethod(params, currency);
+    setAfricaMomoMethod((prev) => {
+      if (prev && africaMomoMethods.includes(prev)) return prev;
+      return preferred;
+    });
+  }, [currency, africaMomoMethods, params]);
+
+  // Paytota: Western invoice + East Africa MoMo. Nomba: NGN + intl. Swychr: XAF/KES/XOF/UGX. Ghana: GHS.
+  const ccy = currency.toUpperCase();
+  const preferSwychr =
+    africaMomoMethod === "swychr"
+    || (
+      !africaMomoMethod
+      && productFeatures.swychr
+      && SWYCHR_TOPUP_CURRENCIES.includes(ccy)
+      && !PAYTOTA_AFRICA_TOPUP_CURRENCIES.includes(ccy)
+    )
+    || (
+      (params.get("provider")?.toLowerCase() === "swychr" || params.get("rail")?.toLowerCase() === "swychr")
+      && ["XAF", "XOF"].includes(ccy)
+    );
+  const preferPaytota =
+    intlMethod === "paytota"
+    || africaMomoMethod === "paytota"
+    || (
+      !africaMomoMethod
+      && productFeatures.paytota
+      && PAYTOTA_AFRICA_TOPUP_CURRENCIES.includes(ccy)
+      && !productFeatures.swychr
+    );
   const preferInterac = intlMethod === "interac";
   const preferFincra = intlMethod === "fincra";
   const gateway: Gateway = routeWalletTopupGateway(
     currency,
     westernProvider,
     africanProvider,
-    forceSwychr,
+    preferSwychr,
     preferPaytota,
     preferInterac,
     preferFincra,
@@ -629,10 +686,48 @@ const TopUpPage = () => {
             </Card>
           )}
 
+          {showAfricaMomoChoice && selectedWallet && liveTopup && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">2. Choose mobile money rail</CardTitle>
+                <CardDescription>
+                  Multiple ways to fund your {currency} wallet — pick one.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-3 sm:grid-cols-2">
+                {africaMomoMethods.map((m) => {
+                  const Icon = m === "paytota" ? FileText : Smartphone;
+                  const selected = africaMomoMethod === m;
+                  return (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setAfricaMomoMethod(m)}
+                      className={cn(
+                        "rounded-lg border p-4 text-left transition-colors",
+                        selected
+                          ? "border-primary bg-primary/10 ring-1 ring-primary/40"
+                          : "border-border hover:border-primary/40",
+                      )}
+                    >
+                      <div className="flex items-center gap-2 font-medium">
+                        <Icon className="h-4 w-4 text-primary" />
+                        {africaMomoMethodLabel(m)}
+                      </div>
+                      <p className="mt-1.5 text-xs text-muted-foreground">
+                        {africaMomoMethodDescription(m, currency)}
+                      </p>
+                    </button>
+                  );
+                })}
+              </CardContent>
+            </Card>
+          )}
+
           {!liveTopup && selectedWallet && (
             <ComingSoon
               title="Top-up not available for this currency"
-              description={`${currency} wallet funding is not available. Try NGN, GHS, USD, EUR, GBP, or CAD.`}
+              description={`${currency} wallet funding is not available. Try NGN, GHS, ZMW, KES, UGX, RWF, USD, EUR, GBP, or CAD.`}
               backHref="/wallets"
               backLabel="View wallets"
             />

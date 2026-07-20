@@ -3,7 +3,33 @@ import { supabase } from "@/integrations/supabase/client";
 
 const PENDING_TXN_KEY = "efin_paytota_pending_txn";
 
-export const PAYTOTA_TOPUP_CURRENCIES = ["USD", "EUR", "GBP", "CAD"] as const;
+export const PAYTOTA_WESTERN_TOPUP_CURRENCIES = ["USD", "EUR", "GBP", "CAD"] as const;
+export const PAYTOTA_AFRICA_TOPUP_CURRENCIES = ["UGX", "KES", "RWF"] as const;
+export const PAYTOTA_TOPUP_CURRENCIES = [
+  ...PAYTOTA_WESTERN_TOPUP_CURRENCIES,
+  ...PAYTOTA_AFRICA_TOPUP_CURRENCIES,
+] as const;
+
+export function isPaytotaAfricaTopupCurrency(currency: string): boolean {
+  return (PAYTOTA_AFRICA_TOPUP_CURRENCIES as readonly string[]).includes(currency.toUpperCase());
+}
+
+export function isPaytotaTopupCurrency(currency: string): boolean {
+  return PAYTOTA_TOPUP_CURRENCIES.includes(
+    currency.toUpperCase() as (typeof PAYTOTA_TOPUP_CURRENCIES)[number],
+  );
+}
+
+export function isPaytotaCadViaUsdCurrency(_currency: string): boolean {
+  return false;
+}
+
+export function paytotaMinAmount(currency: string): number {
+  const c = currency.toUpperCase();
+  if (c === "UGX" || c === "RWF") return 100;
+  if (c === "KES") return 10;
+  return 1;
+}
 
 async function invokeErrorMessage(error: unknown): Promise<string> {
   if (error instanceof FunctionsHttpError) {
@@ -36,20 +62,6 @@ export interface PaytotaPayStatus {
   purchase_id: string | null;
 }
 
-export function isPaytotaTopupCurrency(currency: string): boolean {
-  return PAYTOTA_TOPUP_CURRENCIES.includes(
-    currency.toUpperCase() as (typeof PAYTOTA_TOPUP_CURRENCIES)[number],
-  );
-}
-
-export function isPaytotaCadViaUsdCurrency(_currency: string): boolean {
-  return false;
-}
-
-export function paytotaMinAmount(_currency: string): number {
-  return 1;
-}
-
 export function savePendingPaytotaTxn(txnId: string) {
   try {
     sessionStorage.setItem(PENDING_TXN_KEY, txnId);
@@ -79,6 +91,7 @@ export async function initiatePaytotaCollection(params: {
   credit_amount?: number;
   target_wallet_id: string;
   email?: string;
+  phone?: string;
   return_url?: string;
 }): Promise<PaytotaCollectionResult & { quote?: Record<string, unknown> }> {
   const { data, error } = await supabase.functions.invoke("paytota-collection", { body: params });

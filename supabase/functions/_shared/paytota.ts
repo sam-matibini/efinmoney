@@ -25,17 +25,51 @@ export function isPaytotaConfigured(): boolean {
   return Boolean(cfg.baseUrl && cfg.secretKey && cfg.brandId);
 }
 
+/** Western invoice / card corridors. */
+export const PAYTOTA_WESTERN_CURRENCIES = ["USD", "EUR", "GBP", "CAD"] as const;
+/** East Africa MoMo — UGX/KES documented; RWF via Mobile Money V2 (Airtel/MTN). */
+export const PAYTOTA_AFRICA_MOMO_CURRENCIES = ["UGX", "KES", "RWF"] as const;
+export const PAYTOTA_SUPPORTED_CURRENCIES = [
+  ...PAYTOTA_WESTERN_CURRENCIES,
+  ...PAYTOTA_AFRICA_MOMO_CURRENCIES,
+] as const;
+
+export function isPaytotaAfricaCurrency(currency: string): boolean {
+  return (PAYTOTA_AFRICA_MOMO_CURRENCIES as readonly string[]).includes(currency.toUpperCase());
+}
+
+export function isPaytotaZeroDecimal(currency: string): boolean {
+  return ["UGX", "RWF", "JPY"].includes(currency.toUpperCase());
+}
+
+export function paytotaCountryForCurrency(currency: string): string {
+  const c = currency.toUpperCase();
+  if (c === "KES") return "KE";
+  if (c === "RWF") return "RW";
+  if (c === "UGX") return "UG";
+  if (c === "CAD") return "CA";
+  if (c === "GBP") return "GB";
+  if (c === "EUR") return "DE";
+  return "US";
+}
+
+export function paytotaCollectionWhitelist(currency: string): string[] | undefined {
+  const c = currency.toUpperCase();
+  // This merchant rejects unknown whitelist values (e.g. "mpesa" → 400 invalid_choice).
+  // UGX: airtel/mtnmomo are valid. KES/RWF: omit whitelist and let checkout offer enabled methods.
+  if (c === "UGX") return ["airtel", "mtnmomo"];
+  return undefined;
+}
+
 /** Major units → Paytota product price (minor units / cents). */
 export function toPaytotaPrice(amountMajor: number, currency: string): number {
-  const c = currency.toUpperCase();
-  const decimals = c === "UGX" || c === "JPY" ? 0 : 2;
+  const decimals = isPaytotaZeroDecimal(currency) ? 0 : 2;
   const factor = 10 ** decimals;
   return Math.max(1, Math.round(amountMajor * factor));
 }
 
 export function fromPaytotaPrice(priceMinor: number, currency: string): number {
-  const c = currency.toUpperCase();
-  const decimals = c === "UGX" || c === "JPY" ? 0 : 2;
+  const decimals = isPaytotaZeroDecimal(currency) ? 0 : 2;
   const factor = 10 ** decimals;
   return Math.round((priceMinor / factor) * factor) / factor;
 }
@@ -88,6 +122,7 @@ export async function createPaytotaPurchase(params: {
   successRedirect: string;
   failureRedirect: string;
   successCallback: string;
+  paymentMethodWhitelist?: string[];
 }): Promise<{
   ok: boolean;
   purchaseId: string | null;
@@ -98,54 +133,64 @@ export async function createPaytotaPurchase(params: {
   const cfg = getPaytotaConfig();
   const currency = params.currency.toUpperCase();
   const price = toPaytotaPrice(params.amountMajor, currency);
+  const africa = isPaytotaAfricaCurrency(currency);
 
   // Paytota card checkout expects a full billing address (docs sample + smoke test).
+  // Africa MoMo collection primarily needs phone + country (+ whitelist).
   const defaultsByCurrency: Record<string, { country: string; city: string; street: string; zip: string; state: string }> = {
     USD: { country: "US", city: "New York", street: "1 Test Street", zip: "10001", state: "NY" },
     CAD: { country: "CA", city: "Toronto", street: "1 King Street", zip: "M5H 1A1", state: "ON" },
     GBP: { country: "GB", city: "London", street: "1 Test Road", zip: "SW1A 1AA", state: "ENG" },
     EUR: { country: "DE", city: "Berlin", street: "1 Teststrasse", zip: "10115", state: "BE" },
+    UGX: { country: "UG", city: "Kampala", street: "1 Kampala Road", zip: "00000", state: "Kampala" },
+    KES: { country: "KE", city: "Nairobi", street: "1 Kenyatta Avenue", zip: "00100", state: "Nairobi" },
+    RWF: { country: "RW", city: "Kigali", street: "1 KN Avenue", zip: "00000", state: "Kigali" },
   };
   const defaults = defaultsByCurrency[currency] ?? defaultsByCurrency.USD;
 
   const client: Record<string, string> = {
     email: params.email,
     country: params.country || defaults.country,
-    city: params.city || defaults.city,
-    street_address: params.street || defaults.street,
-    zip_code: params.zip || defaults.zip,
-    state: params.state || defaults.state,
   };
+  if (!africa || params.city || params.street) {
+    client.city = params.city || defaults.city;
+    client.street_address = params.street || defaults.street;
+    client.zip_code = params.zip || defaults.zip;
+    client.state = params.state || defaults.state;
+  }
   if (params.phone) client.phone = params.phone;
 
   const cancelRedirect = params.failureRedirect.includes("paytota=failed")
     ? params.failureRedirect.replace("paytota=failed", "paytota=cancelled")
     : params.failureRedirect;
 
+  const whitelist = params.paymentMethodWhitelist ?? paytotaCollectionWhitelist(currency);
+  const body: Record<string, unknown> = {
+    client,
+    purchase: {
+      currency,
+      products: [{ name: params.productName, price: isPaytotaZeroDecimal(currency) ? String(price) : price }],
+    },
+    reference: params.reference,
+    skip_capture: false,
+    brand_id: cfg.brandId,
+    success_redirect: params.successRedirect,
+    failure_redirect: params.failureRedirect,
+    cancel_redirect: cancelRedirect,
+    success_callback: params.successCallback,
+  };
+  if (whitelist?.length) body.payment_method_whitelist = whitelist;
+
   const { ok, status, json } = await paytotaFetch("/api/v1/purchases/", {
     method: "POST",
-    json: {
-      client,
-      purchase: {
-        currency,
-        products: [{ name: params.productName, price }],
-      },
-      reference: params.reference,
-      skip_capture: false,
-      brand_id: cfg.brandId,
-      success_redirect: params.successRedirect,
-      failure_redirect: params.failureRedirect,
-      cancel_redirect: cancelRedirect,
-      success_callback: params.successCallback,
-    },
+    json: body,
   });
 
   const purchaseId = String(json.id ?? "").trim() || null;
   const checkoutUrl = String(json.checkout_url ?? "").trim() || null;
-  const message = String(
-    (json as { error_message?: string }).error_message
-    ?? (json as { detail?: string }).detail
-    ?? (ok ? "Checkout created" : `Paytota error ${status}`),
+  const message = paytotaErrorMessage(
+    json,
+    ok ? "Checkout created" : `Paytota error ${status}`,
   );
 
   return {
@@ -171,37 +216,83 @@ export function isPaytotaFailedStatus(status: unknown): boolean {
   return ["error", "failed", "cancelled", "canceled", "expired"].includes(s);
 }
 
-/** Uganda MoMo network from MSISDN (with or without 256). */
+/** MoMo execute network slug on Paytota `/po/{id}/{network}/`. */
+export type PaytotaNetwork = "airtel" | "mtnmomo" | "imalipay_payouts";
+/** @deprecated use PaytotaNetwork */
 export type PaytotaUgNetwork = "airtel" | "mtnmomo";
 
-export function normalizeUgPhone(phone: string): { e164: string; national: string; digits: string } {
-  const digits = String(phone ?? "").replace(/\D/g, "");
-  let national = digits;
-  if (national.startsWith("256") && national.length >= 12) national = national.slice(3);
-  if (national.startsWith("0") && national.length >= 10) national = national.slice(1);
-  const e164 = `256${national}`;
-  return { e164, national, digits };
+export function dialCodeForCurrency(currency: string): string {
+  const c = currency.toUpperCase();
+  if (c === "KES") return "254";
+  if (c === "RWF") return "250";
+  return "256";
 }
 
-export function resolvePaytotaUgNetwork(
+export function normalizeAfricaPhone(
   phone: string,
+  currency = "UGX",
+): { e164: string; national: string; digits: string; dial: string } {
+  const dial = dialCodeForCurrency(currency);
+  const digits = String(phone ?? "").replace(/\D/g, "");
+  let national = digits;
+  if (national.startsWith(dial) && national.length >= dial.length + 8) {
+    national = national.slice(dial.length);
+  }
+  if (national.startsWith("0") && national.length >= 9) national = national.slice(1);
+  const e164 = `${dial}${national}`;
+  return { e164, national, digits, dial };
+}
+
+/** @deprecated use normalizeAfricaPhone */
+export function normalizeUgPhone(phone: string): { e164: string; national: string; digits: string } {
+  const n = normalizeAfricaPhone(phone, "UGX");
+  return { e164: n.e164, national: n.national, digits: n.digits };
+}
+
+export function resolvePaytotaNetwork(
+  phone: string,
+  currency: string,
   payoutMethod?: string | null,
-): PaytotaUgNetwork {
+): PaytotaNetwork {
+  const c = currency.toUpperCase();
+  if (c === "KES") return "imalipay_payouts";
+
   const method = String(payoutMethod ?? "").toLowerCase();
   if (method.includes("airtel")) return "airtel";
-  if (method.includes("mtn")) return "mtnmomo";
+  if (method.includes("mtn") || method.includes("momo")) return "mtnmomo";
 
-  const { national } = normalizeUgPhone(phone);
+  const { national } = normalizeAfricaPhone(phone, c);
   const prefix2 = national.slice(0, 2);
+
+  if (c === "RWF") {
+    // Airtel RW: 72, 73 — MTN RW: 78, 79
+    if (["72", "73"].includes(prefix2)) return "airtel";
+    return "mtnmomo";
+  }
+
   // Airtel UG: 70, 74, 75 — MTN UG: 76, 77, 78, 79
   if (["70", "74", "75"].includes(prefix2)) return "airtel";
   return "mtnmomo";
 }
 
-/** Phone format Paytota expects on execute (Airtel = national, MTN = 256…). */
-export function paytotaExecutePhone(phone: string, network: PaytotaUgNetwork): string {
-  const { e164, national } = normalizeUgPhone(phone);
-  return network === "airtel" ? national : e164;
+/** @deprecated use resolvePaytotaNetwork */
+export function resolvePaytotaUgNetwork(
+  phone: string,
+  payoutMethod?: string | null,
+): PaytotaUgNetwork {
+  const n = resolvePaytotaNetwork(phone, "UGX", payoutMethod);
+  return n === "imalipay_payouts" ? "mtnmomo" : n;
+}
+
+/** Phone format Paytota expects on UGX/RWF execute (Airtel = national, MTN = E.164). */
+export function paytotaExecutePhone(
+  phone: string,
+  network: PaytotaNetwork,
+  currency = "UGX",
+): string {
+  const { e164, national } = normalizeAfricaPhone(phone, currency);
+  if (network === "airtel") return national;
+  return e164;
 }
 
 export function isPaytotaPayoutSuccessStatus(status: unknown): boolean {
@@ -227,15 +318,15 @@ export async function createPaytotaPayout(params: {
 }> {
   const cfg = getPaytotaConfig();
   const currency = params.currency.toUpperCase();
-  const amount = currency === "UGX" || currency === "JPY"
+  const amount = isPaytotaZeroDecimal(currency)
     ? String(Math.max(1, Math.round(params.amountMajor)))
     : String(toPaytotaPrice(params.amountMajor, currency));
 
-  const { e164 } = normalizeUgPhone(params.phone);
+  const { e164 } = normalizeAfricaPhone(params.phone, currency);
   const client: Record<string, string> = {
     email: params.email,
     phone: e164,
-    country: params.country || (currency === "UGX" ? "UG" : "UG"),
+    country: params.country || paytotaCountryForCurrency(currency),
   };
   if (params.fullName) client.full_name = params.fullName;
 
@@ -285,41 +376,76 @@ export function paytotaErrorMessage(json: Record<string, unknown>, fallback: str
   if ((json as { detail?: string }).detail && String((json as { detail?: string }).detail) !== "error") {
     return String((json as { detail?: string }).detail);
   }
+
+  // Field-level validation, e.g. { payment_method_whitelist: { "0": [{ message }] } }
+  for (const value of Object.values(json)) {
+    if (!value || typeof value !== "object") continue;
+    if (Array.isArray(value) && value[0]?.message) return String(value[0].message);
+    for (const nested of Object.values(value as Record<string, unknown>)) {
+      if (Array.isArray(nested) && nested[0] && typeof nested[0] === "object" && (nested[0] as { message?: string }).message) {
+        return String((nested[0] as { message?: string }).message);
+      }
+    }
+  }
+
   return fallback;
+}
+
+function paytotaExecuteBody(
+  currency: string,
+  phone: string,
+  network: PaytotaNetwork,
+): Record<string, string> {
+  const c = currency.toUpperCase();
+  const { e164, national } = normalizeAfricaPhone(phone, c);
+
+  if (c === "KES" || network === "imalipay_payouts") {
+    return {
+      accountNumber: e164,
+      accountInstitution: "MPESA",
+      paymentMode: "MOBILE_MONEY",
+      country: "Kenya",
+    };
+  }
+
+  // UGX + RWF: `{ phone }` — Airtel national, MTN E.164
+  return {
+    phone: network === "airtel" ? national : e164,
+  };
 }
 
 /**
  * Execute MoMo payout. Prefer provider execution_url; otherwise POST /po/{id}/{network}/.
- * UGX body is `{ phone }` (not payout_type).
+ * UGX/RWF body is `{ phone }`; KES uses ImaliPay fields.
  */
 export async function executePaytotaMobilePayout(params: {
   payoutId: string;
   executionUrl?: string | null;
   phone: string;
-  network?: PaytotaUgNetwork;
+  currency?: string;
+  network?: PaytotaNetwork;
   payoutMethod?: string | null;
 }): Promise<{
   ok: boolean;
   status: string;
   message: string;
-  network: PaytotaUgNetwork;
+  network: PaytotaNetwork;
   json: Record<string, unknown>;
 }> {
+  const currency = (params.currency || "UGX").toUpperCase();
   const network = params.network
-    ?? resolvePaytotaUgNetwork(params.phone, params.payoutMethod);
+    ?? resolvePaytotaNetwork(params.phone, currency, params.payoutMethod);
   const cfg = getPaytotaConfig();
-  const effectivePhone = paytotaExecutePhone(params.phone, network);
+  const body = paytotaExecuteBody(currency, params.phone, network);
 
   const rawExec = String(params.executionUrl ?? "").trim();
   const candidates: string[] = [];
-  // Docs: POST {base}/po/{id}/{network}/
   candidates.push(`${cfg.baseUrl}/po/${params.payoutId}/${network}/`);
   candidates.push(`https://payments.paytota.com/po/${params.payoutId}/${network}/`);
   if (rawExec) {
     const withSlash = rawExec.endsWith("/") ? rawExec : `${rawExec}/`;
     candidates.push(withSlash);
-    // If provider URL has no network, also try appending network
-    if (!/\/po\/[^/]+\/(airtel|mtnmomo)\/?/.test(withSlash)) {
+    if (!/\/po\/[^/]+\/(airtel|mtnmomo|imalipay_payouts)\/?/.test(withSlash)) {
       candidates.push(`${withSlash.replace(/\/+$/, "")}/${network}/`);
     }
   }
@@ -334,11 +460,10 @@ export async function executePaytotaMobilePayout(params: {
 
     const result = await paytotaFetch(url, {
       method: "POST",
-      json: { phone: effectivePhone },
+      json: body,
     });
     last = result;
 
-    // Success
     if (result.ok && !isPaytotaFailedStatus(result.json.status) && !(result.json as { error?: unknown }).error) {
       const detailStatus = String(result.json.status ?? result.json.detail ?? "pending");
       return {
@@ -350,14 +475,11 @@ export async function executePaytotaMobilePayout(params: {
       };
     }
 
-    // Don't retry other hosts on business errors like terminal disabled
     const msg = paytotaErrorMessage(result.json, "").toLowerCase();
     if (msg.includes("terminal disabled") || msg.includes("insufficient")) {
       break;
     }
-    // Retry on 404 / not found
     if (result.status !== 404 && result.status !== 405) {
-      // keep last; try next only for routing misses
       if (result.status >= 500) continue;
       break;
     }
