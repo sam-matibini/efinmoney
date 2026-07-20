@@ -21,6 +21,7 @@ import NombaTopUpCard from "@/components/payments/NombaTopUpCard";
 import PaytotaTopUpCard from "@/components/payments/PaytotaTopUpCard";
 import SwychrTopUpCard from "@/components/payments/SwychrTopUpCard";
 import { validateMinAmount, minAmount, type FlwMethod } from "@/lib/flutterwave";
+import LoadingSpinner from "@/components/LoadingSpinner";
 import FlutterwaveCardForm from "@/components/payments/FlutterwaveCardForm";
 import { MM_COUNTRIES } from "@/lib/mobileMoneyNetworks";
 import {
