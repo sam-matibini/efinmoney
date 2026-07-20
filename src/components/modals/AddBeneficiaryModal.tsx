@@ -38,6 +38,8 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
   const [name, setName] = useState("");
   const [nickname, setNickname] = useState("");
   const [email, setEmail] = useState("");
+  const [address, setAddress] = useState("");
+  const [tel, setTel] = useState("");
   const [countryId, setCountryId] = useState<string>("Canada");
   const [method, setMethod] = useState<"mobile" | "bank" | "eft" | "interac" | "none">("none");
   const [phone, setPhone] = useState("");
@@ -64,6 +66,8 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
     setName(editing?.name || "");
     setNickname(editing?.nickname || "");
     setEmail(editing?.email || "");
+    setAddress(editing?.address || "");
+    setTel(editing?.tel || "");
     const fromCode = editing?.country_code ? findCountryByCode(editing.country_code) : undefined;
     setCountryId(fromCode?.id || "Canada");
     setMethod(
@@ -142,6 +146,10 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
 
   const handleSave = async () => {
     if (!name.trim()) { toast.error("Please enter a name"); return; }
+    if (!email.trim()) { toast.error("Please enter an email"); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { toast.error("Please enter a valid email"); return; }
+    if (!tel.trim()) { toast.error("Please enter a phone number"); return; }
+    if (!address.trim()) { toast.error("Please enter an address"); return; }
     if (method === "eft") {
       if (!/^\d{3}$/.test(eftInst) || !/^\d{5}$/.test(eftTransit) || !/^\d{7,12}$/.test(eftAcct)) {
         toast.error("EFT requires 3-digit institution, 5-digit transit, and 7-12 digit account");
@@ -156,6 +164,8 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
       name: name.trim(),
       nickname: nickname.trim() || null,
       email: email.trim() || null,
+      address: address.trim() || null,
+      tel: tel.trim() || null,
       country_code: country.code,
       currency_code: country.code,
       payout_method: method === "mobile" ? country.payout : method === "bank" ? "bank" : method === "eft" ? "eft" : method === "interac" ? "interac" : null,
@@ -221,8 +231,19 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
               <Input value={nickname} onChange={(e) => setNickname(e.target.value)} placeholder="e.g. Landlord" />
             </div>
             <div className="space-y-2">
-              <Label>Email (optional)</Label>
-              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="payee@example.com" />
+              <Label>Email</Label>
+              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="payee@example.com" required />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label>Phone</Label>
+              <Input value={tel} onChange={(e) => setTel(e.target.value)} placeholder="+1 (555) 000-0000" required />
+            </div>
+            <div className="space-y-2">
+              <Label>Address</Label>
+              <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="123 Main St, City" required />
             </div>
           </div>
 

@@ -25,6 +25,8 @@ export interface Beneficiary {
   // Payee directory extension
   category: BeneficiaryCategory;
   email: string | null;
+  address: string | null;
+  tel: string | null;
   eft_institution: string | null;
   eft_transit: string | null;
   eft_account: string | null;
@@ -80,6 +82,8 @@ export const useCreateBeneficiary = () => {
         avatar_initials: input.avatar_initials ?? initialsOf(input.name),
         category: input.category ?? "person",
         email: input.email ?? null,
+        address: input.address ?? null,
+        tel: input.tel ?? null,
         eft_institution: input.eft_institution ?? null,
         eft_transit: input.eft_transit ?? null,
         eft_account: input.eft_account ?? null,
@@ -148,6 +152,8 @@ export const recordTransferRecipient = async (params: {
   bank_account?: string | null;
   bank_code?: string | null;
   email?: string | null;
+  address?: string | null;
+  tel?: string | null;
   eft_institution?: string | null;
   eft_transit?: string | null;
   eft_account?: string | null;
@@ -187,6 +193,8 @@ export const recordTransferRecipient = async (params: {
     if (!found.bank_code && params.bank_code) patch.bank_code = params.bank_code;
     if (!found.country_code && params.country_code) patch.country_code = params.country_code;
     if (!found.email && params.email) patch.email = params.email;
+    if (!found.address && params.address) patch.address = params.address;
+    if (!found.tel && params.tel) patch.tel = params.tel;
     if (!found.eft_institution && params.eft_institution) patch.eft_institution = params.eft_institution;
     if (!found.eft_transit && params.eft_transit) patch.eft_transit = params.eft_transit;
     if (!found.eft_account && params.eft_account) patch.eft_account = params.eft_account;

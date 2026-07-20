@@ -246,6 +246,8 @@ CREATE TABLE IF NOT EXISTS public.beneficiaries (
   bank_name text,
   bank_account text,
   currency_code text,
+  address text,
+  tel text,
   nickname text,
   avatar_initials text,
   transfer_count integer DEFAULT 0 NOT NULL,
