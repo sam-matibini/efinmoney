@@ -25,6 +25,7 @@ export type CardSendIntent = {
   ghPayoutMode?: "mobile" | "bank";
   useStellar?: boolean;
   usePawapay?: boolean;
+  usePaytota?: boolean;
   useFincra?: boolean;
   recipientCountryHint?: string;
   at: number;

@@ -362,6 +362,20 @@ Deno.serve(async (req) => {
       !isCanada && !isZambia && !usePawapay && !useMtnMomo && !useStellar &&
       transfer.payout_method !== "card_push";
 
+    // Paytota UGX MoMo — opt-in via use_paytota or PAYTOTA_PAYOUT_ENABLED (does not replace other rails)
+    const paytotaPayoutEnvOn = Deno.env.get("PAYTOTA_PAYOUT_ENABLED") === "true";
+    const usePaytota =
+      !isCanada &&
+      !isZambia &&
+      !usePawapay &&
+      !useMtnMomo &&
+      !useStellar &&
+      !useGhanaPay &&
+      !useFincra &&
+      isMobileMoneyMethod &&
+      targetCurrency === "UGX" &&
+      (payload.use_paytota === true || paytotaPayoutEnvOn);
+
     const isNigeriaBank =
       targetCurrency === "NGN" &&
       transfer.payout_method === "bank" &&
@@ -565,6 +579,44 @@ Deno.serve(async (req) => {
               const swychrJson = await trySwychr();
               if (swychrJson?.success) payoutResult = swychrJson;
             }
+          }
+        }
+      } else if (usePaytota) {
+        const paytotaRes = await fetch(
+          `${Deno.env.get("SUPABASE_URL")}/functions/v1/paytota-payout`,
+          {
+            method: "POST",
+            headers: internalHeaders,
+            body: JSON.stringify({ transfer_id }),
+          },
+        );
+        payoutResult = await paytotaRes.json().catch(() => ({
+          success: false,
+          error: `paytota-payout returned HTTP ${paytotaRes.status}`,
+          rail: "paytota",
+        }));
+        // On failure, fall through to Flutterwave (existing default) without removing that rail
+        if (payoutResult?.success === false) {
+          const flwRes = await fetch(
+            `${Deno.env.get("SUPABASE_URL")}/functions/v1/flutterwave-payout`,
+            {
+              method: "POST",
+              headers: internalHeaders,
+              body: JSON.stringify({
+                transfer_id,
+                phone_number: transfer.recipient_phone,
+                account_number: transfer.recipient_account,
+                bank_code: transfer.recipient_bank_code,
+                amount: Number(transfer.target_amount ?? transfer.source_amount),
+                currency: transfer.target_currency ?? transfer.source_currency,
+                network: resolveNetwork(transfer.payout_method, transfer.target_currency ?? transfer.source_currency),
+                recipient_name: transfer.recipient_name,
+              }),
+            },
+          );
+          const flwJson = await flwRes.json().catch(() => null);
+          if (flwJson?.success) {
+            payoutResult = { ...flwJson, paytota_fallback: true, paytota_error: payoutResult?.error };
           }
         }
       } else {

@@ -93,6 +93,9 @@ verify_jwt = true
 [functions.swychr-payout]
 verify_jwt = false
 
+[functions.paytota-payout]
+verify_jwt = false
+
 [functions.swychr-verify-transfer]
 verify_jwt = true
 

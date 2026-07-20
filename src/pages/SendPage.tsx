@@ -163,6 +163,7 @@ const SendPage = () => {
   const [ngnResolveError, setNgnResolveError] = useState<string | null>(null);
   const [useStellar, setUseStellar] = useState<boolean>(false);
   const [usePawapay, setUsePawapay] = useState<boolean>(false);
+  const [usePaytota, setUsePaytota] = useState<boolean>(false);
   const [useFincra, setUseFincra] = useState<boolean>(import.meta.env.VITE_FINCRA_PAYOUT === "true");
   const [fromQuickSend, setFromQuickSend] = useState(false);
   const [cardResumeProcessing, setCardResumeProcessing] = useState(false);
@@ -330,8 +331,12 @@ const SendPage = () => {
 
   const isNGNBank = targetCountry.code === "NGN";
   const isGhanaBank = targetCountry.code === "GHS" && ghPayoutMode === "bank";
-  const canUseFincra = ["NGN", "KES", "GHS", "UGX", "TZS", "RWF"].includes(targetCountry.code);
   const isBankPayout = isNGNBank || isGhanaBank;
+  const canUseFincra = ["NGN", "KES", "GHS", "UGX", "TZS", "RWF"].includes(targetCountry.code);
+  const canUsePaytotaPayout =
+    productFeatures.paytotaPayout
+    && targetCountry.code === "UGX"
+    && !isBankPayout;
 
   // "Send a secure link" is available when the destination currency supports
   // recipient claims (CAD/USD/GBP/EUR) and the sender holds a wallet in it to
@@ -756,7 +761,7 @@ const SendPage = () => {
         let data: any = null;
         let invokeErr: any = null;
         try {
-          const res = await supabase.functions.invoke('execute-transfer', { body: { transfer_id: tid, use_stellar: isNGNBank && useStellar, use_pawapay: !isBankPayout && usePawapay, use_fincra: useFincra && canUseFincra, recipient_country_hint: targetCountry.country } });
+          const res = await supabase.functions.invoke('execute-transfer', { body: { transfer_id: tid, use_stellar: isNGNBank && useStellar, use_pawapay: !isBankPayout && usePawapay, use_paytota: canUsePaytotaPayout && usePaytota, use_fincra: useFincra && canUseFincra, recipient_country_hint: targetCountry.country } });
           data = res.data;
           invokeErr = res.error;
         } catch (err) {
@@ -899,6 +904,7 @@ const SendPage = () => {
           ghPayoutMode,
           useStellar: isNGNBank && useStellar,
           usePawapay: !isBankPayout && usePawapay,
+          usePaytota: canUsePaytotaPayout && usePaytota,
           useFincra: useFincra && canUseFincra,
           recipientCountryHint: targetCountry.country,
         });
@@ -1196,11 +1202,11 @@ const SendPage = () => {
             transfer_id: tid,
             use_stellar: !!intent.useStellar,
             use_pawapay: !!intent.usePawapay,
+            use_paytota: !!intent.usePaytota,
             use_fincra: !!intent.useFincra,
             recipient_country_hint: intent.recipientCountryHint,
           },
-        });
-        let data: any = res.data;
+        });        let data: any = res.data;
         if (res.error && !data && (res.error as any)?.context?.response) {
           try { data = await (res.error as any).context.response.json(); } catch { /* ignore */ }
         }
@@ -2187,7 +2193,7 @@ const SendPage = () => {
                                               Route this mobile money payout through PawaPay&apos;s pan-African network instead of the default provider.
                                             </p>
                                           </div>
-                                          <Switch
+                                            <Switch
                                             checked={usePawapay}
                                             onCheckedChange={setUsePawapay}
                                             aria-label="Use PawaPay network"
@@ -2199,6 +2205,26 @@ const SendPage = () => {
                                           </p>
                                         )}
                                       </motion.div>
+                                      {canUsePaytotaPayout && (
+                                        <motion.div custom={2.55} variants={fieldVariants} initial="hidden" animate="show" className="rounded-xl border border-sky-500/30 bg-gradient-to-br from-sky-500/5 via-background to-sky-500/5 p-4">
+                                          <div className="flex items-start justify-between gap-3">
+                                            <div className="flex-1">
+                                              <div className="flex items-center gap-2">
+                                                <span className="text-sm font-medium">Use Paytota (test)</span>
+                                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-700 dark:text-sky-300 font-mono uppercase">Test</span>
+                                              </div>
+                                              <p className="text-xs text-muted-foreground mt-1">
+                                                Route this UGX mobile money payout through Paytota. Default rails stay available when off.
+                                              </p>
+                                            </div>
+                                            <Switch
+                                              checked={usePaytota}
+                                              onCheckedChange={setUsePaytota}
+                                              aria-label="Use Paytota payout"
+                                            />
+                                          </div>
+                                        </motion.div>
+                                      )}
                                       {productFeatures.flutterwave && canUseFincra && (
                                         <motion.div custom={2.6} variants={fieldVariants} initial="hidden" animate="show" className="rounded-xl border border-teal-500/30 bg-gradient-to-br from-teal-500/5 via-background to-teal-500/5 p-4">
                                           <div className="flex items-start justify-between gap-3">

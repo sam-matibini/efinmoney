@@ -25,6 +25,8 @@ export const productFeatures = {
   swychr: envFlag("VITE_FEATURE_SWYCHR", true),
   /** Paytota card top-up for USD/EUR/GBP/CAD (Nomba international disabled on merchant). */
   paytota: envFlag("VITE_FEATURE_PAYTOTA", true),
+  /** Paytota UGX MoMo payout test toggle on Send. */
+  paytotaPayout: envFlag("VITE_FEATURE_PAYTOTA_PAYOUT", true),
   adyen: envFlag("VITE_FEATURE_ADYEN", false),
 } as const;
 

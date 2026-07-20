@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 /**
- * Paytota smoke probe — collection (purchase) + payout initiate.
+ * Paytota smoke probe — collection + UGX MoMo payout.
  *
  * Usage (PowerShell):
- *   $env:PAYTOTA_SECRET_KEY="..."; $env:PAYTOTA_BRAND_ID="..."; node scripts/paytota-smoke-test.mjs
+ *   node scripts/paytota-smoke-test.mjs
+ *   node scripts/paytota-smoke-test.mjs --execute   # also execute payout (test wallet)
+ *   node scripts/paytota-smoke-test.mjs --payout-only --execute
  *
- * Or put vars in scripts/.paytota.env (gitignored pattern — do not commit secrets).
+ * Or put vars in scripts/.paytota.env (gitignored).
  */
 import { readFileSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -35,15 +37,29 @@ if (existsSync(envFile)) {
 const BASE = (process.env.PAYTOTA_BASE_URL || "https://gate.paytota.com").replace(/\/+$/, "");
 const SECRET = process.env.PAYTOTA_SECRET_KEY?.trim();
 const BRAND = process.env.PAYTOTA_BRAND_ID?.trim();
+const DO_EXECUTE = process.argv.includes("--execute");
+const PAYOUT_ONLY = process.argv.includes("--payout-only");
+const TEST_PHONE = process.env.PAYTOTA_TEST_PAYOUT_PHONE || "256779735042";
 
 if (!SECRET || !BRAND) {
   console.error("Missing PAYTOTA_SECRET_KEY and/or PAYTOTA_BRAND_ID.");
-  console.error("Get them from Paytota → Developers after KYC:");
-  console.error("  https://gate.paytota.com/login");
-  console.error("Then either set env vars or create scripts/.paytota.env:");
-  console.error("  PAYTOTA_SECRET_KEY=...");
-  console.error("  PAYTOTA_BRAND_ID=...");
   process.exit(1);
+}
+
+function resolveUgNetwork(phone) {
+  const digits = String(phone).replace(/\D/g, "");
+  let national = digits.startsWith("256") ? digits.slice(3) : digits;
+  if (national.startsWith("0")) national = national.slice(1);
+  const p2 = national.slice(0, 2);
+  if (["70", "74", "75"].includes(p2)) return "airtel";
+  return "mtnmomo";
+}
+
+function executePhone(phone, network) {
+  const digits = String(phone).replace(/\D/g, "");
+  let national = digits.startsWith("256") ? digits.slice(3) : digits;
+  if (national.startsWith("0")) national = national.slice(1);
+  return network === "airtel" ? national : `256${national}`;
 }
 
 async function hit(label, method, path, body, extraHeaders = {}) {
@@ -72,49 +88,51 @@ async function hit(label, method, path, body, extraHeaders = {}) {
 }
 
 const ref = `efin-probe-${Date.now()}`;
+let card = { json: {} };
+let momo = { json: {} };
 
-// 1) Card / international-style USD purchase (hosted checkout)
-const card = await hit("CARD collection (USD purchase)", "POST", "/api/v1/purchases/", {
-  client: {
-    email: process.env.PAYTOTA_TEST_EMAIL || "test@efin.money",
-    country: "US",
-    city: "New York",
-    street_address: "1 Test Street",
-    zip_code: "10001",
-    state: "NY",
-  },
-  purchase: {
-    currency: "USD",
-    products: [{ name: "eFinMoney card probe", price: 100 }], // 100 = $1.00 if minor units
-  },
-  reference: `${ref}-card`,
-  skip_capture: false,
-  brand_id: BRAND,
-  success_redirect: "https://efin.money/wallet/topup?paytota=success",
-  failure_redirect: "https://efin.money/wallet/topup?paytota=failed",
-});
+if (!PAYOUT_ONLY) {
+  card = await hit("CARD collection (USD purchase)", "POST", "/api/v1/purchases/", {
+    client: {
+      email: process.env.PAYTOTA_TEST_EMAIL || "test@efin.money",
+      country: "US",
+      city: "New York",
+      street_address: "1 Test Street",
+      zip_code: "10001",
+      state: "NY",
+    },
+    purchase: {
+      currency: "USD",
+      products: [{ name: "eFinMoney card probe", price: 100 }],
+    },
+    reference: `${ref}-card`,
+    skip_capture: false,
+    brand_id: BRAND,
+    success_redirect: "https://efin.money/wallet/topup?paytota=success",
+    failure_redirect: "https://efin.money/wallet/topup?paytota=failed",
+  });
 
-// 2) Local MoMo-style UGX purchase (if enabled on brand)
-const momo = await hit("MOMO collection (UGX purchase)", "POST", "/api/v1/purchases/", {
-  client: {
-    email: process.env.PAYTOTA_TEST_EMAIL || "test@efin.money",
-    phone: process.env.PAYTOTA_TEST_PHONE || "256770123456",
-    country: "UG",
-  },
-  purchase: {
-    currency: "UGX",
-    products: [{ name: "eFinMoney momo probe", price: "500" }],
-  },
-  reference: `${ref}-momo`,
-  skip_capture: false,
-  brand_id: BRAND,
-});
+  momo = await hit("MOMO collection (UGX purchase)", "POST", "/api/v1/purchases/", {
+    client: {
+      email: process.env.PAYTOTA_TEST_EMAIL || "test@efin.money",
+      phone: TEST_PHONE,
+      country: "UG",
+    },
+    purchase: {
+      currency: "UGX",
+      products: [{ name: "eFinMoney momo probe", price: "500" }],
+    },
+    reference: `${ref}-momo`,
+    skip_capture: false,
+    brand_id: BRAND,
+  });
+}
 
-// 3) Mobile payout initiate (do NOT auto-execute — avoids sending real money)
+const network = resolveUgNetwork(TEST_PHONE);
 const payout = await hit("PAYOUT initiate (UGX mobile)", "POST", "/api/v1/payouts/", {
   client: {
     email: process.env.PAYTOTA_TEST_EMAIL || "test@efin.money",
-    phone: process.env.PAYTOTA_TEST_PHONE || "256700123123",
+    phone: TEST_PHONE.startsWith("256") ? TEST_PHONE : `256${TEST_PHONE.replace(/\D/g, "").replace(/^0/, "")}`,
     country: "UG",
   },
   payment: {
@@ -126,15 +144,33 @@ const payout = await hit("PAYOUT initiate (UGX mobile)", "POST", "/api/v1/payout
   brand_id: BRAND,
 });
 
-// Optional: account balance if documented
 await hit("Account balance (best-effort)", "GET", "/api/v1/account/balance/");
 
+let execResult = null;
+if (DO_EXECUTE && payout.json?.id) {
+  let execUrl = String(payout.json.execution_url || "").trim();
+  const hasNetwork = /\/po\/[^/]+\/(airtel|mtnmomo)\/?/.test(execUrl);
+  if (!hasNetwork) {
+    execUrl = `${BASE}/po/${payout.json.id}/${network}/`;
+  }
+  if (!execUrl.endsWith("/")) execUrl += "/";
+  const urlNet = execUrl.match(/\/po\/[^/]+\/(airtel|mtnmomo)\/?/)?.[1] || network;
+  const phone = executePhone(TEST_PHONE, urlNet);
+  console.log(`\nExecuting payout → network=${urlNet} phone=${phone}`);
+  execResult = await hit("PAYOUT execute (UGX mobile)", "POST", execUrl, { phone });
+}
+
 console.log("\n--- Summary ---");
-console.log("Card checkout_url:", card.json?.checkout_url || card.json?.data?.checkout_url || "(none)");
-console.log("Card purchase id:", card.json?.id || "(none)");
-console.log("MoMo purchase id:", momo.json?.id || "(none)");
+if (!PAYOUT_ONLY) {
+  console.log("Card checkout_url:", card.json?.checkout_url || "(none)");
+  console.log("MoMo purchase id:", momo.json?.id || "(none)");
+}
+console.log("Test phone:", TEST_PHONE, "network guess:", network);
 console.log("Payout id:", payout.json?.id || "(none)");
 console.log("Payout execution_url:", payout.json?.execution_url || "(none)");
-console.log(
-  "\nNote: Payout was INITIATED only (not executed). To execute you'd POST to execution_url with {\"payout_type\":\"mobile\"}.",
-);
+if (DO_EXECUTE) {
+  console.log("Execute status:", execResult?.json?.status || execResult?.json?.detail || execResult?.res?.status);
+  console.log("Execute ok HTTP:", execResult?.res?.ok);
+} else {
+  console.log("\nNote: initiate only. Re-run with --execute to POST { phone } to execution_url.");
+}
