@@ -154,6 +154,19 @@ Deno.serve(async (req) => {
     const cfg = getNombaPayConfig();
 
     const amountRounded = Math.round(checkoutAmount * 100) / 100;
+    if (corridor === "international" && amountRounded < 1) {
+      return json({
+        error: `Card checkout minimum is $1.00 (you’re at $${amountRounded.toFixed(2)}). Increase the send amount and try again.`,
+        code: "amount_too_small",
+      }, 400);
+    }
+    if (corridor === "nigeria" && amountRounded < 100) {
+      return json({
+        error: "Naira card checkout minimum is ₦100. Increase the amount and try again.",
+        code: "amount_too_small",
+      }, 400);
+    }
+
     const internalRef = `efin-nomba-${corridor}-${userId.slice(0, 8)}-${Date.now()}`;
     const returnUrl = typeof return_url === "string" && return_url.startsWith("http")
       ? return_url.trim()

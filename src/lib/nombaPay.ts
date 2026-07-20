@@ -97,8 +97,20 @@ export async function initiateNombaCollection(params: {
 }): Promise<NombaCollectionResult & { quote?: Record<string, unknown> }> {
   const { data, error } = await supabase.functions.invoke("nomba-collection", { body: params });
   if (error) throw new Error(await invokeErrorMessage(error));
-  const payload = data as NombaCollectionResult & { error?: string };
-  if (payload.error) throw new Error(payload.error);
+  const payload = data as NombaCollectionResult & {
+    error?: string;
+    message?: string;
+    provider_response?: Record<string, unknown>;
+    code?: string;
+  };
+  if (payload.error) {
+    const providerMsg = String(
+      payload.provider_response?.message
+      ?? (payload.provider_response as { Data?: { message?: string } })?.Data?.message
+      ?? "",
+    ).trim();
+    throw new Error(providerMsg || payload.error);
+  }
   if (!payload.success || !payload.payment_link) {
     throw new Error(payload.message || "Checkout link unavailable");
   }

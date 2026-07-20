@@ -13,10 +13,12 @@ import ViewCardDetailsModal from "@/components/modals/ViewCardDetailsModal";
 import CardPaymentModal from "@/components/modals/CardPaymentModal";
 import CardStack from "@/components/cards/CardStack";
 import CardFeatureSpotlights from "@/components/cards/CardFeatureSpotlights";
+import SwychrCardsPanel from "@/components/cards/SwychrCardsPanel";
 import { useCards, useCardMutations, type Card as CardRow, type RevealedCardSecrets } from "@/hooks/useCards";
 import { usePinGate } from "@/components/send/usePinGate";
 import { useSavedCards, useDeleteSavedCard } from "@/hooks/useSavedCards";
 import { getCardKindLabel, isFundableIssuedCard } from "@/lib/cardDisplay";
+import { productFeatures } from "@/lib/productFeatures";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import PageHeroBanner from "@/components/common/PageHeroBanner";
@@ -403,6 +405,14 @@ const CardsPage = () => {
             onCreateVirtual={handleFeatureVirtual}
             onSpendingLimits={handleFeatureLimits}
           />
+
+          {productFeatures.swychr && (
+            <motion.div
+              variants={{ hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 180, damping: 22 } } }}
+            >
+              <SwychrCardsPanel />
+            </motion.div>
+          )}
         </motion.div>
       </AppPage>
 

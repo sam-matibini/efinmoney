@@ -16,6 +16,8 @@ dist-ssr
 .env
 .env.*
 !.env.example
+scripts/.swychr.env
+scripts/.paytota.env
 
 # Exported data snapshot (PII / large)
 database-export/

@@ -152,7 +152,7 @@ const LiveFxCalculator = ({
   const { data: nombaQuote } = useQuery({
     queryKey: ["nomba-fx-calc", from, to],
     queryFn: () => getNombaExchangeRate(from, to),
-    enabled: from !== to && isNgnPair(from, to),
+    enabled: from !== to && isNgnPair(from, to) && !(displayRate != null && displayRate > 0),
     staleTime: 60_000,
   });
 

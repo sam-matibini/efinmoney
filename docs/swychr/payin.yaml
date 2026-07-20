@@ -1,0 +1,609 @@
+---
+openapi: 3.0.1
+info:
+  title: SwychrConnect Payin API
+  version: v1.0.3
+  description: |
+    API for creating and checking statuses of swychrconnect payin payment links.
+    This specification reflects observed production responses and includes:
+      - /admin/auth -> { token, message, email }
+      - /create_payment_links -> { data: { id, payment_link, transaction_id }, message, status }
+      - /payment_link_status -> nested data.data.attributes resource
+      - webhook callback that posts PaymentLinkStatusResponse to merchant callback_url
+  contact:
+    name: Payin API Support
+    email: support@accountpe.com
+    url: https://accountpe.com/support
+  license:
+    name: MIT
+servers:
+- url: https://api.accountpe.com/api/payin
+  description: Production server
+tags:
+- name: Auth
+  description: Authentication and token management
+- name: Payment Link
+  description: Create and manage payment links
+- name: Payment Link Status
+  description: Retrieve or poll the status of a payment link
+- name: Webhook
+  description: Merchant webhook receiver (example)
+components:
+  securitySchemes:
+    AuthToken:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  headers:
+    Idempotency-Key:
+      description: Idempotency key to deduplicate POST retries
+      schema:
+        type: string
+    X-RateLimit-Limit:
+      description: API limit for the client
+      schema:
+        type: integer
+    X-RateLimit-Remaining:
+      description: Remaining quota for the current window
+      schema:
+        type: integer
+  callbacks:
+    PaymentStatusUpdated:
+      "{$request.body#/data/data/attributes/callback_url}":
+        post:
+          summary: Webhook POST to merchant callback_url when payment status updates
+          description: 'Platform POSTs the same payload as the PaymentLinkStatusResponse
+            to the merchant''s configured callback_url whenever the payment status
+            updates. Merchants should verify X-Swychr-Signature header if configured.
+
+'
+          operationId: paymentStatusWebhook
+          requestBody:
+            required: true
+            content:
+              application/json:
+                schema:
+                  "$ref": "#/components/schemas/PaymentLinkStatusResponse"
+          responses:
+            '200':
+              description: Merchant acknowledged webhook successfully
+  schemas:
+    AuthRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+      required:
+      - email
+      - password
+      example:
+        email: admin@example.com
+        password: strongPassword123
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: JWT token to use for authenticated calls.
+        message:
+          type: string
+          description: Optional message or token expiry timestamp (production shows
+            "MM-DD-YYYY HH:mm")
+          example: 11-28-2025 00:01
+        email:
+          type: string
+          format: email
+          description: Authenticated admin email
+      required:
+      - token
+      - message
+      - email
+      example:
+        token: eyJhbGciOiJIUzI1NiJ9.eyJh...
+        message: 11-28-2025 00:01
+        email: hk2604@gmail.com
+    PaymentLinkRequest:
+      type: object
+      properties:
+        country_code:
+          type: string
+          description: ISO 3166-1 alpha-2 or alpha-3 code
+          pattern: "^[A-Za-z]{2,3}$"
+          example: CM
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        mobile:
+          type: string
+          description: E.164 recommended (but not enforced)
+          example: '919876543210'
+        amount:
+          type: number
+          format: double
+          example: 149.5
+        currency:
+          type: string
+          example: XAF
+        transaction_id:
+          type: string
+          example: txn_20251126_0001
+        description:
+          type: string
+        pass_digital_charge:
+          type: boolean
+        callback_url:
+          type: string
+          format: uri
+          description: Optional merchant callback URL to receive status updates
+      required:
+      - country_code
+      - name
+      - email
+      - transaction_id
+      - amount
+      - pass_digital_charge
+      example:
+        country_code: CM
+        name: Rahul Sharma
+        email: rahul@example.com
+        mobile: '919876543210'
+        amount: 149.5
+        currency: XAF
+        transaction_id: txn_20251126_0001
+        description: 'Payment for order #1234'
+        pass_digital_charge: true
+        callback_url: https://merchant.example.com/webhook/payment_status
+    PaymentLinkData:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 6682
+        payment_link:
+          type: string
+          format: uri
+          example: https://app.swychrconnect.com/payment/35cfd792-66b4-4db2-940d-a694f15bd11c
+        transaction_id:
+          type: string
+          example: txn_20251126_0001
+      required:
+      - id
+      - payment_link
+      - transaction_id
+    PaymentLinkResponse:
+      type: object
+      properties:
+        data:
+          "$ref": "#/components/schemas/PaymentLinkData"
+        message:
+          type: string
+        status:
+          type: integer
+      required:
+      - data
+      - message
+      - status
+      example:
+        data:
+          id: 6682
+          payment_link: https://app.swychrconnect.com/payment/35cfd792-66b4-4db2-940d-a694f15bd11c
+          transaction_id: txn_20251126_0001
+        message: Payment link created successfully
+        status: 200
+    RedirectBehavior:
+      type: object
+      properties:
+        success:
+          type: object
+          properties:
+            when_callback_set:
+              type: string
+            when_callback_not_set:
+              type: string
+        failure:
+          type: object
+          properties:
+            default_failure_url:
+              type: string
+      description: Describes hosted UI redirect behavior after payment completion
+      example:
+        success:
+          when_callback_set: Redirects to the callback_url if set in SwychrConnect
+            portal.
+          when_callback_not_set: Redirects to https://app.swychrconnect.com/payment_success
+            when callback_url not set.
+        failure:
+          default_failure_url: https://app.swychrconnect.com/payment_failed
+    PaymentLinkAttributes:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        mobile:
+          type: string
+        amount:
+          type: number
+          format: double
+        currency_code:
+          type: string
+        country:
+          type: string
+        country_code:
+          type: string
+        status:
+          type: integer
+          description: |
+            Internal numeric status code. Suggested mapping:
+              0 = pending
+              1 = success (paid)
+              2 = failed
+              3 = refunded
+        created_at:
+          type: string
+          format: date-time
+        description:
+          type: string
+        expired_at:
+          type: string
+          format: date-time
+        payment_uuid:
+          type: string
+          format: uri
+        transaction_id:
+          type: string
+        pass_digital_charge:
+          type: boolean
+        net_payable:
+          type: number
+        admin_name:
+          type: string
+        admin_email:
+          type: string
+          format: email
+        callback_url:
+          type: string
+          format: uri
+        redirect_behavior:
+          "$ref": "#/components/schemas/RedirectBehavior"
+      required:
+      - id
+      - transaction_id
+      - amount
+      - currency_code
+      - status
+    PaymentLinkResource:
+      type: object
+      properties:
+        type:
+          type: string
+        id:
+          type: string
+        attributes:
+          "$ref": "#/components/schemas/PaymentLinkAttributes"
+        links:
+          type: object
+          properties:
+            self:
+              type: string
+      required:
+      - type
+      - id
+      - attributes
+    PaymentLinkStatusData:
+      type: object
+      properties:
+        data:
+          "$ref": "#/components/schemas/PaymentLinkResource"
+    PaymentLinkStatusResponse:
+      type: object
+      properties:
+        data:
+          "$ref": "#/components/schemas/PaymentLinkStatusData"
+        message:
+          type: string
+        status:
+          type: integer
+      required:
+      - data
+      - message
+      - status
+      example:
+        data:
+          data:
+            type: payment-links
+            id: '6682'
+            attributes:
+              id: 6682
+              name: Rahul Sharma
+              email: rahul@example.com
+              mobile: '919876543210'
+              amount: 149.5
+              currency_code: XAF
+              country: Cameroon
+              country_code: CM
+              status: 0
+              created_at: '2025-11-27T00:04:05.835+05:30'
+              description: Payment for order
+              expired_at: '2025-11-27T01:04:05.833+05:30'
+              payment_uuid: https://app.swychrconnect.com/payment/35cfd792-66b4-4db2-940d-a694f15bd11c
+              transaction_id: txn_20251126_0001
+              pass_digital_charge: true
+              net_payable: 153.2375
+              admin_name: harshit
+              admin_email: hk2604@gmail.com
+              callback_url: https://merchant.example.com/webhook/payment_status
+              redirect_behavior:
+                success:
+                  when_callback_set: Redirects to the callback_url if set.
+                  when_callback_not_set: Redirects to https://app.swychrconnect.com/payment_success
+                    when callback_url not set.
+                failure:
+                  default_failure_url: https://app.swychrconnect.com/payment_failed
+            links:
+              self: "/payment-links/6682"
+        message: Payment link details retrieved successfully
+        status: 200
+    ErrorItem:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        field:
+          type: string
+          nullable: true
+    ErrorResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+          - error
+        errors:
+          type: array
+          items:
+            "$ref": "#/components/schemas/ErrorItem"
+    ValidationErrorResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        message:
+          type: string
+        validation:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+  responses:
+    UnauthorizedError:
+      description: Authentication failed or missing token.
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+    ValidationError:
+      description: Input validation failed
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ValidationErrorResponse"
+    ServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+security:
+- AuthToken: []
+paths:
+  "/admin/auth":
+    post:
+      tags:
+      - Auth
+      summary: Obtain a bearer token for admin operations
+      description: Exchange admin credentials for a JWT token. Token must be sent
+        in Authorization header.
+      operationId: obtainAuthToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/AuthRequest"
+      responses:
+        '200':
+          description: Logged in, token returned
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/AuthResponse"
+        '400':
+          "$ref": "#/components/responses/ValidationError"
+        '401':
+          "$ref": "#/components/responses/UnauthorizedError"
+        '500':
+          "$ref": "#/components/responses/ServerError"
+  "/create_payment_links":
+    post:
+      tags:
+      - Payment Link
+      summary: Create a payment link
+      description: |
+        Create a hosted payment link for collecting payment. Clients should supply an Idempotency-Key header
+        to prevent duplicate link creation on retries.
+
+        Redirect behavior after payment completion:
+          - On success:
+            1. If callback_url is configured, hosted UI redirects to that callback_url.
+            2. Otherwise hosted UI redirects to https://app.swychrconnect.com/payment_success
+          - On failure:
+            - Hosted UI always redirects to https://app.swychrconnect.com/payment_failed
+
+        Webhook behavior:
+          - If callback_url is provided, the platform will POST the PaymentLinkStatusResponse payload to that URL
+            whenever the status updates (header X-Swychr-Signature included for verification if configured).
+      operationId: createPaymentLink
+      security:
+      - AuthToken: []
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        schema:
+          type: string
+        description: Idempotency key to deduplicate requests
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/PaymentLinkRequest"
+      responses:
+        '200':
+          description: Payment Link Successfully Created
+          headers:
+            X-Request-Id:
+              "$ref": "#/components/headers/X-Request-Id"
+            X-RateLimit-Limit:
+              "$ref": "#/components/headers/X-RateLimit-Limit"
+            X-RateLimit-Remaining:
+              "$ref": "#/components/headers/X-RateLimit-Remaining"
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/PaymentLinkResponse"
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/PaymentLinkResponse"
+        '400':
+          "$ref": "#/components/responses/ValidationError"
+        '401':
+          "$ref": "#/components/responses/UnauthorizedError"
+        '404':
+          description: Country or currency not supported
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+        '409':
+          description: Conflict - duplicate transaction_id or idempotency mismatch
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+        '422':
+          "$ref": "#/components/responses/ValidationError"
+        '429':
+          description: Too Many Requests
+          headers:
+            Retry-After:
+              "$ref": "#/components/headers/Retry-After"
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+        '500':
+          "$ref": "#/components/responses/ServerError"
+  "/payment_link_status":
+    post:
+      tags:
+      - Payment Link Status
+      summary: Get status of a payment link by transaction id
+      description: |
+        Returns the current status of the payment link and payment details if completed.
+        This endpoint accepts transaction_id created by the client when creating the link.
+
+        Redirect behavior (hosted UI):
+          - On success (e.g. status = 1):
+            1. If callback_url set, hosted UI redirects to that URL.
+            2. If not set, hosted UI redirects to https://app.swychrconnect.com/payment_success
+          - On failure:
+            - Hosted UI redirects to https://app.swychrconnect.com/payment_failed
+
+        Webhook behavior:
+          - If callback_url is configured, platform POSTs PaymentLinkStatusResponse to the callback_url on status updates.
+      operationId: getPaymentLinkStatus
+      security:
+      - AuthToken: []
+      parameters:
+      - name: X-Request-Id
+        in: header
+        schema:
+          type: string
+          format: uuid
+        description: Client trace id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                transaction_id:
+                  type: string
+              required:
+              - transaction_id
+            example:
+              transaction_id: txn_20251126_0001
+      callbacks:
+        PaymentStatusUpdated:
+          "$ref": "#/components/callbacks/PaymentStatusUpdated"
+      responses:
+        '200':
+          description: Payment link status retrieved successfully
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/PaymentLinkStatusResponse"
+        '400':
+          "$ref": "#/components/responses/ValidationError"
+        '401':
+          "$ref": "#/components/responses/UnauthorizedError"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '500':
+          "$ref": "#/components/responses/ServerError"
+  "/merchant/webhook/payment_status":
+    post:
+      tags:
+      - Webhook
+      summary: Example merchant webhook receiver (documentation)
+      description: 'Example endpoint showing what merchants should implement to receive
+        webhook events. The POST body is identical to PaymentLinkStatusResponse.
+
+'
+      operationId: merchantWebhookExample
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/PaymentLinkStatusResponse"
+      responses:
+        '200':
+          description: Merchant must respond 200 to acknowledge receipt
+        '400':
+          description: Invalid payload
+externalDocs:
+  description: Integration guide and examples

@@ -26,6 +26,7 @@ import {
   CreditCard,
   Stamp,
   ExternalLink,
+  Receipt,
 } from "lucide-react";
 import { productFeatures } from "@/lib/productFeatures";
 import PageHeroBanner from "@/components/common/PageHeroBanner";
@@ -139,7 +140,7 @@ const MorePage = () => {
                 </div>
                 <p className="text-[11px] text-muted-foreground mt-1.5">
                   {stamps >= stampGoal
-                    ? "Goal reached — more rewards coming soon."
+                    ? "Goal reached — keep earning rewards."
                     : `${stampGoal - stamps} more completed transfers to fill your card.`}
                 </p>
               </div>
@@ -190,6 +191,7 @@ const MorePage = () => {
             rows={[
               { icon: Wallet, label: "My Wallets", onClick: () => navigate("/wallets") },
               ...(productFeatures.cards ? [{ icon: CreditCard, label: "Cards", onClick: () => navigate("/cards") }] : []),
+              ...(productFeatures.billPay ? [{ icon: Receipt, label: "Pay Bills & Airtime", onClick: () => navigate("/pay-bills") }] : []),
               { icon: ArrowLeftRight, label: "Exchange Currency", onClick: () => navigate("/exchange") },
               { icon: PieChart, label: "Transaction Limits", onClick: () => navigate("/kyc") },
             ]}

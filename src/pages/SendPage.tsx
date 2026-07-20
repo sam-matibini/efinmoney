@@ -42,7 +42,7 @@ import { resolveEffectiveRate } from "@/lib/fx";
 import { currencySymbol, countryToCurrency } from "@/lib/currency";
 import { useProfile } from "@/hooks/useProfile";
 import { toast } from "sonner";
-import { ArrowRight, CheckCircle, Users, Clock, Shield, Wallet, Landmark, CreditCard, AlertCircle, X, Search, Globe2, Send } from "lucide-react";
+import { ArrowRight, CheckCircle, Users, Clock, Shield, Wallet, Landmark, CreditCard, AlertCircle, X, Search, Globe2, Send, Lock, Loader2, Check } from "lucide-react";
 import { BrandFlag, CountryFlag } from "@/components/ui/FlagImage";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import CanadaSendFlow from "@/components/send/CanadaSendFlow";
@@ -55,8 +55,24 @@ import FxTicker from "@/components/send/FxTicker";
 import LiveFxCalculator from "@/components/fx/LiveFxCalculator";
 import { parseAmount } from "@/components/fx/liveFxUtils";
 import { clearSendHandoff, readSendHandoff } from "@/lib/sendHandoff";
+import {
+  clearCardSendIntent,
+  markCardSendIntentConsumed,
+  readCardSendIntent,
+  saveCardSendIntent,
+} from "@/lib/cardSendIntent";
+import {
+  clearPendingNombaTxn,
+  getNombaPayStatus,
+  initiateNombaCollection,
+  isNombaTopupCurrency,
+  nombaMinAmount,
+  readPendingNombaTxn,
+  savePendingNombaTxn,
+} from "@/lib/nombaPay";
+import { quoteDirectNombaTopup, quoteCadNombaTopup } from "@/lib/nombaTopupQuote";
 import { productFeatures } from "@/lib/productFeatures";
-import ComingSoon from "@/components/common/ComingSoon";
+import { cn } from "@/lib/utils";
 import PageHeroBanner from "@/components/common/PageHeroBanner";
 import AppPage from "@/components/layout/AppPage";
 import TransferSuccess from "@/components/send/TransferSuccess";
@@ -67,6 +83,29 @@ import {
 } from "@/components/ui/alert-dialog";
 
 type FundingSource = 'wallet' | 'bank' | 'card';
+type CardResumeStage = "confirming" | "sending";
+
+const CARD_RESUME_COPY: Record<CardResumeStage, { title: string; sub: string }> = {
+  confirming: {
+    title: "Confirming card payment…",
+    sub: "We’re verifying your payment went through",
+  },
+  sending: {
+    title: "Sending to your recipient…",
+    sub: "Payment confirmed — delivering the transfer now",
+  },
+};
+
+/** Dev/test FX overrides (white-label Send quotes). Remove when live rates are locked. */
+const TEST_SEND_FX: Record<string, number> = {
+  "USD:NGN": 250,
+  "CAD:NGN": 250,
+};
+
+function testSendFxRate(from: string, to: string): number | null {
+  if (!import.meta.env.DEV) return null;
+  return TEST_SEND_FX[`${from.toUpperCase()}:${to.toUpperCase()}`] ?? null;
+}
 
 const cardBrandClass = (brand?: string | null) => {
   switch ((brand ?? "").toLowerCase()) {
@@ -124,8 +163,12 @@ const SendPage = () => {
   const [ngnResolveError, setNgnResolveError] = useState<string | null>(null);
   const [useStellar, setUseStellar] = useState<boolean>(false);
   const [usePawapay, setUsePawapay] = useState<boolean>(false);
+  const [usePaytota, setUsePaytota] = useState<boolean>(false);
   const [useFincra, setUseFincra] = useState<boolean>(import.meta.env.VITE_FINCRA_PAYOUT === "true");
   const [fromQuickSend, setFromQuickSend] = useState(false);
+  const [cardResumeProcessing, setCardResumeProcessing] = useState(false);
+  const [cardResumeStage, setCardResumeStage] = useState<CardResumeStage>("confirming");
+  const cardResumeLock = useRef(false);
 
   // Ghana bank payout state (toggle between Mobile Money and Bank Transfer)
   const [ghPayoutMode, setGhPayoutMode] = useState<'mobile' | 'bank'>('mobile');
@@ -250,7 +293,9 @@ const SendPage = () => {
   const sourceCurrency = fundingSource === 'wallet'
     ? (selectedWallet?.currency_code || profileCurrency || 'USD')
     : fundingSource === 'card'
-    ? (activeSavedCard?.currency_code || profileCurrency || 'USD')
+    ? (selectedWallet && isNombaTopupCurrency(selectedWallet.currency_code)
+      ? selectedWallet.currency_code
+      : (profileCurrency && isNombaTopupCurrency(profileCurrency) ? profileCurrency : 'USD'))
     : (selectedExternalSource?.currency_code || profileCurrency || 'USD');
   const sourceSymbol = currencySymbol(sourceCurrency);
   const targetSymbol = targetCountry.symbol || targetCountry.code;
@@ -286,8 +331,12 @@ const SendPage = () => {
 
   const isNGNBank = targetCountry.code === "NGN";
   const isGhanaBank = targetCountry.code === "GHS" && ghPayoutMode === "bank";
-  const canUseFincra = ["NGN", "KES", "GHS", "UGX", "TZS", "RWF"].includes(targetCountry.code);
   const isBankPayout = isNGNBank || isGhanaBank;
+  const canUseFincra = ["NGN", "KES", "GHS", "UGX", "TZS", "RWF"].includes(targetCountry.code);
+  const canUsePaytotaPayout =
+    productFeatures.paytotaPayout
+    && targetCountry.code === "UGX"
+    && !isBankPayout;
 
   // "Send a secure link" is available when the destination currency supports
   // recipient claims (CAD/USD/GBP/EUR) and the sender holds a wallet in it to
@@ -391,7 +440,10 @@ const SendPage = () => {
   const { data: nombaFxQuote } = useQuery({
     queryKey: ["nomba-fx", sourceCurrency, targetCountry.code],
     queryFn: () => getNombaExchangeRate(sourceCurrency, targetCountry.code),
-    enabled: !isSameCurrency && isNgnPair(sourceCurrency, targetCountry.code),
+    enabled:
+      !isSameCurrency
+      && isNgnPair(sourceCurrency, targetCountry.code)
+      && testSendFxRate(sourceCurrency, targetCountry.code) == null,
     staleTime: 60_000,
   });
   const nombaRate = nombaFxQuote?.effective_rate && nombaFxQuote.effective_rate > 0
@@ -426,18 +478,21 @@ const SendPage = () => {
   const cardFee = fundingSource === 'card' ? (pricing?.transfer_card_surcharge ?? 0) : 0;
   const fee = parsedAmount > 0 ? baseFee + cardFee : 0;
 
+  const testRate = testSendFxRate(sourceCurrency, targetCountry.code);
   const directDbRate =
     fxRate && Number(fxRate.effective_rate) > 0 ? Number(fxRate.effective_rate) : null;
   const derivedRate = derivedFxRate && Number(derivedFxRate) > 0 ? Number(derivedFxRate) : null;
   const rawRate = isSameCurrency
     ? 1
-    : nombaRate ?? resolvedDbRate ?? directDbRate ?? derivedRate ?? 0;
-  // Apply FX markup from corridor rule (reduces effective rate by markup %)
-  const effectiveRate = rawRate > 0 && corridorRule?.fx_markup_percent
+    : testRate ?? nombaRate ?? resolvedDbRate ?? directDbRate ?? derivedRate ?? 0;
+  // Apply FX markup from corridor rule (reduces effective rate by markup %) — skip for test overrides
+  const effectiveRate = rawRate > 0 && !testRate && corridorRule?.fx_markup_percent
     ? rawRate * (1 - Number(corridorRule.fx_markup_percent) / 100)
     : rawRate;
   const rateAvailable = isSameCurrency || effectiveRate > 0;
-  const rateSource = nombaRate ? "nomba" : (resolvedDbRate || directDbRate ? "internal" : "market");
+  const rateSource = testRate
+    ? "test"
+    : nombaRate ? "nomba" : (resolvedDbRate || directDbRate ? "internal" : "market");
 
   const { data: nombaConversion } = useQuery({
     queryKey: ["nomba-conversion", sourceCurrency, targetCountry.code, parsedAmount, fee],
@@ -451,7 +506,8 @@ const SendPage = () => {
       isNGNBank &&
       sourceCurrency !== "NGN" &&
       parsedAmount > 0 &&
-      rateAvailable,
+      rateAvailable &&
+      testRate == null,
     staleTime: 30_000,
   });
 
@@ -466,6 +522,48 @@ const SendPage = () => {
     && !!selectedWallet
     && parsedAmount > 0
     && parsedAmount > Number(selectedWallet.balance);
+
+  const nombaWallets = useMemo(
+    () => (wallets ?? []).filter((w) => isNombaTopupCurrency(w.currency_code)),
+    [wallets],
+  );
+  const nombaWalletCodes = useMemo(
+    () => [...new Set(nombaWallets.map((w) => w.currency_code))],
+    [nombaWallets],
+  );
+  const cardPayoutCodes = useMemo(() => ["NGN", "GHS"], []);
+  const cardSendEnabled = productFeatures.nombaNigeria && nombaWallets.length > 0;
+
+  const cardCheckoutQuote = useMemo(() => {
+    if (fundingSource !== "card" || parsedAmount <= 0) return null;
+    if (sourceCurrency.toUpperCase() === "CAD" && fxRates?.length) {
+      return quoteCadNombaTopup(parsedAmount, fxRates);
+    }
+    if (isNombaTopupCurrency(sourceCurrency) && sourceCurrency.toUpperCase() !== "CAD") {
+      return quoteDirectNombaTopup(parsedAmount, sourceCurrency);
+    }
+    return null;
+  }, [fundingSource, parsedAmount, sourceCurrency, fxRates]);
+
+  // When paying by card, pick a Nomba charge wallet + keep NG/GH payout destinations
+  useEffect(() => {
+    if (fundingSource !== "card") return;
+    if (nombaWallets.length === 0) return;
+    const currentOk = nombaWallets.some((w) => w.wallet_id === selectedWalletId);
+    if (!currentOk) {
+      const preferred =
+        nombaWallets.find((w) => w.currency_code === "USD")
+        || nombaWallets.find((w) => w.currency_code === "CAD")
+        || nombaWallets.find((w) => w.currency_code === (profileCurrency || ""))
+        || nombaWallets.find((w) => w.currency_code === "NGN")
+        || nombaWallets[0];
+      if (preferred) setSelectedWalletId(preferred.wallet_id);
+    }
+    if (!cardPayoutCodes.includes(targetCountry.code)) {
+      const ng = findCountryByCode("NGN");
+      if (ng) setTargetCountryId(ng.id);
+    }
+  }, [fundingSource, nombaWallets, selectedWalletId, targetCountry.code, profileCurrency, cardPayoutCodes]);
 
   const walletCurrencyCodes = useMemo(
     () => [...new Set((wallets ?? []).map((w) => w.currency_code))],
@@ -490,7 +588,7 @@ const SendPage = () => {
 
   const handleCalcFromChange = useCallback(
     (code: string) => {
-      if (fundingSource === "wallet") {
+      if (fundingSource === "wallet" || fundingSource === "card") {
         const w = wallets?.find((wallet) => wallet.currency_code === code);
         if (w) setSelectedWalletId(w.wallet_id);
       }
@@ -542,7 +640,24 @@ const SendPage = () => {
   );
 
   // Create transfer row + maybe save beneficiary. Returns id.
-  const createTransferRecord = async (overrides?: { funding_source?: 'wallet' | 'card' | 'bank' }) => {
+  const createTransferRecord = async (overrides?: {
+    funding_source?: "wallet" | "card" | "bank";
+    sender_wallet_id?: string;
+    source_currency?: string;
+    target_currency?: string;
+    source_amount?: number;
+    target_amount?: number;
+    exchange_rate?: number;
+    fee_amount?: number;
+    recipient_name?: string;
+    recipient_phone?: string;
+    recipient_account?: string;
+    recipient_bank_code?: string;
+    recipient_bank_name?: string | null;
+    recipient_country?: string;
+    transfer_type?: "bank" | "mobile_money";
+    payout_method?: string;
+  }) => {
     const ngnAcct = isNGNBank ? ngnAccountNumber.replace(/\D/g, "") : "";
     const ngnBank = isNGNBank ? (ngnBanks.find((b) => b.code === ngnBankCode)?.name || null) : null;
     const ghAcct = isGhanaBank ? ghAccountNumber.replace(/\D/g, "") : "";
@@ -550,38 +665,47 @@ const SendPage = () => {
     const bankAcct = isNGNBank ? ngnAcct : isGhanaBank ? ghAcct : "";
     const bankCode = isNGNBank ? ngnBankCode : isGhanaBank ? ghBankCode : "";
     const bankName = isNGNBank ? ngnBank : isGhanaBank ? ghBank : null;
+    const funding = overrides?.funding_source ?? fundingSource;
+    const walletId =
+      overrides?.sender_wallet_id
+      ?? (funding === "wallet" || funding === "card"
+        ? selectedWallet!.wallet_id
+        : wallets?.[0]?.wallet_id || "");
+    const destCurrency = overrides?.target_currency ?? targetCountry.code;
     const transfer = await createTransfer.mutateAsync({
-      sender_wallet_id: fundingSource === 'wallet' ? selectedWallet!.wallet_id : wallets?.[0]?.wallet_id || '',
-      recipient_name: recipientName,
-      recipient_phone: isBankPayout ? undefined : recipientPhone,
-      recipient_account: isBankPayout ? bankAcct : undefined,
-      recipient_bank_code: isBankPayout ? bankCode : undefined,
-      recipient_bank_name: isBankPayout ? (bankName || undefined) : undefined,
-      recipient_country: targetCountry.code,
-      transfer_type: isBankPayout ? 'bank' : 'mobile_money',
-      payout_method: isBankPayout ? 'bank' : effectivePayoutMethod,
-      source_currency: sourceCurrency,
-      target_currency: targetCountry.code,
-      source_amount: parsedAmount,
-      target_amount: receivedAmount,
-      exchange_rate: effectiveRate,
-      fee_amount: fee,
-      funding_source: overrides?.funding_source ?? fundingSource,
+      sender_wallet_id: walletId,
+      recipient_name: overrides?.recipient_name ?? recipientName,
+      recipient_phone: overrides?.recipient_phone ?? (isBankPayout ? undefined : recipientPhone),
+      recipient_account: overrides?.recipient_account ?? (isBankPayout ? bankAcct : undefined),
+      recipient_bank_code: overrides?.recipient_bank_code ?? (isBankPayout ? bankCode : undefined),
+      recipient_bank_name: overrides?.recipient_bank_name ?? (isBankPayout ? (bankName || undefined) : undefined),
+      recipient_country: overrides?.recipient_country ?? destCurrency,
+      transfer_type: overrides?.transfer_type ?? (isBankPayout ? "bank" : "mobile_money"),
+      payout_method: overrides?.payout_method ?? (isBankPayout ? "bank" : effectivePayoutMethod),
+      source_currency: overrides?.source_currency ?? sourceCurrency,
+      target_currency: destCurrency,
+      source_amount: overrides?.source_amount ?? parsedAmount,
+      target_amount: overrides?.target_amount ?? receivedAmount,
+      exchange_rate: overrides?.exchange_rate ?? effectiveRate,
+      fee_amount: overrides?.fee_amount ?? fee,
+      // Card sends are prepaid via Nomba into the wallet, then paid out as wallet
+      funding_source: funding === "card" ? "wallet" : funding,
     });
     setLastTransferId(transfer.id);
     if (user) {
       try {
+        const tType = overrides?.transfer_type ?? (isBankPayout ? "bank" : "mobile_money");
         const { isNew } = await recordTransferRecipient({
           user_id: user.id,
-          name: recipientName,
-          phone: isBankPayout ? "" : recipientPhone,
-          country_code: targetCountry.code,
-          payout_method: isBankPayout ? 'bank' : effectivePayoutMethod,
-          network: isBankPayout ? null : (activeNetwork?.id || null),
-          currency_code: targetCountry.code,
-          bank_name: isBankPayout ? bankName : null,
-          bank_account: isBankPayout ? bankAcct : null,
-          bank_code: isNGNBank ? ngnBankCode : null,
+          name: overrides?.recipient_name ?? recipientName,
+          phone: tType === "bank" ? "" : (overrides?.recipient_phone ?? recipientPhone),
+          country_code: overrides?.recipient_country ?? destCurrency,
+          payout_method: overrides?.payout_method ?? (isBankPayout ? "bank" : effectivePayoutMethod),
+          network: tType === "bank" ? null : (activeNetwork?.id || null),
+          currency_code: destCurrency,
+          bank_name: overrides?.recipient_bank_name ?? (isBankPayout ? bankName : null),
+          bank_account: overrides?.recipient_account ?? (isBankPayout ? bankAcct : null),
+          bank_code: overrides?.recipient_bank_code ?? (isNGNBank ? ngnBankCode : null),
         } as any);
         if (isNew && !pickedBeneficiaryId) setSavePromptOpen(true);
       } catch { /* non-fatal */ }
@@ -637,7 +761,7 @@ const SendPage = () => {
         let data: any = null;
         let invokeErr: any = null;
         try {
-          const res = await supabase.functions.invoke('execute-transfer', { body: { transfer_id: tid, use_stellar: isNGNBank && useStellar, use_pawapay: !isBankPayout && usePawapay, use_fincra: useFincra && canUseFincra, recipient_country_hint: targetCountry.country } });
+          const res = await supabase.functions.invoke('execute-transfer', { body: { transfer_id: tid, use_stellar: isNGNBank && useStellar, use_pawapay: !isBankPayout && usePawapay, use_paytota: canUsePaytotaPayout && usePaytota, use_fincra: useFincra && canUseFincra, recipient_country_hint: targetCountry.country } });
           data = res.data;
           invokeErr = res.error;
         } catch (err) {
@@ -717,10 +841,85 @@ const SendPage = () => {
       return;
     }
 
-    // Card funding removed — use wallet top-up (Nomba / Ghana Pay) first.
-    toast.error("Card payments are disabled. Top up your wallet, then send from your balance.");
+    // ── Card: Nomba hosted checkout → credit wallet → payout (NGN/GHS) ───
+    if (fundingSource === "card") {
+      try {
+        if (!selectedWallet || !isNombaTopupCurrency(selectedWallet.currency_code)) {
+          toast.error("Pick a USD, CAD, EUR, GBP, or NGN wallet to pay by card.");
+          setConfirming(false);
+          return;
+        }
+        const cardMin = nombaMinAmount(selectedWallet.currency_code);
+        if (parsedAmount < cardMin) {
+          toast.error(
+            `Card sends need at least ${selectedWallet.currency_code === "NGN" ? "₦" : selectedWallet.currency_code === "CAD" ? "C$" : "$"}${cardMin} so checkout can clear. Try a larger amount.`,
+          );
+          setConfirming(false);
+          return;
+        }
+        if (!cardPayoutCodes.includes(targetCountry.code)) {
+          toast.error("Card send currently supports Nigeria and Ghana only.");
+          setConfirming(false);
+          return;
+        }
+        if (!user?.email) {
+          toast.error("Your account email is required for card checkout.");
+          setConfirming(false);
+          return;
+        }
+
+        const ngnAcct = isNGNBank ? ngnAccountNumber.replace(/\D/g, "") : "";
+        const ngnBank = isNGNBank ? (ngnBanks.find((b) => b.code === ngnBankCode)?.name || null) : null;
+        const ghAcct = isGhanaBank ? ghAccountNumber.replace(/\D/g, "") : "";
+        const ghBank = isGhanaBank ? (ghBanks.find((b) => b.code === ghBankCode)?.name || null) : null;
+
+        const returnUrl = `${window.location.origin}/send?cardSend=1&walletId=${encodeURIComponent(selectedWallet.wallet_id)}`;
+        const collection = await initiateNombaCollection({
+          credit_amount: parsedAmount,
+          amount: parsedAmount,
+          target_wallet_id: selectedWallet.wallet_id,
+          email: user.email,
+          corridor: selectedWallet.currency_code === "NGN" ? "nigeria" : "international",
+          return_url: returnUrl,
+        });
+
+        saveCardSendIntent({
+          nombaTxnId: collection.transaction_id,
+          walletId: selectedWallet.wallet_id,
+          sourceCurrency,
+          sourceAmount: parsedAmount,
+          targetCountryId,
+          targetCurrency: targetCountry.code,
+          targetAmount: receivedAmount,
+          exchangeRate: effectiveRate,
+          feeAmount: fee,
+          recipientName,
+          recipientPhone: isBankPayout ? "" : recipientPhone,
+          payoutMethod: isBankPayout ? "bank" : effectivePayoutMethod,
+          transferType: isBankPayout ? "bank" : "mobile_money",
+          recipientAccount: isBankPayout ? (isNGNBank ? ngnAcct : ghAcct) : undefined,
+          recipientBankCode: isBankPayout ? (isNGNBank ? ngnBankCode : ghBankCode) : undefined,
+          recipientBankName: isBankPayout ? (isNGNBank ? ngnBank : ghBank) : null,
+          networkId: activeNetwork?.id || null,
+          ghPayoutMode,
+          useStellar: isNGNBank && useStellar,
+          usePawapay: !isBankPayout && usePawapay,
+          usePaytota: canUsePaytotaPayout && usePaytota,
+          useFincra: useFincra && canUseFincra,
+          recipientCountryHint: targetCountry.country,
+        });
+        savePendingNombaTxn(collection.transaction_id);
+        toast.message("Opening secure card checkout…");
+        window.location.href = collection.payment_link;
+      } catch (e: any) {
+        toast.error(e?.message || "Could not start card checkout");
+        setConfirming(false);
+      }
+      return;
+    }
+
+    toast.error("Unsupported funding source.");
     setConfirming(false);
-    return;
   };
 
   const handleCancelTransfer = async () => {
@@ -882,6 +1081,155 @@ const SendPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wallets, searchParams, beneficiaries]);
 
+  // Resume card-funded send after Nomba hosted checkout returns
+  useEffect(() => {
+    if (!wallets?.length || cardResumeLock.current) return;
+
+    const intent = readCardSendIntent();
+    const cardSendFlag = searchParams.get("cardSend") === "1";
+    const nombaStatus = searchParams.get("nomba");
+    const pendingTxn = intent?.nombaTxnId || readPendingNombaTxn();
+
+    if (!intent || intent.status === "consumed") {
+      if (cardSendFlag || nombaStatus) {
+        const next = new URLSearchParams(searchParams);
+        next.delete("cardSend");
+        next.delete("nomba");
+        next.delete("walletId");
+        next.delete("orderId");
+        setSearchParams(next, { replace: true });
+      }
+      return;
+    }
+
+    if (!cardSendFlag && nombaStatus !== "success" && nombaStatus !== "failed" && !pendingTxn) return;
+
+    if (nombaStatus === "failed") {
+      clearCardSendIntent();
+      clearPendingNombaTxn();
+      toast.error("Card payment failed or was cancelled. No transfer was sent.");
+      const next = new URLSearchParams(searchParams);
+      next.delete("cardSend");
+      next.delete("nomba");
+      next.delete("walletId");
+      next.delete("orderId");
+      setSearchParams(next, { replace: true });
+      return;
+    }
+
+    cardResumeLock.current = true;
+    setCardResumeStage("confirming");
+    setCardResumeProcessing(true);
+
+    const stripParams = () => {
+      const next = new URLSearchParams(searchParams);
+      let changed = false;
+      for (const key of ["cardSend", "nomba", "walletId", "orderId"]) {
+        if (next.has(key)) {
+          next.delete(key);
+          changed = true;
+        }
+      }
+      if (changed) setSearchParams(next, { replace: true });
+    };
+
+    const finishPayout = async () => {
+      try {
+        // Restore UI context
+        setFundingSource("wallet");
+        setSelectedWalletId(intent.walletId);
+        setAmount(String(intent.sourceAmount));
+        setTargetCountryId(intent.targetCountryId);
+        setRecipientName(intent.recipientName);
+        setRecipientPhone(intent.recipientPhone || "");
+        if (intent.ghPayoutMode) setGhPayoutMode(intent.ghPayoutMode);
+        if (intent.recipientBankCode && intent.targetCurrency === "NGN") {
+          setNgnBankCode(intent.recipientBankCode);
+          setNgnAccountNumber(intent.recipientAccount || "");
+          setNgnResolvedName(intent.recipientName);
+        }
+        if (intent.recipientBankCode && intent.targetCurrency === "GHS") {
+          setGhBankCode(intent.recipientBankCode);
+          setGhAccountNumber(intent.recipientAccount || "");
+        }
+        if (intent.networkId) setSelectedNetworkId(intent.networkId);
+
+        // Wait until Nomba collection is completed (webhook may lag redirect)
+        let paid = false;
+        for (let i = 0; i < 40; i++) {
+          const status = await getNombaPayStatus(intent.nombaTxnId);
+          if (status?.status === "completed") {
+            paid = true;
+            break;
+          }
+          if (status?.status === "failed" || status?.status === "cancelled") {
+            throw new Error(status.failure_reason || "Card payment failed");
+          }
+          await new Promise((r) => setTimeout(r, 1500));
+        }
+        if (!paid) {
+          throw new Error("Payment is still processing. We’ll finish the send once it clears — check back shortly or contact support.");
+        }
+
+        setCardResumeStage("sending");
+        await qc.invalidateQueries({ queryKey: ["wallets"] });
+
+        const tid = await createTransferRecord({
+          funding_source: "wallet",
+          sender_wallet_id: intent.walletId,
+          source_currency: intent.sourceCurrency,
+          target_currency: intent.targetCurrency,
+          source_amount: intent.sourceAmount,
+          target_amount: intent.targetAmount,
+          exchange_rate: intent.exchangeRate,
+          fee_amount: intent.feeAmount,
+          recipient_name: intent.recipientName,
+          recipient_phone: intent.transferType === "bank" ? undefined : intent.recipientPhone,
+          recipient_account: intent.recipientAccount,
+          recipient_bank_code: intent.recipientBankCode,
+          recipient_bank_name: intent.recipientBankName,
+          recipient_country: intent.targetCurrency,
+          transfer_type: intent.transferType,
+          payout_method: intent.payoutMethod,
+        });
+
+        markCardSendIntentConsumed();
+        clearPendingNombaTxn();
+        stripParams();
+
+        const res = await supabase.functions.invoke("execute-transfer", {
+          body: {
+            transfer_id: tid,
+            use_stellar: !!intent.useStellar,
+            use_pawapay: !!intent.usePawapay,
+            use_paytota: !!intent.usePaytota,
+            use_fincra: !!intent.useFincra,
+            recipient_country_hint: intent.recipientCountryHint,
+          },
+        });        let data: any = res.data;
+        if (res.error && !data && (res.error as any)?.context?.response) {
+          try { data = await (res.error as any).context.response.json(); } catch { /* ignore */ }
+        }
+        if (res.error && !data?.success) {
+          throw new Error(data?.error || (res.error as Error).message || "Payout failed");
+        }
+
+        clearCardSendIntent();
+        toast.success("Card charged — transfer sent to your recipient!");
+        goToStep(4);
+      } catch (e: any) {
+        toast.error(e?.message || "Could not complete transfer after card payment");
+        stripParams();
+      } finally {
+        setCardResumeProcessing(false);
+        setCardResumeStage("confirming");
+        cardResumeLock.current = false;
+      }
+    };
+
+    void finishPayout();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wallets, searchParams]);
 
   const resetForm = () => {
     setDirection(-1);
@@ -896,9 +1244,21 @@ const SendPage = () => {
     setLinkResult(null);
     setFromQuickSend(false);
     clearSendHandoff();
+    clearCardSendIntent();
   };
 
-  const isStep1Valid = parsedAmount > 0 && parsedAmount > fee && receivedAmount > 0 && rateAvailable && !noLinkedSource && !insufficientFunds;
+  const isStep1Valid =
+    parsedAmount > 0
+    && parsedAmount > fee
+    && receivedAmount > 0
+    && rateAvailable
+    && !noLinkedSource
+    && !insufficientFunds
+    && (fundingSource !== "card" || (
+      cardSendEnabled
+      && cardPayoutCodes.includes(targetCountry.code)
+      && parsedAmount >= nombaMinAmount(sourceCurrency)
+    ));
   const isStep2Valid = useLink
     ? (recipientName.trim().length > 2 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail) && parsedAmount > 0)
     : isNGNBank
@@ -914,8 +1274,9 @@ const SendPage = () => {
     : modeParam === 'efinmoney' ? 'efinmoney'
     : 'international';
   const fundingOptions = ([
-    { v: 'wallet' as const, icon: Wallet, label: 'Wallet' },
-    ...(productFeatures.plaid ? [{ v: 'bank' as const, icon: Landmark, label: 'Bank' }] : []),
+    { v: "wallet" as const, icon: Wallet, label: "Wallet" },
+    ...(productFeatures.plaid ? [{ v: "bank" as const, icon: Landmark, label: "Bank" }] : []),
+    ...(productFeatures.nombaNigeria ? [{ v: "card" as const, icon: CreditCard, label: "Card" }] : []),
   ]);
 
   // Step transitions
@@ -927,6 +1288,93 @@ const SendPage = () => {
 
   return (
     <>
+      <AnimatePresence>
+        {cardResumeProcessing && (
+          <motion.div
+            key="card-resume-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-background/70 backdrop-blur-md px-4"
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 16, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 8, scale: 0.98 }}
+              transition={{ type: "spring", stiffness: 380, damping: 28 }}
+              className="w-full max-w-sm rounded-2xl border border-border/80 bg-card p-7 shadow-2xl"
+            >
+              <div className="flex flex-col items-center text-center space-y-5">
+                <div className="relative flex h-16 w-16 items-center justify-center">
+                  <div className="absolute inset-0 rounded-full bg-primary/25 blur-xl animate-pulse" />
+                  <div className="relative flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/30">
+                    <Loader2 className="h-7 w-7 animate-spin" aria-hidden />
+                  </div>
+                </div>
+
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={cardResumeStage}
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -6 }}
+                    transition={{ duration: 0.22 }}
+                    className="space-y-1.5 px-1"
+                  >
+                    <h3 className="text-lg font-display font-semibold text-foreground">
+                      {CARD_RESUME_COPY[cardResumeStage].title}
+                    </h3>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                      {CARD_RESUME_COPY[cardResumeStage].sub}
+                    </p>
+                  </motion.div>
+                </AnimatePresence>
+
+                <div className="w-full space-y-2.5 rounded-xl bg-muted/50 px-3.5 py-3 text-left">
+                  {[
+                    { id: "confirming" as const, label: "Verify card payment" },
+                    { id: "sending" as const, label: "Deliver to recipient" },
+                  ].map((step, idx) => {
+                    const active = cardResumeStage === step.id;
+                    const done = cardResumeStage === "sending" && step.id === "confirming";
+                    return (
+                      <div key={step.id} className="flex items-center gap-2.5">
+                        <div
+                          className={cn(
+                            "flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold",
+                            done && "bg-emerald-500/15 text-emerald-600",
+                            active && "bg-primary text-primary-foreground",
+                            !done && !active && "bg-muted-foreground/15 text-muted-foreground",
+                          )}
+                        >
+                          {done ? <Check className="h-3.5 w-3.5" /> : idx + 1}
+                        </div>
+                        <span
+                          className={cn(
+                            "text-sm",
+                            active || done ? "text-foreground font-medium" : "text-muted-foreground",
+                          )}
+                        >
+                          {step.label}
+                        </span>
+                        {active && (
+                          <Loader2 className="ml-auto h-3.5 w-3.5 animate-spin text-primary" />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <p className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                  <Lock className="h-3 w-3" />
+                  Please don’t close this window
+                </p>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       <AppPage width="default" innerClassName="space-y-5 sm:space-y-6">
           <BackToDashboard />
           {/* Header — slides down with fade */}
@@ -985,37 +1433,49 @@ const SendPage = () => {
               }}
               className="w-full"
             >
-              <TabsList className="relative grid w-full grid-cols-3 h-11 sm:h-12 overflow-hidden">
+              <TabsList
+                className={cn(
+                  "relative grid w-full h-11 sm:h-12 overflow-hidden",
+                  canadaLive ? "grid-cols-3" : "grid-cols-2",
+                )}
+              >
                 {/* Sliding pill */}
                 <motion.div
                   className="absolute top-1 bottom-1 rounded-sm bg-background shadow-sm"
                   initial={false}
                   animate={{
-                    left:
-                      activeTab === 'international' ? '0.25rem'
-                      : activeTab === 'efinmoney' ? 'calc(33.333% + 0.25rem)'
-                      : 'calc(66.666% + 0.25rem)',
+                    left: canadaLive
+                      ? (
+                        activeTab === "international" ? "0.25rem"
+                        : activeTab === "efinmoney" ? "calc(33.333% + 0.25rem)"
+                        : "calc(66.666% + 0.25rem)"
+                      )
+                      : (
+                        activeTab === "international" ? "0.25rem"
+                        : "calc(50% + 0.25rem)"
+                      ),
                   }}
-                  style={{ width: 'calc(33.333% - 0.5rem)' }}
+                  style={{
+                    width: canadaLive ? "calc(33.333% - 0.5rem)" : "calc(50% - 0.5rem)",
+                  }}
                   transition={{ type: "spring", stiffness: 380, damping: 30 }}
                 />
-                <TabsTrigger value="international" className="relative z-10 gap-1 px-1 sm:gap-1.5 sm:px-2 text-[11px] sm:text-sm data-[state=active]:bg-transparent data-[state=active]:shadow-none">
+                <TabsTrigger value="international" className="relative z-10 gap-1.5 px-2 sm:gap-2 sm:px-3 text-xs sm:text-sm data-[state=active]:bg-transparent data-[state=active]:shadow-none">
                   <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/10 ring-1 ring-border">
                     <Globe2 className="h-2.5 w-2.5 text-primary" aria-hidden />
                   </span>
                   International
                 </TabsTrigger>
-                <TabsTrigger value="efinmoney" className="relative z-10 gap-1 px-1 sm:gap-1.5 sm:px-2 text-[11px] sm:text-sm data-[state=active]:bg-transparent data-[state=active]:shadow-none">
+                <TabsTrigger value="efinmoney" className="relative z-10 gap-1.5 px-2 sm:gap-2 sm:px-3 text-xs sm:text-sm data-[state=active]:bg-transparent data-[state=active]:shadow-none">
                   <BrandFlag size="xs" />
                   eFinMoney
                 </TabsTrigger>
-                <TabsTrigger value="canada" className="relative z-10 gap-1 px-1 sm:gap-1.5 sm:px-2 text-[11px] sm:text-sm data-[state=active]:bg-transparent data-[state=active]:shadow-none">
-                  <CountryFlag country="CA" size="xs" />
-                  Domestic
-                  {!canadaLive && (
-                    <span className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">Soon</span>
-                  )}
-                </TabsTrigger>
+                {canadaLive && (
+                  <TabsTrigger value="canada" className="relative z-10 gap-1.5 px-2 sm:gap-2 sm:px-3 text-xs sm:text-sm data-[state=active]:bg-transparent data-[state=active]:shadow-none">
+                    <CountryFlag country="CA" size="xs" />
+                    Domestic
+                  </TabsTrigger>
+                )}
               </TabsList>
 
               {/* Animated tab content swap */}
@@ -1032,14 +1492,7 @@ const SendPage = () => {
                       <TabsContent value="canada" forceMount className="mt-0">
                         {canadaLive ? (
                           <CanadaSendFlow />
-                        ) : (
-                          <ComingSoon
-                            title="Canada domestic — coming soon"
-                            description="Interac, EFT, and CAD domestic transfers are on the roadmap. Nigeria and Ghana are live today."
-                            backHref="/send"
-                            backLabel="Back to international send"
-                          />
-                        )}
+                        ) : null}
                       </TabsContent>
                     </motion.div>
                   ) : activeTab === 'efinmoney' ? (
@@ -1239,6 +1692,54 @@ const SendPage = () => {
                                       </motion.div>
                                     )}
 
+                                    {fundingSource === "card" && (
+                                      <motion.div custom={1} variants={fieldVariants} initial="hidden" animate="show" className="space-y-3">
+                                        <div className="rounded-xl border border-primary/25 bg-primary/5 px-3 py-3 space-y-1.5">
+                                          <p className="text-sm font-medium text-foreground flex items-center gap-2">
+                                            <CreditCard className="h-4 w-4 text-primary" />
+                                            Pay by card, we deliver
+                                          </p>
+                                          <p className="text-xs text-muted-foreground leading-relaxed">
+                                            You’ll enter your card on our secure checkout. Once charged, we send to Nigeria (bank) or Ghana (mobile money).
+                                          </p>
+                                        </div>
+                                        {nombaWallets.length > 0 ? (
+                                          <div className="space-y-2">
+                                            <Label>Charge currency</Label>
+                                            <Select value={selectedWalletId || nombaWallets[0]?.wallet_id} onValueChange={setSelectedWalletId}>
+                                              <SelectTrigger><SelectValue placeholder="Select currency" /></SelectTrigger>
+                                              <SelectContent>
+                                                {nombaWallets.map((w) => (
+                                                  <SelectItem key={w.wallet_id} value={w.wallet_id}>
+                                                    {w.flag_emoji} {w.currency_code} card checkout
+                                                  </SelectItem>
+                                                ))}
+                                              </SelectContent>
+                                            </Select>
+                                            {cardCheckoutQuote && (
+                                              <p className="text-xs text-muted-foreground">
+                                                Card charge ≈ {cardCheckoutQuote.checkoutCurrency}{" "}
+                                                {cardCheckoutQuote.checkoutAmount.toLocaleString("en-US", {
+                                                  minimumFractionDigits: 2,
+                                                  maximumFractionDigits: 2,
+                                                })}
+                                                {" "}(includes card processing fee)
+                                              </p>
+                                            )}
+                                            <p className="text-xs text-muted-foreground">
+                                              Minimum {sourceCurrency === "NGN" ? "₦" : sourceCurrency === "CAD" ? "C$" : "$"}
+                                              {nombaMinAmount(sourceCurrency)} for card checkout
+                                              {sourceCurrency === "CAD" ? " · CAD is charged in USD" : ""}.
+                                            </p>
+                                          </div>
+                                        ) : (
+                                          <div className="rounded-lg border border-dashed border-border bg-muted/40 p-3 text-sm text-muted-foreground">
+                                            Create a USD, CAD, EUR, GBP, or NGN wallet first to pay by card.
+                                          </div>
+                                        )}
+                                      </motion.div>
+                                    )}
+
                                     <motion.div custom={2} variants={fieldVariants} initial="hidden" animate="show" className="flex justify-center py-1">
                                       <LiveFxCalculator
                                         variant="app"
@@ -1249,8 +1750,14 @@ const SendPage = () => {
                                         onFromChange={handleCalcFromChange}
                                         onToChange={handleCalcToChange}
                                         onSendAmountChange={(v) => setAmount(v)}
-                                        fromCurrencyFilter={fundingSource === "wallet" ? walletCurrencyCodes : undefined}
-                                        toCurrencyFilter={payoutCurrencyCodes}
+                                        fromCurrencyFilter={
+                                          fundingSource === "wallet" ? walletCurrencyCodes
+                                          : fundingSource === "card" ? nombaWalletCodes
+                                          : undefined
+                                        }
+                                        toCurrencyFilter={
+                                          fundingSource === "card" ? cardPayoutCodes : payoutCurrencyCodes
+                                        }
                                         quoteRecipient={rateAvailable ? calcQuoteRecipient : undefined}
                                         quoteSend={rateAvailable ? calcQuoteSend : undefined}
                                         displayRate={rateAvailable ? effectiveRate : null}
@@ -1265,6 +1772,18 @@ const SendPage = () => {
                                         showDisclaimer
                                       />
                                     </motion.div>
+
+                                    {fundingSource === "card" && parsedAmount > 0 && parsedAmount < nombaMinAmount(sourceCurrency) && (
+                                      <motion.p
+                                        initial={{ opacity: 0, x: -6 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        className="text-sm font-medium text-destructive flex items-center justify-center gap-1"
+                                      >
+                                        <AlertCircle className="w-3.5 h-3.5" />
+                                        Card minimum is {sourceCurrency === "CAD" ? "C$" : sourceCurrency === "NGN" ? "₦" : "$"}
+                                        {nombaMinAmount(sourceCurrency)}
+                                      </motion.p>
+                                    )}
 
                                     {insufficientFunds && (
                                       <motion.p
@@ -1674,7 +2193,7 @@ const SendPage = () => {
                                               Route this mobile money payout through PawaPay&apos;s pan-African network instead of the default provider.
                                             </p>
                                           </div>
-                                          <Switch
+                                            <Switch
                                             checked={usePawapay}
                                             onCheckedChange={setUsePawapay}
                                             aria-label="Use PawaPay network"
@@ -1682,10 +2201,30 @@ const SendPage = () => {
                                         </div>
                                         ) : (
                                           <p className="text-xs text-muted-foreground">
-                                            Additional mobile-money corridors are coming soon. Ghana and Nigeria bank transfers are live today.
+                                            Ghana mobile money and Nigeria bank transfers are available today.
                                           </p>
                                         )}
                                       </motion.div>
+                                      {canUsePaytotaPayout && (
+                                        <motion.div custom={2.55} variants={fieldVariants} initial="hidden" animate="show" className="rounded-xl border border-sky-500/30 bg-gradient-to-br from-sky-500/5 via-background to-sky-500/5 p-4">
+                                          <div className="flex items-start justify-between gap-3">
+                                            <div className="flex-1">
+                                              <div className="flex items-center gap-2">
+                                                <span className="text-sm font-medium">Use Paytota (test)</span>
+                                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-700 dark:text-sky-300 font-mono uppercase">Test</span>
+                                              </div>
+                                              <p className="text-xs text-muted-foreground mt-1">
+                                                Route this UGX mobile money payout through Paytota. Default rails stay available when off.
+                                              </p>
+                                            </div>
+                                            <Switch
+                                              checked={usePaytota}
+                                              onCheckedChange={setUsePaytota}
+                                              aria-label="Use Paytota payout"
+                                            />
+                                          </div>
+                                        </motion.div>
+                                      )}
                                       {productFeatures.flutterwave && canUseFincra && (
                                         <motion.div custom={2.6} variants={fieldVariants} initial="hidden" animate="show" className="rounded-xl border border-teal-500/30 bg-gradient-to-br from-teal-500/5 via-background to-teal-500/5 p-4">
                                           <div className="flex items-start justify-between gap-3">
@@ -1765,7 +2304,7 @@ const SendPage = () => {
                                       )}
                                       <div className="flex justify-between"><span className="text-muted-foreground">Destination</span><span className="font-medium">{targetCountry.flag} {targetCountry.country}</span></div>
                                       <div className="flex justify-between"><span className="text-muted-foreground">Method</span><span className="font-medium">{useLink ? "Secure link (recipient picks)" : isBankPayout ? "Bank Transfer" : effectiveMethodLabel}</span></div>
-                                      <div className="flex justify-between"><span className="text-muted-foreground">Funding</span><span className="font-medium capitalize">{fundingSource}</span></div>
+                                      <div className="flex justify-between"><span className="text-muted-foreground">Funding</span><span className="font-medium capitalize">{fundingSource === "card" ? "Card" : fundingSource}</span></div>
                                     </div>
                                     <div className="rounded-xl border border-border bg-card p-4 space-y-2 text-sm">
                                       <div className="flex justify-between"><span className="text-muted-foreground">You send</span><span className="font-medium">{sourceSymbol}{parsedAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {sourceCurrency}</span></div>
@@ -1775,6 +2314,11 @@ const SendPage = () => {
                                     </div>
                                     {fundingSource === 'bank' && (
                                       <p className="text-xs text-muted-foreground text-center">Bank transfer — funds will be debited within 1-2 business days.</p>
+                                    )}
+                                    {fundingSource === "card" && (
+                                      <p className="text-xs text-muted-foreground text-center">
+                                        Next you’ll enter card details on our secure page. After payment, we automatically send to your recipient.
+                                      </p>
                                     )}
                                     <div className="flex gap-3">
                                       <Button variant="outline" className="flex-1" onClick={() => goToStep(2)} disabled={confirming || creatingLink}>Back</Button>
@@ -1786,8 +2330,8 @@ const SendPage = () => {
                                           </span>
                                         ) : (
                                           <span className="inline-flex items-center gap-2">
-                                            <Shield className="w-4 h-4" />
-                                            {useLink ? 'Send secure link' : 'Confirm Transfer'}
+                                            {fundingSource === "card" ? <CreditCard className="w-4 h-4" /> : <Shield className="w-4 h-4" />}
+                                            {useLink ? "Send secure link" : fundingSource === "card" ? "Pay with card" : "Confirm Transfer"}
                                           </span>
                                         )}
                                       </Button>

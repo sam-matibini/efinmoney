@@ -71,6 +71,18 @@ const integrations: Integration[] = [
     environment: "production"
   },
   {
+    id: "swychr",
+    name: "Swychr Connect",
+    description: "Primary international payin, payout, virtual cards, and airtime",
+    category: "payments",
+    icon: <Globe className="h-6 w-6" />,
+    status: "connected",
+    enabled: true,
+    lastSync: "Live",
+    apiKeyConfigured: true,
+    environment: "production"
+  },
+  {
     id: "stripe",
     name: "Stripe",
     description: "Card charges and checkout — backend only; hidden from user UI",
@@ -84,7 +96,7 @@ const integrations: Integration[] = [
   {
     id: "visa_direct",
     name: "Visa Direct",
-    description: "Card push payouts — coming soon",
+    description: "Card push payouts",
     category: "cards",
     icon: <CreditCard className="h-6 w-6" />,
     status: "disconnected",
@@ -95,7 +107,7 @@ const integrations: Integration[] = [
   {
     id: "mastercard_send",
     name: "Mastercard Send",
-    description: "Fast, secure money transfers to Mastercard accounts — coming soon",
+    description: "Fast, secure money transfers to Mastercard accounts",
     category: "cards",
     icon: <CreditCard className="h-6 w-6" />,
     status: "disconnected",
@@ -117,7 +129,7 @@ const integrations: Integration[] = [
   {
     id: "mtn_momo",
     name: "MTN Mobile Money",
-    description: "Pan-African MoMo — Ghana live via Ghana Pay; other corridors coming soon",
+    description: "Pan-African MoMo — Ghana live via Ghana Pay",
     category: "mobile_money",
     icon: <Smartphone className="h-6 w-6" />,
     status: "disconnected",
@@ -128,7 +140,7 @@ const integrations: Integration[] = [
   {
     id: "airtel_money",
     name: "Airtel Money",
-    description: "Mobile wallet and payments platform — coming soon",
+    description: "Mobile wallet and payments platform",
     category: "mobile_money",
     icon: <Smartphone className="h-6 w-6" />,
     status: "disconnected",
@@ -162,7 +174,7 @@ const integrations: Integration[] = [
   {
     id: "coinbase",
     name: "Coinbase Commerce",
-    description: "Cryptocurrency payments — coming soon",
+    description: "Cryptocurrency payments",
     category: "crypto",
     icon: <Globe className="h-6 w-6" />,
     status: "disconnected",
@@ -262,7 +274,7 @@ export function IntegrationsPanel() {
       case "sumsub": setCurrentView({ type: "compliance", provider: "sumsub" }); break;
       case "plaid": setCurrentView({ type: "banking", provider: "plaid" }); break;
       case "wise": setCurrentView({ type: "banking", provider: "wise" }); break;
-      default: toast.info("Configuration page coming soon");
+      default: toast.info("Configuration page not available");
     }
   };
 

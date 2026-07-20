@@ -33,7 +33,13 @@ const WalletFundingPanel = ({
   className,
 }: WalletFundingPanelProps) => {
   const navigate = useNavigate();
-  const gateway = routeWalletTopupGateway(currency);
+  const gateway = routeWalletTopupGateway(
+    currency,
+    undefined,
+    undefined,
+    productFeatures.swychr,
+    productFeatures.paytota,
+  );
   const liveTopup = isLiveTopupCurrency(currency);
 
   const [paymentLinkOpen, setPaymentLinkOpen] = useState(false);
@@ -58,7 +64,7 @@ const WalletFundingPanel = ({
       {liveTopup ? (
         <div className="rounded-xl border p-4 space-y-3">
           <p className="text-sm text-muted-foreground leading-relaxed">
-            Top up this wallet via {currency === "GHS" ? "Ghana Pay" : currency === "CAD" ? "USD card checkout" : "secure checkout"} on the dedicated top-up page.
+            Top up this wallet via {currency === "GHS" ? "Ghana Pay" : "secure checkout"} on the dedicated top-up page.
           </p>
           <Button
             className="w-full"
@@ -82,8 +88,8 @@ const WalletFundingPanel = ({
         </div>
       ) : (
         <ComingSoon
-          title={`${currency} top-up — coming soon`}
-          description="We're expanding corridors — Nigeria and Ghana are live today."
+          title={`${currency} top-up is not available`}
+          description="Choose an NGN, GHS, USD, EUR, GBP, or CAD wallet to add money."
           backHref={returnPath}
           backLabel="Back"
           className="border-solid"

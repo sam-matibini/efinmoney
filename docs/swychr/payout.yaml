@@ -1,0 +1,444 @@
+---
+openapi: 3.0.3
+info:
+  title: SwychrConnect Payout API
+  version: v2
+  description: 'Secure payout API for bank transfers and local payment methods across
+    multiple countries.
+
+'
+  contact:
+    name: SwychrConnect Support
+    email: support@swychrconnect.com
+    url: https://accountpe.com
+  license:
+    name: Proprietary
+servers:
+- url: https://api.accountpe.com/api/payout
+  description: Production
+tags:
+- name: Auth Token
+  description: Authentication
+- name: Country Payment Method
+  description: Supported payout methods per country
+- name: Bank List
+  description: Nigerian banks
+- name: Payout Transaction Api
+  description: Create payouts
+- name: Transaction Status
+  description: Track transaction status
+- name: Fiat to PUSD Conversion
+  description: Fiat to PUSD conversion
+- name: PUSD To Fiat Rate
+  description: PUSD to Fiat rate
+security:
+- AuthToken: []
+components:
+  securitySchemes:
+    AuthToken:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Bearer token from /admin/auth
+  schemas:
+    ErrorResponse:
+      type: object
+      required:
+      - status
+      - message
+      properties:
+        status:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Invalid request
+        errors:
+          type: object
+          nullable: true
+          additionalProperties:
+            type: string
+    AuthRequest:
+      type: object
+      required:
+      - email
+      - password
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+    AuthResponse:
+      type: object
+      required:
+      - status
+      - message
+      - token
+      properties:
+        status:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: Login successful
+        token:
+          type: string
+    PayoutMethodsRequest:
+      type: object
+      required:
+      - country_code
+      properties:
+        country_code:
+          type: string
+          example: NG
+    PaymentMethod:
+      type: object
+      properties:
+        id:
+          type: string
+          example: bank_transfer
+        name:
+          type: string
+          example: Bank Transfer
+        supported_currencies:
+          type: array
+          items:
+            type: string
+          example:
+          - NGN
+        notes:
+          type: string
+          nullable: true
+    PayoutMethodsResponse:
+      type: object
+      required:
+      - status
+      - message
+      - data
+      properties:
+        status:
+          type: integer
+        message:
+          type: string
+        data:
+          type: object
+          properties:
+            country:
+              type: string
+              example: Nigeria
+            country_code:
+              type: string
+              example: NG
+            currency_name:
+              type: string
+              example: Nigerian Naira
+            currency_code:
+              type: string
+              example: NGN
+            payment_methods:
+              type: array
+              items:
+                "$ref": "#/components/schemas/PaymentMethod"
+    NigeriaBank:
+      type: object
+      required:
+      - name
+      - code
+      properties:
+        name:
+          type: string
+        code:
+          type: string
+        swift_code:
+          type: string
+          nullable: true
+    NigeriaBanksResponse:
+      type: object
+      required:
+      - status
+      - message
+      - data
+      properties:
+        status:
+          type: integer
+        message:
+          type: string
+        data:
+          type: array
+          items:
+            "$ref": "#/components/schemas/NigeriaBank"
+    CreateTransactionRequest:
+      type: object
+      required:
+      - country_code
+      - beneficiary_name
+      - mobile_no
+      - amount
+      - transaction_id
+      - payment_method
+      properties:
+        country_code:
+          type: string
+          example: NG
+        beneficiary_name:
+          type: string
+          example: John Doe
+        mobile_no:
+          type: string
+          example: "+2348012345678"
+        address:
+          type: string
+          example: 123 Example Street, Lagos
+        amount:
+          type: number
+          format: double
+          example: 50000
+        transaction_id:
+          type: string
+          example: txn_20251203_001
+        payment_method:
+          type: string
+          example: bank_transfer
+        remarks:
+          type: string
+        bank_code:
+          type: string
+          example: '011'
+        account_number:
+          type: string
+          example: '0123456789'
+    CreateTransactionResponse:
+      type: object
+      required:
+      - status
+      - message
+      - transaction_id
+      properties:
+        status:
+          type: integer
+        message:
+          type: string
+        transaction_id:
+          type: string
+        data:
+          type: object
+          nullable: true
+    TransactionStatusResponse:
+      type: object
+      required:
+      - status
+      - message
+      - data
+      properties:
+        status:
+          type: integer
+        message:
+          type: string
+        data:
+          type: object
+          properties:
+            transaction_id:
+              type: string
+            status:
+              type: string
+              enum:
+              - pending
+              - processing
+              - success
+              - failed
+              - refunded
+              - cancelled
+            amount:
+              type: number
+              format: double
+            currency:
+              type: string
+            updated_at:
+              type: string
+              format: date-time
+            provider_reference:
+              type: string
+              nullable: true
+            failure_reason:
+              type: string
+              nullable: true
+    ConversionResponse:
+      type: object
+      required:
+      - status
+      - message
+      properties:
+        status:
+          type: integer
+        message:
+          type: string
+    RateResponse:
+      type: object
+      required:
+      - status
+      - message
+      - data
+      properties:
+        status:
+          type: integer
+        message:
+          type: string
+        data:
+          type: object
+paths:
+  "/admin/auth":
+    post:
+      tags:
+      - Auth Token
+      summary: Login and get JWT token
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/AuthRequest"
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/AuthResponse"
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ErrorResponse"
+  "/payout_methods":
+    post:
+      tags:
+      - Country Payment Method
+      summary: Get supported payout methods for a country
+      operationId: getPayoutMethods
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/PayoutMethodsRequest"
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/PayoutMethodsResponse"
+  "/nigeria_banks":
+    get:
+      tags:
+      - Bank List
+      summary: Get list of Nigerian banks
+      operationId: getNigeriaBanks
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/NigeriaBanksResponse"
+  "/create_transaction":
+    post:
+      tags:
+      - Payout Transaction Api
+      summary: Create payout transaction
+      operationId: createTransaction
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/CreateTransactionRequest"
+      responses:
+        '200':
+          description: Transaction created
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/CreateTransactionResponse"
+  "/transaction_status":
+    post:
+      tags:
+      - Transaction Status
+      summary: Check transaction status
+      operationId: getTransactionStatus
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - transaction_id
+              properties:
+                transaction_id:
+                  type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/TransactionStatusResponse"
+  "/fiat_to_pusd_conversion":
+    post:
+      tags:
+      - Fiat to PUSD Conversion
+      summary: Convert fiat to PUSD
+      operationId: fiatToPusdConversion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - currency_code
+              - fiat_amount
+              properties:
+                currency_code:
+                  type: string
+                fiat_amount:
+                  type: number
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ConversionResponse"
+  "/pusd_to_fiat_rate":
+    post:
+      tags:
+      - PUSD To Fiat Rate
+      summary: Get PUSD to fiat rate
+      operationId: pusdToFiatRate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - country_code
+              - amount
+              properties:
+                country_code:
+                  type: string
+                amount:
+                  type: number
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RateResponse"

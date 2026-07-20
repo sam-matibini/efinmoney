@@ -1,0 +1,1475 @@
+---
+openapi: 3.0.3
+info:
+  title: SwychrConnect Virtual Card API
+  description: |
+    ## Overview
+    The **SwychrConnect Virtual Card API** enables you to issue, manage, and operate virtual prepaid/credit cards
+    powered by **VISA** and **Mastercard** through the SwychrConnect Cards infrastructure.
+
+    ### Key Capabilities
+    - **User Management** â€” Create and update cardholder profiles with KYC data
+    - **Card Issuance** â€” Issue Lite, Prepaid Debit (VISA), Prepaid Credit (Mastercard), and Contactless virtual cards
+    - **Card Operations** â€” Top-up, withdraw, freeze, unfreeze, replace, and terminate cards
+    - **Transactions** â€” Retrieve full or individual transaction history per card
+    - **Wallet and Admin** â€” Monitor wallet balance, transaction logs, and admin profile
+
+    ### Authentication
+    All endpoints except login, forgot_password, resend_otp, and update_password
+    require a Bearer JWT token in the Authorization header.
+
+    Tokens are valid for 24 hours.
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: support@swychr.com
+servers:
+- url: https://api.accountpe.com/api/card/prod
+  description: Production Server
+- url: https://api.accountpe.com/api/card/sandbox
+  description: Sandbox / Testing Server
+tags:
+- name: Authentication
+  description: Login and password management
+- name: Users
+  description: Cardholder user management
+- name: Card Issuance
+  description: Issue Lite, Prepaid Debit (VISA), Prepaid Credit (Mastercard), and
+    Contactless virtual cards
+- name: Transactions
+  description: Card transaction history
+- name: Wallet and Admin
+  description: Wallet balances, transaction logs, and admin profile
+security:
+- BearerAuth: []
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    UserAddress:
+      type: object
+      properties:
+        street:
+          type: string
+          example: 12 Lagos Road
+        city:
+          type: string
+          example: Lagos
+        postal_code:
+          type: string
+          example: '100001'
+        country:
+          type: string
+          example: Nigeria
+    UserIdentity:
+      type: object
+      properties:
+        id_proof_type:
+          type: string
+          example: PASSPORT
+        id_proof_no:
+          type: string
+          example: A12345678
+        id_proof_expiry_date:
+          type: string
+          example: '2030-01-01'
+        id_proof_url_list:
+          type: array
+          items:
+            type: string
+          example: []
+        livelyness_img:
+          type: string
+          nullable: true
+          example: https://cdn.example.com/img.jpg
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          example: 550e8400-e29b-41d4-a716-446655440000
+        name:
+          type: string
+          example: Jane Doe
+        email:
+          type: string
+          example: jane@example.com
+        phone_number:
+          type: string
+          nullable: true
+          example: '8012345678'
+        mobile_code:
+          type: string
+          nullable: true
+          example: "+234"
+        country_iso_code:
+          type: string
+          nullable: true
+          example: NG
+        dob:
+          type: string
+          nullable: true
+          example: '1990-05-15'
+        address:
+          "$ref": "#/components/schemas/UserAddress"
+        identity:
+          "$ref": "#/components/schemas/UserIdentity"
+        final_status:
+          type: string
+          enum:
+          - Approved
+          - Pending
+          - Rejected
+          - KYC Not initiated
+          example: Approved
+        active:
+          type: boolean
+          example: true
+    Card:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 42
+        card_id:
+          type: string
+          example: 7f8e2b1a-4c3d-4e5f-a6b7-890cde123456
+        encrypted_cardnumber:
+          type: string
+          example: 4111XXXXXXXX1111
+        masked_pan:
+          type: string
+          example: 411111XXXX1111
+        encrypted_cvv:
+          type: string
+          example: "***"
+        expiry:
+          type: string
+          example: 12/2026
+        currency:
+          type: string
+          example: USD
+        balance:
+          type: number
+          example: 250.0
+        balance_updated_at:
+          type: string
+          example: '2026-03-06T10:00:00Z'
+        cardholder:
+          type: string
+          example: Jane Doe
+        issuer:
+          type: string
+          enum:
+          - VISA
+          - MASTERCARD
+          example: VISA
+        status:
+          type: string
+          enum:
+          - Active
+          - DISABLED
+          - ACTIVE
+          - Terminated
+          - DEACTIVATED
+          - TERMINATED
+          example: Active
+    Merchant:
+      type: object
+      properties:
+        merchantName:
+          type: string
+          example: Amazon
+        merchantCountry:
+          type: string
+          example: US
+        merchantCity:
+          type: string
+          example: Seattle
+    Transaction:
+      type: object
+      properties:
+        id:
+          type: string
+          example: txn_abc123
+        cardId:
+          type: string
+          example: 7f8e2b1a-4c3d-4e5f-a6b7-890cde123456
+        transactionType:
+          type: string
+          example: PURCHASE
+        transactionStatus:
+          type: string
+          example: APPROVED
+        transactionAmount:
+          type: number
+          example: 29.99
+        currencyCode:
+          type: string
+          example: USD
+        created_at:
+          type: string
+          example: '2026-03-06T10:00:00Z'
+        description:
+          type: string
+          example: Online purchase
+        balanceAfterTransaction:
+          type: number
+          example: 220.01
+        merchant:
+          "$ref": "#/components/schemas/Merchant"
+    ApiError:
+      type: object
+      properties:
+        status:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Please provide correct information.
+paths:
+  "/admin/login":
+    post:
+      tags:
+      - Authentication
+      summary: Admin Login
+      description: Authenticate an admin user and receive a JWT token valid for 24
+        hours.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - email
+              - password
+              properties:
+                email:
+                  type: string
+                  example: admin@example.com
+                password:
+                  type: string
+                  example: SecurePass123!
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                    example: eyJhbGciOiJIUzI1NiJ9...
+                  message:
+                    type: string
+                    example: 03-06-2026 14:30
+                  email:
+                    type: string
+                    example: admin@example.com
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Password does not match
+  "/forgot_password":
+    post:
+      tags:
+      - Authentication
+      summary: Forgot Password - Send OTP
+      description: Sends a one-time password to the admin registered email address.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - email
+              properties:
+                email:
+                  type: string
+                  example: admin@example.com
+      responses:
+        '200':
+          description: OTP sent successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  admin:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                      email:
+                        type: string
+                  message:
+                    type: string
+                    example: Successfully sent otp.
+                  status:
+                    type: integer
+                    example: 200
+        '400':
+          description: Email not found or missing
+  "/resend_otp":
+    post:
+      tags:
+      - Authentication
+      summary: Resend OTP
+      description: Resends the OTP to the admin registered email.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - email
+              properties:
+                email:
+                  type: string
+                  example: admin@example.com
+      responses:
+        '200':
+          description: OTP resent successfully
+        '400':
+          description: Email not found
+  "/update_password":
+    post:
+      tags:
+      - Authentication
+      summary: Reset Password Using OTP
+      description: Validates the OTP and updates the admin password.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - email
+              - otp
+              - password
+              properties:
+                email:
+                  type: string
+                  example: admin@example.com
+                otp:
+                  type: string
+                  example: '482910'
+                password:
+                  type: string
+                  example: NewSecure@456
+      responses:
+        '200':
+          description: Password updated successfully
+        '400':
+          description: OTP mismatch or email not found
+  "/users":
+    post:
+      tags:
+      - Users
+      summary: List All Users
+      description: Returns a paginated list of all cardholders belonging to the authenticated
+        admin account.
+      parameters:
+      - name: page
+        in: query
+        schema:
+          type: integer
+          default: 1
+        description: Page number (1-based)
+      - name: page_size
+        in: query
+        schema:
+          type: integer
+          default: 10
+        description: Number of records per page
+      responses:
+        '200':
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      "$ref": "#/components/schemas/User"
+                  status:
+                    type: integer
+                    example: 200
+                  message:
+                    type: string
+                    example: Successfully retrieved the user list
+  "/get_user":
+    post:
+      tags:
+      - Users
+      summary: Get a Single User
+      description: Retrieves complete profile and KYC data for a specific user by
+        their UUID.
+      parameters:
+      - name: user_id
+        in: query
+        required: true
+        schema:
+          type: string
+        description: The user UUID (user_guid)
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    "$ref": "#/components/schemas/User"
+                  status:
+                    type: integer
+                  message:
+                    type: string
+  "/create_user":
+    post:
+      tags:
+      - Users
+      summary: Create a New User
+      description: Creates a basic user account. KYC data can be added later via update_user.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - email
+              - name
+              properties:
+                email:
+                  type: string
+                  example: user@example.com
+                name:
+                  type: string
+                  example: John Smith
+                country:
+                  type: string
+                  example: Nigeria
+      responses:
+        '200':
+          description: User created or email already exists
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      user_id:
+                        type: string
+                      name:
+                        type: string
+                      email:
+                        type: string
+                      swychr_tag:
+                        type: string
+                      verification_status:
+                        type: string
+                  status:
+                    type: integer
+                  message:
+                    type: string
+  "/update_user":
+    post:
+      tags:
+      - Users
+      summary: Update User KYC Information
+      description: Updates or creates KYC data for an existing user and marks them
+        as Verified.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - user_id
+              properties:
+                user_id:
+                  type: string
+                  example: 550e8400-e29b-41d4-a716-446655440000
+                dob:
+                  type: string
+                  example: '1990-05-15'
+                mobile:
+                  type: string
+                  example: '8012345678'
+                mobile_code:
+                  type: string
+                  example: "+234"
+                gender:
+                  type: string
+                  enum:
+                  - Male
+                  - Female
+                  - Other
+                address:
+                  type: string
+                  example: 12 Lagos Road
+                street:
+                  type: string
+                city:
+                  type: string
+                  example: Lagos
+                postal_code:
+                  type: string
+                  example: '100001'
+                country:
+                  type: string
+                  example: Nigeria
+                country_iso_code:
+                  type: string
+                  example: NG
+                id_proof_type:
+                  type: string
+                  example: PASSPORT
+                id_proof_no:
+                  type: string
+                  example: A12345678
+                id_proof_expiry_date:
+                  type: string
+                  example: '2030-01-01'
+                id_proof_url_list:
+                  type: array
+                  items:
+                    type: string
+                livelyness_img:
+                  type: string
+                  example: https://cdn.example.com/selfie.jpg
+      responses:
+        '200':
+          description: User updated with full KYC data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    "$ref": "#/components/schemas/User"
+                  status:
+                    type: integer
+                    example: 200
+                  message:
+                    type: string
+                    example: User updated successfully
+  "/create_full_user":
+    post:
+      tags:
+      - Users
+      summary: Create User with KYC in One Step
+      description: Combines create_user and update_user into a single call. Creates
+        a fully verified user.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - email
+              - name
+              properties:
+                email:
+                  type: string
+                  example: jane@example.com
+                name:
+                  type: string
+                  example: Jane Doe
+                dob:
+                  type: string
+                  example: '1990-05-15'
+                mobile:
+                  type: string
+                mobile_code:
+                  type: string
+                gender:
+                  type: string
+                address:
+                  type: string
+                street:
+                  type: string
+                city:
+                  type: string
+                postal_code:
+                  type: string
+                country:
+                  type: string
+                country_iso_code:
+                  type: string
+                id_proof_type:
+                  type: string
+                id_proof_no:
+                  type: string
+                id_proof_expiry_date:
+                  type: string
+                id_proof_url_list:
+                  type: array
+                  items:
+                    type: string
+                livelyness_img:
+                  type: string
+      responses:
+        '200':
+          description: User created with KYC
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    "$ref": "#/components/schemas/User"
+                  status:
+                    type: integer
+                  message:
+                    type: string
+  "/check_for_virtual_card":
+    post:
+      tags:
+      - Cards
+      summary: Check User Eligibility for a Virtual Card
+      description: Verifies whether a user KYC is approved and they are eligible to
+        receive a virtual card.
+      parameters:
+      - name: user_id
+        in: query
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Eligibility result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user_id:
+                    type: string
+                  message:
+                    type: string
+                  status:
+                    type: integer
+  "/get_all_virtual_card":
+    post:
+      tags:
+      - Cards
+      summary: List All Cards for a User
+      description: Returns all virtual cards associated with a specific user, ordered
+        newest first.
+      parameters:
+      - name: user_id
+        in: query
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: List of cards
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  card_list:
+                    type: array
+                    items:
+                      "$ref": "#/components/schemas/Card"
+                  message:
+                    type: string
+                  status:
+                    type: integer
+  "/get_all_vcard_admin":
+    post:
+      tags:
+      - Cards
+      summary: List All Cards - Admin View
+      description: Returns all virtual cards across all users belonging to the authenticated
+        admin account.
+      responses:
+        '200':
+          description: All cards under admin
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  card_list:
+                    type: array
+                    items:
+                      "$ref": "#/components/schemas/Card"
+                  message:
+                    type: string
+                  status:
+                    type: integer
+  "/get_virtual_card_details":
+    post:
+      tags:
+      - Cards
+      summary: Get Card Details with Live Balance
+      description: Retrieves card info and fetches the live balance from Swychr before
+        responding.
+      parameters:
+      - name: card_id
+        in: query
+        required: true
+        schema:
+          type: string
+        description: The card UUID (card_guid)
+      responses:
+        '200':
+          description: Card details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  card_list:
+                    "$ref": "#/components/schemas/Card"
+                  message:
+                    type: string
+                  status:
+                    type: integer
+  "/issue_lite_card":
+    post:
+      tags:
+      - Card Issuance
+      summary: Issue Lite Virtual Card
+      description: 'Issues a lightweight virtual card. Supports VISA and Mastercard.
+        Wallet: Mobile. Max active cards: 5. Default fee: $10.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - user_id
+              - amount
+              - card_type
+              properties:
+                user_id:
+                  type: string
+                  example: 550e8400-e29b-41d4-a716-446655440000
+                amount:
+                  type: number
+                  example: 100
+                card_type:
+                  type: string
+                  enum:
+                  - VISA
+                  - MASTERCARD
+                  example: MASTERCARD
+                swipe_count:
+                  type: integer
+                  default: 1
+                  example: 3
+                  description: Maximum allowed swipes
+                expiration_date:
+                  type: string
+                  example: 03/2027
+                  description: MM/YYYY format. Defaults to 1 year from today.
+                termination_date:
+                  type: string
+                  example: 03/2027
+                  description: MM/YYYY format. Defaults to 1 year from today.
+      responses:
+        '200':
+          description: Card issued successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  card_list:
+                    "$ref": "#/components/schemas/Card"
+                  message:
+                    type: string
+                    example: Successfully created the card.
+                  status:
+                    type: integer
+                    example: 200
+        '400':
+          description: Insufficient balance, card limit exceeded, or provider error
+  "/vcard_purchase_credit_card":
+    post:
+      tags:
+      - Card Issuance
+      summary: Issue Prepaid Credit Card (Mastercard)
+      description: 'Issues a Mastercard Prepaid Credit virtual card. Creates Swychr
+        customer on first issuance; re-issues on subsequent calls. Wallet: Mobile.
+        Max active cards: 5. Default fee: $10.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - user_id
+              - amount
+              properties:
+                user_id:
+                  type: string
+                  example: 550e8400-e29b-41d4-a716-446655440000
+                amount:
+                  type: number
+                  example: 200
+      responses:
+        '200':
+          description: Mastercard issued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  card_list:
+                    "$ref": "#/components/schemas/Card"
+                  message:
+                    type: string
+                  status:
+                    type: integer
+        '400':
+          description: Insufficient balance or card limit exceeded
+  "/vcard_purchase_card":
+    post:
+      tags:
+      - Card Issuance
+      summary: Issue Prepaid Debit Card (VISA)
+      description: 'Issues a VISA Prepaid Debit virtual card. Creates Swychr customer
+        on first issuance; re-issues on subsequent calls. Wallet: Box. Max cards:
+        3. Default fee: $2.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - user_id
+              - amount
+              properties:
+                user_id:
+                  type: string
+                  example: 550e8400-e29b-41d4-a716-446655440000
+                amount:
+                  type: integer
+                  example: 50
+      responses:
+        '200':
+          description: VISA card issued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  card_list:
+                    "$ref": "#/components/schemas/Card"
+                  message:
+                    type: string
+                  status:
+                    type: integer
+        '400':
+          description: Insufficient balance or card limit exceeded
+  "/contactless_purchase_card":
+    post:
+      tags:
+      - Card Issuance
+      summary: Issue Contactless Virtual Card
+      description: 'Issues a virtual card with contactless payment (NFC/tap-to-pay).
+        Supports VISA or Mastercard. Wallet: Box. Max cards: 3. Default fee: $2.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - user_id
+              - amount
+              - card_type
+              properties:
+                user_id:
+                  type: string
+                  example: 550e8400-e29b-41d4-a716-446655440000
+                amount:
+                  type: integer
+                  example: 75
+                card_type:
+                  type: string
+                  enum:
+                  - VISA
+                  - MASTERCARD
+                  example: VISA
+                daily_limit:
+                  type: number
+                  default: 300
+                  example: 500
+                  description: Max spend per day in USD
+                transaction_limit:
+                  type: integer
+                  default: 6
+                  example: 10
+                  description: Max number of transactions per day
+      responses:
+        '200':
+          description: Contactless card issued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  card_list:
+                    "$ref": "#/components/schemas/Card"
+                  message:
+                    type: string
+                  status:
+                    type: integer
+        '400':
+          description: Insufficient balance or card limit exceeded
+  "/recharge_vcard":
+    post:
+      tags:
+      - Card Operations
+      summary: Top-Up a Virtual Card
+      description: Adds funds to an active virtual card. Deducts amount plus recharge
+        fee (default 1%) from admin Box wallet.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - card_id
+              - amount
+              properties:
+                card_id:
+                  type: string
+                  example: 7f8e2b1a-4c3d-4e5f-a6b7-890cde123456
+                amount:
+                  type: number
+                  example: 50.0
+      responses:
+        '200':
+          description: Card recharged
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  vcard:
+                    "$ref": "#/components/schemas/Card"
+                  message:
+                    type: string
+                    example: Successfully Recharged
+                  status:
+                    type: integer
+                    example: 200
+        '400':
+          description: Insufficient wallet balance or provider error
+  "/withdraw_fund":
+    post:
+      tags:
+      - Card Operations
+      summary: Withdraw Funds from a Virtual Card
+      description: Withdraws funds from a virtual card back to the admin Box wallet.
+        A 1% withdrawal fee (configurable) is deducted.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - card_id
+              - amount
+              properties:
+                card_id:
+                  type: string
+                  example: 7f8e2b1a-4c3d-4e5f-a6b7-890cde123456
+                amount:
+                  type: number
+                  example: 30.0
+      responses:
+        '200':
+          description: Withdrawal successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  vcard:
+                    "$ref": "#/components/schemas/Card"
+                  message:
+                    type: string
+                    example: Successfully Withdrawn
+                  status:
+                    type: integer
+        '400':
+          description: Provider error
+  "/card_limit_update":
+    post:
+      tags:
+      - Card Operations
+      summary: Update Card Spending Limits
+      description: Updates the daily spending limit and per-transaction limit for
+        a contactless card.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - card_id
+              - daily_limit
+              - transaction_limit
+              properties:
+                card_id:
+                  type: string
+                  example: 7f8e2b1a-4c3d-4e5f-a6b7-890cde123456
+                daily_limit:
+                  type: number
+                  example: 500
+                transaction_limit:
+                  type: integer
+                  example: 10
+      responses:
+        '200':
+          description: Limits updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  vcard:
+                    "$ref": "#/components/schemas/Card"
+                  message:
+                    type: string
+                  status:
+                    type: integer
+  "/freeze_card":
+    post:
+      tags:
+      - Card Operations
+      summary: Freeze a Card
+      description: Temporarily disables a card. Status becomes DISABLED. Use unfreeze_card
+        to re-enable.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - card_id
+              properties:
+                card_id:
+                  type: string
+                  example: 7f8e2b1a-4c3d-4e5f-a6b7-890cde123456
+      responses:
+        '200':
+          description: Card frozen
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  vcard:
+                    "$ref": "#/components/schemas/Card"
+                  message:
+                    type: string
+                    example: Card has been successfully freezed
+                  status:
+                    type: integer
+  "/unfreeze_card":
+    post:
+      tags:
+      - Card Operations
+      summary: Unfreeze a Card
+      description: Re-enables a previously frozen card. Status becomes ACTIVE.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - card_id
+              properties:
+                card_id:
+                  type: string
+                  example: 7f8e2b1a-4c3d-4e5f-a6b7-890cde123456
+      responses:
+        '200':
+          description: Card unfrozen
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  vcard:
+                    "$ref": "#/components/schemas/Card"
+                  message:
+                    type: string
+                    example: Card has been successfully unfreezed
+                  status:
+                    type: integer
+  "/replace_card":
+    post:
+      tags:
+      - Card Operations
+      summary: Replace an Active Card
+      description: Replaces a currently active card with a new one (e.g. lost or damaged).
+        Use terminated_card_replacement for DEACTIVATED or TERMINATED cards.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - card_id
+              properties:
+                card_id:
+                  type: string
+                  example: 7f8e2b1a-4c3d-4e5f-a6b7-890cde123456
+      responses:
+        '200':
+          description: Card replaced
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  vcard:
+                    "$ref": "#/components/schemas/Card"
+                  message:
+                    type: string
+                    example: Card has been successfully replaced
+                  status:
+                    type: integer
+        '400':
+          description: Provider error
+  "/terminated_card_replacement":
+    post:
+      tags:
+      - Card Operations
+      summary: Replace a Terminated or Deactivated Card
+      description: Re-issues a new card for a TERMINATED or DEACTIVATED card. Charges
+        50% of the standard creation fee. Deducts amount plus fee from admin Box wallet.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - card_id
+              properties:
+                card_id:
+                  type: string
+                  example: 7f8e2b1a-4c3d-4e5f-a6b7-890cde123456
+                amount:
+                  type: number
+                  default: 1
+                  example: 25
+                  description: Initial balance for the replacement card
+      responses:
+        '200':
+          description: Replacement card issued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  vcard:
+                    "$ref": "#/components/schemas/Card"
+                  message:
+                    type: string
+                  status:
+                    type: integer
+        '400':
+          description: Card not terminated, insufficient balance, or provider error
+  "/block_card":
+    post:
+      tags:
+      - Card Operations
+      summary: Permanently Terminate a Card
+      description: Permanently terminates a card. IRREVERSIBLE. Withdraws remaining
+        balance (minus 1% fee) and credits admin wallet. Use freeze_card for temporary
+        deactivation.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - card_id
+              properties:
+                card_id:
+                  type: string
+                  example: 7f8e2b1a-4c3d-4e5f-a6b7-890cde123456
+      responses:
+        '200':
+          description: Card permanently terminated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  vcard:
+                    type: object
+                  message:
+                    type: string
+                    example: Card has been successfully terminated
+                  status:
+                    type: integer
+                    example: 200
+        '400':
+          description: Provider error
+  "/get_card_transactions":
+    post:
+      tags:
+      - Transactions
+      summary: Get Card Transaction History
+      description: Returns all transactions for a card from the past 60 days, up to
+        500 records.
+      parameters:
+      - name: card_id
+        in: query
+        required: true
+        schema:
+          type: string
+        description: The card UUID (card_guid)
+      responses:
+        '200':
+          description: Transaction list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  transactions:
+                    type: array
+                    items:
+                      "$ref": "#/components/schemas/Transaction"
+                  message:
+                    type: string
+                  status:
+                    type: integer
+  "/get_card_transaction_byid":
+    post:
+      tags:
+      - Transactions
+      summary: Get a Single Transaction by ID
+      description: Retrieves a specific transaction by its ID for a given card.
+      parameters:
+      - name: card_id
+        in: query
+        required: true
+        schema:
+          type: string
+      - name: transaction_id
+        in: query
+        required: true
+        schema:
+          type: string
+        description: The Swychr transaction ID
+      responses:
+        '200':
+          description: Transaction details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  transactions:
+                    type: array
+                    items:
+                      "$ref": "#/components/schemas/Transaction"
+                  message:
+                    type: string
+                  status:
+                    type: integer
+  "/get_wallet_net_bal":
+    post:
+      tags:
+      - Wallet and Admin
+      summary: Get Current Wallet Balance
+      description: Returns the admin current net wallet balance.
+      responses:
+        '200':
+          description: Current balance
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  wallet_bal:
+                    type: number
+                    example: 1250.0
+                  message:
+                    type: string
+                  status:
+                    type: integer
+  "/get_wallet_transaction":
+    post:
+      tags:
+      - Wallet and Admin
+      summary: Get Wallet Transaction History
+      description: Returns all wallet transactions for the authenticated admin, ordered
+        newest first.
+      responses:
+        '200':
+          description: Wallet transactions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  wallet_data:
+                    type: object
+                    description: JSONAPI serialized wallet transaction collection
+                  message:
+                    type: string
+                  status:
+                    type: integer
+  "/summary":
+    post:
+      tags:
+      - Wallet and Admin
+      summary: Admin Dashboard Summary
+      description: Returns a snapshot including total virtual cards issued, total
+        users, and current wallet balance.
+      responses:
+        '200':
+          description: Summary data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  vcard_no:
+                    type: integer
+                    example: 38
+                  user_no:
+                    type: integer
+                    example: 15
+                  wallet_bal:
+                    type: number
+                    example: 1250.0
+                  message:
+                    type: string
+                  status:
+                    type: integer
+  "/profile_data":
+    post:
+      tags:
+      - Wallet and Admin
+      summary: Get Admin Profile
+      description: Returns the authenticated admin name, email, and configured webhook
+        URLs.
+      responses:
+        '200':
+          description: Admin profile
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  admin:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                      email:
+                        type: string
+                      callback_url:
+                        type: string
+                        nullable: true
+                      transaction_webhook_url:
+                        type: string
+                        nullable: true
+                  message:
+                    type: string
+                  status:
+                    type: integer
+  "/update_profile_data":
+    post:
+      tags:
+      - Wallet and Admin
+      summary: Update Admin Profile
+      description: Updates the admin name, optional password, and webhook/callback
+        URLs.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: Admin Name
+                password:
+                  type: string
+                  description: Only provide if changing password
+                callback_url:
+                  type: string
+                  example: https://your-domain.com/webhooks/callback
+                transaction_webhook_url:
+                  type: string
+                  example: https://your-domain.com/webhooks/transactions
+      responses:
+        '200':
+          description: Profile updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  admin:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                      email:
+                        type: string
+                      callback_url:
+                        type: string
+                      transaction_webhook_url:
+                        type: string
+                  message:
+                    type: string
+                    example: Successfully updated the profile
+                  status:
+                    type: integer

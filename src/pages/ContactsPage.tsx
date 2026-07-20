@@ -63,7 +63,7 @@ const ContactsPage = () => {
   const handleSendTo = (c: Beneficiary) => {
     if (isCanadaBeneficiary(c)) {
       if (!productFeatures.canadaDomestic) {
-        toast.message("Canada domestic transfers are coming soon");
+        toast.message("Canada domestic transfers are not available");
         navigate("/send?mode=canada");
         return;
       }

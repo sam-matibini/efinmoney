@@ -18,10 +18,15 @@ export const productFeatures = {
   stripe: false,
   flutterwave: envFlag("VITE_FEATURE_FLUTTERWAVE", false),
   crypto: envFlag("VITE_FEATURE_CRYPTO", false),
-  billPay: envFlag("VITE_FEATURE_BILL_PAY", false),
+  billPay: envFlag("VITE_FEATURE_BILL_PAY", true),
   paymentLinks: envFlag("VITE_FEATURE_PAYMENT_LINKS", false),
   otherAfricanCorridors: envFlag("VITE_FEATURE_OTHER_AFRICA", false),
-  cards: envFlag("VITE_FEATURE_CARDS", false),
+  cards: envFlag("VITE_FEATURE_CARDS", true),
+  swychr: envFlag("VITE_FEATURE_SWYCHR", true),
+  /** Paytota card top-up for USD/EUR/GBP/CAD (Nomba international disabled on merchant). */
+  paytota: envFlag("VITE_FEATURE_PAYTOTA", true),
+  /** Paytota UGX MoMo payout test toggle on Send. */
+  paytotaPayout: envFlag("VITE_FEATURE_PAYTOTA_PAYOUT", true),
   adyen: envFlag("VITE_FEATURE_ADYEN", false),
 } as const;
 
@@ -31,10 +36,14 @@ export function isFeatureEnabled(key: ProductFeatureKey): boolean {
   return productFeatures[key];
 }
 
-/** Live lenhub corridors: Nigeria + Ghana */
+/** Live top-up corridors — Nomba NGN + Paytota/Nomba intl + Swychr + Ghana Pay */
 export function isLiveTopupCurrency(currency: string): boolean {
   const c = currency.toUpperCase();
-  if (productFeatures.nombaNigeria && ["NGN", "USD", "EUR", "GBP", "CAD"].includes(c)) return true;
+  if (productFeatures.nombaNigeria && c === "NGN") return true;
+  if ((productFeatures.paytota || productFeatures.nombaNigeria) && ["USD", "EUR", "GBP", "CAD"].includes(c)) {
+    return true;
+  }
+  if (productFeatures.swychr && ["XAF", "KES", "XOF", "UGX"].includes(c)) return true;
   if (productFeatures.ghanaPay && c === "GHS") return true;
   return false;
 }

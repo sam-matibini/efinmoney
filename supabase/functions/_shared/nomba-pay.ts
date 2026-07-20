@@ -103,16 +103,30 @@ export function parseNombaCollectionResponse(
   const checkoutUrl = String(data?.link ?? data?.checkoutLink ?? json.link ?? "").trim() || null;
   const orderId = String(data?.order_id ?? data?.orderId ?? json.order_id ?? "").trim() || null;
   const statusCode = Number(data?.status_code ?? json.status_code ?? 0);
-  const message = String(json.message ?? data?.message ?? "").trim();
+  const message = String(
+    json.message
+    ?? data?.message
+    ?? json.error
+    ?? data?.error
+    ?? json.Message
+    ?? "",
+  ).trim();
   const ok = httpStatus >= 200 && httpStatus < 300 && Boolean(checkoutUrl && orderId)
     && (statusCode === 0 || statusCode === 200);
+
+  let failHint = message;
+  if (!ok && !failHint) {
+    if (httpStatus >= 500) failHint = "Payment partner is temporarily unavailable. Try again shortly.";
+    else if (!checkoutUrl) failHint = "Checkout link was not returned. Try a larger amount or another currency.";
+    else failHint = "Collection failed";
+  }
 
   return {
     ok,
     httpStatus,
     checkoutUrl,
     orderId,
-    message: message || (ok ? "Checkout created" : "Collection failed"),
+    message: failHint || (ok ? "Checkout created" : "Collection failed"),
     json,
     raw,
   };

@@ -7,6 +7,8 @@ export const INCOMING_REFERENCE_TYPES: string[] = [
   "manual_topup",
   "wallet_topup",
   "nomba_pay_topup",
+  "swychr_payin_topup",
+  "paytota_pay_topup",
 ];
 
 const INCOMING_LABELS: Record<string, string> = {
@@ -18,6 +20,8 @@ const INCOMING_LABELS: Record<string, string> = {
   manual_topup: "eFinMoney top-up",
   wallet_topup: "eFinMoney top-up",
   nomba_pay_topup: "eFinMoney top-up",
+  swychr_payin_topup: "eFinMoney top-up",
+  paytota_pay_topup: "eFinMoney top-up",
 };
 
 export const cleanIncomingTransactionLabel = (
@@ -27,7 +31,7 @@ export const cleanIncomingTransactionLabel = (
   const fallback = INCOMING_LABELS[refType ?? ""] || "Incoming";
 
   if (!raw) return fallback;
-  if (/stripe|pi_[A-Za-z0-9]+|wallet_topup|flw_|flutterwave|nomba/i.test(raw)) return fallback;
+  if (/stripe|pi_[A-Za-z0-9]+|wallet_topup|flw_|flutterwave|nomba|swychr|paytota/i.test(raw)) return fallback;
 
   return raw;
 };
@@ -43,6 +47,8 @@ export const getIncomingTransactionMeta = (refType: string | null | undefined) =
     case "manual_topup":
     case "wallet_topup":
     case "nomba_pay_topup":
+    case "swychr_payin_topup":
+    case "paytota_pay_topup":
       return "Funds added to your wallet";
     case "transfer":
       return "Incoming transfer";
