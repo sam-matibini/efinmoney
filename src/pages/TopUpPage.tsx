@@ -18,8 +18,8 @@ import { useAuth } from "@/hooks/useAuth";
 import ElicateTopUpCard from "@/components/payments/ElicateTopUpCard";
 import GhanaTopUpCard from "@/components/payments/GhanaTopUpCard";
 import NombaTopUpCard from "@/components/payments/NombaTopUpCard";
-import { validateMinAmount, friendlyFlwError, minAmount, type FlwMethod } from "@/lib/flutterwave";
-import LoadingSpinner from "@/components/LoadingSpinner";
+import { validateMinAmount, minAmount, type FlwMethod } from "@/lib/flutterwave";
+import FlutterwaveCardForm from "@/components/payments/FlutterwaveCardForm";
 import { MM_COUNTRIES } from "@/lib/mobileMoneyNetworks";
 import {
   routeWalletTopupGateway,
@@ -211,39 +211,6 @@ const TopUpPage = () => {
       }
     })();
   }, [params, gateway, africanProvider, queryClient]);
-
-  const handleFlutterwaveTopUp = async () => {
-    const amt = Number(amount);
-    if (!Number.isFinite(amt) || amt <= 0) { toast.error("Enter a valid amount"); return; }
-    const minErr = validateMinAmount(currency, amt);
-    if (minErr) { toast.error(minErr); return; }
-    setLoading(true);
-    try {
-      const redirectUrl = `${window.location.origin}/wallet/topup`;
-      const txRef = `topup-${user?.id || "anon"}-${selectedWalletId.slice(0, 8)}-${Date.now()}`;
-      // Use hosted checkout — let Flutterwave present all locally-available
-      // methods (Card, Bank Transfer, USSD, Mobile Money) for the corridor.
-      const { data, error } = await supabase.functions.invoke("flw-initialize-payment", {
-        body: {
-          amount: amt,
-          currency,
-          paymentMethod: "card",
-          redirectUrl,
-          tx_ref: txRef,
-          type: "wallet_topup",
-          walletId: selectedWalletId,
-        },
-      });
-      if (error) throw error;
-      const link = (data as { payment_link?: string; error?: string })?.payment_link;
-      if ((data as { error?: string })?.error || !link) throw new Error((data as { error?: string })?.error || "No payment link");
-      window.location.href = link;
-    } catch (e) {
-      toast.error(friendlyFlwError(e, currency));
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleFincraTopUp = async () => {
     const amt = Number(amount);
@@ -483,38 +450,25 @@ const TopUpPage = () => {
             </Card>
           )}
 
-          {/* Flutterwave route — hosted checkout (Card, Bank Transfer, USSD, Mobile Money) */}
+          {/* Flutterwave route — in-app card collection */}
           {productFeatures.flutterwave && gateway === "flutterwave" && selectedWallet && liveTopup && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">
-                  {showWesternProviderChoice || showAfricanProviderChoice ? "3. Pay with Flutterwave" : "2. Enter amount"}
+                  {showWesternProviderChoice || showAfricanProviderChoice ? "3. Pay with card" : "2. Enter card details"}
                 </CardTitle>
+                <CardDescription>
+                  Pay securely with your debit or credit card. Powered by Efinmoney via Flutterwave.
+                </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label>Amount ({currency})</Label>
-                  <Input
-                    type="number"
-                    inputMode="decimal"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    placeholder="0.00"
-                    className="h-12 text-lg"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">Minimum: {minAmount(currency)} {currency}</p>
-                </div>
-
-                <div className="p-3 rounded-lg bg-accent/10 border border-accent/20">
-                  <p className="text-xs text-foreground">
-                    You will be redirected to Flutterwave&apos;s secure checkout to pay by card
-                    {currency === "CAD" ? " (Canadian cards)" : currency === "USD" ? " (US cards)" : ""}.
-                  </p>
-                </div>
-
-                <Button className="w-full" size="lg" onClick={handleFlutterwaveTopUp} disabled={loading}>
-                  {loading ? "Opening Flutterwave…" : "Continue to Flutterwave checkout"}
-                </Button>
+              <CardContent>
+                <FlutterwaveCardForm
+                  defaultWalletId={selectedWalletId}
+                  showWalletSelect
+                  onSuccess={() => {
+                    void queryClient.invalidateQueries({ queryKey: ["wallets"] });
+                  }}
+                />
               </CardContent>
             </Card>
           )}
