@@ -1,4 +1,4 @@
-import { supabase } from "@/integrations/supabase/client";
+import { invokeEdgeFunction } from "@/lib/invokeEdgeFunction";
 
 export interface SwychrAirtimeProduct {
   skuId?: string;
@@ -11,11 +11,10 @@ export interface SwychrAirtimeProduct {
 }
 
 export async function fetchSwychrAirtimeCatalog(country: string, type: "products" | "operators" = "products") {
-  const { data, error } = await supabase.functions.invoke("swychr-airtime-catalog", {
-    body: { country: country.toUpperCase(), type },
+  return invokeEdgeFunction<Record<string, unknown>>("swychr-airtime-catalog", {
+    country: country.toUpperCase(),
+    type,
   });
-  if (error) throw error;
-  return data as Record<string, unknown>;
 }
 
 export async function createSwychrAirtimeRecharge(params: {
@@ -26,11 +25,10 @@ export async function createSwychrAirtimeRecharge(params: {
   wallet_id?: string;
   purchaseCurrency?: string;
 }) {
-  const { data, error } = await supabase.functions.invoke("swychr-airtime-recharge", { body: params });
-  if (error) throw error;
-  const payload = data as { success?: boolean; error?: string };
-  if (payload.error) throw new Error(payload.error);
-  return payload;
+  return invokeEdgeFunction<{ success?: boolean; error?: string; message?: string }>(
+    "swychr-airtime-recharge",
+    params,
+  );
 }
 
 export function productSkuId(p: SwychrAirtimeProduct): string {

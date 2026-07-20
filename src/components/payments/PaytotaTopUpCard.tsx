@@ -112,8 +112,8 @@ export default function PaytotaTopUpCard({ walletId, walletCurrency, onComplete 
         return_url: `${window.location.origin}/wallet/topup?walletId=${walletId}`,
       });
       savePendingPaytotaTxn(result.transaction_id);
-      toast.message("Opening Paytota invoice", {
-        description: `Confirm ${formatCredited(quote?.checkoutAmount ?? amt, currency)} on Paytota.`,
+      toast.message("Opening invoice", {
+        description: `Confirm ${formatCredited(quote?.checkoutAmount ?? amt, currency)}.`,
       });
       window.location.href = result.payment_link;
     } catch (e) {
@@ -127,11 +127,10 @@ export default function PaytotaTopUpCard({ walletId, walletCurrency, onComplete 
       <CardHeader className="pb-3">
         <CardTitle className="text-base flex items-center gap-2">
           <FileText className="h-4 w-4 text-sky-500" />
-          Top up {currency}
+          Pay by invoice
         </CardTitle>
         <p className="text-sm text-muted-foreground">
-          Confirm the amount to open your Paytota invoice. Card checkout is pending partner setup —
-          settlement is handled on the invoice.
+          Confirm the amount to open a secure payment invoice. Your {currency} wallet credits when the invoice is paid.
         </p>
       </CardHeader>
       <CardContent className="space-y-4">

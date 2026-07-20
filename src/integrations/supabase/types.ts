@@ -667,6 +667,10 @@ export type Database = {
           id: string
           interac_email: string | null
           last_sent_at: string | null
+          mailing_address: string | null
+          mailing_city: string | null
+          mailing_postal_code: string | null
+          mailing_region: string | null
           name: string
           network: string | null
           nickname: string | null
@@ -694,6 +698,10 @@ export type Database = {
           id?: string
           interac_email?: string | null
           last_sent_at?: string | null
+          mailing_address?: string | null
+          mailing_city?: string | null
+          mailing_postal_code?: string | null
+          mailing_region?: string | null
           name: string
           network?: string | null
           nickname?: string | null
@@ -721,6 +729,10 @@ export type Database = {
           id?: string
           interac_email?: string | null
           last_sent_at?: string | null
+          mailing_address?: string | null
+          mailing_city?: string | null
+          mailing_postal_code?: string | null
+          mailing_region?: string | null
           name?: string
           network?: string | null
           nickname?: string | null

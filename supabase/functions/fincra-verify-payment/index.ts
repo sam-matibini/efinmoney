@@ -65,8 +65,10 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ verified: false, error: "Transaction does not belong to you" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const amount = settleAmount(d);
-    const currency = String(d.currency || meta.currency || "").toUpperCase();
+    const chargeAmount = settleAmount(d);
+    const creditAmount = Number(meta.credit_amount);
+    const amount = Number.isFinite(creditAmount) && creditAmount > 0 ? creditAmount : chargeAmount;
+    const currency = String(meta.credit_currency || meta.currency || d.currency || "").toUpperCase();
     const merchantRef = String(d.merchantReference || reference);
     const fincraId = String(d.id ?? d.reference ?? reference);
 
@@ -76,7 +78,7 @@ Deno.serve(async (req) => {
       const walletIdFromMeta = meta.wallet_id ? String(meta.wallet_id) : undefined;
       const { already } = await creditWalletViaFincra(
         admin, user.id, currency, amount, fincraId || merchantRef, walletIdFromMeta,
-        `Top-up via Fincra (${merchantRef})`,
+        `Wallet top-up (${merchantRef})`,
       );
       credited = !already;
     }

@@ -13,6 +13,8 @@ import { useProfile } from "@/hooks/useProfile";
 import { AtSign, Hash } from "lucide-react";
 import PageHeroBanner from "@/components/common/PageHeroBanner";
 import AppPage from "@/components/layout/AppPage";
+import ZambiaMoMoReceiveLinks from "@/components/payments/ZambiaMoMoReceiveLinks";
+import { productFeatures } from "@/lib/productFeatures";
 
 const AFRICA_CURRENCIES = ["NGN", "KES", "GHS", "ZAR", "UGX", "TZS", "ZMW", "RWF", "USD"];
 
@@ -103,6 +105,8 @@ const ReceivePage = () => {
               </div>
             </CardContent>
           </Card>
+
+          {productFeatures.elicate && <ZambiaMoMoReceiveLinks />}
 
           <Card className="border-indigo-500/30 bg-indigo-500/5">
             <CardHeader>

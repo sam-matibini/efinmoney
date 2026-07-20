@@ -90,14 +90,72 @@ Deno.serve(async (req) => {
       const merchantRef = String(data.merchantReference || meta.reference || data.reference || "");
       const userId = meta.user_id ? String(meta.user_id) : "";
       if (userId && isFincraWalletTopUp(meta, merchantRef)) {
-        const currency = String(data.currency || meta.currency || "").toUpperCase();
-        const amount = settleAmount(data);
+        const creditAmount = Number(meta.credit_amount);
+        const settle = settleAmount(data);
+        const amount = Number.isFinite(creditAmount) && creditAmount > 0 ? creditAmount : settle;
+        const currency = String(meta.credit_currency || meta.currency || data.currency || "").toUpperCase();
         const idempotencyRef = String(data.chargeReference || data.id || merchantRef);
         const walletId = meta.wallet_id ? String(meta.wallet_id) : undefined;
         await creditWalletViaFincra(
           supabase, userId, currency, amount, idempotencyRef, walletId,
-          `Top-up via Fincra webhook (${merchantRef})`,
+          `Wallet top-up (${merchantRef})`,
         );
+      }
+    }
+
+    // CAD Interac / collection deposits → match pending user intents by amount
+    const isCadCollection =
+      String(data.currency || "").toUpperCase() === "CAD"
+      && (
+        eventName.includes("collection")
+        || eventName.includes("virtualaccount")
+        || eventName.includes("virtual_account")
+        || eventName.includes("deposit")
+        || (eventName.includes("successful") && !eventName.includes("payout") && !eventName.includes("charge"))
+      );
+
+    if (isCadCollection || (eventName === "charge.successful" && String(data.currency || "").toUpperCase() === "CAD" && !extractMeta(data).user_id)) {
+      const amount = settleAmount(data);
+      const providerRef = String(data.chargeReference || data.reference || data.id || "");
+      if (amount > 0) {
+        const nowIso = new Date().toISOString();
+        const { data: candidates } = await supabase
+          .from("fincra_cad_interac_intents")
+          .select("id, user_id, wallet_id, amount, reference")
+          .eq("status", "pending")
+          .eq("currency_code", "CAD")
+          .gt("expires_at", nowIso)
+          .order("created_at", { ascending: true })
+          .limit(20);
+
+        const match = (candidates ?? []).find((row) => {
+          const expected = Number(row.amount);
+          return Number.isFinite(expected) && Math.abs(expected - amount) < 0.02;
+        });
+
+        if (match) {
+          const idempotencyRef = providerRef || `interac-${match.id}`;
+          try {
+            await creditWalletViaFincra(
+              supabase,
+              match.user_id as string,
+              "CAD",
+              amount,
+              idempotencyRef,
+              match.wallet_id as string,
+              `Interac e-Transfer top-up (${match.reference})`,
+            );
+            await supabase.from("fincra_cad_interac_intents").update({
+              status: "completed",
+              provider_reference: providerRef || null,
+              credited_at: nowIso,
+            }).eq("id", match.id).eq("status", "pending");
+          } catch (creditErr) {
+            console.error("fincra-webhook CAD Interac credit failed", creditErr);
+          }
+        } else {
+          console.warn("fincra-webhook: CAD deposit with no matching Interac intent", { amount, providerRef, eventName });
+        }
       }
     }
 

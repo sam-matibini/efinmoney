@@ -216,6 +216,7 @@ const ContactsPage = () => {
                       <p className="text-xs text-muted-foreground truncate">
                         {methodLabel(c)}
                         {c.phone ? ` · ${c.phone}` : c.bank_account ? ` · ${c.bank_account}` : ""}
+                        {c.mailing_city ? ` · ${c.mailing_city}` : ""}
                       </p>
                     </div>
                     <div className="hidden sm:block text-right text-xs text-muted-foreground shrink-0 min-w-[120px]">

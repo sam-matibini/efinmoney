@@ -131,17 +131,13 @@ export default function NombaTopUpCard({ walletId, walletCurrency, onComplete }:
     }
   };
 
-  const title = isCadViaUsd
-    ? "Top up CAD (USD card checkout)"
-    : isInternational
-      ? "International checkout"
-      : "Nigeria checkout";
+  const title = "Express card";
 
   const subtitle = isCadViaUsd
     ? "Enter how much CAD you want in your wallet. You'll pay the USD equivalent at checkout — Canadian debit/credit cards are accepted."
     : isInternational
-      ? `Pay with card in ${currency} via our secure hosted checkout (USD, EUR, GBP).`
-      : "Pay with Nigerian debit/credit card via our secure hosted checkout.";
+      ? `Fast card payment in ${currency} via our secure checkout.`
+      : "Fast debit or credit card payment via our secure checkout.";
 
   return (
     <Card className={
@@ -218,9 +214,7 @@ export default function NombaTopUpCard({ walletId, walletCurrency, onComplete }:
           ) : (
             <>
               <ExternalLink className="h-4 w-4 mr-2" />
-              {isCadViaUsd && quote
-                ? `Continue — C$${parsedAmount.toFixed(2)} CAD → $${quote.checkoutAmount.toFixed(2)} USD`
-                : `Continue — ${currency}`}
+              Continue
             </>
           )}
         </Button>

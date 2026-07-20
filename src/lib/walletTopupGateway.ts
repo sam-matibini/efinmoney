@@ -16,20 +16,37 @@ export const SWYCHR_TOPUP_CURRENCIES = ["XAF", "KES", "XOF", "UGX"];
 /** Nomba: NGN + USD/EUR/GBP international + CAD via USD checkout */
 export const NOMBA_PAY_CURRENCIES = [...NOMBA_NIGERIA_CURRENCIES, ...NOMBA_INTERNATIONAL_CURRENCIES, ...NOMBA_CAD_VIA_USD_CURRENCIES];
 /**
- * Paytota hosted card checkout — used for USD/EUR/GBP/CAD while Nomba international is disabled.
+ * Paytota hosted invoice — USD/EUR/GBP/CAD.
  * NGN stays on Nomba.
  */
 export const PAYTOTA_TOPUP_CURRENCIES = ["USD", "EUR", "GBP", "CAD"];
+/** Fincra hosted checkout corridors. CAD uses USD charge → credit CAD wallet (same pattern as Nomba). */
+export const FINCRA_TOPUP_CURRENCIES = ["USD", "EUR", "GBP", "CAD"];
+/** Currencies that can offer multiple western/intl rails for the user to pick */
+export const MULTI_RAIL_TOPUP_CURRENCIES = ["USD", "EUR", "GBP", "CAD"];
 export const AFRICAN_TOPUP_PROVIDER_CURRENCIES = [...FLUTTERWAVE_CURRENCIES];
 
-export type WalletTopupGateway = "flutterwave" | "elicate" | "fincra" | "ghana_pay" | "nomba_pay" | "swychr_pay" | "paytota_pay" | "unsupported";
+export type WalletTopupGateway =
+  | "flutterwave"
+  | "elicate"
+  | "fincra"
+  | "fincra_interac"
+  | "ghana_pay"
+  | "nomba_pay"
+  | "swychr_pay"
+  | "paytota_pay"
+  | "unsupported";
+
 export type WesternTopupProvider = "flutterwave" | "fincra";
 export type AfricanTopupProvider = "flutterwave" | "fincra";
+/** User-facing intl/CAD method pick (internal keys; UI uses white-label labels). */
+export type IntlTopupMethod = "nomba" | "paytota" | "fincra" | "interac";
 
 export function supportsWesternProviderChoice(currency: string): boolean {
   const c = currency.toUpperCase();
   if (NOMBA_INTERNATIONAL_CURRENCIES.includes(c)) return false;
   if (PAYTOTA_TOPUP_CURRENCIES.includes(c)) return false;
+  if (FINCRA_TOPUP_CURRENCIES.includes(c)) return false;
   return FLW_WESTERN_TOPUP_CURRENCIES.includes(c);
 }
 
@@ -48,16 +65,24 @@ export function routeWalletTopupGateway(
   africanProvider?: AfricanTopupProvider,
   preferSwychr = false,
   preferPaytota = false,
+  preferInterac = false,
+  preferFincra = false,
 ): WalletTopupGateway {
   const c = currency.toUpperCase();
-  // Ghana MoMo (Ghana Pay) — Swychr does not offer GHS payin on this account
+  // Ghana MoMo
   if (GHANA_PAY_CURRENCIES.includes(c)) return "ghana_pay";
-  // Paytota: international card collect (USD/EUR/GBP/CAD) when enabled
+  // Explicit Interac (CAD) when user picked that method
+  if (preferInterac && c === "CAD") return "fincra_interac";
+  // Explicit Fincra hosted checkout
+  if (preferFincra && FINCRA_TOPUP_CURRENCIES.includes(c)) return "fincra";
+  // Explicit Paytota when user picked invoice method
   if (preferPaytota && PAYTOTA_TOPUP_CURRENCIES.includes(c)) return "paytota_pay";
-  // Nomba: NGN always; international only when Paytota is off
+  // Nomba: NGN always; intl/CAD when not on another selected rail
   if (c === "NGN") return "nomba_pay";
-  if (!preferPaytota && NOMBA_PAY_CURRENCIES.includes(c)) return "nomba_pay";
-  // Swychr: CM/KE/SN|CI/UG corridors (gated by feature flag via preferSwychr)
+  if (NOMBA_PAY_CURRENCIES.includes(c) && !preferPaytota && !preferInterac && !preferFincra) {
+    return "nomba_pay";
+  }
+  // Swychr corridors
   if (preferSwychr && SWYCHR_TOPUP_CURRENCIES.includes(c)) return "swychr_pay";
   if (ELICATE_CURRENCIES.includes(c)) return "elicate";
   if (supportsAfricanProviderChoice(c) && africanProvider === "fincra") return "fincra";
@@ -67,23 +92,50 @@ export function routeWalletTopupGateway(
   return "unsupported";
 }
 
+/** White-label labels — never expose PSP vendor names in user UI. */
 export function paytotaGatewayLabel(_currency: string): string {
-  return "Paytota invoice";
+  return "Pay by invoice";
+}
+
+export function fincraGatewayLabel(_currency: string): string {
+  return "Card or bank transfer";
 }
 
 export function swychrGatewayLabel(currency: string): string {
   const c = currency.toUpperCase();
-  if (c === "XAF") return "Cameroon checkout";
-  if (c === "KES") return "Kenya checkout";
-  if (c === "XOF") return "West Africa checkout";
-  if (c === "UGX") return "Uganda checkout";
-  return "Mobile money checkout";
+  if (c === "XAF") return "Mobile money";
+  if (c === "KES") return "Mobile money";
+  if (c === "XOF") return "Mobile money";
+  if (c === "UGX") return "Mobile money";
+  return "Mobile money";
 }
 
+/** Nomba white-label — distinct from Fincra's "Card or bank transfer". */
 export function nombaGatewayLabel(currency: string): string {
   const c = currency.toUpperCase();
-  if (c === "CAD") return "USD card checkout";
-  return NOMBA_INTERNATIONAL_CURRENCIES.includes(c)
-    ? "International checkout"
-    : "Nigeria checkout";
+  if (c === "CAD") return "Express card";
+  if (NOMBA_INTERNATIONAL_CURRENCIES.includes(c)) return "Express card";
+  return "Express card";
+}
+
+export function intlMethodLabel(method: IntlTopupMethod): string {
+  if (method === "paytota") return "Pay by invoice";
+  if (method === "interac") return "Interac e-Transfer";
+  if (method === "fincra") return "Card or bank transfer";
+  return "Express card";
+}
+
+export function intlMethodDescription(method: IntlTopupMethod, currency: string): string {
+  if (method === "paytota") return "Secure invoice payment for your wallet.";
+  if (method === "interac") return "Send CAD from your Canadian bank via Interac.";
+  if (method === "fincra") {
+    if (currency.toUpperCase() === "CAD") {
+      return "Pay with card in USD — your CAD wallet is credited (Canadian cards welcome).";
+    }
+    return "Hosted checkout — pay with card or bank transfer where available.";
+  }
+  if (currency.toUpperCase() === "CAD") {
+    return "Fast card payment — pay USD equivalent, credit CAD wallet.";
+  }
+  return `Fast card payment in ${currency.toUpperCase()}.`;
 }

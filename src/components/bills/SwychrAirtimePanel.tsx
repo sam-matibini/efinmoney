@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import { Loader2, Phone } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -92,15 +91,14 @@ export default function SwychrAirtimePanel({ countryId, currency }: Props) {
   };
 
   return (
-    <Card className="border-violet-500/25">
+    <Card className="border-border/60">
       <CardHeader>
         <CardTitle className="text-base flex items-center gap-2">
-          <Phone className="h-4 w-4 text-violet-400" />
+          <Phone className="h-4 w-4 text-emerald-600" />
           Mobile airtime
-          <Badge variant="outline" className="text-xs">Swychr</Badge>
         </CardTitle>
         <p className="text-sm text-muted-foreground">
-          Buy airtime for {countryId} via Swychr PrepayNation catalog.
+          Top up a mobile number instantly for {countryId}.
         </p>
       </CardHeader>
       <CardContent className="space-y-4">

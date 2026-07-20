@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { invokeEdgeFunction } from "@/lib/invokeEdgeFunction";
 
 export interface SwychrCardRow {
   id: string;
@@ -20,15 +21,19 @@ export async function listSwychrCards(): Promise<SwychrCardRow[]> {
 }
 
 export async function issueSwychrCard(params: {
-  swychr_user_id: string;
+  /** Optional — if omitted, edge function reuses or creates a live Swychr cardholder from the profile. */
+  swychr_user_id?: string;
   amount: number;
   card_type?: "VISA" | "MASTERCARD";
   wallet_id?: string;
+  email?: string;
+  name?: string;
+  country?: string;
 }) {
-  const { data, error } = await supabase.functions.invoke("swychr-card-issue", { body: params });
-  if (error) throw error;
-  if ((data as { error?: string })?.error) throw new Error((data as { error: string }).error);
-  return data as { success: boolean; card?: Record<string, unknown> };
+  return invokeEdgeFunction<{ success: boolean; card?: Record<string, unknown>; message?: string }>(
+    "swychr-card-issue",
+    params,
+  );
 }
 
 export async function swychrCardOp(params: {
@@ -36,8 +41,6 @@ export async function swychrCardOp(params: {
   card_id: string;
   amount?: number;
 }) {
-  const { data, error } = await supabase.functions.invoke("swychr-card-ops", { body: params });
-  if (error) throw error;
-  if ((data as { error?: string })?.error) throw new Error((data as { error: string }).error);
-  return data;
+  return invokeEdgeFunction("swychr-card-ops", params);
 }
+

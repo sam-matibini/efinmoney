@@ -15,11 +15,18 @@ const PAYMENT_METHODS_BY_CCY: Record<string, string[]> = {
   TZS: ["mobile_money"],
   ZMW: ["mobile_money", "card"],
   USD: ["card"],
-  CAD: ["card", "bank_transfer"],
+  EUR: ["card", "bank_transfer"],
+  GBP: ["card", "bank_transfer"],
   ZAR: ["card", "bank_transfer"],
   XAF: ["mobile_money"],
   XOF: ["mobile_money"],
 };
+
+/** Currencies Fincra checkout accepts for the charge itself (not wallet credit currency). */
+const FINCRA_CHARGE_CURRENCIES = new Set([
+  "NGN", "USD", "GBP", "EUR", "GHS", "KES", "UGX", "TZS", "ZMW",
+  "EGP", "MZN", "MWK", "ZWL", "GNF", "XOF", "XAF", "ZAR",
+]);
 
 function jr(status: number, body: unknown) {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -67,21 +74,52 @@ Deno.serve(async (req) => {
     if (!user) return jr(401, { error: "Unauthorized" });
 
     const body = await req.json().catch(() => ({}));
-    const amount = Number(body?.amount);
-    const currency = String(body?.currency || "NGN").toUpperCase();
-    const redirectUrl = String(body?.redirectUrl || "");
     const walletId = body?.walletId ? String(body.walletId) : "";
     const clientRef = body?.reference ? String(body.reference) : "";
+    const redirectUrl = String(body?.redirectUrl || "");
 
-    if (!Number.isFinite(amount) || amount <= 0) return jr(400, { error: "Invalid amount" });
+    // Charge currency sent to Fincra (USD for CAD-via-USD)
+    let chargeCurrency = String(body?.currency || body?.charge_currency || "NGN").toUpperCase();
+    let chargeAmount = Number(body?.amount ?? body?.charge_amount);
+
+    // Wallet credit (may differ from charge — e.g. credit CAD, charge USD)
+    let creditCurrency = String(body?.credit_currency || chargeCurrency).toUpperCase();
+    let creditAmount = Number(body?.credit_amount ?? chargeAmount);
+
+    // CAD wallet → always charge USD on Fincra (checkout API does not accept CAD)
+    if (creditCurrency === "CAD" || chargeCurrency === "CAD") {
+      creditCurrency = "CAD";
+      chargeCurrency = "USD";
+      if (!Number.isFinite(creditAmount) || creditAmount <= 0) {
+        creditAmount = Number(body?.amount);
+      }
+      chargeAmount = Number(body?.charge_amount ?? body?.amount);
+      if (!Number.isFinite(chargeAmount) || chargeAmount <= 0) {
+        return jr(400, { error: "CAD top-up requires charge_amount in USD" });
+      }
+    }
+
+    if (!Number.isFinite(chargeAmount) || chargeAmount <= 0) return jr(400, { error: "Invalid amount" });
+    if (!Number.isFinite(creditAmount) || creditAmount <= 0) {
+      creditAmount = chargeAmount;
+      creditCurrency = chargeCurrency;
+    }
     if (!redirectUrl) return jr(400, { error: "redirectUrl required" });
+    if (!FINCRA_CHARGE_CURRENCIES.has(chargeCurrency)) {
+      return jr(400, {
+        error: `currency must be one of the following values: ${[...FINCRA_CHARGE_CURRENCIES].join(", ")}`,
+      });
+    }
 
     if (walletId) {
       const { data: w } = await supabase.from("wallets")
         .select("id, user_id, currency_code").eq("id", walletId).maybeSingle();
       if (!w || w.user_id !== user.id) return jr(403, { error: "Wallet not accessible" });
-      if (String(w.currency_code).toUpperCase() !== currency) {
-        return jr(400, { error: `Wallet currency (${w.currency_code}) does not match top-up currency (${currency})` });
+      const walletCcy = String(w.currency_code).toUpperCase();
+      if (walletCcy !== creditCurrency) {
+        return jr(400, {
+          error: `Wallet currency (${w.currency_code}) does not match credit currency (${creditCurrency})`,
+        });
       }
     }
 
@@ -108,8 +146,8 @@ Deno.serve(async (req) => {
     const fincraRedirectUrl = normalizeFincraRedirectUrl(redirectUrl);
 
     const payload: Record<string, unknown> = {
-      amount: Math.round(amount * 100) / 100,
-      currency,
+      amount: Math.round(chargeAmount * 100) / 100,
+      currency: chargeCurrency,
       redirectUrl: fincraRedirectUrl,
       reference,
       feeBearer: "customer",
@@ -122,10 +160,14 @@ Deno.serve(async (req) => {
       metadata: {
         user_id: user.id,
         type: "wallet_topup",
-        currency,
+        currency: creditCurrency,
+        credit_currency: creditCurrency,
+        credit_amount: Math.round(creditAmount * 100) / 100,
+        charge_currency: chargeCurrency,
+        charge_amount: Math.round(chargeAmount * 100) / 100,
         ...(walletId ? { wallet_id: walletId } : {}),
       },
-      paymentMethods: PAYMENT_METHODS_BY_CCY[currency] ?? ["card", "bank_transfer", "mobile_money"],
+      paymentMethods: PAYMENT_METHODS_BY_CCY[chargeCurrency] ?? ["card", "bank_transfer"],
     };
 
     const { ok, status, json } = await fincraFetch("/checkout/payments", {
@@ -145,6 +187,10 @@ Deno.serve(async (req) => {
       payment_link: data?.link,
       reference: data?.reference ?? reference,
       pay_code: data?.payCode,
+      charge_currency: chargeCurrency,
+      charge_amount: chargeAmount,
+      credit_currency: creditCurrency,
+      credit_amount: creditAmount,
     });
   } catch (err) {
     console.error("fincra-initialize-checkout error", err);

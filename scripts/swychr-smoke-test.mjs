@@ -102,13 +102,14 @@ async function hit(label, url, init) {
 }
 
 const results = [];
-console.log("Swychr Connect smoke test (90-day bearer via /admin/auth)\n");
+const cardEnv = process.env.SWYCHR_CARD_SANDBOX === "true" ? "sandbox" : "prod";
+console.log(`Swychr Connect smoke test (card=${cardEnv}, airtime=prod)\n`);
 
 for (const suite of ["payin", "payout", "card", "airtime"]) {
   try {
     const token = await login(suite);
     results.push({ ok: true });
-    console.log(`AUTH ${suite} OK (token length ${token.length})`);
+    console.log(`AUTH ${suite} OK (token length ${token.length}${suite === "card" ? `, base=${suiteBase("card")}` : ""})`);
 
     const authHdr = {
       Authorization: `Bearer ${token}`,
@@ -147,5 +148,5 @@ for (const suite of ["payin", "payout", "card", "airtime"]) {
 
 const passed = results.filter((r) => r.ok).length;
 console.log(`\n${passed}/${results.length} checks passed.`);
-console.log("Keep VITE_FEATURE_SWYCHR=false until sandbox E2E is verified.");
+console.log(`Card API: ${cardEnv}. Airtime: prod only.`);
 process.exit(passed >= 2 ? 0 : 1);

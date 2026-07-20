@@ -120,5 +120,5 @@ for (const suite of ["payin", "payout", "card", "airtime"] as Suite[]) {
 
 const passed = results.filter((r) => r.ok).length;
 console.log(`\n${passed}/${results.length} checks passed.`);
-console.log("Production UI remains off until VITE_FEATURE_SWYCHR=true and sandbox E2E verified.");
+console.log("Card/airtime smoke uses live prod unless SWYCHR_CARD_SANDBOX=true.");
 Deno.exit(passed >= 4 ? 0 : 1);

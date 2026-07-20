@@ -1,5 +1,9 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { getElicateConfig } from "../_shared/elicate.ts";
+import {
+  elicateCreatePayout,
+  extractTransactionId,
+  getElicateConfig,
+} from "../_shared/elicate.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -7,17 +11,13 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-// Elicate routes by phone prefix, so a single bank code "MPS" (Mobile Payment Service)
-// works across MTN / Airtel / Zamtel on Zambia.
 const ELICATE_BANK_CODE = "MPS";
 
-// Normalize to Elicate's required international format: 260XXXXXXXXX (NO leading zero).
-// Accepts any of: +260971234567, 260971234567, 0971234567, 971234567, with spaces/dashes.
 function normalizeZmPhoneIntl(raw?: string | null): string {
   let phone = String(raw || "").replace(/[^\d]/g, "");
-  if (phone.startsWith("00")) phone = phone.slice(2);    // 00260... -> 260...
-  if (phone.startsWith("0")) phone = phone.slice(1);     // 0971...  -> 971...
-  if (!phone.startsWith("260")) phone = `260${phone}`;   // 971...   -> 260971...
+  if (phone.startsWith("00")) phone = phone.slice(2);
+  if (phone.startsWith("0")) phone = phone.slice(1);
+  if (!phone.startsWith("260")) phone = `260${phone}`;
   return phone;
 }
 
@@ -88,15 +88,11 @@ Deno.serve(async (req) => {
     }
 
     const elicate = getElicateConfig();
-    const secret = elicate.secretKey;
-    const PAYOUT_URL = elicate.payoutUrl;
-    if (!secret) {
-      return new Response(JSON.stringify({ success: false, error: `ELICATE_${elicate.mode === "live" ? "LIVE_" : ""}SECRET_KEY not configured` }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    if (!PAYOUT_URL) {
-      return new Response(JSON.stringify({ success: false, error: "ELICATE_LIVE_BASE_URL not configured" }), {
+    if (!elicate.secretKey) {
+      return new Response(JSON.stringify({
+        success: false,
+        error: `ELICATE_${elicate.mode === "live" ? "LIVE_" : ""}SECRET_KEY not configured`,
+      }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -113,8 +109,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Idempotency: if this transfer was already dispatched, don't fire a second payout.
-    // Webhook will (or already did) flip status to completed/failed.
     if (["processing", "completed", "refunded"].includes(transfer.status) && transfer.provider_reference) {
       return new Response(JSON.stringify({
         success: true,
@@ -130,8 +124,7 @@ Deno.serve(async (req) => {
     const beneficiaryName = String(transfer.recipient_name || "Customer").trim() || "Customer";
     const narration = String(transfer.purpose || transfer.notes || "eFinMoney payout").slice(0, 100);
 
-    // Elicate payout (disbursement) — pushes funds to the beneficiary; no PIN prompt.
-    const payload = {
+    const result = await elicateCreatePayout({
       amount,
       currency: "ZMW",
       account_bank: ELICATE_BANK_CODE,
@@ -139,33 +132,14 @@ Deno.serve(async (req) => {
       beneficiary_name: beneficiaryName,
       reference,
       narration,
-    };
-
-    console.log("Elicate PAYOUT request:", { mode: elicate.mode, url: PAYOUT_URL, payload });
-
-    const res = await fetch(PAYOUT_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${secret}`,
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify(payload),
     });
 
-    const respText = await res.text();
-    console.log("Elicate PAYOUT response:", res.status, respText);
-
-    let respJson: any = {};
-    try { respJson = JSON.parse(respText); } catch { respJson = { raw: respText }; }
-
-    if (!res.ok) {
-      const friendlyError = res.status >= 500
-        ? "Elicate returned an internal server error. Please retry in a few moments."
-        : respJson?.message || respJson?.error || "Elicate payout failed";
+    if (!result.ok) {
+      const friendlyError = result.status >= 500
+        ? "Payout provider is temporarily unavailable. Please retry shortly."
+        : (result.error || "Payout failed");
 
       const reversal = await reverseTransferLedger(supabase, transfer_id);
-
       await supabase.from("transfers").update({
         status: "failed",
         failure_reason: friendlyError,
@@ -174,18 +148,19 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({
         success: false,
         error: friendlyError,
-        code: res.status >= 500 ? "provider_internal_error" : "provider_error",
+        code: result.status >= 500 ? "provider_internal_error" : "provider_error",
         refunded: reversal.reversed,
-        provider_status: res.status,
-        provider_response: respJson,
+        provider_status: result.status,
+        provider_response: result.data,
       }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Extract documented fields: transaction_id / id from the payout response.
-    const data = respJson?.data || respJson;
-    const transactionId =
-      data?.transaction_id || data?.transactionId || data?.id || null;
-    const providerReference = transactionId || data?.reference || reference;
+    const data = result.data;
+    const payoutId =
+      extractTransactionId(data)
+      || (typeof data.payout_id === "string" ? data.payout_id : null)
+      || null;
+    const providerReference = payoutId || String(data.reference ?? reference);
 
     await supabase.from("transfers").update({
       status: "processing",
@@ -194,9 +169,11 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify({
       success: true,
-      transaction_id: transactionId,
+      payout_id: payoutId,
+      transaction_id: payoutId,
       provider_reference: providerReference,
-      provider_response: respJson,
+      provider_response: data,
+      mode: elicate.mode,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (err) {
     console.error("elicate-payout error:", err);

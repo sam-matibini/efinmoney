@@ -56,6 +56,10 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
   const [eftHolder, setEftHolder] = useState("");
   // Interac
   const [interacEmail, setInteracEmail] = useState("");
+  const [mailingAddress, setMailingAddress] = useState("");
+  const [mailingCity, setMailingCity] = useState("");
+  const [mailingRegion, setMailingRegion] = useState("");
+  const [mailingPostal, setMailingPostal] = useState("");
   const [notes, setNotes] = useState("");
   const [tags, setTags] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -74,7 +78,9 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
       editing?.eft_account ? "eft" :
       editing?.interac_email ? "interac" :
       editing?.bank_account ? "bank" :
-      editing?.phone ? "mobile" : (defaultMethod || "none")
+      editing?.phone && editing?.payout_method && editing.payout_method !== "eft" && editing.payout_method !== "interac" && editing.payout_method !== "bank"
+        ? "mobile"
+        : (defaultMethod || "none")
     );
     setPhone(editing?.phone || "");
     setBankName(editing?.bank_name || "");
@@ -86,6 +92,10 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
     setEftAcct(editing?.eft_account || "");
     setEftHolder(editing?.eft_account_holder || "");
     setInteracEmail(editing?.interac_email || "");
+    setMailingAddress(editing?.mailing_address || "");
+    setMailingCity(editing?.mailing_city || "");
+    setMailingRegion(editing?.mailing_region || "");
+    setMailingPostal(editing?.mailing_postal_code || "");
     setNotes(editing?.notes || "");
     setTags((editing?.tags || []).join(", "));
     setShowAdvanced(!!editing?.notes || !!editing?.tags?.length);
@@ -159,6 +169,9 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
     if (method === "interac" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(interacEmail)) {
       toast.error("Interac requires a valid email"); return;
     }
+    if (method === "mobile" && !phone.trim()) {
+      toast.error("Mobile payout requires a phone number"); return;
+    }
 
     const payload: any = {
       name: name.trim(),
@@ -169,7 +182,7 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
       country_code: country.code,
       currency_code: country.code,
       payout_method: method === "mobile" ? country.payout : method === "bank" ? "bank" : method === "eft" ? "eft" : method === "interac" ? "interac" : null,
-      phone: method === "mobile" ? phone.trim() : null,
+      phone: phone.trim() || null,
       bank_name: method === "bank" ? selectedBankName.trim() : null,
       bank_account: method === "bank" ? bankAccount.trim() : null,
       bank_code: method === "bank" && isNigeriaBank ? bankCode.trim() || null : null,
@@ -178,6 +191,10 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
       eft_account: method === "eft" ? eftAcct : null,
       eft_account_holder: method === "eft" ? (eftHolder.trim() || name.trim()) : null,
       interac_email: method === "interac" ? interacEmail.trim() : null,
+      mailing_address: mailingAddress.trim() || null,
+      mailing_city: mailingCity.trim() || null,
+      mailing_region: mailingRegion.trim() || null,
+      mailing_postal_code: mailingPostal.trim() || null,
       category,
       notes: notes.trim() || null,
       tags: tags.split(",").map(t => t.trim()).filter(Boolean),
@@ -248,6 +265,45 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
           </div>
 
           <div className="space-y-2">
+            <Label>Phone (optional)</Label>
+            <Input
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder={method === "mobile" ? "+260..." : "+1..."}
+            />
+            {method === "mobile" && (
+              <p className="text-xs text-muted-foreground">Used as the mobile money payout number.</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label>Mailing address (optional)</Label>
+            <Input
+              value={mailingAddress}
+              onChange={(e) => setMailingAddress(e.target.value)}
+              placeholder="Street address"
+            />
+            <div className="grid grid-cols-2 gap-3">
+              <Input
+                value={mailingCity}
+                onChange={(e) => setMailingCity(e.target.value)}
+                placeholder="City"
+              />
+              <Input
+                value={mailingRegion}
+                onChange={(e) => setMailingRegion(e.target.value)}
+                placeholder="State / Province"
+              />
+            </div>
+            <Input
+              value={mailingPostal}
+              onChange={(e) => setMailingPostal(e.target.value)}
+              placeholder="Postal / ZIP code"
+            />
+          </div>
+
+          <div className="space-y-2">
             <Label>Default payout method</Label>
             <Tabs value={method} onValueChange={(v) => setMethod(v as any)}>
               <TabsList className="grid grid-cols-5 w-full">
@@ -260,11 +316,10 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
             </Tabs>
           </div>
 
-          {method === "mobile" && (
-            <div className="space-y-2">
-              <Label>Phone Number</Label>
-              <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+254..." />
-            </div>
+          {method === "mobile" && !phone.trim() && (
+            <p className="text-xs text-amber-700 dark:text-amber-400">
+              Enter a phone number above for mobile money payouts.
+            </p>
           )}
           {method === "bank" && (
             <>

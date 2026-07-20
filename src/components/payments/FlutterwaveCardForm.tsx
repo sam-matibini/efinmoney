@@ -25,9 +25,9 @@ interface Props {
 type Stage = "idle" | "charging" | "auth" | "verifying" | "crediting" | "success";
 
 const STAGE_COPY: Record<Exclude<Stage, "idle" | "success">, { title: string; sub: string }> = {
-  charging: { title: "Charging your card…", sub: "Securely processing with Flutterwave" },
+  charging: { title: "Charging your card…", sub: "Securely processing your payment" },
   auth: { title: "Verifying your identity…", sub: "Please complete the security check" },
-  verifying: { title: "Verifying payment…", sub: "Confirming with Flutterwave" },
+  verifying: { title: "Verifying payment…", sub: "Confirming with your bank" },
   crediting: { title: "Crediting your wallet…", sub: "Almost done" },
 };
 
@@ -84,7 +84,7 @@ function ProcessingOverlay({ stage }: { stage: Exclude<Stage, "idle" | "success"
         <p className="text-xs text-muted-foreground">{STAGE_COPY[stage].sub}</p>
       </div>
       <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-        <Lock className="h-3 w-3" /> Secured by Flutterwave
+        <Lock className="h-3 w-3" /> Secured by eFinMoney
       </div>
     </div>
   );
@@ -97,7 +97,7 @@ function EfinmoneyBranding() {
         <span className="text-white text-[10px] font-bold">e</span>
       </div>
       <span className="text-xs text-muted-foreground">
-        Payment powered by <span className="font-semibold text-emerald-600">Efinmoney</span> via Flutterwave
+        Payment powered by <span className="font-semibold text-emerald-600">eFinMoney</span>
       </span>
     </div>
   );

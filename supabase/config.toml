@@ -42,6 +42,21 @@ verify_jwt = false
 [functions.elicate-charge]
 verify_jwt = false
 
+[functions.elicate-status]
+verify_jwt = false
+
+[functions.elicate-stream]
+verify_jwt = false
+
+[functions.elicate-checkout]
+verify_jwt = false
+
+[functions.elicate-payment-links]
+verify_jwt = false
+
+[functions.elicate-reconcile]
+verify_jwt = false
+
 [functions.ghana-collection]
 verify_jwt = true
 
@@ -187,6 +202,9 @@ verify_jwt = false
 
 [functions.fincra-webhook]
 verify_jwt = false
+
+[functions.fincra-cad-interac]
+verify_jwt = true
 
 [functions.fincra-payout]
 verify_jwt = false

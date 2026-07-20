@@ -108,10 +108,14 @@ const EDGE_FUNCTIONS: Array<{ name: string; description: string; jwt: boolean; c
   { name: "yellowcard-payout",         description: "Initiates Yellowcard Africa payouts",      jwt: false, category: "Yellowcard" },
   { name: "yellowcard-webhook",        description: "Receives Yellowcard events",               jwt: false, category: "Yellowcard" },
   // Elicate
-  { name: "elicate-payout",            description: "Initiates Elicate payouts",                jwt: false, category: "Elicate" },
-  { name: "elicate-charge",            description: "Elicate charge execution",                 jwt: false, category: "Elicate" },
-  { name: "elicate-reconcile",         description: "Reconcile Elicate transactions",           jwt: true,  category: "Elicate" },
-  { name: "elicate-webhook",           description: "Receives Elicate events",                  jwt: false, category: "Elicate" },
+  { name: "elicate-payout",            description: "Zambia MoMo payouts",                      jwt: false, category: "Elicate" },
+  { name: "elicate-charge",            description: "Zambia MoMo collections (secret)",         jwt: true,  category: "Elicate" },
+  { name: "elicate-status",            description: "Poll + settle charge status",              jwt: true,  category: "Elicate" },
+  { name: "elicate-stream",            description: "SSE proxy for payment status",             jwt: true,  category: "Elicate" },
+  { name: "elicate-checkout",          description: "Public-key checkout collect",              jwt: true,  category: "Elicate" },
+  { name: "elicate-payment-links",     description: "Create/list/update MoMo payment links",    jwt: true,  category: "Elicate" },
+  { name: "elicate-reconcile",         description: "Reconcile pending ZMW payouts",            jwt: true,  category: "Elicate" },
+  { name: "elicate-webhook",           description: "Receives Elicate HMAC webhooks",           jwt: false, category: "Elicate" },
   // MTN MoMo
   { name: "mtn-momo-payout",           description: "Initiates MTN Mobile Money payouts",      jwt: false, category: "MTN MoMo" },
   { name: "mtn-momo-webhook",          description: "Receives MTN MoMo events",                jwt: false, category: "MTN MoMo" },
@@ -123,6 +127,7 @@ const EDGE_FUNCTIONS: Array<{ name: string; description: string; jwt: boolean; c
   { name: "fincra-payout",             description: "Initiates Fincra payouts",                jwt: false, category: "Fincra" },
   { name: "fincra-verify-payment",     description: "Verify Fincra payment status",            jwt: true,  category: "Fincra" },
   { name: "fincra-webhook",            description: "Receives Fincra events",                  jwt: false, category: "Fincra" },
+  { name: "fincra-cad-interac",         description: "CAD Interac e-Transfer top-up intents",   jwt: true,  category: "Fincra" },
   // Ghana
   { name: "ghana-collection",          description: "Ghana GHS collection initiation",         jwt: true,  category: "Ghana" },
   { name: "ghana-payout",              description: "Ghana GHS payout",                        jwt: false, category: "Ghana" },

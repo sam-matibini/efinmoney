@@ -1,0 +1,162 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+
+  try {
+    const authHeader = req.headers.get("Authorization") || "";
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const anon = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const service = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    const userClient = createClient(supabaseUrl, anon, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: { user }, error: userErr } = await userClient.auth.getUser();
+    if (userErr || !user) return json({ error: "Unauthorized" }, 401);
+
+    const admin = createClient(supabaseUrl, service);
+    const alias = (Deno.env.get("FINCRA_CAD_INTERAC_ALIAS") || "").trim();
+
+    if (req.method === "GET") {
+      const url = new URL(req.url);
+      const intentId = url.searchParams.get("intent_id");
+      if (intentId) {
+        const { data, error } = await admin
+          .from("fincra_cad_interac_intents")
+          .select("id, amount, currency_code, reference, status, created_at, expires_at, credited_at")
+          .eq("id", intentId)
+          .eq("user_id", user.id)
+          .maybeSingle();
+        if (error) return json({ error: error.message }, 500);
+        if (!data) return json({ error: "Intent not found" }, 404);
+        return json({
+          intent: data,
+          alias: alias || null,
+          configured: Boolean(alias),
+        });
+      }
+
+      const { data: pending } = await admin
+        .from("fincra_cad_interac_intents")
+        .select("id, amount, currency_code, reference, status, created_at, expires_at")
+        .eq("user_id", user.id)
+        .eq("status", "pending")
+        .gt("expires_at", new Date().toISOString())
+        .order("created_at", { ascending: false })
+        .limit(5);
+
+      return json({
+        alias: alias || null,
+        configured: Boolean(alias),
+        pending: pending ?? [],
+      });
+    }
+
+    if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
+
+    const body = await req.json().catch(() => ({})) as {
+      action?: string;
+      amount?: number;
+      wallet_id?: string;
+      intent_id?: string;
+    };
+
+    const action = String(body.action || "create").toLowerCase();
+
+    if (action === "cancel") {
+      const intentId = String(body.intent_id || "");
+      if (!intentId) return json({ error: "intent_id required" }, 400);
+      const { data, error } = await admin
+        .from("fincra_cad_interac_intents")
+        .update({ status: "cancelled" })
+        .eq("id", intentId)
+        .eq("user_id", user.id)
+        .eq("status", "pending")
+        .select("id, status")
+        .maybeSingle();
+      if (error) return json({ error: error.message }, 500);
+      if (!data) return json({ error: "Intent not found or not pending" }, 404);
+      return json({ ok: true, intent: data });
+    }
+
+    if (!alias) {
+      return json({
+        error: "Interac e-Transfer is not configured yet. Please try card checkout or pay by invoice.",
+        code: "alias_missing",
+      }, 503);
+    }
+
+    const amount = Number(body.amount);
+    const walletId = String(body.wallet_id || "");
+    if (!Number.isFinite(amount) || amount < 1) {
+      return json({ error: "Enter an amount of at least CAD 1.00" }, 400);
+    }
+    if (!walletId) return json({ error: "wallet_id required" }, 400);
+
+    const { data: wallet, error: wErr } = await admin
+      .from("wallets")
+      .select("id, user_id, currency_code")
+      .eq("id", walletId)
+      .maybeSingle();
+    if (wErr || !wallet || wallet.user_id !== user.id) {
+      return json({ error: "Wallet not found" }, 404);
+    }
+    if (String(wallet.currency_code).toUpperCase() !== "CAD") {
+      return json({ error: "Interac e-Transfer only funds CAD wallets" }, 400);
+    }
+
+    // Expire stale pending intents for this user
+    await admin
+      .from("fincra_cad_interac_intents")
+      .update({ status: "expired" })
+      .eq("user_id", user.id)
+      .eq("status", "pending")
+      .lt("expires_at", new Date().toISOString());
+
+    const reference = `efm-interac-${user.id.slice(0, 8)}-${Date.now()}`;
+    const { data: intent, error: insErr } = await admin
+      .from("fincra_cad_interac_intents")
+      .insert({
+        user_id: user.id,
+        wallet_id: walletId,
+        amount: Math.round(amount * 100) / 100,
+        currency_code: "CAD",
+        reference,
+        status: "pending",
+      })
+      .select("id, amount, currency_code, reference, status, created_at, expires_at")
+      .single();
+
+    if (insErr || !intent) {
+      return json({ error: insErr?.message || "Could not create Interac intent" }, 500);
+    }
+
+    return json({
+      ok: true,
+      alias,
+      intent,
+      instructions: [
+        `Open your Canadian banking app and send an Interac e-Transfer.`,
+        `Send exactly CAD ${intent.amount} to ${alias}.`,
+        `Autodeposit is enabled — no security question needed.`,
+        `Your CAD wallet credits when the transfer arrives (usually within minutes).`,
+      ],
+    });
+  } catch (err) {
+    console.error("fincra-cad-interac error:", err);
+    return json({ error: err instanceof Error ? err.message : "Server error" }, 500);
+  }
+});

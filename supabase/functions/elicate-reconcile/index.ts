@@ -1,37 +1,33 @@
-// Polls Elicate for the current status of every transfer still in `processing`
-// state, then completes/fails them using the same ledger logic as the webhook.
-// Safe to run on a schedule (cron) or invoke ad-hoc to test transfer completion.
-
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
-import { getElicateConfig } from "../_shared/elicate.ts";
+import {
+  elicatePayoutStatus,
+  getElicateConfig,
+  isElicateFailureStatus,
+  isElicateSuccessStatus,
+} from "../_shared/elicate.ts";
 
-function statusUrl(baseUrl: string, txId: string): string {
-  // baseUrl is the charge endpoint .../api/v1/payments/charge → strip /charge
-  const u = new URL(baseUrl);
-  u.pathname = u.pathname.replace(/\/charge\/?$/i, "");
-  return `${u.origin}${u.pathname}/${encodeURIComponent(txId)}`;
-}
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS, GET",
+};
 
 async function settleSuccess(
   supabase: ReturnType<typeof createClient>,
-  transfer: any,
+  transfer: Record<string, unknown>,
   providerRef: string,
 ): Promise<{ ok: true } | { ok: false; reason: string }> {
   if (transfer.status === "completed") return { ok: true };
 
-  const { data: elicateAcc } = await supabase
-    .from("ledger_accounts").select("id").eq("code", "1205").maybeSingle();
+  const { data: elicateAcc } = await supabase.from("ledger_accounts").select("id").eq("code", "1205").maybeSingle();
   const { data: walletLiab } = await supabase
-    .from("ledger_accounts").select("id")
-    .like("code", "21%").eq("currency_code", "ZMW").limit(1).single();
+    .from("ledger_accounts").select("id").like("code", "21%").eq("currency_code", "ZMW").limit(1).single();
 
   if (!elicateAcc || !walletLiab) return { ok: false, reason: "Ledger setup incomplete" };
 
   const journalId = crypto.randomUUID();
   const amount = Number(transfer.target_amount);
-
-  const entries: any[] = [
+  const entries: Record<string, unknown>[] = [
     {
       journal_id: journalId,
       account_id: walletLiab.id,
@@ -56,21 +52,19 @@ async function settleSuccess(
     },
   ];
 
-  const { data: payableAcc } = await supabase
-    .from("ledger_accounts").select("id").eq("code", "2123").maybeSingle();
+  const { data: payableAcc } = await supabase.from("ledger_accounts").select("id").eq("code", "2123").maybeSingle();
   if (payableAcc) {
     entries[0].account_id = payableAcc.id;
     entries[0].description = `Clear ZMW payable for ${transfer.recipient_name}`;
   }
 
-  // Idempotency guard — never double-post the same settlement
   const { data: existing } = await supabase
     .from("ledger_entries")
     .select("id")
     .eq("reference_type", "elicate_payout")
     .eq("reference_id", transfer.id)
     .limit(1);
-  if (!existing || existing.length === 0) {
+  if (!existing?.length) {
     const { error: leErr } = await supabase.from("ledger_entries").insert(entries);
     if (leErr) return { ok: false, reason: leErr.message };
   }
@@ -87,7 +81,7 @@ async function reverseLedger(supabase: ReturnType<typeof createClient>, transfer
   const { data: already } = await supabase
     .from("ledger_entries").select("id")
     .eq("reference_type", "transfer_reversal").eq("reference_id", transferId).limit(1);
-  if (already && already.length) return;
+  if (already?.length) return;
 
   const { data: originals } = await supabase
     .from("ledger_entries")
@@ -126,8 +120,8 @@ Deno.serve(async (req) => {
       transferId = body?.transfer_id ?? null;
     }
 
-    const { mode, url, secretKey } = getElicateConfig();
-    if (!secretKey || !url) {
+    const { mode, secretKey } = getElicateConfig();
+    if (!secretKey) {
       return new Response(JSON.stringify({ error: "Elicate not configured", mode }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -139,7 +133,6 @@ Deno.serve(async (req) => {
       .eq("status", "processing")
       .eq("target_currency", "ZMW")
       .not("provider_reference", "is", null)
-      .like("provider_reference", "EP-%")
       .order("created_at", { ascending: false })
       .limit(50);
 
@@ -148,28 +141,22 @@ Deno.serve(async (req) => {
     const { data: transfers, error } = await q;
     if (error) throw error;
 
-    const results: any[] = [];
+    const results: Record<string, unknown>[] = [];
     for (const t of transfers ?? []) {
       const providerRef: string = t.provider_reference;
-      const u = statusUrl(url, providerRef);
-      const r = await fetch(u, {
-        headers: { Authorization: `Bearer ${secretKey}`, Accept: "application/json" },
-      });
-      const text = await r.text();
-      let body: any = {};
-      try { body = JSON.parse(text); } catch { body = { raw: text }; }
-
-      const status = String(body?.status ?? body?.data?.status ?? "").toLowerCase();
+      // Prefer payout status API for PO-* / payout ids; also works for EP-* where applicable.
+      const details = await elicatePayoutStatus(providerRef);
+      const status = String(details.data?.status ?? "").toLowerCase();
       let action = "no_change";
 
-      if (["successful", "success", "completed", "paid"].includes(status)) {
+      if (details.ok && isElicateSuccessStatus(status)) {
         const res = await settleSuccess(supabase, t, providerRef);
         action = res.ok ? "completed" : `error:${res.reason}`;
-      } else if (["failed", "failure", "rejected", "cancelled", "canceled"].includes(status)) {
+      } else if (details.ok && isElicateFailureStatus(status)) {
         await reverseLedger(supabase, t.id);
         await supabase.from("transfers").update({
           status: "failed",
-          failure_reason: body?.message || body?.reason || `Elicate status: ${status}`,
+          failure_reason: String(details.data?.message || details.error || `Elicate status: ${status}`),
         }).eq("id", t.id);
         action = "failed";
       }
@@ -179,7 +166,8 @@ Deno.serve(async (req) => {
         provider_reference: providerRef,
         provider_status: status || "(unknown)",
         action,
-        http: r.status,
+        http: details.status,
+        ok: details.ok,
       });
     }
 

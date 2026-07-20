@@ -2097,7 +2097,7 @@ const SendPage = () => {
                                                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/20 text-primary font-mono uppercase">Testnet</span>
                                               </div>
                                               <p className="text-xs text-muted-foreground mt-1">
-                                                Route this Naira payout over the Stellar blockchain via a SEP-31 anchor instead of Flutterwave. Settles in seconds with an on-chain receipt.
+                                                Route this Naira payout over the Stellar blockchain via a SEP-31 anchor instead of the default bank rail. Settles in seconds with an on-chain receipt.
                                               </p>
                                             </div>
                                             <Switch
@@ -2113,14 +2113,14 @@ const SendPage = () => {
                                             <div className="flex items-start justify-between gap-3">
                                               <div className="flex-1">
                                                 <div className="flex items-center gap-2">
-                                                  <span className="text-sm font-medium">Send via Fincra (Sandbox)</span>
+                                                  <span className="text-sm font-medium">Alternate bank payout (test)</span>
                                                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-700 dark:text-teal-300 font-mono uppercase">Test</span>
                                                 </div>
                                                 <p className="text-xs text-muted-foreground mt-1">
-                                                  Route this payout through Fincra instead of Flutterwave. Requires funded Fincra sandbox balance for disbursements.
+                                                  Route this payout through an alternate bank rail. Requires a funded disbursement balance.
                                                 </p>
                                               </div>
-                                              <Switch checked={useFincra} onCheckedChange={setUseFincra} aria-label="Use Fincra payout" />
+                                              <Switch checked={useFincra} onCheckedChange={setUseFincra} aria-label="Use alternate bank payout" />
                                             </div>
                                           </motion.div>
                                         )}
@@ -2210,17 +2210,17 @@ const SendPage = () => {
                                           <div className="flex items-start justify-between gap-3">
                                             <div className="flex-1">
                                               <div className="flex items-center gap-2">
-                                                <span className="text-sm font-medium">Use Paytota (test)</span>
+                                                <span className="text-sm font-medium">Alternate MoMo payout (test)</span>
                                                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-700 dark:text-sky-300 font-mono uppercase">Test</span>
                                               </div>
                                               <p className="text-xs text-muted-foreground mt-1">
-                                                Route this UGX mobile money payout through Paytota. Default rails stay available when off.
+                                                Route this UGX mobile money payout through an alternate rail. Default rails stay available when off.
                                               </p>
                                             </div>
                                             <Switch
                                               checked={usePaytota}
                                               onCheckedChange={setUsePaytota}
-                                              aria-label="Use Paytota payout"
+                                              aria-label="Use alternate MoMo payout"
                                             />
                                           </div>
                                         </motion.div>
@@ -2230,14 +2230,14 @@ const SendPage = () => {
                                           <div className="flex items-start justify-between gap-3">
                                             <div className="flex-1">
                                               <div className="flex items-center gap-2">
-                                                <span className="text-sm font-medium">Send via Fincra (Sandbox)</span>
+                                                <span className="text-sm font-medium">Alternate MoMo payout (test)</span>
                                                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-700 dark:text-teal-300 font-mono uppercase">Test</span>
                                               </div>
                                               <p className="text-xs text-muted-foreground mt-1">
-                                                Route this mobile money payout through Fincra instead of the default provider.
+                                                Route this mobile money payout through an alternate rail instead of the default provider.
                                               </p>
                                             </div>
-                                            <Switch checked={useFincra} onCheckedChange={setUseFincra} aria-label="Use Fincra payout" />
+                                            <Switch checked={useFincra} onCheckedChange={setUseFincra} aria-label="Use alternate MoMo payout" />
                                           </div>
                                         </motion.div>
                                       )}

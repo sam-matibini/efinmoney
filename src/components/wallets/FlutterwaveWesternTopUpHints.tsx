@@ -9,10 +9,10 @@ export default function FlutterwaveWesternTopUpHints({ currency }: Props) {
       <CardHeader className="pb-2">
         <CardTitle className="text-base flex items-center gap-2">
           <Info className="h-5 w-5 text-orange-600 shrink-0" />
-          Paying with Flutterwave ({currency})
+          Paying with card ({currency})
         </CardTitle>
         <CardDescription>
-          You will be redirected to Flutterwave&apos;s secure checkout. Your card is charged the amount you enter.
+          Enter your card details securely below. Your card is charged the amount you enter.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3 text-sm">

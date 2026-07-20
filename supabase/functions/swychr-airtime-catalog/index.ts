@@ -1,6 +1,10 @@
 import { corsHeaders } from "../_shared/cors.ts";
 import { isSwychrConfigured, isSwychrEnabled } from "../_shared/swychr-auth.ts";
-import { listSwychrOperators, listSwychrProductsByCountry } from "../_shared/swychr-airtime.ts";
+import {
+  listSwychrOperators,
+  listSwychrProductsByCountry,
+  lookupSwychrMobile,
+} from "../_shared/swychr-airtime.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -23,11 +27,23 @@ Deno.serve(async (req) => {
   const body = await req.json().catch(() => ({}));
   const country = String((body as Record<string, unknown>).country ?? "NG").toUpperCase();
   const type = String((body as Record<string, unknown>).type ?? "products");
+  const mobile = String((body as Record<string, unknown>).mobile ?? "").trim();
 
   try {
-    const data = type === "operators"
-      ? await listSwychrOperators(country)
-      : await listSwychrProductsByCountry(country);
+    let data: unknown;
+    if (type === "operators") {
+      data = await listSwychrOperators(country);
+    } else if (type === "lookup") {
+      if (!mobile) {
+        return new Response(JSON.stringify({ error: "mobile required for lookup" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      data = await lookupSwychrMobile(mobile);
+    } else {
+      data = await listSwychrProductsByCountry(country);
+    }
     return new Response(JSON.stringify(data), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

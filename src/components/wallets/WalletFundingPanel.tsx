@@ -38,7 +38,7 @@ const WalletFundingPanel = ({
     undefined,
     undefined,
     productFeatures.swychr,
-    productFeatures.paytota,
+    false,
   );
   const liveTopup = isLiveTopupCurrency(currency);
 
@@ -64,7 +64,7 @@ const WalletFundingPanel = ({
       {liveTopup ? (
         <div className="rounded-xl border p-4 space-y-3">
           <p className="text-sm text-muted-foreground leading-relaxed">
-            Top up this wallet via {currency === "GHS" ? "Ghana Pay" : "secure checkout"} on the dedicated top-up page.
+            Top up this wallet via secure checkout on the dedicated top-up page.
           </p>
           <Button
             className="w-full"

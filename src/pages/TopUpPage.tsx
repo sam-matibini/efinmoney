@@ -12,10 +12,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { CheckCircle2, XCircle, CreditCard, Smartphone, Building2, Globe, Wallet } from "lucide-react";
+import { CheckCircle2, XCircle, CreditCard, Smartphone, Building2, Globe, Wallet, FileText, Landmark } from "lucide-react";
 import { useWallets } from "@/hooks/useWallets";
 import { useAuth } from "@/hooks/useAuth";
 import ElicateTopUpCard from "@/components/payments/ElicateTopUpCard";
+import CadInteracTopUpCard from "@/components/payments/CadInteracTopUpCard";
 import GhanaTopUpCard from "@/components/payments/GhanaTopUpCard";
 import NombaTopUpCard from "@/components/payments/NombaTopUpCard";
 import PaytotaTopUpCard from "@/components/payments/PaytotaTopUpCard";
@@ -30,15 +31,23 @@ import {
   supportsAfricanProviderChoice,
   type WesternTopupProvider,
   type AfricanTopupProvider,
+  type IntlTopupMethod,
+  type WalletTopupGateway,
+  MULTI_RAIL_TOPUP_CURRENCIES,
   nombaGatewayLabel,
   paytotaGatewayLabel,
+  fincraGatewayLabel,
   swychrGatewayLabel,
+  intlMethodLabel,
+  intlMethodDescription,
 } from "@/lib/walletTopupGateway";
 import { clearPendingSwychrTxn } from "@/lib/swychrPay";
 import FlutterwaveWesternTopUpHints from "@/components/wallets/FlutterwaveWesternTopUpHints";
 import { buildFincraTopupRedirectUrl, parseFincraReturnReference, isFincraCheckoutCurrency } from "@/lib/fincraTopup";
 import { clearPendingNombaTxn } from "@/lib/nombaPay";
 import { clearPendingPaytotaTxn, confirmPaytotaPayment, readPendingPaytotaTxn } from "@/lib/paytotaPay";
+import { quoteCadNombaTopup } from "@/lib/nombaTopupQuote";
+import { useFxRates } from "@/hooks/useFxRates";
 import { cn } from "@/lib/utils";
 import ComingSoon from "@/components/common/ComingSoon";
 import { isLiveTopupCurrency, productFeatures } from "@/lib/productFeatures";
@@ -48,7 +57,30 @@ import { currencySymbol } from "@/lib/currency";
 
 const MM_BY_CCY = Object.fromEntries(MM_COUNTRIES.map((c) => [c.currency, c]));
 
-type Gateway = "flutterwave" | "elicate" | "fincra" | "ghana_pay" | "nomba_pay" | "swychr_pay" | "paytota_pay" | "unsupported";
+type Gateway = WalletTopupGateway;
+
+function availableIntlMethods(currency: string): IntlTopupMethod[] {
+  const c = currency.toUpperCase();
+  if (!MULTI_RAIL_TOPUP_CURRENCIES.includes(c)) return [];
+  const methods: IntlTopupMethod[] = [];
+  if (productFeatures.nombaNigeria) methods.push("nomba");
+  // Fincra: USD/EUR/GBP direct; CAD via USD card charge (same idea as Express card)
+  if (productFeatures.fincra && ["USD", "EUR", "GBP", "CAD"].includes(c)) methods.push("fincra");
+  if (productFeatures.paytota) methods.push("paytota");
+  if (c === "CAD" && productFeatures.fincraInterac) methods.push("interac");
+  return methods;
+}
+
+function initialIntlMethod(params: URLSearchParams, currency: string): IntlTopupMethod | null {
+  const methods = availableIntlMethods(currency);
+  if (methods.length === 0) return null;
+  const fromQuery = params.get("method")?.toLowerCase() || params.get("provider")?.toLowerCase() || params.get("rail")?.toLowerCase();
+  if (fromQuery === "interac" && methods.includes("interac")) return "interac";
+  if ((fromQuery === "fincra" || fromQuery === "bank") && methods.includes("fincra")) return "fincra";
+  if ((fromQuery === "paytota" || fromQuery === "invoice") && methods.includes("paytota")) return "paytota";
+  if ((fromQuery === "nomba" || fromQuery === "card" || fromQuery === "express") && methods.includes("nomba")) return "nomba";
+  return methods[0];
+}
 
 function initialWesternProvider(params: URLSearchParams): WesternTopupProvider {
   const fromQuery = params.get("provider")?.toLowerCase();
@@ -99,6 +131,7 @@ const TopUpPage = () => {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { data: wallets, isLoading: walletsLoading } = useWallets();
+  const { data: fxRates = [] } = useFxRates();
 
   const [selectedWalletId, setSelectedWalletId] = useState<string>("");
   const [amount, setAmount] = useState("");
@@ -108,6 +141,7 @@ const TopUpPage = () => {
   const [loading, setLoading] = useState(false);
   const [westernProvider, setWesternProvider] = useState<WesternTopupProvider>(() => initialWesternProvider(params));
   const [africanProvider, setAfricanProvider] = useState<AfricanTopupProvider>(() => initialAfricanProvider(params));
+  const [intlMethod, setIntlMethod] = useState<IntlTopupMethod | null>(null);
   const [verifyState, setVerifyState] = useState<{ status: "verifying" | "success" | "failed"; message: string } | null>(null);
 
   // Initialize wallet from URL or default
@@ -136,23 +170,39 @@ const TopUpPage = () => {
   const currency = selectedWallet?.currency_code || "USD";
   const showWesternProviderChoice = supportsWesternProviderChoice(currency);
   const showAfricanProviderChoice = supportsAfricanProviderChoice(currency);
-  // Paytota: USD/EUR/GBP/CAD. Nomba: NGN. Swychr: XAF/KES/XOF/UGX. Ghana Pay: GHS.
+  const intlMethods = useMemo(() => availableIntlMethods(currency), [currency]);
+  const showIntlMethodChoice = intlMethods.length > 1;
+
+  // Keep intl method valid when wallet/currency changes
+  useEffect(() => {
+    if (intlMethods.length === 0) {
+      setIntlMethod(null);
+      return;
+    }
+    const preferred = initialIntlMethod(params, currency);
+    setIntlMethod((prev) => {
+      if (prev && intlMethods.includes(prev)) return prev;
+      return preferred;
+    });
+  }, [currency, intlMethods, params]);
+
+  // Paytota: USD/EUR/GBP/CAD. Nomba: NGN + intl. Swychr: XAF/KES/XOF/UGX. Ghana Pay: GHS. Interac: CAD.
   const wantSwychr =
     productFeatures.swychr
     || params.get("provider")?.toLowerCase() === "swychr"
     || params.get("rail")?.toLowerCase() === "swychr";
   const forceSwychr = wantSwychr && ["XAF", "KES", "XOF", "UGX"].includes(currency.toUpperCase());
-  const wantPaytota =
-    productFeatures.paytota
-    || params.get("provider")?.toLowerCase() === "paytota"
-    || params.get("rail")?.toLowerCase() === "paytota";
-  const forcePaytota = wantPaytota && ["USD", "EUR", "GBP", "CAD"].includes(currency.toUpperCase());
+  const preferPaytota = intlMethod === "paytota";
+  const preferInterac = intlMethod === "interac";
+  const preferFincra = intlMethod === "fincra";
   const gateway: Gateway = routeWalletTopupGateway(
     currency,
     westernProvider,
     africanProvider,
     forceSwychr,
-    forcePaytota,
+    preferPaytota,
+    preferInterac,
+    preferFincra,
   );
   const liveTopup = isLiveTopupCurrency(currency);
   const availableFlwMethods = FLW_METHODS_BY_CCY[currency] || ["card"];
@@ -245,7 +295,7 @@ const TopUpPage = () => {
 
     const fincraRef = parseFincraReturnReference(window.location.search);
     if (fincraRef && (fincraRef.startsWith("topup-fincra-") || fincraRef.startsWith("efm_fincra_"))) {
-      setVerifyState({ status: "verifying", message: "Verifying your Fincra payment…" });
+      setVerifyState({ status: "verifying", message: "Verifying your payment…" });
       (async () => {
         const session = (await supabase.auth.getSession()).data.session;
         const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fincra-verify-payment?reference=${encodeURIComponent(fincraRef)}`;
@@ -254,7 +304,7 @@ const TopUpPage = () => {
           const json = await res.json();
           if (json?.verified) {
             setVerifyState({ status: "success", message: `Wallet credited with ${json.currency} ${json.amount}` });
-            toast.success("Fincra top-up complete");
+            toast.success("Top-up complete");
           } else {
             setVerifyState({ status: "failed", message: json?.error || "Payment could not be verified" });
           }
@@ -297,21 +347,43 @@ const TopUpPage = () => {
     if (!Number.isFinite(amt) || amt <= 0) { toast.error("Enter a valid amount"); return; }
     const minErr = validateMinAmount(currency, amt);
     if (minErr) { toast.error(minErr); return; }
-    if (!isFincraCheckoutCurrency(currency)) {
-      toast.error(`Fincra checkout does not support ${currency}. Use Flutterwave for this wallet.`);
+
+    const isCadViaUsd = currency.toUpperCase() === "CAD";
+    let chargeAmount = amt;
+    let chargeCurrency = currency.toUpperCase();
+    let creditAmount = amt;
+    let creditCurrency = currency.toUpperCase();
+
+    if (isCadViaUsd) {
+      const quote = quoteCadNombaTopup(amt, fxRates);
+      if (!quote) {
+        toast.error("CAD/USD rate unavailable — try again shortly");
+        return;
+      }
+      chargeAmount = quote.checkoutAmount;
+      chargeCurrency = "USD";
+      creditAmount = quote.creditAmount;
+      creditCurrency = "CAD";
+    } else if (!isFincraCheckoutCurrency(currency)) {
+      toast.error(`This checkout does not support ${currency}. Try another payment method.`);
       return;
     }
+
     setLoading(true);
     try {
       const { url: redirectUrl, usesProductionReturn } = buildFincraTopupRedirectUrl();
       if (usesProductionReturn) {
-        toast.info("After payment, Fincra will return you to efin.money (required for sandbox checkout).");
+        toast.info("After payment, you will return to efin.money (required for checkout).");
       }
       const reference = `topup-fincra-${user?.id || "anon"}-${selectedWalletId.slice(0, 8)}-${Date.now()}`;
       const { data, error } = await supabase.functions.invoke("fincra-initialize-checkout", {
         body: {
-          amount: amt,
-          currency,
+          amount: chargeAmount,
+          currency: chargeCurrency,
+          charge_amount: chargeAmount,
+          charge_currency: chargeCurrency,
+          credit_amount: creditAmount,
+          credit_currency: creditCurrency,
           redirectUrl,
           reference,
           walletId: selectedWalletId,
@@ -322,9 +394,14 @@ const TopUpPage = () => {
       if ((data as { error?: string })?.error || !link) {
         throw new Error((data as { error?: string })?.error || "No payment link");
       }
+      if (isCadViaUsd) {
+        toast.message("Opening checkout", {
+          description: `Pay $${chargeAmount.toFixed(2)} USD — CAD ${creditAmount.toFixed(2)} credits after payment.`,
+        });
+      }
       window.location.href = link;
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not start Fincra checkout");
+      toast.error(e instanceof Error ? e.message : "Could not start checkout");
     } finally {
       setLoading(false);
     }
@@ -332,12 +409,13 @@ const TopUpPage = () => {
 
   const gatewayBadge = useMemo(() => {
     if (gateway === "swychr_pay") return { label: swychrGatewayLabel(currency), icon: Globe, color: "bg-violet-500/10 text-violet-700 border-violet-500/30" };
-    if (gateway === "paytota_pay") return { label: paytotaGatewayLabel(currency), icon: CreditCard, color: "bg-sky-500/10 text-sky-700 border-sky-500/30" };
+    if (gateway === "paytota_pay") return { label: paytotaGatewayLabel(currency), icon: FileText, color: "bg-sky-500/10 text-sky-700 border-sky-500/30" };
     if (gateway === "nomba_pay") return { label: nombaGatewayLabel(currency), icon: CreditCard, color: "bg-green-600/10 text-green-700 border-green-600/30" };
-    if (gateway === "ghana_pay") return { label: "Ghana MoMo", icon: Smartphone, color: "bg-yellow-500/10 text-yellow-700 border-yellow-500/30" };
+    if (gateway === "ghana_pay") return { label: "Mobile money", icon: Smartphone, color: "bg-yellow-500/10 text-yellow-700 border-yellow-500/30" };
     if (gateway === "elicate") return { label: "Mobile Money", icon: Smartphone, color: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30" };
-    if (gateway === "fincra") return { label: "Fincra", icon: Globe, color: "bg-teal-500/10 text-teal-600 border-teal-500/30" };
-    if (gateway === "flutterwave") return { label: "Flutterwave", icon: Globe, color: "bg-orange-500/10 text-orange-500 border-orange-500/30" };
+    if (gateway === "fincra_interac") return { label: "Interac e-Transfer", icon: Landmark, color: "bg-red-500/10 text-red-700 border-red-500/30" };
+    if (gateway === "fincra") return { label: fincraGatewayLabel(currency), icon: Building2, color: "bg-teal-500/10 text-teal-600 border-teal-500/30" };
+    if (gateway === "flutterwave") return { label: "Card", icon: CreditCard, color: "bg-orange-500/10 text-orange-500 border-orange-500/30" };
     return { label: "Unavailable", icon: XCircle, color: "bg-muted text-muted-foreground" };
   }, [gateway, currency]);
 
@@ -420,7 +498,7 @@ const TopUpPage = () => {
               <CardHeader>
                 <CardTitle className="text-base">2. Choose how to pay</CardTitle>
                 <CardDescription>
-                  Flutterwave and Fincra offer hosted checkout for US/Canadian cards — Fincra is experimental for USD/CAD.
+                  Pick a payment method for your {currency} wallet.
                 </CardDescription>
               </CardHeader>
               <CardContent className="grid gap-3 sm:grid-cols-2">
@@ -435,11 +513,11 @@ const TopUpPage = () => {
                   )}
                 >
                   <div className="flex items-center gap-2 font-medium">
-                    <Globe className="h-4 w-4 text-orange-500" />
-                    Flutterwave
+                    <CreditCard className="h-4 w-4 text-orange-500" />
+                    Card
                   </div>
                   <p className="mt-1.5 text-xs text-muted-foreground">
-                    Secure hosted checkout. Canadian/US debit and credit cards.
+                    Enter card details in-app. Canadian/US debit and credit cards.
                   </p>
                 </button>
                 <button
@@ -454,10 +532,10 @@ const TopUpPage = () => {
                 >
                   <div className="flex items-center gap-2 font-medium">
                     <Globe className="h-4 w-4 text-teal-600" />
-                    Fincra
+                    Bank or card
                   </div>
                   <p className="mt-1.5 text-xs text-muted-foreground">
-                    Sandbox Fincra checkout for {currency} — card (and bank transfer where supported).
+                    Hosted checkout for {currency} — card and bank transfer where supported.
                   </p>
                 </button>
               </CardContent>
@@ -469,7 +547,7 @@ const TopUpPage = () => {
               <CardHeader>
                 <CardTitle className="text-base">2. Choose how to pay</CardTitle>
                 <CardDescription>
-                  Flutterwave and Fincra both offer hosted checkout for African wallets — card, bank transfer, and mobile money where supported.
+                  Pick a payment method for your {currency} wallet.
                 </CardDescription>
               </CardHeader>
               <CardContent className="grid gap-3 sm:grid-cols-2">
@@ -484,11 +562,11 @@ const TopUpPage = () => {
                   )}
                 >
                   <div className="flex items-center gap-2 font-medium">
-                    <Globe className="h-4 w-4 text-orange-500" />
-                    Flutterwave
+                    <CreditCard className="h-4 w-4 text-orange-500" />
+                    Card
                   </div>
                   <p className="mt-1.5 text-xs text-muted-foreground">
-                    Existing African rails — card, bank transfer, USSD, mobile money.
+                    Card, bank transfer, USSD, or mobile money where supported.
                   </p>
                 </button>
                 <button
@@ -502,13 +580,51 @@ const TopUpPage = () => {
                   )}
                 >
                   <div className="flex items-center gap-2 font-medium">
-                    <Globe className="h-4 w-4 text-teal-600" />
-                    Fincra
+                    <Building2 className="h-4 w-4 text-teal-600" />
+                    Card or bank transfer
                   </div>
                   <p className="mt-1.5 text-xs text-muted-foreground">
-                    Sandbox/live Fincra checkout — card, bank transfer, mobile money by corridor.
+                    Hosted checkout — card, bank transfer, mobile money by corridor.
                   </p>
                 </button>
+              </CardContent>
+            </Card>
+          )}
+
+          {showIntlMethodChoice && selectedWallet && liveTopup && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">2. Choose how to pay</CardTitle>
+                <CardDescription>
+                  Multiple ways to fund your {currency} wallet — pick one.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-3 sm:grid-cols-2">
+                {intlMethods.map((m) => {
+                  const Icon = m === "paytota" ? FileText : m === "interac" ? Landmark : m === "fincra" ? Building2 : CreditCard;
+                  const selected = intlMethod === m;
+                  return (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setIntlMethod(m)}
+                      className={cn(
+                        "rounded-lg border p-4 text-left transition-colors",
+                        selected
+                          ? "border-primary bg-primary/10 ring-1 ring-primary/40"
+                          : "border-border hover:border-primary/40",
+                      )}
+                    >
+                      <div className="flex items-center gap-2 font-medium">
+                        <Icon className="h-4 w-4 text-primary" />
+                        {intlMethodLabel(m)}
+                      </div>
+                      <p className="mt-1.5 text-xs text-muted-foreground">
+                        {intlMethodDescription(m, currency)}
+                      </p>
+                    </button>
+                  );
+                })}
               </CardContent>
             </Card>
           )}
@@ -540,7 +656,7 @@ const TopUpPage = () => {
                   {showWesternProviderChoice || showAfricanProviderChoice ? "3. Pay with card" : "2. Enter card details"}
                 </CardTitle>
                 <CardDescription>
-                  Pay securely with your debit or credit card. Powered by Efinmoney via Flutterwave.
+                  Pay securely with your debit or credit card. Powered by eFinMoney.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -555,13 +671,20 @@ const TopUpPage = () => {
             </Card>
           )}
 
-          {/* Fincra route — hosted checkout */}
-          {productFeatures.flutterwave && gateway === "fincra" && selectedWallet && liveTopup && (
+          {/* Card or bank transfer (Fincra hosted) — always available when selected, not gated on Flutterwave */}
+          {gateway === "fincra" && selectedWallet && liveTopup && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">
-                  {(showAfricanProviderChoice || showWesternProviderChoice) ? "3. Pay with Fincra" : "2. Enter amount"}
+                  {showIntlMethodChoice || showAfricanProviderChoice || showWesternProviderChoice
+                    ? "3. Enter amount"
+                    : "2. Enter amount"}
                 </CardTitle>
+                <CardDescription>
+                  {currency.toUpperCase() === "CAD"
+                    ? "Enter CAD to credit. You’ll pay the USD equivalent by card at checkout (Canadian cards welcome)."
+                    : "Continue to a secure page to pay by card or bank transfer."}
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
@@ -577,16 +700,53 @@ const TopUpPage = () => {
                   <p className="text-xs text-muted-foreground mt-1">Minimum: {minAmount(currency)} {currency}</p>
                 </div>
 
+                {currency.toUpperCase() === "CAD" && Number(amount) > 0 && (() => {
+                  const quote = quoteCadNombaTopup(Number(amount), fxRates);
+                  if (!quote) {
+                    return (
+                      <p className="text-xs text-amber-700 dark:text-amber-400">
+                        CAD/USD rate loading… try again in a moment.
+                      </p>
+                    );
+                  }
+                  return (
+                    <div className="rounded-lg border bg-muted/40 p-3 text-sm space-y-1.5">
+                      <div className="flex justify-between gap-2">
+                        <span className="text-muted-foreground">Wallet credit</span>
+                        <span className="font-medium tabular-nums">C${quote.creditAmount.toFixed(2)} CAD</span>
+                      </div>
+                      <div className="flex justify-between gap-2">
+                        <span className="text-muted-foreground">You pay (approx.)</span>
+                        <span className="font-semibold tabular-nums">${quote.checkoutAmount.toFixed(2)} USD</span>
+                      </div>
+                      {quote.fxRate && (
+                        <p className="text-[11px] text-muted-foreground pt-1">
+                          Rate: 1 CAD ≈ {quote.fxRate.toFixed(4)} USD · fee included
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
+
                 <div className="p-3 rounded-lg bg-teal-500/10 border border-teal-500/20">
                   <p className="text-xs text-foreground">
-                    {currency === "USD" || currency === "CAD"
-                      ? `Experimental: Fincra ${currency} checkout. If it fails, switch back to Flutterwave.`
-                      : "You will be redirected to Fincra's secure sandbox checkout. Use Fincra test cards or bank transfer where available."}
+                    {currency.toUpperCase() === "CAD"
+                      ? "You’ll pay in USD at checkout; your CAD wallet is credited after payment succeeds."
+                      : "You will be redirected to complete payment. Your wallet credits when the payment succeeds."}
                   </p>
                 </div>
 
-                <Button className="w-full" size="lg" onClick={handleFincraTopUp} disabled={loading}>
-                  {loading ? "Opening Fincra…" : "Continue to Fincra checkout"}
+                <Button
+                  className="w-full"
+                  size="lg"
+                  onClick={handleFincraTopUp}
+                  disabled={loading || (currency.toUpperCase() === "CAD" && !quoteCadNombaTopup(Number(amount) || 0, fxRates))}
+                >
+                  {loading
+                    ? "Opening checkout…"
+                    : currency.toUpperCase() === "CAD"
+                      ? "Continue — pay with card (USD)"
+                      : "Continue — card or bank transfer"}
                 </Button>
               </CardContent>
             </Card>
@@ -603,7 +763,7 @@ const TopUpPage = () => {
             />
           )}
 
-          {/* Paytota — USD/EUR/GBP/CAD card checkout */}
+          {/* Pay by invoice */}
           {liveTopup && gateway === "paytota_pay" && selectedWallet && (
             <PaytotaTopUpCard
               walletId={selectedWallet.wallet_id}
@@ -614,9 +774,20 @@ const TopUpPage = () => {
             />
           )}
 
-          {/* Nomba — NGN hosted card checkout (intl when Paytota off) */}
+          {/* Card checkout (Nomba) */}
           {liveTopup && gateway === "nomba_pay" && selectedWallet && (
             <NombaTopUpCard
+              walletId={selectedWallet.wallet_id}
+              walletCurrency={currency}
+              onComplete={() => {
+                void queryClient.invalidateQueries({ queryKey: ["wallets"] });
+              }}
+            />
+          )}
+
+          {/* CAD Interac e-Transfer */}
+          {productFeatures.fincraInterac && liveTopup && gateway === "fincra_interac" && selectedWallet && (
+            <CadInteracTopUpCard
               walletId={selectedWallet.wallet_id}
               walletCurrency={currency}
               onComplete={() => {
@@ -630,8 +801,8 @@ const TopUpPage = () => {
             <GhanaTopUpCard walletId={selectedWallet.wallet_id} walletCurrency={currency} />
           )}
 
-          {/* Elicate route — direct mobile-money top-up for Zambia (ZMW) */}
-          {productFeatures.flutterwave && liveTopup && gateway === "elicate" && selectedWallet && (
+          {/* Zambia MoMo top-up */}
+          {productFeatures.elicate && liveTopup && gateway === "elicate" && selectedWallet && (
             <ElicateTopUpCard walletId={selectedWallet.wallet_id} walletCurrency={currency} />
           )}
         </motion.div>

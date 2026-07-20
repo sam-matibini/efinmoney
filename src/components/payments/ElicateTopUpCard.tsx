@@ -8,15 +8,13 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Smartphone, ShieldCheck, ArrowRight, Loader2, MessageSquare, KeyRound, Wallet, User } from "lucide-react";
+import { Smartphone, ShieldCheck, ArrowRight, Loader2, MessageSquare, KeyRound, Wallet, User, ExternalLink } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { initiateElicateCharge, getElicateChargeStatus } from "@/lib/elicate";
+import { initiateElicateCharge, pollElicateChargeStatus } from "@/lib/elicate";
 import { useProfile } from "@/hooks/useProfile";
 
-// Zambia mobile-money prefix → default network. User can still override.
 function networkFromPhone(raw: string): string | null {
   const digits = raw.replace(/[^\d]/g, "");
-  // Normalise to last 9 (national) — strip 260 country code if present.
   let n = digits;
   if (n.startsWith("260")) n = n.slice(3);
   if (n.startsWith("0")) n = n.slice(1);
@@ -42,33 +40,31 @@ const NETWORKS = [
 export default function ElicateTopUpCard({ walletId, walletCurrency }: Props) {
   const queryClient = useQueryClient();
   const { data: profile } = useProfile();
-  const [params, setParams] = useSearchParams();
+  const [, setParams] = useSearchParams();
   const [amount, setAmount] = useState("");
   const [network, setNetwork] = useState("MTN");
   const [phone, setPhone] = useState("");
   const [phoneTouched, setPhoneTouched] = useState(false);
   const [networkTouched, setNetworkTouched] = useState(false);
   const [confirming, setConfirming] = useState(false);
-  const [redirecting, setRedirecting] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [redirectUrl, setRedirectUrl] = useState<string | null>(null);
+  const [activeChargeId, setActiveChargeId] = useState<string | null>(null);
+  const [sandboxMode, setSandboxMode] = useState(false);
 
-  // Pre-fill the user's saved phone (one-time, before they type anything).
   useEffect(() => {
     if (phoneTouched) return;
     const saved = profile?.phone_number?.trim();
     if (saved && !phone) setPhone(saved);
   }, [profile?.phone_number, phone, phoneTouched]);
 
-  // Auto-detect network from phone prefix unless user has manually picked one.
   useEffect(() => {
     if (networkTouched) return;
     const detected = networkFromPhone(phone);
     if (detected && detected !== network) setNetwork(detected);
   }, [phone, network, networkTouched]);
 
-  // Handle return from Elicate hosted page: poll the real charge status rather
-  // than trusting the redirect alone (webhook delivery isn't always immediate).
-  // Runs once on mount only — the cleanup below must not be torn down by our
-  // own setParams call clearing the query string.
+  // Resume poll after return from hosted page
   useEffect(() => {
     const chargeId = new URLSearchParams(window.location.search).get("elicate_charge_id");
     if (!chargeId) return;
@@ -82,35 +78,70 @@ export default function ElicateTopUpCard({ walletId, walletCurrency }: Props) {
       return next;
     }, { replace: true });
 
+    setActiveChargeId(chargeId);
     let cancelled = false;
-    const POLL_INTERVAL_MS = 3000;
-    const MAX_ATTEMPTS = 20; // ~60s
-
     const poll = async (attempt: number) => {
       if (cancelled) return;
-      const charge = await getElicateChargeStatus(chargeId);
-      if (cancelled) return;
-
-      if (charge?.status === "completed") {
-        toast.success("Top-up successful — your wallet has been credited.");
-        queryClient.invalidateQueries({ queryKey: ["wallets"] });
+      try {
+        const charge = await pollElicateChargeStatus({ charge_id: chargeId });
+        if (cancelled) return;
+        if (charge.status === "completed") {
+          toast.success("Top-up successful — your wallet has been credited.");
+          queryClient.invalidateQueries({ queryKey: ["wallets"] });
+          setActiveChargeId(null);
+          setRedirectUrl(null);
+          return;
+        }
+        if (charge.status === "failed" || charge.status === "cancelled" || charge.status === "expired") {
+          toast.error(charge.failure_reason || "Top-up was not completed.");
+          setActiveChargeId(null);
+          setRedirectUrl(null);
+          return;
+        }
+      } catch {
+        /* keep polling */
+      }
+      if (attempt >= 40) {
+        toast.info("Still confirming your top-up — check your balance shortly.");
         return;
       }
-      if (charge?.status === "failed" || charge?.status === "cancelled" || charge?.status === "expired") {
-        toast.error(charge.failure_reason || "Top-up was not completed.");
-        return;
-      }
-      if (attempt >= MAX_ATTEMPTS) {
-        toast.info("Still confirming your top-up — check back shortly if your balance hasn't updated.");
-        return;
-      }
-      setTimeout(() => poll(attempt + 1), POLL_INTERVAL_MS);
+      setTimeout(() => poll(attempt + 1), 3000);
     };
-
     poll(0);
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Poll while iframe is open
+  useEffect(() => {
+    if (!activeChargeId || !redirectUrl) return;
+    let cancelled = false;
+    const tick = async () => {
+      if (cancelled) return;
+      try {
+        const charge = await pollElicateChargeStatus({ charge_id: activeChargeId });
+        if (cancelled) return;
+        if (charge.status === "completed") {
+          toast.success("Top-up successful — your wallet has been credited.");
+          queryClient.invalidateQueries({ queryKey: ["wallets"] });
+          setActiveChargeId(null);
+          setRedirectUrl(null);
+          setBusy(false);
+          return;
+        }
+        if (charge.status === "failed") {
+          toast.error(charge.failure_reason || "Top-up failed");
+          setActiveChargeId(null);
+          setRedirectUrl(null);
+          setBusy(false);
+          return;
+        }
+      } catch { /* continue */ }
+      setTimeout(tick, 3000);
+    };
+    const t = setTimeout(tick, 3000);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [activeChargeId, redirectUrl, queryClient]);
 
   if (walletCurrency !== "ZMW") return null;
 
@@ -129,7 +160,7 @@ export default function ElicateTopUpCard({ walletId, walletCurrency }: Props) {
 
   const proceed = async () => {
     setConfirming(false);
-    setRedirecting(true);
+    setBusy(true);
     try {
       const returnUrl = `${window.location.origin}/wallets/topup?walletId=${walletId}`;
       const result = await initiateElicateCharge({
@@ -139,16 +170,17 @@ export default function ElicateTopUpCard({ walletId, walletCurrency }: Props) {
         network,
         return_url: returnUrl,
       });
+      setSandboxMode(result.mode === "sandbox");
       if (result.redirect_url) {
-        // Redirect-first flow. Webhook credits the wallet after PIN authorisation.
-        window.location.href = result.redirect_url;
+        setRedirectUrl(result.redirect_url);
+        setActiveChargeId(result.charge_id);
         return;
       }
-      toast.error("Top-up could not start — provider did not return a payment page. Please try again or contact support.");
-      setRedirecting(false);
+      toast.error("Top-up could not start — no payment page returned. Try again.");
+      setBusy(false);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not start top-up");
-      setRedirecting(false);
+      setBusy(false);
     }
   };
 
@@ -158,7 +190,7 @@ export default function ElicateTopUpCard({ walletId, walletCurrency }: Props) {
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2 flex-wrap">
             Top up with Mobile Money
-            <Badge variant="outline" className="border-primary/30 text-primary">
+            <Badge variant="outline" className="border-emerald-500/30 text-emerald-700">
               <Smartphone className="w-3 h-3 mr-1" />
               MTN · Airtel · Zamtel
             </Badge>
@@ -187,11 +219,6 @@ export default function ElicateTopUpCard({ walletId, walletCurrency }: Props) {
                 ))}
               </SelectContent>
             </Select>
-            {!networkTouched && phone && (
-              <p className="text-xs text-muted-foreground mt-1">
-                Auto-selected from phone prefix — change manually if wrong.
-              </p>
-            )}
           </div>
 
           <div>
@@ -217,26 +244,17 @@ export default function ElicateTopUpCard({ walletId, walletCurrency }: Props) {
               onChange={(e) => { setPhone(e.target.value); setPhoneTouched(true); }}
               placeholder="+260 97 123 4567"
             />
-            <p className="text-xs text-muted-foreground mt-1">
-              {profile?.phone_number && phone === profile.phone_number
-                ? "Topping up your own wallet. Change the number to top up someone else."
-                : phone && phone !== profile?.phone_number
-                  ? "Topping up someone else's mobile money — make sure the number is correct."
-                  : "Enter the phone number to charge for this top-up."}
-            </p>
           </div>
 
           <div className="p-3 rounded-lg bg-muted/40 border border-border flex items-start gap-2">
             <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Mobile money payments are processed by our regulated payment partner. You'll
-              briefly leave eFinMoney to enter an OTP and confirm with your PIN — then return
-              here automatically with your wallet credited.
+              Approve the payment with your mobile money PIN. Your ZMW wallet credits when the charge succeeds.
             </p>
           </div>
 
-          <Button className="w-full" size="lg" onClick={validateAndConfirm} disabled={redirecting}>
-            {redirecting ? "Connecting to secure payment partner…" : `Top up ${amount ? `ZMW ${amount}` : "with Mobile Money"}`}
+          <Button className="w-full" size="lg" onClick={validateAndConfirm} disabled={busy}>
+            {busy ? "Starting…" : `Top up ${amount ? `ZMW ${amount}` : "with Mobile Money"}`}
           </Button>
         </CardContent>
       </Card>
@@ -244,37 +262,69 @@ export default function ElicateTopUpCard({ walletId, walletCurrency }: Props) {
       <Dialog open={confirming} onOpenChange={(o) => { if (!o) setConfirming(false); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>You're about to leave eFinMoney</DialogTitle>
+            <DialogTitle>Confirm mobile money top-up</DialogTitle>
             <DialogDescription>
-              {profile?.phone_number && phone === profile.phone_number ? (
-                <>We'll take you to our secure payment partner to authorise this {network} top-up of <strong>ZMW {amount}</strong> from <strong>{phone}</strong>.</>
-              ) : (
-                <>This will charge <strong>{phone}</strong> ({network}) <strong>ZMW {amount}</strong> and credit your wallet. The owner of that phone must approve the OTP and PIN — so only proceed if you have access to it (or they're with you).</>
-              )}
+              Charge <strong>{phone}</strong> ({network}) <strong>ZMW {amount}</strong> and credit your wallet.
             </DialogDescription>
           </DialogHeader>
-
           <div className="space-y-3 py-2">
-            <Step icon={<ArrowRight className="w-4 h-4" />} title="You'll be redirected">
-              You'll see a page hosted by our payment processor. This is normal — it's how mobile money authorisation works.
+            <Step icon={<ArrowRight className="w-4 h-4" />} title="Secure verification">
+              Complete any OTP / PIN steps on the payment page.
             </Step>
-            <Step icon={<MessageSquare className="w-4 h-4" />} title="Enter the OTP we send to your phone">
-              Watch for an SMS or WhatsApp message with a verification code, and enter it on the page.
+            <Step icon={<MessageSquare className="w-4 h-4" />} title="OTP if prompted">
+              {sandboxMode
+                ? "In test mode use OTP 123456 when asked."
+                : "Watch for SMS or WhatsApp with a verification code."}
             </Step>
-            <Step icon={<KeyRound className="w-4 h-4" />} title="Approve with your Mobile Money PIN">
-              Your phone will get a USSD prompt. Enter your PIN — this is how MTN/Airtel/Zamtel confirm you're authorising the payment.
+            <Step icon={<KeyRound className="w-4 h-4" />} title="Approve on your phone">
+              Enter your mobile money PIN when prompted.
             </Step>
-            <Step icon={<Wallet className="w-4 h-4" />} title="Wallet credits automatically">
-              You'll be returned to eFinMoney and your ZMW balance will update within seconds.
+            <Step icon={<Wallet className="w-4 h-4" />} title="Wallet updates automatically">
+              We confirm the payment in the background and credit your balance.
             </Step>
           </div>
-
           <div className="flex gap-2 pt-2">
-            <Button variant="outline" className="flex-1" onClick={() => setConfirming(false)} disabled={redirecting}>
+            <Button variant="outline" className="flex-1" onClick={() => setConfirming(false)} disabled={busy}>
               Cancel
             </Button>
-            <Button className="flex-1" onClick={proceed} disabled={redirecting}>
-              {redirecting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Continue to payment"}
+            <Button className="flex-1" onClick={proceed} disabled={busy}>
+              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : "Continue"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!redirectUrl} onOpenChange={(o) => {
+        if (!o) {
+          setRedirectUrl(null);
+          setBusy(false);
+        }
+      }}>
+        <DialogContent className="max-w-lg sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Complete payment</DialogTitle>
+            <DialogDescription>
+              Finish verification below. Waiting for confirmation…
+            </DialogDescription>
+          </DialogHeader>
+          {redirectUrl && (
+            <iframe
+              title="Mobile money verification"
+              src={redirectUrl}
+              className="w-full h-[420px] rounded-xl border border-border bg-background"
+            />
+          )}
+          <div className="flex flex-wrap gap-2">
+            {redirectUrl && (
+              <Button variant="outline" asChild>
+                <a href={redirectUrl} target="_blank" rel="noreferrer">
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                  Open in new tab
+                </a>
+              </Button>
+            )}
+            <Button variant="ghost" onClick={() => { setRedirectUrl(null); setBusy(false); }}>
+              Close
             </Button>
           </div>
         </DialogContent>

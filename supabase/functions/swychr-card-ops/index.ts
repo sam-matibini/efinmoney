@@ -33,6 +33,8 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_ANON_KEY")!,
     { global: { headers: { Authorization: authHeader } } },
   );
+  const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+
   const { data: { user } } = await userClient.auth.getUser();
   if (!user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
 
@@ -46,7 +48,7 @@ Deno.serve(async (req) => {
   }
 
   const { data: owned } = await userClient.from("swychr_cards")
-    .select("id").eq("swychr_card_id", String(card_id)).eq("user_id", user.id).maybeSingle();
+    .select("id, status").eq("swychr_card_id", String(card_id)).eq("user_id", user.id).maybeSingle();
   if (!owned) {
     return new Response(JSON.stringify({ error: "Card not found" }), {
       status: 404,
@@ -75,7 +77,19 @@ Deno.serve(async (req) => {
       });
   }
 
-  return new Response(JSON.stringify({ success: result.ok, data: result.data, message: result.message }), {
+  if (result.ok && (action === "freeze" || action === "unfreeze")) {
+    await admin.from("swychr_cards").update({
+      status: action === "freeze" ? "frozen" : "active",
+      updated_at: new Date().toISOString(),
+    }).eq("id", owned.id);
+  }
+
+  return new Response(JSON.stringify({
+    success: result.ok,
+    data: result.data,
+    message: result.message,
+  }), {
+    status: result.ok ? 200 : 502,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 });

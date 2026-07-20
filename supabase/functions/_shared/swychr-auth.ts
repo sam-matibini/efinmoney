@@ -13,10 +13,15 @@ const API_HOST = "https://api.accountpe.com";
 /** 90 days minus 1 day buffer */
 const TOKEN_TTL_MS = 89 * 24 * 60 * 60 * 1000;
 
+/** Cards default to live prod. Set SWYCHR_CARD_SANDBOX=true only for partner sandbox. */
+export function isSwychrCardSandbox(): boolean {
+  return Deno.env.get("SWYCHR_CARD_SANDBOX") === "true";
+}
+
 const SUITE_BASE: Record<SwychrSuite, string> = {
   payin: `${API_HOST}/api/payin`,
   payout: `${API_HOST}/api/payout`,
-  card: Deno.env.get("SWYCHR_CARD_SANDBOX") === "true"
+  card: isSwychrCardSandbox()
     ? `${API_HOST}/api/card/sandbox`
     : `${API_HOST}/api/card/prod`,
   airtime: `${API_HOST}/api/airtime/prod`,

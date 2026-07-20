@@ -20,7 +20,8 @@ Feature flags: `src/lib/productFeatures.ts` (override with `VITE_FEATURE_*` in `
 |---------|------|---------------------|
 | Canada domestic (Interac, EFT, Paysafe) | `canadaDomestic` | `/transfers/canada`, `CanadaSendFlow` |
 | Stripe / cards | `stripe`, `cards` | `/cards`, card funding on send, `/stripe-connect` |
-| Flutterwave & other Africa | `flutterwave`, `otherAfricanCorridors` | FLW top-up, KES/UGX/TZS/RWF/ZMW send UI |
+| Flutterwave & other Africa | `flutterwave`, `otherAfricanCorridors` | FLW top-up, KES/UGX/TZS/RWF send UI |
+| Elicate (Zambia) | `elicate` (`VITE_FEATURE_ELICATE`) | ZMW MoMo top-up, send, payment links |
 | Crypto / Stellar | `crypto` | Exchange crypto tab, `/send/cpn` |
 | Bill pay | `billPay` | `/pay-bills`, `/pay-bills/canada` |
 | Swychr (all rails) | `swychr` | Top-up, payout fallback, cards, airtime — secondary provider |
@@ -34,9 +35,10 @@ These remain deployed for ops, webhooks, and a future re-enable:
 
 - Flutterwave (`flw-*`, execute-transfer FLW fallback — currently disabled for Nomba debug)
 - Stripe (`stripe-*`, Visa Direct)
-- Adyen, Fincra, Elicate, PawaPay, Paysafe, Stellar/Circle (CPN)
+- Adyen, Fincra, PawaPay, Paysafe, Stellar/Circle (CPN)
+- Elicate Pay (`elicate-*`) — **live** ZMW MoMo; enable with `ELICATE_ENV=live` + `VITE_FEATURE_ELICATE=true`
 - Bill-pay and payment-link claim handlers
-- Swychr Connect (`swychr-*`) — sandbox; enable with `SWYCHR_ENABLED=true` + `VITE_FEATURE_SWYCHR=true`
+- Swychr Connect (`swychr-*`) — **live** card `/api/card/prod` + airtime `/api/airtime/prod`; enable with `SWYCHR_ENABLED=true` + `VITE_FEATURE_SWYCHR=true` (card sandbox only if `SWYCHR_CARD_SANDBOX=true`)
 
 Admin: **API Management** at `/admin/api` (FLW/Stripe corridor probes marked legacy).
 

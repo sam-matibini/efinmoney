@@ -1,4 +1,4 @@
-/** Currencies Fincra checkout API accepts (CAD is not on this list). */
+/** Currencies Fincra checkout API accepts (CAD is Interac-only, not hosted checkout). */
 export const FINCRA_CHECKOUT_CURRENCIES = [
   "NGN", "USD", "GBP", "EUR", "GHS", "KES", "UGX", "TZS", "ZMW",
   "EGP", "MZN", "MWK", "ZWL", "GNF", "XOF", "XAF", "ZAR",

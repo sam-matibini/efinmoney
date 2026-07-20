@@ -1,5 +1,10 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { getElicateConfig } from "../_shared/elicate.ts";
+import {
+  elicateCharge,
+  extractRedirectUrl,
+  extractTransactionId,
+  getElicateConfig,
+} from "../_shared/elicate.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -29,7 +34,6 @@ function resolveNetwork(input?: string | null): string {
   return String(input).toUpperCase();
 }
 
-// Normalize to local Zambian format (0961234567) for charge calls.
 function normalizeZmPhone(raw?: string | null): string {
   let phone = String(raw || "").replace(/[^\d]/g, "");
   if (phone.startsWith("00")) phone = phone.slice(2);
@@ -38,14 +42,19 @@ function normalizeZmPhone(raw?: string | null): string {
   return phone;
 }
 
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return json({ error: "Unauthorized" }, 401);
-    }
+    if (!authHeader?.startsWith("Bearer ")) return json({ error: "Unauthorized" }, 401);
 
     const userClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -79,7 +88,6 @@ Deno.serve(async (req) => {
       return json({ error: "Target wallet required" }, 400);
     }
 
-    // Rate-limit: max 10 charge attempts / minute / user.
     const { data: rl, error: rlErr } = await admin.rpc("check_rate_limit", {
       p_key: `elicate_charge:${userId}`,
       p_max_requests: 10,
@@ -88,7 +96,6 @@ Deno.serve(async (req) => {
     if (rlErr) return json({ error: "Rate limit check failed", detail: rlErr.message }, 500);
     if (rl === false) return json({ error: "Too many top-up attempts. Try again in a minute." }, 429);
 
-    // Verify the user owns the target wallet and it's ZMW.
     const { data: wallet } = await userClient
       .from("wallets")
       .select("id,user_id,currency_code")
@@ -96,15 +103,12 @@ Deno.serve(async (req) => {
       .maybeSingle();
     if (!wallet || wallet.user_id !== userId) return json({ error: "Invalid wallet" }, 403);
     if (wallet.currency_code !== "ZMW") {
-      return json({ error: "Elicate top-up is only available for ZMW wallets" }, 400);
+      return json({ error: "Mobile money top-up is only available for ZMW wallets" }, 400);
     }
 
     const elicate = getElicateConfig();
     if (!elicate.secretKey) {
       return json({ error: `ELICATE_${elicate.mode === "live" ? "LIVE_" : ""}SECRET_KEY not configured` }, 500);
-    }
-    if (!elicate.chargeUrl) {
-      return json({ error: "Elicate charge endpoint not configured" }, 500);
     }
 
     const networkResolved = resolveNetwork(typeof network === "string" ? network : null);
@@ -113,8 +117,6 @@ Deno.serve(async (req) => {
     const reference = `efin_topup_${userId.slice(0, 8)}_${Date.now()}`;
     const beneficiaryName = String(customer_name || userData?.user?.email || "Customer").trim();
 
-    // Persist the charge attempt BEFORE calling Elicate so we can correlate the webhook
-    // even if the API call fails partway through.
     const { data: charge, error: insErr } = await admin
       .from("elicate_charges")
       .insert({
@@ -138,87 +140,59 @@ Deno.serve(async (req) => {
       .select()
       .single();
 
-    if (insErr) {
-      return json({ error: "Could not record charge", detail: insErr.message }, 500);
+    if (insErr) return json({ error: "Could not record charge", detail: insErr.message }, 500);
+
+    let redirectTarget: string | undefined;
+    if (typeof return_url === "string" && return_url.trim()) {
+      redirectTarget = return_url.trim();
+      try {
+        const u = new URL(redirectTarget);
+        u.searchParams.set("elicate_charge_id", charge.id);
+        redirectTarget = u.toString();
+      } catch { /* leave as-is */ }
     }
 
-    const payload: Record<string, unknown> = {
+    const result = await elicateCharge({
       amount: amountRounded,
       phone: phoneNormalized,
       network: networkResolved,
       currency: "ZMW",
       reference,
       customer_name: beneficiaryName,
-    };
-    if (typeof return_url === "string" && return_url.trim()) {
-      // Elicate redirects the user back here after they complete payment on the hosted page.
-      // Stamp our charge id on it so the frontend polls the real outcome instead of assuming success.
-      let redirectTarget = return_url.trim();
-      try {
-        const u = new URL(redirectTarget);
-        u.searchParams.set("elicate_charge_id", charge.id);
-        redirectTarget = u.toString();
-      } catch { /* leave as-is if not a valid absolute URL */ }
-      payload.redirect_url = redirectTarget;
-      payload.return_url = redirectTarget;
-    }
-
-    console.log("Elicate CHARGE request:", { mode: elicate.mode, url: elicate.chargeUrl, payload });
-
-    const res = await fetch(elicate.chargeUrl, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${elicate.secretKey}`,
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify(payload),
+      redirect_url: redirectTarget,
+      return_url: redirectTarget,
     });
 
-    const respText = await res.text();
-    console.log("Elicate CHARGE response:", res.status, respText);
-
-    let respJson: any = {};
-    try { respJson = JSON.parse(respText); } catch { respJson = { raw: respText }; }
-
-    if (!res.ok) {
-      const friendlyError = res.status >= 500
+    if (!result.ok) {
+      const friendlyError = result.status >= 500
         ? "Top-up provider is temporarily unavailable. Please try again in a moment."
-        : respJson?.message || respJson?.error || "Top-up failed";
+        : (result.error || "Top-up failed");
 
       await admin.from("elicate_charges").update({
         status: "failed",
         failure_reason: friendlyError,
-        raw_response: respJson,
+        raw_response: result.data,
       }).eq("id", charge.id);
 
       return json({
         error: friendlyError,
-        code: res.status >= 500 ? "provider_internal_error" : "provider_error",
-        provider_status: res.status,
-        provider_response: respJson,
-      }, 200);
+        code: result.status >= 500 ? "provider_internal_error" : "provider_error",
+        provider_status: result.status,
+        provider_response: result.data,
+        mode: elicate.mode,
+      }, 502);
     }
 
-    const data = respJson?.data || respJson;
-    const transactionId =
-      data?.transaction_id || data?.transactionId || data?.id || null;
-    const providerReference = transactionId || data?.reference || reference;
-    // Per Elicate docs the redirect URL lives at data.meta.redirect_url.
-    // Check the other common shapes as defensive fallbacks.
-    const redirectUrl =
-      data?.meta?.redirect_url ||
-      data?.meta?.authorization?.redirect_url ||
-      data?.authorization?.redirect_url ||
-      data?.redirect_url ||
-      respJson?.redirect_url ||
-      null;
+    const data = result.data;
+    const transactionId = extractTransactionId(data);
+    const providerReference = transactionId || String(data.reference ?? reference);
+    const redirectUrl = extractRedirectUrl(data);
 
     await admin.from("elicate_charges").update({
       status: "awaiting_approval",
       psp_reference: providerReference,
       redirect_url: redirectUrl,
-      raw_response: respJson,
+      raw_response: data,
     }).eq("id", charge.id);
 
     return json({
@@ -228,19 +202,13 @@ Deno.serve(async (req) => {
       provider_reference: providerReference,
       redirect_url: redirectUrl,
       status: "awaiting_approval",
+      mode: elicate.mode,
       message: redirectUrl
-        ? "Redirecting to the secure payment page…"
-        : "Approve the prompt that just appeared on your phone to complete the top-up.",
+        ? "Complete verification on the secure payment page."
+        : "Approve the prompt on your phone to complete the top-up.",
     });
   } catch (e) {
     console.error("elicate-charge error", e);
     return json({ error: String((e as Error)?.message || e) }, 500);
   }
 });
-
-function json(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
-}

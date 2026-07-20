@@ -4,8 +4,8 @@ OpenAPI specs for Payin, Payout, Virtual Cards, and Airtime.
 
 - `payin.yaml` — hosted payment links + webhook
 - `payout.yaml` — bank/MoMo payouts + Nigeria banks
-- `card.yaml` — virtual card issuance (prod + sandbox via `SWYCHR_CARD_SANDBOX=true`)
-- `airtime.yaml` — PrepayNation mobile recharge catalog
+- `card.yaml` — virtual card issuance (**live** `/api/card/prod`; sandbox only if `SWYCHR_CARD_SANDBOX=true`)
+- `airtime.yaml` — PrepayNation mobile recharge (**live** `/api/airtime/prod` only)
 
 ## Auth (no dashboard API key)
 
@@ -18,7 +18,7 @@ SWYCHR_ENABLED=true
 SWYCHR_EMAIL=...
 SWYCHR_PASSWORD=...
 SWYCHR_WEBHOOK_SECRET=...
-SWYCHR_CARD_SANDBOX=true   # optional, for card sandbox
+SWYCHR_CARD_SANDBOX=false  # true = card sandbox; omit/false = live prod
 SWYCHR_PAYOUT_FALLBACK=true  # try swychr after nomba payout fails
 ```
 
@@ -34,4 +34,15 @@ $env:SWYCHR_EMAIL="..."; $env:SWYCHR_PASSWORD="..."; node scripts/swychr-smoke-t
 
 Or put creds in `scripts/.swychr.env` then `node scripts/swychr-smoke-test.mjs`.
 
-Does not enable production UI (`VITE_FEATURE_SWYCHR=false` by default).
+Enable UI with `VITE_FEATURE_SWYCHR=true` / `VITE_FEATURE_CARDS=true` when ready.
+
+## Live cards — ops notes
+
+- Cardholder create must use **`/create_full_user`** (prod `/create_user` returns `user_id: null`).
+- Issuance calls `/issue_lite_card` and debits the **admin Box wallet**. Check balance:
+
+```bash
+node scripts/swychr-wallet-bal.mjs
+```
+
+If `wallet_bal` is `0`, fund the wallet in the AccountPe/Swychr dashboard before issuing (fee ≈ $10 + initial load).
