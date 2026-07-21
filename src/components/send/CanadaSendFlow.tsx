@@ -1505,6 +1505,10 @@ const CanadaSendFlow = () => {
           tags: [],
           address: null,
           tel: null,
+          mailing_address: null,
+          mailing_city: null,
+          mailing_region: null,
+          mailing_postal_code: null,
         }}
       />
 
