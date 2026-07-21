@@ -202,6 +202,65 @@ export async function createPaytotaPurchase(params: {
   };
 }
 
+/**
+ * Execute a MoMo STK push / PIN prompt for a purchase (server-to-server).
+ * This avoids redirecting the user to the hosted invoice page.
+ * Docs (V2): POST {base}/p/{id}/ with form-data s2s=true & pm=paytota_proxy
+ */
+export async function executePaytotaMomoCollection(purchaseId: string): Promise<{
+  ok: boolean;
+  status: string;
+  message: string;
+  json: Record<string, unknown>;
+}> {
+  const cfg = getPaytotaConfig();
+  const url = `${cfg.baseUrl}/p/${purchaseId}/`;
+
+  const form = new FormData();
+  form.append("s2s", "true");
+  form.append("pm", "paytota_proxy");
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      Authorization: `Bearer ${cfg.secretKey}`,
+    },
+    body: form,
+    redirect: "manual",
+  });
+  // A 3xx redirect means Paytota dispatched the STK push and is redirecting
+  // to success/failure URL. We treat this as success (pending user approval).
+  if (res.status >= 300 && res.status < 400) {
+    const location = res.headers.get("location") ?? "";
+    const isFailure = location.includes("paytota=failed");
+    return {
+      ok: !isFailure,
+      status: isFailure ? "error" : "pending",
+      message: isFailure ? "MoMo execute was rejected by provider" : "STK push sent",
+      json: { _redirect: location, _http: res.status },
+    };
+  }
+
+  const raw = await res.text();
+  let json: Record<string, unknown> = {};
+  try {
+    json = raw ? JSON.parse(raw) : {};
+  } catch {
+    json = { raw };
+  }
+
+  const status = String(json.status ?? json.detail ?? (res.ok ? "pending" : "error"));
+  const message = paytotaErrorMessage(json, res.ok ? "STK push sent" : `Execute error ${res.status}`);
+
+  return {
+    ok: res.ok && !isPaytotaFailedStatus(status),
+    status,
+    message,
+    json,
+  };
+}
+
 export async function getPaytotaPurchase(purchaseId: string) {
   return paytotaFetch(`/api/v1/purchases/${purchaseId}/`, { method: "GET" });
 }

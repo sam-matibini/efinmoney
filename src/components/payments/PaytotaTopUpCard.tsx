@@ -156,6 +156,18 @@ export default function PaytotaTopUpCard({ walletId, walletCurrency, onComplete 
         return_url: `${window.location.origin}/wallet/topup?walletId=${walletId}`,
       });
       savePendingPaytotaTxn(result.transaction_id);
+
+      // STK push path: stay on page, user approves on handset, poll for completion.
+      if ((result as any).stk_push) {
+        toast.success("Approve the payment on your phone", {
+          description: "Your wallet will credit automatically once you confirm.",
+          duration: 10000,
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Invoice/redirect path (Western or fallback).
       toast.message(africa ? "Opening mobile money checkout" : "Opening invoice", {
         description: `Confirm ${formatCredited(quote?.checkoutAmount ?? amt, currency)}.`,
       });

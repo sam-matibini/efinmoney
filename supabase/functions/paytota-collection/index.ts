@@ -2,6 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import {
   buildPaytotaWebhookUrl,
   createPaytotaPurchase,
+  executePaytotaMomoCollection,
   getPaytotaConfig,
   isPaytotaAfricaCurrency,
   isPaytotaConfigured,
@@ -245,6 +246,40 @@ Deno.serve(async (req) => {
       provider_reference: result.purchaseId,
       raw_response: result.json,
     }).eq("id", txn.id);
+
+    // For Africa MoMo: execute STK push server-side so user gets a PIN prompt
+    // instead of being redirected to the hosted invoice page.
+    if (africa && result.purchaseId) {
+      const exec = await executePaytotaMomoCollection(result.purchaseId);
+
+      await admin.from("paytota_payin_transactions").update({
+        last_event: exec.json,
+      }).eq("id", txn.id);
+
+      if (!exec.ok) {
+        // Fall back to checkout_url redirect if STK push fails
+        console.warn("MoMo STK push failed, falling back to checkout_url:", exec.message);
+      } else {
+        // STK push sent — user approves on handset; webhook will credit wallet.
+        return json({
+          success: true,
+          transaction_id: txn.id,
+          purchase_id: result.purchaseId,
+          payment_link: null,
+          stk_push: true,
+          message: "Approve the payment on your phone. Your wallet will credit automatically.",
+          quote: {
+            credit_amount: creditAmount,
+            credit_currency: creditCurrency,
+            checkout_amount: amountRounded,
+            checkout_currency: checkoutCurrency,
+            platform_fee: platformFee,
+            fx_rate: fxRate,
+          },
+          provider_response: exec.json,
+        });
+      }
+    }
 
     return json({
       success: true,

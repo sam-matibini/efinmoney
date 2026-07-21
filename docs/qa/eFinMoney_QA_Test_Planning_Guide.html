@@ -1,0 +1,1318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>eFinMoney — QA Test Planning Guide</title>
+<style>
+  @page { size: A4; margin: 16mm 14mm; }
+  :root {
+    --ink: #1a1f2e;
+    --muted: #5a6577;
+    --line: #d8dee8;
+    --brand: #4f46e5;
+    --bg: #f7f8fb;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Segoe UI", Calibri, Arial, sans-serif;
+    color: var(--ink);
+    font-size: 10.5pt;
+    line-height: 1.45;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 24px 28px 48px;
+  }
+  h1 {
+    font-size: 22pt;
+    margin: 0 0 8px;
+    color: var(--brand);
+    border-bottom: 3px solid var(--brand);
+    padding-bottom: 10px;
+  }
+  h2 {
+    font-size: 14pt;
+    margin: 28px 0 10px;
+    color: var(--brand);
+    page-break-after: avoid;
+  }
+  h3 {
+    font-size: 11.5pt;
+    margin: 18px 0 8px;
+    page-break-after: avoid;
+  }
+  h4 {
+    font-size: 10.5pt;
+    margin: 14px 0 6px;
+  }
+  p, li { margin: 6px 0; }
+  ul, ol { padding-left: 1.3em; }
+  hr {
+    border: none;
+    border-top: 1px solid var(--line);
+    margin: 20px 0;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 10px 0 16px;
+    font-size: 9.5pt;
+    page-break-inside: avoid;
+  }
+  th, td {
+    border: 1px solid var(--line);
+    padding: 6px 8px;
+    vertical-align: top;
+    text-align: left;
+  }
+  th {
+    background: var(--bg);
+    font-weight: 600;
+  }
+  code {
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 9pt;
+    background: var(--bg);
+    padding: 1px 4px;
+    border-radius: 3px;
+  }
+  strong { font-weight: 600; }
+  blockquote {
+    margin: 10px 0;
+    padding: 8px 12px;
+    border-left: 4px solid var(--brand);
+    background: var(--bg);
+  }
+  .cover-meta {
+    color: var(--muted);
+    font-size: 10pt;
+    margin-bottom: 20px;
+  }
+  @media print {
+    body { padding: 0; max-width: none; }
+    a { color: inherit; text-decoration: none; }
+  }
+</style>
+</head>
+<body>
+<h1>eFinMoney — QA Test Planning Guide</h1>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Product</strong></td>
+<td>eFinMoney (<code>https://www.efin.money</code>)</td>
+</tr>
+<tr>
+<td><strong>Document purpose</strong></td>
+<td>Enable QA to design end-to-end and regression test cases</td>
+</tr>
+<tr>
+<td><strong>Audience</strong></td>
+<td>QA leads, test engineers, product UAT</td>
+</tr>
+<tr>
+<td><strong>Version</strong></td>
+<td>1.0 — July 2026</td>
+</tr>
+<tr>
+<td><strong>Source of truth for flags</strong></td>
+<td><code>src/lib/productFeatures.ts</code></td>
+</tr>
+<tr>
+<td><strong>App stack</strong></td>
+<td>Vite + React + TypeScript + Supabase (Auth, DB, Edge Functions)</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>1. Product overview</h2>
+<p><strong>eFinMoney</strong> is a multi-currency consumer fintech wallet for cross-border money movement, focused on Africa ↔ Western corridors (Canada, USD/EUR/GBP).</p>
+<p>Users can:</p>
+<ol>
+<li>Create and hold <strong>multi-currency fiat wallets</strong></li>
+<li><strong>Top up</strong> wallets via several payment providers (shown under white-label method names)</li>
+<li><strong>Send</strong> money to bank accounts or mobile money (MoMo) beneficiaries</li>
+<li><strong>Exchange</strong> between fiat currencies</li>
+<li>Manage <strong>contacts/payees</strong></li>
+<li>Optionally use <strong>virtual cards</strong>, <strong>bill pay</strong>, and <strong>airtime</strong> (when enabled)</li>
+<li>Complete <strong>KYC / identity verification</strong> before full access</li>
+</ol>
+<p>Internal payment providers (Nomba, Fincra, Paytota, Elicate, Swychr, Ghana Pay, Flutterwave, etc.) must <strong>not</strong> appear by brand name in customer top-up UI. Testers must assert the <strong>user-facing labels</strong> listed in §3.</p>
+<hr>
+<h2>2. Environments &amp; access</h2>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Notes for QA</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Production web</td>
+<td><code>https://www.efin.money</code></td>
+</tr>
+<tr>
+<td>Local / staging</td>
+<td>Local Vite (<code>npm run dev</code>); Supabase project as configured in <code>.env</code></td>
+</tr>
+<tr>
+<td>Auth</td>
+<td>Email/password (Supabase Auth); PIN reset flows exist</td>
+</tr>
+<tr>
+<td>KYC gate</td>
+<td>Most app shell routes require KYC progress via Persona</td>
+</tr>
+<tr>
+<td>Admin</td>
+<td>Separate <code>/admin/*</code> routes with staff roles</td>
+</tr>
+<tr>
+<td>Feature flags</td>
+<td>Client: <code>VITE_FEATURE_*</code> in env. Defaults in <code>productFeatures.ts</code></td>
+</tr>
+<tr>
+<td>Backend secrets</td>
+<td>Edge Function secrets (not visible to QA UI) — PSP keys, webhooks</td>
+</tr>
+</tbody></table>
+<p><strong>Test accounts needed</strong></p>
+<ul>
+<li>Unverified user (pre-KYC)</li>
+<li>KYC-approved user with funded wallets (NGN, GHS, ZMW, USD, CAD, etc.)</li>
+<li>Staff/admin (KYC review, API management)</li>
+<li>Beneficiaries: Nigeria bank, Ghana MoMo, Zambia MoMo, Canada Interac/EFT (directory only if Canada send gated)</li>
+</ul>
+<hr>
+<h2>3. White-label payment method map (critical for UI assertions)</h2>
+<table>
+<thead>
+<tr>
+<th>Internal rail</th>
+<th>User-facing label</th>
+<th>Typical use</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Nomba</td>
+<td><strong>Express card</strong></td>
+<td>NGN top-up; USD/EUR/GBP; CAD charged as USD then credited CAD</td>
+</tr>
+<tr>
+<td>Fincra checkout</td>
+<td><strong>Card or bank transfer</strong></td>
+<td>USD/EUR/GBP; CAD via USD charge</td>
+</tr>
+<tr>
+<td>Paytota</td>
+<td><strong>Pay by invoice</strong></td>
+<td>USD, EUR, GBP, CAD invoice collection</td>
+</tr>
+<tr>
+<td>Fincra Interac</td>
+<td><strong>Interac e-Transfer</strong></td>
+<td>CAD only (feature flag usually <strong>off</strong>)</td>
+</tr>
+<tr>
+<td>Ghana Pay</td>
+<td><strong>Mobile money</strong> / Ghana MoMo</td>
+<td>GHS</td>
+</tr>
+<tr>
+<td>Elicate</td>
+<td><strong>Mobile Money</strong></td>
+<td>ZMW (MTN / Airtel / Zamtel)</td>
+</tr>
+<tr>
+<td>Swychr</td>
+<td><strong>Mobile money</strong></td>
+<td>XAF, KES, XOF, UGX top-up; also cards &amp; airtime</td>
+</tr>
+</tbody></table>
+<p><strong>Fail any case</strong> where customer UI shows Nomba, Fincra, Paytota, Elicate, Swychr, Flutterwave brand names on top-up/send choosers (admin/API screens may still show PSP names).</p>
+<hr>
+<h2>4. Feature flags (defaults — July 2026)</h2>
+<p>Override with <code>VITE_FEATURE_&lt;NAME&gt;=true|false</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Flag key</th>
+<th>Env var</th>
+<th>Default</th>
+<th>What QA sees when ON</th>
+<th>When OFF</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>nombaNigeria</code></td>
+<td><code>VITE_FEATURE_NOMBA_NIGERIA</code></td>
+<td><strong>true</strong></td>
+<td>NGN Express card; NGN send</td>
+<td>Hide Nomba NGN</td>
+</tr>
+<tr>
+<td><code>ghanaPay</code></td>
+<td><code>VITE_FEATURE_GHANA_PAY</code></td>
+<td><strong>true</strong></td>
+<td>GHS MoMo top-up/send</td>
+<td>Hide Ghana</td>
+</tr>
+<tr>
+<td><code>elicate</code></td>
+<td><code>VITE_FEATURE_ELICATE</code></td>
+<td><strong>true</strong></td>
+<td>ZMW MoMo top-up/send/receive links</td>
+<td>Hide Zambia Elicate</td>
+</tr>
+<tr>
+<td><code>paytota</code></td>
+<td><code>VITE_FEATURE_PAYTOTA</code></td>
+<td><strong>true</strong></td>
+<td>Pay by invoice on USD/EUR/GBP/CAD</td>
+<td>Hide invoice option</td>
+</tr>
+<tr>
+<td><code>paytotaPayout</code></td>
+<td><code>VITE_FEATURE_PAYTOTA_PAYOUT</code></td>
+<td><strong>true</strong></td>
+<td>UGX MoMo payout toggle on Send</td>
+<td>Hide toggle</td>
+</tr>
+<tr>
+<td><code>fincra</code></td>
+<td><code>VITE_FEATURE_FINCRA</code></td>
+<td><strong>true</strong></td>
+<td>Card or bank transfer top-up</td>
+<td>Hide Fincra checkout</td>
+</tr>
+<tr>
+<td><code>fincraInterac</code></td>
+<td><code>VITE_FEATURE_FINCRA_INTERAC</code></td>
+<td><strong>false</strong></td>
+<td>CAD Interac e-Transfer top-up</td>
+<td>“Not available” / hidden</td>
+</tr>
+<tr>
+<td><code>swychr</code></td>
+<td><code>VITE_FEATURE_SWYCHR</code></td>
+<td><strong>true</strong></td>
+<td>Swychr MoMo top-up, cards panel, airtime</td>
+<td>Hide Swychr surfaces</td>
+</tr>
+<tr>
+<td><code>plaid</code></td>
+<td><code>VITE_FEATURE_PLAID</code></td>
+<td><strong>true</strong></td>
+<td>Bank link on send funding</td>
+<td>Hide Plaid</td>
+</tr>
+<tr>
+<td><code>billPay</code></td>
+<td><code>VITE_FEATURE_BILL_PAY</code></td>
+<td><strong>true</strong></td>
+<td><code>/pay-bills</code></td>
+<td>Coming Soon</td>
+</tr>
+<tr>
+<td><code>cards</code></td>
+<td><code>VITE_FEATURE_CARDS</code></td>
+<td><strong>true</strong></td>
+<td><code>/cards</code> route</td>
+<td>Coming Soon</td>
+</tr>
+<tr>
+<td><code>canadaDomestic</code></td>
+<td><code>VITE_FEATURE_CANADA_DOMESTIC</code></td>
+<td><strong>false</strong></td>
+<td><code>/transfers/canada</code> live</td>
+<td>Coming Soon</td>
+</tr>
+<tr>
+<td><code>paymentLinks</code></td>
+<td><code>VITE_FEATURE_PAYMENT_LINKS</code></td>
+<td><strong>false</strong></td>
+<td>Escrow <code>/payment-links</code>, <code>/claim</code></td>
+<td>Coming Soon</td>
+</tr>
+<tr>
+<td><code>flutterwave</code></td>
+<td><code>VITE_FEATURE_FLUTTERWAVE</code></td>
+<td><strong>false</strong></td>
+<td>FLW top-up UI</td>
+<td>Hidden</td>
+</tr>
+<tr>
+<td><code>otherAfricanCorridors</code></td>
+<td><code>VITE_FEATURE_OTHER_AFRICA</code></td>
+<td><strong>false</strong></td>
+<td>KES/UGX/TZS/RWF as live send</td>
+<td>Not live send</td>
+</tr>
+<tr>
+<td><code>crypto</code></td>
+<td><code>VITE_FEATURE_CRYPTO</code></td>
+<td><strong>false</strong></td>
+<td>Crypto exchange / CPN send</td>
+<td>Coming Soon</td>
+</tr>
+<tr>
+<td><code>stripe</code></td>
+<td><em>(hardcoded)</em></td>
+<td><strong>false</strong></td>
+<td>Stripe Connect / African card</td>
+<td>Always gated</td>
+</tr>
+<tr>
+<td><code>adyen</code></td>
+<td><code>VITE_FEATURE_ADYEN</code></td>
+<td><strong>false</strong></td>
+<td>Adyen</td>
+<td>Hidden</td>
+</tr>
+</tbody></table>
+<p><strong>Live top-up currencies</strong> (when flags default): NGN, USD, EUR, GBP, CAD, XAF, KES, XOF, UGX, GHS, ZMW.</p>
+<p><strong>Live send corridors</strong> (when flags default): <strong>Nigeria (NG)</strong>, <strong>Ghana (GH)</strong>, <strong>Zambia (ZM)</strong> only.</p>
+<hr>
+<h2>5. Application map (routes)</h2>
+<h3>5.1 Public / marketing</h3>
+<table>
+<thead>
+<tr>
+<th>Path</th>
+<th>Purpose</th>
+<th>Suggested test focus</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>/</code></td>
+<td>Landing</td>
+<td>Load, CTA to auth</td>
+</tr>
+<tr>
+<td><code>/features</code>, <code>/how-it-works</code>, <code>/about</code>, <code>/contact</code></td>
+<td>Marketing</td>
+<td>Links, forms</td>
+</tr>
+<tr>
+<td><code>/privacy</code>, <code>/terms</code>, <code>/compliance</code></td>
+<td>Legal</td>
+<td>Content loads</td>
+</tr>
+<tr>
+<td><code>/auth</code>, <code>/auth/confirm</code>, <code>/auth/reset-password</code></td>
+<td>Auth</td>
+<td>Sign up, login, email confirm, password reset</td>
+</tr>
+<tr>
+<td><code>/reset-pin</code></td>
+<td>PIN reset</td>
+<td>Request + confirm</td>
+</tr>
+<tr>
+<td><code>/s/:code</code></td>
+<td>Short link</td>
+<td>Resolve valid/invalid code</td>
+</tr>
+<tr>
+<td><code>/claim/:code</code></td>
+<td>Claim escrow link</td>
+<td>Gated by <code>paymentLinks</code></td>
+</tr>
+<tr>
+<td><code>/deposit/complete</code>, <code>/payment-callback</code></td>
+<td>PSP return</td>
+<td>Wallet credit after top-up</td>
+</tr>
+<tr>
+<td><code>/callback</code>, <code>/interac/callback</code></td>
+<td>Interac OAuth</td>
+<td>Only if Interac flows enabled</td>
+</tr>
+</tbody></table>
+<h3>5.2 Authenticated customer app</h3>
+<table>
+<thead>
+<tr>
+<th>Path</th>
+<th>Purpose</th>
+<th>Gate</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>/dashboard</code></td>
+<td>Home balances / actions</td>
+<td>KYC shell</td>
+</tr>
+<tr>
+<td><code>/wallets</code></td>
+<td>List/create wallets</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>/wallets/:walletId/statement</code></td>
+<td>Statement</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>/wallet/topup</code></td>
+<td>Fund wallet</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>/wallet/receive</code></td>
+<td>Receive money / VAs / ZMW links</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>/send</code></td>
+<td>Cross-border send</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>/send/cpn</code></td>
+<td>Crypto send</td>
+<td><code>crypto</code></td>
+</tr>
+<tr>
+<td><code>/send/african-card</code></td>
+<td>African card send</td>
+<td><code>stripe</code></td>
+</tr>
+<tr>
+<td><code>/exchange</code></td>
+<td>FX</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>/transfers</code>, <code>/transfers/:id</code></td>
+<td>History / tracking</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>/transactions/:journalId</code></td>
+<td>Ledger detail</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>/contacts</code>, <code>/payees</code></td>
+<td>Beneficiaries</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>/cards</code>, <code>/cards/efin/:id</code></td>
+<td>Cards</td>
+<td><code>cards</code></td>
+</tr>
+<tr>
+<td><code>/pay-bills</code>, <code>/pay-bills/canada</code></td>
+<td>Bills</td>
+<td><code>billPay</code></td>
+</tr>
+<tr>
+<td><code>/payment-links</code></td>
+<td>Escrow links</td>
+<td><code>paymentLinks</code></td>
+</tr>
+<tr>
+<td><code>/transfers/canada</code></td>
+<td>Canada domestic</td>
+<td><code>canadaDomestic</code></td>
+</tr>
+<tr>
+<td><code>/more</code>, <code>/profile</code>, <code>/security</code>, <code>/support</code></td>
+<td>Settings hub</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>/kyc</code>, onboarding <code>/onboarding/*</code></td>
+<td>Identity</td>
+<td>—</td>
+</tr>
+</tbody></table>
+<h3>5.3 Admin / ops</h3>
+<table>
+<thead>
+<tr>
+<th>Area</th>
+<th>Paths (examples)</th>
+<th>Test themes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Access</td>
+<td><code>/admin/login</code>, <code>/admin/dashboard</code></td>
+<td>Role-based login</td>
+</tr>
+<tr>
+<td>Users / staff</td>
+<td><code>/admin/users</code>, <code>/admin/staff</code>, <code>/admin/onboarding</code></td>
+<td>CRUD, invites</td>
+</tr>
+<tr>
+<td>KYC</td>
+<td><code>/admin/kyc</code>, <code>/admin/kyc/:id</code></td>
+<td>Approve/reject; Sumsub EDD</td>
+</tr>
+<tr>
+<td>Finance</td>
+<td><code>/admin/finance</code>, <code>/admin/revenue</code>, <code>/admin/pricing</code></td>
+<td>Balances, pricing</td>
+</tr>
+<tr>
+<td>Compliance</td>
+<td>AML, sanctions, STR, LCTR, EFTR, CDD, EDD, etc.</td>
+<td>Workflows &amp; forms</td>
+</tr>
+<tr>
+<td>Ops</td>
+<td><code>/admin/operations</code>, incidents, reconciliation</td>
+<td>Ops queues</td>
+</tr>
+<tr>
+<td>API probes</td>
+<td><code>/admin/api</code></td>
+<td>Integration health (may show PSP names)</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>6. Core user journeys (for test-case design)</h2>
+<h3>6.1 Registration → KYC → dashboard</h3>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Expected</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1. Sign up</td>
+<td>Account created; email confirm if required</td>
+</tr>
+<tr>
+<td>2. Login</td>
+<td>Session established</td>
+</tr>
+<tr>
+<td>3. Onboarding / KYC</td>
+<td>Persona inquiry starts (<code>/onboarding/identity</code> or <code>/kyc</code>)</td>
+</tr>
+<tr>
+<td>4. Pending / approved / rejected</td>
+<td>Correct routing to welcome, app, or rejected</td>
+</tr>
+<tr>
+<td>5. Dashboard</td>
+<td>Wallets and primary CTAs visible when approved</td>
+</tr>
+</tbody></table>
+<p><strong>Negative:</strong> Incomplete KYC cannot fully use send/top-up as designed by <code>KYCGuard</code>.</p>
+<h3>6.2 Create wallet</h3>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Expected</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Open <code>/wallets</code> → Create</td>
+<td>Modal lists popular currencies (e.g. NGN, USD, CAD, KES, GBP, EUR, GHS, UGX, TZS, ZMW)</td>
+</tr>
+<tr>
+<td>Create NGN + CAD + ZMW</td>
+<td>Three wallets appear with zero or correct balance</td>
+</tr>
+<tr>
+<td>Duplicate currency</td>
+<td>Blocked or no duplicate</td>
+</tr>
+</tbody></table>
+<h3>6.3 Top-up — by currency</h3>
+<p>Testers should open <code>/wallet/topup</code>, select wallet currency, and verify <strong>method picker</strong> matches flags.</p>
+<h4>A. NGN — Express card (Nomba)</h4>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Case</th>
+<th>Expected</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>TU-NGN-01</td>
+<td>Select NGN wallet</td>
+<td>Express card method available</td>
+</tr>
+<tr>
+<td>TU-NGN-02</td>
+<td>Enter amount → Continue</td>
+<td>Redirect or card flow; no “Nomba” brand in customer UI</td>
+</tr>
+<tr>
+<td>TU-NGN-03</td>
+<td>Successful payment return</td>
+<td>Wallet balance increases; transfer/tx history entry</td>
+</tr>
+<tr>
+<td>TU-NGN-04</td>
+<td>Cancel / fail</td>
+<td>No credit; clear error</td>
+</tr>
+</tbody></table>
+<h4>B. GHS — Ghana Mobile Money</h4>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Case</th>
+<th>Expected</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>TU-GHS-01</td>
+<td>Select GHS</td>
+<td>Ghana MoMo networks (MTN / AirtelTigo / Telecel)</td>
+</tr>
+<tr>
+<td>TU-GHS-02</td>
+<td>Valid phone + amount</td>
+<td>Collection initiated; OTP/USSD as provider requires</td>
+</tr>
+<tr>
+<td>TU-GHS-03</td>
+<td>Success webhook</td>
+<td>GHS wallet credited</td>
+</tr>
+</tbody></table>
+<h4>C. ZMW — Mobile Money (Elicate)</h4>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Case</th>
+<th>Expected</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>TU-ZMW-01</td>
+<td>Select ZMW</td>
+<td>Mobile Money; networks MTN / Airtel / Zamtel</td>
+</tr>
+<tr>
+<td>TU-ZMW-02</td>
+<td>OTP / approval flow</td>
+<td>Charge completes</td>
+</tr>
+<tr>
+<td>TU-ZMW-03</td>
+<td>Success</td>
+<td>ZMW balance credit</td>
+</tr>
+</tbody></table>
+<h4>D. USD / EUR / GBP — multi-rail picker</h4>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Case</th>
+<th>Expected</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>TU-FX-01</td>
+<td>Select USD (flags default)</td>
+<td>Options include <strong>Express card</strong>, <strong>Card or bank transfer</strong>, <strong>Pay by invoice</strong> (as enabled)</td>
+</tr>
+<tr>
+<td>TU-FX-02</td>
+<td>Express card path</td>
+<td>Completes and credits wallet</td>
+</tr>
+<tr>
+<td>TU-FX-03</td>
+<td>Card or bank transfer</td>
+<td>Hosted checkout; EUR/GBP may offer bank_transfer; <strong>USD is card-only</strong> on Fincra</td>
+</tr>
+<tr>
+<td>TU-FX-04</td>
+<td>Pay by invoice</td>
+<td>Invoice issued; credit on payment</td>
+</tr>
+<tr>
+<td>TU-FX-05</td>
+<td>White-label</td>
+<td>No PSP brand names on chooser</td>
+</tr>
+</tbody></table>
+<h4>E. CAD — multi-rail (important)</h4>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Case</th>
+<th>Expected</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>TU-CAD-01</td>
+<td>Select CAD</td>
+<td>Method picker: Express card, Card or bank transfer, Pay by invoice; Interac only if <code>fincraInterac</code></td>
+</tr>
+<tr>
+<td>TU-CAD-02</td>
+<td>Express card / Fincra card</td>
+<td><strong>Charge currency is USD</strong>; <strong>credit currency is CAD</strong> (quote UI should explain conversion)</td>
+</tr>
+<tr>
+<td>TU-CAD-03</td>
+<td>Interac when flag off</td>
+<td>Not offered or “coming soon”</td>
+</tr>
+<tr>
+<td>TU-CAD-04</td>
+<td>Interac when flag on</td>
+<td>Interac e-Transfer instructions; credit on match</td>
+</tr>
+<tr>
+<td>TU-CAD-05</td>
+<td>Merchant not enabled for USD card</td>
+<td>Clear failure from Fincra (account config), not silent</td>
+</tr>
+</tbody></table>
+<h4>F. Swychr MoMo currencies (XAF, KES, XOF, UGX)</h4>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Case</th>
+<th>Expected</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>TU-SWY-01</td>
+<td>Select KES/UGX/etc.</td>
+<td>Mobile money top-up UI</td>
+</tr>
+<tr>
+<td>TU-SWY-02</td>
+<td>Complete payin</td>
+<td>Wallet credited</td>
+</tr>
+</tbody></table>
+<h3>6.4 Send money</h3>
+<p>Open <code>/send</code>. Live corridors by default: <strong>NG, GH, ZM</strong>.</p>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Case</th>
+<th>Expected</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>SND-01</td>
+<td>Send to Nigeria bank beneficiary</td>
+<td>Account resolve (where available); fee/FX quote; success → tracking</td>
+</tr>
+<tr>
+<td>SND-02</td>
+<td>Send to Ghana MoMo</td>
+<td>Network + phone; success</td>
+</tr>
+<tr>
+<td>SND-03</td>
+<td>Send to Zambia MoMo</td>
+<td>MTN/Airtel/Zamtel; success</td>
+</tr>
+<tr>
+<td>SND-04</td>
+<td>Insufficient balance</td>
+<td>Blocked with clear message</td>
+</tr>
+<tr>
+<td>SND-05</td>
+<td>Non-live corridor (e.g. KE) with <code>otherAfricanCorridors</code> false</td>
+<td>Not offered as live / Coming Soon</td>
+</tr>
+<tr>
+<td>SND-06</td>
+<td>Paytota UGX payout toggle</td>
+<td>Appears when <code>paytotaPayout</code>; alternate rail works or fails gracefully</td>
+</tr>
+<tr>
+<td>SND-07</td>
+<td>Plaid bank funding</td>
+<td>Link token opens when <code>plaid</code>; secrets required</td>
+</tr>
+<tr>
+<td>SND-08</td>
+<td>Tracking page</td>
+<td>Status progresses; failure reason if failed</td>
+</tr>
+</tbody></table>
+<p><strong>Known blocker:</strong> Nomba upstream JWT expiry can break NGN transfer/conversion while bank lookup still works — document as environment defect, not app UI bug, if APIs return auth errors.</p>
+<h3>6.5 Receive money</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Case</th>
+<th>Path / expected</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>RCV-01</td>
+<td>In-network receive</td>
+<td>Account number / <code>@efin_tag</code> shown</td>
+</tr>
+<tr>
+<td>RCV-02</td>
+<td>Virtual accounts</td>
+<td>VA list for supported currencies (NGN, KES, GHS, ZAR, UGX, TZS, ZMW, RWF, USD as implemented)</td>
+</tr>
+<tr>
+<td>RCV-03</td>
+<td>Zambia MoMo payment links</td>
+<td>Create fixed/flexible ZMW link when <code>elicate</code>; pay with MoMo; wallet credit</td>
+</tr>
+<tr>
+<td>RCV-04</td>
+<td>Escrow payment links</td>
+<td><code>/payment-links</code> Coming Soon when <code>paymentLinks</code> false</td>
+</tr>
+</tbody></table>
+<h3>6.6 Contacts / payees</h3>
+<p>Routes: <code>/contacts</code>, <code>/payees</code>. Modal: Add / Edit Payee.</p>
+<table>
+<thead>
+<tr>
+<th>Field / control</th>
+<th>Required?</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Category</td>
+<td>Yes</td>
+<td>person, supplier, employee, contractor, payee, other</td>
+</tr>
+<tr>
+<td>Country</td>
+<td>Yes</td>
+<td>Drives payout defaults</td>
+</tr>
+<tr>
+<td>Full name / business</td>
+<td>Yes</td>
+<td></td>
+</tr>
+<tr>
+<td>Nickname</td>
+<td>Optional</td>
+<td></td>
+</tr>
+<tr>
+<td>Email</td>
+<td>Optional</td>
+<td></td>
+</tr>
+<tr>
+<td><strong>Phone</strong></td>
+<td>Optional (required if Mobile payout)</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><strong>Mailing address</strong></td>
+<td>Optional</td>
+<td>Street, city, state/province, postal</td>
+</tr>
+<tr>
+<td>Default payout</td>
+<td>Optional</td>
+<td>None / EFT 🇨🇦 / Interac / Mobile / Bank</td>
+</tr>
+<tr>
+<td>Notes &amp; tags</td>
+<td>Optional</td>
+<td></td>
+</tr>
+</tbody></table>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Case</th>
+<th>Expected</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>CON-01</td>
+<td>Create person with phone + mailing address</td>
+<td>Saved; visible on edit</td>
+</tr>
+<tr>
+<td>CON-02</td>
+<td>Edit payee</td>
+<td>All fields reload including tel &amp; address</td>
+</tr>
+<tr>
+<td>CON-03</td>
+<td>Mobile payout without phone</td>
+<td>Validation error</td>
+</tr>
+<tr>
+<td>CON-04</td>
+<td>Interac without email</td>
+<td>Validation error</td>
+</tr>
+<tr>
+<td>CON-05</td>
+<td>EFT fields</td>
+<td>Institution / transit / account validation</td>
+</tr>
+<tr>
+<td>CON-06</td>
+<td>Nigeria bank</td>
+<td>Bank list + account name resolve</td>
+</tr>
+<tr>
+<td>CON-07</td>
+<td>Search contacts</td>
+<td>Match name, nickname, phone</td>
+</tr>
+<tr>
+<td>CON-08</td>
+<td>Send from contact</td>
+<td>Prefills send flow</td>
+</tr>
+</tbody></table>
+<h3>6.7 Exchange (FX)</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Case</th>
+<th>Expected</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>FX-01</td>
+<td>Exchange NGN → USD (or supported pair)</td>
+<td>Quote, fee, success; both wallets update</td>
+</tr>
+<tr>
+<td>FX-02</td>
+<td>Crypto tab</td>
+<td>Hidden / Coming Soon when <code>crypto</code> false</td>
+</tr>
+</tbody></table>
+<h3>6.8 Cards</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Case</th>
+<th>Expected</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>CRD-01</td>
+<td><code>/cards</code> with <code>cards</code> true</td>
+<td>Page loads</td>
+</tr>
+<tr>
+<td>CRD-02</td>
+<td>Swychr virtual card issue</td>
+<td>Issue/ops when <code>swychr</code>; needs funded provider wallet</td>
+</tr>
+<tr>
+<td>CRD-03</td>
+<td>Stripe card funding</td>
+<td>Gated (<code>stripe</code> false)</td>
+</tr>
+</tbody></table>
+<h3>6.9 Bills &amp; airtime</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Case</th>
+<th>Expected</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>BIL-01</td>
+<td><code>/pay-bills</code></td>
+<td>Categories (airtime, cable, utilities, etc.) via Flutterwave billers when enabled</td>
+</tr>
+<tr>
+<td>BIL-02</td>
+<td>Validate + pay bill</td>
+<td>Success / clear failure</td>
+</tr>
+<tr>
+<td>BIL-03</td>
+<td>Canada bills</td>
+<td><code>/pay-bills/canada</code></td>
+</tr>
+<tr>
+<td>AIR-01</td>
+<td>Swychr airtime panel</td>
+<td>Catalog + recharge when <code>swychr</code> and not Canada-only context</td>
+</tr>
+</tbody></table>
+<h3>6.10 Transfers history</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Case</th>
+<th>Expected</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>HST-01</td>
+<td>List transfers</td>
+<td>Newest first; filters if any</td>
+</tr>
+<tr>
+<td>HST-02</td>
+<td>Open detail</td>
+<td>Status, amounts, corridor, reference</td>
+</tr>
+<tr>
+<td>HST-03</td>
+<td>Failed transfer</td>
+<td>Failure reason displayed</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>7. Admin &amp; compliance testing (high level)</h2>
+<p>Prioritize by role:</p>
+<table>
+<thead>
+<tr>
+<th>Theme</th>
+<th>Examples</th>
+<th>Pass criteria</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>AuthZ</td>
+<td>Non-admin cannot open <code>/admin/*</code></td>
+<td>Redirect / 403</td>
+</tr>
+<tr>
+<td>KYC queue</td>
+<td>Approve / reject with notes</td>
+<td>User status updates; audit</td>
+</tr>
+<tr>
+<td>Sumsub EDD</td>
+<td>Launch from KYC review</td>
+<td>Applicant created/status</td>
+</tr>
+<tr>
+<td>User management</td>
+<td>View user wallets / freeze if exists</td>
+<td>Actions logged</td>
+</tr>
+<tr>
+<td>API Management</td>
+<td><code>/admin/api</code> probes</td>
+<td>Health results; PSP names OK here</td>
+</tr>
+<tr>
+<td>AML modules</td>
+<td>Sanctions, STR, monitoring</td>
+<td>Forms save; permissions</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>8. Non-functional &amp; cross-cutting</h2>
+<table>
+<thead>
+<tr>
+<th>Area</th>
+<th>Cases</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Responsive</td>
+<td>Desktop + mobile for Top-up, Send, Contacts, Dashboard</td>
+</tr>
+<tr>
+<td>Session</td>
+<td>Expiry / logout clears access</td>
+</tr>
+<tr>
+<td>Deep links</td>
+<td>Payment callback returns to correct wallet</td>
+</tr>
+<tr>
+<td>Idempotency</td>
+<td>Double-submit top-up/send does not double-credit</td>
+</tr>
+<tr>
+<td>Webhooks</td>
+<td>Manual replay / delayed webhook still credits once</td>
+</tr>
+<tr>
+<td>Localization</td>
+<td>Currency symbols &amp; decimals correct (ZMW, NGN, CAD)</td>
+</tr>
+<tr>
+<td>Accessibility</td>
+<td>Labels on form fields; modal focus trap</td>
+</tr>
+<tr>
+<td>Security</td>
+<td>No secrets in client bundle; no PSP keys in Network response bodies</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>9. Suggested test suites (team split)</h2>
+<h3>Suite A — Smoke (daily / release)</h3>
+<ol>
+<li>Login + dashboard  </li>
+<li>NGN Express card top-up (sandbox amount)  </li>
+<li>GHS MoMo top-up  </li>
+<li>ZMW MoMo top-up  </li>
+<li>NGN bank send (small amount)  </li>
+<li>Create/edit contact with phone + address  </li>
+<li>FX one pair  </li>
+<li>Confirm Coming Soon: Canada domestic, payment links, crypto</li>
+</ol>
+<h3>Suite B — CAD / Western top-up</h3>
+<ol>
+<li>CAD method picker labels  </li>
+<li>CAD via USD charge (Express + Card or bank)  </li>
+<li>Invoice path  </li>
+<li>Interac on/off by flag  </li>
+<li>Fincra USD merchant errors handled</li>
+</ol>
+<h3>Suite C — Zambia / Elicate</h3>
+<ol>
+<li>Top-up OTP  </li>
+<li>Send MoMo  </li>
+<li>Receive payment links  </li>
+<li>Webhook / reconcile credit</li>
+</ol>
+<h3>Suite D — Cards / bills / airtime</h3>
+<ol>
+<li>Cards page + Swychr issue  </li>
+<li>Bill validate/pay  </li>
+<li>Airtime catalog/recharge</li>
+</ol>
+<h3>Suite E — Regression / flags</h3>
+<ol>
+<li>Toggle <code>elicate</code> / <code>fincra</code> / <code>paytota</code> / <code>swychr</code> off → UI hides  </li>
+<li><code>otherAfricanCorridors</code> on → KE/UG appear as send  </li>
+<li>White-label assertions across all top-up methods</li>
+</ol>
+<h3>Suite F — Admin / KYC</h3>
+<ol>
+<li>Persona happy path  </li>
+<li>Admin approve/reject  </li>
+<li>Role matrix</li>
+</ol>
+<hr>
+<h2>10. Known limitations &amp; environment risks</h2>
+<ol>
+<li><strong><code>fincraInterac</code> default false</strong> — Interac CAD top-up not in default builds.  </li>
+<li><strong><code>canadaDomestic</code> false</strong> — Canada Interac/EFT send Coming Soon.  </li>
+<li><strong><code>paymentLinks</code> false</strong> — Escrow links gated; <strong>ZMW Elicate receive links still live</strong> when <code>elicate</code> true.  </li>
+<li><strong>Fincra USD = card only</strong> — no bank_transfer for USD charge currency.  </li>
+<li><strong>CAD always charged as USD</strong> for card/checkout rails that use Fincra/Nomba international path.  </li>
+<li><strong>Fincra merchant config</strong> — “Merchant not enabled to process USD card” is account-side, not card failure.  </li>
+<li><strong>Localhost redirect</strong> — Fincra return URL may point to production <code>VITE_APP_URL</code>.  </li>
+<li><strong>Nomba JWT</strong> — Upstream expired JWT can break payouts while lookups work.  </li>
+<li><strong>Swychr cards</strong> — Need funded admin/box wallet; sandbox vs prod via secrets.  </li>
+<li><strong><code>docs/PRODUCT_RAILS.md</code> may be stale</strong> — prefer <code>productFeatures.ts</code> for what is live.</li>
+</ol>
+<hr>
+<h2>11. Data &amp; evidence for bug reports</h2>
+<p>Please include:</p>
+<ul>
+<li>Environment URL + build/commit if known  </li>
+<li>User ID / email (test account)  </li>
+<li>Wallet currency &amp; amount  </li>
+<li>Corridor / beneficiary type  </li>
+<li>User-facing method label selected  </li>
+<li>Timestamp (UTC)  </li>
+<li>Screenshots + Network failing request (status, response message)  </li>
+<li>Transfer / payment reference from UI  </li>
+<li>Feature flag assumptions</li>
+</ul>
+<hr>
+<h2>12. Glossary</h2>
+<table>
+<thead>
+<tr>
+<th>Term</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Rail / PSP</td>
+<td>Payment service provider powering a method</td>
+</tr>
+<tr>
+<td>Corridor</td>
+<td>Country/currency path for send</td>
+</tr>
+<tr>
+<td>MoMo</td>
+<td>Mobile money</td>
+</tr>
+<tr>
+<td>VA</td>
+<td>Virtual account number for receive</td>
+</tr>
+<tr>
+<td>KYC / CDD / EDD</td>
+<td>Identity &amp; due diligence levels</td>
+</tr>
+<tr>
+<td>White-label</td>
+<td>Hide provider brand; show product method name</td>
+</tr>
+<tr>
+<td>Edge Function</td>
+<td>Supabase serverless API backing a rail</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>13. Document control</h2>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Prepared for</td>
+<td>QA team test-case authoring</td>
+</tr>
+<tr>
+<td>Related code</td>
+<td><code>src/lib/productFeatures.ts</code>, <code>src/lib/walletTopupGateway.ts</code>, <code>src/pages/TopUpPage.tsx</code>, <code>src/pages/SendPage.tsx</code>, <code>src/components/modals/AddBeneficiaryModal.tsx</code></td>
+</tr>
+<tr>
+<td>Related internal docs</td>
+<td><code>docs/PRODUCT_RAILS.md</code>, <code>docs/swychr/README.md</code></td>
+</tr>
+<tr>
+<td>Update trigger</td>
+<td>Any change to feature-flag defaults or live corridors</td>
+</tr>
+</tbody></table>
+<hr>
+<p><em>End of eFinMoney QA Test Planning Guide</em></p>
+
+</body>
+</html>
