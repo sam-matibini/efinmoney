@@ -4,6 +4,7 @@ import { MapPin } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import LiveFxCalculator from "@/components/fx/LiveFxCalculator";
+import TopUpModal from "@/components/modals/TopUpModal";
 import {
   buildUsdMap,
   midRateFromUsdMap,
@@ -34,6 +35,7 @@ const SendMoneyModal = ({ children }: SendMoneyModalProps) => {
   const [from, setFrom] = useState<string>("USD");
   const [to, setTo] = useState<string>("NGN");
   const [amount, setAmount] = useState("100");
+  const [showTopUp, setShowTopUp] = useState(false);
 
   const { data: wallets } = useWallets();
   const { data: fxRates } = useFxRates();
@@ -217,9 +219,18 @@ const SendMoneyModal = ({ children }: SendMoneyModalProps) => {
           footer={
             <>
               {insufficientBalance && (
-                <p className="mt-2 text-center text-[10px] font-medium text-amber-300/90">
-                  Balance too low for this amount — you can top up on the next screen
-                </p>
+                <div className="mt-2 flex items-center justify-center gap-2">
+                  <p className="text-[10px] font-medium text-amber-300/90">
+                    Balance too low for this amount
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowTopUp(true)}
+                    className="rounded-full bg-amber-400/20 px-2.5 py-0.5 text-[10px] font-semibold text-amber-300 transition-colors hover:bg-amber-400/30"
+                  >
+                    Top Up Now
+                  </button>
+                </div>
               )}
               {productFeatures.canadaDomestic && (
               <button
@@ -238,6 +249,12 @@ const SendMoneyModal = ({ children }: SendMoneyModalProps) => {
           }
         />
       </DialogContent>
+      <TopUpModal
+        open={showTopUp}
+        onOpenChange={setShowTopUp}
+        defaultWalletId={selectedWallet?.wallet_id}
+        title={`Top up ${selectedWallet?.currency_code ?? ""} wallet`}
+      />
     </Dialog>
   );
 };
