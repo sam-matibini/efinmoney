@@ -3,11 +3,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { currencySymbol } from "@/lib/currency";
 import { useAuth } from "@/hooks/useAuth";
-import { CreditCard, Loader2 } from "lucide-react";
+import { Building2, Check, Copy, CreditCard, Loader2 } from "lucide-react";
 
 type Step = "details" | "pin" | "otp" | "avs" | "done";
 
@@ -17,20 +18,43 @@ interface Props {
   onComplete?: () => void;
 }
 
+type VaDetails = {
+  account_number: string;
+  account_name: string | null;
+  bank_name: string | null;
+  amount: number;
+  currency: string;
+  order_ref: string | null;
+  expiry: string | null;
+};
+
 function formatCardNumber(raw: string): string {
   const digits = raw.replace(/\D/g, "").slice(0, 19);
   return digits.replace(/(\d{4})(?=\d)/g, "$1 ").trim();
 }
 
+function defaultCountry(currency: string): string {
+  const c = currency.toUpperCase();
+  if (c === "NGN") return "NG";
+  if (c === "CAD") return "CA";
+  if (c === "USD") return "US";
+  if (c === "GBP") return "GB";
+  if (c === "GHS") return "GH";
+  if (c === "KES") return "KE";
+  return "";
+}
+
 /**
- * Lenhub Flutter card collect — USD/CAD/EUR/GBP + African wallet currencies.
+ * Lenhub Flutter collect — card (all collect currencies) + NGN bank transfer (VA).
  * Card data is posted only to our edge function (never stored in DB).
  */
 export default function LenhubFlutterTopUpCard({ walletId, walletCurrency, onComplete }: Props) {
   const { user } = useAuth();
   const currency = walletCurrency.toUpperCase();
   const sym = currencySymbol(currency);
+  const supportsBank = currency === "NGN";
 
+  const [payMode, setPayMode] = useState<"card" | "bank">(supportsBank ? "card" : "card");
   const [step, setStep] = useState<Step>("details");
   const [busy, setBusy] = useState(false);
   const [amount, setAmount] = useState("");
@@ -44,24 +68,30 @@ export default function LenhubFlutterTopUpCard({ walletId, walletCurrency, onCom
   const [pin, setPin] = useState("");
   const [otp, setOtp] = useState("");
   const [city, setCity] = useState("");
-  const [country, setCountry] = useState(currency === "CAD" ? "CA" : currency === "USD" ? "US" : "");
+  const [country, setCountry] = useState(defaultCountry(currency));
   const [line1, setLine1] = useState("");
   const [postal, setPostal] = useState("");
   const [state, setState] = useState("");
+  const [va, setVa] = useState<VaDetails | null>(null);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (!email && user?.email) setEmail(user.email);
   }, [user?.email, email]);
 
+  useEffect(() => {
+    setCountry(defaultCountry(currency));
+  }, [currency]);
+
   const payAmount = Number(amount);
   const amountOk = Number.isFinite(payAmount) && payAmount > 0;
+  const minHint = currency === "NGN" ? "Min ~₦100" : null;
 
   const invoke = async (action: string, extra: Record<string, unknown> = {}) => {
     const { data, error } = await supabase.functions.invoke("lenhub-flutter", {
       body: { action, wallet_id: walletId, ...extra },
     });
 
-    // Supabase puts non-2xx bodies in error.context; data may still hold JSON
     let body = (data ?? null) as Record<string, unknown> | null;
     if (error) {
       try {
@@ -78,9 +108,71 @@ export default function LenhubFlutterTopUpCard({ walletId, walletCurrency, onCom
     return body;
   };
 
+  const copyAccount = async () => {
+    if (!va?.account_number) return;
+    try {
+      await navigator.clipboard.writeText(va.account_number);
+      setCopied(true);
+      toast.success("Account number copied");
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("Could not copy");
+    }
+  };
+
+  const submitBank = async () => {
+    if (!amountOk) {
+      toast.error("Enter how much you want to add");
+      return;
+    }
+    if (currency === "NGN" && payAmount < 100) {
+      toast.error("Minimum top-up is ₦100");
+      return;
+    }
+    if (!email.trim()) {
+      toast.error("Email is required");
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const data = await invoke("virtual_account", {
+        currency,
+        amount: payAmount,
+        email: email.trim(),
+        narration: `eFin NGN top-up`,
+      });
+      const raw = data?.virtual_account as Record<string, unknown> | null | undefined;
+      if (!raw?.account_number) {
+        throw new Error(String(data?.message || "No account details returned"));
+      }
+      setLocalId(data?.local_id ? String(data.local_id) : null);
+      setChargeId(data?.charge_id ? String(data.charge_id) : null);
+      setVa({
+        account_number: String(raw.account_number),
+        account_name: raw.account_name != null ? String(raw.account_name) : null,
+        bank_name: raw.bank_name != null ? String(raw.bank_name) : null,
+        amount: Number(raw.amount ?? payAmount),
+        currency: String(raw.currency || currency),
+        order_ref: raw.order_ref != null ? String(raw.order_ref) : null,
+        expiry: raw.expiry != null ? String(raw.expiry) : null,
+      });
+      toast.success("Transfer details ready — pay from your bank app");
+      onComplete?.();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not create transfer account");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const submitCard = async () => {
     if (!amountOk) {
       toast.error("Enter how much you want to add");
+      return;
+    }
+    if (currency === "NGN" && payAmount < 100) {
+      toast.error("Minimum top-up is ₦100");
       return;
     }
     const pan = cardNumber.replace(/\s+/g, "");
@@ -111,20 +203,30 @@ export default function LenhubFlutterTopUpCard({ walletId, walletCurrency, onCom
       const nextChargeId = String(
         data?.charge_id ||
           data?.chargeId ||
-          (data?.provider as Record<string, unknown> | undefined)?.charge_id ||
           "",
       ).trim() || null;
-      // Dig deeper into provider payload if needed
+
       const provider = data?.provider as Record<string, unknown> | undefined;
-      const deepId =
-        nextChargeId ||
-        String(
-          (provider?.message as Record<string, unknown> | undefined)?.id ||
-            (provider?.data as Record<string, unknown> | undefined)?.id ||
-            (provider?.data as Record<string, unknown> | undefined)?.chargeId ||
-            "",
-        ).trim() ||
-        null;
+      const dig = (obj: unknown): string | null => {
+        if (!obj || typeof obj !== "object") return null;
+        if (Array.isArray(obj)) {
+          for (const item of obj) {
+            const found = dig(item);
+            if (found) return found;
+          }
+          return null;
+        }
+        const rec = obj as Record<string, unknown>;
+        for (const k of ["chargeId", "charge_id", "id"]) {
+          if (rec[k] != null && String(rec[k]).trim()) return String(rec[k]).trim();
+        }
+        for (const nest of ["message", "data", "status"]) {
+          const found = dig(rec[nest]);
+          if (found) return found;
+        }
+        return null;
+      };
+      const deepId = nextChargeId || dig(provider);
 
       setLocalId(data?.local_id ? String(data.local_id) : null);
       setChargeId(deepId);
@@ -138,8 +240,18 @@ export default function LenhubFlutterTopUpCard({ walletId, walletCurrency, onCom
         setStep("avs");
         return;
       }
-      setStep("pin");
-      toast.success("Card accepted — enter PIN if asked, or skip");
+
+      const next = String(data?.next_action || "").toLowerCase();
+      if (next.includes("additional") || next === "avs" || next.includes("redirect")) {
+        setStep("avs");
+        toast.success("Card accepted — enter billing address");
+      } else if (next.includes("otp")) {
+        setStep("otp");
+        toast.success("Card accepted — enter OTP");
+      } else {
+        setStep("pin");
+        toast.success("Card accepted — enter PIN if asked, or skip to address");
+      }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Card charge failed");
     } finally {
@@ -217,49 +329,205 @@ export default function LenhubFlutterTopUpCard({ walletId, walletCurrency, onCom
     }
   };
 
+  const title = currency === "NGN" ? "NGN card or bank" : "Card (direct)";
+  const description =
+    currency === "NGN"
+      ? "Pay with your Nigerian card or transfer from any bank app. Wallet updates when payment confirms."
+      : `Pay in ${currency}. Enter the amount to add to your wallet, then your card details.`;
+
+  const amountEmailFields = (
+    <div className="grid gap-4 sm:grid-cols-2">
+      <div className="space-y-2">
+        <Label htmlFor="lf-amount">Amount ({currency})</Label>
+        <div className="relative">
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+            {sym}
+          </span>
+          <Input
+            id="lf-amount"
+            className="pl-9"
+            inputMode="decimal"
+            placeholder={currency === "NGN" ? "1000" : "0.00"}
+            value={amount}
+            onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ""))}
+          />
+        </div>
+        {minHint && <p className="text-xs text-muted-foreground">{minHint}</p>}
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="lf-email">Email</Label>
+        <Input
+          id="lf-email"
+          type="email"
+          autoComplete="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+      </div>
+    </div>
+  );
+
   return (
     <Card>
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-lg">
           <CreditCard className="h-5 w-5" />
-          Card (direct)
+          {title}
         </CardTitle>
-        <CardDescription>
-          Pay in {currency}. Enter the amount to add to your wallet, then your card details.
-        </CardDescription>
+        <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
-        {step === "details" && (
-          <>
-            <div className="grid gap-4 sm:grid-cols-2">
+        {supportsBank && step === "details" && !va && (
+          <Tabs value={payMode} onValueChange={(v) => setPayMode(v as "card" | "bank")}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="card" className="gap-1.5">
+                <CreditCard className="h-3.5 w-3.5" />
+                Card
+              </TabsTrigger>
+              <TabsTrigger value="bank" className="gap-1.5">
+                <Building2 className="h-3.5 w-3.5" />
+                Bank transfer
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="card" className="mt-4 space-y-5">
+              {amountEmailFields}
               <div className="space-y-2">
-                <Label htmlFor="lf-amount">Amount ({currency})</Label>
-                <div className="relative">
-                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
-                    {sym}
-                  </span>
+                <Label htmlFor="lf-pan">Card number</Label>
+                <Input
+                  id="lf-pan"
+                  inputMode="numeric"
+                  autoComplete="cc-number"
+                  placeholder="5399 … or your Naira card"
+                  value={cardNumber}
+                  onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
+                />
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="lf-mm">Month</Label>
                   <Input
-                    id="lf-amount"
-                    className="pl-9"
-                    inputMode="decimal"
-                    placeholder="0.00"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ""))}
+                    id="lf-mm"
+                    inputMode="numeric"
+                    placeholder="MM"
+                    maxLength={2}
+                    value={expMonth}
+                    onChange={(e) => setExpMonth(e.target.value.replace(/\D/g, "").slice(0, 2))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="lf-yy">Year</Label>
+                  <Input
+                    id="lf-yy"
+                    inputMode="numeric"
+                    placeholder="YY"
+                    maxLength={4}
+                    value={expYear}
+                    onChange={(e) => setExpYear(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="lf-cvv">CVV</Label>
+                  <Input
+                    id="lf-cvv"
+                    type="password"
+                    inputMode="numeric"
+                    autoComplete="cc-csc"
+                    placeholder="•••"
+                    maxLength={4}
+                    value={cvv}
+                    onChange={(e) => setCvv(e.target.value.replace(/\D/g, "").slice(0, 4))}
                   />
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="lf-email">Email</Label>
-                <Input
-                  id="lf-email"
-                  type="email"
-                  autoComplete="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
-            </div>
+              <Button className="w-full" size="lg" disabled={busy || !amountOk} onClick={submitCard}>
+                {busy ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : amountOk ? (
+                  `Pay ${sym}${payAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                ) : (
+                  "Enter amount to continue"
+                )}
+              </Button>
+            </TabsContent>
 
+            <TabsContent value="bank" className="mt-4 space-y-5">
+              {amountEmailFields}
+              <p className="text-sm text-muted-foreground">
+                We create a one-time Naira account. Transfer the exact amount from your bank app — wallet credits after confirmation.
+              </p>
+              <Button className="w-full" size="lg" disabled={busy || !amountOk} onClick={submitBank}>
+                {busy ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : amountOk ? (
+                  `Get account for ${sym}${payAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                ) : (
+                  "Enter amount to continue"
+                )}
+              </Button>
+            </TabsContent>
+          </Tabs>
+        )}
+
+        {supportsBank && va && (
+          <div className="space-y-4 rounded-lg border bg-muted/30 p-4">
+            <p className="text-sm font-medium">Transfer exactly this amount</p>
+            <div className="text-2xl font-semibold tracking-tight">
+              {sym}
+              {Number(va.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{" "}
+              <span className="text-base font-normal text-muted-foreground">{va.currency}</span>
+            </div>
+            <div className="space-y-3 text-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-muted-foreground">Account number</p>
+                  <p className="font-mono text-base font-semibold tracking-wide">{va.account_number}</p>
+                </div>
+                <Button type="button" variant="outline" size="sm" onClick={copyAccount}>
+                  {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                </Button>
+              </div>
+              {va.bank_name && (
+                <div>
+                  <p className="text-muted-foreground">Bank</p>
+                  <p className="font-medium">{va.bank_name}</p>
+                </div>
+              )}
+              {va.account_name && (
+                <div>
+                  <p className="text-muted-foreground">Account name</p>
+                  <p className="font-medium">{va.account_name}</p>
+                </div>
+              )}
+              {va.order_ref && (
+                <div>
+                  <p className="text-muted-foreground">Reference</p>
+                  <p className="font-mono text-xs">{va.order_ref}</p>
+                </div>
+              )}
+              {va.expiry && (
+                <p className="text-xs text-amber-700">Expires: {va.expiry}</p>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              After you transfer, this page can stay open — your wallet updates when the provider confirms.
+            </p>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => {
+                setVa(null);
+                setAmount("");
+              }}
+            >
+              New amount
+            </Button>
+          </div>
+        )}
+
+        {!supportsBank && step === "details" && (
+          <>
+            {amountEmailFields}
             <div className="space-y-2">
               <Label htmlFor="lf-pan">Card number</Label>
               <Input
@@ -271,7 +539,6 @@ export default function LenhubFlutterTopUpCard({ walletId, walletCurrency, onCom
                 onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
               />
             </div>
-
             <div className="grid grid-cols-3 gap-3">
               <div className="space-y-2">
                 <Label htmlFor="lf-mm">Month</Label>
@@ -309,7 +576,6 @@ export default function LenhubFlutterTopUpCard({ walletId, walletCurrency, onCom
                 />
               </div>
             </div>
-
             <Button className="w-full" size="lg" disabled={busy || !amountOk} onClick={submitCard}>
               {busy ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -401,7 +667,7 @@ export default function LenhubFlutterTopUpCard({ walletId, walletCurrency, onCom
                 <Label htmlFor="lf-country">Country</Label>
                 <Input
                   id="lf-country"
-                  placeholder="CA"
+                  placeholder={currency === "NGN" ? "NG" : "CA"}
                   value={country}
                   onChange={(e) => setCountry(e.target.value.toUpperCase())}
                 />

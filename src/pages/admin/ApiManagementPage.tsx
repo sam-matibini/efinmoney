@@ -416,19 +416,19 @@ export default function ApiManagementPage() {
                         <CardDescription className="mt-1">{integ.description}</CardDescription>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
-                        {status.healthy ? (
-                          <Badge className="bg-indigo-500/15 text-indigo-500 hover:bg-indigo-500/20 border-indigo-500/30 gap-1">
-                            <CheckCircle2 className="h-3 w-3" /> {status.label}
-                          </Badge>
+                      {status.healthy ? (
+                        <Badge className="bg-indigo-500/15 text-indigo-500 hover:bg-indigo-500/20 border-indigo-500/30 gap-1">
+                          <CheckCircle2 className="h-3 w-3" /> {status.label}
+                        </Badge>
                         ) : status.label === "Disabled" ? (
                           <Badge variant="outline" className="bg-muted text-muted-foreground gap-1">
                             <XCircle className="h-3 w-3" /> {status.label}
                           </Badge>
-                        ) : (
-                          <Badge variant="outline" className="bg-yellow-500/15 text-yellow-500 border-yellow-500/30 gap-1">
-                            <AlertTriangle className="h-3 w-3" /> {status.label}
-                          </Badge>
-                        )}
+                      ) : (
+                        <Badge variant="outline" className="bg-yellow-500/15 text-yellow-500 border-yellow-500/30 gap-1">
+                          <AlertTriangle className="h-3 w-3" /> {status.label}
+                        </Badge>
+                      )}
                       </div>
                     </div>
                   </CardHeader>
@@ -446,20 +446,20 @@ export default function ApiManagementPage() {
                           disabled={toggleIntegration.isPending}
                         />
                         <span className="text-xs text-muted-foreground">{enabled ? "Enabled" : "Disabled"}</span>
-                      </div>
-                      <Button
+                    </div>
+                    <Button
                         size="sm" variant="secondary"
                         disabled={probeLoading}
-                        onClick={() => {
-                          if (integ.key === "flutterwave") {
-                            void runFlutterwaveCorridorProbe();
+                      onClick={() => {
+                        if (integ.key === "flutterwave") {
+                          void runFlutterwaveCorridorProbe();
                           } else {
                             void runTestConnection(integ.key, integ.name);
-                          }
-                        }}
-                      >
-                        {integ.key === "flutterwave" ? "Probe CAD/USD Collect" : "Test Connection"}
-                      </Button>
+                        }
+                      }}
+                    >
+                      {integ.key === "flutterwave" ? "Probe CAD/USD Collect" : "Test Connection"}
+                    </Button>
                     </div>
                     {isPlaid && (
                       <p className="text-[11px] text-amber-600 bg-amber-500/10 rounded-md px-2.5 py-1.5 mt-1">
@@ -570,20 +570,20 @@ export default function ApiManagementPage() {
                           );
                         }
                         rows.push(
-                          <TableRow key={fn.name}>
+                      <TableRow key={fn.name}>
                             <TableCell className="font-mono text-sm pl-6">{fn.name}</TableCell>
-                            <TableCell className="text-muted-foreground">{fn.description}</TableCell>
-                            <TableCell>
-                              {fn.jwt ? (
-                                <Badge variant="outline" className="gap-1"><Lock className="h-3 w-3" /> JWT</Badge>
-                              ) : (
-                                <Badge variant="outline" className="gap-1 bg-blue-500/10 text-blue-500 border-blue-500/30"><Globe className="h-3 w-3" /> Public</Badge>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Badge className="bg-indigo-500/15 text-indigo-500 border-indigo-500/30">Active</Badge>
-                            </TableCell>
-                          </TableRow>
+                        <TableCell className="text-muted-foreground">{fn.description}</TableCell>
+                        <TableCell>
+                          {fn.jwt ? (
+                            <Badge variant="outline" className="gap-1"><Lock className="h-3 w-3" /> JWT</Badge>
+                          ) : (
+                            <Badge variant="outline" className="gap-1 bg-blue-500/10 text-blue-500 border-blue-500/30"><Globe className="h-3 w-3" /> Public</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Badge className="bg-indigo-500/15 text-indigo-500 border-indigo-500/30">Active</Badge>
+                        </TableCell>
+                      </TableRow>
                         );
                       });
                       return rows;

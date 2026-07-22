@@ -30,7 +30,7 @@ export const productFeatures = {
   paytota: envFlag("VITE_FEATURE_PAYTOTA", true),
   /** Paytota UGX/KES/RWF MoMo payout toggle on Send. */
   paytotaPayout: envFlag("VITE_FEATURE_PAYTOTA_PAYOUT", true),
-  /** Fincra hosted checkout (USD/EUR/GBP/CAD) — white-labeled as Card or bank transfer. */
+  /** Fincra hosted checkout — western + Africa collect (NGN/GHS/KES/…). */
   fincra: envFlag("VITE_FEATURE_FINCRA", true),
   /** Fincra CAD Interac e-Transfer collections (platform alias + intent matching). */
   fincraInterac: envFlag("VITE_FEATURE_FINCRA_INTERAC", false),
@@ -45,7 +45,7 @@ export function isFeatureEnabled(key: ProductFeatureKey): boolean {
   return productFeatures[key];
 }
 
-/** Live top-up corridors — Nomba NGN + Paytota/Nomba intl + Swychr + Ghana Pay + Elicate ZMW */
+/** Live top-up corridors — Nomba NGN + Paytota/Nomba intl + Swychr + Ghana Pay + Elicate ZMW + Fincra Africa */
 export function isLiveTopupCurrency(currency: string): boolean {
   const c = currency.toUpperCase();
   if (productFeatures.nombaNigeria && c === "NGN") return true;
@@ -53,6 +53,9 @@ export function isLiveTopupCurrency(currency: string): boolean {
     return true;
   }
   if (productFeatures.lenhubFlutter && ["NGN", "GHS", "KES", "UGX", "RWF", "TZS"].includes(c)) return true;
+  if (productFeatures.fincra && ["NGN", "GHS", "KES", "UGX", "TZS", "ZMW", "ZAR", "XAF", "XOF", "MWK"].includes(c)) {
+    return true;
+  }
   if (productFeatures.fincraInterac && c === "CAD") return true;
   if (productFeatures.swychr && ["XAF", "KES", "XOF", "UGX"].includes(c)) return true;
   if (productFeatures.paytota && ["UGX", "KES", "RWF"].includes(c)) return true;

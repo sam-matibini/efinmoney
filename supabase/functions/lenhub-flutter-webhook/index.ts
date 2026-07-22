@@ -56,8 +56,41 @@ function pickStatus(payload: Record<string, unknown>): string {
 
 function pickChargeId(payload: Record<string, unknown>): string | null {
   const data = (payload.data || payload) as Record<string, unknown>;
-  const id = data.charge_id || data.chargeId || data.id || payload.charge_id || payload.chargeId;
+  const id =
+    data.charge_id ||
+    data.chargeId ||
+    data.order_ref ||
+    data.orderRef ||
+    data.flw_ref ||
+    data.flwRef ||
+    data.tx_ref ||
+    data.txRef ||
+    data.id ||
+    payload.charge_id ||
+    payload.chargeId ||
+    payload.order_ref ||
+    payload.flw_ref;
   return id != null ? String(id) : null;
+}
+
+/** Collect all plausible refs so VA top-ups (order_ref / flw_ref) still match. */
+function pickChargeIdCandidates(payload: Record<string, unknown>): string[] {
+  const data = (payload.data || payload) as Record<string, unknown>;
+  const keys = [
+    "charge_id", "chargeId", "order_ref", "orderRef", "flw_ref", "flwRef",
+    "tx_ref", "txRef", "id", "reference",
+  ];
+  const out: string[] = [];
+  for (const src of [data, payload]) {
+    for (const k of keys) {
+      const v = src[k];
+      if (v != null && String(v).trim()) {
+        const s = String(v).trim();
+        if (!out.includes(s)) out.push(s);
+      }
+    }
+  }
+  return out;
 }
 
 function pickTransferRef(payload: Record<string, unknown>): string | null {
@@ -166,44 +199,47 @@ Deno.serve(async (req) => {
     const success = ["successful", "success", "succeeded", "completed", "paid"].includes(status);
     const failed = ["failed", "cancelled", "canceled", "reversed"].includes(status);
 
-    const chargeId = pickChargeId(payload);
-    if (chargeId) {
+    const chargeCandidates = pickChargeIdCandidates(payload);
+    const chargeId = chargeCandidates[0] || pickChargeId(payload);
+    let charge: Record<string, unknown> | null = null;
+    if (chargeCandidates.length) {
       const { data: charges } = await supabase
         .from("lenhub_flutter_charges")
         .select("*")
-        .eq("charge_id", chargeId)
+        .in("charge_id", chargeCandidates)
         .limit(1);
-      const charge = charges?.[0];
-      if (charge && success && !charge.credited_at) {
-        const credit = await creditWallet(supabase, {
-          userId: charge.user_id,
-          walletId: charge.wallet_id,
-          currency: charge.currency_code,
-          amount: Number(charge.amount),
-          chargeRowId: charge.id,
-          chargeId,
+      charge = charges?.[0] ?? null;
+    }
+    if (charge && success && !charge.credited_at) {
+      const settleId = String(charge.charge_id || chargeId || charge.id);
+      const credit = await creditWallet(supabase, {
+        userId: String(charge.user_id),
+        walletId: (charge.wallet_id as string | null) ?? null,
+        currency: String(charge.currency_code),
+        amount: Number(charge.amount),
+        chargeRowId: String(charge.id),
+        chargeId: settleId,
+      });
+      await supabase.from("lenhub_flutter_charges").update({
+        status: credit.credited ? "credited" : `success_${credit.reason}`,
+        credited_at: credit.credited ? new Date().toISOString() : null,
+        provider_response: payload,
+        updated_at: new Date().toISOString(),
+      }).eq("id", charge.id);
+      if (credit.credited) {
+        await supabase.from("notifications").insert({
+          user_id: charge.user_id,
+          title: "Wallet topped up",
+          message: `${charge.currency_code} ${charge.amount} has been added to your wallet.`,
+          type: "wallet",
         });
-        await supabase.from("lenhub_flutter_charges").update({
-          status: credit.credited ? "credited" : `success_${credit.reason}`,
-          credited_at: credit.credited ? new Date().toISOString() : null,
-          provider_response: payload,
-          updated_at: new Date().toISOString(),
-        }).eq("id", charge.id);
-        if (credit.credited) {
-          await supabase.from("notifications").insert({
-            user_id: charge.user_id,
-            title: "Wallet topped up",
-            message: `${charge.currency_code} ${charge.amount} has been added to your wallet.`,
-            type: "wallet",
-          });
-        }
-      } else if (charge && failed) {
-        await supabase.from("lenhub_flutter_charges").update({
-          status: "failed",
-          provider_response: payload,
-          updated_at: new Date().toISOString(),
-        }).eq("id", charge.id);
       }
+    } else if (charge && failed) {
+      await supabase.from("lenhub_flutter_charges").update({
+        status: "failed",
+        provider_response: payload,
+        updated_at: new Date().toISOString(),
+      }).eq("id", charge.id);
     }
 
     const providerRef = pickTransferRef(payload);

@@ -421,3 +421,92 @@ export async function flwV4CreateDirectTransfer(params: {
   const data = (result.json.data || {}) as { id?: string };
   return { ...result, transferId: data.id ? String(data.id) : null };
 }
+
+export async function flwV4CreateCardMethod(params: {
+  cardNumber: string;
+  expiryMonth: string;
+  expiryYear: string;
+  cvv: string;
+}): Promise<FlwV4Result & { paymentMethodId: string | null }> {
+  const { flwV4EncryptCardFields, getFlwV4EncryptionKey, flwV4GenerateNonce } = await import("./flw-encrypt.ts");
+  const encKey = getFlwV4EncryptionKey();
+  if (!encKey) {
+    return {
+      ok: false,
+      status: 0,
+      json: {
+        message:
+          "V4 encryption key missing. Set FLW_ENCRYPTION_KEY to the base64 Encryption key from company Flutterwave → Settings → API.",
+      },
+      paymentMethodId: null,
+    };
+  }
+
+  const nonce = flwV4GenerateNonce(12);
+  const year = params.expiryYear.length === 4 ? params.expiryYear.slice(-2) : params.expiryYear;
+  let encrypted: Awaited<ReturnType<typeof flwV4EncryptCardFields>>;
+  try {
+    encrypted = await flwV4EncryptCardFields(
+      {
+        card_number: params.cardNumber.replace(/\s/g, ""),
+        expiry_month: params.expiryMonth.padStart(2, "0"),
+        expiry_year: year,
+        cvv: params.cvv,
+      },
+      encKey,
+      nonce,
+    );
+  } catch (e) {
+    return {
+      ok: false,
+      status: 0,
+      json: { message: e instanceof Error ? e.message : "Card encryption failed" },
+      paymentMethodId: null,
+    };
+  }
+
+  const result = await flwV4Fetch("/payment-methods", {
+    method: "POST",
+    json: {
+      type: "card",
+      card: {
+        nonce: encrypted.nonce,
+        encrypted_card_number: encrypted.encrypted_card_number,
+        encrypted_expiry_month: encrypted.encrypted_expiry_month,
+        encrypted_expiry_year: encrypted.encrypted_expiry_year,
+        encrypted_cvv: encrypted.encrypted_cvv,
+      },
+    },
+    timeoutMs: 30_000,
+  });
+  const data = result.json.data as { id?: string } | undefined;
+  return { ...result, paymentMethodId: data?.id ? String(data.id) : null };
+}
+
+export async function flwV4UpdateChargeAuthorization(params: {
+  chargeId: string;
+  pin?: string;
+  otp?: string;
+}): Promise<FlwV4Result> {
+  const body: Record<string, unknown> = { authorization: {} };
+  if (params.pin) {
+    const { flwV4EncryptField, getFlwV4EncryptionKey, flwV4GenerateNonce } = await import("./flw-encrypt.ts");
+    const encKey = getFlwV4EncryptionKey();
+    if (!encKey) {
+      return { ok: false, status: 0, json: { message: "FLW_ENCRYPTION_KEY missing for PIN encryption" } };
+    }
+    const nonce = flwV4GenerateNonce(12);
+    const encrypted_pin = await flwV4EncryptField(params.pin, encKey, nonce);
+    body.authorization = { type: "pin", pin: { nonce, encrypted_pin } };
+  } else if (params.otp) {
+    body.authorization = { type: "otp", otp: params.otp };
+  } else {
+    return { ok: false, status: 0, json: { message: "pin or otp required" } };
+  }
+
+  return flwV4Fetch(`/charges/${encodeURIComponent(params.chargeId)}`, {
+    method: "PUT",
+    json: body,
+    timeoutMs: 30_000,
+  });
+}

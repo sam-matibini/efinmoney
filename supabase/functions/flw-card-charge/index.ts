@@ -1,5 +1,14 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { flwV3Fetch } from "../_shared/flw-v3.ts";
+import { flwEncrypt3DesClient, getFlwEncryptionKey, getFlwV4EncryptionKey } from "../_shared/flw-encrypt.ts";
+import {
+  flwV4CreateCardMethod,
+  flwV4CreateCharge,
+  flwV4CreateCustomer,
+  flwV4ErrorMessage,
+  flwV4UpdateChargeAuthorization,
+  isFlwV4Configured,
+} from "../_shared/flw-v4.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -14,6 +23,79 @@ const ok = (body: unknown) => jr(200, body);
 
 const VALID_CARD_CURRENCIES = ["NGN", "USD", "KES", "UGX", "GHS", "ZMW", "RWF", "TZS", "CAD", "GBP", "EUR"];
 
+async function creditWallet(params: {
+  admin: ReturnType<typeof createClient>;
+  userId: string;
+  walletId: string | null | undefined;
+  amount: number;
+  currency: string;
+  flwId: string;
+  txRef: string;
+}) {
+  const creditedAmount = params.amount;
+  const creditedCurrency = params.currency.toUpperCase();
+  let targetWalletId = params.walletId ? String(params.walletId) : "";
+
+  if (targetWalletId) {
+    const { data: w } = await params.admin.from("wallets").select("id, user_id, currency_code")
+      .eq("id", targetWalletId).maybeSingle();
+    if (!w || w.user_id !== params.userId || w.currency_code.toUpperCase() !== creditedCurrency) {
+      targetWalletId = "";
+    }
+  }
+  if (!targetWalletId) {
+    const { data: wallet } = await params.admin.from("wallets").select("id")
+      .eq("user_id", params.userId).eq("currency_code", creditedCurrency).maybeSingle();
+    if (wallet) targetWalletId = wallet.id;
+  }
+  if (!targetWalletId) {
+    const { data: nw } = await params.admin.from("wallets")
+      .insert({ user_id: params.userId, currency_code: creditedCurrency, is_default: false })
+      .select("id").single();
+    if (nw) targetWalletId = nw.id;
+  }
+  if (!targetWalletId) return;
+
+  const idempotencyRef = params.flwId || params.txRef;
+  const { data: existing } = await params.admin.from("ledger_entries").select("id")
+    .eq("reference_type", "flw_topup").eq("external_reference", idempotencyRef).limit(1);
+  if (existing && existing.length > 0) return;
+
+  const { data: asset } = await params.admin.from("ledger_accounts").select("id")
+    .eq("currency_code", creditedCurrency).ilike("name", "Flutterwave Settlement%").limit(1).maybeSingle();
+  const { data: liab } = await params.admin.from("ledger_accounts").select("id")
+    .like("code", "21%").eq("currency_code", creditedCurrency)
+    .ilike("name", "Customer Wallet Liability%").limit(1).maybeSingle();
+  if (!asset || !liab) return;
+
+  const journalId = crypto.randomUUID();
+  const desc = `Card top-up via Flutterwave ${params.flwId}`;
+  await params.admin.from("ledger_entries").insert([
+    {
+      journal_id: journalId,
+      account_id: asset.id,
+      wallet_id: null,
+      currency_code: creditedCurrency,
+      debit_amount: creditedAmount,
+      credit_amount: 0,
+      description: desc,
+      reference_type: "flw_topup",
+      external_reference: idempotencyRef,
+    },
+    {
+      journal_id: journalId,
+      account_id: liab.id,
+      wallet_id: targetWalletId,
+      currency_code: creditedCurrency,
+      debit_amount: 0,
+      credit_amount: creditedAmount,
+      description: desc,
+      reference_type: "flw_topup",
+      external_reference: idempotencyRef,
+    },
+  ]);
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -24,65 +106,296 @@ Deno.serve(async (req) => {
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: authHeader } } }
+      { global: { headers: { Authorization: authHeader } } },
     );
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return jr(401, { error: "Unauthorized" });
     const userId = user.id;
 
     const { data: rl } = await supabase.rpc("check_rate_limit", {
-      p_key: `flw_card:${userId}`, p_max_requests: 10, p_window_seconds: 60,
+      p_key: `flw_card:${userId}`,
+      p_max_requests: 10,
+      p_window_seconds: 60,
     });
     if (rl === false) return jr(429, { error: "Too many requests" });
 
     const body = await req.json().catch(() => ({}));
     const {
-      card_number, cvv, expiry_month, expiry_year,
-      amount: rawAmount, currency: rawCurrency,
-      fullname, email: rawEmail,
+      card_number,
+      cvv,
+      expiry_month,
+      expiry_year,
+      amount: rawAmount,
+      currency: rawCurrency,
+      fullname,
+      email: rawEmail,
       wallet_id: walletId,
-      billing_address, billing_city, billing_zip,
-      pin, authorization,
+      billing_address,
+      billing_city,
+      billing_zip,
+      pin,
+      authorization,
+      charge_id: existingChargeId,
     } = body as Record<string, unknown>;
 
     const amount = Number(rawAmount);
     const currency = String(rawCurrency || "USD").toUpperCase();
-    const txRef = `efm_card_${userId.slice(0, 8)}_${Date.now()}`;
+    const txRef = `efmcard-${userId.replace(/-/g, "").slice(0, 8)}-${Date.now().toString(36)}`;
     const redirectUrl = String(body?.redirect_url || "");
 
     if (!Number.isFinite(amount) || amount <= 0) return jr(400, { error: "Invalid amount" });
-    if (!VALID_CARD_CURRENCIES.includes(currency)) return jr(400, { error: `Currency ${currency} not supported for card payments` });
+    if (!VALID_CARD_CURRENCIES.includes(currency)) {
+      return jr(400, { error: `Currency ${currency} not supported for card payments` });
+    }
 
     const cardNumber = String(card_number || "").replace(/\s/g, "");
     const cardCvv = String(cvv || "");
     const expiryMonth = String(expiry_month || "").padStart(2, "0");
-    const expiryYearVal = String(expiry_year || "");
-
-    if (cardNumber.length < 13 || cardNumber.length > 19) return jr(400, { error: "Invalid card number" });
-    if (!/^\d{2,4}$/.test(cardCvv)) return jr(400, { error: "Invalid CVV" });
-    if (!/^\d{2}$/.test(expiryMonth) || Number(expiryMonth) < 1 || Number(expiryMonth) > 12) return jr(400, { error: "Invalid expiry month" });
-    if (!/^\d{2,4}$/.test(expiryYearVal)) return jr(400, { error: "Invalid expiry year" });
+    let expiryYearVal = String(expiry_year || "");
+    if (expiryYearVal.length === 4) expiryYearVal = expiryYearVal.slice(-2);
 
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
     if (walletId) {
       const { data: w } = await admin.from("wallets")
         .select("id, user_id, currency_code")
-        .eq("id", String(walletId)).maybeSingle();
+        .eq("id", String(walletId))
+        .maybeSingle();
       if (!w || w.user_id !== userId) return jr(403, { error: "Wallet not accessible" });
       if (w.currency_code.toUpperCase() !== currency) {
-        return jr(400, { error: `Wallet currency (${w.currency_code}) does not match payment currency (${currency})` });
+        return jr(400, {
+          error: `Wallet currency (${w.currency_code}) does not match payment currency (${currency})`,
+        });
       }
     }
 
     const { data: profile } = await admin.from("profiles")
       .select("email, first_name, last_name, phone")
-      .eq("user_id", userId).maybeSingle();
+      .eq("user_id", userId)
+      .maybeSingle();
 
     const customerName = String(fullname || "").trim() ||
       `${profile?.first_name || ""} ${profile?.last_name || ""}`.trim() ||
       "eFin User";
+    const nameParts = customerName.split(/\s+/).filter(Boolean);
+    const firstName = nameParts[0] || "eFin";
+    const lastName = nameParts.slice(1).join(" ") || "User";
     const customerEmail = String(rawEmail || profile?.email || `${userId}@efin.money`).trim();
+
+    // ── V4 path (company account — not enabled for Rave v3) ─────────────
+    if (isFlwV4Configured()) {
+      if (!getFlwV4EncryptionKey()) {
+        return ok({
+          success: false,
+          error:
+            "Company Flutterwave is V4-only. Set FLW_ENCRYPTION_KEY to the base64 Encryption key from Flutterwave → Settings → API (not the old 24-char V3 key).",
+          code: "missing_v4_encryption_key",
+        });
+      }
+
+      // Follow-up PIN / OTP on an existing charge
+      const authObj = authorization && typeof authorization === "object"
+        ? authorization as Record<string, unknown>
+        : null;
+      const pinVal = pin ? String(pin) : (authObj?.pin != null ? String(authObj.pin) : "");
+      const otpVal = authObj?.otp != null ? String(authObj.otp) : "";
+      const chargeIdFollowUp = existingChargeId ? String(existingChargeId) : "";
+
+      if (chargeIdFollowUp && (pinVal || otpVal)) {
+        const updated = await flwV4UpdateChargeAuthorization({
+          chargeId: chargeIdFollowUp,
+          pin: pinVal || undefined,
+          otp: otpVal || undefined,
+        });
+        if (!updated.ok) {
+          return ok({
+            success: false,
+            error: flwV4ErrorMessage(updated.json, "Authorization failed"),
+            code: "auth_failed",
+          });
+        }
+        const data = (updated.json.data || {}) as Record<string, unknown>;
+        const status = String(data.status || "").toLowerCase();
+        if (["succeeded", "successful", "success", "completed"].includes(status)) {
+          await creditWallet({
+            admin,
+            userId,
+            walletId: walletId ? String(walletId) : null,
+            amount: Number(data.amount || amount),
+            currency: String(data.currency || currency),
+            flwId: String(data.id || chargeIdFollowUp),
+            txRef: String(data.reference || txRef),
+          });
+          return ok({
+            success: true,
+            verified: true,
+            reference: String(data.reference || txRef),
+            charge_id: String(data.id || chargeIdFollowUp),
+            status,
+            amount: Number(data.amount || amount),
+            currency: String(data.currency || currency),
+          });
+        }
+        const next = data.next_action as Record<string, unknown> | undefined;
+        if (next) {
+          const type = String(next.type || "").toLowerCase();
+          const redirect = (next.redirect_url as { url?: string } | undefined)?.url
+            || (next.redirect as { url?: string } | undefined)?.url
+            || null;
+          return ok({
+            success: true,
+            requires_auth: true,
+            auth: { mode: type.includes("redirect") ? "redirect" : type || "otp", redirect, fields: [] },
+            reference: String(data.reference || txRef),
+            charge_id: String(data.id || chargeIdFollowUp),
+            status: String(data.status || "pending"),
+          });
+        }
+        return ok({
+          success: true,
+          pending_verification: true,
+          reference: String(data.reference || txRef),
+          charge_id: String(data.id || chargeIdFollowUp),
+          status: status || "pending",
+        });
+      }
+
+      if (cardNumber.length < 13 || cardNumber.length > 19) return jr(400, { error: "Invalid card number" });
+      if (!/^\d{2,4}$/.test(cardCvv)) return jr(400, { error: "Invalid CVV" });
+      if (!/^\d{2}$/.test(expiryMonth) || Number(expiryMonth) < 1 || Number(expiryMonth) > 12) {
+        return jr(400, { error: "Invalid expiry month" });
+      }
+      if (!/^\d{2}$/.test(expiryYearVal)) return jr(400, { error: "Invalid expiry year" });
+
+      const customer = await flwV4CreateCustomer({
+        email: customerEmail,
+        firstName,
+        lastName,
+      });
+      if (!customer.customerId) {
+        return ok({
+          success: false,
+          error: flwV4ErrorMessage(customer.json, "Could not create Flutterwave customer"),
+          code: "customer_failed",
+        });
+      }
+
+      const pm = await flwV4CreateCardMethod({
+        cardNumber,
+        expiryMonth,
+        expiryYear: expiryYearVal,
+        cvv: cardCvv,
+      });
+      if (!pm.paymentMethodId) {
+        return ok({
+          success: false,
+          error: flwV4ErrorMessage(pm.json, "Card payment method failed"),
+          code: "payment_method_failed",
+        });
+      }
+
+      const charge = await flwV4CreateCharge({
+        amount,
+        currency,
+        reference: txRef,
+        customerId: customer.customerId,
+        paymentMethodId: pm.paymentMethodId,
+        redirectUrl: redirectUrl || undefined,
+        meta: {
+          user_id: userId,
+          type: "wallet_topup",
+          currency,
+          ...(walletId ? { wallet_id: walletId } : {}),
+          ...(billing_address ? { billing_address } : {}),
+          ...(billing_city ? { billing_city } : {}),
+          ...(billing_zip ? { billing_zip } : {}),
+        },
+      });
+
+      if (!charge.ok && !charge.chargeId) {
+        return ok({
+          success: false,
+          error: flwV4ErrorMessage(charge.json, "Card charge failed"),
+          code: "charge_failed",
+        });
+      }
+
+      const data = (charge.json.data || {}) as Record<string, unknown>;
+      const status = String(data.status || "").toLowerCase();
+      const next = charge.nextAction || (data.next_action as Record<string, unknown>) || null;
+
+      if (next) {
+        const type = String(next.type || "").toLowerCase();
+        const redirect = (next.redirect_url as { url?: string } | undefined)?.url
+          || (next.redirect as { url?: string } | undefined)?.url
+          || null;
+        let mode = "pin";
+        if (type.includes("redirect") || redirect) mode = "redirect";
+        else if (type.includes("otp")) mode = "otp";
+        else if (type.includes("pin")) mode = "pin";
+        else if (type.includes("avs")) mode = "avs_noauth";
+        else if (type) mode = type;
+
+        return ok({
+          success: true,
+          requires_auth: true,
+          auth: { mode, redirect, fields: [] },
+          reference: txRef,
+          tx_ref: txRef,
+          charge_id: charge.chargeId || data.id || null,
+          message: flwV4ErrorMessage(charge.json, `Complete ${mode}`),
+          status: status || "pending",
+        });
+      }
+
+      if (["succeeded", "successful", "success", "completed"].includes(status)) {
+        await creditWallet({
+          admin,
+          userId,
+          walletId: walletId ? String(walletId) : null,
+          amount: Number(data.amount || amount),
+          currency: String(data.currency || currency),
+          flwId: String(data.id || charge.chargeId || ""),
+          txRef,
+        });
+        return ok({
+          success: true,
+          verified: true,
+          reference: txRef,
+          charge_id: charge.chargeId,
+          status,
+          amount: Number(data.amount || amount),
+          currency: String(data.currency || currency),
+        });
+      }
+
+      return ok({
+        success: true,
+        pending_verification: true,
+        reference: txRef,
+        charge_id: charge.chargeId,
+        status: status || "pending",
+        amount,
+        currency,
+      });
+    }
+
+    // ── V3 path (legacy merchants still on Rave v3) ─────────────────────
+    const encKey = getFlwEncryptionKey();
+    if (!encKey || encKey.length !== 24) {
+      return ok({
+        success: false,
+        error: "Card payments require FLW_ENCRYPTION_KEY (24-char V3 key) or V4 OAuth + base64 encryption key.",
+        code: "missing_encryption_key",
+      });
+    }
+
+    if (cardNumber.length < 13 || cardNumber.length > 19) return jr(400, { error: "Invalid card number" });
+    if (!/^\d{2,4}$/.test(cardCvv)) return jr(400, { error: "Invalid CVV" });
+    if (!/^\d{2}$/.test(expiryMonth) || Number(expiryMonth) < 1 || Number(expiryMonth) > 12) {
+      return jr(400, { error: "Invalid expiry month" });
+    }
+    if (!/^\d{2}$/.test(expiryYearVal)) return jr(400, { error: "Invalid expiry year" });
 
     const chargePayload: Record<string, unknown> = {
       card_number: cardNumber,
@@ -94,159 +407,80 @@ Deno.serve(async (req) => {
       fullname: customerName,
       email: customerEmail,
       tx_ref: txRef,
-      enckey: Deno.env.get("FLW_ENCRYPTION_KEY") || undefined,
-      meta: { user_id: userId, type: "wallet_topup", currency, ...(walletId ? { wallet_id: walletId } : {}) },
+      enckey: encKey,
+      meta: {
+        user_id: userId,
+        type: "wallet_topup",
+        currency,
+        ...(walletId ? { wallet_id: walletId } : {}),
+      },
     };
-
     if (billing_address) chargePayload.billingaddress = String(billing_address);
     if (billing_city) chargePayload.billingcity = String(billing_city);
     if (billing_zip) chargePayload.billingzip = String(billing_zip);
-
-    // Handle second-step auth (pin, etc.)
     if (authorization && typeof authorization === "object") {
       chargePayload.authorization = authorization;
     } else if (pin) {
       chargePayload.authorization = { mode: "pin", pin: String(pin) };
     }
+    if (redirectUrl) chargePayload.redirect_url = redirectUrl;
 
-    if (redirectUrl) {
-      chargePayload.redirect_url = redirectUrl;
-    }
-
+    const client = flwEncrypt3DesClient(chargePayload, encKey);
     const { ok: success, status, json } = await flwV3Fetch("/charges?type=card", {
       method: "POST",
-      body: JSON.stringify(chargePayload),
+      body: JSON.stringify({ client }),
       timeoutMs: 30_000,
     });
 
     if (!success) {
       const msg = json?.message || json?.error || `Card charge failed (HTTP ${status})`;
-      const suggestion = json?.data?.processor_response || json?.data?.suggested_auth || "";
-      return ok({
-        success: false,
-        error: suggestion ? `${msg} — ${suggestion}` : msg,
-        transient: [0, 408, 502, 503, 504].includes(status),
-        code: json?.status || "error",
-        provider_status: status,
-      });
+      return ok({ success: false, error: msg, code: json?.status || "error", provider_status: status });
     }
 
     const data = json?.data || json;
-
-    // Check if further authorization is needed (PIN, OTP, 3DS redirect, etc.)
     const authMode = data?.meta?.authorization?.mode || data?.authorization?.mode || null;
     const authRedirect = data?.meta?.authorization?.redirect || data?.authorization?.redirect || null;
-    const authFields = data?.meta?.authorization?.fields || data?.authorization?.fields || [];
-
     if (authMode) {
       return ok({
         success: true,
         requires_auth: true,
-        auth: {
-          mode: authMode,
-          redirect: authRedirect || null,
-          fields: authFields,
-        },
+        auth: { mode: authMode, redirect: authRedirect || null, fields: [] },
         reference: txRef,
-        tx_ref: txRef,
         charge_id: data?.id || null,
         flw_ref: data?.flw_ref || null,
-        message: data?.message || `Enter ${authMode}`,
         status: data?.status || "pending",
       });
     }
 
-    // Direct success — verify and credit
     const chargeStatus = String(data?.status || "").toLowerCase();
     const chargeId = String(data?.id || "");
-    const flwRef = String(data?.flw_ref || "");
-
-    // Verify the transaction
-    const verifyPath = chargeId
-      ? `/transactions/${encodeURIComponent(chargeId)}/verify`
-      : `/transactions/verify_by_reference?tx_ref=${encodeURIComponent(txRef)}`;
-    const { ok: vOk, json: vJson } = await flwV3Fetch(verifyPath, { method: "GET" });
-
-    if (!vOk || !vJson?.data) {
-      return ok({
-        success: true,
-        pending_verification: true,
-        reference: txRef,
-        tx_ref: txRef,
-        charge_id: chargeId,
-        flw_ref: flwRef,
-        status: chargeStatus,
-        amount: data?.amount || amount,
-        currency: data?.currency || currency,
+    if (["successful", "success", "completed"].includes(chargeStatus)) {
+      await creditWallet({
+        admin,
+        userId,
+        walletId: walletId ? String(walletId) : null,
+        amount: Number(data?.amount || amount),
+        currency: String(data?.currency || currency),
+        flwId: chargeId,
+        txRef,
       });
-    }
-
-    const vData = vJson.data;
-    const vStatus = String(vData?.status || "").toLowerCase();
-
-    if (vStatus === "successful" || vStatus === "success" || vStatus === "completed") {
-      // Credit wallet via ledger (same pattern as flw-verify-payment)
-      const creditedAmount = Number(vData?.amount || amount);
-      const creditedCurrency = String(vData?.currency || currency).toUpperCase();
-      const ref = String(vData?.tx_ref || txRef);
-      const flwId = String(vData?.id || chargeId);
-
-      let targetWalletId = walletId ? String(walletId) : "";
-      if (targetWalletId) {
-        const { data: w } = await admin.from("wallets").select("id, user_id, currency_code")
-          .eq("id", targetWalletId).maybeSingle();
-        if (!w || w.user_id !== userId || w.currency_code.toUpperCase() !== creditedCurrency) {
-          targetWalletId = "";
-        }
-      }
-      if (!targetWalletId) {
-        const { data: wallet } = await admin.from("wallets").select("id")
-          .eq("user_id", userId).eq("currency_code", creditedCurrency).maybeSingle();
-        if (wallet) targetWalletId = wallet.id;
-      }
-      if (!targetWalletId) {
-        const { data: nw } = await admin.from("wallets")
-          .insert({ user_id: userId, currency_code: creditedCurrency, is_default: false })
-          .select("id").single();
-        if (nw) targetWalletId = nw.id;
-      }
-
-      if (targetWalletId) {
-        const idempotencyRef = flwId || ref;
-        const { data: existing } = await admin.from("ledger_entries").select("id")
-          .eq("reference_type", "flw_topup").eq("external_reference", idempotencyRef).limit(1);
-
-        if (!existing || existing.length === 0) {
-          const { data: asset } = await admin.from("ledger_accounts").select("id")
-            .eq("currency_code", creditedCurrency).ilike("name", "Flutterwave Settlement%").limit(1).maybeSingle();
-          const { data: liab } = await admin.from("ledger_accounts").select("id")
-            .like("code", "21%").eq("currency_code", creditedCurrency).ilike("name", "Customer Wallet Liability%").limit(1).maybeSingle();
-
-          if (asset && liab) {
-            const journalId = crypto.randomUUID();
-            const desc = `Card top-up via Flutterwave ${flwId}`;
-            await admin.from("ledger_entries").insert([
-              { journal_id: journalId, account_id: asset.id, wallet_id: null, currency_code: creditedCurrency, debit_amount: creditedAmount, credit_amount: 0, description: desc, reference_type: "flw_topup", external_reference: idempotencyRef },
-              { journal_id: journalId, account_id: liab.id, wallet_id: targetWalletId, currency_code: creditedCurrency, debit_amount: 0, credit_amount: creditedAmount, description: desc, reference_type: "flw_topup", external_reference: idempotencyRef },
-            ]);
-          }
-        }
-      }
     }
 
     return ok({
       success: true,
-      verified: vStatus === "successful" || vStatus === "success" || vStatus === "completed",
+      verified: ["successful", "success", "completed"].includes(chargeStatus),
       reference: txRef,
-      tx_ref: txRef,
       charge_id: chargeId,
-      flw_ref: flwRef,
-      status: vStatus || chargeStatus,
-      amount: creditedAmount || data?.amount || amount,
-      currency: creditedCurrency || data?.currency || currency,
+      status: chargeStatus,
+      amount: Number(data?.amount || amount),
+      currency: String(data?.currency || currency),
     });
   } catch (err) {
     console.error("flw-card-charge error", err);
-    return ok({ success: false, error: err instanceof Error ? err.message : "Unknown error", transient: true });
+    return ok({
+      success: false,
+      error: err instanceof Error ? err.message : "Unknown error",
+      transient: true,
+    });
   }
 });

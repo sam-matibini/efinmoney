@@ -188,12 +188,15 @@ Deno.serve(async (req) => {
           ? "Lenhub returned empty success (no charge created). Upstream Flutterwave credentials may be down — ask lenhub to fix auth."
           : (result.message || "Card charge failed"))
         : result.message;
+      const nextAction = ok
+        ? (result.nextAction || "pin_or_otp_or_avs")
+        : null;
 
       if (localId) {
         await supabase.from("lenhub_flutter_charges").update({
           charge_id: result.chargeId,
           status: ok ? "requires_action" : "failed",
-          next_action: ok ? "pin_or_otp_or_avs" : null,
+          next_action: nextAction,
           provider_response: result.json,
           updated_at: new Date().toISOString(),
         }).eq("id", localId);
@@ -204,7 +207,7 @@ Deno.serve(async (req) => {
         local_id: localId,
         charge_id: result.chargeId,
         message: failMessage,
-        next_action: ok ? "pin_or_otp_or_avs" : null,
+        next_action: nextAction,
         provider: result.json,
         db_warning: insErr && !localId ? insErr.message : undefined,
       }, ok ? 200 : 400);
@@ -268,10 +271,77 @@ Deno.serve(async (req) => {
     if (action === "virtual_account") {
       const email = String(body.email || user.email || "");
       const amount = Number(body.amount);
+      const currency = String(body.currency || "NGN").toUpperCase();
       const narration = String(body.narration || `eFin top-up ${user.id.slice(0, 8)}`);
       if (!email || !(amount > 0)) return json({ error: "email and amount required" }, 400);
+      if (!supportsLenhubFlutterCollect(currency)) {
+        return json({ error: `Currency ${currency} not supported for Lenhub Flutter collect` }, 400);
+      }
+
+      let walletId: string | null = typeof body.wallet_id === "string" ? body.wallet_id : null;
+      if (!walletId) {
+        const { data: wallet } = await supabase
+          .from("wallets")
+          .select("id")
+          .eq("user_id", user.id)
+          .eq("currency_code", currency)
+          .maybeSingle();
+        walletId = wallet?.id ?? null;
+      }
+
+      let localId: string | null = null;
+      const { data: row, error: insErr } = await supabase
+        .from("lenhub_flutter_charges")
+        .insert({
+          user_id: user.id,
+          wallet_id: walletId,
+          currency_code: currency,
+          amount,
+          email,
+          status: "creating_va",
+        })
+        .select("id")
+        .single();
+      if (insErr) {
+        console.error("lenhub_flutter_charges VA insert:", insErr.message);
+      } else {
+        localId = row?.id ?? null;
+      }
+
       const result = await lenhubFlutterCreateVirtualAccount({ email, amount, narration });
-      return json({ success: result.ok, message: result.message, provider: result.json }, result.ok ? 200 : 400);
+      const va = result.va;
+      const providerRef = va.orderRef || va.flwRef;
+      const ok = result.ok && Boolean(va.accountNumber);
+
+      if (localId) {
+        await supabase.from("lenhub_flutter_charges").update({
+          charge_id: providerRef,
+          status: ok ? "awaiting_transfer" : "va_failed",
+          next_action: "bank_transfer",
+          provider_response: result.json,
+          updated_at: new Date().toISOString(),
+        }).eq("id", localId);
+      }
+
+      return json({
+        success: ok,
+        message: ok ? (result.message || "Virtual account created") : (result.message || "Could not create virtual account"),
+        local_id: localId,
+        charge_id: providerRef,
+        virtual_account: ok
+          ? {
+              account_number: va.accountNumber,
+              account_name: va.accountName,
+              bank_name: va.bankName,
+              amount: va.amount ?? amount,
+              currency: va.currency || currency,
+              order_ref: va.orderRef,
+              flw_ref: va.flwRef,
+              expiry: va.expiry,
+            }
+          : null,
+        provider: result.json,
+      }, ok ? 200 : 400);
     }
 
     return json({ error: `Unknown action: ${action}` }, 400);

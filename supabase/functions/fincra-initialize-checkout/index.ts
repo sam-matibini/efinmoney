@@ -8,18 +8,21 @@ const corsHeaders = {
 };
 
 const PAYMENT_METHODS_BY_CCY: Record<string, string[]> = {
+  // Confirmed on live merchant probe (2026-07-22)
   NGN: ["card", "bank_transfer", "payattitude"],
-  KES: ["mobile_money", "bank_transfer"],
-  GHS: ["mobile_money", "bank_transfer"],
-  UGX: ["mobile_money", "bank_transfer"],
+  KES: ["mobile_money"],
+  GHS: ["mobile_money", "card"],
+  UGX: ["mobile_money"],
   TZS: ["mobile_money"],
   ZMW: ["mobile_money", "card"],
-  USD: ["card"],
-  EUR: ["card", "bank_transfer"],
-  GBP: ["card", "bank_transfer"],
-  ZAR: ["card", "bank_transfer"],
+  ZAR: ["card"],
   XAF: ["mobile_money"],
   XOF: ["mobile_money"],
+  MWK: ["mobile_money"],
+  USD: ["card"],
+  // EUR/GBP not enabled for collect on this merchant yet — keep for when unlocked
+  EUR: ["card", "bank_transfer"],
+  GBP: ["card", "bank_transfer"],
 };
 
 /** Currencies Fincra checkout accepts for the charge itself (not wallet credit currency). */

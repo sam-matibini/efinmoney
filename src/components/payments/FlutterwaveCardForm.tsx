@@ -168,6 +168,7 @@ export default function FlutterwaveCardForm({
   const [authMode, setAuthMode] = useState<string | null>(null);
   const [authRedirect, setAuthRedirect] = useState<string | null>(null);
   const [lastPayload, setLastPayload] = useState<Record<string, unknown> | null>(null);
+  const [pendingChargeId, setPendingChargeId] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
 
   useEffect(() => {
@@ -280,6 +281,8 @@ export default function FlutterwaveCardForm({
 
       if (data?.requires_auth) {
         const am = data?.auth?.mode;
+        const cid = data?.charge_id ? String(data.charge_id) : null;
+        if (cid) setPendingChargeId(cid);
         setAuthMode(am);
         if (am === "redirect" && data?.auth?.redirect) {
           setAuthRedirect(data.auth.redirect);
@@ -309,7 +312,11 @@ export default function FlutterwaveCardForm({
   const handlePinSubmit = (pin: string) => {
     if (!lastPayload) return;
     const auth = { mode: "pin", pin };
-    handleCharge({ ...lastPayload, authorization: auth });
+    handleCharge({
+      ...lastPayload,
+      authorization: auth,
+      ...(pendingChargeId ? { charge_id: pendingChargeId } : {}),
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {

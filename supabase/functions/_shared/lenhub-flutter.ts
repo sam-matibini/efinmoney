@@ -305,6 +305,13 @@ export async function lenhubFlutterNetworks(country: string): Promise<LenhubFlut
 
 function pickNestedId(obj: unknown, keys: string[]): string | null {
   if (!obj || typeof obj !== "object") return null;
+  if (Array.isArray(obj)) {
+    for (const item of obj) {
+      const found = pickNestedId(item, keys);
+      if (found) return found;
+    }
+    return null;
+  }
   const rec = obj as Record<string, unknown>;
   for (const k of keys) {
     if (rec[k] != null && String(rec[k]).trim()) return String(rec[k]).trim();
@@ -318,6 +325,23 @@ function pickNestedId(obj: unknown, keys: string[]): string | null {
   return null;
 }
 
+/** First card-create action hint: pin | otp | additional_fields | redirect | null */
+export function pickLenhubCardNextAction(json: Record<string, unknown>): string | null {
+  const message = json.message;
+  const rows = Array.isArray(message)
+    ? message
+    : message && typeof message === "object"
+    ? [message]
+    : [];
+  for (const row of rows) {
+    if (!row || typeof row !== "object") continue;
+    const type = String((row as Record<string, unknown>).type || "").toLowerCase();
+    if (type) return type;
+  }
+  const deep = pickNestedId(json, ["type"]);
+  return deep ? deep.toLowerCase() : null;
+}
+
 export async function lenhubFlutterCreateCardPayment(body: {
   card_number: string;
   expiry_date_month: string;
@@ -327,13 +351,13 @@ export async function lenhubFlutterCreateCardPayment(body: {
   callback: string;
   email: string;
   currency: string;
-}): Promise<LenhubFlutterResult & { chargeId: string | null }> {
+}): Promise<LenhubFlutterResult & { chargeId: string | null; nextAction: string | null }> {
   const result = await lenhubFlutterFetch("POST", "/app/flutter/card/payment/create/", { body, timeoutMs: 45_000 });
   const data = unwrapData(result.json) as Record<string, unknown> | null;
   const chargeId =
     pickNestedId(data, ["id", "chargeId", "charge_id", "flw_ref", "tx_ref", "reference"]) ||
     pickNestedId(result.json, ["id", "chargeId", "charge_id", "flw_ref", "tx_ref", "reference"]);
-  return { ...result, chargeId };
+  return { ...result, chargeId, nextAction: pickLenhubCardNextAction(result.json) };
 }
 
 export async function lenhubFlutterSendPin(pin: string, chargeId: string): Promise<LenhubFlutterResult> {
@@ -360,18 +384,57 @@ export async function lenhubFlutterConfirmPayment(body: {
   return lenhubFlutterFetch("POST", "/app/flutter/confirm_payment/", { body });
 }
 
+export type LenhubVirtualAccountDetails = {
+  accountNumber: string | null;
+  accountName: string | null;
+  bankName: string | null;
+  amount: number | null;
+  orderRef: string | null;
+  flwRef: string | null;
+  currency: string | null;
+  expiry: string | null;
+};
+
+/** Flatten common Flutterwave / Lenhub VA shapes into a single object. */
+export function pickLenhubVirtualAccount(json: Record<string, unknown>): LenhubVirtualAccountDetails {
+  const data = (unwrapData(json) || json) as Record<string, unknown>;
+  const nested =
+    (data?.data && typeof data.data === "object" ? (data.data as Record<string, unknown>) : null) ||
+    data;
+  const pick = (...keys: string[]): string | null => {
+    for (const k of keys) {
+      const v = nested?.[k];
+      if (v != null && String(v).trim()) return String(v).trim();
+    }
+    return null;
+  };
+  const amountRaw = nested?.amount ?? nested?.amountExpected;
+  const amount = amountRaw != null && Number.isFinite(Number(amountRaw)) ? Number(amountRaw) : null;
+  return {
+    accountNumber: pick("account_number", "accountNumber", "account"),
+    accountName: pick("account_name", "accountName", "note"),
+    bankName: pick("bank_name", "bankName", "bank"),
+    amount,
+    orderRef: pick("order_ref", "orderRef", "tx_ref", "txRef", "reference"),
+    flwRef: pick("flw_ref", "flwRef", "id"),
+    currency: pick("currency", "currency_code")?.toUpperCase() ?? null,
+    expiry: pick("expiry_date", "expiryDate", "expires_at", "note2"),
+  };
+}
+
 export async function lenhubFlutterCreateVirtualAccount(params: {
   email: string;
   amount: number;
   narration: string;
-}): Promise<LenhubFlutterResult> {
-  return lenhubFlutterFetch("POST", "/app/flutter/create/virtual/account/", {
+}): Promise<LenhubFlutterResult & { va: LenhubVirtualAccountDetails }> {
+  const result = await lenhubFlutterFetch("POST", "/app/flutter/create/virtual/account/", {
     query: {
       email: params.email,
       amount: params.amount,
       narration: params.narration,
     },
   });
+  return { ...result, va: pickLenhubVirtualAccount(result.json) };
 }
 
 export async function lenhubFlutterBankPayout(params: {
