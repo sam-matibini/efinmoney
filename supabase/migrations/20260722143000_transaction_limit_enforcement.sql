@@ -8,9 +8,72 @@
 -- check_transfer_balance, rather than in the 20+ edge functions that touch the
 -- table -- one chokepoint means none can be missed.
 --
--- Resolution: if the sender owns an APPROVED business, business limits apply;
--- otherwise their individual risk tier does.
+-- CURRENCY: tier limits are plain numbers with no currency attached, while
+-- transfers.source_amount can be NGN, GHS, CAD, USD... Comparing them directly
+-- is meaningless -- NGN 1,000 is about CAD 0.90, so a naive comparison against
+-- a limit of 500 would block essentially every NGN transfer. Everything is
+-- therefore converted to a single base currency (see limit_base_currency)
+-- before comparison.
 
+-- ============== base currency ==============
+-- Change via: ALTER DATABASE <db> SET app.settings.limit_base_currency = 'USD';
+CREATE OR REPLACE FUNCTION public.limit_base_currency()
+RETURNS text
+LANGUAGE sql
+STABLE
+SET search_path TO 'public'
+AS $$
+  SELECT upper(COALESCE(current_setting('app.settings.limit_base_currency', true), 'CAD'));
+$$;
+
+-- ============== FX conversion ==============
+-- Latest still-valid rate, direct or inverted. Returns NULL when no rate is
+-- known -- callers must decide what that means rather than assume 1:1.
+CREATE OR REPLACE FUNCTION public.fx_convert(p_amount numeric, p_from text, p_to text)
+RETURNS numeric
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_rate numeric;
+BEGIN
+  IF p_amount IS NULL THEN RETURN NULL; END IF;
+  IF upper(p_from) = upper(p_to) THEN RETURN p_amount; END IF;
+
+  SELECT effective_rate INTO v_rate
+    FROM public.fx_rates
+   WHERE upper(from_currency) = upper(p_from)
+     AND upper(to_currency)   = upper(p_to)
+     AND (valid_until IS NULL OR valid_until > now())
+   ORDER BY valid_from DESC
+   LIMIT 1;
+
+  IF v_rate IS NOT NULL AND v_rate > 0 THEN
+    RETURN p_amount * v_rate;
+  END IF;
+
+  -- Fall back to the inverse pair.
+  SELECT effective_rate INTO v_rate
+    FROM public.fx_rates
+   WHERE upper(from_currency) = upper(p_to)
+     AND upper(to_currency)   = upper(p_from)
+     AND (valid_until IS NULL OR valid_until > now())
+   ORDER BY valid_from DESC
+   LIMIT 1;
+
+  IF v_rate IS NOT NULL AND v_rate > 0 THEN
+    RETURN p_amount / v_rate;
+  END IF;
+
+  RETURN NULL;
+END;
+$function$;
+
+GRANT EXECUTE ON FUNCTION public.fx_convert(numeric, text, text) TO authenticated;
+
+-- ============== limit resolution ==============
 CREATE OR REPLACE FUNCTION public.resolve_transaction_limits(p_user_id uuid)
 RETURNS TABLE (
   scope text,
@@ -55,10 +118,12 @@ $function$;
 
 GRANT EXECUTE ON FUNCTION public.resolve_transaction_limits(uuid) TO authenticated;
 
--- Spend already committed in the window. Counts only transfers that are still
--- alive -- money that never left does not consume a customer's allowance.
--- Statuses per the transfer_status enum: initiated, funded, processing,
--- completed, failed, reversed, expired.
+-- ============== spend in window, normalised to base currency ==============
+-- Counts only transfers that are still alive -- money that never left does not
+-- consume a customer's allowance. Statuses per the transfer_status enum:
+-- initiated, funded, processing, completed, failed, reversed, expired.
+-- Rows with no known FX rate are skipped rather than counted at face value,
+-- which would otherwise inflate spend by orders of magnitude.
 CREATE OR REPLACE FUNCTION public.transfer_spend_since(p_user_id uuid, p_since timestamptz)
 RETURNS numeric
 LANGUAGE sql
@@ -66,7 +131,9 @@ STABLE
 SECURITY DEFINER
 SET search_path TO 'public'
 AS $$
-  SELECT COALESCE(sum(source_amount), 0)
+  SELECT COALESCE(sum(
+           public.fx_convert(source_amount, source_currency, public.limit_base_currency())
+         ), 0)
   FROM public.transfers
   WHERE sender_id = p_user_id
     AND created_at >= p_since
@@ -77,6 +144,7 @@ $$;
 
 GRANT EXECUTE ON FUNCTION public.transfer_spend_since(uuid, timestamptz) TO authenticated;
 
+-- ============== the check ==============
 CREATE OR REPLACE FUNCTION public.tg_transfers_check_limit()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -84,8 +152,10 @@ SECURITY DEFINER
 SET search_path TO 'public'
 AS $function$
 DECLARE
-  v_lim RECORD;
-  v_day numeric;
+  v_lim  RECORD;
+  v_base text := public.limit_base_currency();
+  v_amt  numeric;
+  v_day  numeric;
   v_month numeric;
 BEGIN
   IF NEW.sender_id IS NULL THEN
@@ -100,20 +170,33 @@ BEGIN
     RETURN NEW;
   END IF;
 
-  IF v_lim.single_limit > 0 AND NEW.source_amount > v_lim.single_limit THEN
+  v_amt := public.fx_convert(NEW.source_amount, NEW.source_currency, v_base);
+
+  -- Deliberately fail OPEN when no rate is available. A stale or missing FX
+  -- pair must not halt payments; the gap is logged for the daily reconcile to
+  -- pick up. Blocking every transfer in an unpriced corridor would be a worse
+  -- failure than briefly not enforcing a ceiling.
+  IF v_amt IS NULL THEN
+    RAISE WARNING 'tg_transfers_check_limit: no % -> % rate; limit not enforced for transfer by %',
+      NEW.source_currency, v_base, NEW.sender_id;
+    RETURN NEW;
+  END IF;
+
+  IF v_lim.single_limit > 0 AND v_amt > v_lim.single_limit THEN
     RAISE EXCEPTION
-      'Transfer of % exceeds your per-transaction limit of % (% tier)',
-      NEW.source_amount, v_lim.single_limit, v_lim.tier_label
+      'Transfer of % % (% %) exceeds your per-transaction limit of % % (% tier)',
+      NEW.source_amount, NEW.source_currency, round(v_amt, 2), v_base,
+      v_lim.single_limit, v_base, v_lim.tier_label
       USING ERRCODE = 'check_violation',
             HINT = 'limit_exceeded:single';
   END IF;
 
   IF v_lim.daily_limit > 0 THEN
     v_day := public.transfer_spend_since(NEW.sender_id, date_trunc('day', now()));
-    IF v_day + NEW.source_amount > v_lim.daily_limit THEN
+    IF v_day + v_amt > v_lim.daily_limit THEN
       RAISE EXCEPTION
-        'Transfer of % would exceed your daily limit of % (% already sent today)',
-        NEW.source_amount, v_lim.daily_limit, v_day
+        'This transfer would exceed your daily limit of % % (% % already sent today)',
+        v_lim.daily_limit, v_base, round(v_day, 2), v_base
         USING ERRCODE = 'check_violation',
               HINT = 'limit_exceeded:daily';
     END IF;
@@ -121,10 +204,10 @@ BEGIN
 
   IF v_lim.monthly_limit > 0 THEN
     v_month := public.transfer_spend_since(NEW.sender_id, date_trunc('month', now()));
-    IF v_month + NEW.source_amount > v_lim.monthly_limit THEN
+    IF v_month + v_amt > v_lim.monthly_limit THEN
       RAISE EXCEPTION
-        'Transfer of % would exceed your monthly limit of % (% already sent this month)',
-        NEW.source_amount, v_lim.monthly_limit, v_month
+        'This transfer would exceed your monthly limit of % % (% % already sent this month)',
+        v_lim.monthly_limit, v_base, round(v_month, 2), v_base
         USING ERRCODE = 'check_violation',
               HINT = 'limit_exceeded:monthly';
     END IF;
@@ -134,18 +217,17 @@ BEGIN
 END;
 $function$;
 
--- Runs after trg_check_transfer_balance (alphabetical order on matching timing),
--- so a customer sees "insufficient balance" before "over your limit".
 DROP TRIGGER IF EXISTS trg_transfers_check_limit ON public.transfers;
 CREATE TRIGGER trg_transfers_check_limit
   BEFORE INSERT ON public.transfers
   FOR EACH ROW EXECUTE FUNCTION public.tg_transfers_check_limit();
 
--- Read-only headroom for the UI.
+-- ============== read-only headroom for the UI ==============
 CREATE OR REPLACE FUNCTION public.my_transaction_headroom()
 RETURNS TABLE (
   scope text,
   tier_label text,
+  base_currency text,
   single_limit numeric,
   daily_limit numeric,
   daily_used numeric,
@@ -157,7 +239,7 @@ STABLE
 SECURITY DEFINER
 SET search_path TO 'public'
 AS $$
-  SELECT l.scope, l.tier_label, l.single_limit,
+  SELECT l.scope, l.tier_label, public.limit_base_currency(), l.single_limit,
          l.daily_limit,   public.transfer_spend_since(auth.uid(), date_trunc('day', now())),
          l.monthly_limit, public.transfer_spend_since(auth.uid(), date_trunc('month', now()))
   FROM public.resolve_transaction_limits(auth.uid()) l;
