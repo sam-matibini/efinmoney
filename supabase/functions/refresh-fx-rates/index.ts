@@ -104,16 +104,41 @@ Deno.serve(async (req) => {
       }
     }
 
-    const { error } = await supabase.from("fx_rates").insert(rows);
+    // fx_rates is UNIQUE (from_currency, to_currency, valid_from) and every row
+    // in a run shares valid_from, so the same pair must not appear twice. The
+    // cross-rate loop already emits CAD->NGN etc., and the Nomba block re-emits
+    // those pairs -- inserting both violates the constraint and fails the whole
+    // batch. Deduplicate by pair, keeping the last writer: Nomba's live corridor
+    // rate is more accurate than a USD cross-rate and is pushed after it.
+    const byPair = new Map<string, any>();
+    for (const row of rows) {
+      byPair.set(`${row.from_currency}|${row.to_currency}`, row);
+    }
+    const deduped = Array.from(byPair.values());
+
+    const { error } = await supabase.from("fx_rates").insert(deduped);
     if (error) throw error;
 
     return new Response(
-      JSON.stringify({ success: true, source, inserted: rows.length, fetched_at: now.toISOString() }),
+      JSON.stringify({
+        success: true,
+        source,
+        inserted: deduped.length,
+        deduplicated: rows.length - deduped.length,
+        fetched_at: now.toISOString(),
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (err) {
     console.error("refresh-fx-rates error:", err);
-    const msg = err instanceof Error ? err.message : "Unknown error";
+    // Supabase returns PostgrestError as a plain object, not an Error, so
+    // instanceof alone reports "Unknown error" and hides the real cause.
+    const msg =
+      err instanceof Error
+        ? err.message
+        : typeof err === "object" && err !== null
+          ? JSON.stringify(err)
+          : "Unknown error";
     return new Response(JSON.stringify({ success: false, error: msg }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
