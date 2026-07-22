@@ -148,10 +148,13 @@ export interface FlwInitResult {
   reference: string;
   charge_id?: string;
   next_action?: any;
+  message?: string;
+  stk_push?: boolean;
   status?: string;
   transient?: boolean;
   fallback?: boolean;
   provider_status?: number;
+  api?: string;
 }
 
 export const initializeFlwPayment = async (params: {
@@ -162,6 +165,7 @@ export const initializeFlwPayment = async (params: {
   phone?: string;
   network?: string;
   country?: string;
+  walletId?: string;
 }): Promise<FlwInitResult> => {
   const { data, error } = await supabase.functions.invoke("flw-initialize-payment", { body: params });
   if (error) throw new Error(error.message || "Failed to initialize payment");

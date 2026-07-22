@@ -28,6 +28,19 @@ export const PAYTOTA_TOPUP_CURRENCIES = [
 ];
 /** Fincra hosted checkout corridors. CAD uses USD charge → credit CAD wallet (same pattern as Nomba). */
 export const FINCRA_TOPUP_CURRENCIES = ["USD", "EUR", "GBP", "CAD"];
+/** Lenhub Flutter card collect currencies (flutter.json card create). */
+export const LENHUB_FLUTTER_TOPUP_CURRENCIES = [
+  "USD",
+  "CAD",
+  "EUR",
+  "GBP",
+  "NGN",
+  "GHS",
+  "KES",
+  "UGX",
+  "RWF",
+  "TZS",
+];
 /** Currencies that can offer multiple western/intl rails for the user to pick */
 export const MULTI_RAIL_TOPUP_CURRENCIES = ["USD", "EUR", "GBP", "CAD"];
 /** East Africa currencies that can offer Swychr + Paytota MoMo */
@@ -43,14 +56,15 @@ export type WalletTopupGateway =
   | "nomba_pay"
   | "swychr_pay"
   | "paytota_pay"
+  | "lenhub_flutter"
   | "unsupported";
 
 export type WesternTopupProvider = "flutterwave" | "fincra";
 export type AfricanTopupProvider = "flutterwave" | "fincra";
 /** User-facing intl/CAD method pick (internal keys; UI uses white-label labels). */
-export type IntlTopupMethod = "nomba" | "paytota" | "fincra" | "interac";
+export type IntlTopupMethod = "nomba" | "paytota" | "fincra" | "interac" | "lenhub";
 /** East Africa MoMo method pick when both Swychr and Paytota are live. */
-export type AfricaMomoTopupMethod = "swychr" | "paytota";
+export type AfricaMomoTopupMethod = "swychr" | "paytota" | "flutterwave";
 
 export function supportsWesternProviderChoice(currency: string): boolean {
   const c = currency.toUpperCase();
@@ -77,26 +91,32 @@ export function routeWalletTopupGateway(
   preferPaytota = false,
   preferInterac = false,
   preferFincra = false,
+  preferFlutterwave = false,
+  preferLenhubFlutter = false,
 ): WalletTopupGateway {
   const c = currency.toUpperCase();
+  // Explicit Lenhub Flutter card rail
+  if (preferLenhubFlutter && LENHUB_FLUTTER_TOPUP_CURRENCIES.includes(c)) return "lenhub_flutter";
   // Ghana MoMo
   if (GHANA_PAY_CURRENCIES.includes(c)) return "ghana_pay";
   // Explicit Interac (CAD) when user picked that method
   if (preferInterac && c === "CAD") return "fincra_interac";
   // Explicit Fincra hosted checkout
   if (preferFincra && FINCRA_TOPUP_CURRENCIES.includes(c)) return "fincra";
+  // Explicit Flutterwave Africa MoMo
+  if (preferFlutterwave && FLUTTERWAVE_CURRENCIES.includes(c)) return "flutterwave";
   // Explicit Paytota when user picked invoice / Africa MoMo checkout
   if (preferPaytota && PAYTOTA_TOPUP_CURRENCIES.includes(c)) return "paytota_pay";
   // Explicit Swychr
   if (preferSwychr && SWYCHR_TOPUP_CURRENCIES.includes(c)) return "swychr_pay";
   // Nomba: NGN always; intl/CAD when not on another selected rail
   if (c === "NGN") return "nomba_pay";
-  if (NOMBA_PAY_CURRENCIES.includes(c) && !preferPaytota && !preferInterac && !preferFincra) {
+  if (NOMBA_PAY_CURRENCIES.includes(c) && !preferPaytota && !preferInterac && !preferFincra && !preferFlutterwave) {
     return "nomba_pay";
   }
   // Default Africa MoMo: Swychr first where available, else Paytota (RWF)
-  if (SWYCHR_TOPUP_CURRENCIES.includes(c)) return "swychr_pay";
-  if (PAYTOTA_AFRICA_TOPUP_CURRENCIES.includes(c)) return "paytota_pay";
+  if (SWYCHR_TOPUP_CURRENCIES.includes(c) && !preferFlutterwave) return "swychr_pay";
+  if (PAYTOTA_AFRICA_TOPUP_CURRENCIES.includes(c) && !preferFlutterwave) return "paytota_pay";
   if (ELICATE_CURRENCIES.includes(c)) return "elicate";
   if (supportsAfricanProviderChoice(c) && africanProvider === "fincra") return "fincra";
   if (FLUTTERWAVE_CURRENCIES.includes(c) && africanProvider !== "fincra") return "flutterwave";
@@ -137,12 +157,16 @@ export function intlMethodLabel(method: IntlTopupMethod): string {
   if (method === "paytota") return "Pay by invoice";
   if (method === "interac") return "Interac e-Transfer";
   if (method === "fincra") return "Card or bank transfer";
+  if (method === "lenhub") return "Card (direct)";
   return "Express card";
 }
 
 export function intlMethodDescription(method: IntlTopupMethod, currency: string): string {
   if (method === "paytota") return "Secure invoice payment for your wallet.";
   if (method === "interac") return "Send CAD from your Canadian bank via Interac.";
+  if (method === "lenhub") {
+    return `Pay with card in ${currency.toUpperCase()} — PIN/OTP secured.`;
+  }
   if (method === "fincra") {
     if (currency.toUpperCase() === "CAD") {
       return "Pay with card in USD — your CAD wallet is credited (Canadian cards welcome).";
@@ -157,12 +181,16 @@ export function intlMethodDescription(method: IntlTopupMethod, currency: string)
 
 export function africaMomoMethodLabel(method: AfricaMomoTopupMethod): string {
   if (method === "paytota") return "MoMo checkout";
+  if (method === "flutterwave") return "Mobile money (alt)";
   return "Mobile money";
 }
 
 export function africaMomoMethodDescription(method: AfricaMomoTopupMethod, currency: string): string {
   if (method === "paytota") {
     return `Hosted mobile money payment for your ${currency.toUpperCase()} wallet.`;
+  }
+  if (method === "flutterwave") {
+    return `Alternate mobile money rail for your ${currency.toUpperCase()} wallet.`;
   }
   return `Pay with mobile money to fund your ${currency.toUpperCase()} wallet.`;
 }

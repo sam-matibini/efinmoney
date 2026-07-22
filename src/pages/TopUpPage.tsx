@@ -19,11 +19,13 @@ import ElicateTopUpCard from "@/components/payments/ElicateTopUpCard";
 import CadInteracTopUpCard from "@/components/payments/CadInteracTopUpCard";
 import GhanaTopUpCard from "@/components/payments/GhanaTopUpCard";
 import NombaTopUpCard from "@/components/payments/NombaTopUpCard";
+import LenhubFlutterTopUpCard from "@/components/payments/LenhubFlutterTopUpCard";
 import PaytotaTopUpCard from "@/components/payments/PaytotaTopUpCard";
 import SwychrTopUpCard from "@/components/payments/SwychrTopUpCard";
 import { validateMinAmount, minAmount, type FlwMethod } from "@/lib/flutterwave";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import FlutterwaveCardForm from "@/components/payments/FlutterwaveCardForm";
+import FlutterwaveMomoTopUpCard from "@/components/payments/FlutterwaveMomoTopUpCard";
 import { MM_COUNTRIES } from "@/lib/mobileMoneyNetworks";
 import {
   routeWalletTopupGateway,
@@ -31,6 +33,7 @@ import {
   supportsAfricanProviderChoice,
   type WesternTopupProvider,
   type AfricanTopupProvider,
+  LENHUB_FLUTTER_TOPUP_CURRENCIES,
   type IntlTopupMethod,
   type AfricaMomoTopupMethod,
   type WalletTopupGateway,
@@ -67,13 +70,26 @@ type Gateway = WalletTopupGateway;
 
 function availableIntlMethods(currency: string): IntlTopupMethod[] {
   const c = currency.toUpperCase();
-  if (!MULTI_RAIL_TOPUP_CURRENCIES.includes(c)) return [];
   const methods: IntlTopupMethod[] = [];
-  if (productFeatures.nombaNigeria) methods.push("nomba");
-  // Fincra: USD/EUR/GBP direct; CAD via USD card charge (same idea as Express card)
-  if (productFeatures.fincra && ["USD", "EUR", "GBP", "CAD"].includes(c)) methods.push("fincra");
-  if (productFeatures.paytota) methods.push("paytota");
-  if (c === "CAD" && productFeatures.fincraInterac) methods.push("interac");
+  // Western multi-rail (USD/EUR/GBP/CAD)
+  if (MULTI_RAIL_TOPUP_CURRENCIES.includes(c)) {
+    if (productFeatures.nombaNigeria) methods.push("nomba");
+    if (productFeatures.fincra && ["USD", "EUR", "GBP", "CAD"].includes(c)) methods.push("fincra");
+    if (productFeatures.paytota) methods.push("paytota");
+    if (c === "CAD" && productFeatures.fincraInterac) methods.push("interac");
+    if (productFeatures.lenhubFlutter) methods.push("lenhub");
+    return methods;
+  }
+  // NGN: Nomba express + optional direct card
+  if (c === "NGN") {
+    if (productFeatures.nombaNigeria) methods.push("nomba");
+    if (productFeatures.lenhubFlutter) methods.push("lenhub");
+    return methods;
+  }
+  // Other Africa wallets: direct card as an optional extra rail (query ?method=lenhub)
+  if (productFeatures.lenhubFlutter && LENHUB_FLUTTER_TOPUP_CURRENCIES.includes(c)) {
+    methods.push("lenhub");
+  }
   return methods;
 }
 
@@ -83,6 +99,8 @@ function availableAfricaMomoMethods(currency: string): AfricaMomoTopupMethod[] {
   const methods: AfricaMomoTopupMethod[] = [];
   if (productFeatures.swychr && SWYCHR_TOPUP_CURRENCIES.includes(c)) methods.push("swychr");
   if (productFeatures.paytota && PAYTOTA_AFRICA_TOPUP_CURRENCIES.includes(c)) methods.push("paytota");
+  // Flutterwave V4 MoMo — live on this merchant for KES/UGX (TZS currently maintenance).
+  if (productFeatures.flutterwave && ["KES", "UGX", "RWF"].includes(c)) methods.push("flutterwave");
   return methods;
 }
 
@@ -94,6 +112,7 @@ function initialIntlMethod(params: URLSearchParams, currency: string): IntlTopup
   if ((fromQuery === "fincra" || fromQuery === "bank") && methods.includes("fincra")) return "fincra";
   if ((fromQuery === "paytota" || fromQuery === "invoice") && methods.includes("paytota")) return "paytota";
   if ((fromQuery === "nomba" || fromQuery === "card" || fromQuery === "express") && methods.includes("nomba")) return "nomba";
+  if ((fromQuery === "lenhub" || fromQuery === "flutter" || fromQuery === "direct") && methods.includes("lenhub")) return "lenhub";
   return methods[0];
 }
 
@@ -105,6 +124,7 @@ function initialAfricaMomoMethod(params: URLSearchParams, currency: string): Afr
     return "paytota";
   }
   if ((fromQuery === "swychr" || fromQuery === "mobile") && methods.includes("swychr")) return "swychr";
+  if ((fromQuery === "flutterwave" || fromQuery === "flw") && methods.includes("flutterwave")) return "flutterwave";
   return methods[0];
 }
 
@@ -208,6 +228,15 @@ const TopUpPage = () => {
       setIntlMethod(null);
       return;
     }
+    const ccy = currency.toUpperCase();
+    const onlyLenhubExtra = intlMethods.length === 1 && intlMethods[0] === "lenhub"
+      && !MULTI_RAIL_TOPUP_CURRENCIES.includes(ccy)
+      && ccy !== "NGN";
+    if (onlyLenhubExtra) {
+      const q = (params.get("method") || params.get("provider") || params.get("rail") || "").toLowerCase();
+      setIntlMethod(q === "lenhub" || q === "flutter" || q === "direct" ? "lenhub" : null);
+      return;
+    }
     const preferred = initialIntlMethod(params, currency);
     setIntlMethod((prev) => {
       if (prev && intlMethods.includes(prev)) return prev;
@@ -250,8 +279,10 @@ const TopUpPage = () => {
       && PAYTOTA_AFRICA_TOPUP_CURRENCIES.includes(ccy)
       && !productFeatures.swychr
     );
+  const preferFlutterwave = africaMomoMethod === "flutterwave";
   const preferInterac = intlMethod === "interac";
   const preferFincra = intlMethod === "fincra";
+  const preferLenhubFlutter = intlMethod === "lenhub";
   const gateway: Gateway = routeWalletTopupGateway(
     currency,
     westernProvider,
@@ -260,6 +291,8 @@ const TopUpPage = () => {
     preferPaytota,
     preferInterac,
     preferFincra,
+    preferFlutterwave,
+    preferLenhubFlutter,
   );
   const liveTopup = isLiveTopupCurrency(currency);
   const availableFlwMethods = FLW_METHODS_BY_CCY[currency] || ["card"];
@@ -468,6 +501,7 @@ const TopUpPage = () => {
     if (gateway === "swychr_pay") return { label: swychrGatewayLabel(currency), icon: Globe, color: "bg-violet-500/10 text-violet-700 border-violet-500/30" };
     if (gateway === "paytota_pay") return { label: paytotaGatewayLabel(currency), icon: FileText, color: "bg-sky-500/10 text-sky-700 border-sky-500/30" };
     if (gateway === "nomba_pay") return { label: nombaGatewayLabel(currency), icon: CreditCard, color: "bg-green-600/10 text-green-700 border-green-600/30" };
+    if (gateway === "lenhub_flutter") return { label: "Card (direct)", icon: CreditCard, color: "bg-indigo-500/10 text-indigo-700 border-indigo-500/30" };
     if (gateway === "ghana_pay") return { label: "Mobile money", icon: Smartphone, color: "bg-yellow-500/10 text-yellow-700 border-yellow-500/30" };
     if (gateway === "elicate") return { label: "Mobile Money", icon: Smartphone, color: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30" };
     if (gateway === "fincra_interac") return { label: "Interac e-Transfer", icon: Landmark, color: "bg-red-500/10 text-red-700 border-red-500/30" };
@@ -727,7 +761,7 @@ const TopUpPage = () => {
           {!liveTopup && selectedWallet && (
             <ComingSoon
               title="Top-up not available for this currency"
-              description={`${currency} wallet funding is not available. Try NGN, GHS, ZMW, KES, UGX, RWF, USD, EUR, GBP, or CAD.`}
+              description={`${currency} wallet funding is not available. Try NGN, GHS, ZMW, KES, UGX, RWF, TZS, USD, EUR, GBP, or CAD.`}
               backHref="/wallets"
               backLabel="View wallets"
             />
@@ -743,27 +777,40 @@ const TopUpPage = () => {
             </Card>
           )}
 
-          {/* Flutterwave route — in-app card collection */}
+          {/* Flutterwave route — MoMo (V4) + card (legacy V3 form when available) */}
           {productFeatures.flutterwave && gateway === "flutterwave" && selectedWallet && liveTopup && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">
-                  {showWesternProviderChoice || showAfricanProviderChoice ? "3. Pay with card" : "2. Enter card details"}
-                </CardTitle>
-                <CardDescription>
-                  Pay securely with your debit or credit card. Powered by eFinMoney.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <FlutterwaveCardForm
-                  defaultWalletId={selectedWalletId}
-                  showWalletSelect
-                  onSuccess={() => {
+            <div className="space-y-4">
+              {(availableFlwMethods.includes("mobilemoney") || currency === "TZS") && (
+                <FlutterwaveMomoTopUpCard
+                  walletId={selectedWallet.wallet_id}
+                  walletCurrency={currency}
+                  onComplete={() => {
                     void queryClient.invalidateQueries({ queryKey: ["wallets"] });
                   }}
                 />
-              </CardContent>
-            </Card>
+              )}
+              {availableFlwMethods.includes("card") && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">
+                      {showWesternProviderChoice || showAfricanProviderChoice ? "3. Pay with card" : "Or pay with card"}
+                    </CardTitle>
+                    <CardDescription>
+                      Debit or credit card. Card on V4 is rolling out — MoMo is preferred for African wallets.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <FlutterwaveCardForm
+                      defaultWalletId={selectedWalletId}
+                      showWalletSelect
+                      onSuccess={() => {
+                        void queryClient.invalidateQueries({ queryKey: ["wallets"] });
+                      }}
+                    />
+                  </CardContent>
+                </Card>
+              )}
+            </div>
           )}
 
           {/* Card or bank transfer (Fincra hosted) — always available when selected, not gated on Flutterwave */}
@@ -872,6 +919,17 @@ const TopUpPage = () => {
           {/* Card checkout (Nomba) */}
           {liveTopup && gateway === "nomba_pay" && selectedWallet && (
             <NombaTopUpCard
+              walletId={selectedWallet.wallet_id}
+              walletCurrency={currency}
+              onComplete={() => {
+                void queryClient.invalidateQueries({ queryKey: ["wallets"] });
+              }}
+            />
+          )}
+
+          {/* Lenhub Flutter direct card — USD/CAD/EUR/GBP + Africa wallets */}
+          {liveTopup && gateway === "lenhub_flutter" && selectedWallet && (
+            <LenhubFlutterTopUpCard
               walletId={selectedWallet.wallet_id}
               walletCurrency={currency}
               onComplete={() => {

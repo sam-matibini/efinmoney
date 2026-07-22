@@ -329,3 +329,13 @@ verify_jwt = false
 
 [functions.payment-link-revoke]
 verify_jwt = false
+
+# Lenhub Flutter wrapper (/app/flutter/*)
+[functions.lenhub-flutter]
+verify_jwt = true
+
+[functions.lenhub-flutter-payout]
+verify_jwt = false
+
+[functions.lenhub-flutter-webhook]
+verify_jwt = false

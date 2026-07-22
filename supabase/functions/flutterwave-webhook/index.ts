@@ -127,15 +127,16 @@ Deno.serve(async (req) => {
     const meta = Array.isArray((data as { meta?: unknown }).meta) ? (data as { meta: Array<Record<string, unknown>> }).meta[0] : (data as { meta?: Record<string, unknown> }).meta || {};
 
     // ---- charge.completed (top-up or virtual account credit)
-    if (eventName === "charge.completed" || (data as { tx_ref?: string }).tx_ref) {
-      if (status === "successful" || status === "success") {
+    // V3 statuses: successful/success. V4 statuses: succeeded/successful.
+    if (eventName === "charge.completed" || (data as { tx_ref?: string }).tx_ref || (data as { reference?: string }).reference) {
+      if (["successful", "success", "succeeded", "paid", "completed"].includes(status)) {
         const amount = Number((data as { amount?: number }).amount || 0);
         const currency = String((data as { currency?: string }).currency || "").toUpperCase();
         const userIdMeta = meta?.user_id ? String(meta.user_id) : null;
         const txType = meta?.type ? String(meta.type) : null;
 
         // Top-up flow (initialized via /payments)
-        if (userIdMeta && (txType === "wallet_topup" || String(reference).startsWith("efm_topup_") || String(reference).startsWith("topup-"))) {
+        if (userIdMeta && (txType === "wallet_topup" || String(reference).startsWith("efm_topup_") || String(reference).startsWith("efmtopup-") || String(reference).startsWith("topup-"))) {
           const walletIdMeta = meta?.wallet_id ? String(meta.wallet_id) : null;
           let walletId: string | undefined;
 
@@ -200,7 +201,7 @@ Deno.serve(async (req) => {
       if (transfer) {
         let newStatus: string | null = null;
         let title = "", message = "";
-        if (status === "successful" || status === "success" || status === "completed") {
+        if (status === "successful" || status === "success" || status === "succeeded" || status === "completed") {
           newStatus = "completed";
           title = "Transfer completed";
           message = `Your transfer of ${transfer.target_currency} ${transfer.target_amount} to ${transfer.recipient_name} is complete.`;

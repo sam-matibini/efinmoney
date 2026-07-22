@@ -1,0 +1,283 @@
+/**
+ * Lenhub Flutter helper API — quote, banks, verify, networks, card steps, VA.
+ * POST { action, ... }
+ */
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import {
+  isLenhubFlutterEnabled,
+  lenhubFlutterConfirmPayment,
+  lenhubFlutterCreateCardPayment,
+  lenhubFlutterCreateVirtualAccount,
+  lenhubFlutterExchangeRate,
+  lenhubFlutterGetBanks,
+  lenhubFlutterNetworks,
+  lenhubFlutterSendOtp,
+  lenhubFlutterSendPin,
+  lenhubFlutterVerifyAccount,
+  supportsLenhubFlutterCollect,
+} from "../_shared/lenhub-flutter.ts";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+function json(data: unknown, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
+
+  if (!isLenhubFlutterEnabled()) {
+    return json({ error: "Lenhub Flutter rail disabled" }, 503);
+  }
+
+  const supabase = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+  );
+
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader) return json({ error: "Missing authorization" }, 401);
+  const { data: { user } } = await supabase.auth.getUser(authHeader.replace("Bearer ", ""));
+  if (!user) return json({ error: "Unauthorized" }, 401);
+
+  const body = await req.json().catch(() => ({})) as Record<string, unknown>;
+  const action = String(body.action || "").toLowerCase();
+
+  try {
+    if (action === "quote" || action === "exchange_rate") {
+      const source = String(body.source_currency || "").toUpperCase();
+      const dest = String(body.destination_currency || "").toUpperCase();
+      const amount = Number(body.amount);
+      if (!source || !dest || !(amount > 0)) return json({ error: "source_currency, destination_currency, amount required" }, 400);
+      const result = await lenhubFlutterExchangeRate({ sourceCurrency: source, destinationCurrency: dest, amount });
+      return json({
+        success: result.ok,
+        rate: result.rate,
+        rate_id: result.rateId,
+        source_amount: result.sourceAmount,
+        destination_amount: result.destAmount,
+        message: result.message,
+        provider: result.json,
+      }, result.ok ? 200 : 400);
+    }
+
+    if (action === "banks") {
+      const country = String(body.country_code || body.country || "").toUpperCase();
+      if (!country) return json({ error: "country_code required" }, 400);
+      const result = await lenhubFlutterGetBanks(country);
+      return json({
+        success: result.ok,
+        banks: result.banks,
+        message: result.message,
+        provider: result.json,
+      }, result.ok ? 200 : 400);
+    }
+
+    if (action === "verify") {
+      const account_number = String(body.account_number || "");
+      const currency = String(body.currency || "").toUpperCase();
+      const bank_code = String(body.bank_code || "");
+      if (!account_number || !currency || !bank_code) {
+        return json({ error: "account_number, currency, bank_code required" }, 400);
+      }
+      const result = await lenhubFlutterVerifyAccount({ accountNumber: account_number, currency, bankCode: bank_code });
+      return json({
+        success: result.ok,
+        account_name: result.accountName,
+        message: result.message,
+        provider: result.json,
+      }, result.ok ? 200 : 400);
+    }
+
+    if (action === "networks") {
+      const country = String(body.country || body.country_code || "GH").toUpperCase();
+      const result = await lenhubFlutterNetworks(country);
+      return json({
+        success: result.ok,
+        networks: result.networks,
+        message: result.message,
+        provider: result.json,
+      }, result.ok ? 200 : 400);
+    }
+
+    if (action === "card_create") {
+      const currency = String(body.currency || "").toUpperCase();
+      const amount = Number(body.amount);
+      const email = String(body.email || user.email || "");
+      if (!supportsLenhubFlutterCollect(currency)) {
+        return json({ error: `Currency ${currency} not supported for Lenhub Flutter collect` }, 400);
+      }
+      if (!(amount > 0) || !email) return json({ error: "amount and email required" }, 400);
+
+      const card_number = String(body.card_number || "").replace(/\s+/g, "");
+      const expiry_date_month = String(body.expiry_date_month || body.exp_month || "").padStart(2, "0");
+      const expiry_date_year = String(body.expiry_date_year || body.exp_year || "");
+      const cvv = String(body.cvv || "");
+      if (!card_number || !expiry_date_month || !expiry_date_year || !cvv) {
+        return json({ error: "card_number, expiry_date_month, expiry_date_year, cvv required" }, 400);
+      }
+
+      const projectRef = Deno.env.get("SUPABASE_URL")?.match(/https:\/\/([^.]+)/)?.[1];
+      const callback = String(body.callback || `https://${projectRef}.functions.supabase.co/lenhub-flutter-webhook`);
+
+      // Prefer wallet_id from client; fall back to lookup
+      let walletId: string | null = typeof body.wallet_id === "string" ? body.wallet_id : null;
+      if (!walletId) {
+        const { data: wallet } = await supabase
+          .from("wallets")
+          .select("id")
+          .eq("user_id", user.id)
+          .eq("currency_code", currency)
+          .maybeSingle();
+        walletId = wallet?.id ?? null;
+      }
+
+      let localId: string | null = null;
+      const { data: row, error: insErr } = await supabase
+        .from("lenhub_flutter_charges")
+        .insert({
+          user_id: user.id,
+          wallet_id: walletId,
+          currency_code: currency,
+          amount,
+          email,
+          status: "creating",
+        })
+        .select("id")
+        .single();
+
+      if (insErr) {
+        // Table missing / RLS — still attempt provider charge; surface DB hint
+        console.error("lenhub_flutter_charges insert:", insErr.message);
+        if (/relation .* does not exist|Could not find the table/i.test(insErr.message)) {
+          return json({
+            error: "Database table missing. Run migration 20260722020000_lenhub_flutter.sql in Supabase SQL editor, then retry.",
+            code: "migration_required",
+            detail: insErr.message,
+          }, 400);
+        }
+      } else {
+        localId = row?.id ?? null;
+      }
+
+      const result = await lenhubFlutterCreateCardPayment({
+        card_number,
+        expiry_date_month,
+        expiry_date_year: expiry_date_year.length === 4 ? expiry_date_year.slice(-2) : expiry_date_year,
+        cvv,
+        amount,
+        callback,
+        email,
+        currency,
+      });
+
+      // Empty lenhub body { status: success, message: [] } is not a real charge
+      const providerEmpty =
+        Array.isArray((result.json as { message?: unknown }).message) &&
+        ((result.json as { message?: unknown[] }).message?.length ?? 0) === 0;
+      const ok = result.ok && Boolean(result.chargeId) && !providerEmpty;
+      const failMessage = !ok
+        ? (providerEmpty
+          ? "Lenhub returned empty success (no charge created). Upstream Flutterwave credentials may be down — ask lenhub to fix auth."
+          : (result.message || "Card charge failed"))
+        : result.message;
+
+      if (localId) {
+        await supabase.from("lenhub_flutter_charges").update({
+          charge_id: result.chargeId,
+          status: ok ? "requires_action" : "failed",
+          next_action: ok ? "pin_or_otp_or_avs" : null,
+          provider_response: result.json,
+          updated_at: new Date().toISOString(),
+        }).eq("id", localId);
+      }
+
+      return json({
+        success: ok,
+        local_id: localId,
+        charge_id: result.chargeId,
+        message: failMessage,
+        next_action: ok ? "pin_or_otp_or_avs" : null,
+        provider: result.json,
+        db_warning: insErr && !localId ? insErr.message : undefined,
+      }, ok ? 200 : 400);
+    }
+
+    if (action === "card_pin") {
+      const chargeId = String(body.charge_id || body.chargeId || "");
+      const pin = String(body.pin || "");
+      const localId = body.local_id ? String(body.local_id) : null;
+      if (!chargeId || !pin) return json({ error: "charge_id and pin required" }, 400);
+      const result = await lenhubFlutterSendPin(pin, chargeId);
+      if (localId) {
+        await supabase.from("lenhub_flutter_charges").update({
+          status: result.ok ? "pin_sent" : "failed",
+          provider_response: result.json,
+          updated_at: new Date().toISOString(),
+        }).eq("id", localId).eq("user_id", user.id);
+      }
+      return json({ success: result.ok, message: result.message, provider: result.json }, result.ok ? 200 : 400);
+    }
+
+    if (action === "card_otp") {
+      const chargeId = String(body.charge_id || body.chargeId || "");
+      const otp = String(body.otp || "");
+      const localId = body.local_id ? String(body.local_id) : null;
+      if (!chargeId || !otp) return json({ error: "charge_id and otp required" }, 400);
+      const result = await lenhubFlutterSendOtp(otp, chargeId);
+      if (localId) {
+        await supabase.from("lenhub_flutter_charges").update({
+          status: result.ok ? "otp_sent" : "failed",
+          provider_response: result.json,
+          updated_at: new Date().toISOString(),
+        }).eq("id", localId).eq("user_id", user.id);
+      }
+      return json({ success: result.ok, message: result.message, provider: result.json }, result.ok ? 200 : 400);
+    }
+
+    if (action === "card_confirm") {
+      const charge_id = String(body.charge_id || body.chargeId || "");
+      const localId = body.local_id ? String(body.local_id) : null;
+      if (!charge_id) return json({ error: "charge_id required" }, 400);
+      const result = await lenhubFlutterConfirmPayment({
+        charge_id,
+        city: String(body.city || ""),
+        country: String(body.country || ""),
+        line1: String(body.line1 || ""),
+        postal_code: String(body.postal_code || ""),
+        state: String(body.state || ""),
+        line2: body.line2 != null ? String(body.line2) : null,
+      });
+      if (localId) {
+        await supabase.from("lenhub_flutter_charges").update({
+          status: result.ok ? "confirming" : "failed",
+          provider_response: result.json,
+          updated_at: new Date().toISOString(),
+        }).eq("id", localId).eq("user_id", user.id);
+      }
+      return json({ success: result.ok, message: result.message, provider: result.json }, result.ok ? 200 : 400);
+    }
+
+    if (action === "virtual_account") {
+      const email = String(body.email || user.email || "");
+      const amount = Number(body.amount);
+      const narration = String(body.narration || `eFin top-up ${user.id.slice(0, 8)}`);
+      if (!email || !(amount > 0)) return json({ error: "email and amount required" }, 400);
+      const result = await lenhubFlutterCreateVirtualAccount({ email, amount, narration });
+      return json({ success: result.ok, message: result.message, provider: result.json }, result.ok ? 200 : 400);
+    }
+
+    return json({ error: `Unknown action: ${action}` }, 400);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Unknown error";
+    console.error("lenhub-flutter error", msg);
+    return json({ error: msg }, 400);
+  }
+});

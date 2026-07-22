@@ -344,7 +344,28 @@ Deno.serve(async (req) => {
       recipientCountry === "GHANA" ||
       (recipientCountryHint ?? "").trim().toUpperCase() === "GHANA";
     const ghanaPayConfigured = isGhanaPayConfigured();
+
+    // Lenhub Flutter wrapper — multi-currency FX bank payout + GHS MoMo (prefer when enabled)
+    const lenhubFlutterEnvOn = Deno.env.get("LENHUB_FLUTTER_ENABLED") !== "false"
+      && Deno.env.get("LENHUB_FLUTTER_PAYOUT") !== "false";
+    const LENHUB_FLUTTER_BANK = new Set(["NGN", "GHS", "KES", "UGX", "RWF", "TZS", "ZMW"]);
+    const hasLenhubBankRail = !!(transfer.recipient_account && transfer.recipient_bank_code)
+      && LENHUB_FLUTTER_BANK.has(targetCurrency);
+    const hasLenhubGhanaMomo = isMobileMoneyMethod && targetCurrency === "GHS"
+      && !(transfer.recipient_account && transfer.recipient_bank_code);
+    const useLenhubFlutter =
+      lenhubFlutterEnvOn &&
+      !isCanada &&
+      !isZambia &&
+      !usePawapay &&
+      !useMtnMomo &&
+      !useStellar &&
+      transfer.payout_method !== "card_push" &&
+      payload.use_lenhub_flutter !== false &&
+      (hasLenhubBankRail || hasLenhubGhanaMomo);
+
     const useGhanaPay =
+      !useLenhubFlutter &&
       ghanaPayConfigured &&
       isGhana &&
       !isCanada &&
@@ -358,6 +379,7 @@ Deno.serve(async (req) => {
       !(payload.use_pawapay === true || transfer.use_pawapay === true);
     const useFincra =
       !useGhanaPay &&
+      !useLenhubFlutter &&
       (payload.use_fincra === true || transfer.use_fincra === true) &&
       !isCanada && !isZambia && !usePawapay && !useMtnMomo && !useStellar &&
       transfer.payout_method !== "card_push";
@@ -371,6 +393,7 @@ Deno.serve(async (req) => {
       !useMtnMomo &&
       !useStellar &&
       !useGhanaPay &&
+      !useLenhubFlutter &&
       !useFincra &&
       isMobileMoneyMethod &&
       targetCurrency === "UGX" &&
@@ -381,8 +404,8 @@ Deno.serve(async (req) => {
       transfer.payout_method === "bank" &&
       !!transfer.recipient_account &&
       !!transfer.recipient_bank_code;
-    // DEBUG: Nomba-only for NGN bank — Flutterwave fallback disabled to surface lenhub errors.
-    const nombaNigeriaOnly = true;
+    // When Lenhub Flutter is primary for NGN bank, Nomba is fallback only.
+    const nombaNigeriaOnly = !useLenhubFlutter;
 
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
     const internalHeaders = {
@@ -492,6 +515,54 @@ Deno.serve(async (req) => {
           },
         );
         payoutResult = await res.json();
+      } else if (useLenhubFlutter) {
+        const lfRes = await fetch(
+          `${Deno.env.get("SUPABASE_URL")}/functions/v1/lenhub-flutter-payout`,
+          {
+            method: "POST",
+            headers: internalHeaders,
+            body: JSON.stringify({ transfer_id }),
+          },
+        );
+        payoutResult = await lfRes.json().catch(() => ({
+          success: false,
+          error: `lenhub-flutter-payout HTTP ${lfRes.status}`,
+          rail: "lenhub_flutter",
+        }));
+        // Fallbacks: NGN bank → Nomba; GHS MoMo → Ghana Pay; else Flutterwave
+        if (payoutResult?.success === false) {
+          if (isNigeriaBank && isNombaNigeriaConfigured()) {
+            const nombaRes = await fetch(
+              `${Deno.env.get("SUPABASE_URL")}/functions/v1/nomba-payout`,
+              { method: "POST", headers: internalHeaders, body: JSON.stringify({ transfer_id }) },
+            );
+            const nombaJson = await nombaRes.json().catch(() => null);
+            if (nombaJson?.success) payoutResult = nombaJson;
+          } else if (hasLenhubGhanaMomo && ghanaPayConfigured) {
+            const ghRes = await fetch(
+              `${Deno.env.get("SUPABASE_URL")}/functions/v1/ghana-payout`,
+              { method: "POST", headers: internalHeaders, body: JSON.stringify({ transfer_id }) },
+            );
+            const ghJson = await ghRes.json().catch(() => null);
+            if (ghJson?.success) payoutResult = ghJson;
+          } else {
+            const flwRes = await fetch(
+              `${Deno.env.get("SUPABASE_URL")}/functions/v1/flutterwave-payout`,
+              { method: "POST", headers: internalHeaders, body: JSON.stringify({
+                transfer_id,
+                phone_number: transfer.recipient_phone,
+                account_number: transfer.recipient_account,
+                bank_code: transfer.recipient_bank_code,
+                amount: Number(transfer.target_amount ?? transfer.source_amount),
+                currency: transfer.target_currency ?? transfer.source_currency,
+                network: resolveNetwork(transfer.payout_method, transfer.target_currency ?? transfer.source_currency),
+                recipient_name: transfer.recipient_name,
+              }) },
+            );
+            const flwJson = await flwRes.json().catch(() => null);
+            if (flwJson?.success) payoutResult = flwJson;
+          }
+        }
       } else if (useGhanaPay) {
         const res = await fetch(
           `${Deno.env.get("SUPABASE_URL")}/functions/v1/ghana-payout`,

@@ -1,10 +1,15 @@
-// V3 Payout / Transfer — POST /v3/transfers
+// Flutterwave payout — V4 direct-transfers when FLW_CLIENT_ID is set, else V3 /transfers
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { flwV3Fetch } from "../_shared/flw-v3.ts";
 import {
   checkFlutterwaveLiquidity,
   queuePendingLiquidity,
 } from "../_shared/treasury-worker.ts";
+import {
+  flwV4CreateDirectTransfer,
+  flwV4ErrorMessage,
+  isFlwV4Configured,
+} from "../_shared/flw-v4.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -32,11 +37,6 @@ const V3_MM_BANK: Record<string, string> = {
   "RWF:mtn": "MTN", "RWF:airtel": "ATL",
 };
 
-// Flutterwave V3 requires `destination_branch_code` for payouts to some
-// corridors (Uganda UGX, Tanzania TZS). Without it, the transfer is queued
-// and then fails asynchronously with "branchcode not provided" on the webhook.
-// Keyed by `${currency}:${account_bank}` (account_bank already mapped above for
-// mobile money, or raw bank code for bank rails).
 const V3_BRANCH_CODES: Record<string, string> = {
   "UGX:MTN": "UG010101",
   "UGX:ATL": "UG020202",
@@ -47,7 +47,6 @@ const V3_BRANCH_CODES: Record<string, string> = {
   "TZS:TIGO": "TZ030303",
 };
 
-// Currencies that always require a branch code regardless of rail
 const BRANCH_CODE_REQUIRED_CURRENCIES = new Set(["UGX", "TZS"]);
 
 function normalizePhone(phone: string): string { return phone.replace(/\D/g, ""); }
@@ -62,6 +61,13 @@ function isProviderBalanceError(message: string): boolean {
   return m.includes("insufficient funds in customer wallet") ||
          m.includes("insufficient balance") ||
          (m.includes("insufficient") && m.includes("wallet"));
+}
+
+function splitRecipientName(full: string): { first: string; last: string } {
+  const parts = full.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return { first: "eFin", last: "User" };
+  if (parts.length === 1) return { first: parts[0], last: "User" };
+  return { first: parts[0], last: parts.slice(1).join(" ") };
 }
 
 async function reverseTransferLedger(supabase: ReturnType<typeof createClient>, transferId: string) {
@@ -132,34 +138,123 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "phone_number required for mobile money payout" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    if (!Deno.env.get("FLW_SECRET_KEY")) {
-      // Stub mode if not configured
+    const useV4 = isFlwV4Configured();
+    if (!useV4 && !Deno.env.get("FLW_SECRET_KEY")) {
       await supabase.from("transfers").update({ status: "processing", provider_reference: `STUB-${transfer_id.slice(0, 8)}` }).eq("id", transfer_id);
       await supabase.from("notifications").insert({ user_id: senderId, title: "Transfer queued", message: `Your ${currency} ${amount} transfer to ${recipient_name} is queued (Flutterwave not yet configured).`, type: "info" });
       return new Response(JSON.stringify({ success: true, stub: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Preflight liquidity — queue instead of failing when FLW balance is low
-    const liq = await checkFlutterwaveLiquidity(supabase, amount, currency, { requireBuffer: false });
-    if (!liq.sufficient) {
-      const internalReason = `FLW ${liq.debitCurrency} shortfall (available ${liq.available}, need ${liq.needed})`;
-      await queuePendingLiquidity(supabase, transfer_id, senderId, internalReason);
+    // V3 balance preflight only (V4 balances endpoint differs).
+    if (!useV4) {
+      const liq = await checkFlutterwaveLiquidity(supabase, amount, currency, { requireBuffer: false });
+      if (!liq.sufficient) {
+        const internalReason = `FLW ${liq.debitCurrency} shortfall (available ${liq.available}, need ${liq.needed})`;
+        await queuePendingLiquidity(supabase, transfer_id, senderId, internalReason);
+        return new Response(JSON.stringify({
+          success: true,
+          queued: true,
+          pending_liquidity: true,
+          code: "pending_liquidity",
+          available: liq.available,
+        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+    }
+
+    const projectRef = Deno.env.get("SUPABASE_URL")?.match(/https:\/\/([^.]+)/)?.[1];
+    const callbackUrl = `https://${projectRef}.functions.supabase.co/flutterwave-webhook`;
+    const isBankRail = !!(bank_code && account_number);
+    const { first, last } = splitRecipientName(recipient_name || "eFin User");
+
+    // ── V4 direct-transfers ───────────────────────────────────────────
+    if (useV4) {
+      const reference = `efmpayout-${transfer_id.replace(/-/g, "").slice(0, 8)}-${Date.now().toString(36)}`;
+      const result = await flwV4CreateDirectTransfer({
+        type: isBankRail ? "bank" : "mobile_money",
+        amount: Math.round(amount * 100) / 100,
+        currency,
+        reference,
+        narration: `Transfer to ${recipient_name}`.slice(0, 180),
+        callbackUrl,
+        meta: { transfer_id, network: network || (isBankRail ? "bank" : ""), api: "v4" },
+        network: network || "",
+        phone: phone_number || "",
+        recipientFirstName: first,
+        recipientLastName: last,
+        bankCode: bank_code,
+        accountNumber: account_number,
+      });
+
+      if (!result.ok) {
+        const rawReason = flwV4ErrorMessage(result.json, `HTTP ${result.status}`);
+        if (isTemporaryProviderSetupError(rawReason)) {
+          const opsReason = `Provider setup required: enable IP whitelisting on Flutterwave for ${currency} payouts. Funds returned. (raw: ${rawReason})`;
+          const userReason = `${currency} payouts are temporarily unavailable. Your funds have been returned to your wallet — please try again shortly.`;
+          const rev = await reverseTransferLedger(supabase, transfer_id);
+          await supabase.from("transfers").update({ status: "failed", failure_reason: opsReason.slice(0, 500) }).eq("id", transfer_id);
+          await supabase.from("notifications").insert({
+            user_id: senderId,
+            title: "Transfer failed — refunded",
+            message: rev.reversed ? userReason : userReason.replace("Your funds have been returned to your wallet — please try again shortly.", "Please contact support."),
+            type: "error",
+          });
+          return new Response(JSON.stringify({
+            success: false,
+            error: userReason,
+            code: "provider_setup_required",
+            refunded: rev.reversed,
+            provider_message: rawReason,
+            api: "v4",
+          }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+        if (isProviderBalanceError(rawReason)) {
+          await queuePendingLiquidity(supabase, transfer_id, senderId, `FLW V4 balance error: ${rawReason}`);
+          return new Response(JSON.stringify({
+            success: true,
+            queued: true,
+            pending_liquidity: true,
+            code: "pending_liquidity",
+            provider_message: rawReason,
+            api: "v4",
+          }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+        const rev = await reverseTransferLedger(supabase, transfer_id);
+        await supabase.from("transfers").update({ status: "failed", failure_reason: rawReason.slice(0, 500) }).eq("id", transfer_id);
+        await supabase.from("notifications").insert({
+          user_id: senderId,
+          title: "Transfer failed — refunded",
+          message: rev.reversed ? `Your transfer to ${recipient_name} could not be sent — ${rawReason} Your wallet has been refunded.` : rawReason,
+          type: "error",
+        });
+        return new Response(JSON.stringify({
+          success: false,
+          error: rawReason,
+          refunded: rev.reversed,
+          api: "v4",
+          provider_response: result.json,
+        }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      await supabase.from("transfers").update({
+        status: "processing",
+        provider_reference: result.transferId || reference,
+      }).eq("id", transfer_id);
+      await supabase.from("notifications").insert({
+        user_id: senderId,
+        title: "Transfer initiated",
+        message: `Your ${currency} ${amount} transfer to ${recipient_name} is being processed.`,
+        type: "info",
+      });
       return new Response(JSON.stringify({
         success: true,
-        queued: true,
-        pending_liquidity: true,
-        code: "pending_liquidity",
-        available: liq.available,
+        reference,
+        flw_id: result.transferId,
+        api: "v4",
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    // ── V3 /transfers fallback ─────────────────────────────────────────
     const reference = `EFM-${transfer_id.slice(0, 8)}-${Date.now()}`;
-    const projectRef = Deno.env.get("SUPABASE_URL")?.match(/https:\/\/([^.]+)/)?.[1];
-    const callbackUrl = `https://${projectRef}.functions.supabase.co/flutterwave-webhook`;
-
-    // Bank rail = caller provided both bank_code and account_number
-    // (NGN NUBAN, GHS branch code, or any other Flutterwave-supported bank corridor).
-    const isBankRail = !!(bank_code && account_number);
     const debitCurrency = Deno.env.get("FLW_MERCHANT_CURRENCY") || "NGN";
     let payload: Record<string, unknown>;
     if (isBankRail) {
@@ -202,7 +297,6 @@ Deno.serve(async (req) => {
       if (branch) (payload as Record<string, unknown>).destination_branch_code = branch;
     }
 
-    // Hard-stop if the destination requires a branch code we don't know.
     if (BRANCH_CODE_REQUIRED_CURRENCIES.has(currency) && !(payload as Record<string, unknown>).destination_branch_code) {
       const reason = `Missing branch code for ${currency} payout — network not yet supported`;
       const rev = await reverseTransferLedger(supabase, transfer_id);
@@ -228,8 +322,7 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ success: false, error: userReason, code: "provider_setup_required", refunded: rev.reversed, provider_message: rawReason }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
       if (isProviderBalanceError(rawReason)) {
-        const internalReason = `FLW balance error: ${rawReason}`;
-        await queuePendingLiquidity(supabase, transfer_id, senderId, internalReason);
+        await queuePendingLiquidity(supabase, transfer_id, senderId, `FLW balance error: ${rawReason}`);
         return new Response(JSON.stringify({
           success: true,
           queued: true,
@@ -246,10 +339,10 @@ Deno.serve(async (req) => {
 
     await supabase.from("transfers").update({ status: "processing", provider_reference: String(json.data?.id || json.data?.reference || reference) }).eq("id", transfer_id);
     await supabase.from("notifications").insert({ user_id: senderId, title: "Transfer initiated", message: `Your ${currency} ${amount} transfer to ${recipient_name} is being processed.`, type: "info" });
-    return new Response(JSON.stringify({ success: true, reference, flw_id: json.data?.id }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ success: true, reference, flw_id: json.data?.id, api: "v3" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
-    console.error("flutterwave-payout V3 error", msg);
+    console.error("flutterwave-payout error", msg);
     if (currentTransferId) {
       try {
         const rev = await reverseTransferLedger(supabase, currentTransferId);
