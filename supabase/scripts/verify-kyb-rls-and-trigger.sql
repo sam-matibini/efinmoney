@@ -3,16 +3,39 @@
 --   (b) the approval trigger -- a business cannot reach 'approved' while any
 --       required document is missing or unapproved.
 --
--- The fixtures need rows in auth.users (business_profiles.owner_user_id has an
--- FK to it), and inserting there fires on_auth_user_created -> handle_new_user,
--- which provisions profiles/wallets/roles/risk-tiers AND queues a welcome email
--- through pg_net. None of that may survive on a live database.
+-- Run in Supabase Dashboard -> SQL Editor -> New query -> paste -> Run, AFTER
+-- the KYB migrations (20260722120000, 20260722121000) have been applied.
+-- Prefer a branch or staging database. Read the caveats below before running
+-- it against production.
 --
--- So the whole body runs inside an inner block with an EXCEPTION handler. That
--- makes it a subtransaction: the sentinel raised at the end unwinds every write
--- above it -- the auth.users rows, everything handle_new_user created, and the
--- queued pg_net request -- while still letting a genuine failure propagate and
--- fail the migration.
+-- Deliberately NOT a migration: it needs rows in auth.users (business_profiles
+-- .owner_user_id has an FK to it), and inserting there fires
+-- on_auth_user_created -> handle_new_user, which provisions profiles, wallets,
+-- user_roles and risk tiers, and queues a welcome email through pg_net. None of
+-- that may survive on a live database, and it is not something that should fire
+-- automatically on every `supabase db push`.
+--
+-- Two mitigations, and one caveat:
+--
+--   * The whole body runs inside an inner block with an EXCEPTION handler,
+--     making it a subtransaction. The sentinel raised at the end unwinds every
+--     write above it -- the auth.users rows, everything handle_new_user
+--     created, and the queued pg_net request. A genuine check failure still
+--     propagates and aborts with a readable message.
+--
+--   * Success is reported via RAISE NOTICE, so check the output: a silent run
+--     means the notices were suppressed, not that the checks were skipped.
+--
+--   * CAVEAT: the auth.users INSERT below lists the columns required by the
+--     auth schema at time of writing. If Supabase has since added a NOT NULL
+--     column, this aborts on the INSERT before any check runs. That is a false
+--     negative on the script, not a fault in the KYB schema -- add the column
+--     and re-run.
+--
+-- This exercises the policy predicate functions directly. It cannot exercise
+-- RLS enforcement itself, because SQL Editor and migrations both run with
+-- privileges that bypass RLS. To test enforcement end to end, sign in as two
+-- separate non-staff users and confirm neither sees the other's business.
 
 DO $outer$
 DECLARE
