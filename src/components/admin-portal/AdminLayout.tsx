@@ -19,6 +19,7 @@ import AdminPageSkeleton from "@/components/admin-portal/AdminPageSkeleton";
 const NAV = [
   { to: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/admin/kyc", label: "KYC Queue", icon: ShieldCheck },
+  { to: "/admin/kyb", label: "KYB Queue", icon: Building2 },
   { to: "/admin/users", label: "Users", icon: Users },
   { to: "/admin/staff", label: "Staff", icon: UserCog, requiresStaffMgmt: true },
   { to: "/admin/board-dashboard", label: "Board", icon: Gauge },

@@ -69,12 +69,20 @@ const Welcome = lazyImport(() => import("./pages/onboarding/Welcome"));
 const OnboardingIdentity = lazyImport(() => import("./pages/onboarding/Identity"));
 const OnboardingEnhanced = lazyImport(() => import("./pages/onboarding/Enhanced"));
 const OnboardingRejected = lazyImport(() => import("./pages/onboarding/Rejected"));
+const KybDetails = lazyImport(() => import("./pages/onboarding/business/Details"));
+const KybOwnership = lazyImport(() => import("./pages/onboarding/business/Ownership"));
+const KybDocuments = lazyImport(() => import("./pages/onboarding/business/Documents"));
+const KybReview = lazyImport(() => import("./pages/onboarding/business/Review"));
+const KybSubmitted = lazyImport(() => import("./pages/onboarding/business/Submitted"));
+const KybRejected = lazyImport(() => import("./pages/onboarding/business/Rejected"));
 const ShortLinkResolver = lazyImport(() => import("./pages/ShortLinkResolver"));
 const ClaimPaymentLinkPage = lazyImport(() => import("./pages/ClaimPaymentLinkPage"));
 const AdminLogin = lazyImport(() => import("./pages/admin/AdminLogin"));
 const AdminDashboardPage = lazyImport(() => import("./pages/admin/AdminDashboardPage"));
 const KycQueuePage = lazyImport(() => import("./pages/admin/KycQueuePage"));
 const KycReviewPage = lazyImport(() => import("./pages/admin/KycReviewPage"));
+const KybQueuePage = lazyImport(() => import("./pages/admin/KybQueuePage"));
+const KybReviewPage = lazyImport(() => import("./pages/admin/KybReviewPage"));
 const AdminAdyenLinksPage = lazyImport(() => import("./pages/admin/AdminAdyenLinksPage"));
 const AdminAdyenTransactionsPage = lazyImport(() => import("./pages/admin/AdminAdyenTransactionsPage"));
 const RiskTiersPage = lazyImport(() => import("./pages/admin/RiskTiersPage"));
@@ -292,6 +300,8 @@ const AppRoutes = () => {
         <Route path="/admin/dashboard" element={<AdminAuthProvider><AdminGuard><AdminDashboardPage /></AdminGuard></AdminAuthProvider>} />
         <Route path="/admin/kyc" element={<AdminAuthProvider><AdminGuard><KycQueuePage /></AdminGuard></AdminAuthProvider>} />
         <Route path="/admin/kyc/:id" element={<AdminAuthProvider><AdminGuard><KycReviewPage /></AdminGuard></AdminAuthProvider>} />
+        <Route path="/admin/kyb" element={<AdminAuthProvider><AdminGuard><KybQueuePage /></AdminGuard></AdminAuthProvider>} />
+        <Route path="/admin/kyb/:id" element={<AdminAuthProvider><AdminGuard><KybReviewPage /></AdminGuard></AdminAuthProvider>} />
         <Route path="/admin/users" element={<AdminAuthProvider><AdminGuard><UsersPage /></AdminGuard></AdminAuthProvider>} />
         <Route path="/admin/users/:id" element={<AdminAuthProvider><AdminGuard><UserDetailPage /></AdminGuard></AdminAuthProvider>} />
         <Route path="/admin/risk-tiers" element={<AdminAuthProvider><AdminGuard><RiskTiersPage /></AdminGuard></AdminAuthProvider>} />
@@ -347,6 +357,13 @@ const AppRoutes = () => {
         <Route path="/onboarding/pending" element={<Navigate to="/dashboard" replace />} />
         <Route path="/onboarding/approved" element={<Navigate to="/dashboard" replace />} />
         <Route path="/onboarding/rejected" element={<ProtectedRoute><OnboardingRejected /></ProtectedRoute>} />
+        <Route path="/onboarding/business" element={<Navigate to="/onboarding/business/details" replace />} />
+        <Route path="/onboarding/business/details" element={<ProtectedRoute><KybDetails /></ProtectedRoute>} />
+        <Route path="/onboarding/business/ownership" element={<ProtectedRoute><KybOwnership /></ProtectedRoute>} />
+        <Route path="/onboarding/business/documents" element={<ProtectedRoute><KybDocuments /></ProtectedRoute>} />
+        <Route path="/onboarding/business/review" element={<ProtectedRoute><KybReview /></ProtectedRoute>} />
+        <Route path="/onboarding/business/submitted" element={<ProtectedRoute><KybSubmitted /></ProtectedRoute>} />
+        <Route path="/onboarding/business/rejected" element={<ProtectedRoute><KybRejected /></ProtectedRoute>} />
         <Route path="/settings/profile" element={<Navigate to="/profile" replace />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
