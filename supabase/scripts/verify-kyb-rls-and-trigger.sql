@@ -81,6 +81,14 @@ BEGIN
     (v_user_b, 'Verify Co B', 'corporation', 'CA', 'B-0001', 'in_progress')
   RETURNING id INTO v_biz_b;
 
+  -- A real business always declares at least one beneficial owner, and
+  -- screening covers the business plus every owner -- so the fixture needs one
+  -- for the screening assertions in (d) to mean anything.
+  INSERT INTO public.business_owners
+    (business_profile_id, full_name, role, ownership_percent, verification_status)
+  VALUES
+    (v_biz_a, 'Verify Owner One', 'beneficial_owner', 100, 'pending');
+
   -- ---------- (a) RLS boundary ----------
   -- owns_business() is what every business_* policy delegates to, so testing it
   -- directly tests the boundary without needing to impersonate a JWT.
