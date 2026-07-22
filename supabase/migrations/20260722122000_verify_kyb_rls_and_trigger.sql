@@ -2,10 +2,19 @@
 --   (a) the RLS boundary -- business A must be invisible to business B's owner;
 --   (b) the approval trigger -- a business cannot reach 'approved' while any
 --       required document is missing or unapproved.
--- Everything runs inside a transaction that is rolled back, so no test rows
--- survive. Raises an exception (failing the migration) if a check fails.
+--
+-- The fixtures need rows in auth.users (business_profiles.owner_user_id has an
+-- FK to it), and inserting there fires on_auth_user_created -> handle_new_user,
+-- which provisions profiles/wallets/roles/risk-tiers AND queues a welcome email
+-- through pg_net. None of that may survive on a live database.
+--
+-- So the whole body runs inside an inner block with an EXCEPTION handler. That
+-- makes it a subtransaction: the sentinel raised at the end unwinds every write
+-- above it -- the auth.users rows, everything handle_new_user created, and the
+-- queued pg_net request -- while still letting a genuine failure propagate and
+-- fail the migration.
 
-DO $$
+DO $outer$
 DECLARE
   v_user_a uuid := gen_random_uuid();
   v_user_b uuid := gen_random_uuid();
@@ -16,6 +25,8 @@ DECLARE
   v_blocked boolean := false;
   r RECORD;
 BEGIN
+ BEGIN   -- subtransaction: everything below is unwound before this migration commits
+
   -- Isolated identities for the fixtures.
   INSERT INTO auth.users (id, instance_id, aud, role, email, encrypted_password,
                           email_confirmed_at, created_at, updated_at)
@@ -128,9 +139,17 @@ BEGIN
   END IF;
   RAISE NOTICE 'OK  (c) % audit row(s) recorded', v_visible;
 
-  -- Discard the fixtures.
-  DELETE FROM public.business_profiles WHERE id IN (v_biz_a, v_biz_b);
-  DELETE FROM auth.users WHERE id IN (v_user_a, v_user_b);
+  -- All checks passed. Unwind the subtransaction so none of the fixtures --
+  -- nor anything handle_new_user provisioned for them -- reaches the commit.
+  RAISE EXCEPTION 'KYB_VERIFY_ROLLBACK';
 
-  RAISE NOTICE 'KYB verification passed.';
-END $$;
+ EXCEPTION
+   WHEN OTHERS THEN
+     IF SQLERRM = 'KYB_VERIFY_ROLLBACK' THEN
+       RAISE NOTICE 'KYB verification passed; all fixtures rolled back.';
+     ELSE
+       -- A real failure: re-raise so the migration aborts.
+       RAISE;
+     END IF;
+ END;
+END $outer$;
