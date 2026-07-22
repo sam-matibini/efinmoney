@@ -1,7 +1,16 @@
--- Verifies the two things that must not regress on the KYB module:
+-- Verifies the things that must not regress on the KYB module:
 --   (a) the RLS boundary -- business A must be invisible to business B's owner;
 --   (b) the approval trigger -- a business cannot reach 'approved' while any
---       required document is missing or unapproved.
+--       required document is missing or unapproved;
+--   (c) every status transition lands on the audit trail;
+--   (d) submission screens the business and its owners against aml_watchlist,
+--       and an unresolved hit blocks approval;
+--   (e) a declared PEP blocks approval until signed off individually;
+--   (f) limit resolution picks business limits for an approved business owner
+--       and individual limits for everyone else.
+--
+-- Note: (d) forces a synthetic hit rather than relying on a real watchlist
+-- match, so the test does not depend on aml_watchlist contents.
 --
 -- Run in Supabase Dashboard -> SQL Editor -> New query -> paste -> Run, AFTER
 -- the KYB migrations (20260722120000, 20260722121000) have been applied.
@@ -45,6 +54,7 @@ DECLARE
   v_biz_b uuid;
   v_visible bigint;
   v_status kyb_status;
+  v_scope text;
   v_blocked boolean := false;
   r RECORD;
 BEGIN
@@ -161,6 +171,87 @@ BEGIN
     RAISE EXCEPTION 'AUDIT FAILED: expected at least 2 audit rows, found %', v_visible;
   END IF;
   RAISE NOTICE 'OK  (c) % audit row(s) recorded', v_visible;
+
+  -- ---------- (d) sanctions screening ----------
+  -- Reset to in_progress, then submit: the AFTER trigger must screen the
+  -- business name plus every declared owner.
+  UPDATE public.business_profiles SET kyb_status = 'in_progress' WHERE id = v_biz_a;
+  UPDATE public.business_profiles SET kyb_status = 'pending_review' WHERE id = v_biz_a;
+
+  SELECT count(*) INTO v_visible
+    FROM public.aml_screenings WHERE trigger = 'kyb' AND trigger_ref = v_biz_a;
+  IF v_visible < 2 THEN
+    RAISE EXCEPTION
+      'SCREENING FAILED: expected >=2 screening rows (business + owner), found %', v_visible;
+  END IF;
+  RAISE NOTICE 'OK  (d) screening produced % subject row(s)', v_visible;
+
+  -- Force an unresolved hit and confirm approval is refused.
+  UPDATE public.aml_screenings
+     SET status = 'hit', match_count = 1, screened_by = NULL
+   WHERE trigger = 'kyb' AND trigger_ref = v_biz_a
+     AND subject_name = 'Verify Co A';
+
+  v_blocked := false;
+  BEGIN
+    UPDATE public.business_profiles SET kyb_status = 'approved' WHERE id = v_biz_a;
+  EXCEPTION WHEN check_violation THEN
+    v_blocked := true;
+  END;
+  IF NOT v_blocked THEN
+    RAISE EXCEPTION 'SCREENING FAILED: business approved with an unresolved sanctions hit';
+  END IF;
+  RAISE NOTICE 'OK  (d) approval blocked by unresolved sanctions hit';
+
+  -- Resolving it (stamping screened_by) must unblock approval.
+  UPDATE public.aml_screenings
+     SET screened_by = v_user_a, status = 'clear'
+   WHERE trigger = 'kyb' AND trigger_ref = v_biz_a;
+
+  -- ---------- (e) PEP sign-off ----------
+  INSERT INTO public.business_owners
+    (business_profile_id, full_name, role, ownership_percent, is_pep, verification_status)
+  VALUES
+    (v_biz_a, 'Verify Pep Person', 'director', 0, true, 'pending');
+
+  v_blocked := false;
+  BEGIN
+    UPDATE public.business_profiles SET kyb_status = 'approved' WHERE id = v_biz_a;
+  EXCEPTION WHEN check_violation THEN
+    v_blocked := true;
+  END;
+  IF NOT v_blocked THEN
+    RAISE EXCEPTION 'PEP FAILED: business approved with an unsigned-off PEP';
+  END IF;
+  RAISE NOTICE 'OK  (e) approval blocked by PEP awaiting sign-off';
+
+  UPDATE public.business_owners
+     SET verification_status = 'approved'
+   WHERE business_profile_id = v_biz_a AND is_pep;
+
+  UPDATE public.business_profiles SET kyb_status = 'approved' WHERE id = v_biz_a;
+  SELECT kyb_status INTO v_status FROM public.business_profiles WHERE id = v_biz_a;
+  IF v_status <> 'approved' THEN
+    RAISE EXCEPTION 'PEP FAILED: approval still refused after sign-off, got %', v_status;
+  END IF;
+  RAISE NOTICE 'OK  (e) approval proceeds once hits are reviewed and PEPs signed off';
+
+  -- ---------- (f) limit resolution ----------
+  -- Owner A now has an approved business, so business limits must win.
+  SELECT scope INTO v_scope FROM public.resolve_transaction_limits(v_user_a);
+  IF v_scope IS DISTINCT FROM 'business' THEN
+    RAISE EXCEPTION 'LIMITS FAILED: expected business scope for an approved owner, got %',
+      COALESCE(v_scope, 'null');
+  END IF;
+  RAISE NOTICE 'OK  (f) approved business owner resolves to business limits';
+
+  -- Owner B has no approved business, so their individual tier applies.
+  SELECT scope INTO v_scope FROM public.resolve_transaction_limits(v_user_b);
+  IF v_scope IS DISTINCT FROM 'individual' THEN
+    RAISE EXCEPTION 'LIMITS FAILED: expected individual scope for user B, got %',
+      COALESCE(v_scope, 'null');
+  END IF;
+  RAISE NOTICE 'OK  (f) non-business user resolves to individual limits';
 
   -- All checks passed. Unwind the subtransaction so none of the fixtures --
   -- nor anything handle_new_user provisioned for them -- reaches the commit.

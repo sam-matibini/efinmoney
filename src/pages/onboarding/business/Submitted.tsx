@@ -37,7 +37,9 @@ const Submitted = () => {
         <div>
           <p className="text-sm font-medium text-foreground">We'll email you the decision</p>
           <p className="text-xs text-muted-foreground">
-            Once approved, your business account is enabled for payments straight away.
+            Sent to {business?.business_email || "your account email"}. You'll also see it in
+            your notifications. Once approved, your business account is enabled for payments
+            straight away.
           </p>
         </div>
       </Card>

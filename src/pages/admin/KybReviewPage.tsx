@@ -34,7 +34,7 @@ const KybReviewPage = () => {
     queryKey: ["admin-kyb", id],
     enabled: !!id,
     queryFn: async () => {
-      const [b, o, d, a] = await Promise.all([
+      const [b, o, d, a, s] = await Promise.all([
         db.from("business_profiles").select("*").eq("id", id).maybeSingle(),
         db
           .from("business_owners")
@@ -51,6 +51,12 @@ const KybReviewPage = () => {
           .select("*")
           .eq("business_profile_id", id)
           .order("created_at", { ascending: false }),
+        db
+          .from("aml_screenings")
+          .select("*")
+          .eq("trigger", "kyb")
+          .eq("trigger_ref", id)
+          .order("match_count", { ascending: false }),
       ]);
       if (b.error) throw b.error;
       return {
@@ -58,6 +64,7 @@ const KybReviewPage = () => {
         owners: (o.data || []) as any[],
         documents: (d.data || []) as any[],
         audit: (a.data || []) as any[],
+        screenings: (s.data || []) as any[],
       };
     },
   });
@@ -88,6 +95,51 @@ const KybReviewPage = () => {
     },
     onSuccess: invalidate,
     onError: (e: any) => toast.error(e?.message || "Could not update document."),
+  });
+
+  // Stamping screened_by is what marks a hit resolved — the approval trigger
+  // counts hits with screened_by IS NULL and refuses while any remain.
+  const clearHit = useMutation({
+    mutationFn: async ({ screeningId, isFalsePositive }: { screeningId: string; isFalsePositive: boolean }) => {
+      const { data: session } = await supabase.auth.getUser();
+      const { error } = await db
+        .from("aml_screenings")
+        .update({
+          screened_by: session.user?.id ?? null,
+          screened_at: new Date().toISOString(),
+          status: isFalsePositive ? "clear" : "hit",
+        })
+        .eq("id", screeningId);
+      if (error) throw error;
+    },
+    onSuccess: invalidate,
+    onError: (e: any) => toast.error(e?.message || "Could not update the screening."),
+  });
+
+  const reviewOwner = useMutation({
+    mutationFn: async ({ ownerId, status }: { ownerId: string; status: "approved" | "rejected" }) => {
+      const { error } = await db
+        .from("business_owners")
+        .update({ verification_status: status })
+        .eq("id", ownerId);
+      if (error) throw error;
+    },
+    onSuccess: invalidate,
+    onError: (e: any) => toast.error(e?.message || "Could not update the owner."),
+  });
+
+  const rescreen = useMutation({
+    mutationFn: async () => {
+      const { error } = await (supabase as any).rpc("screen_kyb_entity", {
+        p_business_profile_id: id,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Re-screened against the current watchlist.");
+      invalidate();
+    },
+    onError: (e: any) => toast.error(e?.message || "Could not re-screen."),
   });
 
   const decide = useMutation({
@@ -146,6 +198,13 @@ const KybReviewPage = () => {
     ownerId ? owners.find((o) => o.id === ownerId)?.full_name : null;
 
   const decided = ["approved", "rejected", "suspended"].includes(b.kyb_status);
+
+  const screenings = data!.screenings;
+  const unresolvedHits = screenings.filter((s) => s.status === "hit" && !s.screened_by);
+  const pepsPendingSignoff = owners.filter(
+    (o) => o.is_pep && o.verification_status !== "approved"
+  );
+  const blockers = unresolvedHits.length + pepsPendingSignoff.length;
 
   return (
     <AdminLayout>
@@ -255,6 +314,103 @@ const KybReviewPage = () => {
           </Card>
         </div>
 
+        <Card className={unresolvedHits.length > 0 ? "border-destructive/50" : undefined}>
+          <CardHeader className="flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-base">
+              Sanctions &amp; PEP screening
+              {b.aml_last_screened_at && (
+                <span className="ml-2 text-xs font-normal text-muted-foreground">
+                  last run {format(new Date(b.aml_last_screened_at), "PPp")}
+                </span>
+              )}
+            </CardTitle>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={rescreen.isPending}
+              onClick={() => rescreen.mutate()}
+            >
+              {rescreen.isPending ? "Screening..." : "Re-screen"}
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {screenings.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                Not screened yet — screening runs automatically on submission.
+              </p>
+            )}
+            {screenings.map((s) => {
+              const isHit = s.status === "hit";
+              const resolved = Boolean(s.screened_by);
+              return (
+                <div
+                  key={s.id}
+                  className="flex items-center gap-3 rounded-lg border p-3 flex-wrap"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium">{s.subject_name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {isHit ? `${s.match_count} watchlist match(es)` : "No match"}
+                      {s.subject_country && ` · ${s.subject_country}`}
+                      {resolved && " · reviewed"}
+                    </p>
+                  </div>
+                  <Badge
+                    variant={isHit && !resolved ? "destructive" : isHit ? "outline" : "secondary"}
+                  >
+                    {isHit ? (resolved ? "hit — reviewed" : "hit") : "clear"}
+                  </Badge>
+                  {isHit && !resolved && (
+                    <>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={clearHit.isPending}
+                        onClick={() =>
+                          clearHit.mutate({ screeningId: s.id, isFalsePositive: true })
+                        }
+                      >
+                        False positive
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={clearHit.isPending}
+                        onClick={() =>
+                          clearHit.mutate({ screeningId: s.id, isFalsePositive: false })
+                        }
+                      >
+                        Confirmed — reviewed
+                      </Button>
+                    </>
+                  )}
+                </div>
+              );
+            })}
+
+            {pepsPendingSignoff.length > 0 && (
+              <div className="rounded-lg border border-destructive/50 p-3 space-y-2">
+                <p className="text-sm font-medium">
+                  Politically exposed person(s) awaiting sign-off
+                </p>
+                {pepsPendingSignoff.map((o) => (
+                  <div key={o.id} className="flex items-center gap-3 flex-wrap">
+                    <span className="text-sm flex-1 min-w-0">{o.full_name}</span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={reviewOwner.isPending}
+                      onClick={() => reviewOwner.mutate({ ownerId: o.id, status: "approved" })}
+                    >
+                      Approve this person
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Documents</CardTitle>
@@ -359,8 +515,25 @@ const KybReviewPage = () => {
                 </Button>
               )}
             </div>
+            {blockers > 0 && (
+              <div className="flex items-start gap-2 rounded-lg border border-destructive/50 p-3">
+                <AlertTriangle className="w-4 h-4 text-destructive mt-0.5 flex-shrink-0" />
+                <div className="text-sm">
+                  <p className="font-medium">Approval will be refused</p>
+                  <ul className="text-muted-foreground mt-1 space-y-0.5">
+                    {unresolvedHits.length > 0 && (
+                      <li>{unresolvedHits.length} unresolved sanctions hit(s)</li>
+                    )}
+                    {pepsPendingSignoff.length > 0 && (
+                      <li>{pepsPendingSignoff.length} PEP(s) awaiting sign-off</li>
+                    )}
+                  </ul>
+                </div>
+              </div>
+            )}
             <p className="text-xs text-muted-foreground">
-              Approval is blocked until every required business document is marked approved.
+              Approval is blocked until every required business document is approved, every
+              sanctions hit is reviewed, and every declared PEP is signed off.
             </p>
           </CardContent>
         </Card>

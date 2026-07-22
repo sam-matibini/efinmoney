@@ -1,5 +1,5 @@
 // Send transactional emails via Resend.
-// Body: { type: 'welcome' | 'transfer_completed' | 'kyc_update' | 'topup_completed', to: string, data?: Record<string, any> }
+// Body: { type: 'welcome' | 'transfer_completed' | 'kyc_update' | 'kyb_update' | 'topup_completed', to: string, data?: Record<string, any> }
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -89,6 +89,39 @@ function kycHtml(status: string) {
     </div>`;
 }
 
+function kybHtml(d: Record<string, any>) {
+  const name = d.legal_name || "your business";
+  const status = String(d.status || "updated");
+  const appUrl = d.app_url || "https://efin.money";
+
+  const body: Record<string, string> = {
+    approved: `<p style="line-height:1.55"><strong>${name}</strong> has been verified. Your business account is active and ready to send and receive payments.</p>`,
+    rejected: `<p style="line-height:1.55">We were unable to verify <strong>${name}</strong>.</p>
+      ${d.reason ? `<div style="margin:20px 0;padding:16px;border-left:3px solid #ef4444;background:#fef2f2"><p style="margin:0;line-height:1.55">${d.reason}</p></div>` : ""}
+      <p style="line-height:1.55">You can update your details and resubmit — everything you entered has been saved.</p>`,
+    suspended: `<p style="line-height:1.55">The business account for <strong>${name}</strong> has been suspended.</p>
+      ${d.reason ? `<div style="margin:20px 0;padding:16px;border-left:3px solid #ef4444;background:#fef2f2"><p style="margin:0;line-height:1.55">${d.reason}</p></div>` : ""}
+      <p style="line-height:1.55">Please contact support to discuss reinstating it.</p>`,
+    pending_review: `<p style="line-height:1.55">We have received the verification application for <strong>${name}</strong>.</p>
+      <p style="line-height:1.55">Our compliance team reviews applications within 1–2 business days. We will email you as soon as there is a decision.</p>`,
+  };
+
+  const headings: Record<string, string> = {
+    approved: "Business verified ✅",
+    rejected: "Business verification unsuccessful",
+    suspended: "Business account suspended",
+    pending_review: "Application received",
+  };
+
+  return `
+    <div style="font-family:Inter,system-ui,sans-serif;max-width:560px;margin:auto;padding:24px;color:#0f172a">
+      <h1 style="font-size:22px;margin:0 0 12px">${headings[status] || "Business verification update"}</h1>
+      ${body[status] || `<p style="line-height:1.55">The verification status for <strong>${name}</strong> is now: <strong>${status}</strong>.</p>`}
+      <p style="margin-top:24px"><a href="${appUrl}/dashboard" style="color:#2563eb">Open your dashboard</a></p>
+      <p style="color:#64748b;font-size:12px;margin-top:32px">— eFinMoney Compliance</p>
+    </div>`;
+}
+
 function topupCompletedHtml(d: Record<string, any>) {
   const currency = d.currency || "";
   const amount = Number(d.amount || 0);
@@ -144,6 +177,15 @@ Deno.serve(async (req) => {
     } else if (type === "kyc_update") {
       subject = `KYC status updated: ${data.status}`;
       html = kycHtml(data.status || "updated");
+    } else if (type === "kyb_update") {
+      const subjects: Record<string, string> = {
+        approved: `${data.legal_name || "Your business"} is verified`,
+        rejected: `Action needed: ${data.legal_name || "your business"} verification`,
+        suspended: `${data.legal_name || "Your business"} account suspended`,
+        pending_review: `We received your application for ${data.legal_name || "your business"}`,
+      };
+      subject = subjects[String(data.status)] || `Business verification updated: ${data.status}`;
+      html = kybHtml(data);
     } else if (type === "topup_completed") {
       const sym = { CAD: "C$", USD: "$", EUR: "€", GBP: "£", NGN: "₦", GHS: "GH₵" }[data.currency] || "";
       const amt = data.currency === "NGN" ? Number(data.amount || 0).toLocaleString() : Number(data.amount || 0).toFixed(2);
