@@ -1,16 +1,15 @@
 #!/usr/bin/env node
 /**
- * Probe Lenhub Flutter wrapper (mtn.lenhub.net/app/flutter/*)
+ * Probe Lenhub Flutter wrapper (efincash.lenhub.net/v1/flutterwave/flutter/*)
  * Usage: node scripts/probe-lenhub-flutter.mjs
  * Optional live card (charges real money — tiny amount):
  *   LENHUB_CARD_NUMBER=... LENHUB_CARD_EXP_MONTH=09 LENHUB_CARD_EXP_YEAR=27 LENHUB_CARD_CVV=... \
- *   LENHUB_CARD_CURRENCY=USD LENHUB_CARD_AMOUNT=1 node scripts/probe-lenhub-flutter.mjs
+ *   LENHUB_CARD_CURRENCY=NGN LENHUB_CARD_AMOUNT=100 node scripts/probe-lenhub-flutter.mjs
  */
-const BASE = (process.env.LENHUB_FLUTTER_API_URL || "https://mtn.lenhub.net").replace(/\/+$/, "");
+const BASE = (process.env.LENHUB_FLUTTER_API_URL || "https://efincash.lenhub.net").replace(/\/+$/, "");
+const PREFIX = "/v1/flutterwave/flutter";
 
 async function hit(method, path, { query = {}, body } = {}) {
-  const url = new URL(path, BASE.endsWith("/") ? BASE : BASE + "/");
-  // path already absolute-ish
   const u = new URL(path.startsWith("http") ? path : `${BASE}${path.startsWith("/") ? "" : "/"}${path}`);
   for (const [k, v] of Object.entries(query)) {
     if (v === undefined || v === null || v === "") continue;
@@ -78,7 +77,13 @@ function pickType(json) {
   return null;
 }
 
-console.log(`Base: ${BASE}\n`);
+function summarizeFail(json) {
+  const s = JSON.stringify(json);
+  return s.length > 160 ? s.slice(0, 160) : s;
+}
+
+console.log(`Base: ${BASE}`);
+console.log(`Prefix: ${PREFIX}\n`);
 
 // --- Parser self-check (Postman shape) ---
 const sample = {
@@ -92,8 +97,8 @@ console.log(`parser type: ${pickType(sample)} (expect additional_fields)\n`);
 console.log("=== Banks ===");
 const countries = ["NG", "GH", "KE", "UG", "TZ", "RW", "ZM"];
 for (const c of countries) {
-  const { status, json } = await hit("GET", "/app/flutter/bank/code/", { query: { country_code: c } });
-  console.log(`banks ${c}: HTTP ${status} count=${bankCount(json)}`);
+  const { status, json } = await hit("GET", `${PREFIX}/bank/code/`, { query: { country_code: c } });
+  console.log(`banks ${c}: HTTP ${status} count=${bankCount(json)} ${bankCount(json) ? "" : summarizeFail(json)}`);
 }
 
 // --- FX ---
@@ -113,43 +118,77 @@ const pairs = [
   ["CAD", "USD"],
 ];
 for (const [s, d] of pairs) {
-  const { status, json } = await hit("POST", "/app/flutter/exchange/rate/", {
+  const { status, json } = await hit("POST", `${PREFIX}/exchange/rate/`, {
     query: { source_currency: s, destination_currency: d, amount: 10 },
   });
   console.log(
-    `FX ${s}->${d}: HTTP ${status} ${okFx(json) ? `OK rate=${fxRate(json)}` : `FAIL ${JSON.stringify(json).slice(0, 140)}`}`,
+    `FX ${s}->${d}: HTTP ${status} ${okFx(json) ? `OK rate=${fxRate(json)}` : `FAIL ${summarizeFail(json)}`}`,
   );
 }
 
-// --- Networks ---
+// --- Networks (new check/mobile/networks endpoint) ---
 console.log("\n=== MoMo networks ===");
 for (const c of ["GH", "KE", "UG", "NG", "TZ", "RW", "ZM"]) {
-  const { status, json } = await hit("POST", "/app/flutter/create/customer/", { query: { country: c } });
-  const nets = (json?.message?.data || []).map((n) => n.network).filter(Boolean).join(",") ||
-    (Array.isArray(json?.message) ? JSON.stringify(json.message).slice(0, 80) : JSON.stringify(json).slice(0, 100));
+  const { status, json } = await hit("POST", `${PREFIX}/check/mobile/networks/`, { query: { country: c } });
+  const data = json?.message?.data || json?.message?.message?.data || json?.data;
+  const nets = Array.isArray(data)
+    ? data.map((n) => n.network || n.name).filter(Boolean).join(",")
+    : summarizeFail(json);
   console.log(`networks ${c}: HTTP ${status} ${nets}`);
 }
 
-// --- Account verify (NG sample — may fail if account invalid; just capability signal) ---
+// --- Account verify (NG sample) ---
 console.log("\n=== Verify account (NG smoke) ===");
 {
-  const { status, json } = await hit("POST", "/app/flutter/verify/account/", {
+  const { status, json } = await hit("POST", `${PREFIX}/verify/account/`, {
     query: { account_number: "0690000031", currency: "NGN", bank_code: "044" },
   });
-  console.log(`verify NG: HTTP ${status} ${JSON.stringify(json).slice(0, 220)}`);
+  console.log(`verify NG: HTTP ${status} ${summarizeFail(json)}`);
 }
 
 // --- Virtual account ---
 console.log("\n=== Virtual account ===");
 {
-  const { status, json } = await hit("POST", "/app/flutter/create/virtual/account/", {
+  const { status, json } = await hit("POST", `${PREFIX}/create/virtual/account/`, {
     query: {
       email: "probe@efin.money",
       amount: 1000,
       narration: "efin-probe-va",
     },
   });
-  console.log(`VA: HTTP ${status} ${JSON.stringify(json).slice(0, 220)}`);
+  console.log(`VA: HTTP ${status} ${summarizeFail(json)}`);
+}
+
+// --- New Kenya MoMo route exists? (no live money — missing required fields would 4xx; we send probe-shaped params) ---
+console.log("\n=== Kenya MoMo route smoke (no live payout intent) ===");
+{
+  const { status, json } = await hit("POST", `${PREFIX}/kenya/mobile/money/transfer/`, {
+    query: {
+      amount: 1,
+      number: "254700000000",
+      first_name: "Probe",
+      last_name: "User",
+      network: "MPESA",
+      source_currency: "USD",
+      narration: "efin-route-smoke",
+    },
+  });
+  console.log(`kenya momo: HTTP ${status} ${summarizeFail(json)}`);
+}
+
+// --- Elicate Zambia route smoke ---
+console.log("\n=== Elicate Zambia route smoke ===");
+{
+  const { status, json } = await hit("POST", "/v1/elicate/flutter/zambia/payout/", {
+    query: {
+      amount: 1,
+      account_type: "mobile_money",
+      account_number: "260970000000",
+      fullname: "Probe User",
+      narrative: "efin-route-smoke",
+    },
+  });
+  console.log(`zambia elicate: HTTP ${status} ${summarizeFail(json)}`);
 }
 
 // --- Optional live card create ---
@@ -162,17 +201,16 @@ if (pan) {
     expiry_date_year: String(process.env.LENHUB_CARD_EXP_YEAR || "").slice(-2),
     cvv: String(process.env.LENHUB_CARD_CVV || ""),
     amount: Number(process.env.LENHUB_CARD_AMOUNT || 1),
-    callback: "https://dkdnwumllibwdlqbjkwy.supabase.co/functions/v1/lenhub-flutter-webhook",
+    callback: "https://efin-flw-proxy.ukwenzyb.workers.dev/webhooks/lenhub-flutter",
     email: process.env.LENHUB_CARD_EMAIL || "probe@efin.money",
-    currency: (process.env.LENHUB_CARD_CURRENCY || "USD").toUpperCase(),
+    currency: (process.env.LENHUB_CARD_CURRENCY || "NGN").toUpperCase(),
   };
-  const { status, json } = await hit("POST", "/app/flutter/card/payment/create/", { body });
+  const { status, json } = await hit("POST", `${PREFIX}/card/payment/create/`, { body });
   console.log(
-    `card ${body.currency} ${body.amount}: HTTP ${status} chargeId=${pickChargeId(json)} type=${pickType(json)} body=${JSON.stringify(json).slice(0, 280)}`,
+    `card ${body.currency} ${body.amount}: HTTP ${status} chargeId=${pickChargeId(json)} type=${pickType(json)} body=${summarizeFail(json)}`,
   );
 } else {
   console.log("Skipped (set LENHUB_CARD_NUMBER + EXP + CVV to live-test card create).");
-  console.log("Postman already showed: chargeId + type=additional_fields works.");
 }
 
-console.log("\nDone. Payouts skipped by default (moves money). Set LENHUB_PROBE_PAYOUT=1 with bank details to try.");
+console.log("\nDone. No redeploy performed.");

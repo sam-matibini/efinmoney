@@ -105,16 +105,10 @@ Deno.serve(async (req) => {
       (profile?.email ?? "eFin User");
     const customerPhone = phone || profile?.phone || "";
 
-    // ── V4 path (company account) ──────────────────────────────────────
-    if (isFlwV4Configured()) {
-      if (paymentMethod !== "mobilemoney") {
-        return ok({
-          success: false,
-          error:
-            "This Flutterwave account uses V4 APIs. Mobile money top-up is available now; card checkout is coming next.",
-          code: "v4_method_unsupported",
-        });
-      }
+    // ── V4 path: mobile money only (company account is V4 for MoMo).
+    // Card / bank / USSD use V3 hosted Standard checkout below (Sam: redirect
+    // checkout enabled; direct charge needs PCI and is not used).
+    if (isFlwV4Configured() && paymentMethod === "mobilemoney") {
       if (!customerPhone) {
         return jr(400, { error: "A mobile money phone number is required", code: "phone_required" });
       }

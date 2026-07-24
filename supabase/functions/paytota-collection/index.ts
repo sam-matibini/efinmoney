@@ -260,14 +260,14 @@ Deno.serve(async (req) => {
         // Fall back to checkout_url redirect if STK push fails
         console.warn("MoMo STK push failed, falling back to checkout_url:", exec.message);
       } else {
-        // STK push sent — user approves on handset; webhook will credit wallet.
+        // STK may or may not reach the handset — always return checkout_url as fallback.
         return json({
           success: true,
           transaction_id: txn.id,
           purchase_id: result.purchaseId,
-          payment_link: null,
+          payment_link: result.checkoutUrl,
           stk_push: true,
-          message: "Approve the payment on your phone. Your wallet will credit automatically.",
+          message: "Approve the payment on your phone, or open the checkout page if no prompt arrives.",
           quote: {
             credit_amount: creditAmount,
             credit_currency: creditCurrency,

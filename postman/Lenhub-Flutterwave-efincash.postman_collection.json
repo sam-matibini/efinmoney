@@ -1,0 +1,281 @@
+{
+  "info": {
+    "_postman_id": "efin-lenhub-flutter-v1",
+    "name": "eFin — Lenhub Flutterwave (efincash)",
+    "description": "New Lenhub Flutterwave wrapper on https://efincash.lenhub.net\n\nDocs: https://efincash.lenhub.net/docs\nOpenAPI: https://efincash.lenhub.net/openapi.json\n\nBase: {{baseUrl}} = https://efincash.lenhub.net\nPrefix: /v1/flutterwave/flutter\n\nNotes:\n- No API key header required in the OpenAPI (Lenhub proxies with their own FLW creds).\n- If responses show code 10401 Unauthorized, that is Lenhub's upstream Flutterwave auth — not your Postman setup.\n- Card create can charge real money — use tiny amounts.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "https://efincash.lenhub.net" },
+    { "key": "callback", "value": "https://efin-flw-proxy.ukwenzyb.workers.dev/webhooks/lenhub-flutter" },
+    { "key": "email", "value": "probe@efin.money" },
+    { "key": "chargeId", "value": "" },
+    { "key": "card_number", "value": "5399838383838381" },
+    { "key": "expiry_month", "value": "09" },
+    { "key": "expiry_year", "value": "31" },
+    { "key": "cvv", "value": "123" }
+  ],
+  "item": [
+    {
+      "name": "1. Collect — Card",
+      "item": [
+        {
+          "name": "Card payment create (NGN)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "try {",
+                  "  const j = pm.response.json();",
+                  "  const walk = (o) => {",
+                  "    if (!o || typeof o !== 'object') return null;",
+                  "    if (Array.isArray(o)) { for (const i of o) { const f = walk(i); if (f) return f; } return null; }",
+                  "    for (const k of ['chargeId','charge_id','id']) if (o[k]) return String(o[k]);",
+                  "    for (const n of ['message','data','status']) { const f = walk(o[n]); if (f) return f; }",
+                  "    return null;",
+                  "  };",
+                  "  const id = walk(j);",
+                  "  if (id) { pm.collectionVariables.set('chargeId', id); console.log('chargeId=', id); }",
+                  "} catch (e) { console.log(e); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"card_number\": \"{{card_number}}\",\n  \"expiry_date_month\": \"{{expiry_month}}\",\n  \"expiry_date_year\": \"{{expiry_year}}\",\n  \"cvv\": \"{{cvv}}\",\n  \"amount\": 100,\n  \"callback\": \"{{callback}}\",\n  \"email\": \"{{email}}\",\n  \"currency\": \"NGN\"\n}"
+            },
+            "url": "{{baseUrl}}/v1/flutterwave/flutter/card/payment/create/"
+          }
+        },
+        {
+          "name": "Send PIN",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pin\": \"3310\",\n  \"chargeId\": \"{{chargeId}}\"\n}"
+            },
+            "url": "{{baseUrl}}/v1/flutterwave/flutter/complete/payment/pin/"
+          }
+        },
+        {
+          "name": "Send OTP",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"otp\": \"123456\",\n  \"chargeId\": \"{{chargeId}}\"\n}"
+            },
+            "url": "{{baseUrl}}/v1/flutterwave/flutter/complete/payment/otp/"
+          }
+        },
+        {
+          "name": "Confirm payment (AVS / billing)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"charge_id\": \"{{chargeId}}\",\n  \"city\": \"Lagos\",\n  \"country\": \"NG\",\n  \"line1\": \"12 Admiralty Way\",\n  \"postal_code\": \"100001\",\n  \"state\": \"LA\",\n  \"line2\": null\n}"
+            },
+            "url": "{{baseUrl}}/v1/flutterwave/flutter/confirm_payment/"
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Collect — Virtual account",
+      "item": [
+        {
+          "name": "Create virtual account (NGN)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/v1/flutterwave/flutter/create/virtual/account/?email={{email}}&amount=1000&narration=efin-postman-va",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "flutterwave", "flutter", "create", "virtual", "account", ""],
+              "query": [
+                { "key": "email", "value": "{{email}}" },
+                { "key": "amount", "value": "1000" },
+                { "key": "narration", "value": "efin-postman-va" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Quote / banks / verify",
+      "item": [
+        {
+          "name": "Exchange rate USD→NGN",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/v1/flutterwave/flutter/exchange/rate/?source_currency=USD&destination_currency=NGN&amount=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "flutterwave", "flutter", "exchange", "rate", ""],
+              "query": [
+                { "key": "source_currency", "value": "USD" },
+                { "key": "destination_currency", "value": "NGN" },
+                { "key": "amount", "value": "10" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get bank codes (NG)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/v1/flutterwave/flutter/bank/code/?country_code=NG",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "flutterwave", "flutter", "bank", "code", ""],
+              "query": [{ "key": "country_code", "value": "NG" }]
+            }
+          }
+        },
+        {
+          "name": "Verify account (NG smoke)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/v1/flutterwave/flutter/verify/account/?account_number=0690000031&currency=NGN&bank_code=044",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "flutterwave", "flutter", "verify", "account", ""],
+              "query": [
+                { "key": "account_number", "value": "0690000031" },
+                { "key": "currency", "value": "NGN" },
+                { "key": "bank_code", "value": "044" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Check mobile networks (KE)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/v1/flutterwave/flutter/check/mobile/networks/?country=KE",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "flutterwave", "flutter", "check", "mobile", "networks", ""],
+              "query": [{ "key": "country", "value": "KE" }]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Payouts (moves money — careful)",
+      "item": [
+        {
+          "name": "Bank payout / FX exchange",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/v1/flutterwave/flutter/payout/exchange/?amount=10&source_currency=USD&destination_currency=NGN&bank_code=044&account_number=0690000031&callback_url={{callback}}&narration=efin-postman-payout",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "flutterwave", "flutter", "payout", "exchange", ""],
+              "query": [
+                { "key": "amount", "value": "10" },
+                { "key": "source_currency", "value": "USD" },
+                { "key": "destination_currency", "value": "NGN" },
+                { "key": "bank_code", "value": "044" },
+                { "key": "account_number", "value": "0690000031" },
+                { "key": "callback_url", "value": "{{callback}}" },
+                { "key": "narration", "value": "efin-postman-payout" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Ghana MoMo transfer",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/v1/flutterwave/flutter/ghana/mobile/money/transfer/?amount=1&number=233241234567&first_name=Probe&last_name=User&network=MTN&source_currency=USD&narration=efin-postman-gh",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "flutterwave", "flutter", "ghana", "mobile", "money", "transfer", ""],
+              "query": [
+                { "key": "amount", "value": "1" },
+                { "key": "number", "value": "233241234567" },
+                { "key": "first_name", "value": "Probe" },
+                { "key": "last_name", "value": "User" },
+                { "key": "network", "value": "MTN" },
+                { "key": "source_currency", "value": "USD" },
+                { "key": "narration", "value": "efin-postman-gh" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Kenya MoMo transfer",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/v1/flutterwave/flutter/kenya/mobile/money/transfer/?amount=1&number=254700000000&first_name=Probe&last_name=User&network=MPESA&source_currency=USD&narration=efin-postman-ke",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "flutterwave", "flutter", "kenya", "mobile", "money", "transfer", ""],
+              "query": [
+                { "key": "amount", "value": "1" },
+                { "key": "number", "value": "254700000000" },
+                { "key": "first_name", "value": "Probe" },
+                { "key": "last_name", "value": "User" },
+                { "key": "network", "value": "MPESA" },
+                { "key": "source_currency", "value": "USD" },
+                { "key": "narration", "value": "efin-postman-ke" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Elicate Zambia payout",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/v1/elicate/flutter/zambia/payout/?amount=1&account_type=mobile_money&account_number=260970000000&fullname=Probe%20User&narrative=efin-postman-zm",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "elicate", "flutter", "zambia", "payout", ""],
+              "query": [
+                { "key": "amount", "value": "1" },
+                { "key": "account_type", "value": "mobile_money" },
+                { "key": "account_number", "value": "260970000000" },
+                { "key": "fullname", "value": "Probe User" },
+                { "key": "narrative", "value": "efin-postman-zm" }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

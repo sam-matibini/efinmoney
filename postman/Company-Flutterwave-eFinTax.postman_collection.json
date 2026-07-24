@@ -1,0 +1,376 @@
+{
+  "info": {
+    "_postman_id": "efin-company-flutterwave-demo",
+    "name": "eFin — Company Flutterwave (eFintax merchant)",
+    "description": "Boss demo for COMPANY Flutterwave (eFintax Advisors / merchant 100818356).\n\n## What this proves in Postman\n1. **OAuth works** (V4 Client ID/Secret) → company account is live\n2. **V3 card attempts fail** (encryption / method restrictions) → not a simple card-funding merchant\n3. **Africa payouts** via V4 `/direct-transfers` (through IP whitelist proxy) → THIS is what company FLW is good for\n\n## Clearest CAD/USD card proof (already captured in app)\nIn-app card top-up returns: **Merchant is not enabled to use this payment method.**\nShow that screenshot alongside Postman OAuth + payout.\n\n## Setup (once)\n1. Import this collection + `Company-Flutterwave-eFinTax.postman_environment.json`\n2. Select environment **eFin Company Flutterwave (LIVE)**\n3. Paste from `migration-export/secrets.env` (do not commit secrets):\n   - `flw_client_id` = FLW_CLIENT_ID\n   - `flw_client_secret` = FLW_CLIENT_SECRET\n   - `flw_secret_key` = FLW_SECRET_KEY\n   - `flw_public_key` = FLW_PUBLIC_KEY\n4. Run **0. Auth** first\n\n## 3-minute boss walkthrough\n1. `0. Auth → Get V4 access token` → 200 + access_token ✅\n2. Show app screenshot: CAD **In-app card** → Merchant not enabled ❌\n3. Optional: `2. Payouts → UGX/GHS` with a phone you control ⚠️ moves money\n\nThis is NOT Lenhub (`efincash.lenhub.net`).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "0. Auth",
+      "item": [
+        {
+          "name": "Get V4 access token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('OAuth token issued', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j.access_token).to.be.a('string').and.not.empty;",
+                  "  pm.environment.set('access_token', j.access_token);",
+                  "  console.log('token expires_in=', j.expires_in);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "grant_type", "value": "client_credentials" },
+                { "key": "client_id", "value": "{{flw_client_id}}" },
+                { "key": "client_secret", "value": "{{flw_client_secret}}" }
+              ]
+            },
+            "url": "https://idp.flutterwave.com/realms/flutterwave/protocol/openid-connect/token",
+            "description": "Company Flutterwave V4 OAuth. Saves access_token into the environment."
+          }
+        }
+      ]
+    },
+    {
+      "name": "1. Collect FAIL (show boss — card not enabled)",
+      "item": [
+        {
+          "name": "V3 card charge USD (expect NOT ENABLED)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Flutterwave V3 requires card payload encrypted as 3DES-24 → { client }",
+                  "// Prefer environment, but also accept collection/global (pm.variables).",
+                  "const secret = pm.environment.get('flw_secret_key') || pm.collectionVariables.get('flw_secret_key') || pm.variables.get('flw_secret_key');",
+                  "if (!secret) throw new Error('Set flw_secret_key in the active Environment (or collection variables)');",
+                  "",
+                  "let key = pm.environment.get('flw_v3_encryption_key') || pm.variables.get('flw_v3_encryption_key') || '';",
+                  "if (!key || key.length !== 24) {",
+                  "  const md5 = CryptoJS.MD5(secret).toString();",
+                  "  const first12 = secret.replace(/^FLWSECK-/, '').slice(0, 12);",
+                  "  key = first12 + md5.slice(-12);",
+                  "}",
+                  "if (key.length !== 24) throw new Error('V3 encryption key must be 24 chars, got ' + key.length);",
+                  "",
+                  "const payload = {",
+                  "  card_number: '5531886652142950',",
+                  "  cvv: '564',",
+                  "  expiry_month: '09',",
+                  "  expiry_year: '32',",
+                  "  currency: 'USD',",
+                  "  amount: '5',",
+                  "  email: 'boss-demo@efin.money',",
+                  "  fullname: 'Boss Demo',",
+                  "  tx_ref: 'efin-boss-usd-' + Date.now(),",
+                  "  redirect_url: 'https://www.efin.money/wallet/topup'",
+                  "};",
+                  "",
+                  "const encrypted = CryptoJS.TripleDES.encrypt(",
+                  "  JSON.stringify(payload),",
+                  "  CryptoJS.enc.Utf8.parse(key),",
+                  "  { mode: CryptoJS.mode.ECB, padding: CryptoJS.pad.Pkcs7 }",
+                  ");",
+                  "pm.variables.set('encrypted_client', encrypted.toString());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "console.log(JSON.stringify(j));",
+                  "pm.test('Merchant cannot use V3 card collect', function () {",
+                  "  const msg = String(j.message || '').toLowerCase();",
+                  "  pm.expect(msg).to.match(/not enabled|payment method|rave v3/);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{flw_secret_key}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client\": \"{{encrypted_client}}\"\n}"
+            },
+            "url": "{{v3_base}}/v3/charges?type=card",
+            "description": "Auto-encrypts card payload with 3DES-24 (Postman pre-request).\n\nYou were not wrong before — Flutterwave rejects plaintext cards.\n\nAfter encryption, expected:\n{\"status\":\"error\",\"message\":\"Merchant is not enabled for Rave v3\",\"data\":null}"
+          }
+        },
+        {
+          "name": "V3 card charge CAD (expect NOT ENABLED)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const secret = pm.environment.get('flw_secret_key') || pm.collectionVariables.get('flw_secret_key') || pm.variables.get('flw_secret_key');",
+                  "if (!secret) throw new Error('Set flw_secret_key in the active Environment (or collection variables)');",
+                  "",
+                  "let key = pm.environment.get('flw_v3_encryption_key') || pm.variables.get('flw_v3_encryption_key') || '';",
+                  "if (!key || key.length !== 24) {",
+                  "  const md5 = CryptoJS.MD5(secret).toString();",
+                  "  const first12 = secret.replace(/^FLWSECK-/, '').slice(0, 12);",
+                  "  key = first12 + md5.slice(-12);",
+                  "}",
+                  "",
+                  "const payload = {",
+                  "  card_number: '5531886652142950',",
+                  "  cvv: '564',",
+                  "  expiry_month: '09',",
+                  "  expiry_year: '32',",
+                  "  currency: 'CAD',",
+                  "  amount: '5',",
+                  "  email: 'boss-demo@efin.money',",
+                  "  fullname: 'Boss Demo',",
+                  "  tx_ref: 'efin-boss-cad-' + Date.now(),",
+                  "  redirect_url: 'https://www.efin.money/wallet/topup'",
+                  "};",
+                  "",
+                  "const encrypted = CryptoJS.TripleDES.encrypt(",
+                  "  JSON.stringify(payload),",
+                  "  CryptoJS.enc.Utf8.parse(key),",
+                  "  { mode: CryptoJS.mode.ECB, padding: CryptoJS.pad.Pkcs7 }",
+                  ");",
+                  "pm.variables.set('encrypted_client', encrypted.toString());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "console.log(JSON.stringify(j));",
+                  "pm.test('CAD card collect blocked', function () {",
+                  "  const msg = String(j.message || '').toLowerCase();",
+                  "  pm.expect(msg).to.match(/not enabled|payment method|rave v3/);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{flw_secret_key}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client\": \"{{encrypted_client}}\"\n}"
+            },
+            "url": "{{v3_base}}/v3/charges?type=card",
+            "description": "Same as USD, with 3DES encryption. Expect Rave v3 not enabled."
+          }
+        },
+        {
+          "name": "V3 banks list NG (connectivity smoke)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{flw_secret_key}}" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": "{{v3_base}}/v3/banks/NG",
+            "description": "Optional connectivity check. May also be blocked if V3 is disabled on merchant."
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Payouts WORK (Africa send — careful, moves money)",
+      "item": [
+        {
+          "name": "UGX MoMo payout — TINY (edit phone first)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "if (!pm.environment.get('access_token')) {",
+                  "  throw new Error('Run 0. Auth → Get V4 access token first');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "console.log(pm.response.text());",
+                  "pm.test('Accepted or clear business error (not auth failure)', function () {",
+                  "  pm.expect([200,201,400,422]).to.include(pm.response.code);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "X-Idempotency-Key", "value": "{{$guid}}" },
+              { "key": "X-Trace-Id", "value": "{{$guid}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"instant\",\n  \"payment_instruction\": {\n    \"source_currency\": \"UGX\",\n    \"destination_currency\": \"UGX\",\n    \"amount\": {\n      \"applies_to\": \"destination_currency\",\n      \"value\": 1000\n    },\n    \"recipient\": {\n      \"name\": { \"first\": \"Boss\", \"last\": \"Demo\" },\n      \"mobile_money\": {\n        \"network\": \"MTN\",\n        \"msisdn\": \"256700000000\",\n        \"country\": \"UG\"\n      }\n    }\n  },\n  \"narration\": \"eFin boss demo UGX\",\n  \"reference\": \"efin-boss-ugx-{{$timestamp}}\",\n  \"callback_url\": \"{{callback_url}}\"\n}"
+            },
+            "url": "{{v4_base}}/direct-transfers",
+            "description": "⚠️ MOVES MONEY if successful.\n\nReplace msisdn with a real UGX MTN test number you control before sending.\nUses Cloudflare proxy (IP whitelist).\n\nPrevious live probes: UGX/GHS/RWF/TZS returned 201 OK on this merchant."
+          }
+        },
+        {
+          "name": "GHS MoMo payout — TINY (edit phone first)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "if (!pm.environment.get('access_token')) {",
+                  "  throw new Error('Run 0. Auth → Get V4 access token first');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "X-Idempotency-Key", "value": "{{$guid}}" },
+              { "key": "X-Trace-Id", "value": "{{$guid}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"instant\",\n  \"payment_instruction\": {\n    \"source_currency\": \"GHS\",\n    \"destination_currency\": \"GHS\",\n    \"amount\": {\n      \"applies_to\": \"destination_currency\",\n      \"value\": 1\n    },\n    \"recipient\": {\n      \"name\": { \"first\": \"Boss\", \"last\": \"Demo\" },\n      \"mobile_money\": {\n        \"network\": \"MTN\",\n        \"msisdn\": \"233241234567\",\n        \"country\": \"GH\"\n      }\n    }\n  },\n  \"narration\": \"eFin boss demo GHS\",\n  \"reference\": \"efin-boss-ghs-{{$timestamp}}\",\n  \"callback_url\": \"{{callback_url}}\"\n}"
+            },
+            "url": "{{v4_base}}/direct-transfers",
+            "description": "⚠️ MOVES MONEY if successful. Edit msisdn first."
+          }
+        },
+        {
+          "name": "ZMW MoMo payout — expect NOT ENABLED",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "if (!pm.environment.get('access_token')) {",
+                  "  throw new Error('Run 0. Auth → Get V4 access token first');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "X-Idempotency-Key", "value": "{{$guid}}" },
+              { "key": "X-Trace-Id", "value": "{{$guid}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"instant\",\n  \"payment_instruction\": {\n    \"source_currency\": \"ZMW\",\n    \"destination_currency\": \"ZMW\",\n    \"amount\": {\n      \"applies_to\": \"destination_currency\",\n      \"value\": 10\n    },\n    \"recipient\": {\n      \"name\": { \"first\": \"Boss\", \"last\": \"Demo\" },\n      \"mobile_money\": {\n        \"network\": \"MTN\",\n        \"msisdn\": \"260970000000\",\n        \"country\": \"ZM\"\n      }\n    }\n  },\n  \"narration\": \"eFin boss demo ZMW\",\n  \"reference\": \"efin-boss-zmw-{{$timestamp}}\",\n  \"callback_url\": \"{{callback_url}}\"\n}"
+            },
+            "url": "{{v4_base}}/direct-transfers",
+            "description": "Previous probe: ZMW not enabled on this merchant — useful contrast vs UGX/GHS."
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Optional V4 customer create (MoMo collect prep)",
+      "item": [
+        {
+          "name": "Create / find customer",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "if (!pm.environment.get('access_token')) {",
+                  "  throw new Error('Run 0. Auth first');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "const id = j?.data?.id;",
+                  "if (id) pm.collectionVariables.set('customer_id', id);",
+                  "console.log(pm.response.text());"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "X-Idempotency-Key", "value": "{{$guid}}" },
+              { "key": "X-Trace-Id", "value": "{{$guid}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"boss-demo@efin.money\",\n  \"name\": { \"first\": \"Boss\", \"last\": \"Demo\" }\n}"
+            },
+            "url": "{{v4_base}}/customers",
+            "description": "Prep step for MoMo collect charges. Useful to show V4 API access works beyond OAuth."
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    { "key": "customer_id", "value": "" }
+  ]
+}

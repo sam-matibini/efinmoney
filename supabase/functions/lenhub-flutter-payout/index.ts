@@ -5,6 +5,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import {
   isLenhubFlutterPayoutEnabled,
+  getLenhubFlutterWebhookUrl,
   lenhubFlutterBankPayout,
   lenhubFlutterGhanaMomoPayout,
   resolveGhanaMomoNetwork,
@@ -90,8 +91,7 @@ Deno.serve(async (req) => {
     const recipientName = String(transfer.recipient_name || "Recipient");
     const { first, last } = splitName(recipientName);
 
-    const projectRef = Deno.env.get("SUPABASE_URL")?.match(/https:\/\/([^.]+)/)?.[1];
-    const callbackUrl = `https://${projectRef}.functions.supabase.co/lenhub-flutter-webhook`;
+    const callbackUrl = getLenhubFlutterWebhookUrl();
     const narration = `Transfer to ${recipientName}`.slice(0, 180);
 
     const hasBank = !!(transfer.recipient_account && transfer.recipient_bank_code);

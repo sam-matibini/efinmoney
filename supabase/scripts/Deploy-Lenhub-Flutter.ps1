@@ -38,9 +38,10 @@ foreach ($fn in $fns) {
 Write-Host ""
 Write-Host "Setting LENHUB_FLUTTER_* secrets..." -ForegroundColor Yellow
 npx supabase secrets set --project-ref $ProjectRef `
-  LENHUB_FLUTTER_API_URL=https://mtn.lenhub.net `
+  LENHUB_FLUTTER_API_URL=https://efincash.lenhub.net `
   LENHUB_FLUTTER_ENABLED=true `
-  LENHUB_FLUTTER_PAYOUT=true
+  LENHUB_FLUTTER_PAYOUT=true `
+  LENHUB_FLUTTER_WEBHOOK_URL=https://efin-flw-proxy.ukwenzyb.workers.dev/webhooks/lenhub-flutter
 
 if ($failed.Count -gt 0) {
   Write-Host ""
@@ -51,5 +52,6 @@ if ($failed.Count -gt 0) {
 
 Write-Host ""
 Write-Host "Lenhub Flutter deploy OK." -ForegroundColor Green
-Write-Host "Next: Top Up -> Card (direct) with a small USD/CAD amount." -ForegroundColor Cyan
+Write-Host "Give Lenhub this webhook URL:" -ForegroundColor Cyan
+Write-Host "  https://efin-flw-proxy.ukwenzyb.workers.dev/webhooks/lenhub-flutter" -ForegroundColor White
 Write-Host ""

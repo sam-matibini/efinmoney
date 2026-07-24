@@ -17,6 +17,9 @@ const SETTLEMENT_BY_CURRENCY: Record<string, string> = {
   CAD: "1271",
   EUR: "1272",
   GBP: "1273",
+  UGX: "1280",
+  KES: "1281",
+  RWF: "1282",
 };
 
 const LIABILITY_BY_CURRENCY: Record<string, string> = {
@@ -24,6 +27,9 @@ const LIABILITY_BY_CURRENCY: Record<string, string> = {
   CAD: "2101",
   EUR: "2104",
   GBP: "2105",
+  KES: "2110",
+  UGX: "2111",
+  RWF: "2112",
 };
 
 type SupabaseAdmin = ReturnType<typeof createClient>;

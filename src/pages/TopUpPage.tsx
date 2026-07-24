@@ -24,7 +24,7 @@ import PaytotaTopUpCard from "@/components/payments/PaytotaTopUpCard";
 import SwychrTopUpCard from "@/components/payments/SwychrTopUpCard";
 import { validateMinAmount, minAmount, type FlwMethod } from "@/lib/flutterwave";
 import LoadingSpinner from "@/components/LoadingSpinner";
-import FlutterwaveCardForm from "@/components/payments/FlutterwaveCardForm";
+import FlutterwaveHostedTopUpCard from "@/components/payments/FlutterwaveHostedTopUpCard";
 import FlutterwaveMomoTopUpCard from "@/components/payments/FlutterwaveMomoTopUpCard";
 import { MM_COUNTRIES } from "@/lib/mobileMoneyNetworks";
 import {
@@ -107,8 +107,9 @@ function availableAfricaMomoMethods(currency: string): AfricaMomoTopupMethod[] {
   // Primary / existing rails first
   if (c === "GHS" && productFeatures.ghanaPay) methods.push("ghana");
   if (c === "ZMW" && productFeatures.elicate) methods.push("elicate");
-  if (productFeatures.swychr && SWYCHR_TOPUP_CURRENCIES.includes(c)) methods.push("swychr");
+  // Paytota first for East Africa MoMo (UGX/KES/RWF) so Top Up defaults to it
   if (productFeatures.paytota && PAYTOTA_AFRICA_TOPUP_CURRENCIES.includes(c)) methods.push("paytota");
+  if (productFeatures.swychr && SWYCHR_TOPUP_CURRENCIES.includes(c)) methods.push("swychr");
   // Flutterwave V4 MoMo — live on this merchant for KES/UGX/RWF/TZS
   if (productFeatures.flutterwave && ["KES", "UGX", "RWF", "TZS"].includes(c)) methods.push("flutterwave");
   // Fincra as extra hosted checkout where merchant collect works
@@ -656,7 +657,7 @@ const TopUpPage = () => {
                     Card
                   </div>
                   <p className="mt-1.5 text-xs text-muted-foreground">
-                    Enter card details in-app. Canadian/US debit and credit cards.
+                    Flutterwave hosted checkout — pay on their page (no in-app card entry).
                   </p>
                 </button>
                 <button
@@ -825,7 +826,7 @@ const TopUpPage = () => {
             </Card>
           )}
 
-          {/* Flutterwave route — MoMo (V4) + card (legacy V3 form when available) */}
+          {/* Flutterwave — MoMo (V4) + card hosted Standard checkout (redirect, no PCI) */}
           {productFeatures.flutterwave && gateway === "flutterwave" && selectedWallet && liveTopup && (
             <div className="space-y-4">
               {(availableFlwMethods.includes("mobilemoney") || currency === "TZS") && (
@@ -838,29 +839,13 @@ const TopUpPage = () => {
                 />
               )}
               {availableFlwMethods.includes("card") && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base">
-                      {showWesternProviderChoice || showAfricanProviderChoice || showIntlMethodChoice
-                        ? "3. Pay with card"
-                        : "Or pay with card"}
-                    </CardTitle>
-                    <CardDescription>
-                      {currency === "USD" || currency === "CAD"
-                        ? `Enter your card details to add funds to your ${currency} wallet.`
-                        : "Debit or credit card. Card on V4 is rolling out — MoMo is preferred for African wallets."}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <FlutterwaveCardForm
-                      defaultWalletId={selectedWalletId}
-                      showWalletSelect
-                      onSuccess={() => {
-                        void queryClient.invalidateQueries({ queryKey: ["wallets"] });
-                      }}
-                    />
-                  </CardContent>
-                </Card>
+                <FlutterwaveHostedTopUpCard
+                  walletId={selectedWallet.wallet_id}
+                  walletCurrency={currency}
+                  onComplete={() => {
+                    void queryClient.invalidateQueries({ queryKey: ["wallets"] });
+                  }}
+                />
               )}
             </div>
           )}

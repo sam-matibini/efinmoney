@@ -423,7 +423,7 @@ export default function ApiManagementPage() {
                         ) : status.label === "Disabled" ? (
                           <Badge variant="outline" className="bg-muted text-muted-foreground gap-1">
                             <XCircle className="h-3 w-3" /> {status.label}
-                          </Badge>
+                        </Badge>
                       ) : (
                         <Badge variant="outline" className="bg-yellow-500/15 text-yellow-500 border-yellow-500/30 gap-1">
                           <AlertTriangle className="h-3 w-3" /> {status.label}

@@ -47,7 +47,8 @@ export interface PaytotaCollectionResult {
   success: boolean;
   transaction_id: string;
   purchase_id?: string;
-  payment_link: string;
+  payment_link: string | null;
+  stk_push?: boolean;
   message: string;
 }
 
@@ -100,7 +101,11 @@ export async function initiatePaytotaCollection(params: {
     error?: string;
     quote?: Record<string, unknown>;
   };
-  if (!payload?.success || !payload.payment_link) {
+  if (!payload?.success) {
+    throw new Error(payload?.error || payload?.message || "Could not start checkout");
+  }
+  // Africa MoMo STK: payment_link may be null; user approves on handset.
+  if (!payload.payment_link && !payload.stk_push) {
     throw new Error(payload?.error || payload?.message || "Could not start checkout");
   }
   return payload;

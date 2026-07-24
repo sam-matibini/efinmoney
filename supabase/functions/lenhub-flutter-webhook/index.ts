@@ -3,36 +3,11 @@
  * Settles card top-ups and bank/MoMo payouts.
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { creditLenhubFlutterTopup } from "../_shared/lenhub-flutter-credit.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
-
-const SETTLEMENT_BY_CURRENCY: Record<string, string> = {
-  NGN: "1260",
-  USD: "1261",
-  EUR: "1262",
-  GBP: "1263",
-  CAD: "1261",
-  GHS: "1260",
-  KES: "1260",
-  UGX: "1260",
-  RWF: "1260",
-  TZS: "1260",
-};
-
-const LIABILITY_BY_CURRENCY: Record<string, string> = {
-  NGN: "2102",
-  USD: "2100",
-  CAD: "2101",
-  EUR: "2104",
-  GBP: "2105",
-  GHS: "2102",
-  KES: "2102",
-  UGX: "2102",
-  RWF: "2102",
-  TZS: "2102",
 };
 
 function json(data: unknown, status = 200) {
@@ -44,14 +19,17 @@ function json(data: unknown, status = 200) {
 
 function pickStatus(payload: Record<string, unknown>): string {
   const data = (payload.data || payload) as Record<string, unknown>;
-  return String(
-    data.status ||
-      payload.status ||
-      (payload.message && typeof payload.message === "object"
-        ? (payload.message as Record<string, unknown>).status
-        : "") ||
-      "",
-  ).toLowerCase();
+  const msg = payload.message;
+  const msgObj = msg && typeof msg === "object" && !Array.isArray(msg)
+    ? (msg as Record<string, unknown>)
+    : null;
+  const nestedStatus = msgObj?.status;
+  const nested =
+    nestedStatus && typeof nestedStatus === "object" && !Array.isArray(nestedStatus)
+      ? (nestedStatus as Record<string, unknown>).status
+      : nestedStatus;
+  const raw = data.status ?? payload.status ?? nested ?? msgObj?.event ?? payload.event ?? "";
+  return String(raw).toLowerCase();
 }
 
 function pickChargeId(payload: Record<string, unknown>): string | null {
@@ -101,70 +79,6 @@ function pickTransferRef(payload: Record<string, unknown>): string | null {
   return id != null ? String(id) : null;
 }
 
-async function creditWallet(
-  supabase: ReturnType<typeof createClient>,
-  params: { userId: string; walletId: string | null; currency: string; amount: number; chargeRowId: string; chargeId: string },
-) {
-  const { data: already } = await supabase
-    .from("ledger_entries")
-    .select("id")
-    .eq("reference_type", "lenhub_flutter_topup")
-    .eq("reference_id", params.chargeRowId)
-    .limit(1);
-  if (already?.length) return { credited: false, reason: "already_credited" };
-
-  let walletId = params.walletId;
-  if (!walletId) {
-    const { data: wallet } = await supabase
-      .from("wallets")
-      .select("id")
-      .eq("user_id", params.userId)
-      .eq("currency_code", params.currency)
-      .maybeSingle();
-    walletId = wallet?.id ?? null;
-  }
-  if (!walletId) return { credited: false, reason: "wallet_missing" };
-
-  const assetCode = SETTLEMENT_BY_CURRENCY[params.currency] || SETTLEMENT_BY_CURRENCY.USD;
-  const liabCode = LIABILITY_BY_CURRENCY[params.currency] || LIABILITY_BY_CURRENCY.USD;
-  const { data: asset } = await supabase.from("ledger_accounts").select("id").eq("code", assetCode).maybeSingle();
-  const { data: liab } = await supabase.from("ledger_accounts").select("id").eq("code", liabCode).maybeSingle();
-  if (!asset || !liab) return { credited: false, reason: "ledger_account_missing" };
-
-  const journalId = crypto.randomUUID();
-  const desc = `Lenhub Flutter top-up ${params.chargeId}`.slice(0, 500);
-  const { error } = await supabase.from("ledger_entries").insert([
-    {
-      journal_id: journalId,
-      account_id: asset.id,
-      wallet_id: null,
-      currency_code: params.currency,
-      debit_amount: params.amount,
-      credit_amount: 0,
-      description: desc,
-      reference_type: "lenhub_flutter_topup",
-      reference_id: params.chargeRowId,
-      external_reference: params.chargeId,
-      created_by: params.userId,
-    },
-    {
-      journal_id: journalId,
-      account_id: liab.id,
-      wallet_id: walletId,
-      currency_code: params.currency,
-      debit_amount: 0,
-      credit_amount: params.amount,
-      description: desc,
-      reference_type: "lenhub_flutter_topup",
-      reference_id: params.chargeRowId,
-      external_reference: params.chargeId,
-      created_by: params.userId,
-    },
-  ]);
-  if (error) return { credited: false, reason: error.message };
-  return { credited: true, reason: "ok" };
-}
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -196,7 +110,12 @@ Deno.serve(async (req) => {
     } catch { /* optional log table */ }
 
     const status = pickStatus(payload);
-    const success = ["successful", "success", "succeeded", "completed", "paid"].includes(status);
+    const eventName = String(payload.event || payload.type || "").toLowerCase();
+    const success =
+      ["successful", "success", "succeeded", "completed", "paid"].includes(status) ||
+      eventName.includes("charge.completed") ||
+      eventName.includes("transfer.completed") ||
+      eventName.includes("payment.completed");
     const failed = ["failed", "cancelled", "canceled", "reversed"].includes(status);
 
     const chargeCandidates = pickChargeIdCandidates(payload);
@@ -210,9 +129,41 @@ Deno.serve(async (req) => {
         .limit(1);
       charge = charges?.[0] ?? null;
     }
+    // VA webhooks often key off account_number when reference isn't repeated
+    if (!charge) {
+      const data = (payload.data || payload) as Record<string, unknown>;
+      const acct = String(
+        data.account_number || data.accountNumber || payload.account_number || "",
+      ).trim();
+      if (acct) {
+        const { data: byAcct } = await supabase
+          .from("lenhub_flutter_charges")
+          .select("*")
+          .is("credited_at", null)
+          .filter("provider_response", "cs", JSON.stringify({ account_number: acct }))
+          .order("created_at", { ascending: false })
+          .limit(5);
+        charge = (byAcct || []).find((row) => {
+          const pr = JSON.stringify(row.provider_response || {});
+          return pr.includes(acct);
+        }) ?? null;
+        if (!charge) {
+          const { data: recent } = await supabase
+            .from("lenhub_flutter_charges")
+            .select("*")
+            .eq("status", "awaiting_transfer")
+            .is("credited_at", null)
+            .order("created_at", { ascending: false })
+            .limit(20);
+          charge = (recent || []).find((row) =>
+            JSON.stringify(row.provider_response || {}).includes(acct),
+          ) ?? null;
+        }
+      }
+    }
     if (charge && success && !charge.credited_at) {
       const settleId = String(charge.charge_id || chargeId || charge.id);
-      const credit = await creditWallet(supabase, {
+      const credit = await creditLenhubFlutterTopup(supabase, {
         userId: String(charge.user_id),
         walletId: (charge.wallet_id as string | null) ?? null,
         currency: String(charge.currency_code),

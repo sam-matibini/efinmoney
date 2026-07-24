@@ -164,11 +164,11 @@ export function routeWalletTopupGateway(
   ) {
     return "nomba_pay";
   }
-  // Default Africa MoMo: Swychr first where available, else Paytota (RWF)
-  if (SWYCHR_TOPUP_CURRENCIES.includes(c) && !preferFlutterwave && !preferFincra) return "swychr_pay";
-  if (PAYTOTA_AFRICA_TOPUP_CURRENCIES.includes(c) && !preferFlutterwave && !preferFincra) {
+  // Default East Africa MoMo → Paytota (UGX/KES/RWF); Swychr for XAF/XOF (and when explicitly picked)
+  if (PAYTOTA_AFRICA_TOPUP_CURRENCIES.includes(c) && !preferFlutterwave && !preferFincra && !preferSwychr) {
     return "paytota_pay";
   }
+  if (SWYCHR_TOPUP_CURRENCIES.includes(c) && !preferFlutterwave && !preferFincra) return "swychr_pay";
   if (ELICATE_CURRENCIES.includes(c) && !preferFincra) return "elicate";
   // Sole Fincra Africa corridors (no other primary live rail on this build)
   if (["ZAR", "MWK"].includes(c) && isFincraTopupCurrency(c)) return "fincra";
@@ -219,7 +219,7 @@ export function intlMethodLabel(method: IntlTopupMethod, currency?: string): str
   if (method === "lenhub") {
     return currency?.toUpperCase() === "NGN" ? "NGN card or bank" : "Card (direct)";
   }
-  if (method === "flutterwave") return "In-app card";
+  if (method === "flutterwave") return "Card checkout";
   return "Express card";
 }
 
@@ -235,9 +235,12 @@ export function intlMethodDescription(method: IntlTopupMethod, currency: string)
   }
   if (method === "flutterwave") {
     if (c === "CAD") {
-      return "Enter card details in-app — Canadian debit/credit cards for your CAD wallet.";
+      return "Secure Flutterwave checkout — pay on their page, CAD wallet credits after confirmation.";
     }
-    return `Enter card details in-app for your ${c} wallet.`;
+    if (c === "USD") {
+      return "Secure Flutterwave checkout — pay on their page, USD wallet credits after confirmation.";
+    }
+    return "Secure Flutterwave checkout — you’ll pay on their hosted page.";
   }
   if (method === "fincra") {
     if (c === "CAD") {

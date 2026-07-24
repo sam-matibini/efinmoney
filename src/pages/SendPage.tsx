@@ -2210,17 +2210,20 @@ const SendPage = () => {
                                           <div className="flex items-start justify-between gap-3">
                                             <div className="flex-1">
                                               <div className="flex items-center gap-2">
-                                                <span className="text-sm font-medium">Alternate MoMo payout (test)</span>
+                                                <span className="text-sm font-medium">Paytota MoMo (test)</span>
                                                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-700 dark:text-sky-300 font-mono uppercase">Test</span>
                                               </div>
                                               <p className="text-xs text-muted-foreground mt-1">
-                                                Route this {targetCountry.code} mobile money payout through an alternate rail. Default rails stay available when off.
+                                                Route this {targetCountry.code} mobile money payout through Paytota. Use this for Uganda MoMo testing.
                                               </p>
                                             </div>
                                             <Switch
                                               checked={usePaytota}
-                                              onCheckedChange={setUsePaytota}
-                                              aria-label="Use alternate MoMo payout"
+                                              onCheckedChange={(on) => {
+                                                setUsePaytota(on);
+                                                if (on) setUseFincra(false);
+                                              }}
+                                              aria-label="Use Paytota MoMo payout"
                                             />
                                           </div>
                                         </motion.div>
@@ -2230,14 +2233,21 @@ const SendPage = () => {
                                           <div className="flex items-start justify-between gap-3">
                                             <div className="flex-1">
                                               <div className="flex items-center gap-2">
-                                                <span className="text-sm font-medium">Alternate MoMo payout (test)</span>
+                                                <span className="text-sm font-medium">Fincra MoMo (test)</span>
                                                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-700 dark:text-teal-300 font-mono uppercase">Test</span>
                                               </div>
                                               <p className="text-xs text-muted-foreground mt-1">
-                                                Route this mobile money payout through an alternate rail instead of the default provider.
+                                                Route this mobile money payout through Fincra instead of the default provider.
                                               </p>
                                             </div>
-                                            <Switch checked={useFincra} onCheckedChange={setUseFincra} aria-label="Use alternate MoMo payout" />
+                                            <Switch
+                                              checked={useFincra}
+                                              onCheckedChange={(on) => {
+                                                setUseFincra(on);
+                                                if (on) setUsePaytota(false);
+                                              }}
+                                              aria-label="Use Fincra MoMo payout"
+                                            />
                                           </div>
                                         </motion.div>
                                       )}

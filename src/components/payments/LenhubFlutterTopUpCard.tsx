@@ -74,10 +74,42 @@ export default function LenhubFlutterTopUpCard({ walletId, walletCurrency, onCom
   const [state, setState] = useState("");
   const [va, setVa] = useState<VaDetails | null>(null);
   const [copied, setCopied] = useState(false);
+  const [vaCredited, setVaCredited] = useState(false);
 
   useEffect(() => {
     if (!email && user?.email) setEmail(user.email);
   }, [user?.email, email]);
+
+  // Poll charge row while waiting for bank transfer confirmation
+  useEffect(() => {
+    if (!va || !localId || vaCredited) return;
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const { data } = await supabase
+          .from("lenhub_flutter_charges")
+          .select("status, credited_at, amount, currency_code")
+          .eq("id", localId)
+          .maybeSingle();
+        if (cancelled || !data) return;
+        if (data.credited_at || data.status === "credited") {
+          setVaCredited(true);
+          toast.success(
+            `${data.currency_code || currency} ${Number(data.amount).toLocaleString()} credited to your wallet`,
+          );
+          onComplete?.();
+        }
+      } catch {
+        /* ignore poll errors */
+      }
+    };
+    tick();
+    const id = window.setInterval(tick, 5000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [va, localId, vaCredited, currency, onComplete]);
 
   useEffect(() => {
     setCountry(defaultCountry(currency));
@@ -148,6 +180,7 @@ export default function LenhubFlutterTopUpCard({ walletId, walletCurrency, onCom
       }
       setLocalId(data?.local_id ? String(data.local_id) : null);
       setChargeId(data?.charge_id ? String(data.charge_id) : null);
+      setVaCredited(false);
       setVa({
         account_number: String(raw.account_number),
         account_name: raw.account_name != null ? String(raw.account_name) : null,
@@ -164,6 +197,146 @@ export default function LenhubFlutterTopUpCard({ walletId, walletCurrency, onCom
     } finally {
       setBusy(false);
     }
+  };
+
+  /** Lenhub often never sends VA success webhooks — let the payer confirm after transfer. */
+  const confirmPaid = async () => {
+    if (!localId && !chargeId && !va?.account_number) {
+      toast.error("Missing payment reference — create a new transfer account.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const data = await invoke("settle_va", {
+        local_id: localId,
+        charge_id: chargeId || va?.order_ref,
+        account_number: va?.account_number,
+      });
+      if (data?.credited || data?.already_credited) {
+        setVaCredited(true);
+        toast.success(
+          `${data?.currency || currency} ${Number(data?.amount || va?.amount || 0).toLocaleString()} credited to your wallet`,
+        );
+        onComplete?.();
+      } else {
+        throw new Error(String(data?.message || data?.reason || "Could not credit wallet"));
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not confirm payment");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const digRedirect = (obj: unknown): string | null => {
+    if (!obj || typeof obj !== "object") return null;
+    if (Array.isArray(obj)) {
+      for (const item of obj) {
+        const found = digRedirect(item);
+        if (found) return found;
+      }
+      return null;
+    }
+    const rec = obj as Record<string, unknown>;
+    for (const k of ["url", "redirect_url", "redirectUrl", "authurl", "authUrl"]) {
+      const v = rec[k];
+      if (v != null && String(v).trim().startsWith("http")) return String(v).trim();
+    }
+    for (const nest of ["message", "data", "status", "provider"]) {
+      const found = digRedirect(rec[nest]);
+      if (found) return found;
+    }
+    return null;
+  };
+
+  const digNextType = (obj: unknown): string | null => {
+    const known = new Set([
+      "pin",
+      "otp",
+      "redirect",
+      "avs",
+      "additional_fields",
+      "send_pin",
+      "send_otp",
+      "validateotp",
+      "validate_otp",
+    ]);
+    const walk = (node: unknown): string | null => {
+      if (!node || typeof node !== "object") return null;
+      if (Array.isArray(node)) {
+        for (const item of node) {
+          const found = walk(item);
+          if (found) return found;
+        }
+        return null;
+      }
+      const rec = node as Record<string, unknown>;
+      if (rec.type != null) {
+        const t = String(rec.type).trim().toLowerCase();
+        if (known.has(t) || t.includes("redirect") || t.includes("3ds")) return t;
+      }
+      for (const nest of ["message", "data", "status", "provider"]) {
+        const found = walk(rec[nest]);
+        if (found) return found;
+      }
+      return null;
+    };
+    return walk(obj);
+  };
+
+  /** Map provider hints to a known step. Avoid naive includes("otp") — it matched "pin_or_otp_or_avs". */
+  const normalizeAuthHint = (raw: string): "redirect" | "otp" | "pin" | "avs" | "" => {
+    const n = raw.toLowerCase().trim();
+    if (!n || n === "pin_or_otp_or_avs" || n === "pin_or_otp") return "";
+    if (n === "redirect" || n.includes("redirect") || n.includes("3ds")) return "redirect";
+    if (n === "otp" || n === "send_otp" || n === "validateotp" || n === "validate_otp") return "otp";
+    if (n === "pin" || n === "send_pin") return "pin";
+    if (n === "avs" || n === "additional_fields" || n.includes("additional")) return "avs";
+    return "";
+  };
+
+  const followNextAction = (
+    nextRaw: string,
+    redirectRaw: string,
+    provider: unknown,
+    fallback: Step,
+  ) => {
+    const next = normalizeAuthHint(nextRaw || digNextType(provider) || "");
+    const redirectUrl = (redirectRaw || digRedirect(provider) || "").trim();
+    if ((next === "redirect" || Boolean(redirectUrl)) && redirectUrl.startsWith("http")) {
+      toast.success("Redirecting to your bank to authorize…");
+      window.location.assign(redirectUrl);
+      return;
+    }
+    if (next === "redirect" && !redirectUrl) {
+      toast.error("Bank redirect required, but no URL came back. Try again or use bank transfer.");
+      setStep("details");
+      return;
+    }
+    if (next === "avs") {
+      setStep("avs");
+      toast.success("Enter billing address to continue");
+      return;
+    }
+    if (next === "otp") {
+      setStep("otp");
+      toast.message("Enter the OTP only if your bank/SMS sent one");
+      return;
+    }
+    if (next === "pin") {
+      setStep("pin");
+      toast.success("Enter your card PIN");
+      return;
+    }
+    // No clear next step from Lenhub — don't invent OTP (users never get an SMS).
+    if (fallback === "otp") {
+      toast.message(
+        "Bank did not ask for an OTP. If a code arrives, enter it below; otherwise tap Skip or use bank transfer.",
+      );
+      setStep("otp");
+      return;
+    }
+    setStep(fallback);
   };
 
   const submitCard = async () => {
@@ -242,16 +415,8 @@ export default function LenhubFlutterTopUpCard({ walletId, walletCurrency, onCom
       }
 
       const next = String(data?.next_action || "").toLowerCase();
-      if (next.includes("additional") || next === "avs" || next.includes("redirect")) {
-        setStep("avs");
-        toast.success("Card accepted — enter billing address");
-      } else if (next.includes("otp")) {
-        setStep("otp");
-        toast.success("Card accepted — enter OTP");
-      } else {
-        setStep("pin");
-        toast.success("Card accepted — enter PIN if asked, or skip to address");
-      }
+      const redirectUrl = String(data?.redirect_url || "").trim();
+      followNextAction(next, redirectUrl, provider ?? data, "pin");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Card charge failed");
     } finally {
@@ -270,10 +435,14 @@ export default function LenhubFlutterTopUpCard({ walletId, walletCurrency, onCom
     }
     setBusy(true);
     try {
-      await invoke("card_pin", { charge_id: chargeId, local_id: localId, pin });
+      const data = await invoke("card_pin", { charge_id: chargeId, local_id: localId, pin });
       setPin("");
-      setStep("otp");
-      toast.success("PIN sent — enter OTP if required");
+      followNextAction(
+        String(data?.next_action || ""),
+        String(data?.redirect_url || ""),
+        data?.provider ?? data,
+        "otp",
+      );
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "PIN failed");
     } finally {
@@ -292,10 +461,14 @@ export default function LenhubFlutterTopUpCard({ walletId, walletCurrency, onCom
     }
     setBusy(true);
     try {
-      await invoke("card_otp", { charge_id: chargeId, local_id: localId, otp });
+      const data = await invoke("card_otp", { charge_id: chargeId, local_id: localId, otp });
       setOtp("");
-      setStep("avs");
-      toast.success("OTP accepted — confirm billing address");
+      followNextAction(
+        String(data?.next_action || ""),
+        String(data?.redirect_url || ""),
+        data?.provider ?? data,
+        "avs",
+      );
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "OTP failed");
     } finally {
@@ -487,37 +660,48 @@ export default function LenhubFlutterTopUpCard({ walletId, walletCurrency, onCom
                   {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
                 </Button>
               </div>
-              {va.bank_name && (
-                <div>
-                  <p className="text-muted-foreground">Bank</p>
-                  <p className="font-medium">{va.bank_name}</p>
-                </div>
-              )}
-              {va.account_name && (
+              <div>
+                <p className="text-muted-foreground">Bank</p>
+                <p className="font-medium">{va.bank_name || "Check your bank app after pasting the account number"}</p>
+              </div>
+              {va.account_name && !/^please make a bank transfer/i.test(va.account_name) && (
                 <div>
                   <p className="text-muted-foreground">Account name</p>
                   <p className="font-medium">{va.account_name}</p>
                 </div>
               )}
-              {va.order_ref && (
+              {(va.order_ref || localId) && (
                 <div>
                   <p className="text-muted-foreground">Reference</p>
-                  <p className="font-mono text-xs">{va.order_ref}</p>
+                  <p className="font-mono text-xs">{va.order_ref || localId}</p>
                 </div>
               )}
               {va.expiry && (
-                <p className="text-xs text-amber-700">Expires: {va.expiry}</p>
+                <p className="text-xs text-amber-700">
+                  Expires: {Number.isNaN(Date.parse(va.expiry)) ? va.expiry : new Date(va.expiry).toLocaleString()}
+                </p>
               )}
             </div>
             <p className="text-xs text-muted-foreground">
-              After you transfer, this page can stay open — your wallet updates when the provider confirms.
+              {vaCredited
+                ? "Payment confirmed — your NGN wallet has been credited."
+                : "Transfer the exact amount to this account at the bank shown. Your bank app may display a Flutterwave / merchant name — that is normal. After you pay, tap I’ve paid below (Lenhub often does not send the automatic webhook)."}
             </p>
+            {vaCredited && (
+              <p className="text-sm font-medium text-emerald-700">Wallet credited successfully</p>
+            )}
+            {!vaCredited && (
+              <Button className="w-full" size="lg" disabled={busy} onClick={confirmPaid}>
+                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "I’ve paid — credit my wallet"}
+              </Button>
+            )}
             <Button
               variant="outline"
               className="w-full"
               onClick={() => {
                 setVa(null);
                 setAmount("");
+                setVaCredited(false);
               }}
             >
               New amount
@@ -612,7 +796,14 @@ export default function LenhubFlutterTopUpCard({ walletId, walletCurrency, onCom
               <Button className="flex-1" disabled={busy || !pin || !chargeId} onClick={submitPin}>
                 {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Submit PIN"}
               </Button>
-              <Button variant="outline" disabled={busy} onClick={() => setStep("otp")}>
+              <Button
+                variant="outline"
+                disabled={busy}
+                onClick={() => {
+                  toast.message("If your bank uses a web page to authorize, cancel and retry the card — we should redirect automatically.");
+                  setStep("avs");
+                }}
+              >
                 Skip
               </Button>
             </div>
@@ -621,6 +812,9 @@ export default function LenhubFlutterTopUpCard({ walletId, walletCurrency, onCom
 
         {step === "otp" && (
           <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Only enter a code if your bank actually sent one by SMS. Many cards authorize on a bank web page instead — if you got no SMS, tap Skip or switch to bank transfer.
+            </p>
             <div className="space-y-2">
               <Label htmlFor="lf-otp">One-time code (OTP)</Label>
               <Input

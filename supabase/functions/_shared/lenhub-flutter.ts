@@ -1,17 +1,21 @@
 /**
- * Lenhub Flutterwave wrapper (`/app/flutter/*` on mtn.lenhub.net).
- * Spec: Efin-Projects/flutter.json
+ * Lenhub Flutterwave wrapper (`/v1/flutterwave/flutter/*` on efincash.lenhub.net).
+ * Spec: flutterlenhub.json / https://efincash.lenhub.net/docs
  *
  * Collect: card create → pin → otp → confirm; virtual account
  * Quote / banks / verify / networks
- * Payout: bank FX (`payout/exchange`) + Ghana MoMo
+ * Payout: bank FX + Ghana/Kenya MoMo (+ Elicate Zambia route)
  *
  * Env:
- *   LENHUB_FLUTTER_API_URL (default https://mtn.lenhub.net)
+ *   LENHUB_FLUTTER_API_URL (default https://efincash.lenhub.net)
  *   LENHUB_FLUTTER_ENABLED=true
  *   LENHUB_FLUTTER_PAYOUT=true
+ *   LENHUB_FLUTTER_WEBHOOK_URL (preferred public callback — CF proxy, not supabase.co)
+ *   FLW_PROXY_URL / FLW_V4_PROXY_URL (fallback → {proxy}/webhooks/lenhub-flutter)
  */
-const DEFAULT_BASE = "https://mtn.lenhub.net";
+const DEFAULT_BASE = "https://efincash.lenhub.net";
+/** Path prefix for Flutterwave routes (docs OpenAPI). */
+const FLW_PREFIX = "/v1/flutterwave/flutter";
 
 /** Currencies we offer for card/VA top-up via this rail (API accepts free-form currency). */
 export const LENHUB_FLUTTER_COLLECT_CURRENCIES = [
@@ -50,7 +54,7 @@ export const LENHUB_FLUTTER_PAYOUT_SOURCE_CURRENCIES = [
   "NGN",
 ] as const;
 
-export const LENHUB_FLUTTER_MOMO_CURRENCIES = ["GHS"] as const;
+export const LENHUB_FLUTTER_MOMO_CURRENCIES = ["GHS", "KES"] as const;
 
 export type LenhubFlutterResult = {
   ok: boolean;
@@ -74,6 +78,25 @@ function normalizeHost(raw: string): string {
 
 export function getLenhubFlutterBaseUrl(): string {
   return normalizeHost(Deno.env.get("LENHUB_FLUTTER_API_URL")?.trim() || DEFAULT_BASE);
+}
+
+/**
+ * Public callback URL we give Lenhub / pass on card+payout creates.
+ * Prefer Cloudflare façade so partners never see a raw supabase.co URL.
+ */
+export function getLenhubFlutterWebhookUrl(): string {
+  const explicit = Deno.env.get("LENHUB_FLUTTER_WEBHOOK_URL")?.trim();
+  if (explicit) return explicit.replace(/\/+$/, "");
+
+  const proxy =
+    Deno.env.get("FLW_PROXY_URL")?.trim() ||
+    Deno.env.get("FLW_V4_PROXY_URL")?.trim() ||
+    "https://efin-flw-proxy.ukwenzyb.workers.dev";
+  const base = normalizeHost(proxy);
+  if (base) return `${base}/webhooks/lenhub-flutter`;
+
+  const projectRef = Deno.env.get("SUPABASE_URL")?.match(/https:\/\/([^.]+)/)?.[1];
+  return `https://${projectRef}.supabase.co/functions/v1/lenhub-flutter-webhook`;
 }
 
 export function isLenhubFlutterEnabled(): boolean {
@@ -143,6 +166,15 @@ function extractMessage(json: Record<string, unknown>, fallback: string): string
     if (typeof m.error === "string") return m.error;
   }
   if (typeof json.error === "string") return json.error;
+  const raw = typeof json.raw === "string" ? json.raw : "";
+  if (raw) {
+    if (/AESGCM key must be 128, 192, or 256 bits/i.test(raw)) {
+      return "Lenhub card encrypt failed (bad Flutterwave encryption key on their server). Bank transfer still works — ask Lenhub to fix AESGCM EncryptionKey.";
+    }
+    if (/ValueError|Traceback|Internal Server Error/i.test(raw)) {
+      return "Lenhub card API crashed (HTTP 500). Use bank transfer for now, or ask Lenhub to fix card create.";
+    }
+  }
   return fallback;
 }
 
@@ -220,7 +252,7 @@ export async function lenhubFlutterFetch(
 }
 
 export async function lenhubFlutterGetBanks(countryCode: string): Promise<LenhubFlutterResult & { banks: Array<{ id?: string; code: string; name: string }> }> {
-  const result = await lenhubFlutterFetch("GET", "/app/flutter/bank/code/", {
+  const result = await lenhubFlutterFetch("GET", `${FLW_PREFIX}/bank/code/`, {
     query: { country_code: countryCode.toUpperCase() },
   });
   const data = unwrapData(result.json);
@@ -243,7 +275,7 @@ export async function lenhubFlutterExchangeRate(params: {
   destinationCurrency: string;
   amount: number;
 }): Promise<LenhubFlutterResult & { rate: number | null; rateId: string | null; sourceAmount: number | null; destAmount: number | null }> {
-  const result = await lenhubFlutterFetch("POST", "/app/flutter/exchange/rate/", {
+  const result = await lenhubFlutterFetch("POST", `${FLW_PREFIX}/exchange/rate/`, {
     query: {
       source_currency: params.sourceCurrency.toUpperCase(),
       destination_currency: params.destinationCurrency.toUpperCase(),
@@ -269,7 +301,7 @@ export async function lenhubFlutterVerifyAccount(params: {
   currency: string;
   bankCode: string;
 }): Promise<LenhubFlutterResult & { accountName: string | null }> {
-  const result = await lenhubFlutterFetch("POST", "/app/flutter/verify/account/", {
+  const result = await lenhubFlutterFetch("POST", `${FLW_PREFIX}/verify/account/`, {
     query: {
       account_number: params.accountNumber,
       currency: params.currency.toUpperCase(),
@@ -285,7 +317,7 @@ export async function lenhubFlutterVerifyAccount(params: {
 }
 
 export async function lenhubFlutterNetworks(country: string): Promise<LenhubFlutterResult & { networks: Array<{ id?: string; network: string; name: string }> }> {
-  const result = await lenhubFlutterFetch("POST", "/app/flutter/create/customer/", {
+  const result = await lenhubFlutterFetch("POST", `${FLW_PREFIX}/check/mobile/networks/`, {
     query: { country: country.toUpperCase() },
   });
   const data = unwrapData(result.json);
@@ -342,6 +374,43 @@ export function pickLenhubCardNextAction(json: Record<string, unknown>): string 
   return deep ? deep.toLowerCase() : null;
 }
 
+/** 3DS / issuer redirect URL from Lenhub card-create (type: redirect). */
+export function pickLenhubCardRedirectUrl(json: Record<string, unknown>): string | null {
+  const message = json.message;
+  const rows = Array.isArray(message)
+    ? message
+    : message && typeof message === "object"
+    ? [message]
+    : [];
+  for (const row of rows) {
+    if (!row || typeof row !== "object") continue;
+    const r = row as Record<string, unknown>;
+    const url = r.url ?? r.redirect_url ?? r.redirectUrl ?? r.authurl ?? r.authUrl;
+    if (url != null && String(url).trim().startsWith("http")) return String(url).trim();
+  }
+  const walk = (obj: unknown): string | null => {
+    if (!obj || typeof obj !== "object") return null;
+    if (Array.isArray(obj)) {
+      for (const item of obj) {
+        const found = walk(item);
+        if (found) return found;
+      }
+      return null;
+    }
+    const rec = obj as Record<string, unknown>;
+    for (const k of ["url", "redirect_url", "redirectUrl", "authurl", "authUrl"]) {
+      const v = rec[k];
+      if (v != null && String(v).trim().startsWith("http")) return String(v).trim();
+    }
+    for (const nest of ["message", "data", "status"]) {
+      const found = walk(rec[nest]);
+      if (found) return found;
+    }
+    return null;
+  };
+  return walk(json);
+}
+
 export async function lenhubFlutterCreateCardPayment(body: {
   card_number: string;
   expiry_date_month: string;
@@ -351,23 +420,28 @@ export async function lenhubFlutterCreateCardPayment(body: {
   callback: string;
   email: string;
   currency: string;
-}): Promise<LenhubFlutterResult & { chargeId: string | null; nextAction: string | null }> {
-  const result = await lenhubFlutterFetch("POST", "/app/flutter/card/payment/create/", { body, timeoutMs: 45_000 });
+}): Promise<LenhubFlutterResult & { chargeId: string | null; nextAction: string | null; redirectUrl: string | null }> {
+  const result = await lenhubFlutterFetch("POST", `${FLW_PREFIX}/card/payment/create/`, { body, timeoutMs: 45_000 });
   const data = unwrapData(result.json) as Record<string, unknown> | null;
   const chargeId =
     pickNestedId(data, ["id", "chargeId", "charge_id", "flw_ref", "tx_ref", "reference"]) ||
     pickNestedId(result.json, ["id", "chargeId", "charge_id", "flw_ref", "tx_ref", "reference"]);
-  return { ...result, chargeId, nextAction: pickLenhubCardNextAction(result.json) };
+  return {
+    ...result,
+    chargeId,
+    nextAction: pickLenhubCardNextAction(result.json),
+    redirectUrl: pickLenhubCardRedirectUrl(result.json),
+  };
 }
 
 export async function lenhubFlutterSendPin(pin: string, chargeId: string): Promise<LenhubFlutterResult> {
-  return lenhubFlutterFetch("POST", "/app/flutter/complete/payment/pin/", {
+  return lenhubFlutterFetch("POST", `${FLW_PREFIX}/complete/payment/pin/`, {
     body: { pin, chargeId },
   });
 }
 
 export async function lenhubFlutterSendOtp(otp: string, chargeId: string): Promise<LenhubFlutterResult> {
-  return lenhubFlutterFetch("PUT", "/app/flutter/complete/payment/otp/", {
+  return lenhubFlutterFetch("PUT", `${FLW_PREFIX}/complete/payment/otp/`, {
     body: { otp, chargeId },
   });
 }
@@ -381,7 +455,7 @@ export async function lenhubFlutterConfirmPayment(body: {
   state: string;
   line2?: string | null;
 }): Promise<LenhubFlutterResult> {
-  return lenhubFlutterFetch("POST", "/app/flutter/confirm_payment/", { body });
+  return lenhubFlutterFetch("POST", `${FLW_PREFIX}/confirm_payment/`, { body });
 }
 
 export type LenhubVirtualAccountDetails = {
@@ -410,15 +484,31 @@ export function pickLenhubVirtualAccount(json: Record<string, unknown>): LenhubV
   };
   const amountRaw = nested?.amount ?? nested?.amountExpected;
   const amount = amountRaw != null && Number.isFinite(Number(amountRaw)) ? Number(amountRaw) : null;
+  // Lenhub/FLW dynamic VA shape (efincash):
+  //   account_number, account_bank_name, note (instruction — NOT account name),
+  //   account_expiration_datetime, reference, narration
+  // Never map `note` → accountName (it is transfer instructions).
   return {
     accountNumber: pick("account_number", "accountNumber", "account"),
-    accountName: pick("account_name", "accountName", "note"),
-    bankName: pick("bank_name", "bankName", "bank"),
+    accountName: pick("account_name", "accountName", "account_name_on_bank"),
+    bankName: pick(
+      "account_bank_name",
+      "bank_name",
+      "bankName",
+      "bank",
+      "account_bank",
+    ),
     amount,
     orderRef: pick("order_ref", "orderRef", "tx_ref", "txRef", "reference"),
     flwRef: pick("flw_ref", "flwRef", "id"),
     currency: pick("currency", "currency_code")?.toUpperCase() ?? null,
-    expiry: pick("expiry_date", "expiryDate", "expires_at", "note2"),
+    expiry: pick(
+      "account_expiration_datetime",
+      "expiry_date",
+      "expiryDate",
+      "expires_at",
+      "note2",
+    ),
   };
 }
 
@@ -427,7 +517,7 @@ export async function lenhubFlutterCreateVirtualAccount(params: {
   amount: number;
   narration: string;
 }): Promise<LenhubFlutterResult & { va: LenhubVirtualAccountDetails }> {
-  const result = await lenhubFlutterFetch("POST", "/app/flutter/create/virtual/account/", {
+  const result = await lenhubFlutterFetch("POST", `${FLW_PREFIX}/create/virtual/account/`, {
     query: {
       email: params.email,
       amount: params.amount,
@@ -435,6 +525,14 @@ export async function lenhubFlutterCreateVirtualAccount(params: {
     },
   });
   return { ...result, va: pickLenhubVirtualAccount(result.json) };
+}
+
+function pickProviderRef(data: Record<string, unknown> | null): string | null {
+  if (!data) return null;
+  if (data.id != null) return String(data.id);
+  if (data.reference != null) return String(data.reference);
+  if (data.flw_ref != null) return String(data.flw_ref);
+  return null;
 }
 
 export async function lenhubFlutterBankPayout(params: {
@@ -446,7 +544,7 @@ export async function lenhubFlutterBankPayout(params: {
   callbackUrl: string;
   narration: string;
 }): Promise<LenhubFlutterResult & { providerRef: string | null }> {
-  const result = await lenhubFlutterFetch("POST", "/app/flutter/payout/exchange/", {
+  const result = await lenhubFlutterFetch("POST", `${FLW_PREFIX}/payout/exchange/`, {
     query: {
       amount: params.amount,
       source_currency: params.sourceCurrency.toUpperCase(),
@@ -459,15 +557,36 @@ export async function lenhubFlutterBankPayout(params: {
     timeoutMs: 45_000,
   });
   const data = unwrapData(result.json) as Record<string, unknown> | null;
-  const providerRef =
-    data?.id != null
-      ? String(data.id)
-      : data?.reference != null
-      ? String(data.reference)
-      : data?.flw_ref != null
-      ? String(data.flw_ref)
-      : null;
-  return { ...result, providerRef };
+  return { ...result, providerRef: pickProviderRef(data) };
+}
+
+async function lenhubFlutterMomoTransfer(
+  countryPath: "ghana" | "kenya",
+  params: {
+    amount: number;
+    msisdn: string;
+    firstName: string;
+    lastName: string;
+    network: string;
+    sourceCurrency: string;
+    narration: string;
+  },
+): Promise<LenhubFlutterResult & { providerRef: string | null }> {
+  const result = await lenhubFlutterFetch("POST", `${FLW_PREFIX}/${countryPath}/mobile/money/transfer/`, {
+    query: {
+      amount: params.amount,
+      // OpenAPI uses `number` (not msisdn)
+      number: params.msisdn.replace(/\D/g, ""),
+      first_name: params.firstName,
+      last_name: params.lastName,
+      network: params.network,
+      source_currency: params.sourceCurrency.toUpperCase(),
+      narration: params.narration.slice(0, 180),
+    },
+    timeoutMs: 45_000,
+  });
+  const data = unwrapData(result.json) as Record<string, unknown> | null;
+  return { ...result, providerRef: pickProviderRef(data) };
 }
 
 export async function lenhubFlutterGhanaMomoPayout(params: {
@@ -479,26 +598,41 @@ export async function lenhubFlutterGhanaMomoPayout(params: {
   sourceCurrency: string;
   narration: string;
 }): Promise<LenhubFlutterResult & { providerRef: string | null }> {
-  const result = await lenhubFlutterFetch("POST", "/app/flutter/ghana/mobile/money/transfer/", {
+  return lenhubFlutterMomoTransfer("ghana", params);
+}
+
+export async function lenhubFlutterKenyaMomoPayout(params: {
+  amount: number;
+  msisdn: string;
+  firstName: string;
+  lastName: string;
+  network: string;
+  sourceCurrency: string;
+  narration: string;
+}): Promise<LenhubFlutterResult & { providerRef: string | null }> {
+  return lenhubFlutterMomoTransfer("kenya", params);
+}
+
+/** Elicate Zambia MoMo via Lenhub (`/v1/elicate/flutter/zambia/payout/`). */
+export async function lenhubElicateZambiaPayout(params: {
+  amount: number;
+  accountType: string;
+  accountNumber: string;
+  fullname: string;
+  narrative: string;
+}): Promise<LenhubFlutterResult & { providerRef: string | null }> {
+  const result = await lenhubFlutterFetch("POST", "/v1/elicate/flutter/zambia/payout/", {
     query: {
       amount: params.amount,
-      msisdn: params.msisdn.replace(/\D/g, ""),
-      first_name: params.firstName,
-      last_name: params.lastName,
-      network: params.network,
-      source_currency: params.sourceCurrency.toUpperCase(),
-      narration: params.narration.slice(0, 180),
+      account_type: params.accountType,
+      account_number: params.accountNumber,
+      fullname: params.fullname,
+      narrative: params.narrative.slice(0, 180),
     },
     timeoutMs: 45_000,
   });
   const data = unwrapData(result.json) as Record<string, unknown> | null;
-  const providerRef =
-    data?.id != null
-      ? String(data.id)
-      : data?.reference != null
-      ? String(data.reference)
-      : null;
-  return { ...result, providerRef };
+  return { ...result, providerRef: pickProviderRef(data) };
 }
 
 export function splitName(full: string): { first: string; last: string } {

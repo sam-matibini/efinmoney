@@ -18,6 +18,7 @@ dist-ssr
 !.env.example
 scripts/.swychr.env
 scripts/.paytota.env
+postman/*.local.json
 
 # Exported data snapshot (PII / large)
 database-export/

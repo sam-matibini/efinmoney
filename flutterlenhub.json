@@ -1,0 +1,725 @@
+{
+    "openapi": "3.1.0",
+    "info": {
+      "title": "NinjaAPI",
+      "version": "1.0.0",
+      "description": ""
+    },
+    "paths": {
+      "/v1/flutterwave/flutter/card/payment/create/": {
+        "post": {
+          "operationId": "payment_flutterwave_test_post",
+          "summary": "Test Post",
+          "parameters": [],
+          "responses": {
+            "200": {
+              "description": "OK"
+            }
+          },
+          "tags": [
+            "Flutterwave"
+          ],
+          "requestBody": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EfinMoneyCardSchema"
+                }
+              }
+            },
+            "required": true
+          }
+        }
+      },
+      "/v1/flutterwave/flutter/complete/payment/pin/": {
+        "post": {
+          "operationId": "payment_flutterwave_send_pin",
+          "summary": "Send Pin",
+          "parameters": [],
+          "responses": {
+            "200": {
+              "description": "OK"
+            }
+          },
+          "tags": [
+            "Flutterwave"
+          ],
+          "requestBody": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EfinMoneySendPinSchema"
+                }
+              }
+            },
+            "required": true
+          }
+        }
+      },
+      "/v1/flutterwave/flutter/complete/payment/otp/": {
+        "put": {
+          "operationId": "payment_flutterwave_complete_payment_pin",
+          "summary": "Complete Payment Pin",
+          "parameters": [],
+          "responses": {
+            "200": {
+              "description": "OK"
+            }
+          },
+          "tags": [
+            "Flutterwave"
+          ],
+          "requestBody": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EfinMoneySendOTPSchema"
+                }
+              }
+            },
+            "required": true
+          }
+        }
+      },
+      "/v1/flutterwave/flutter/confirm_payment/": {
+        "post": {
+          "operationId": "payment_flutterwave_confirm_payment",
+          "summary": "Confirm Payment",
+          "parameters": [],
+          "responses": {
+            "200": {
+              "description": "OK"
+            }
+          },
+          "tags": [
+            "Flutterwave"
+          ],
+          "requestBody": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EfinMoneyfieldschema"
+                }
+              }
+            },
+            "required": true
+          }
+        }
+      },
+      "/v1/flutterwave/flutter/create/virtual/account/": {
+        "post": {
+          "operationId": "payment_flutterwave_create_virtual_accounts",
+          "summary": "Create Virtual Accounts",
+          "parameters": [
+            {
+              "in": "query",
+              "name": "email",
+              "schema": {
+                "title": "Email",
+                "type": "string"
+              },
+              "required": true
+            },
+            {
+              "in": "query",
+              "name": "amount",
+              "schema": {
+                "title": "Amount",
+                "type": "number"
+              },
+              "required": true
+            },
+            {
+              "in": "query",
+              "name": "narration",
+              "schema": {
+                "title": "Narration",
+                "type": "string"
+              },
+              "required": true
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK"
+            }
+          },
+          "tags": [
+            "Flutterwave"
+          ]
+        }
+      },
+      "/v1/flutterwave/flutter/exchange/rate/": {
+        "post": {
+          "operationId": "payment_flutterwave_exchange_rate",
+          "summary": "Exchange Rate",
+          "parameters": [
+            {
+              "in": "query",
+              "name": "source_currency",
+              "schema": {
+                "title": "Source Currency",
+                "type": "string"
+              },
+              "required": true
+            },
+            {
+              "in": "query",
+              "name": "destination_currency",
+              "schema": {
+                "title": "Destination Currency",
+                "type": "string"
+              },
+              "required": true
+            },
+            {
+              "in": "query",
+              "name": "amount",
+              "schema": {
+                "title": "Amount",
+                "type": "number"
+              },
+              "required": true
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK"
+            }
+          },
+          "tags": [
+            "Flutterwave"
+          ]
+        }
+      },
+      "/v1/flutterwave/flutter/bank/code/": {
+        "get": {
+          "operationId": "payment_flutterwave_get_bank_code",
+          "summary": "Get Bank Code",
+          "parameters": [
+            {
+              "in": "query",
+              "name": "country_code",
+              "schema": {
+                "title": "Country Code",
+                "type": "string"
+              },
+              "required": true
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK"
+            }
+          },
+          "tags": [
+            "Flutterwave"
+          ]
+        }
+      },
+      "/v1/flutterwave/flutter/verify/account/": {
+        "post": {
+          "operationId": "payment_flutterwave_verify_account",
+          "summary": "Verify Account",
+          "parameters": [
+            {
+              "in": "query",
+              "name": "account_number",
+              "schema": {
+                "title": "Account Number",
+                "type": "string"
+              },
+              "required": true
+            },
+            {
+              "in": "query",
+              "name": "currency",
+              "schema": {
+                "title": "Currency",
+                "type": "string"
+              },
+              "required": true
+            },
+            {
+              "in": "query",
+              "name": "bank_code",
+              "schema": {
+                "title": "Bank Code",
+                "type": "string"
+              },
+              "required": true
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK"
+            }
+          },
+          "tags": [
+            "Flutterwave"
+          ]
+        }
+      },
+      "/v1/flutterwave/flutter/payout/exchange/": {
+        "post": {
+          "operationId": "payment_flutterwave_payout_naria_exchange",
+          "summary": "Payout Naria Exchange",
+          "parameters": [
+            {
+              "in": "query",
+              "name": "amount",
+              "schema": {
+                "title": "Amount",
+                "type": "number"
+              },
+              "required": true
+            },
+            {
+              "in": "query",
+              "name": "source_currency",
+              "schema": {
+                "title": "Source Currency",
+                "type": "string"
+              },
+              "required": true
+            },
+            {
+              "in": "query",
+              "name": "destination_currency",
+              "schema": {
+                "title": "Destination Currency",
+                "type": "string"
+              },
+              "required": true
+            },
+            {
+              "in": "query",
+              "name": "bank_code",
+              "schema": {
+                "title": "Bank Code",
+                "type": "string"
+              },
+              "required": true
+            },
+            {
+              "in": "query",
+              "name": "account_number",
+              "schema": {
+                "title": "Account Number",
+                "type": "string"
+              },
+              "required": true
+            },
+            {
+              "in": "query",
+              "name": "callback_url",
+              "schema": {
+                "title": "Callback Url",
+                "type": "string"
+              },
+              "required": true
+            },
+            {
+              "in": "query",
+              "name": "narration",
+              "schema": {
+                "title": "Narration",
+                "type": "string"
+              },
+              "required": true
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK"
+            }
+          },
+          "tags": [
+            "Flutterwave"
+          ]
+        }
+      },
+      "/v1/flutterwave/flutter/check/mobile/networks/": {
+        "post": {
+          "operationId": "payment_flutterwave_mobile_mobile_networks",
+          "summary": "Mobile Mobile Networks",
+          "parameters": [
+            {
+              "in": "query",
+              "name": "country",
+              "schema": {
+                "title": "Country",
+                "type": "string"
+              },
+              "required": true
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK"
+            }
+          },
+          "tags": [
+            "Flutterwave"
+          ]
+        }
+      },
+      "/v1/flutterwave/flutter/ghana/mobile/money/transfer/": {
+        "post": {
+          "operationId": "payment_flutterwave_ghana_mobile_money",
+          "summary": "Ghana Mobile Money",
+          "parameters": [
+            {
+              "in": "query",
+              "name": "amount",
+              "schema": {
+                "title": "Amount",
+                "type": "number"
+              },
+              "required": true
+            },
+            {
+              "in": "query",
+              "name": "number",
+              "schema": {
+                "title": "Number",
+                "type": "string"
+              },
+              "required": true
+            },
+            {
+              "in": "query",
+              "name": "first_name",
+              "schema": {
+                "title": "First Name",
+                "type": "string"
+              },
+              "required": true
+            },
+            {
+              "in": "query",
+              "name": "last_name",
+              "schema": {
+                "title": "Last Name",
+                "type": "string"
+              },
+              "required": true
+            },
+            {
+              "in": "query",
+              "name": "network",
+              "schema": {
+                "title": "Network",
+                "type": "string"
+              },
+              "required": true
+            },
+            {
+              "in": "query",
+              "name": "source_currency",
+              "schema": {
+                "title": "Source Currency",
+                "type": "string"
+              },
+              "required": true
+            },
+            {
+              "in": "query",
+              "name": "narration",
+              "schema": {
+                "title": "Narration",
+                "type": "string"
+              },
+              "required": true
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK"
+            }
+          },
+          "tags": [
+            "Flutterwave"
+          ]
+        }
+      },
+      "/v1/flutterwave/flutter/kenya/mobile/money/transfer/": {
+        "post": {
+          "operationId": "payment_flutterwave_kenya_mobile_money",
+          "summary": "Kenya Mobile Money",
+          "parameters": [
+            {
+              "in": "query",
+              "name": "amount",
+              "schema": {
+                "title": "Amount",
+                "type": "number"
+              },
+              "required": true
+            },
+            {
+              "in": "query",
+              "name": "number",
+              "schema": {
+                "title": "Number",
+                "type": "string"
+              },
+              "required": true
+            },
+            {
+              "in": "query",
+              "name": "first_name",
+              "schema": {
+                "title": "First Name",
+                "type": "string"
+              },
+              "required": true
+            },
+            {
+              "in": "query",
+              "name": "last_name",
+              "schema": {
+                "title": "Last Name",
+                "type": "string"
+              },
+              "required": true
+            },
+            {
+              "in": "query",
+              "name": "network",
+              "schema": {
+                "title": "Network",
+                "type": "string"
+              },
+              "required": true
+            },
+            {
+              "in": "query",
+              "name": "source_currency",
+              "schema": {
+                "title": "Source Currency",
+                "type": "string"
+              },
+              "required": true
+            },
+            {
+              "in": "query",
+              "name": "narration",
+              "schema": {
+                "title": "Narration",
+                "type": "string"
+              },
+              "required": true
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK"
+            }
+          },
+          "tags": [
+            "Flutterwave"
+          ]
+        }
+      },
+      "/v1/elicate/flutter/zambia/payout/": {
+        "post": {
+          "operationId": "payment_elicate_api_zambia_mobile_money",
+          "summary": "Zambia Mobile Money",
+          "parameters": [
+            {
+              "in": "query",
+              "name": "amount",
+              "schema": {
+                "title": "Amount",
+                "type": "number"
+              },
+              "required": true
+            },
+            {
+              "in": "query",
+              "name": "account_type",
+              "schema": {
+                "title": "Account Type",
+                "type": "string"
+              },
+              "required": true
+            },
+            {
+              "in": "query",
+              "name": "account_number",
+              "schema": {
+                "title": "Account Number",
+                "type": "string"
+              },
+              "required": true
+            },
+            {
+              "in": "query",
+              "name": "fullname",
+              "schema": {
+                "title": "Fullname",
+                "type": "string"
+              },
+              "required": true
+            },
+            {
+              "in": "query",
+              "name": "narrative",
+              "schema": {
+                "title": "Narrative",
+                "type": "string"
+              },
+              "required": true
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK"
+            }
+          },
+          "tags": [
+            "Elicate"
+          ]
+        }
+      }
+    },
+    "components": {
+      "schemas": {
+        "EfinMoneyCardSchema": {
+          "properties": {
+            "card_number": {
+              "title": "Card Number",
+              "type": "string"
+            },
+            "expiry_date_month": {
+              "title": "Expiry Date Month",
+              "type": "string"
+            },
+            "expiry_date_year": {
+              "title": "Expiry Date Year",
+              "type": "string"
+            },
+            "cvv": {
+              "title": "Cvv",
+              "type": "string"
+            },
+            "amount": {
+              "title": "Amount",
+              "type": "number"
+            },
+            "callback": {
+              "title": "Callback",
+              "type": "string"
+            },
+            "email": {
+              "title": "Email",
+              "type": "string"
+            },
+            "currency": {
+              "title": "Currency",
+              "type": "string"
+            }
+          },
+          "required": [
+            "card_number",
+            "expiry_date_month",
+            "expiry_date_year",
+            "cvv",
+            "amount",
+            "callback",
+            "email",
+            "currency"
+          ],
+          "title": "EfinMoneyCardSchema",
+          "type": "object"
+        },
+        "EfinMoneySendPinSchema": {
+          "properties": {
+            "pin": {
+              "title": "Pin",
+              "type": "string"
+            },
+            "chargeId": {
+              "title": "Chargeid",
+              "type": "string"
+            }
+          },
+          "required": [
+            "pin",
+            "chargeId"
+          ],
+          "title": "EfinMoneySendPinSchema",
+          "type": "object"
+        },
+        "EfinMoneySendOTPSchema": {
+          "properties": {
+            "otp": {
+              "title": "Otp",
+              "type": "string"
+            },
+            "chargeId": {
+              "title": "Chargeid",
+              "type": "string"
+            }
+          },
+          "required": [
+            "otp",
+            "chargeId"
+          ],
+          "title": "EfinMoneySendOTPSchema",
+          "type": "object"
+        },
+        "EfinMoneyfieldschema": {
+          "properties": {
+            "charge_id": {
+              "title": "Charge Id",
+              "type": "string"
+            },
+            "city": {
+              "title": "City",
+              "type": "string"
+            },
+            "country": {
+              "title": "Country",
+              "type": "string"
+            },
+            "line1": {
+              "title": "Line1",
+              "type": "string"
+            },
+            "postal_code": {
+              "title": "Postal Code",
+              "type": "string"
+            },
+            "state": {
+              "title": "State",
+              "type": "string"
+            },
+            "line2": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Line2"
+            }
+          },
+          "required": [
+            "charge_id",
+            "city",
+            "country",
+            "line1",
+            "postal_code",
+            "state"
+          ],
+          "title": "EfinMoneyfieldschema",
+          "type": "object"
+        }
+      }
+    },
+    "servers": []
+  }

@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { FileText, Loader2, Smartphone } from "lucide-react";
+import { ExternalLink, FileText, Loader2, Smartphone } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import {
   clearPendingPaytotaTxn,
@@ -69,6 +69,8 @@ export default function PaytotaTopUpCard({ walletId, walletCurrency, onComplete 
   const [email, setEmail] = useState(user?.email ?? "");
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
+  const [awaitingPhone, setAwaitingPhone] = useState(false);
+  const [checkoutLink, setCheckoutLink] = useState<string | null>(null);
 
   useEffect(() => {
     if (!email && user?.email) setEmail(user.email);
@@ -98,6 +100,8 @@ export default function PaytotaTopUpCard({ walletId, walletCurrency, onComplete 
       }
       if (status.status === "completed") {
         clearPendingPaytotaTxn();
+        setAwaitingPhone(false);
+        setCheckoutLink(null);
         const credited = status.credit_amount ?? status.amount;
         const creditedCcy = status.credit_currency ?? status.currency;
         toast.success(`Wallet credited ${formatCredited(credited, creditedCcy)}`);
@@ -106,6 +110,8 @@ export default function PaytotaTopUpCard({ walletId, walletCurrency, onComplete 
       }
       if (status.status === "failed") {
         clearPendingPaytotaTxn();
+        setAwaitingPhone(false);
+        setCheckoutLink(null);
         toast.error(status.failure_reason || "Top-up failed");
       }
     };
@@ -157,17 +163,22 @@ export default function PaytotaTopUpCard({ walletId, walletCurrency, onComplete 
       });
       savePendingPaytotaTxn(result.transaction_id);
 
-      // STK push path: stay on page, user approves on handset, poll for completion.
-      if ((result as any).stk_push) {
+      // STK path: stay on page + offer hosted checkout if no phone prompt arrives.
+      if (result.stk_push) {
+        setCheckoutLink(result.payment_link || null);
+        setAwaitingPhone(true);
         toast.success("Approve the payment on your phone", {
-          description: "Your wallet will credit automatically once you confirm.",
-          duration: 10000,
+          description: "No prompt? Use “Open checkout page” below.",
+          duration: 12000,
         });
         setLoading(false);
         return;
       }
 
       // Invoice/redirect path (Western or fallback).
+      if (!result.payment_link) {
+        throw new Error("No checkout link returned");
+      }
       toast.message(africa ? "Opening mobile money checkout" : "Opening invoice", {
         description: `Confirm ${formatCredited(quote?.checkoutAmount ?? amt, currency)}.`,
       });
@@ -246,7 +257,41 @@ export default function PaytotaTopUpCard({ walletId, walletCurrency, onComplete 
           />
         </div>
 
-        <Button className="w-full" onClick={handleConfirm} disabled={loading || !quote}>
+        {awaitingPhone && (
+          <div className="rounded-lg border border-sky-500/40 bg-sky-500/5 p-3 space-y-3">
+            <p className="text-sm font-medium">Waiting for phone approval…</p>
+            <p className="text-xs text-muted-foreground">
+              Check the MoMo phone for a PIN / STK prompt. If nothing arrives, open the secure checkout page and pay there instead.
+            </p>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              {checkoutLink && (
+                <Button
+                  type="button"
+                  className="flex-1"
+                  onClick={() => {
+                    window.open(checkoutLink, "_blank", "noopener,noreferrer");
+                  }}
+                >
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  Open checkout page
+                </Button>
+              )}
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1"
+                onClick={() => {
+                  setAwaitingPhone(false);
+                  setCheckoutLink(null);
+                }}
+              >
+                Try again
+              </Button>
+            </div>
+          </div>
+        )}
+
+        <Button className="w-full" onClick={handleConfirm} disabled={loading || !quote || awaitingPhone}>
           {loading ? (
             <>
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
