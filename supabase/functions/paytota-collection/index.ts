@@ -148,22 +148,6 @@ Deno.serve(async (req) => {
       ? return_url.trim()
       : null;
     const appBase = (Deno.env.get("APP_URL") || "https://www.efin.money").replace(/\/+$/, "");
-    const successRedirect = returnUrl
-      ? (() => {
-          const u = new URL(returnUrl);
-          u.searchParams.set("paytota", "success");
-          u.searchParams.set("walletId", target_wallet_id);
-          return u.toString();
-        })()
-      : `${appBase}/wallet/topup?paytota=success&walletId=${target_wallet_id}`;
-    const failureRedirect = returnUrl
-      ? (() => {
-          const u = new URL(returnUrl);
-          u.searchParams.set("paytota", "failed");
-          u.searchParams.set("walletId", target_wallet_id);
-          return u.toString();
-        })()
-      : `${appBase}/wallet/topup?paytota=failed&walletId=${target_wallet_id}`;
 
     const webhookUrl = buildPaytotaWebhookUrl();
     const cfg = getPaytotaConfig();
@@ -208,6 +192,26 @@ Deno.serve(async (req) => {
       }, 500);
     }
 
+    // Include our txn id so success return can confirm without sessionStorage
+    const successRedirect = (() => {
+      const u = returnUrl
+        ? new URL(returnUrl)
+        : new URL(`${appBase}/wallet/topup`);
+      u.searchParams.set("paytota", "success");
+      u.searchParams.set("walletId", target_wallet_id);
+      u.searchParams.set("transaction_id", txn.id);
+      return u.toString();
+    })();
+    const failureRedirect = (() => {
+      const u = returnUrl
+        ? new URL(returnUrl)
+        : new URL(`${appBase}/wallet/topup`);
+      u.searchParams.set("paytota", "failed");
+      u.searchParams.set("walletId", target_wallet_id);
+      u.searchParams.set("transaction_id", txn.id);
+      return u.toString();
+    })();
+
     const result = await createPaytotaPurchase({
       email: customerEmail,
       currency: checkoutCurrency,
@@ -250,24 +254,26 @@ Deno.serve(async (req) => {
     // For Africa MoMo: execute STK push server-side so user gets a PIN prompt
     // instead of being redirected to the hosted invoice page.
     if (africa && result.purchaseId) {
-      const exec = await executePaytotaMomoCollection(result.purchaseId);
+      const exec = await executePaytotaMomoCollection(
+        result.purchaseId,
+        phoneNormalized,
+      );
 
       await admin.from("paytota_payin_transactions").update({
         last_event: exec.json,
       }).eq("id", txn.id);
 
-      if (!exec.ok) {
-        // Fall back to checkout_url redirect if STK push fails
-        console.warn("MoMo STK push failed, falling back to checkout_url:", exec.message);
-      } else {
-        // STK may or may not reach the handset — always return checkout_url as fallback.
+      if (exec.ok) {
         return json({
           success: true,
           transaction_id: txn.id,
           purchase_id: result.purchaseId,
-          payment_link: result.checkoutUrl,
+          // Prefer payform URL; never send /invoice/ as primary for MoMo STK
+          payment_link: result.checkoutUrl && !/\/invoice\/?$/i.test(result.checkoutUrl)
+            ? result.checkoutUrl
+            : null,
           stk_push: true,
-          message: "Approve the payment on your phone, or open the checkout page if no prompt arrives.",
+          message: "Approve the payment on your phone. Stay on this page — do not open the invoice link.",
           quote: {
             credit_amount: creditAmount,
             credit_currency: creditCurrency,
@@ -279,6 +285,22 @@ Deno.serve(async (req) => {
           provider_response: exec.json,
         });
       }
+
+      // STK failed — do not silently fall through to invoice redirect (useless for MoMo).
+      console.warn("MoMo STK push failed:", exec.message, exec.json);
+      await admin.from("paytota_payin_transactions").update({
+        status: "failed",
+        failure_reason: exec.message,
+        last_event: exec.json,
+      }).eq("id", txn.id);
+      return json({
+        success: false,
+        error: exec.message || "Mobile money prompt failed. Ask Paytota to enable UGX MoMo collection terminals.",
+        code: "stk_failed",
+        transaction_id: txn.id,
+        purchase_id: result.purchaseId,
+        provider_response: exec.json,
+      }, 200);
     }
 
     return json({

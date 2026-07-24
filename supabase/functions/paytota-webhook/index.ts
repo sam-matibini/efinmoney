@@ -201,6 +201,7 @@ Deno.serve(async (req) => {
       const purchaseId = String(body.purchase_id ?? body.purchaseId ?? "").trim();
       const txnId = String(body.transaction_id ?? body.transactionId ?? "").trim();
       const reference = String(body.reference ?? "").trim();
+      const walletId = String(body.target_wallet_id ?? body.wallet_id ?? body.walletId ?? "").trim();
 
       // Webhook-style body from Paytota success_callback (may include id / status without auth)
       const looksLikeWebhook = Boolean(
@@ -252,8 +253,28 @@ Deno.serve(async (req) => {
       const { data: userData } = await userClient.auth.getUser(authHeader.replace("Bearer ", ""));
       if (!userData?.user?.id) return json({ error: "Unauthorized" }, 401);
 
-      const txn = await findTxn(supabase, purchaseId || undefined, reference || undefined, txnId || undefined);
-      if (!txn || txn.user_id !== userData.user.id) return json({ error: "Not found" }, 404);
+      let txn = await findTxn(supabase, purchaseId || undefined, reference || undefined, txnId || undefined);
+
+      // Return URL often only has walletId (sessionStorage / purchase_id missing)
+      if (!txn && walletId) {
+        const { data: byWallet } = await supabase
+          .from("paytota_payin_transactions")
+          .select("*")
+          .eq("user_id", userData.user.id)
+          .eq("target_wallet_id", walletId)
+          .in("status", ["pending", "processing", "completed"])
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        txn = byWallet;
+      }
+
+      if (!txn || txn.user_id !== userData.user.id) {
+        return json({
+          error: "Payment session not found. If MoMo already deducted, refresh your wallet or contact support with the Paytota reference.",
+          code: "txn_not_found",
+        }, 404);
+      }
 
       if (txn.status === "completed" || txn.status === "failed") {
         return json({

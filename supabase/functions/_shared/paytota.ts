@@ -54,10 +54,11 @@ export function paytotaCountryForCurrency(currency: string): string {
 }
 
 export function paytotaCollectionWhitelist(currency: string): string[] | undefined {
-  const c = currency.toUpperCase();
-  // This merchant rejects unknown whitelist values (e.g. "mpesa" → 400 invalid_choice).
-  // UGX: airtel/mtnmomo are valid. KES/RWF: omit whitelist and let checkout offer enabled methods.
-  if (c === "UGX") return ["airtel", "mtnmomo"];
+  // Do NOT send payment_method_whitelist for Africa MoMo on this merchant.
+  // Whitelisting airtel/mtnmomo causes create to auto-fail with visa
+  // no_matching_terminal → status cancelled → checkout_url becomes /invoice/.
+  // Omitting whitelist keeps status "created" and STK execute via paytota_proxy works.
+  void currency;
   return undefined;
 }
 
@@ -188,13 +189,25 @@ export async function createPaytotaPurchase(params: {
 
   const purchaseId = String(json.id ?? "").trim() || null;
   const checkoutUrl = String(json.checkout_url ?? "").trim() || null;
-  const message = paytotaErrorMessage(
+  const purchaseStatus = String(json.status ?? "").toLowerCase();
+  const cancelledOnCreate = ["cancelled", "canceled", "error", "failed"].includes(purchaseStatus);
+  let message = paytotaErrorMessage(
     json,
     ok ? "Checkout created" : `Paytota error ${status}`,
   );
+  if (cancelledOnCreate) {
+    const attempts = (json.transaction_data as { attempts?: Array<{ error?: { message?: string; code?: string } }> } | undefined)
+      ?.attempts;
+    const attemptErr = attempts?.find((a) => a?.error)?.error;
+    message = attemptErr?.message
+      || attemptErr?.code
+      || "Purchase was cancelled by Paytota (no matching MoMo terminal). Ask Paytota to enable UGX collection.";
+  }
 
+  // Hosted checkout needs checkout_url; Africa STK can proceed with purchase id alone.
+  const ready = africa ? Boolean(purchaseId) : Boolean(purchaseId && checkoutUrl);
   return {
-    ok: ok && Boolean(purchaseId && checkoutUrl),
+    ok: ok && ready && !cancelledOnCreate,
     purchaseId,
     checkoutUrl,
     message,
@@ -204,10 +217,13 @@ export async function createPaytotaPurchase(params: {
 
 /**
  * Execute a MoMo STK push / PIN prompt for a purchase (server-to-server).
- * This avoids redirecting the user to the hosted invoice page.
- * Docs (V2): POST {base}/p/{id}/ with form-data s2s=true & pm=paytota_proxy
+ * Docs (V2): POST {base}/p/{id}/ multipart form-data:
+ *   s2s=true, pm=paytota_proxy, phone (recommended; also on purchase client)
  */
-export async function executePaytotaMomoCollection(purchaseId: string): Promise<{
+export async function executePaytotaMomoCollection(
+  purchaseId: string,
+  phone?: string,
+): Promise<{
   ok: boolean;
   status: string;
   message: string;
@@ -219,6 +235,8 @@ export async function executePaytotaMomoCollection(purchaseId: string): Promise<
   const form = new FormData();
   form.append("s2s", "true");
   form.append("pm", "paytota_proxy");
+  const phoneDigits = String(phone ?? "").replace(/\D/g, "");
+  if (phoneDigits) form.append("phone", phoneDigits);
 
   const res = await fetch(url, {
     method: "POST",
@@ -460,6 +478,7 @@ function paytotaExecuteBody(
 
   if (c === "KES" || network === "imalipay_payouts") {
     return {
+      payout_type: "mobile",
       accountNumber: e164,
       accountInstitution: "MPESA",
       paymentMode: "MOBILE_MONEY",
@@ -467,15 +486,18 @@ function paytotaExecuteBody(
     };
   }
 
-  // UGX + RWF: `{ phone }` — Airtel national, MTN E.164
+  // UGX (+ RWF): Paytota docs — execute via paytota_proxy with payout_type=mobile.
+  // Phone is also on the create payout client; include it on execute for safety.
   return {
+    payout_type: "mobile",
     phone: network === "airtel" ? national : e164,
   };
 }
 
 /**
- * Execute MoMo payout. Prefer provider execution_url; otherwise POST /po/{id}/{network}/.
- * UGX/RWF body is `{ phone }`; KES uses ImaliPay fields.
+ * Execute MoMo payout.
+ * Paytota: POST /po/{id}/paytota_proxy/ with { payout_type: "mobile" }.
+ * Keep network-specific URLs as fallbacks for older/test merchants.
  */
 export async function executePaytotaMobilePayout(params: {
   payoutId: string;
@@ -499,15 +521,23 @@ export async function executePaytotaMobilePayout(params: {
 
   const rawExec = String(params.executionUrl ?? "").trim();
   const candidates: string[] = [];
-  candidates.push(`${cfg.baseUrl}/po/${params.payoutId}/${network}/`);
-  candidates.push(`https://payments.paytota.com/po/${params.payoutId}/${network}/`);
+
+  // Official path (Paytota): /po/{id}/paytota_proxy/
+  candidates.push(`${cfg.baseUrl}/po/${params.payoutId}/paytota_proxy/`);
+  candidates.push(`https://payments.paytota.com/po/${params.payoutId}/paytota_proxy/`);
+
   if (rawExec) {
     const withSlash = rawExec.endsWith("/") ? rawExec : `${rawExec}/`;
-    candidates.push(withSlash);
-    if (!/\/po\/[^/]+\/(airtel|mtnmomo|imalipay_payouts)\/?/.test(withSlash)) {
-      candidates.push(`${withSlash.replace(/\/+$/, "")}/${network}/`);
+    candidates.unshift(withSlash);
+    // If provider returned bare /po/{id}/, append paytota_proxy
+    if (/\/po\/[^/]+\/?$/.test(withSlash) && !withSlash.includes("paytota_proxy")) {
+      candidates.unshift(`${withSlash.replace(/\/+$/, "")}/paytota_proxy/`);
     }
   }
+
+  // Legacy network-specific fallbacks
+  candidates.push(`${cfg.baseUrl}/po/${params.payoutId}/${network}/`);
+  candidates.push(`https://payments.paytota.com/po/${params.payoutId}/${network}/`);
 
   const tried = new Set<string>();
   let last: { ok: boolean; status: number; json: Record<string, unknown> } | null = null;
@@ -535,29 +565,32 @@ export async function executePaytotaMobilePayout(params: {
     }
 
     const msg = paytotaErrorMessage(result.json, "").toLowerCase();
-    if (msg.includes("terminal disabled") || msg.includes("insufficient")) {
+    // Keep trying other URL shapes unless funds/auth are the issue
+    if (msg.includes("insufficient")) {
       break;
     }
-    if (result.status !== 404 && result.status !== 405) {
-      if (result.status >= 500) continue;
+    if (result.status === 401 || result.status === 403) {
       break;
     }
+    // 400 terminal disabled on old /mtnmomo path — still try paytota_proxy if not tried
+    continue;
   }
 
   const status = last?.status ?? 0;
   const json = last?.json ?? {};
   const detailStatus = String(json.status ?? json.detail ?? "error");
-  const message = paytotaErrorMessage(
-    json,
-    `Paytota execute error ${status}`,
-  );
+  let message = paytotaErrorMessage(json, `Payout execute failed (${status})`);
+  if (/terminal disabled/i.test(message)) {
+    message =
+      "Paytota mobile payout is not enabled on this merchant yet (terminal disabled). Ask Paytota to enable the MoMo payout terminal for this currency.";
+  }
 
   return {
     ok: false,
     status: detailStatus,
     message,
     network,
-    json: { ...json, _execute_tried: [...tried] },
+    json: { ...json, _execute_url: [...tried][0] ?? null, _http: status, _execute_tried: [...tried] },
   };
 }
 

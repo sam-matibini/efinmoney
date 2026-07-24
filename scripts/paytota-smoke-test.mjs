@@ -148,16 +148,18 @@ await hit("Account balance (best-effort)", "GET", "/api/v1/account/balance/");
 
 let execResult = null;
 if (DO_EXECUTE && payout.json?.id) {
+  // Official Paytota path: /po/{id}/paytota_proxy/ + { payout_type: "mobile" }
   let execUrl = String(payout.json.execution_url || "").trim();
-  const hasNetwork = /\/po\/[^/]+\/(airtel|mtnmomo)\/?/.test(execUrl);
-  if (!hasNetwork) {
-    execUrl = `${BASE}/po/${payout.json.id}/${network}/`;
+  if (!execUrl || !/paytota_proxy/.test(execUrl)) {
+    execUrl = `${BASE}/po/${payout.json.id}/paytota_proxy/`;
   }
   if (!execUrl.endsWith("/")) execUrl += "/";
-  const urlNet = execUrl.match(/\/po\/[^/]+\/(airtel|mtnmomo)\/?/)?.[1] || network;
-  const phone = executePhone(TEST_PHONE, urlNet);
-  console.log(`\nExecuting payout → network=${urlNet} phone=${phone}`);
-  execResult = await hit("PAYOUT execute (UGX mobile)", "POST", execUrl, { phone });
+  const phone = executePhone(TEST_PHONE, network);
+  console.log(`\nExecuting payout → paytota_proxy phone=${phone}`);
+  execResult = await hit("PAYOUT execute (UGX mobile)", "POST", execUrl, {
+    payout_type: "mobile",
+    phone,
+  });
 }
 
 console.log("\n--- Summary ---");
@@ -172,5 +174,5 @@ if (DO_EXECUTE) {
   console.log("Execute status:", execResult?.json?.status || execResult?.json?.detail || execResult?.res?.status);
   console.log("Execute ok HTTP:", execResult?.res?.ok);
 } else {
-  console.log("\nNote: initiate only. Re-run with --execute to POST { phone } to execution_url.");
+  console.log("\nNote: initiate only. Re-run with --execute to POST { payout_type: mobile } to /po/{id}/paytota_proxy/.");
 }

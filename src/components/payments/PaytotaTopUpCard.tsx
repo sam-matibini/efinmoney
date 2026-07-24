@@ -163,21 +163,31 @@ export default function PaytotaTopUpCard({ walletId, walletCurrency, onComplete 
       });
       savePendingPaytotaTxn(result.transaction_id);
 
-      // STK path: stay on page + offer hosted checkout if no phone prompt arrives.
+      // STK path: stay on page — never auto-open /invoice/ (that is not MoMo pay).
       if (result.stk_push) {
-        setCheckoutLink(result.payment_link || null);
+        const link = result.payment_link && !/\/invoice\/?$/i.test(result.payment_link)
+          ? result.payment_link
+          : null;
+        setCheckoutLink(link);
         setAwaitingPhone(true);
         toast.success("Approve the payment on your phone", {
-          description: "No prompt? Use “Open checkout page” below.",
+          description: link
+            ? "No prompt? You can open the secure checkout as a backup."
+            : "Check MTN/Airtel for a PIN / STK prompt.",
           duration: 12000,
         });
         setLoading(false);
         return;
       }
 
-      // Invoice/redirect path (Western or fallback).
+      // Invoice/redirect path (Western only — Africa returns stk_push or error).
       if (!result.payment_link) {
         throw new Error("No checkout link returned");
+      }
+      if (/\/invoice\/?$/i.test(result.payment_link) && africa) {
+        throw new Error(
+          "Paytota returned an invoice page instead of MoMo. Collection terminals may not be enabled — contact Paytota.",
+        );
       }
       toast.message(africa ? "Opening mobile money checkout" : "Opening invoice", {
         description: `Confirm ${formatCredited(quote?.checkoutAmount ?? amt, currency)}.`,

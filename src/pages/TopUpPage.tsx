@@ -386,14 +386,17 @@ const TopUpPage = () => {
 
     const paytotaStatus = params.get("paytota");
     if (paytotaStatus === "success") {
-      setVerifyState({ status: "verifying", message: "Confirming your card payment…" });
+      setVerifyState({ status: "verifying", message: "Confirming your mobile money payment…" });
       (async () => {
         try {
           const pendingId = readPendingPaytotaTxn();
           const purchaseId = params.get("purchase_id") || params.get("purchaseId") || undefined;
+          const txnFromUrl = params.get("transaction_id") || params.get("transactionId") || undefined;
+          const walletFromUrl = params.get("walletId") || params.get("wallet_id") || undefined;
           const result = await confirmPaytotaPayment({
-            transaction_id: pendingId || undefined,
+            transaction_id: txnFromUrl || pendingId || undefined,
             purchase_id: purchaseId,
+            wallet_id: walletFromUrl || undefined,
           });
           if (result.status === "completed") {
             clearPendingPaytotaTxn();

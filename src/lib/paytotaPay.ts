@@ -26,7 +26,9 @@ export function isPaytotaCadViaUsdCurrency(_currency: string): boolean {
 
 export function paytotaMinAmount(currency: string): number {
   const c = currency.toUpperCase();
-  if (c === "UGX" || c === "RWF") return 100;
+  // MoMo corridors — keep above typical network floors
+  if (c === "UGX") return 500;
+  if (c === "RWF") return 500;
   if (c === "KES") return 10;
   return 1;
 }
@@ -134,8 +136,15 @@ export async function getPaytotaPayStatus(txnId: string): Promise<PaytotaPayStat
 export async function confirmPaytotaPayment(params: {
   transaction_id?: string;
   purchase_id?: string;
+  wallet_id?: string;
 }): Promise<{ ok: boolean; status: string; credit_amount?: number; credit_currency?: string; error?: string }> {
-  const { data, error } = await supabase.functions.invoke("paytota-webhook", { body: params });
+  const { data, error } = await supabase.functions.invoke("paytota-webhook", {
+    body: {
+      transaction_id: params.transaction_id,
+      purchase_id: params.purchase_id,
+      wallet_id: params.wallet_id,
+    },
+  });
   if (error) throw new Error(await invokeErrorMessage(error));
   return data as {
     ok: boolean;

@@ -75,6 +75,10 @@ const payout = await hit("POST", "/api/v1/payouts/", {
 });
 
 if (payout.json?.id) {
+  // Official: /po/{id}/paytota_proxy/ + payout_type=mobile
+  await hit("POST", `/po/${payout.json.id}/paytota_proxy/`, { payout_type: "mobile", phone });
+  await hit("POST", `/po/${payout.json.id}/paytota_proxy/`, { payout_type: "mobile" });
+  // Legacy (expect terminal disabled if proxy works)
   await hit("POST", `/po/${payout.json.id}/airtel/`, { phone: "770123456" });
   await hit("POST", `/po/${payout.json.id}/mtnmomo/`, { phone });
 }
