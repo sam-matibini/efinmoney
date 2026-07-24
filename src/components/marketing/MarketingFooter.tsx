@@ -16,6 +16,7 @@ const NAV_PILLS: { label: string; href: string; external?: boolean }[] = [
   { label: "About", href: "/about" },
   { label: "Privacy", href: "/privacy" },
   { label: "Terms", href: "/terms" },
+  { label: "Refund Policy", href: "/refund" },
   { label: "Compliance", href: "/compliance" },
   { label: "Contact", href: "/contact" },
 ];

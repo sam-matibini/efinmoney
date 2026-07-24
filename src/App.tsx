@@ -38,6 +38,7 @@ import AdminLayout from "@/components/admin-portal/AdminLayout";
 // Lazy-loaded pages (admin, onboarding, legal, rarely-used)
 const PrivacyPolicyPage = lazyImport(() => import("./pages/PrivacyPolicyPage"));
 const TermsPage = lazyImport(() => import("./pages/TermsPage"));
+const RefundPolicyPage = lazyImport(() => import("./pages/RefundPolicyPage"));
 const CompliancePage = lazyImport(() => import("./pages/CompliancePage"));
 const Features = lazyImport(() => import("./pages/Features"));
 const HowItWorks = lazyImport(() => import("./pages/HowItWorks"));
@@ -237,6 +238,7 @@ const AppRoutes = () => {
         <Route path="/claim/:code" element={<GatedPage feature="paymentLinks"><ClaimPaymentLinkPage /></GatedPage>} />
         <Route path="/privacy" element={<PrivacyPolicyPage />} />
         <Route path="/terms" element={<TermsPage />} />
+        <Route path="/refund" element={<RefundPolicyPage />} />
         <Route path="/compliance" element={<CompliancePage />} />
         <Route path="/features" element={<Features />} />
         <Route path="/how-it-works" element={<HowItWorks />} />
