@@ -54,14 +54,19 @@ const MarketTicker = () => {
 
   const items = useMemo<Item[]>(() => {
     if (!data) return [];
-    const fiat: Item[] = (data.fiat || []).map((f) => ({
-      kind: "fiat",
-      key: `${f.from}/${f.to}`,
-      from: f.from,
-      to: f.to,
-      price: f.price,
-      delta: f.change24h,
-    }));
+    // market-rates now returns a USD->X row for every pickable currency; the
+    // ticker only has flags/room for a curated set, so show the pairs we can
+    // render cleanly (both legs known) and let the calculator use the rest.
+    const fiat: Item[] = (data.fiat || [])
+      .filter((f) => CURRENCY_TO_CC[f.from] && CURRENCY_TO_CC[f.to])
+      .map((f) => ({
+        kind: "fiat",
+        key: `${f.from}/${f.to}`,
+        from: f.from,
+        to: f.to,
+        price: f.price,
+        delta: f.change24h,
+      }));
     const crypto: Item[] = (data.crypto || []).map((c) => ({
       kind: "crypto",
       key: c.symbol,

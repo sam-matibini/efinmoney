@@ -6,7 +6,13 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const SUPPORTED = ["USD", "CAD", "EUR", "GBP", "NGN", "KES", "UGX", "TZS", "ZMW", "BIF", "MZN", "GHS", "RWF", "XAF", "XOF", "MWK", "ZAR", "BWP"];
+// CORE currencies get the full NxN cross-product so server-side lookups
+// (fx_convert, transfer limits) always find a direct row for a transacting
+// corridor. Everything the provider AND the currencies table both know about
+// additionally gets a USD->X row so the Live FX Calculator can derive any
+// cross-rate client-side (buildUsdMap). Keeping CORE small bounds table growth;
+// the broad USD->X set is one row per currency.
+const CORE = ["USD", "CAD", "EUR", "GBP", "NGN", "KES", "UGX", "TZS", "ZMW", "BIF", "MZN", "GHS", "RWF", "XAF", "XOF", "MWK", "ZAR", "BWP"];
 const MARKUP = 0.005; // 0.5% spread
 
 // Try OpenExchangeRates (paid, accurate). On any failure fall back to
@@ -15,8 +21,9 @@ async function fetchUsdRates(): Promise<{ source: string; rates: Record<string, 
   const appId = Deno.env.get("OPENEXCHANGERATES_APP_ID");
   if (appId) {
     try {
-      const symbols = SUPPORTED.filter((c) => c !== "USD").join(",");
-      const url = `https://openexchangerates.org/api/latest.json?app_id=${appId}&base=USD&symbols=${symbols}`;
+      // No symbols filter: pull every currency the provider offers so the broad
+      // USD->X coverage below is as wide as the currencies table allows.
+      const url = `https://openexchangerates.org/api/latest.json?app_id=${appId}&base=USD`;
       const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
@@ -53,8 +60,9 @@ Deno.serve(async (req) => {
     const validUntil = new Date(now.getTime() + 2 * 60 * 60 * 1000).toISOString();
     const rows: any[] = [];
 
-    for (const from of SUPPORTED) {
-      for (const to of SUPPORTED) {
+    // CORE NxN: direct rows for every transacting corridor (server-side lookups).
+    for (const from of CORE) {
+      for (const to of CORE) {
         if (from === to) continue;
         const fromRate = rates[from];
         const toRate = rates[to];
@@ -73,6 +81,35 @@ Deno.serve(async (req) => {
           valid_until: validUntil,
         });
       }
+    }
+
+    // BROAD USD->X: one row per currency the provider AND the currencies table
+    // both know, so the calculator can quote any pickable currency via a
+    // client-side cross-rate. fx_rates.{from,to}_currency FK -> currencies(code),
+    // so restricting to existing codes keeps the whole batch insert FK-safe.
+    const { data: ccyRows, error: ccyErr } = await supabase
+      .from("currencies")
+      .select("code")
+      .eq("is_active", true);
+    if (ccyErr) throw ccyErr;
+    const tableCodes = new Set((ccyRows ?? []).map((r: { code: string }) => r.code));
+    const coreSet = new Set(CORE);
+
+    for (const [code, rateVal] of Object.entries(rates)) {
+      if (code === "USD" || coreSet.has(code)) continue; // USD->core already emitted above
+      if (!tableCodes.has(code)) continue; // FK: must exist in currencies
+      const market = Number(rateVal);
+      if (!market || market <= 0) continue;
+      rows.push({
+        from_currency: "USD",
+        to_currency: code,
+        rate: market,
+        markup_rate: MARKUP,
+        effective_rate: market * (1 - MARKUP),
+        source,
+        valid_from: now.toISOString(),
+        valid_until: validUntil,
+      });
     }
 
     if (isNombaNigeriaConfigured()) {

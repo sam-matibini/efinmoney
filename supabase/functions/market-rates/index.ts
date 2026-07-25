@@ -6,17 +6,10 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 };
 
-// Keep in sync with refresh-fx-rates SUPPORTED list.
-const SUPPORTED = [
-  "USD", "CAD", "EUR", "GBP", "NGN", "KES", "UGX", "TZS", "ZMW",
-  "BIF", "MZN", "GHS", "RWF", "XAF", "XOF", "MWK", "ZAR", "BWP",
-];
-
-// USD↔X for every non-USD currency lets buildUsdMap on the client derive
-// every cross-rate (including CAD→BWP, GBP→BWP, etc.).
-const FIAT_PAIRS: { from: string; to: string }[] = [
-  ...SUPPORTED.filter((c) => c !== "USD").map((c) => ({ from: "USD", to: c })),
-  // A couple of explicit non-USD pairs we want a direct 24h-change series for.
+// Non-USD pairs we surface directly (for a real 24h-change series and, for
+// CAD→NGN, the live Nomba corridor rate). Every other cross-rate is derived
+// client-side by buildUsdMap from the USD→X rows returned below.
+const EXPLICIT_PAIRS: { from: string; to: string }[] = [
   { from: "CAD", to: "NGN" },
   { from: "CAD", to: "BWP" },
   { from: "GBP", to: "USD" },
@@ -51,12 +44,50 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    // FIAT: most-recent + closest-to-24h-old row per pair
+    // FIAT: return every currently-valid USD→X rate (one row per currency) so
+    // the client can quote any pickable currency, plus a few explicit non-USD
+    // pairs. Two bulk queries drive the whole USD→X set instead of one query
+    // per pair, which scales to the full currency list.
     const fiat: { from: string; to: string; price: number; market_price: number; change24h: number }[] = [];
+    const nowIso = new Date().toISOString();
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
+    // Latest valid USD→X (dedupe to newest per to_currency).
+    const { data: latestUsd } = await supabase
+      .from("fx_rates")
+      .select("to_currency, rate, effective_rate, valid_from")
+      .eq("from_currency", "USD")
+      .gt("valid_until", nowIso)
+      .order("valid_from", { ascending: false })
+      .limit(5000);
+    // ~24h-ago USD→X for a change series (dedupe to newest before the cutoff).
+    const { data: priorUsd } = await supabase
+      .from("fx_rates")
+      .select("to_currency, effective_rate, valid_from")
+      .eq("from_currency", "USD")
+      .lte("valid_from", oneDayAgo)
+      .order("valid_from", { ascending: false })
+      .limit(5000);
+
+    const priorByTo = new Map<string, number>();
+    for (const r of priorUsd ?? []) {
+      if (!priorByTo.has(r.to_currency)) priorByTo.set(r.to_currency, Number(r.effective_rate));
+    }
+    const seenUsd = new Set<string>();
+    for (const r of latestUsd ?? []) {
+      if (seenUsd.has(r.to_currency)) continue;
+      seenUsd.add(r.to_currency);
+      const price = Number(r.effective_rate);
+      if (!price || price <= 0) continue;
+      const market_price = Number(r.rate) || price;
+      const prior = priorByTo.get(r.to_currency);
+      const change24h = prior && prior > 0 ? ((price - prior) / prior) * 100 : 0;
+      fiat.push({ from: "USD", to: r.to_currency, price, market_price, change24h });
+    }
+
+    // Explicit non-USD pairs — most-recent + closest-to-24h-old row per pair.
     await Promise.all(
-      FIAT_PAIRS.map(async (p) => {
+      EXPLICIT_PAIRS.map(async (p) => {
         const { data: latestArr } = await supabase
           .from("fx_rates")
           .select("rate, effective_rate, valid_from")
