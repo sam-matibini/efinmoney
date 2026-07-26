@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Check, ChevronsUpDown } from "lucide-react";
 import KybShell from "@/components/kyb/KybShell";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -15,6 +15,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
+import { ISO_COUNTRIES, findIsoCountry } from "@/lib/isoCountries";
 import { useKyb, BusinessEntityType } from "@/hooks/useKyb";
 
 const ENTITY_TYPES: { value: BusinessEntityType; label: string }[] = [
@@ -28,15 +39,15 @@ const ENTITY_TYPES: { value: BusinessEntityType; label: string }[] = [
   { value: "other", label: "Other" },
 ];
 
-// Only jurisdictions with a seeded document matrix are selectable.
-const SUPPORTED_COUNTRIES = [
-  { code: "CA", name: "Canada" },
-  { code: "NG", name: "Nigeria" },
-];
+// Business onboarding is only live where a document matrix is seeded (kyb_document_requirements).
+// All countries are shown for search, but only these can be submitted.
+const SUPPORTED_COUNTRY_CODES = new Set(["CA", "NG"]);
 
 const Details = () => {
   const navigate = useNavigate();
   const { business, saveBusiness, isLoading } = useKyb();
+
+  const [countryOpen, setCountryOpen] = useState(false);
 
   const [form, setForm] = useState({
     legal_name: "",
@@ -88,10 +99,18 @@ const Details = () => {
   const set = (key: keyof typeof form) => (value: string) =>
     setForm((f) => ({ ...f, [key]: value }));
 
+  const selectedCountry = findIsoCountry(form.incorporation_country);
+  const countryUnsupported = useMemo(
+    () => !!form.incorporation_country && !SUPPORTED_COUNTRY_CODES.has(form.incorporation_country),
+    [form.incorporation_country],
+  );
+
   const submit = async () => {
     if (!form.legal_name.trim()) return toast.error("Legal business name is required.");
     if (!form.entity_type) return toast.error("Select the entity type.");
     if (!form.incorporation_country) return toast.error("Select the country of registration.");
+    if (countryUnsupported)
+      return toast.error("Business onboarding isn't available in this country yet.");
     if (!form.registration_number.trim())
       return toast.error("Business registration number is required.");
 
@@ -172,18 +191,64 @@ const Details = () => {
 
           <div className="space-y-2">
             <Label>Country of registration *</Label>
-            <Select value={form.incorporation_country} onValueChange={set("incorporation_country")}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select country" />
-              </SelectTrigger>
-              <SelectContent>
-                {SUPPORTED_COUNTRIES.map((c) => (
-                  <SelectItem key={c.code} value={c.code}>
-                    {c.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Popover open={countryOpen} onOpenChange={setCountryOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={countryOpen}
+                  className="w-full justify-between font-normal"
+                >
+                  {selectedCountry ? (
+                    <span className="inline-flex items-center gap-2 truncate">
+                      <span className="text-lg leading-none">{selectedCountry.flag}</span>
+                      <span className="truncate">{selectedCountry.name}</span>
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground">Select country</span>
+                  )}
+                  <ChevronsUpDown className="w-4 h-4 opacity-50 shrink-0" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent
+                align="start"
+                className="p-0 w-[--radix-popover-trigger-width] min-w-[260px]"
+              >
+                <Command>
+                  <CommandInput placeholder="Search country..." />
+                  <CommandList>
+                    <CommandEmpty>No country found.</CommandEmpty>
+                    <CommandGroup>
+                      {ISO_COUNTRIES.map((c) => (
+                        <CommandItem
+                          key={c.code}
+                          value={c.name}
+                          onSelect={() => {
+                            set("incorporation_country")(c.code);
+                            setCountryOpen(false);
+                          }}
+                        >
+                          <span className="text-lg leading-none mr-2">{c.flag}</span>
+                          <span className="flex-1 truncate">{c.name}</span>
+                          <Check
+                            className={cn(
+                              "w-4 h-4 ml-2",
+                              form.incorporation_country === c.code ? "opacity-100" : "opacity-0",
+                            )}
+                          />
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+            {countryUnsupported && (
+              <p className="text-xs text-destructive">
+                Business onboarding isn't available in this country yet.
+              </p>
+            )}
           </div>
         </div>
 
@@ -328,7 +393,7 @@ const Details = () => {
 
       <Button
         onClick={submit}
-        disabled={saveBusiness.isPending || isLoading}
+        disabled={saveBusiness.isPending || isLoading || countryUnsupported}
         size="lg"
         className="w-full"
       >
