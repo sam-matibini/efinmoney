@@ -27,10 +27,12 @@ import {
   Stamp,
   ExternalLink,
   Receipt,
+  Building2,
 } from "lucide-react";
 import { productFeatures } from "@/lib/productFeatures";
 import PageHeroBanner from "@/components/common/PageHeroBanner";
 import AppPage from "@/components/layout/AppPage";
+import { useKyb, KybStep } from "@/hooks/useKyb";
 
 interface Row {
   icon: any;
@@ -87,6 +89,56 @@ const MorePage = () => {
   const stamps = Math.min(completedCount, stampGoal);
 
   const verified = profile?.kyc_status === "approved" || profile?.kyc_status === "verified";
+
+  const { business, isApproved: businessApproved } = useKyb();
+
+  // Persistent entry into the business flow, so a user who dismissed the
+  // dashboard prompt can always come back. Mirrors BusinessPromptCard routing.
+  const bizStepPath: Record<KybStep, string> = {
+    details: "/onboarding/business/details",
+    ownership: "/onboarding/business/ownership",
+    documents: "/onboarding/business/documents",
+    review: "/onboarding/business/review",
+    completed: "/onboarding/business/details",
+  };
+  const businessRow: Row = (() => {
+    if (businessApproved) {
+      return {
+        icon: Building2,
+        label: "Business account",
+        onClick: () => navigate("/business"),
+        right: <Badge className="bg-primary/15 text-primary border-primary/30 hover:bg-primary/15">Active</Badge>,
+      };
+    }
+    if (business?.kyb_status === "pending_review") {
+      return {
+        icon: Building2,
+        label: "Business application",
+        onClick: () => navigate("/onboarding/business/submitted"),
+        right: <Badge variant="outline">In review</Badge>,
+      };
+    }
+    if (business?.kyb_status === "rejected" || business?.kyb_status === "suspended") {
+      return {
+        icon: Building2,
+        label: "Business application",
+        onClick: () => navigate("/onboarding/business/rejected"),
+        right: <Badge variant="outline">Action needed</Badge>,
+      };
+    }
+    if (business) {
+      return {
+        icon: Building2,
+        label: "Continue business application",
+        onClick: () => navigate(bizStepPath[business.current_step] ?? "/onboarding/business/details"),
+      };
+    }
+    return {
+      icon: Building2,
+      label: "Open a business account",
+      onClick: () => navigate("/onboarding/business/details"),
+    };
+  })();
 
   return (
     <AppPage width="narrow" className="pt-6 md:pt-8">
@@ -182,6 +234,7 @@ const MorePage = () => {
               },
               { icon: Bell, label: "Notifications", onClick: () => navigate("/security") },
               { icon: Users, label: "Contacts & Beneficiaries", onClick: () => navigate("/contacts") },
+              businessRow,
             ]}
           />
 
