@@ -1,13 +1,17 @@
 /**
  * Lenhub Flutterwave wrapper (`/v1/flutterwave/flutter/*` on efincash.lenhub.net).
- * Spec: flutterlenhub.json / https://efincash.lenhub.net/docs
+ * Spec: EfinMoney OpenAPI (`/openapi.json`) — auth session + FLW / Fincra / Payota.
+ *
+ * Auth: POST /v1/flutterwave/auth/user_api/ with raw API key → Fernet `key`
+ * used as `user_key` on every subsequent call (raw API key alone → Unauthorized).
  *
  * Collect: card create → pin → otp → confirm; virtual account
  * Quote / banks / verify / networks
- * Payout: bank FX + Ghana/Kenya MoMo (+ Elicate Zambia route)
+ * Payout: NGN bank FX + unified MoMo (+ Elicate Zambia route)
  *
  * Env:
  *   LENHUB_FLUTTER_API_URL (default https://efincash.lenhub.net)
+ *   LENHUB_FLUTTER_USER_KEY / LENHUB_FLUTTER_API_KEY (required for live calls)
  *   LENHUB_FLUTTER_ENABLED=true
  *   LENHUB_FLUTTER_PAYOUT=true
  *   LENHUB_FLUTTER_WEBHOOK_URL (preferred public callback — CF proxy, not supabase.co)
@@ -16,6 +20,7 @@
 const DEFAULT_BASE = "https://efincash.lenhub.net";
 /** Path prefix for Flutterwave routes (docs OpenAPI). */
 const FLW_PREFIX = "/v1/flutterwave/flutter";
+const AUTH_PATH = "/v1/flutterwave/auth/user_api/";
 
 /** Currencies we offer for card/VA top-up via this rail (API accepts free-form currency). */
 export const LENHUB_FLUTTER_COLLECT_CURRENCIES = [
@@ -34,18 +39,13 @@ export const LENHUB_FLUTTER_COLLECT_CURRENCIES = [
 /** Bank list country codes that have returned data in live probes. */
 export const LENHUB_FLUTTER_BANK_COUNTRIES = ["NG", "GH", "KE"] as const;
 
-/** Destination currencies for bank payout/exchange (matched to FX probes). */
-export const LENHUB_FLUTTER_BANK_PAYOUT_CURRENCIES = [
-  "NGN",
-  "GHS",
-  "KES",
-  "UGX",
-  "RWF",
-  "TZS",
-  "ZMW",
-] as const;
+/**
+ * Bank payout destinations in current EfinMoney OpenAPI.
+ * Spec only exposes `/payout/exchange/nigeria` (USD/CAD/… → NGN).
+ */
+export const LENHUB_FLUTTER_BANK_PAYOUT_CURRENCIES = ["NGN"] as const;
 
-/** Source currencies that can fund FX bank / Ghana MoMo payouts. */
+/** Source currencies that can fund FX bank / MoMo payouts (USD→CAD FX works; CAD source often Unauthorized). */
 export const LENHUB_FLUTTER_PAYOUT_SOURCE_CURRENCIES = [
   "USD",
   "CAD",
@@ -54,7 +54,11 @@ export const LENHUB_FLUTTER_PAYOUT_SOURCE_CURRENCIES = [
   "NGN",
 ] as const;
 
-export const LENHUB_FLUTTER_MOMO_CURRENCIES = ["GHS", "KES"] as const;
+export const LENHUB_FLUTTER_MOMO_CURRENCIES = ["GHS", "KES", "UGX"] as const;
+
+let cachedSessionKey: string | null = null;
+let cachedSessionAt = 0;
+const SESSION_TTL_MS = 20_000;
 
 export type LenhubFlutterResult = {
   ok: boolean;
@@ -80,6 +84,55 @@ export function getLenhubFlutterBaseUrl(): string {
   return normalizeHost(Deno.env.get("LENHUB_FLUTTER_API_URL")?.trim() || DEFAULT_BASE);
 }
 
+/** Raw tenant API key from Lenhub (not the Fernet session token). */
+export function getLenhubFlutterApiKey(): string {
+  return (
+    Deno.env.get("LENHUB_FLUTTER_USER_KEY")?.trim() ||
+    Deno.env.get("LENHUB_FLUTTER_API_KEY")?.trim() ||
+    ""
+  );
+}
+
+/**
+ * Exchange raw API key for short-lived Fernet `user_key` used on all FLW routes.
+ */
+export async function lenhubFlutterAuth(force = false): Promise<LenhubFlutterResult & { sessionKey: string | null }> {
+  const now = Date.now();
+  if (!force && cachedSessionKey && now - cachedSessionAt < SESSION_TTL_MS) {
+    return {
+      ok: true,
+      httpStatus: 200,
+      message: "cached",
+      json: { status: "success", key: cachedSessionKey },
+      raw: "",
+      sessionKey: cachedSessionKey,
+    };
+  }
+
+  const apiKey = getLenhubFlutterApiKey();
+  if (!apiKey) {
+    const msg = "LENHUB_FLUTTER_USER_KEY (or LENHUB_FLUTTER_API_KEY) is not set";
+    return { ok: false, httpStatus: 0, message: msg, json: { error: msg }, raw: msg, sessionKey: null };
+  }
+
+  const result = await lenhubFlutterFetchRaw("POST", AUTH_PATH, {
+    body: { user_key: apiKey },
+    timeoutMs: 20_000,
+  });
+  const key =
+    result.json?.key != null && String(result.json.key).trim()
+      ? String(result.json.key).trim()
+      : null;
+  if (result.ok && key) {
+    cachedSessionKey = key;
+    cachedSessionAt = Date.now();
+  } else {
+    cachedSessionKey = null;
+    cachedSessionAt = 0;
+  }
+  return { ...result, ok: result.ok && Boolean(key), sessionKey: key };
+}
+
 /**
  * Public callback URL we give Lenhub / pass on card+payout creates.
  * Prefer Cloudflare façade so partners never see a raw supabase.co URL.
@@ -102,7 +155,7 @@ export function getLenhubFlutterWebhookUrl(): string {
 export function isLenhubFlutterEnabled(): boolean {
   const flag = (Deno.env.get("LENHUB_FLUTTER_ENABLED") || "true").trim().toLowerCase();
   if (flag === "false" || flag === "0" || flag === "off") return false;
-  return Boolean(getLenhubFlutterBaseUrl());
+  return Boolean(getLenhubFlutterBaseUrl()) && Boolean(getLenhubFlutterApiKey());
 }
 
 export function isLenhubFlutterPayoutEnabled(): boolean {
@@ -146,16 +199,85 @@ function unwrapData(json: Record<string, unknown>): unknown {
   return json;
 }
 
+/** Dig into Lenhub/Fincra nested charge payloads for real payment status. */
+export function pickLenhubNestedCharge(json: Record<string, unknown>): Record<string, unknown> | null {
+  const walk = (obj: unknown, depth = 0): Record<string, unknown> | null => {
+    if (!obj || typeof obj !== "object" || depth > 6) return null;
+    if (Array.isArray(obj)) {
+      for (const item of obj) {
+        const found = walk(item, depth + 1);
+        if (found) return found;
+      }
+      return null;
+    }
+    const rec = obj as Record<string, unknown>;
+    // Prefer the innermost charge-like object that has payment status / processor_response
+    if (rec.processor_response || (rec.id && typeof rec.id === "string" && String(rec.id).startsWith("chg_"))) {
+      return rec;
+    }
+    for (const nest of ["data", "status", "message", "charge", "payment"]) {
+      if (rec[nest] != null) {
+        const found = walk(rec[nest], depth + 1);
+        if (found) return found;
+      }
+    }
+    return null;
+  };
+  return walk(json);
+}
+
+export function pickLenhubProcessorFailure(json: Record<string, unknown>): {
+  chargeStatus: string | null;
+  code: string | null;
+  type: string | null;
+  message: string | null;
+} {
+  const charge = pickLenhubNestedCharge(json);
+  const chargeStatus = charge?.status != null ? String(charge.status).toLowerCase() : null;
+  const pr = charge?.processor_response;
+  let code: string | null = null;
+  let type: string | null = null;
+  if (pr && typeof pr === "object" && !Array.isArray(pr)) {
+    const p = pr as Record<string, unknown>;
+    code = p.code != null ? String(p.code) : null;
+    type = p.type != null ? String(p.type) : null;
+  }
+  let message: string | null = null;
+  if (code === "62" || /restricted_service|fraud|restricted/i.test(type || "")) {
+    message =
+      "Card declined (processor code 62 — restricted / fraud-flagged). Use another card, or ask the bank to unblock international e-commerce.";
+  } else if (type || code) {
+    message = `Card declined${type ? `: ${type.replace(/_/g, " ")}` : ""}${code ? ` (code ${code})` : ""}`;
+  }
+  return { chargeStatus, code, type, message };
+}
+
 function extractMessage(json: Record<string, unknown>, fallback: string): string {
+  const processor = pickLenhubProcessorFailure(json);
+  if (processor.message && (processor.chargeStatus === "failed" || processor.code || processor.type)) {
+    return processor.message;
+  }
+
   const message = json.message;
-  if (typeof message === "string" && message.trim()) return message.trim();
+  if (typeof message === "string" && message.trim()) {
+    const m = message.trim();
+    // Lenhub Python KeyError leaked as the message body
+    if (m === "'next_action'" || m === "next_action") {
+      return "Lenhub card create crashed (missing next_action). Retry — if it keeps failing, ask Lenhub to fix their Flutterwave response parser.";
+    }
+    return m;
+  }
   if (message && typeof message === "object") {
     const m = message as Record<string, unknown>;
     if (typeof m.message === "string" && m.message.trim()) return m.message.trim();
     const status = m.status;
     if (status && typeof status === "object") {
       const s = status as Record<string, unknown>;
-      if (typeof s.message === "string" && s.message.trim()) return s.message.trim();
+      if (typeof s.message === "string" && s.message.trim()) {
+        // "Charge updated" with nested failed charge — prefer processor text
+        if (processor.message) return processor.message;
+        return s.message.trim();
+      }
       const err = s.error;
       if (err && typeof err === "object") {
         const e = err as Record<string, unknown>;
@@ -171,8 +293,8 @@ function extractMessage(json: Record<string, unknown>, fallback: string): string
     if (/AESGCM key must be 128, 192, or 256 bits/i.test(raw)) {
       return "Lenhub card encrypt failed (bad Flutterwave encryption key on their server). Bank transfer still works — ask Lenhub to fix AESGCM EncryptionKey.";
     }
-    if (/ValueError|Traceback|Internal Server Error/i.test(raw)) {
-      return "Lenhub card API crashed (HTTP 500). Use bank transfer for now, or ask Lenhub to fix card create.";
+    if (/ValueError|Traceback|Internal Server Error|KeyError/i.test(raw)) {
+      return "Lenhub card API crashed (HTTP 500). Retry, or ask Lenhub to fix card create.";
     }
   }
   return fallback;
@@ -181,6 +303,14 @@ function extractMessage(json: Record<string, unknown>, fallback: string): string
 function isSuccessEnvelope(json: Record<string, unknown>, httpStatus: number): boolean {
   if (httpStatus < 200 || httpStatus >= 300) return false;
   if (String(json.status || "").toLowerCase() === "error") return false;
+
+  // Lenhub confirm often returns HTTP 200 + "Charge updated" while nested charge.status === "failed"
+  const processor = pickLenhubProcessorFailure(json);
+  if (processor.chargeStatus === "failed" || processor.chargeStatus === "cancelled") return false;
+  if (processor.code || (processor.type && /invalid|declined|fraud|restricted|failed/i.test(processor.type))) {
+    return false;
+  }
+
   const message = json.message;
   // Lenhub sometimes returns { status: "success", message: [] } with no real payload
   if (Array.isArray(message) && message.length === 0) return false;
@@ -192,6 +322,11 @@ function isSuccessEnvelope(json: Record<string, unknown>, httpStatus: number): b
       const s = status as Record<string, unknown>;
       if (String(s.status || "").toLowerCase() === "failed") return false;
       if (s.error) return false;
+      const nestedData = s.data;
+      if (nestedData && typeof nestedData === "object" && !Array.isArray(nestedData)) {
+        const nd = nestedData as Record<string, unknown>;
+        if (String(nd.status || "").toLowerCase() === "failed") return false;
+      }
     }
     if (String(m.status || "").toLowerCase() === "failed") return false;
     if (Array.isArray(m) && m.length === 0) return false;
@@ -199,7 +334,29 @@ function isSuccessEnvelope(json: Record<string, unknown>, httpStatus: number): b
   return String(json.status || "success").toLowerCase() === "success" || httpStatus < 300;
 }
 
-export async function lenhubFlutterFetch(
+function looksUnauthorized(json: Record<string, unknown>, httpStatus: number): boolean {
+  if (httpStatus === 401) return true;
+  if (String(json.status) === "401" || Number(json.status) === 401) return true;
+  const msg = String(json.message || "").toLowerCase();
+  if (msg === "unauthorized" || msg.includes("unauthorized")) return true;
+  return false;
+}
+
+/** Transient Lenhub/FLW card-create failures worth one fresh-session retry. */
+function looksTransientCardCreateFailure(result: LenhubFlutterResult): boolean {
+  if (looksUnauthorized(result.json, result.httpStatus)) return true;
+  const msg = String(result.message || result.json?.message || "");
+  if (msg.includes("'next_action'") || msg.includes("next_action")) return true;
+  if (String(result.json?.status || "").toLowerCase() === "error" && /next_action/i.test(msg)) {
+    return true;
+  }
+  const message = result.json?.message;
+  if (Array.isArray(message) && message.length === 0) return true;
+  return false;
+}
+
+/** Low-level fetch with no session injection (used by auth + authenticated wrapper). */
+async function lenhubFlutterFetchRaw(
   method: string,
   path: string,
   opts: {
@@ -249,6 +406,50 @@ export async function lenhubFlutterFetch(
     const msg = err instanceof Error ? err.message : String(err);
     return { ok: false, httpStatus: 0, message: msg, json: { error: msg }, raw: msg };
   }
+}
+
+/**
+ * Authenticated Lenhub call: injects Fernet session as `user_key` into query + body,
+ * refreshes once on Unauthorized.
+ */
+export async function lenhubFlutterFetch(
+  method: string,
+  path: string,
+  opts: {
+    query?: Record<string, string | number | undefined | null>;
+    body?: Record<string, unknown>;
+    timeoutMs?: number;
+    /** Skip session (auth endpoint only). */
+    skipAuth?: boolean;
+  } = {},
+): Promise<LenhubFlutterResult> {
+  if (opts.skipAuth) {
+    return lenhubFlutterFetchRaw(method, path, opts);
+  }
+
+  const run = async (forceAuth: boolean): Promise<LenhubFlutterResult> => {
+    const auth = await lenhubFlutterAuth(forceAuth);
+    if (!auth.sessionKey) {
+      return {
+        ok: false,
+        httpStatus: auth.httpStatus || 401,
+        message: auth.message || "Lenhub auth failed",
+        json: auth.json,
+        raw: auth.raw,
+      };
+    }
+    const query = { ...(opts.query || {}), user_key: auth.sessionKey };
+    const body = opts.body ? { ...opts.body, user_key: auth.sessionKey } : undefined;
+    return lenhubFlutterFetchRaw(method, path, { ...opts, query, body });
+  };
+
+  let result = await run(false);
+  if (looksUnauthorized(result.json, result.httpStatus)) {
+    cachedSessionKey = null;
+    cachedSessionAt = 0;
+    result = await run(true);
+  }
+  return result;
 }
 
 export async function lenhubFlutterGetBanks(countryCode: string): Promise<LenhubFlutterResult & { banks: Array<{ id?: string; code: string; name: string }> }> {
@@ -301,8 +502,8 @@ export async function lenhubFlutterVerifyAccount(params: {
   currency: string;
   bankCode: string;
 }): Promise<LenhubFlutterResult & { accountName: string | null }> {
-  const result = await lenhubFlutterFetch("POST", `${FLW_PREFIX}/verify/account/`, {
-    query: {
+  const result = await lenhubFlutterFetch("POST", `${FLW_PREFIX}/verify/bank_account/`, {
+    body: {
       account_number: params.accountNumber,
       currency: params.currency.toUpperCase(),
       bank_code: params.bankCode,
@@ -317,7 +518,7 @@ export async function lenhubFlutterVerifyAccount(params: {
 }
 
 export async function lenhubFlutterNetworks(country: string): Promise<LenhubFlutterResult & { networks: Array<{ id?: string; network: string; name: string }> }> {
-  const result = await lenhubFlutterFetch("POST", `${FLW_PREFIX}/check/mobile/networks/`, {
+  const result = await lenhubFlutterFetch("GET", `${FLW_PREFIX}/check/mobile/networks/`, {
     query: { country: country.toUpperCase() },
   });
   const data = unwrapData(result.json);
@@ -421,17 +622,34 @@ export async function lenhubFlutterCreateCardPayment(body: {
   email: string;
   currency: string;
 }): Promise<LenhubFlutterResult & { chargeId: string | null; nextAction: string | null; redirectUrl: string | null }> {
-  const result = await lenhubFlutterFetch("POST", `${FLW_PREFIX}/card/payment/create/`, { body, timeoutMs: 45_000 });
-  const data = unwrapData(result.json) as Record<string, unknown> | null;
-  const chargeId =
-    pickNestedId(data, ["id", "chargeId", "charge_id", "flw_ref", "tx_ref", "reference"]) ||
-    pickNestedId(result.json, ["id", "chargeId", "charge_id", "flw_ref", "tx_ref", "reference"]);
-  return {
-    ...result,
-    chargeId,
-    nextAction: pickLenhubCardNextAction(result.json),
-    redirectUrl: pickLenhubCardRedirectUrl(result.json),
+  const attempt = async () => {
+    const result = await lenhubFlutterFetch("POST", `${FLW_PREFIX}/card/payment/create/`, {
+      body,
+      timeoutMs: 45_000,
+    });
+    const data = unwrapData(result.json) as Record<string, unknown> | null;
+    const chargeId =
+      pickNestedId(data, ["id", "chargeId", "charge_id", "flw_ref", "tx_ref", "reference"]) ||
+      pickNestedId(result.json, ["id", "chargeId", "charge_id", "flw_ref", "tx_ref", "reference"]);
+    return {
+      ...result,
+      chargeId,
+      nextAction: pickLenhubCardNextAction(result.json),
+      redirectUrl: pickLenhubCardRedirectUrl(result.json),
+    };
   };
+
+  let out = await attempt();
+  // Lenhub often flakes: KeyError 'next_action', empty message[], or stale Fernet session.
+  for (const delayMs of [400, 700]) {
+    if (!looksTransientCardCreateFailure(out) && out.chargeId) break;
+    if (!looksTransientCardCreateFailure(out)) break;
+    cachedSessionKey = null;
+    cachedSessionAt = 0;
+    await new Promise((r) => setTimeout(r, delayMs));
+    out = await attempt();
+  }
+  return out;
 }
 
 export async function lenhubFlutterSendPin(pin: string, chargeId: string): Promise<LenhubFlutterResult> {
@@ -446,6 +664,10 @@ export async function lenhubFlutterSendOtp(otp: string, chargeId: string): Promi
   });
 }
 
+/**
+ * AVS / billing address step — matches Lenhub OpenAPI `EfinMoneyfieldschema`
+ * and their sample body (user_key injected by lenhubFlutterFetch).
+ */
 export async function lenhubFlutterConfirmPayment(body: {
   charge_id: string;
   city: string;
@@ -455,7 +677,27 @@ export async function lenhubFlutterConfirmPayment(body: {
   state: string;
   line2?: string | null;
 }): Promise<LenhubFlutterResult> {
-  return lenhubFlutterFetch("POST", `${FLW_PREFIX}/confirm_payment/`, { body });
+  const payload: Record<string, unknown> = {
+    charge_id: body.charge_id,
+    city: body.city,
+    country: body.country,
+    line1: body.line1,
+    postal_code: body.postal_code,
+    state: body.state,
+    // Lenhub sample always includes line2 (nullable / empty string OK)
+    line2: body.line2 != null && String(body.line2).trim() ? String(body.line2).trim() : "",
+  };
+  const result = await lenhubFlutterFetch("POST", `${FLW_PREFIX}/confirm_payment/`, { body: payload });
+  // Re-evaluate ok using nested charge status (envelope "Charge updated" is not payment success)
+  const processor = pickLenhubProcessorFailure(result.json);
+  if (processor.chargeStatus === "failed" || processor.code) {
+    return {
+      ...result,
+      ok: false,
+      message: processor.message || result.message || "Card payment failed",
+    };
+  }
+  return result;
 }
 
 export type LenhubVirtualAccountDetails = {
@@ -517,11 +759,12 @@ export async function lenhubFlutterCreateVirtualAccount(params: {
   amount: number;
   narration: string;
 }): Promise<LenhubFlutterResult & { va: LenhubVirtualAccountDetails }> {
+  // OpenAPI CreatevirtualSchema: user_key + amount + email (narration not in schema; kept for ledger notes).
+  void params.narration;
   const result = await lenhubFlutterFetch("POST", `${FLW_PREFIX}/create/virtual/account/`, {
-    query: {
+    body: {
       email: params.email,
       amount: params.amount,
-      narration: params.narration,
     },
   });
   return { ...result, va: pickLenhubVirtualAccount(result.json) };
@@ -544,11 +787,23 @@ export async function lenhubFlutterBankPayout(params: {
   callbackUrl: string;
   narration: string;
 }): Promise<LenhubFlutterResult & { providerRef: string | null }> {
-  const result = await lenhubFlutterFetch("POST", `${FLW_PREFIX}/payout/exchange/`, {
-    query: {
+  const dest = params.destinationCurrency.toUpperCase();
+  if (dest !== "NGN") {
+    const msg = `Lenhub EfinMoney OpenAPI only supports NGN bank payout (got ${dest})`;
+    return {
+      ok: false,
+      httpStatus: 400,
+      message: msg,
+      json: { error: msg, code: "unsupported_bank_corridor" },
+      raw: msg,
+      providerRef: null,
+    };
+  }
+  // Spec: POST /payout/exchange/nigeria — JSON body, source → NGN
+  const result = await lenhubFlutterFetch("POST", `${FLW_PREFIX}/payout/exchange/nigeria`, {
+    body: {
       amount: params.amount,
       source_currency: params.sourceCurrency.toUpperCase(),
-      destination_currency: params.destinationCurrency.toUpperCase(),
       bank_code: params.bankCode,
       account_number: params.accountNumber,
       callback_url: params.callbackUrl,
@@ -561,7 +816,7 @@ export async function lenhubFlutterBankPayout(params: {
 }
 
 async function lenhubFlutterMomoTransfer(
-  countryPath: "ghana" | "kenya",
+  currency: "GHS" | "KES" | "UGX",
   params: {
     amount: number;
     msisdn: string;
@@ -572,10 +827,10 @@ async function lenhubFlutterMomoTransfer(
     narration: string;
   },
 ): Promise<LenhubFlutterResult & { providerRef: string | null }> {
-  const result = await lenhubFlutterFetch("POST", `${FLW_PREFIX}/${countryPath}/mobile/money/transfer/`, {
-    query: {
+  const result = await lenhubFlutterFetch("POST", `${FLW_PREFIX}/mobile/money/transfer/`, {
+    body: {
       amount: params.amount,
-      // OpenAPI uses `number` (not msisdn)
+      currency,
       number: params.msisdn.replace(/\D/g, ""),
       first_name: params.firstName,
       last_name: params.lastName,
@@ -598,7 +853,7 @@ export async function lenhubFlutterGhanaMomoPayout(params: {
   sourceCurrency: string;
   narration: string;
 }): Promise<LenhubFlutterResult & { providerRef: string | null }> {
-  return lenhubFlutterMomoTransfer("ghana", params);
+  return lenhubFlutterMomoTransfer("GHS", params);
 }
 
 export async function lenhubFlutterKenyaMomoPayout(params: {
@@ -610,7 +865,19 @@ export async function lenhubFlutterKenyaMomoPayout(params: {
   sourceCurrency: string;
   narration: string;
 }): Promise<LenhubFlutterResult & { providerRef: string | null }> {
-  return lenhubFlutterMomoTransfer("kenya", params);
+  return lenhubFlutterMomoTransfer("KES", params);
+}
+
+export async function lenhubFlutterUgandaMomoPayout(params: {
+  amount: number;
+  msisdn: string;
+  firstName: string;
+  lastName: string;
+  network: string;
+  sourceCurrency: string;
+  narration: string;
+}): Promise<LenhubFlutterResult & { providerRef: string | null }> {
+  return lenhubFlutterMomoTransfer("UGX", params);
 }
 
 /** Elicate Zambia MoMo via Lenhub (`/v1/elicate/flutter/zambia/payout/`). */

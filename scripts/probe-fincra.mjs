@@ -90,3 +90,5 @@ if (PUB_KEY && businessId) {
 
 console.log("\nWebhook URL (set in Fincra dashboard):");
 console.log("  https://dkdnwumllibwdlqbjkwy.supabase.co/functions/v1/fincra-webhook");
+console.log("\nFor payout corridor dry-run (balances + MoMo codes, no payouts):");
+console.log("  node scripts/probe-fincra-payout.mjs");

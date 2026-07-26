@@ -25,6 +25,9 @@ const refOf = (id: string) => `EFM-${id.replace(/-/g, "").slice(0, 8).toUpperCas
 
 const friendlyFailureReason = (reason: string): string => {
   const r = reason.toLowerCase();
+  if (/^http\s*404\b/.test(r.trim()) || r.includes("http 404")) {
+    return "The payout provider could not process this transfer (account or corridor not found). If the status is Failed, funds should be back in your wallet — check the bank (e.g. OPay) and use a 10-digit account number.";
+  }
   if (r.includes("flutterwave") || r.includes("settlement") || r.includes("pending_liquidity") ||
       (r.includes("available") && r.includes("need"))) {
     return "Your transfer is still being processed. Delivery usually completes within a few minutes.";
@@ -152,11 +155,21 @@ const TransferTrackingPage = () => {
         transfer.target_currency === "NGN"
         && (transfer.payout_method === "bank" || transfer.transfer_type === "bank")
         && !!transfer.recipient_bank_code;
+      const looksFincra = /^STUB-FINCRA/i.test(String(transfer.provider_reference || ""))
+        || /fincra/i.test(String(transfer.provider_reference || ""))
+        || /fincra/i.test(String(transfer.failure_reason || ""));
       const { data: swychrPayout } = await supabase
         .from("swychr_payout_transactions")
         .select("id")
         .eq("transfer_id", id)
         .maybeSingle();
+      // Fincra settles via webhook — don't poll Nomba/FLW (they 404 and confuse the timeline)
+      if (looksFincra) {
+        const { data: fresh } = await supabase.from("transfers").select("*").eq("id", id).maybeSingle();
+        if (fresh) setTransfer(fresh as Transfer);
+        if (!silent) toast.info(`Transfer status: ${fresh?.status || transfer.status}`);
+        return;
+      }
       const fn = isPaysafe
         ? "paysafe-verify-transfer"
         : swychrPayout
@@ -432,7 +445,9 @@ const TransferTrackingPage = () => {
                     Your payment was received. We're completing delivery to your recipient — this usually takes a few minutes.
                   </div>
                 )}
-                {transfer.failure_reason && transfer.status !== "pending_liquidity" && (
+                {transfer.failure_reason
+                  && ["failed", "reversed", "expired"].includes(transfer.status)
+                  && (
                   <div className="mt-4 p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-sm text-destructive">
                     {friendlyFailureReason(transfer.failure_reason)}
                   </div>

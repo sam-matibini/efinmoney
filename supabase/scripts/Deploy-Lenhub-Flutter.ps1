@@ -43,6 +43,10 @@ npx supabase secrets set --project-ref $ProjectRef `
   LENHUB_FLUTTER_PAYOUT=true `
   LENHUB_FLUTTER_WEBHOOK_URL=https://efin-flw-proxy.ukwenzyb.workers.dev/webhooks/lenhub-flutter
 
+Write-Host ""
+Write-Host "Also set the tenant API key (from Lenhub / scripts/.lenhub.env):" -ForegroundColor Yellow
+Write-Host "  npx supabase secrets set --project-ref $ProjectRef LENHUB_FLUTTER_USER_KEY=<key>" -ForegroundColor White
+
 if ($failed.Count -gt 0) {
   Write-Host ""
   Write-Host "Incomplete. Failed: $($failed -join ', ')" -ForegroundColor Red

@@ -8,6 +8,8 @@ import {
   getLenhubFlutterWebhookUrl,
   lenhubFlutterBankPayout,
   lenhubFlutterGhanaMomoPayout,
+  lenhubFlutterKenyaMomoPayout,
+  lenhubFlutterUgandaMomoPayout,
   resolveGhanaMomoNetwork,
   splitName,
   supportsLenhubFlutterBankPayout,
@@ -113,19 +115,26 @@ Deno.serve(async (req) => {
         narration,
       });
     } else if (momo && supportsLenhubFlutterMomoPayout(destCurrency)) {
-      rail = "ghana_momo";
+      rail = `${destCurrency.toLowerCase()}_momo`;
       if (!transfer.recipient_phone) {
         return json({ success: false, error: "recipient phone required for MoMo payout" }, 400);
       }
-      result = await lenhubFlutterGhanaMomoPayout({
+      const momoParams = {
         amount: Math.round(amount * 100) / 100,
         msisdn: String(transfer.recipient_phone),
         firstName: first,
         lastName: last,
-        network: resolveGhanaMomoNetwork(String(transfer.payout_method || "MTN")),
+        network: destCurrency === "GHS"
+          ? resolveGhanaMomoNetwork(String(transfer.payout_method || "MTN"))
+          : String(transfer.payout_method || (destCurrency === "KES" ? "SAFARICOM" : "MTN")),
         sourceCurrency,
         narration,
-      });
+      };
+      result = destCurrency === "KES"
+        ? await lenhubFlutterKenyaMomoPayout(momoParams)
+        : destCurrency === "UGX"
+        ? await lenhubFlutterUgandaMomoPayout(momoParams)
+        : await lenhubFlutterGhanaMomoPayout(momoParams);
     } else {
       return json({
         success: false,

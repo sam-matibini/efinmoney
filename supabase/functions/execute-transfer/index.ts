@@ -345,16 +345,23 @@ Deno.serve(async (req) => {
       (recipientCountryHint ?? "").trim().toUpperCase() === "GHANA";
     const ghanaPayConfigured = isGhanaPayConfigured();
 
+    // Explicit Fincra opt-in (Send "Alternate bank payout" / Fincra MoMo toggle)
+    // must beat Lenhub → Nomba fallback, otherwise NGN always lands on Nomba.
+    const wantFincra = payload.use_fincra === true || transfer.use_fincra === true;
+
     // Lenhub Flutter wrapper — multi-currency FX bank payout + GHS MoMo (prefer when enabled)
     const lenhubFlutterEnvOn = Deno.env.get("LENHUB_FLUTTER_ENABLED") !== "false"
       && Deno.env.get("LENHUB_FLUTTER_PAYOUT") !== "false";
-    const LENHUB_FLUTTER_BANK = new Set(["NGN", "GHS", "KES", "UGX", "RWF", "TZS", "ZMW"]);
+    // EfinMoney OpenAPI: bank FX is NGN-only; MoMo is unified GHS/KES/UGX.
+    const LENHUB_FLUTTER_BANK = new Set(["NGN"]);
+    const LENHUB_FLUTTER_MOMO = new Set(["GHS", "KES", "UGX"]);
     const hasLenhubBankRail = !!(transfer.recipient_account && transfer.recipient_bank_code)
       && LENHUB_FLUTTER_BANK.has(targetCurrency);
-    const hasLenhubGhanaMomo = isMobileMoneyMethod && targetCurrency === "GHS"
+    const hasLenhubGhanaMomo = isMobileMoneyMethod && LENHUB_FLUTTER_MOMO.has(targetCurrency)
       && !(transfer.recipient_account && transfer.recipient_bank_code);
     const useLenhubFlutter =
       lenhubFlutterEnvOn &&
+      !wantFincra &&
       !isCanada &&
       !isZambia &&
       !usePawapay &&
@@ -375,12 +382,12 @@ Deno.serve(async (req) => {
       !useStellar &&
       transfer.payout_method !== "card_push" &&
       !(transfer.recipient_account && transfer.recipient_bank_code) &&
-      !(payload.use_fincra === true || transfer.use_fincra === true) &&
+      !wantFincra &&
       !(payload.use_pawapay === true || transfer.use_pawapay === true);
     const useFincra =
+      wantFincra &&
       !useGhanaPay &&
       !useLenhubFlutter &&
-      (payload.use_fincra === true || transfer.use_fincra === true) &&
       !isCanada && !isZambia && !usePawapay && !useMtnMomo && !useStellar &&
       transfer.payout_method !== "card_push";
 

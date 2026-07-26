@@ -129,7 +129,11 @@ Deno.serve(async (req) => {
       }
 
       const projectRef = Deno.env.get("SUPABASE_URL")?.match(/https:\/\/([^.]+)/)?.[1];
-      const callback = String(body.callback || getLenhubFlutterWebhookUrl() || `https://${projectRef}.supabase.co/functions/v1/lenhub-flutter-webhook`);
+      const callbackBase = String(
+        body.callback ||
+          getLenhubFlutterWebhookUrl() ||
+          `https://${projectRef}.supabase.co/functions/v1/lenhub-flutter-webhook`,
+      ).replace(/\/+$/, "");
 
       // Prefer wallet_id from client; fall back to lookup
       let walletId: string | null = typeof body.wallet_id === "string" ? body.wallet_id : null;
@@ -144,6 +148,9 @@ Deno.serve(async (req) => {
       }
 
       let localId: string | null = null;
+      const clientPlatform = String(body.client_platform || body.clientPlatform || "web").toLowerCase() === "mobile"
+        ? "mobile"
+        : "web";
       const { data: row, error: insErr } = await supabase
         .from("lenhub_flutter_charges")
         .insert({
@@ -153,6 +160,7 @@ Deno.serve(async (req) => {
           amount,
           email,
           status: "creating",
+          provider_response: { client_platform: clientPlatform },
         })
         .select("id")
         .single();
@@ -170,6 +178,11 @@ Deno.serve(async (req) => {
       } else {
         localId = row?.id ?? null;
       }
+
+      // Stamp local row id so 3DS browser return can match even when FLW refs differ
+      const callback = localId
+        ? `${callbackBase}${callbackBase.includes("?") ? "&" : "?"}efin_local=${encodeURIComponent(localId)}`
+        : callbackBase;
 
       const result = await lenhubFlutterCreateCardPayment({
         card_number,
@@ -189,7 +202,7 @@ Deno.serve(async (req) => {
       const ok = result.ok && Boolean(result.chargeId) && !providerEmpty;
       const failMessage = !ok
         ? (providerEmpty
-          ? "Lenhub returned empty success (no charge created). Upstream Flutterwave credentials may be down — ask lenhub to fix auth."
+          ? "Lenhub returned empty success (no charge created). Their Flutterwave card rail is flaky for this card/currency — retry once, or try another card. If it keeps failing, ask Lenhub to check FLW credentials."
           : (result.message || "Card charge failed"))
         : result.message;
       // Prefer an explicit Lenhub type. Vague "pin_or_otp_or_avs" made the UI
@@ -201,7 +214,7 @@ Deno.serve(async (req) => {
           charge_id: result.chargeId,
           status: ok ? "requires_action" : "failed",
           next_action: nextAction,
-          provider_response: result.json,
+          provider_response: { ...(result.json || {}), client_platform: clientPlatform },
           updated_at: new Date().toISOString(),
         }).eq("id", localId);
       }
@@ -268,14 +281,24 @@ Deno.serve(async (req) => {
       const charge_id = String(body.charge_id || body.chargeId || "");
       const localId = body.local_id ? String(body.local_id) : null;
       if (!charge_id) return json({ error: "charge_id required" }, 400);
+      const city = String(body.city || "").trim();
+      const country = String(body.country || "").trim().toUpperCase();
+      const line1 = String(body.line1 || "").trim();
+      const postal_code = String(body.postal_code || "").trim();
+      const state = String(body.state || "").trim();
+      if (!city || !country || !line1 || !postal_code || !state) {
+        return json({
+          error: "city, country, line1, postal_code, and state are required for AVS confirm",
+        }, 400);
+      }
       const result = await lenhubFlutterConfirmPayment({
         charge_id,
-        city: String(body.city || ""),
-        country: String(body.country || ""),
-        line1: String(body.line1 || ""),
-        postal_code: String(body.postal_code || ""),
-        state: String(body.state || ""),
-        line2: body.line2 != null ? String(body.line2) : null,
+        city,
+        country,
+        line1,
+        postal_code,
+        state,
+        line2: body.line2 != null ? String(body.line2) : "",
       });
       if (localId) {
         await supabase.from("lenhub_flutter_charges").update({
@@ -284,7 +307,13 @@ Deno.serve(async (req) => {
           updated_at: new Date().toISOString(),
         }).eq("id", localId).eq("user_id", user.id);
       }
-      return json({ success: result.ok, message: result.message, provider: result.json }, result.ok ? 200 : 400);
+      return json({
+        success: result.ok,
+        message: result.message,
+        provider: result.json,
+        next_action: result.ok ? pickLenhubCardNextAction(result.json) : null,
+        redirect_url: result.ok ? pickLenhubCardRedirectUrl(result.json) : null,
+      }, result.ok ? 200 : 400);
     }
 
     if (action === "virtual_account") {

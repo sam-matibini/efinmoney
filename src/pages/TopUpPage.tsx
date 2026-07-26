@@ -10,6 +10,15 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { CheckCircle2, XCircle, CreditCard, Smartphone, Building2, Globe, Wallet, FileText, Landmark } from "lucide-react";
@@ -196,7 +205,7 @@ const METHOD_ICON: Record<FlwMethod, typeof CreditCard> = {
 };
 
 const TopUpPage = () => {
-  const [params] = useSearchParams();
+  const [params, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { data: wallets, isLoading: walletsLoading } = useWallets();
@@ -213,6 +222,24 @@ const TopUpPage = () => {
   const [intlMethod, setIntlMethod] = useState<IntlTopupMethod | null>(null);
   const [africaMomoMethod, setAfricaMomoMethod] = useState<AfricaMomoTopupMethod | null>(null);
   const [verifyState, setVerifyState] = useState<{ status: "verifying" | "success" | "failed"; message: string } | null>(null);
+  const [resultDialog, setResultDialog] = useState<{
+    open: boolean;
+    status: "success" | "failed" | "pending";
+    title: string;
+    message: string;
+  }>({ open: false, status: "failed", title: "", message: "" });
+
+  const clearLenhubReturnParams = () => {
+    const next = new URLSearchParams(params);
+    let changed = false;
+    for (const k of ["lenhub", "msg", "charge_id", "chargeId"]) {
+      if (next.has(k)) {
+        next.delete(k);
+        changed = true;
+      }
+    }
+    if (changed) setSearchParams(next, { replace: true });
+  };
 
   // Initialize wallet from URL or default
   useEffect(() => {
@@ -381,6 +408,50 @@ const TopUpPage = () => {
     if (nombaStatus === "failed") {
       clearPendingNombaTxn();
       setVerifyState({ status: "failed", message: "Payment could not be completed." });
+      return;
+    }
+
+    const lenhubStatus = params.get("lenhub");
+    if (lenhubStatus === "success") {
+      const message = "Payment received — your wallet should update shortly.";
+      setVerifyState({ status: "success", message });
+      setResultDialog({
+        open: true,
+        status: "success",
+        title: "Top-up successful",
+        message,
+      });
+      toast.success("Top-up complete");
+      void queryClient.invalidateQueries({ queryKey: ["wallets"] });
+      clearLenhubReturnParams();
+      return;
+    }
+    if (lenhubStatus === "failed") {
+      const msg = params.get("msg") || "Card payment could not be completed.";
+      const message = msg.includes("Policy error")
+        ? `${msg} Your bank declined this card charge — try another card or NGN bank transfer.`
+        : msg;
+      setVerifyState({ status: "failed", message });
+      setResultDialog({
+        open: true,
+        status: "failed",
+        title: "Payment failed",
+        message,
+      });
+      toast.error(message);
+      clearLenhubReturnParams();
+      return;
+    }
+    if (lenhubStatus === "pending") {
+      const message = "Payment submitted — waiting for confirmation…";
+      setVerifyState({ status: "verifying", message });
+      setResultDialog({
+        open: true,
+        status: "pending",
+        title: "Payment pending",
+        message,
+      });
+      clearLenhubReturnParams();
       return;
     }
 
@@ -591,15 +662,54 @@ const TopUpPage = () => {
           )}
 
           {verifyState && (
-            <Card>
+            <Card className={
+              verifyState.status === "failed"
+                ? "border-destructive/50 bg-destructive/5"
+                : verifyState.status === "success"
+                ? "border-emerald-500/40 bg-emerald-500/5"
+                : undefined
+            }>
               <CardContent className="pt-6 flex items-center gap-3">
-                {verifyState.status === "success" ? <CheckCircle2 className="w-6 h-6 text-primary" /> :
-                 verifyState.status === "failed" ? <XCircle className="w-6 h-6 text-destructive" /> :
+                {verifyState.status === "success" ? <CheckCircle2 className="w-6 h-6 text-emerald-600 shrink-0" /> :
+                 verifyState.status === "failed" ? <XCircle className="w-6 h-6 text-destructive shrink-0" /> :
                  <LoadingSpinner size={24} />}
-                <p>{verifyState.message}</p>
+                <div>
+                  <p className="font-medium">
+                    {verifyState.status === "failed" ? "Payment failed" :
+                     verifyState.status === "success" ? "Payment successful" :
+                     "Confirming payment"}
+                  </p>
+                  <p className="text-sm text-muted-foreground">{verifyState.message}</p>
+                </div>
               </CardContent>
             </Card>
           )}
+
+          <AlertDialog
+            open={resultDialog.open}
+            onOpenChange={(open) => setResultDialog((prev) => ({ ...prev, open }))}
+          >
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle className="flex items-center gap-2">
+                  {resultDialog.status === "success" ? (
+                    <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                  ) : resultDialog.status === "failed" ? (
+                    <XCircle className="w-5 h-5 text-destructive" />
+                  ) : null}
+                  {resultDialog.title}
+                </AlertDialogTitle>
+                <AlertDialogDescription className="text-left">
+                  {resultDialog.message}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogAction>
+                  {resultDialog.status === "failed" ? "Try again" : "OK"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
 
           {/* Wallet selector */}
           <Card>

@@ -110,6 +110,7 @@ Deno.serve(async (req) => {
           status: "completed",
           completed_at: completedAt,
           provider_reference: payoutTxn.provider_reference ?? transfer.provider_reference,
+          failure_reason: null,
         })
         .eq("id", transfer_id);
 
@@ -136,6 +137,7 @@ Deno.serve(async (req) => {
           status: "completed",
           completed_at: completedAt,
           provider_reference: payoutTxn.provider_reference ?? transfer.provider_reference,
+          failure_reason: null,
         })
         .eq("id", transfer_id);
 

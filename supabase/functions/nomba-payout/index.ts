@@ -194,6 +194,7 @@ Deno.serve(async (req) => {
       status: "completed",
       completed_at: completedAt,
       provider_reference: providerRef,
+      failure_reason: null,
     }).eq("id", transfer_id);
     await supabase.from("nomba_payout_transactions").update({
       status: "completed",

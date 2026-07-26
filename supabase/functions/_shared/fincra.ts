@@ -1,5 +1,7 @@
 const SANDBOX_BASE = "https://sandboxapi.fincra.com";
 const LIVE_BASE = "https://api.fincra.com";
+/** Cloudflare Worker path prefix — same pattern as FLW_PROXY_URL for Flutterwave. */
+const DEFAULT_PROXY = "https://efin-flw-proxy.ukwenzyb.workers.dev";
 
 export interface FincraConfig {
   mode: "live" | "sandbox";
@@ -13,7 +15,20 @@ export interface FincraConfig {
 export function getFincraConfig(): FincraConfig {
   const envRaw = (Deno.env.get("FINCRA_ENV") ?? "sandbox").trim().toLowerCase();
   const isLive = ["live", "production", "prod", "1", "true"].includes(envRaw);
-  const baseUrl = (Deno.env.get("FINCRA_BASE_URL") || (isLive ? LIVE_BASE : SANDBOX_BASE)).replace(/\/+$/, "");
+
+  // Prefer explicit FINCRA_BASE_URL.
+  // Else route via Cloudflare Worker (same pattern as FLW_PROXY_URL) so Fincra
+  // can whitelist Worker egress — Supabase Edge has no static IP.
+  const explicit = Deno.env.get("FINCRA_BASE_URL")?.trim();
+  const proxyRoot = (
+    Deno.env.get("FINCRA_PROXY_URL")?.trim() ||
+    Deno.env.get("FLW_PROXY_URL")?.trim() ||
+    DEFAULT_PROXY
+  ).replace(/\/+$/, "");
+  const useProxy = Deno.env.get("FINCRA_USE_PROXY") !== "false";
+  const viaProxy = `${proxyRoot}/${isLive ? "fincra" : "fincra-sandbox"}`;
+  const direct = isLive ? LIVE_BASE : SANDBOX_BASE;
+  const baseUrl = (explicit || (useProxy ? viaProxy : direct)).replace(/\/+$/, "");
 
   return {
     mode: isLive ? "live" : "sandbox",

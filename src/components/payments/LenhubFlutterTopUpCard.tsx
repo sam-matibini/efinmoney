@@ -70,6 +70,7 @@ export default function LenhubFlutterTopUpCard({ walletId, walletCurrency, onCom
   const [city, setCity] = useState("");
   const [country, setCountry] = useState(defaultCountry(currency));
   const [line1, setLine1] = useState("");
+  const [line2, setLine2] = useState("");
   const [postal, setPostal] = useState("");
   const [state, setState] = useState("");
   const [va, setVa] = useState<VaDetails | null>(null);
@@ -481,17 +482,27 @@ export default function LenhubFlutterTopUpCard({ walletId, walletCurrency, onCom
       toast.error("Missing charge ID — go back and pay with the card again.");
       return;
     }
+    if (!line1.trim() || !city.trim() || !country.trim() || !postal.trim() || !state.trim()) {
+      toast.error("Fill in street, city, state, postal code, and country");
+      return;
+    }
     setBusy(true);
     try {
-      await invoke("card_confirm", {
+      const data = await invoke("card_confirm", {
         charge_id: chargeId,
         local_id: localId,
-        city,
-        country,
-        line1,
-        postal_code: postal,
-        state,
+        city: city.trim(),
+        country: country.trim().toUpperCase(),
+        line1: line1.trim(),
+        line2: line2.trim() || "",
+        postal_code: postal.trim(),
+        state: state.trim(),
       });
+      const redirect = String(data?.redirect_url || "").trim();
+      if (redirect.startsWith("http")) {
+        followNextAction(String(data?.next_action || ""), redirect, data?.provider ?? data, "done");
+        return;
+      }
       setStep("done");
       toast.success("Payment submitted — wallet updates when confirmed");
       onComplete?.();
@@ -837,10 +848,16 @@ export default function LenhubFlutterTopUpCard({ walletId, walletCurrency, onCom
 
         {step === "avs" && (
           <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">Billing address for card verification.</p>
+            <p className="text-sm text-muted-foreground">
+              Billing address for card verification (AVS). Matches Lenhub confirm_payment fields.
+            </p>
             <div className="space-y-2">
               <Label htmlFor="lf-line1">Street address</Label>
-              <Input id="lf-line1" value={line1} onChange={(e) => setLine1(e.target.value)} />
+              <Input id="lf-line1" value={line1} onChange={(e) => setLine1(e.target.value)} placeholder="178 Brookfield Crescent" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="lf-line2">Address line 2 (optional)</Label>
+              <Input id="lf-line2" value={line2} onChange={(e) => setLine2(e.target.value)} placeholder="Apt, suite, unit…" />
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-2">
@@ -849,16 +866,16 @@ export default function LenhubFlutterTopUpCard({ walletId, walletCurrency, onCom
               </div>
               <div className="space-y-2">
                 <Label htmlFor="lf-state">State / province</Label>
-                <Input id="lf-state" value={state} onChange={(e) => setState(e.target.value)} />
+                <Input id="lf-state" value={state} onChange={(e) => setState(e.target.value)} placeholder="Manitoba" />
               </div>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="lf-postal">Postal code</Label>
-                <Input id="lf-postal" value={postal} onChange={(e) => setPostal(e.target.value)} />
+                <Input id="lf-postal" value={postal} onChange={(e) => setPostal(e.target.value)} placeholder="R3Y 0L7" />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="lf-country">Country</Label>
+                <Label htmlFor="lf-country">Country (ISO)</Label>
                 <Input
                   id="lf-country"
                   placeholder={currency === "NGN" ? "NG" : "CA"}

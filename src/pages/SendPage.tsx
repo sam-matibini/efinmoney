@@ -2113,11 +2113,11 @@ const SendPage = () => {
                                             <div className="flex items-start justify-between gap-3">
                                               <div className="flex-1">
                                                 <div className="flex items-center gap-2">
-                                                  <span className="text-sm font-medium">Alternate bank payout (test)</span>
+                                                  <span className="text-sm font-medium">Fincra bank payout (test)</span>
                                                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-700 dark:text-teal-300 font-mono uppercase">Test</span>
                                                 </div>
                                                 <p className="text-xs text-muted-foreground mt-1">
-                                                  Route this payout through an alternate bank rail. Requires a funded disbursement balance.
+                                                  Route this NGN payout through Fincra (not Nomba / Lenhub). Requires a funded Fincra NGN balance.
                                                 </p>
                                               </div>
                                               <Switch checked={useFincra} onCheckedChange={setUseFincra} aria-label="Use alternate bank payout" />
