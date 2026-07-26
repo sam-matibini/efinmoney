@@ -1,9 +1,10 @@
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
-import { Send, Download, RefreshCw, Smartphone } from "lucide-react";
+import { Send, Download, RefreshCw, Smartphone, Building2 } from "lucide-react";
 import SendMoneyModal from "@/components/modals/SendMoneyModal";
 import ExchangeModal from "@/components/modals/ExchangeModal";
 import { productFeatures } from "@/lib/productFeatures";
+import { useKyb, KybStep } from "@/hooks/useKyb";
 
 type Item =
   | { kind: "modal"; Modal: any; icon: any; label: string; color: string }
@@ -47,7 +48,37 @@ const ButtonInner = ({ icon: Icon, label, color }: { icon: any; label: string; c
 };
 
 const QuickActions = () => {
-  const items = allItems;
+  const { business, isApproved } = useKyb();
+
+  // Persistent, always-visible dashboard entry into the business flow.
+  // State-aware, mirroring BusinessPromptCard routing.
+  const bizStepPath: Record<KybStep, string> = {
+    details: "/onboarding/business/details",
+    ownership: "/onboarding/business/ownership",
+    documents: "/onboarding/business/documents",
+    review: "/onboarding/business/review",
+    completed: "/onboarding/business/details",
+  };
+  const businessTo = !business
+    ? "/onboarding/business/details"
+    : isApproved
+      ? "/business"
+      : business.kyb_status === "pending_review"
+        ? "/onboarding/business/submitted"
+        : business.kyb_status === "rejected" || business.kyb_status === "suspended"
+          ? "/onboarding/business/rejected"
+          : bizStepPath[business.current_step] ?? "/onboarding/business/details";
+
+  const items: Item[] = [
+    ...allItems,
+    {
+      kind: "link",
+      to: businessTo,
+      icon: Building2,
+      label: "Business",
+      color: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
+    },
+  ];
 
   return (
     <section className="mb-8">
