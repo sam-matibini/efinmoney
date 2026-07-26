@@ -16,6 +16,7 @@ import {
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRoles } from "@/hooks/useUserRoles";
+import { useKyb } from "@/hooks/useKyb";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -60,6 +61,7 @@ const buildNavItem = (label: string, href: string): NavItem => ({ label, href })
 const Header = () => {
   const { signOut, user } = useAuth();
   const { isAdmin, isFinance, isCompliance } = useUserRoles();
+  const { isApproved: hasBusiness } = useKyb();
   const { data: wallets } = useWallets();
   const { data: profile } = useProfile();
   const defaultWallet = wallets?.find((w) => w.is_default) || wallets?.[0];
@@ -88,6 +90,7 @@ const Header = () => {
     buildNavItem("Foreign Currency Exchange", "/exchange"),
     buildNavItem("Wallets", "/wallets"),
     ...(productFeatures.cards ? [buildNavItem("Cards", "/cards")] : []),
+    ...(hasBusiness ? [buildNavItem("Business", "/business")] : []),
   ];
 
   if (!isAdmin && isFinance) navItems.push(buildNavItem("Finance", "/finance"));

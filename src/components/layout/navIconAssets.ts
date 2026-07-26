@@ -9,6 +9,7 @@ export const NAV_ICON_FILES: Record<string, string> = {
   "Foreign Currency Exchange": "fx-exchange",
   Wallets: "wallets",
   Cards: "cards",
+  Business: "business",
   Finance: "finance",
   Operations: "operations",
   Admin: "admin",

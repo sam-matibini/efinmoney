@@ -58,6 +58,7 @@ export const navShortLabels: Record<string, string> = {
   "Foreign Currency Exchange": "Exchange",
   Wallets: "Wallets",
   Cards: "Cards",
+  Business: "Business",
   Finance: "Finance",
   Operations: "Operations",
   Admin: "Admin",
