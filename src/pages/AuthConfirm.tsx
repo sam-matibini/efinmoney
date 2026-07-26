@@ -103,8 +103,23 @@ const AuthConfirm = () => {
           }
         }
 
+        // Route new signups by the account type chosen at registration.
+        // Falls back to the account-type picker if metadata is missing.
+        let finalTarget = target;
+        if (otpType === "signup" && (!nextParam || nextParam === "/")) {
+          try {
+            const { data } = await supabase.auth.getUser();
+            const at = (data.user?.user_metadata as { account_type?: string } | undefined)?.account_type;
+            if (at === "business") finalTarget = "/onboarding/business/details";
+            else if (at === "individual") finalTarget = "/onboarding/identity";
+          } catch {
+            /* keep default target */
+          }
+          setDest(finalTarget);
+        }
+
         setStatus("success");
-        window.setTimeout(() => navigate(target, { replace: true }), 2200);
+        window.setTimeout(() => navigate(finalTarget, { replace: true }), 2200);
       } catch (e) {
         setStatus("error");
         setErrorMsg(e instanceof Error ? e.message : "We couldn't verify this link.");

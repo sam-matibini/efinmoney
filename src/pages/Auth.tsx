@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Eye, EyeOff, ArrowRight, ArrowLeft, MailCheck } from "lucide-react";
+import { Eye, EyeOff, ArrowRight, ArrowLeft, MailCheck, User, Building2, Check } from "lucide-react";
 import { Logo, Wordmark } from "@/components/Logo";
 import LoadingSpinner from "@/components/LoadingSpinner";
 
@@ -18,6 +18,7 @@ const Auth = () => {
   const modeParam = params.get("mode");
   const redirectTo = params.get("redirect");
   const [isSignUp, setIsSignUp] = useState(modeParam !== "signin");
+  const [accountType, setAccountType] = useState<"individual" | "business" | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -50,7 +51,7 @@ const Auth = () => {
           toast.error("Passwords do not match.");
           return;
         }
-        const { error } = await signUp(email, password, fullName);
+        const { error } = await signUp(email, password, fullName, accountType ?? "individual");
         if (error) toast.error(error.message);
         else {
           // Identity is required before transfers; preserve the deep-link for after KYC.
@@ -159,10 +160,65 @@ const Auth = () => {
               {isSignUp ? "Create your account" : "Welcome back"}
             </h1>
             <p className="mt-3 text-neutral-600">
-              {isSignUp ? "Start sending money in minutes." : "Sign in to access your wallets."}
+              {isSignUp
+                ? accountType
+                  ? "Just a few details to get started."
+                  : "First, who is this account for?"
+                : "Sign in to access your wallets."}
             </p>
           </div>
 
+          {isSignUp && !accountType ? (
+            <div className="space-y-4">
+              <button
+                type="button"
+                onClick={() => setAccountType("individual")}
+                className="w-full text-left rounded-2xl border border-neutral-200 p-5 hover:border-primary hover:bg-primary/5 transition-colors flex items-start gap-4"
+              >
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <User className="h-5 w-5" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block font-bold text-neutral-900">Individual</span>
+                  <span className="block text-sm text-neutral-600">A personal account for sending, receiving and spending money.</span>
+                </span>
+                <ArrowRight className="ml-auto mt-1 h-5 w-5 shrink-0 text-neutral-300" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setAccountType("business")}
+                className="w-full text-left rounded-2xl border border-neutral-200 p-5 hover:border-primary hover:bg-primary/5 transition-colors flex items-start gap-4"
+              >
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <Building2 className="h-5 w-5" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block font-bold text-neutral-900">Corporate / Business</span>
+                  <span className="block text-sm text-neutral-600">For a registered company — verified with business documents and ownership (KYB).</span>
+                </span>
+                <ArrowRight className="ml-auto mt-1 h-5 w-5 shrink-0 text-neutral-300" />
+              </button>
+            </div>
+          ) : (
+          <>
+          {isSignUp && accountType && (
+            <button
+              type="button"
+              onClick={() => setAccountType(null)}
+              className="mb-5 w-full flex items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-left"
+            >
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                {accountType === "business" ? <Building2 className="h-4 w-4" /> : <User className="h-4 w-4" />}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold text-neutral-900">
+                  {accountType === "business" ? "Corporate / Business account" : "Individual account"}
+                </span>
+                <span className="block text-xs text-neutral-500">Tap to change</span>
+              </span>
+              <ArrowLeft className="h-4 w-4 shrink-0 text-neutral-400" />
+            </button>
+          )}
           <form onSubmit={handleSubmit} className="space-y-5">
             {isSignUp && (
               <div className="space-y-2">
@@ -255,6 +311,8 @@ const Auth = () => {
               )}
             </button>
           </form>
+          </>
+          )}
 
           <p className="mt-8 text-center text-neutral-600">
             {isSignUp ? "Already have an account?" : "Don't have an account?"}
@@ -262,6 +320,7 @@ const Auth = () => {
               onClick={() => {
                 setIsSignUp(!isSignUp);
                 setConfirmPassword("");
+                setAccountType(null);
               }}
               className="ml-2 text-primary hover:text-primary/80 font-bold"
             >

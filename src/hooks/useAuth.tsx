@@ -7,7 +7,7 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
+  signUp: (email: string, password: string, fullName: string, accountType?: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
 }
@@ -58,7 +58,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []);
 
-  const signUp = async (email: string, password: string, fullName: string) => {
+  const signUp = async (email: string, password: string, fullName: string, accountType?: string) => {
     try {
       const { error } = await supabase.auth.signUp({
         email,
@@ -67,6 +67,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           emailRedirectTo: window.location.origin,
           data: {
             full_name: fullName,
+            // Drives the post-confirmation route (KYB for business, KYC for individual).
+            account_type: accountType === "business" ? "business" : "individual",
           },
         },
       });
