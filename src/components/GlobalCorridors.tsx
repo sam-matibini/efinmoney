@@ -9,6 +9,10 @@ const CORRIDORS = [
   { from: "Canada", to: "Kenya", flag: "🇰🇪" },
   { from: "Canada", to: "Senegal", flag: "🇸🇳" },
   { from: "Canada", to: "Zimbabwe", flag: "🇿🇼" },
+  { from: "Canada", to: "Zambia", flag: "🇿🇲" },
+  { from: "Canada", to: "South Africa", flag: "🇿🇦" },
+  { from: "Canada", to: "Uganda", flag: "🇺🇬" },
+  { from: "Canada", to: "Tanzania", flag: "🇹🇿" },
 ];
 
 interface GlobalCorridorsProps {
@@ -144,7 +148,7 @@ export default function GlobalCorridors({ videoSrc }: GlobalCorridorsProps) {
             lineHeight: 1.65,
           }}
         >
-          Real-time transfers from Canada to 5 African corridors — with the best
+          Real-time transfers from Canada to {CORRIDORS.length} African corridors — with the best
           rates on the continent.
         </p>
 
