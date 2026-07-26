@@ -416,8 +416,8 @@ const SECTIONS: Array<{ id: string; title: string; body: React.ReactNode }> = [
           <p className="font-semibold text-foreground">EfinMoney Customer Support</p>
           <p>
             Email:{" "}
-            <a className="text-primary underline" href="mailto:support@efinmoney.com">
-              support@efinmoney.com
+            <a className="text-primary underline" href="mailto:support@efin.money">
+              support@efin.money
             </a>
           </p>
           <p>
@@ -518,7 +518,7 @@ export default function RefundPolicyPage() {
 
             <div className="border-t border-border pt-6 flex items-center gap-2 text-sm text-muted-foreground">
               <Mail className="h-4 w-4" />
-              Questions? <a href="mailto:support@efinmoney.com" className="text-primary underline">support@efinmoney.com</a>
+              Questions? <a href="mailto:support@efin.money" className="text-primary underline">support@efin.money</a>
             </div>
           </CardContent>
         </Card>
