@@ -9,7 +9,7 @@ import efinIcon from "@/assets/efin-icon.png";
 type EmailOtpType = "signup" | "invite" | "magiclink" | "recovery" | "email_change" | "email";
 
 const DEFAULT_NEXT: Record<string, string> = {
-  signup: "/onboarding/identity",
+  signup: "/onboarding/account-type",
   invite: "/admin/onboarding",
   recovery: "/auth/reset-password",
   email_change: "/profile",

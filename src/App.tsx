@@ -67,6 +67,7 @@ const ReceivePage = lazyImport(() => import("./pages/ReceivePage"));
 const PayBillsPage = lazyImport(() => import("./pages/PayBillsPage"));
 const CanadaBillPayPage = lazyImport(() => import("./pages/CanadaBillPayPage"));
 const Welcome = lazyImport(() => import("./pages/onboarding/Welcome"));
+const AccountType = lazyImport(() => import("./pages/onboarding/AccountType"));
 const OnboardingIdentity = lazyImport(() => import("./pages/onboarding/Identity"));
 const OnboardingEnhanced = lazyImport(() => import("./pages/onboarding/Enhanced"));
 const OnboardingRejected = lazyImport(() => import("./pages/onboarding/Rejected"));
@@ -354,6 +355,7 @@ const AppRoutes = () => {
         <Route path="/callback" element={<InteracCallback />} />
         <Route path="/interac/callback" element={<InteracHubCallback />} />
         <Route path="/onboarding/welcome" element={<ProtectedRoute><Welcome /></ProtectedRoute>} />
+        <Route path="/onboarding/account-type" element={<ProtectedRoute><AccountType /></ProtectedRoute>} />
         <Route path="/onboarding/identity" element={<ProtectedRoute><OnboardingIdentity /></ProtectedRoute>} />
         <Route path="/onboarding/enhanced" element={<ProtectedRoute><OnboardingEnhanced /></ProtectedRoute>} />
         <Route path="/onboarding/pending" element={<Navigate to="/dashboard" replace />} />
