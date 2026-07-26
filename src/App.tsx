@@ -32,6 +32,7 @@ import PaymentLinksPage from "./pages/PaymentLinksPage";
 import KycAppLayout from "@/components/layout/KycAppLayout";
 import ProtectedShell from "@/components/layout/ProtectedShell";
 import ClientShell from "@/components/layout/ClientShell";
+import KybGuard from "@/components/kyb/KybGuard";
 import AdminGuard from "@/components/admin-portal/AdminGuard";
 import AdminLayout from "@/components/admin-portal/AdminLayout";
 
@@ -77,6 +78,7 @@ const KybDocuments = lazyImport(() => import("./pages/onboarding/business/Docume
 const KybReview = lazyImport(() => import("./pages/onboarding/business/Review"));
 const KybSubmitted = lazyImport(() => import("./pages/onboarding/business/Submitted"));
 const KybRejected = lazyImport(() => import("./pages/onboarding/business/Rejected"));
+const BusinessOverview = lazyImport(() => import("./pages/business/BusinessOverview"));
 const ShortLinkResolver = lazyImport(() => import("./pages/ShortLinkResolver"));
 const ClaimPaymentLinkPage = lazyImport(() => import("./pages/ClaimPaymentLinkPage"));
 const AdminLogin = lazyImport(() => import("./pages/admin/AdminLogin"));
@@ -248,6 +250,7 @@ const AppRoutes = () => {
 
         <Route element={<KycShellRoute />}>
           <Route path="/dashboard" element={<Index />} />
+          <Route path="/business" element={<KybGuard><BusinessOverview /></KybGuard>} />
           <Route path="/wallets" element={<WalletsPage />} />
           <Route path="/wallets/:walletId/statement" element={<WalletStatementPage />} />
           <Route path="/send" element={<SendPage />} />

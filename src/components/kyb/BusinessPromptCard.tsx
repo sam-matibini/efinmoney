@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { Building2, ArrowRight, Clock, AlertTriangle, X } from "lucide-react";
+import { Building2, ArrowRight, Clock, AlertTriangle, X, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useKyb, KybStep } from "@/hooks/useKyb";
 import { cn } from "@/lib/utils";
@@ -60,6 +60,13 @@ const variants = {
     iconColor: "text-destructive",
     Icon: AlertTriangle,
   },
+  active: {
+    border: "border-primary/25",
+    glow: "from-primary/[0.08] via-transparent to-transparent",
+    iconBg: "bg-primary/10",
+    iconColor: "text-primary",
+    Icon: CheckCircle2,
+  },
 } as const;
 
 const BusinessPromptCard = () => {
@@ -69,9 +76,6 @@ const BusinessPromptCard = () => {
   const [dismissed, setDismissed] = useState(isDismissed);
 
   if (isLoading) return null;
-
-  // Approved businesses need no prompt — the account simply works.
-  if (business?.kyb_status === "approved") return null;
 
   let variant: keyof typeof variants = "register";
   let eyebrow = "Business account";
@@ -86,7 +90,15 @@ const BusinessPromptCard = () => {
   if (business) {
     dismissible = false;
 
-    if (business.kyb_status === "pending_review") {
+    if (business.kyb_status === "approved") {
+      variant = "active";
+      eyebrow = "Business account";
+      title = `${business.legal_name} is verified`;
+      message = "Your business account is active. View limits and manage payouts.";
+      cta = "Open business account";
+      href = "/business";
+      perks = [];
+    } else if (business.kyb_status === "pending_review") {
       variant = "pending";
       title = "Verification in review";
       message = `We're reviewing ${business.legal_name}. We'll email you as soon as there's a decision.`;
