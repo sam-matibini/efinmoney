@@ -4,6 +4,7 @@ import {
   Search,
   LogOut,
   Menu,
+  Building2,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -16,7 +17,7 @@ import {
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRoles } from "@/hooks/useUserRoles";
-import { useKyb } from "@/hooks/useKyb";
+import { useKyb, KybStep } from "@/hooks/useKyb";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -61,7 +62,7 @@ const buildNavItem = (label: string, href: string): NavItem => ({ label, href })
 const Header = () => {
   const { signOut, user } = useAuth();
   const { isAdmin, isFinance, isCompliance } = useUserRoles();
-  const { isApproved: hasBusiness } = useKyb();
+  const { business, isApproved: hasBusiness } = useKyb();
   const { data: wallets } = useWallets();
   const { data: profile } = useProfile();
   const defaultWallet = wallets?.find((w) => w.is_default) || wallets?.[0];
@@ -92,6 +93,33 @@ const Header = () => {
     ...(productFeatures.cards ? [buildNavItem("Cards", "/cards")] : []),
     ...(hasBusiness ? [buildNavItem("Business", "/business")] : []),
   ];
+
+  // Desktop-reachable business entry (the mobile "More" menu isn't in the
+  // desktop nav). State-aware, mirroring BusinessPromptCard routing.
+  const bizStepPath: Record<KybStep, string> = {
+    details: "/onboarding/business/details",
+    ownership: "/onboarding/business/ownership",
+    documents: "/onboarding/business/documents",
+    review: "/onboarding/business/review",
+    completed: "/onboarding/business/details",
+  };
+  let businessMenuLabel = "Open a business account";
+  let businessMenuTarget = "/onboarding/business/details";
+  if (business) {
+    if (hasBusiness) {
+      businessMenuLabel = "Business account";
+      businessMenuTarget = "/business";
+    } else if (business.kyb_status === "pending_review") {
+      businessMenuLabel = "Business application";
+      businessMenuTarget = "/onboarding/business/submitted";
+    } else if (business.kyb_status === "rejected" || business.kyb_status === "suspended") {
+      businessMenuLabel = "Business application";
+      businessMenuTarget = "/onboarding/business/rejected";
+    } else {
+      businessMenuLabel = "Continue business application";
+      businessMenuTarget = bizStepPath[business.current_step] ?? "/onboarding/business/details";
+    }
+  }
 
   if (!isAdmin && isFinance) navItems.push(buildNavItem("Finance", "/finance"));
   if (!isAdmin && (isFinance || isCompliance)) navItems.push(buildNavItem("Operations", "/operations"));
@@ -295,6 +323,11 @@ const Header = () => {
                 <DropdownMenuItem onClick={() => navigate("/profile")}>Profile Settings</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigate("/kyc")}>KYC Verification</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigate("/security")}>Security</DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => navigate(businessMenuTarget)}>
+                  <Building2 className="w-4 h-4 mr-2" />
+                  {businessMenuLabel}
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={signOut} className="text-destructive focus:text-destructive">
                   <LogOut className="w-4 h-4 mr-2" />
