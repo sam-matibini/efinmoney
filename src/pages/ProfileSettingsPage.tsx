@@ -9,11 +9,22 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
-import { AtSign, Copy, Hash, User } from "lucide-react";
+import { AtSign, Copy, Hash, User, Check, ChevronsUpDown } from "lucide-react";
 import { AvatarUpload } from "@/components/profile/AvatarUpload";
 import { normalizeToE164 } from "@/lib/phone";
 import PageHeroBanner from "@/components/common/PageHeroBanner";
 import AppPage from "@/components/layout/AppPage";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
+import { ISO_COUNTRIES, findIsoCountry } from "@/lib/isoCountries";
 
 const ProfileSettingsPage = () => {
   const { user } = useAuth();
@@ -28,6 +39,7 @@ const ProfileSettingsPage = () => {
   const [stateProvince, setStateProvince] = useState("");
   const [postalCode, setPostalCode] = useState("");
   const [addressCountry, setAddressCountry] = useState("");
+  const [countryOpen, setCountryOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [emailOptOut, setEmailOptOut] = useState(false);
 
@@ -277,14 +289,60 @@ const ProfileSettingsPage = () => {
               <Input id="postal" value={postalCode} onChange={(e) => setPostalCode(e.target.value)} placeholder="M5V 2T6" />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="country">Country (ISO-2)</Label>
-              <Input
-                id="country"
-                value={addressCountry}
-                onChange={(e) => setAddressCountry(e.target.value.toUpperCase())}
-                maxLength={2}
-                placeholder="CA"
-              />
+              <Label>Country</Label>
+              <Popover open={countryOpen} onOpenChange={setCountryOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={countryOpen}
+                    className="w-full justify-between font-normal"
+                  >
+                    {findIsoCountry(addressCountry) ? (
+                      <span className="inline-flex items-center gap-2 truncate">
+                        <span className="text-lg leading-none">{findIsoCountry(addressCountry)!.flag}</span>
+                        <span className="truncate">{findIsoCountry(addressCountry)!.name}</span>
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">Select country</span>
+                    )}
+                    <ChevronsUpDown className="w-4 h-4 opacity-50 shrink-0" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                  align="start"
+                  className="p-0 w-[--radix-popover-trigger-width] min-w-[260px]"
+                >
+                  <Command>
+                    <CommandInput placeholder="Search country..." />
+                    <CommandList>
+                      <CommandEmpty>No country found.</CommandEmpty>
+                      <CommandGroup>
+                        {ISO_COUNTRIES.map((c) => (
+                          <CommandItem
+                            key={c.code}
+                            value={c.name}
+                            onSelect={() => {
+                              setAddressCountry(c.code);
+                              setCountryOpen(false);
+                            }}
+                          >
+                            <span className="text-lg leading-none mr-2">{c.flag}</span>
+                            <span className="flex-1 truncate">{c.name}</span>
+                            <Check
+                              className={cn(
+                                "w-4 h-4 ml-2",
+                                addressCountry === c.code ? "opacity-100" : "opacity-0",
+                              )}
+                            />
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
 
