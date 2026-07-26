@@ -4,8 +4,31 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { Sparkles, Send, Plus, History, X, Loader2 } from "lucide-react";
+import { Sparkles, Send, Plus, History, X, Loader2, Headphones } from "lucide-react";
 import { useAliceChat } from "@/hooks/useAliceChat";
+
+declare global {
+  interface Window {
+    Tawk_API?: {
+      maximize?: () => void;
+      showWidget?: () => void;
+      hideWidget?: () => void;
+      isChatMaximized?: () => boolean;
+    };
+  }
+}
+
+function openLiveSupport() {
+  const tawk = window.Tawk_API;
+  if (!tawk) return false;
+  try {
+    tawk.showWidget?.();
+    tawk.maximize?.();
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 const STARTERS: Record<"user" | "admin", string[]> = {
   user: [
@@ -103,9 +126,10 @@ export default function AliceWidget({ context }: { context: "user" | "admin" }) 
         onPointerUp={onPointerUp}
         aria-label="Alice AI assistant — drag to move, tap to open"
         className={cn(
-          "fixed z-40 h-14 w-14 rounded-full shadow-lg overflow-hidden touch-none select-none cursor-grab active:cursor-grabbing",
+          "fixed z-50 h-14 w-14 rounded-full shadow-lg overflow-hidden touch-none select-none cursor-grab active:cursor-grabbing",
           "bg-gradient-primary text-primary-foreground flex items-center justify-center ring-2 ring-background",
-          pos ? "" : "right-4 bottom-24 md:bottom-6",
+          // Single launcher: tawk bubble is hidden, so sit in the bottom-right corner
+          pos ? "" : "right-4 bottom-6",
         )}
         style={pos ? { left: pos.x, top: pos.y } : undefined}
       >
@@ -201,22 +225,36 @@ export default function AliceWidget({ context }: { context: "user" | "admin" }) 
             </div>
           </ScrollArea>
 
-          {/* Composer */}
-          <form
-            onSubmit={(e) => { e.preventDefault(); submit(input); }}
-            className="border-t p-3 flex items-center gap-2 shrink-0"
-          >
-            <Input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask Alice…"
-              disabled={isSending}
-              className="flex-1"
-            />
-            <Button type="submit" size="icon" disabled={isSending || !input.trim()} aria-label="Send">
-              {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-            </Button>
-          </form>
+          {/* Live support bridge + composer */}
+          <div className="border-t shrink-0">
+            {context === "user" && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (openLiveSupport()) setOpen(false);
+                }}
+                className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors border-b"
+              >
+                <Headphones className="h-4 w-4 shrink-0" />
+                <span className="flex-1 text-left">Need a human? Talk to support</span>
+              </button>
+            )}
+            <form
+              onSubmit={(e) => { e.preventDefault(); submit(input); }}
+              className="p-3 flex items-center gap-2"
+            >
+              <Input
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Ask Alice…"
+                disabled={isSending}
+                className="flex-1"
+              />
+              <Button type="submit" size="icon" disabled={isSending || !input.trim()} aria-label="Send">
+                {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              </Button>
+            </form>
+          </div>
         </SheetContent>
       </Sheet>
     </>

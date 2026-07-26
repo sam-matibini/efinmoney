@@ -70,11 +70,18 @@
     </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
-    <!--Start of Tawk.to Script-->
+    <!--Start of Tawk.to Script (launcher hidden — opened from Alice widget)-->
     <script type="text/javascript">
       var Tawk_API = Tawk_API || {}, Tawk_LoadStart = new Date();
-      // Keep chat above sticky footers / bottom nav chrome
       Tawk_API.customStyle = { zIndex: 99990 };
+      // Hide the purple bubble so Alice is the only floating chat button.
+      // Live support still opens via Alice → "Talk to a human".
+      Tawk_API.onLoad = function () {
+        try { Tawk_API.hideWidget(); } catch (e) {}
+      };
+      Tawk_API.onChatMinimized = function () {
+        try { Tawk_API.hideWidget(); } catch (e) {}
+      };
       (function () {
         var s1 = document.createElement("script"),
           s0 = document.getElementsByTagName("script")[0];
