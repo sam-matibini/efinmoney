@@ -157,12 +157,18 @@ const Auth = () => {
         >
           <div className="text-center mb-10">
             <h1 className="text-4xl md:text-5xl font-black tracking-tight text-neutral-900">
-              {isSignUp ? "Create your account" : "Welcome back"}
+              {isSignUp
+                ? accountType === "business"
+                  ? "Create your business account"
+                  : "Create your account"
+                : "Welcome back"}
             </h1>
             <p className="mt-3 text-neutral-600">
               {isSignUp
                 ? accountType
-                  ? "Just a few details to get started."
+                  ? accountType === "business"
+                    ? "First, create your login — you'll add your company details next."
+                    : "Just a few details to get started."
                   : "First, who is this account for?"
                 : "Sign in to access your wallets."}
             </p>
@@ -305,7 +311,11 @@ const Auth = () => {
                 <LoadingSpinner size={20} />
               ) : (
                 <>
-                  {isSignUp ? "Create account" : "Sign in"}
+                  {isSignUp
+                    ? accountType === "business"
+                      ? "Continue to business setup"
+                      : "Create account"
+                    : "Sign in"}
                   <ArrowRight className="w-5 h-5" />
                 </>
               )}
