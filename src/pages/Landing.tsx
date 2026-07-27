@@ -2,13 +2,14 @@ import { useEffect } from "react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { ArrowRight, Globe, Shield, Zap, Wallet, Send, BarChart3, Building2, Layers, Check } from "lucide-react";
+import { ArrowRight, Globe, Shield, Zap, Wallet, Send, BarChart3, Layers, Check } from "lucide-react";
 import MarketingHeader from "@/components/marketing/MarketingHeader";
 import MarketingFooter from "@/components/marketing/MarketingFooter";
 import { CountryFlag } from "@/components/ui/FlagImage";
 import africaHero from "@/assets/landing-africa-hero.jpg";
 import africaBand from "@/assets/landing-africa-band.jpg";
 import b2bPhone from "@/assets/landing-b2b-phone.jpg";
+import efinConnectIntro from "@/assets/landing-efinconnect-intro.jpeg";
 import tourismKenya from "@/assets/landing-tourism-kenya.jpg";
 import tourismVicFalls from "@/assets/landing-tourism-victoria-falls.jpg";
 import tourismZanzibar from "@/assets/landing-tourism-zanzibar.jpg";
@@ -502,6 +503,21 @@ const Landing = () => {
       {/* ============ BUILT FOR BUSINESS (B2B) ============ */}
       <section className="relative bg-white py-20 md:py-24 overflow-hidden">
         <div className="absolute -top-32 right-0 w-[600px] h-[600px] rounded-full bg-[hsl(var(--primary)/0.06)] blur-3xl pointer-events-none" />
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-80px" }}
+          transition={{ duration: 0.6 }}
+          className="relative max-w-7xl mx-auto px-6 mb-12 md:mb-14 flex justify-center"
+        >
+          <img
+            src={efinConnectIntro}
+            alt="Introducing eFinConnect — Treasury Management Portal"
+            width={595}
+            height={230}
+            className="w-full max-w-[440px] h-auto"
+          />
+        </motion.div>
         <div className="max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-12 items-center">
           <motion.div
             initial={{ opacity: 0, x: -30 }}
@@ -510,11 +526,7 @@ const Landing = () => {
             transition={{ duration: 0.6 }}
             className="order-2 lg:order-1"
           >
-            <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-semibold uppercase tracking-[0.18em] text-[hsl(var(--brand-700))] bg-[hsl(var(--accent))]">
-              <Building2 className="w-3 h-3" />
-              eFinConnect
-            </span>
-            <h2 className="mt-4 text-4xl md:text-5xl font-black tracking-tight text-[hsl(var(--brand-900))]">
+            <h2 className="text-4xl md:text-5xl font-black tracking-tight text-[hsl(var(--brand-900))]">
               Treasury, payouts and FX, in one professional platform.
             </h2>
             <p className="mt-5 text-[15px] md:text-base text-neutral-600 leading-relaxed max-w-xl">
