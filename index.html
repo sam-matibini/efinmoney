@@ -70,28 +70,9 @@
     </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
-    <!--Start of Tawk.to Script (launcher hidden — opened from Alice widget)-->
-    <script type="text/javascript">
-      var Tawk_API = Tawk_API || {}, Tawk_LoadStart = new Date();
-      Tawk_API.customStyle = { zIndex: 99990 };
-      // Hide the purple bubble so Alice is the only floating chat button.
-      // Live support still opens via Alice → "Talk to a human".
-      Tawk_API.onLoad = function () {
-        try { Tawk_API.hideWidget(); } catch (e) {}
-      };
-      Tawk_API.onChatMinimized = function () {
-        try { Tawk_API.hideWidget(); } catch (e) {}
-      };
-      (function () {
-        var s1 = document.createElement("script"),
-          s0 = document.getElementsByTagName("script")[0];
-        s1.async = true;
-        s1.src = "https://embed.tawk.to/6a6609b9846c4d1d49b067ed/1juf9c01a";
-        s1.charset = "UTF-8";
-        s1.setAttribute("crossorigin", "*");
-        s0.parentNode.insertBefore(s1, s0);
-      })();
-    </script>
-    <!--End of Tawk.to Script-->
+    <!--
+      Tawk.to is loaded lazily from the authenticated shell (see src/lib/tawk.ts),
+      not here — so public pages never trigger a "N new message" tab-title alert.
+    -->
   </body>
 </html>
