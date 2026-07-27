@@ -512,7 +512,7 @@ const Landing = () => {
           >
             <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-semibold uppercase tracking-[0.18em] text-[hsl(var(--brand-700))] bg-[hsl(var(--accent))]">
               <Building2 className="w-3 h-3" />
-              eFinMoney for Business
+              eFinConnect
             </span>
             <h2 className="mt-4 text-4xl md:text-5xl font-black tracking-tight text-[hsl(var(--brand-900))]">
               Treasury, payouts and FX, in one professional platform.
