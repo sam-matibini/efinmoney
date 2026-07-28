@@ -1,6 +1,6 @@
 import { ReactNode, Suspense, useEffect, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, ShieldCheck, Users, Layers, ScrollText, Settings, Bell, Search, LogOut, ChevronLeft, ChevronRight, Sun, Moon, Activity, ExternalLink, SlidersHorizontal, UserCog, Gauge, AlertCircle, FileText, Eye, ShieldAlert, Shield, ClipboardList, Ban, UserX, Building2, FileWarning, GraduationCap, Landmark, Globe, ArrowLeftRight, Banknote, RefreshCw, TrendingUp, Zap, BookOpen, BarChart2, Scale, CalendarCheck, Archive, PanelLeft, Wallet, Cog, Megaphone, Headphones, Tags } from "lucide-react";
+import { ChevronDown, LayoutDashboard, ShieldCheck, Users, Layers, ScrollText, Settings, Bell, Search, LogOut, ChevronLeft, ChevronRight, Sun, Moon, Activity, ExternalLink, SlidersHorizontal, UserCog, Gauge, AlertCircle, FileText, Eye, ShieldAlert, Shield, ClipboardList, Ban, UserX, Building2, FileWarning, GraduationCap, Landmark, Globe, ArrowLeftRight, Banknote, RefreshCw, TrendingUp, Zap, BookOpen, BarChart2, Scale, CalendarCheck, Archive, PanelLeft, Wallet, Cog, Megaphone, Headphones, Tags } from "lucide-react";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,49 +16,105 @@ import { formatDistanceToNow } from "date-fns";
 import { DeferredAliceWidget } from "@/components/layout/DeferredShellWidgets";
 import AdminPageSkeleton from "@/components/admin-portal/AdminPageSkeleton";
 
-const NAV = [
+type NavItem = {
+  to: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  requiresStaffMgmt?: boolean;
+};
+
+type NavGroup = {
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  items: NavItem[];
+};
+
+const TOP_NAV: NavItem[] = [
   { to: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/admin/kyc", label: "KYC Queue", icon: ShieldCheck },
-  { to: "/admin/kyb", label: "KYB Queue", icon: Building2 },
-  { to: "/admin/users", label: "Users", icon: Users },
-  { to: "/admin/staff", label: "Staff", icon: UserCog, requiresStaffMgmt: true },
   { to: "/admin/board-dashboard", label: "Board", icon: Gauge },
-  { to: "/admin/finance", label: "Finance", icon: Wallet },
-  { to: "/admin/revenue", label: "Revenue", icon: TrendingUp },
-  { to: "/admin/pricing", label: "Pricing", icon: Tags },
-  { to: "/admin/operations", label: "Operations", icon: PanelLeft },
-  { to: "/admin/communication", label: "Communication", icon: Megaphone },
-  { to: "/admin/support", label: "Support", icon: Headphones },
-  { to: "/admin/settings", label: "Settings", icon: Cog },
-  { to: "/admin/security", label: "Security", icon: ShieldAlert },
-  { to: "/admin/incidents", label: "Incidents", icon: AlertCircle },
-  { to: "/admin/compliance-register", label: "Compliance Reg.", icon: FileText },
-  { to: "/admin/aml-policy", label: "AML Policy", icon: Shield },
-  { to: "/admin/cdd", label: "CDD", icon: ClipboardList },
-  { to: "/admin/edd", label: "EDD", icon: ShieldCheck },
-  { to: "/admin/sanctions", label: "Sanctions", icon: Ban },
-  { to: "/admin/pep-screening", label: "PEP Screening", icon: UserX },
-  { to: "/admin/beneficial-ownership", label: "Ownership", icon: Building2 },
-  { to: "/admin/str-filing", label: "STR / SAR", icon: FileWarning },
-  { to: "/admin/transaction-monitoring", label: "TX Monitor", icon: BarChart2 },
-  { to: "/admin/trade-aml", label: "Trade AML", icon: TrendingUp },
-  { to: "/admin/correspondent-banking", label: "Correspond. Banks", icon: Landmark },
-  { to: "/admin/geographic-risk", label: "Geo Risk", icon: Globe },
-  { to: "/admin/travel-rule", label: "Travel Rule", icon: ArrowLeftRight },
-  { to: "/admin/lctr", label: "LCTR", icon: Banknote },
-  { to: "/admin/eftr", label: "EFTR", icon: RefreshCw },
-  { to: "/admin/wire-transfers", label: "Wire Act", icon: Zap },
-  { to: "/admin/regulatory-changes", label: "Reg. Changes", icon: BookOpen },
-  { to: "/admin/settlement-reconciliation", label: "Settlement Rec.", icon: Scale },
-  { to: "/admin/period-end-controls", label: "Period-End", icon: CalendarCheck },
-  { to: "/admin/evidence-repository", label: "Evidence Repo", icon: Archive },
-  { to: "/admin/training", label: "Training", icon: GraduationCap },
-  { to: "/admin/auditor-portal", label: "Auditor Portal", icon: Eye },
-  { to: "/admin/risk-tiers", label: "Risk Tiers", icon: Layers },
-  { to: "/admin/kyc-config", label: "KYC Config", icon: SlidersHorizontal },
-  { to: "/admin/audit-log", label: "Audit Log", icon: ScrollText },
-  { to: "/admin/diagnostics", label: "Diagnostics", icon: Activity },
-  { to: "/admin/api", label: "API Management", icon: Settings },
+];
+
+const NAV_GROUPS: NavGroup[] = [
+  {
+    label: "Queue", icon: Layers, items: [
+      { to: "/admin/kyc", label: "KYC Queue", icon: ShieldCheck },
+      { to: "/admin/kyb", label: "KYB Queue", icon: Building2 },
+    ],
+  },
+  {
+    label: "Users", icon: Users, items: [
+      { to: "/admin/users", label: "Users", icon: Users },
+      { to: "/admin/staff", label: "Staff", icon: UserCog, requiresStaffMgmt: true },
+    ],
+  },
+  {
+    label: "Finance", icon: Wallet, items: [
+      { to: "/admin/finance", label: "Finance", icon: Wallet },
+      { to: "/admin/revenue", label: "Revenue", icon: TrendingUp },
+      { to: "/admin/pricing", label: "Pricing", icon: Tags },
+      { to: "/admin/settlement-reconciliation", label: "Settlement Rec.", icon: Scale },
+      { to: "/admin/period-end-controls", label: "Period-End", icon: CalendarCheck },
+      { to: "/admin/evidence-repository", label: "Evidence Repo", icon: Archive },
+    ],
+  },
+  {
+    label: "Operations", icon: PanelLeft, items: [
+      { to: "/admin/operations", label: "Operations", icon: PanelLeft },
+      { to: "/admin/communication", label: "Communication", icon: Megaphone },
+      { to: "/admin/support", label: "Support", icon: Headphones },
+      { to: "/admin/training", label: "Training", icon: GraduationCap },
+    ],
+  },
+  {
+    label: "Compliance", icon: Shield, items: [
+      { to: "/admin/cdd", label: "CDD", icon: ClipboardList },
+      { to: "/admin/edd", label: "EDD", icon: ShieldCheck },
+      { to: "/admin/beneficial-ownership", label: "Ownership", icon: Building2 },
+      { to: "/admin/compliance-register", label: "Compliance Reg.", icon: FileText },
+      { to: "/admin/aml-policy", label: "AML Policy", icon: Shield },
+      { to: "/admin/kyc-config", label: "KYC Config", icon: SlidersHorizontal },
+      { to: "/admin/risk-tiers", label: "Risk Tiers", icon: Layers },
+    ],
+  },
+  {
+    label: "Screening", icon: Search, items: [
+      { to: "/admin/sanctions", label: "Sanctions", icon: Ban },
+      { to: "/admin/pep-screening", label: "PEP Screening", icon: UserX },
+      { to: "/admin/geographic-risk", label: "Geo Risk", icon: Globe },
+    ],
+  },
+  {
+    label: "Monitoring", icon: Activity, items: [
+      { to: "/admin/transaction-monitoring", label: "TX Monitor", icon: BarChart2 },
+      { to: "/admin/trade-aml", label: "Trade AML", icon: TrendingUp },
+      { to: "/admin/correspondent-banking", label: "Correspond. Banks", icon: Landmark },
+      { to: "/admin/travel-rule", label: "Travel Rule", icon: ArrowLeftRight },
+      { to: "/admin/lctr", label: "LCTR", icon: Banknote },
+      { to: "/admin/eftr", label: "EFTR", icon: RefreshCw },
+      { to: "/admin/wire-transfers", label: "Wire Act", icon: Zap },
+      { to: "/admin/regulatory-changes", label: "Reg. Changes", icon: BookOpen },
+    ],
+  },
+  {
+    label: "Audit & Reporting", icon: ScrollText, items: [
+      { to: "/admin/audit-log", label: "Audit Log", icon: ScrollText },
+      { to: "/admin/str-filing", label: "STR / SAR", icon: FileWarning },
+      { to: "/admin/auditor-portal", label: "Auditor Portal", icon: Eye },
+    ],
+  },
+  {
+    label: "Security", icon: ShieldAlert, items: [
+      { to: "/admin/security", label: "Security", icon: ShieldAlert },
+      { to: "/admin/incidents", label: "Incidents", icon: AlertCircle },
+    ],
+  },
+  {
+    label: "System", icon: Cog, items: [
+      { to: "/admin/settings", label: "Settings", icon: Cog },
+      { to: "/admin/diagnostics", label: "Diagnostics", icon: Activity },
+      { to: "/admin/api", label: "API Management", icon: Settings },
+    ],
+  },
 ];
 
 const AdminLayout = ({ children }: { children: ReactNode }) => {
@@ -70,6 +126,32 @@ const AdminLayout = ({ children }: { children: ReactNode }) => {
   const { theme, setTheme } = useTheme();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
+  const [navSearch, setNavSearch] = useState("");
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("admin-nav-sections") || "{}");
+    } catch {
+      return {};
+    }
+  });
+
+  // Persist section expand/collapse state
+  useEffect(() => {
+    localStorage.setItem("admin-nav-sections", JSON.stringify(expandedSections));
+  }, [expandedSections]);
+
+  // Auto-expand active section on navigation
+  useEffect(() => {
+    for (const group of NAV_GROUPS) {
+      const isActive = group.items.some(
+        (item) => location.pathname === item.to || location.pathname.startsWith(item.to + "/")
+      );
+      if (isActive && !expandedSections[group.label]) {
+        setExpandedSections((prev) => ({ ...prev, [group.label]: true }));
+        break;
+      }
+    }
+  }, [location.pathname]);
 
   // Notifications query
   const { data: notifications = [] } = useQuery({
@@ -172,6 +254,103 @@ const AdminLayout = ({ children }: { children: ReactNode }) => {
     queryClient.invalidateQueries({ queryKey: ["admin-notifications", admin.id] });
   };
 
+  const allNavItems = [...TOP_NAV, ...NAV_GROUPS.flatMap((g) => g.items)];
+
+  const renderNavItem = (item: NavItem) => {
+    const Icon = item.icon;
+    const active = location.pathname === item.to || location.pathname.startsWith(item.to + "/");
+    const badge = item.to === "/admin/kyc" && pendingKycCount > 0 ? pendingKycCount : null;
+    return (
+      <NavLink
+        key={item.to}
+        to={item.to}
+        onClick={() => setMobileOpen(false)}
+        className={cn(
+          "relative flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+          active
+            ? "bg-sidebar-primary text-sidebar-primary-foreground"
+            : "text-sidebar-foreground hover:bg-sidebar-accent"
+        )}
+      >
+        <Icon className="w-4 h-4 shrink-0" />
+        {!collapsed && <span className="flex-1">{item.label}</span>}
+        {badge !== null && (
+          <span
+            className={cn(
+              "rounded-full text-[10px] font-bold min-w-[20px] px-1.5 py-0.5 text-center",
+              active ? "bg-sidebar-primary-foreground text-sidebar-primary" : "bg-destructive text-destructive-foreground",
+              collapsed && "absolute top-1 right-1"
+            )}
+          >
+            {badge > 99 ? "99+" : badge}
+          </span>
+        )}
+      </NavLink>
+    );
+  };
+
+  const renderNavGroup = (group: NavGroup) => {
+    const filteredItems = navSearch
+      ? group.items.filter((item) => item.label.toLowerCase().includes(navSearch.toLowerCase()))
+      : group.items;
+    if (navSearch && filteredItems.length === 0) return null;
+
+    const isExpanded = navSearch ? true : (expandedSections[group.label] ?? false);
+    const GroupIcon = group.icon;
+    const kycBadge = group.label === "Queue" && pendingKycCount > 0 ? pendingKycCount : null;
+
+    const visibleItems = filteredItems.filter(
+      (item) => !item.requiresStaffMgmt || hasPermission("manage_staff")
+    );
+    if (visibleItems.length === 0) return null;
+
+    return (
+      <div key={group.label}>
+        <button
+          onClick={() => {
+            if (!navSearch) {
+              setExpandedSections((prev) => ({ ...prev, [group.label]: !prev[group.label] }));
+            }
+          }}
+          className={cn(
+            "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors",
+            collapsed
+              ? "justify-center text-muted-foreground hover:text-foreground hover:bg-sidebar-accent relative"
+              : "text-muted-foreground hover:text-foreground hover:bg-sidebar-accent"
+          )}
+        >
+          <GroupIcon className="w-4 h-4 shrink-0" />
+          {!collapsed && (
+            <>
+              <span className="flex-1 text-left">{group.label}</span>
+              {kycBadge !== null && (
+                <span
+                  className={cn(
+                    "rounded-full text-[10px] font-bold min-w-[20px] px-1.5 py-0.5 text-center bg-destructive text-destructive-foreground",
+                    collapsed && "absolute top-1 right-1"
+                  )}
+                >
+                  {kycBadge > 99 ? "99+" : kycBadge}
+                </span>
+              )}
+              <ChevronDown className={cn("w-3.5 h-3.5 transition-transform shrink-0", isExpanded && "rotate-180")} />
+            </>
+          )}
+          {collapsed && kycBadge !== null && (
+            <span className="absolute top-1 right-1 rounded-full text-[10px] font-bold min-w-[20px] px-1.5 py-0.5 text-center bg-destructive text-destructive-foreground">
+              {kycBadge > 99 ? "99+" : kycBadge}
+            </span>
+          )}
+        </button>
+        {!collapsed && isExpanded && (
+          <div className="ml-2 space-y-0.5 border-l border-sidebar-border pl-2">
+            {visibleItems.map(renderNavItem)}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const SidebarContent = (
     <div className={cn("h-full flex flex-col bg-sidebar border-r border-sidebar-border transition-all", collapsed ? "w-16" : "w-64")}>
       {/* Logo */}
@@ -187,38 +366,24 @@ const AdminLayout = ({ children }: { children: ReactNode }) => {
 
       {/* Nav */}
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-        {NAV.filter((item) => !item.requiresStaffMgmt || hasPermission("manage_staff")).map((item) => {
-          const Icon = item.icon;
-          const active = location.pathname === item.to || location.pathname.startsWith(item.to + "/");
-          const badge = item.to === "/admin/kyc" && pendingKycCount > 0 ? pendingKycCount : null;
-          return (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              onClick={() => setMobileOpen(false)}
-              className={cn(
-                "relative flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-                active
-                  ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                  : "text-sidebar-foreground hover:bg-sidebar-accent"
-              )}
-            >
-              <Icon className="w-4 h-4 shrink-0" />
-              {!collapsed && <span className="flex-1">{item.label}</span>}
-              {badge !== null && (
-                <span
-                  className={cn(
-                    "rounded-full text-[10px] font-bold min-w-[20px] px-1.5 py-0.5 text-center",
-                    active ? "bg-sidebar-primary-foreground text-sidebar-primary" : "bg-destructive text-destructive-foreground",
-                    collapsed && "absolute top-1 right-1"
-                  )}
-                >
-                  {badge > 99 ? "99+" : badge}
-                </span>
-              )}
-            </NavLink>
-          );
-        })}
+        {collapsed
+          ? allNavItems.filter((item) => !item.requiresStaffMgmt || hasPermission("manage_staff")).map(renderNavItem)
+          : (
+            <>
+              <div className="relative mb-2">
+                <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={navSearch}
+                  onChange={(e) => setNavSearch(e.target.value)}
+                  placeholder="Search nav..."
+                  className="pl-8 h-8 text-xs bg-muted/50 border-transparent focus-visible:bg-background"
+                />
+              </div>
+              {TOP_NAV.filter((item) => !item.requiresStaffMgmt || hasPermission("manage_staff")).map(renderNavItem)}
+              <div className="my-2 border-t border-sidebar-border" />
+              {NAV_GROUPS.map(renderNavGroup)}
+            </>
+          )}
       </nav>
 
       {/* Profile */}
