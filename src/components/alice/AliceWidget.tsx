@@ -6,29 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { Sparkles, Send, Plus, History, X, Loader2, Headphones } from "lucide-react";
 import { useAliceChat } from "@/hooks/useAliceChat";
-
-declare global {
-  interface Window {
-    Tawk_API?: {
-      maximize?: () => void;
-      showWidget?: () => void;
-      hideWidget?: () => void;
-      isChatMaximized?: () => boolean;
-    };
-  }
-}
-
-function openLiveSupport() {
-  const tawk = window.Tawk_API;
-  if (!tawk) return false;
-  try {
-    tawk.showWidget?.();
-    tawk.maximize?.();
-    return true;
-  } catch {
-    return false;
-  }
-}
+import LiveSupportChat from "@/components/support/LiveSupportChat";
 
 const STARTERS: Record<"user" | "admin", string[]> = {
   user: [
@@ -47,6 +25,7 @@ const STARTERS: Record<"user" | "admin", string[]> = {
 
 export default function AliceWidget({ context }: { context: "user" | "admin" }) {
   const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<"alice" | "support">("alice");
   const [showHistory, setShowHistory] = useState(false);
   const [input, setInput] = useState("");
   const { messages, isSending, send, newChat, loadConversation, conversations } = useAliceChat(context);
@@ -128,7 +107,7 @@ export default function AliceWidget({ context }: { context: "user" | "admin" }) 
         className={cn(
           "fixed z-50 h-14 w-14 rounded-full shadow-lg overflow-hidden touch-none select-none cursor-grab active:cursor-grabbing",
           "bg-gradient-primary text-primary-foreground flex items-center justify-center ring-2 ring-background",
-          // Single launcher: tawk bubble is hidden, so sit in the bottom-right corner
+          // Single floating launcher in the bottom-right corner
           pos ? "" : "right-4 bottom-6",
         )}
         style={pos ? { left: pos.x, top: pos.y } : undefined}
@@ -142,8 +121,12 @@ export default function AliceWidget({ context }: { context: "user" | "admin" }) 
         />
       </button>
 
-      <Sheet open={open} onOpenChange={setOpen}>
+      <Sheet open={open} onOpenChange={(o) => { setOpen(o); if (!o) setMode("alice"); }}>
         <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col gap-0" hideClose>
+          {mode === "support" ? (
+            <LiveSupportChat onBack={() => setMode("alice")} />
+          ) : (
+          <>
           {/* Header */}
           <div className="flex items-center gap-2 px-4 h-14 border-b shrink-0">
             <div className="relative h-8 w-8 rounded-full bg-gradient-primary text-primary-foreground flex items-center justify-center overflow-hidden">
@@ -230,9 +213,7 @@ export default function AliceWidget({ context }: { context: "user" | "admin" }) 
             {context === "user" && (
               <button
                 type="button"
-                onClick={() => {
-                  if (openLiveSupport()) setOpen(false);
-                }}
+                onClick={() => setMode("support")}
                 className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors border-b"
               >
                 <Headphones className="h-4 w-4 shrink-0" />
@@ -255,6 +236,8 @@ export default function AliceWidget({ context }: { context: "user" | "admin" }) 
               </Button>
             </form>
           </div>
+          </>
+          )}
         </SheetContent>
       </Sheet>
     </>

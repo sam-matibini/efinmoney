@@ -307,9 +307,6 @@ verify_jwt = false
 [functions.notify-guest-reply]
 verify_jwt = false
 
-[functions.tawk-webhook]
-verify_jwt = false
-
 [functions.test-integration]
 verify_jwt = false
 

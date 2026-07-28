@@ -1,5 +1,10 @@
-// Sends an email to the support inbox when a user opens or replies to a support thread.
-// Called client-side after thread/message insert — no JWT required (internal use only).
+// Sends an email when a user opens or replies to a support thread.
+// The shared support inbox is always the primary recipient; individual admins
+// are BCC'd so they're alerted outside the portal. Recipients respect
+// assignment: an unassigned thread alerts every admin, an assigned one only its
+// assignee. Called client-side after thread/message insert — no JWT required.
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -12,6 +17,42 @@ const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
 const FROM = "eFinMoney Support <noreply@efinsuite.com>";
 const SUPPORT_TO = Deno.env.get("SUPPORT_INBOX") || "support@efin.money";
 const ADMIN_SUPPORT_URL = "https://efin.money/admin/support";
+const STAFF_ROLES = ["admin", "finance", "compliance"];
+
+// The individual admin emails to BCC — the thread's assignee if assigned,
+// otherwise every staff member. Best-effort: on any failure we still email the
+// shared inbox.
+async function adminBccList(threadId: string): Promise<string[]> {
+  try {
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    );
+    const { data: thread } = await supabase
+      .from("support_threads").select("assigned_to").eq("id", threadId).maybeSingle();
+
+    let ids: string[];
+    if (thread?.assigned_to) {
+      ids = [thread.assigned_to as string];
+    } else {
+      const { data: roles } = await supabase
+        .from("user_roles").select("user_id").in("role", STAFF_ROLES);
+      ids = [...new Set((roles ?? []).map((r: { user_id: string }) => r.user_id))];
+    }
+    if (!ids.length) return [];
+
+    const { data: profs } = await supabase
+      .from("profiles").select("email").in("user_id", ids);
+    return [...new Set(
+      (profs ?? [])
+        .map((p: { email: string | null }) => p.email)
+        .filter((e: string | null): e is string => !!e && e !== SUPPORT_TO),
+    )];
+  } catch (e) {
+    console.error("adminBccList", e);
+    return [];
+  }
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -50,10 +91,14 @@ Deno.serve(async (req) => {
         </div>
       </div>`;
 
+    const bcc = await adminBccList(thread_id);
+    const payload: Record<string, unknown> = { from: FROM, to: [SUPPORT_TO], subject: emailSubject, html };
+    if (bcc.length) payload.bcc = bcc;
+
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${RESEND_API_KEY}` },
-      body: JSON.stringify({ from: FROM, to: [SUPPORT_TO], subject: emailSubject, html }),
+      body: JSON.stringify(payload),
     });
 
     if (!res.ok) {

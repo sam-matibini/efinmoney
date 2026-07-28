@@ -1,6 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { loadTawk } from "@/lib/tawk";
 
 const AdyenReturnHandler = lazy(() => import("@/components/payments/AdyenReturnHandler"));
 const AliceWidget = lazy(() => import("@/components/alice/AliceWidget"));
@@ -26,7 +25,6 @@ export function DeferredAliceWidget({ context }: { context: "user" | "admin" }) 
     if (import.meta.env.VITE_ALICE_ENABLED === "false") return;
     const run = () => {
       setShow(true);
-      loadTawk(); // live-support embed, only in authenticated shells
     };
     if ("requestIdleCallback" in window) {
       const id = requestIdleCallback(run, { timeout: 3000 });

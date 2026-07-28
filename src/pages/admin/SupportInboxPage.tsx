@@ -91,7 +91,7 @@ export default function SupportInboxPage() {
                     <span className="font-medium text-sm truncate flex-1">{nameFor(t)}</span>
                     {t.channel && t.channel !== "app" && (
                       <span className="text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded-full bg-violet-500/15 text-violet-600 shrink-0">
-                        {t.channel === "contact" ? "Guest" : t.channel}
+                        {t.channel === "contact" ? "Guest" : t.channel === "chat" ? "Live chat" : t.channel}
                       </span>
                     )}
                     {t.priority === "urgent" && <AlertTriangle className="w-3.5 h-3.5 text-red-500 shrink-0" />}

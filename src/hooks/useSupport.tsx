@@ -116,7 +116,7 @@ export const useThreadMessages = (threadId: string | null) => {
 export const useCreateThread = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ subject, body, files = [] }: { subject: string; body: string; files?: File[] }) => {
+    mutationFn: async ({ subject, body, files = [], channel }: { subject: string; body: string; files?: File[]; channel?: SupportChannel }) => {
       const { data: auth } = await supabase.auth.getUser();
       const uid = auth.user?.id;
       if (!uid) throw new Error("Not signed in");
@@ -124,7 +124,7 @@ export const useCreateThread = () => {
       const { data: profile } = await supabase.from("profiles").select("full_name, email").eq("user_id", uid).single();
 
       const { data: thread, error } = await db.from("support_threads")
-        .insert({ user_id: uid, subject }).select("*").single();
+        .insert({ user_id: uid, subject, ...(channel ? { channel } : {}) }).select("*").single();
       if (error) throw error;
       const attachments = files.length ? await uploadSupportFiles(uid, files) : [];
       const { error: mErr } = await db.from("support_messages")
