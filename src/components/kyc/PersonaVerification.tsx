@@ -21,6 +21,10 @@ export const PersonaVerification = ({ userId, onComplete, onError, className, la
   const [loading, setLoading] = useState(false);
   const autoStartedRef = useRef(false);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // The status poll is an async setInterval; overlapping ticks can each see
+  // "approved" and fire onComplete more than once, spamming the finalize
+  // toasts. This guard makes completion fire exactly once.
+  const completedRef = useRef(false);
 
   const stopPolling = useCallback(() => {
     if (pollingRef.current) {
@@ -28,6 +32,18 @@ export const PersonaVerification = ({ userId, onComplete, onError, className, la
       pollingRef.current = null;
     }
   }, []);
+
+  const finish = useCallback(
+    (inquiryId: string, status: string) => {
+      if (completedRef.current) return;
+      completedRef.current = true;
+      stopPolling();
+      setLoading(false);
+      toast.success("Identity check submitted");
+      onComplete?.({ inquiryId, status });
+    },
+    [onComplete, stopPolling],
+  );
 
   useEffect(() => {
     return () => stopPolling();
@@ -53,6 +69,11 @@ export const PersonaVerification = ({ userId, onComplete, onError, className, la
       }
 
       pollingRef.current = setInterval(async () => {
+        // Already finalized (possibly by an overlapping tick) — bail out.
+        if (completedRef.current) {
+          stopPolling();
+          return;
+        }
         if (personaWindow.closed) {
           stopPolling();
           setLoading(false);
@@ -62,17 +83,20 @@ export const PersonaVerification = ({ userId, onComplete, onError, className, la
             });
             const status = data?.status || data?.persona_inquiry_status;
             if (status === "approved" || status === "completed" || status === "needs_review") {
-              toast.success("Identity check submitted");
-              onComplete?.({ inquiryId, status });
-            } else {
+              finish(inquiryId, status);
+            } else if (!completedRef.current) {
+              completedRef.current = true;
               toast.message("Verification window closed", {
                 description: "If you completed the verification, we'll process it shortly.",
               });
             }
           } catch {
-            toast.message("Verification window closed", {
-              description: "If you completed the verification, we'll process it shortly.",
-            });
+            if (!completedRef.current) {
+              completedRef.current = true;
+              toast.message("Verification window closed", {
+                description: "If you completed the verification, we'll process it shortly.",
+              });
+            }
           }
           return;
         }
@@ -83,18 +107,15 @@ export const PersonaVerification = ({ userId, onComplete, onError, className, la
           });
           const status = data?.status || data?.persona_inquiry_status;
           if (status === "approved" || status === "completed" || status === "needs_review") {
-            stopPolling();
             personaWindow.close();
-            setLoading(false);
-            toast.success("Identity check submitted");
-            onComplete?.({ inquiryId, status });
+            finish(inquiryId, status);
           }
         } catch {
           /* polling error — retry next tick */
         }
       }, PERSONA_POLL_MS);
     },
-    [onComplete, stopPolling],
+    [finish, stopPolling],
   );
 
   const startVerification = async () => {
