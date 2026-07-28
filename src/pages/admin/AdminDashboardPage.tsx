@@ -50,7 +50,6 @@ const AdminDashboardPage = () => {
         rejectedRate,
       };
     },
-    refetchInterval: 30000,
   });
 
   const Kpi = ({ icon: Icon, label, value, accent }: { icon: typeof Users; label: string; value: number | string; accent: string }) => (

@@ -100,7 +100,6 @@ const AdminLayout = ({ children }: { children: ReactNode }) => {
       return count || 0;
     },
     enabled: !!admin,
-    refetchInterval: 30000,
   });
 
   // Realtime: KYC submissions
@@ -128,6 +127,27 @@ const AdminLayout = ({ children }: { children: ReactNode }) => {
         { event: "INSERT", schema: "public", table: "admin_notifications", filter: `admin_id=eq.${admin.id}` },
         () => {
           queryClient.invalidateQueries({ queryKey: ["admin-notifications", admin.id] });
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "kyc_audit_log" },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] });
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "user_risk_tiers" },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] });
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "profiles" },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] });
         }
       )
       .subscribe();
