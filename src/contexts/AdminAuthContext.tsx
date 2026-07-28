@@ -127,9 +127,11 @@ export const AdminAuthProvider = ({ children }: { children: ReactNode }) => {
       console.warn('admin signOut error, forcing local clear', e);
     }
     try {
-      Object.keys(localStorage)
-        .filter((k) => k.startsWith('sb-') && k.endsWith('-auth-token'))
-        .forEach((k) => localStorage.removeItem(k));
+      const url = import.meta.env.VITE_SUPABASE_URL;
+      const projectRef = url ? new URL(url).hostname.split('.')[0] : null;
+      if (projectRef) {
+        localStorage.removeItem(`sb-${projectRef}-auth-token`);
+      }
     } catch {}
     setAdmin(null);
     setUser(null);
