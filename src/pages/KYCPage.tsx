@@ -75,22 +75,67 @@ const KYCPage = () => {
           <Card className="p-6">Loading...</Card>
         ) : (
           <div className="space-y-4">
-            <Card className="p-6">
+            <Card
+              className={cn(
+                "relative overflow-hidden p-6 border",
+                isVerified
+                  ? "border-primary/30"
+                  : status === "pending"
+                  ? "border-amber-500/30"
+                  : status === "rejected"
+                  ? "border-destructive/30"
+                  : "border-border",
+              )}
+            >
+              <div
+                className={cn(
+                  "absolute inset-x-0 top-0 h-1",
+                  isVerified
+                    ? "bg-primary"
+                    : status === "pending"
+                    ? "bg-amber-500"
+                    : status === "rejected"
+                    ? "bg-destructive"
+                    : "bg-secondary",
+                )}
+              />
               <div className="flex items-start gap-4">
-                <div className="w-12 h-12 rounded-xl bg-secondary flex items-center justify-center flex-shrink-0">
-                  <Shield className="w-6 h-6 text-foreground" />
+                <div
+                  className={cn(
+                    "flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl",
+                    isVerified
+                      ? "bg-primary/10 text-primary"
+                      : status === "pending"
+                      ? "bg-amber-500/10 text-amber-500"
+                      : status === "rejected"
+                      ? "bg-destructive/10 text-destructive"
+                      : "bg-secondary text-foreground",
+                  )}
+                >
+                  <Icon className="h-7 w-7" />
                 </div>
                 <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <h2 className="font-semibold text-foreground">Verification Status</h2>
-                    <Icon className={`w-4 h-4 ${cfg.color}`} />
-                  </div>
-                  <p className="text-sm text-muted-foreground mb-3">
-                    Your account is currently <span className="font-medium text-foreground">{cfg.label}</span>
+                  <h2 className="font-semibold text-foreground">Verification Status</h2>
+                  <p className="mt-0.5 text-sm text-muted-foreground">
+                    Your account is currently{" "}
+                    <span className="font-medium text-foreground">{cfg.label}</span>
                   </p>
-                  <div className="flex gap-2">
-                    <Badge variant="secondary">Status: {cfg.label}</Badge>
-                    <Badge variant="outline">{tier.replace('_', ' ').toUpperCase()}</Badge>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <span
+                      className={cn(
+                        "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium",
+                        isVerified
+                          ? "bg-primary/10 text-primary"
+                          : status === "pending"
+                          ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                          : status === "rejected"
+                          ? "bg-destructive/10 text-destructive"
+                          : "bg-secondary text-foreground",
+                      )}
+                    >
+                      <Icon className="h-3.5 w-3.5" /> {cfg.label}
+                    </span>
+                    <Badge variant="outline">{tier.replace("_", " ").toUpperCase()}</Badge>
                   </div>
                 </div>
               </div>

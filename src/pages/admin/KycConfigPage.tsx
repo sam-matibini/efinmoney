@@ -135,85 +135,85 @@ export default function KycConfigPage() {
                 {isLoading || !draft ? (
                   <div className="text-sm text-muted-foreground py-8 text-center">Loading tiers…</div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="w-[120px]">Tier</TableHead>
-                          <TableHead>Label</TableHead>
-                          <TableHead className="text-right">Single</TableHead>
-                          <TableHead className="text-right">Daily</TableHead>
-                          <TableHead className="text-right">Monthly</TableHead>
-                          <TableHead className="text-right">Max Balance</TableHead>
-                          <TableHead>Features</TableHead>
-                          <TableHead className="w-[120px]"></TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {VISIBLE_TIERS.map((tier) => {
-                          const row = draft[tier];
-                          if (!row) return null;
-                          return (
-                            <TableRow key={tier}>
-                              <TableCell>
-                                <Badge variant="outline" className="uppercase">
-                                  {tier.replace("_", " ")}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>
+                  <div className="grid gap-4 md:grid-cols-3">
+                    {VISIBLE_TIERS.map((tier) => {
+                      const row = draft[tier];
+                      if (!row) return null;
+                      const tierNum = tier.split("_")[1];
+                      const limitFields = [
+                        { k: "single_limit", label: "Single" },
+                        { k: "daily_limit", label: "Daily" },
+                        { k: "monthly_limit", label: "Monthly" },
+                        { k: "max_balance", label: "Max balance" },
+                      ] as const;
+                      return (
+                        <div key={tier} className="flex flex-col rounded-2xl border border-border bg-card p-5">
+                          {/* Header */}
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-secondary text-lg font-black text-foreground">
+                              {tierNum}
+                            </div>
+                            <div className="flex-1">
+                              <div className="text-sm font-bold uppercase tracking-wide text-foreground">
+                                Tier {tierNum}
+                              </div>
+                              <Input
+                                value={row.label}
+                                onChange={(e) => updateField(tier, "label", e.target.value)}
+                                placeholder="Label"
+                                className="mt-1 h-8 text-xs"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Limits */}
+                          <div className="mt-4 grid grid-cols-2 gap-2">
+                            {limitFields.map(({ k, label }) => (
+                              <div key={k}>
+                                <Label className="text-[11px] text-muted-foreground">{label}</Label>
                                 <Input
-                                  value={row.label}
-                                  onChange={(e) => updateField(tier, "label", e.target.value)}
-                                  className="h-9 min-w-[120px]"
+                                  type="number"
+                                  inputMode="decimal"
+                                  value={row[k]}
+                                  onChange={(e) => updateField(tier, k, Number(e.target.value))}
+                                  className="mt-1 h-9"
                                 />
-                              </TableCell>
-                              {(["single_limit", "daily_limit", "monthly_limit", "max_balance"] as const).map((k) => (
-                                <TableCell key={k} className="text-right">
-                                  <Input
-                                    type="number"
-                                    inputMode="decimal"
-                                    value={row[k]}
-                                    onChange={(e) => updateField(tier, k, Number(e.target.value))}
-                                    className="h-9 text-right min-w-[110px]"
-                                  />
-                                </TableCell>
-                              ))}
-                              <TableCell>
-                                <div className="flex flex-wrap gap-2 max-w-[260px]">
-                                  {FEATURE_KEYS.map((f) => (
-                                    <label
-                                      key={f}
-                                      className="flex items-center gap-1.5 text-xs px-2 py-1 rounded-md border bg-muted/30"
-                                    >
-                                      <Switch
-                                        checked={Boolean(row.features_enabled?.[f])}
-                                        onCheckedChange={(v) => toggleFeature(tier, f, v)}
-                                      />
-                                      <span className="capitalize">{f.replace("_", " ")}</span>
-                                    </label>
-                                  ))}
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                <Button
-                                  size="sm"
-                                  onClick={() => saveTier(tier)}
-                                  disabled={savingTier === tier}
-                                  className="gap-1"
-                                >
-                                  {savingTier === tier ? (
-                                    <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                                  ) : (
-                                    <Save className="h-3.5 w-3.5" />
-                                  )}
-                                  Save
-                                </Button>
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Features */}
+                          <div className="mt-4 space-y-1.5">
+                            {FEATURE_KEYS.map((f) => (
+                              <label
+                                key={f}
+                                className="flex items-center justify-between gap-2 rounded-lg border bg-muted/30 px-2.5 py-1.5 text-xs"
+                              >
+                                <span className="capitalize">{f.replace("_", " ")}</span>
+                                <Switch
+                                  checked={Boolean(row.features_enabled?.[f])}
+                                  onCheckedChange={(v) => toggleFeature(tier, f, v)}
+                                />
+                              </label>
+                            ))}
+                          </div>
+
+                          {/* Save */}
+                          <Button
+                            onClick={() => saveTier(tier)}
+                            disabled={savingTier === tier}
+                            className="mt-4 w-full gap-1.5"
+                          >
+                            {savingTier === tier ? (
+                              <RefreshCw className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Save className="h-4 w-4" />
+                            )}
+                            Save Tier {tierNum}
+                          </Button>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </CardContent>
