@@ -80,7 +80,14 @@ export const AdminAuthProvider = ({ children }: { children: ReactNode }) => {
       .select("id, role, status, full_name, email, department, permissions")
       .eq("id", uid)
       .maybeSingle();
-    if (error || !data) {
+    if (error) {
+      console.warn("AdminAuth: error fetching admin record", error);
+      setAdmin(null);
+      return null;
+    }
+    if (!data) {
+      console.warn("AdminAuth: no admin record found for user", uid);
+      toast.error("Unable to verify admin access. Please sign in again.");
       setAdmin(null);
       return null;
     }
