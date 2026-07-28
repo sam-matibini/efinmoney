@@ -389,6 +389,8 @@ const EfinmoneyP2PFlow = () => {
     setSending(false);
     qc.invalidateQueries({ queryKey: ["wallets", user?.id] });
     qc.invalidateQueries({ queryKey: ["wallets"] });
+    qc.invalidateQueries({ queryKey: ["transfers"] });
+    qc.invalidateQueries({ queryKey: ["dashboard-transfers"] });
     const ok = settled.filter((r) => r.status === "fulfilled" && r.value.success).length;
     toast.success(`${ok} of ${totalRecipients} transfers completed`);
   };

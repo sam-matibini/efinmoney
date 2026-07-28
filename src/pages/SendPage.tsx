@@ -796,6 +796,11 @@ const SendPage = () => {
           return;
         }
         if (invokeErr) throw new Error(invokeErr.message || 'Payout failed');
+        // Reflect the debited balance and new activity across the app at once —
+        // wallet balances, the transfers list, and the dashboard's recent activity.
+        qc.invalidateQueries({ queryKey: ["wallets"] });
+        qc.invalidateQueries({ queryKey: ["transfers"] });
+        qc.invalidateQueries({ queryKey: ["dashboard-transfers"] });
         const payout = data?.payout;
         const redirectUrl = payout?.redirect_url;
         goToStep(4);
@@ -831,6 +836,8 @@ const SendPage = () => {
       try {
         const tid = await createTransferRecord();
         await supabase.from('transfers').update({ status: 'processing' }).eq('id', tid);
+        qc.invalidateQueries({ queryKey: ["transfers"] });
+        qc.invalidateQueries({ queryKey: ["dashboard-transfers"] });
         toast.success('Bank transfer initiated — funds will be debited within 1-2 business days');
         goToStep(4);
       } catch (e: any) {
@@ -1215,6 +1222,9 @@ const SendPage = () => {
         }
 
         clearCardSendIntent();
+        qc.invalidateQueries({ queryKey: ["wallets"] });
+        qc.invalidateQueries({ queryKey: ["transfers"] });
+        qc.invalidateQueries({ queryKey: ["dashboard-transfers"] });
         toast.success("Card charged — transfer sent to your recipient!");
         goToStep(4);
       } catch (e: any) {
@@ -2107,22 +2117,6 @@ const SendPage = () => {
                                             />
                                           </div>
                                         </motion.div>
-                                        )}
-                                        {productFeatures.flutterwave && canUseFincra && (
-                                          <motion.div custom={2.8} variants={fieldVariants} initial="hidden" animate="show" className="rounded-xl border border-teal-500/30 bg-gradient-to-br from-teal-500/5 via-background to-teal-500/5 p-4">
-                                            <div className="flex items-start justify-between gap-3">
-                                              <div className="flex-1">
-                                                <div className="flex items-center gap-2">
-                                                  <span className="text-sm font-medium">Fincra bank payout (test)</span>
-                                                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-700 dark:text-teal-300 font-mono uppercase">Test</span>
-                                                </div>
-                                                <p className="text-xs text-muted-foreground mt-1">
-                                                  Route this NGN payout through Fincra (not Nomba / Lenhub). Requires a funded Fincra NGN balance.
-                                                </p>
-                                              </div>
-                                              <Switch checked={useFincra} onCheckedChange={setUseFincra} aria-label="Use alternate bank payout" />
-                                            </div>
-                                          </motion.div>
                                         )}
                                       </>
                                     ) : isGhanaBank ? (
