@@ -30,7 +30,6 @@ const AdminLogin = () => {
       return;
     }
     toast.success("Welcome to the admin portal");
-    navigate("/admin/dashboard", { replace: true });
   };
 
   return (
