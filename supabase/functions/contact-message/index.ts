@@ -83,7 +83,10 @@ Deno.serve(async (req) => {
       .single();
     if (tErr) {
       console.error("thread insert", tErr);
-      return json({ error: "Could not send your message. Please try again later." }, 502);
+      // Surface the Postgres error code (e.g. 42703 undefined_column,
+      // 23502 not_null_violation, 42501 insufficient_privilege) so a failed
+      // deploy is diagnosable without server logs. Not sensitive.
+      return json({ error: "Could not send your message. Please try again later.", code: tErr.code, at: "thread" }, 502);
     }
 
     const { error: mErr } = await supabase
@@ -91,7 +94,7 @@ Deno.serve(async (req) => {
       .insert({ thread_id: thread.id, sender_role: "user", sender_id: null, body: cleanMessage });
     if (mErr) {
       console.error("message insert", mErr);
-      return json({ error: "Could not send your message. Please try again later." }, 502);
+      return json({ error: "Could not send your message. Please try again later.", code: mErr.code, at: "message" }, 502);
     }
 
     // Backup: email the support inbox too (non-blocking).
