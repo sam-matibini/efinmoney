@@ -34,8 +34,17 @@ export default function SupportInboxPage() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "open" | "unread">("open");
 
-  const ids = useMemo(() => Array.from(new Set(threads.map((t) => t.user_id))), [threads]);
+  const ids = useMemo(
+    () => Array.from(new Set(threads.map((t) => t.user_id).filter((id): id is string => !!id))),
+    [threads]
+  );
   const { data: profiles = {} } = useProfilesByIds(ids);
+
+  // Guest threads (Contact form / live chat) have no profile — fall back to the
+  // name/email captured at submission.
+  const nameFor = (t: SupportThread) =>
+    (t.user_id && (profiles[t.user_id]?.full_name || profiles[t.user_id]?.email)) ||
+    t.guest_name || t.guest_email || "User";
 
   const filtered = useMemo(() =>
     threads
@@ -75,12 +84,16 @@ export default function SupportInboxPage() {
             ) : filtered.length === 0 ? (
               <div className="p-10 text-center"><Inbox className="w-8 h-8 mx-auto text-muted-foreground/40 mb-2" /><p className="text-xs text-muted-foreground">No conversations</p></div>
             ) : filtered.map((t) => {
-              const p = profiles[t.user_id];
               return (
                 <button key={t.id} onClick={() => setActiveId(t.id)}
                   className={cn("w-full text-left p-3 hover:bg-muted/40 transition-colors", activeId === t.id && "bg-muted/60")}>
                   <div className="flex items-center gap-2">
-                    <span className="font-medium text-sm truncate flex-1">{p?.full_name || p?.email || "User"}</span>
+                    <span className="font-medium text-sm truncate flex-1">{nameFor(t)}</span>
+                    {t.channel && t.channel !== "app" && (
+                      <span className="text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded-full bg-violet-500/15 text-violet-600 shrink-0">
+                        {t.channel === "contact" ? "Guest" : t.channel}
+                      </span>
+                    )}
                     {t.priority === "urgent" && <AlertTriangle className="w-3.5 h-3.5 text-red-500 shrink-0" />}
                     {t.unread_for_staff && <span className="w-2 h-2 rounded-full bg-primary shrink-0" />}
                   </div>
@@ -101,7 +114,7 @@ export default function SupportInboxPage() {
 
         {/* Conversation */}
         <div className="rounded-2xl border border-border overflow-hidden">
-          {active ? <Conversation key={active.id} thread={active} customerName={profiles[active.user_id]?.full_name || profiles[active.user_id]?.email || "User"} />
+          {active ? <Conversation key={active.id} thread={active} customerName={nameFor(active)} />
             : <div className="h-full flex items-center justify-center text-sm text-muted-foreground">Select a conversation</div>}
         </div>
       </div>
@@ -137,7 +150,12 @@ function Conversation({ thread, customerName }: { thread: SupportThread; custome
       <div className="flex items-center gap-3 p-3 border-b border-border">
         <div className="min-w-0 flex-1">
           <div className="font-semibold text-sm truncate">{customerName}</div>
-          <div className="text-xs text-muted-foreground truncate">{thread.subject}</div>
+          <div className="text-xs text-muted-foreground truncate">
+            {thread.subject}
+            {thread.guest_email && !thread.user_id && (
+              <span className="ml-1.5 text-violet-600">· replies emailed to {thread.guest_email}</span>
+            )}
+          </div>
         </div>
         <Button size="sm" variant="outline" className="gap-1.5 h-8"
           onClick={() => update.mutate({ id: thread.id, patch: { assigned_to: user?.id ?? null } })}

@@ -29,9 +29,14 @@ export async function getAttachmentUrl(path: string): Promise<string | null> {
   return data?.signedUrl ?? null;
 }
 
+export type SupportChannel = "app" | "contact" | "chat";
+
 export interface SupportThread {
   id: string;
-  user_id: string;
+  user_id: string | null;
+  guest_name?: string | null;
+  guest_email?: string | null;
+  channel?: SupportChannel;
   subject: string;
   status: ThreadStatus;
   priority?: "low" | "normal" | "high" | "urgent";
@@ -48,7 +53,7 @@ export interface SupportMessage {
   id: string;
   thread_id: string;
   sender_role: "user" | "staff";
-  sender_id: string;
+  sender_id: string | null;
   body: string;
   attachments: Attachment[];
   created_at: string;
@@ -170,6 +175,23 @@ export const useSendMessage = () => {
             sender_name: (profile as any)?.full_name || (profile as any)?.email || "A customer",
           },
         }).catch(() => { /* non-blocking */ });
+      } else {
+        // Staff replied. A guest thread (no account) has no in-app bell, so
+        // email the reply back to the customer to close the loop.
+        const { data } = await db.from("support_threads")
+          .select("subject, guest_email, guest_name, user_id").eq("id", threadId).single();
+        const thread = data as Pick<SupportThread, "subject" | "guest_email" | "guest_name" | "user_id"> | null;
+        if (thread?.guest_email && !thread.user_id) {
+          supabase.functions.invoke("notify-guest-reply", {
+            body: {
+              thread_id: threadId,
+              guest_email: thread.guest_email,
+              guest_name: thread.guest_name,
+              subject: thread.subject || "your support request",
+              preview: body.slice(0, 1000),
+            },
+          }).catch(() => { /* non-blocking */ });
+        }
       }
     },
     onSuccess: (_d, v) => {
