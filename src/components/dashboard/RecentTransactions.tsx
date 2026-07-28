@@ -8,12 +8,9 @@ import { useProfile } from "@/hooks/useProfile";
 import { useStatement } from "@/hooks/useStatement";
 import { StatementActions } from "@/components/statement/StatementActions";
 import { StatementTable } from "@/components/statement/StatementTable";
-import { currencySymbol } from "@/lib/currency";
+import { StatementBalanceCards } from "@/components/statement/StatementBalanceCards";
 
 const DASHBOARD_LIMIT = 8;
-
-const fmt = (n: number) =>
-  n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const DASHBOARD_STATEMENT_LIMIT = 100;
 
@@ -51,11 +48,6 @@ const RecentTransactions = () => {
   for (const c of new Set([...Object.keys(totalsIn), ...Object.keys(totalsOut)])) {
     netByCurrency[c] = (totalsIn[c] || 0) - (totalsOut[c] || 0);
   }
-  const renderTotals = (totals: Record<string, number>, sign: "+" | "-" | "") => {
-    const entries = Object.entries(totals).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
-    if (entries.length === 0) return `${sign}${fmt(0)}`;
-    return entries.map(([c, v]) => `${sign}${currencySymbol(c) || ""}${fmt(Math.abs(v))} ${c}`).join("  ·  ");
-  };
 
   const visible = rows.slice(0, DASHBOARD_LIMIT);
   const hasItems = rows.length > 0;
@@ -97,25 +89,13 @@ const RecentTransactions = () => {
 
       {/* Balance Money In / Out / Net tiles */}
       {hasItems && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-4">
-          <div className="rounded-xl border border-border bg-indigo-500/[0.04] px-3 py-2.5">
-            <div className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">Total Money In</div>
-            <div className="text-base font-display font-bold text-primary tabular-nums break-words leading-tight">
-              {renderTotals(totalsIn, "+")}
-            </div>
-          </div>
-          <div className="rounded-xl border border-border bg-rose-500/[0.04] px-3 py-2.5">
-            <div className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">Total Money Out</div>
-            <div className="text-base font-display font-bold text-destructive tabular-nums break-words leading-tight">
-              {renderTotals(totalsOut, "-")}
-            </div>
-          </div>
-          <div className="rounded-xl border border-border bg-primary/[0.06] px-3 py-2.5">
-            <div className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">Net Balance</div>
-            <div className="text-base font-display font-bold text-foreground tabular-nums break-words leading-tight">
-              {renderTotals(netByCurrency, "")}
-            </div>
-          </div>
+        <div className="mb-4">
+          <StatementBalanceCards
+            totalsIn={totalsIn}
+            totalsOut={totalsOut}
+            netByCurrency={netByCurrency}
+            variant="compact"
+          />
         </div>
       )}
 

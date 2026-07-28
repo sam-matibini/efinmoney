@@ -11,13 +11,9 @@ import { useProfile } from "@/hooks/useProfile";
 import { useStatement } from "@/hooks/useStatement";
 import { StatementTable } from "@/components/statement/StatementTable";
 import { StatementActions } from "@/components/statement/StatementActions";
-import { currencySymbol } from "@/lib/currency";
-import PageHeroBanner from "@/components/common/PageHeroBanner";
+import { StatementBalanceCards } from "@/components/statement/StatementBalanceCards";
+import { StatementNetHero } from "@/components/statement/StatementNetHero";
 import AppPage from "@/components/layout/AppPage";
-import { ArrowDownLeft, ArrowUpRight, FileText } from "lucide-react";
-
-const fmt = (n: number) =>
-  n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const TransfersListPage = () => {
   const { user } = useAuth();
@@ -59,11 +55,6 @@ const TransfersListPage = () => {
     for (const c of all) out[c] = (totalsIn[c] || 0) - (totalsOut[c] || 0);
     return out;
   }, [totalsIn, totalsOut]);
-  const renderTotals = (totals: Record<string, number>, sign: "+" | "-" | "") => {
-    const entries = Object.entries(totals).sort((a, b) => b[1] - a[1]);
-    if (entries.length === 0) return `${sign}${fmt(0)}`;
-    return entries.map(([c, v]) => `${sign}${currencySymbol(c)}${fmt(Math.abs(v))} ${c}`).join("  ·  ");
-  };
 
   const accountHolder = profile?.full_name || profile?.email || user?.email || "Account holder";
 
@@ -93,39 +84,19 @@ const TransfersListPage = () => {
           <StatementActions rows={rows} meta={meta} defaultEmail={user?.email || ""} />
         </motion.div>
 
-        <PageHeroBanner
-          icon={FileText}
-          label="Net balance across wallets"
-          value={renderTotals(netByCurrency, "")}
-          meta={[
-            { icon: ArrowDownLeft, text: `In: ${renderTotals(totalsIn, "+")}` },
-            { icon: ArrowUpRight, text: `Out: ${renderTotals(totalsOut, "-")}` },
-            { icon: FileText, text: `${totalCount} transaction${totalCount === 1 ? "" : "s"} on record` },
-          ]}
-          variant="accent"
+        <StatementNetHero
+          netByCurrency={netByCurrency}
+          totalsIn={totalsIn}
+          totalsOut={totalsOut}
+          totalCount={totalCount}
         />
 
-        {/* Balance Totals (across the whole statement) */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div className="rounded-xl border border-border bg-indigo-500/[0.04] p-4">
-            <div className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">Total Money In</div>
-            <div className="text-xl sm:text-2xl font-display font-bold text-primary tabular-nums break-words leading-tight">
-              {renderTotals(totalsIn, "+")}
-            </div>
-          </div>
-          <div className="rounded-xl border border-border bg-rose-500/[0.04] p-4">
-            <div className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">Total Money Out</div>
-            <div className="text-xl sm:text-2xl font-display font-bold text-destructive tabular-nums break-words leading-tight">
-              {renderTotals(totalsOut, "-")}
-            </div>
-          </div>
-          <div className="rounded-xl border border-border bg-primary/[0.06] p-4">
-            <div className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">Net Balance</div>
-            <div className="text-xl sm:text-2xl font-display font-bold text-foreground tabular-nums break-words leading-tight">
-              {renderTotals(netByCurrency, "")}
-            </div>
-          </div>
-        </div>
+        <StatementBalanceCards
+          totalsIn={totalsIn}
+          totalsOut={totalsOut}
+          netByCurrency={netByCurrency}
+          variant="full"
+        />
 
         <Card>
           <CardHeader className="space-y-3">
