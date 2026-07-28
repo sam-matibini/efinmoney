@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
@@ -22,6 +22,12 @@ const Identity = () => {
   const [searchParams] = useSearchParams();
   const autoStartPersona = searchParams.get("autostart") === "persona";
 
+  // Completion can be signalled more than once (overlapping status polls, a
+  // resumed popup). Finalize exactly once, and pin every finalize toast to one
+  // id so any stray duplicate replaces it instead of stacking on the dashboard.
+  const finalizingRef = useRef(false);
+  const FINALIZE_TOAST_ID = "kyc-finalize";
+
   // Ensure a KYC row exists so subsequent webhook updates attach correctly
   useEffect(() => {
     if (!user) return;
@@ -44,7 +50,10 @@ const Identity = () => {
   }, [isVerified, hasPassedCoreChecks, navigate]);
 
   const onPersonaComplete = async (info?: { inquiryId?: string; status?: string }) => {
-    const toastId = toast.loading("Finalizing verification…");
+    // Guard against duplicate completion signals — finalize just once.
+    if (finalizingRef.current) return;
+    finalizingRef.current = true;
+    toast.loading("Finalizing verification…", { id: FINALIZE_TOAST_ID });
 
     try {
       // Trust our own flow: as soon as Persona's SDK fires onComplete
@@ -62,11 +71,12 @@ const Identity = () => {
         ]);
       }
       await refetch();
-      toast.success("You're verified — welcome!", { id: toastId });
+      toast.success("You're verified — welcome!", { id: FINALIZE_TOAST_ID });
       navigate("/dashboard", { replace: true });
     } catch (e) {
       console.error("Auto-approve failed", e);
-      toast.error("Couldn't finalize verification. Please try again.", { id: toastId });
+      finalizingRef.current = false; // allow a retry
+      toast.error("Couldn't finalize verification. Please try again.", { id: FINALIZE_TOAST_ID });
     }
   };
 

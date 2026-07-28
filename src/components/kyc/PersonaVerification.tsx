@@ -39,7 +39,8 @@ export const PersonaVerification = ({ userId, onComplete, onError, className, la
       completedRef.current = true;
       stopPolling();
       setLoading(false);
-      toast.success("Identity check submitted");
+      // No toast here — the completion handler owns the single "Finalizing… →
+      // verified" toast so nothing stacks on the dashboard.
       onComplete?.({ inquiryId, status });
     },
     [onComplete, stopPolling],
