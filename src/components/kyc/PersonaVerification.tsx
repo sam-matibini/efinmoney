@@ -161,7 +161,7 @@ export const PersonaVerification = ({ userId, onComplete, onError, className, la
       }
       if (data?.alreadySubmitted) {
         setLoading(false);
-        toast.success("Verification already submitted");
+        // Silent — completion is confirmed by the bell notification, not a toast.
         onComplete?.({ inquiryId: data.inquiryId, status: data.status || "completed" });
         return;
       }
@@ -204,7 +204,7 @@ export const PersonaVerification = ({ userId, onComplete, onError, className, la
         },
         onComplete: ({ inquiryId, status }: { inquiryId: string; status: string }) => {
           console.log("[Persona] onComplete", { inquiryId, status });
-          toast.success("Identity check submitted");
+          // Silent — completion is confirmed by the bell notification, not a toast.
           onComplete?.({ inquiryId, status });
         },
         onCancel: (payload?: unknown) => {

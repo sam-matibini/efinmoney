@@ -23,8 +23,9 @@ const Identity = () => {
   const autoStartPersona = searchParams.get("autostart") === "persona";
 
   // Completion can be signalled more than once (overlapping status polls, a
-  // resumed popup). Finalize exactly once, and pin every finalize toast to one
-  // id so any stray duplicate replaces it instead of stacking on the dashboard.
+  // resumed popup). Finalize exactly once. Success is silent — the bell gets a
+  // one-time "You're verified" notification from the DB trigger. Only failures
+  // toast, pinned to a fixed id so a stray duplicate replaces instead of stacks.
   const finalizingRef = useRef(false);
   const FINALIZE_TOAST_ID = "kyc-finalize";
 
@@ -53,7 +54,6 @@ const Identity = () => {
     // Guard against duplicate completion signals — finalize just once.
     if (finalizingRef.current) return;
     finalizingRef.current = true;
-    toast.loading("Finalizing verification…", { id: FINALIZE_TOAST_ID });
 
     try {
       // Trust our own flow: as soon as Persona's SDK fires onComplete
@@ -71,7 +71,8 @@ const Identity = () => {
         ]);
       }
       await refetch();
-      toast.success("You're verified — welcome!", { id: FINALIZE_TOAST_ID });
+      // Silent success — the "You're verified" bell notification (created by the
+      // DB trigger on approval) is the only confirmation. No toast.
       navigate("/dashboard", { replace: true });
     } catch (e) {
       console.error("Auto-approve failed", e);
