@@ -19,20 +19,53 @@ import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
 import AdminLayout from "@/components/admin-portal/AdminLayout";
 
-type IntegrationKey = "flutterwave" | "stripe" | "paysafe" | "plaid" | "persona" | "mpesa";
+type IntegrationKey = string;
+
+const INTEGRATION_CATEGORIES = [
+  "Payments — Africa",
+  "Payments — Global & Cards",
+  "Banking",
+  "Crypto & Stablecoin",
+  "KYC & Compliance",
+  "Messaging",
+] as const;
 
 const INTEGRATIONS: Array<{
   key: IntegrationKey;
   name: string;
   description: string;
+  category: (typeof INTEGRATION_CATEGORIES)[number];
   envHints: string[];
 }> = [
-  { key: "flutterwave", name: "Flutterwave", description: "African payouts, top-ups & bills", envHints: ["FLW_SECRET_KEY", "FLW_PUBLIC_KEY"] },
-  { key: "stripe", name: "Stripe", description: "Card charges & Visa Direct payouts", envHints: ["STRIPE_SECRET_KEY"] },
-  { key: "paysafe", name: "Paysafe", description: "Canadian Interac & EFT payouts", envHints: ["PAYSAFE_API_KEY"] },
-  { key: "plaid", name: "Plaid", description: "Bank account linking & balances", envHints: ["PLAID_CLIENT_ID", "PLAID_SECRET"] },
-  { key: "persona", name: "Persona", description: "KYC & ID verification", envHints: ["PERSONA_API_KEY"] },
-  { key: "mpesa", name: "M-Pesa", description: "Mobile money (Kenya)", envHints: ["MPESA_CONSUMER_KEY"] },
+  // Payments — Africa
+  { key: "nomba", name: "Nomba", description: "Nigeria NGN bank & card payouts, FX, collection", category: "Payments — Africa", envHints: ["NOMBA_PAY_API_URL", "NOMBA_PAY_USER"] },
+  { key: "ghana", name: "Ghana Pay", description: "Ghana GHS collection & mobile-money payouts", category: "Payments — Africa", envHints: ["GHANA_PAY_API_URL", "GHANA_PAY_USER"] },
+  { key: "fincra", name: "Fincra", description: "Africa collect + NGN/GHS/KES payouts & CAD Interac", category: "Payments — Africa", envHints: ["FINCRA_SECRET_KEY", "FINCRA_BUSINESS_ID"] },
+  { key: "flutterwave", name: "Flutterwave", description: "African payouts, top-ups & bills (TZS primary)", category: "Payments — Africa", envHints: ["FLW_SECRET_KEY", "FLW_PUBLIC_KEY"] },
+  { key: "swychr", name: "Swychr", description: "International pay-in/out, virtual cards & airtime", category: "Payments — Africa", envHints: ["SWYCHR_EMAIL", "SWYCHR_PASSWORD"] },
+  { key: "elicate", name: "Elicate Pay", description: "Zambia MoMo (ZMW) top-up, send & payment links", category: "Payments — Africa", envHints: ["ELICATE_SECRET_KEY", "ELICATE_PUBLIC_KEY"] },
+  { key: "paytota", name: "Paytota", description: "USD/EUR/GBP/CAD invoices + East Africa MoMo", category: "Payments — Africa", envHints: ["PAYTOTA_SECRET_KEY", "PAYTOTA_BASE_URL"] },
+  { key: "lenhub", name: "Lenhub Flutter", description: "Card collect + FX bank/MoMo payouts wrapper", category: "Payments — Africa", envHints: ["LENHUB_FLUTTER_API_KEY", "LENHUB_FLUTTER_USER_KEY"] },
+  { key: "mtn_momo", name: "MTN MoMo", description: "Pan-African MTN Mobile Money payouts", category: "Payments — Africa", envHints: ["MTN_MOMO_PRIMARY_KEY"] },
+  { key: "mpesa", name: "M-Pesa", description: "Safaricom mobile money (Kenya)", category: "Payments — Africa", envHints: ["MPESA_CONSUMER_KEY", "MPESA_CONSUMER_SECRET"] },
+  { key: "pawapay", name: "PawaPay", description: "Pan-African mobile money payouts", category: "Payments — Africa", envHints: ["PAWAPAY_API_TOKEN"] },
+  { key: "yellowcard", name: "Yellowcard", description: "Africa stablecoin on/off-ramp payouts", category: "Payments — Africa", envHints: ["YELLOWCARD_API_KEY", "YELLOWCARD_SECRET"] },
+  // Payments — Global & Cards
+  { key: "stripe", name: "Stripe", description: "Card charges, Connect, Issuing & Treasury", category: "Payments — Global & Cards", envHints: ["STRIPE_SECRET_KEY"] },
+  { key: "adyen", name: "Adyen", description: "Global card drop-in & payment links", category: "Payments — Global & Cards", envHints: ["ADYEN_API_KEY", "ADYEN_MERCHANT_ACCOUNT"] },
+  { key: "paysafe", name: "Paysafe", description: "Canadian Interac & EFT payouts", category: "Payments — Global & Cards", envHints: ["PAYSAFE_API_KEY"] },
+  // Banking
+  { key: "plaid", name: "Plaid", description: "Bank account linking & balances (Canada domestic)", category: "Banking", envHints: ["PLAID_CLIENT_ID", "PLAID_SECRET"] },
+  { key: "interac", name: "Interac", description: "Canada domestic e-Transfer / EFT rail", category: "Banking", envHints: ["INTERAC_CLIENT_ID", "INTERAC_PRIVATE_JWK"] },
+  // Crypto & Stablecoin
+  { key: "circle", name: "Circle", description: "USDC corridor & CPN stablecoin payouts", category: "Crypto & Stablecoin", envHints: ["CIRCLE_API_KEY"] },
+  { key: "crossmint", name: "Crossmint", description: "Crypto order execution", category: "Crypto & Stablecoin", envHints: ["CROSSMINT_API_KEY"] },
+  { key: "stellar", name: "Stellar", description: "SEP-31 anchor payouts & XLM/USDC wallets", category: "Crypto & Stablecoin", envHints: ["STELLAR_TREASURY_SEED"] },
+  // KYC & Compliance
+  { key: "persona", name: "Persona", description: "KYC & ID verification", category: "KYC & Compliance", envHints: ["PERSONA_API_KEY"] },
+  { key: "sumsub", name: "Sumsub", description: "Enhanced due diligence — ID + AML checks", category: "KYC & Compliance", envHints: ["SUMSUB_APP_TOKEN", "SUMSUB_SECRET_KEY"] },
+  // Messaging
+  { key: "resend", name: "Resend", description: "Transactional & broadcast email", category: "Messaging", envHints: ["RESEND_API_KEY"] },
 ];
 
 const EDGE_FUNCTIONS: Array<{ name: string; description: string; jwt: boolean; category: string }> = [
@@ -344,6 +377,8 @@ export default function ApiManagementPage() {
     return row?.is_enabled === true;
   };
 
+  const activeCount = INTEGRATIONS.filter((i) => isActiveInteg(i.key)).length;
+
   return (
     <AdminLayout>
     <div className="space-y-6 p-6">
@@ -354,8 +389,8 @@ export default function ApiManagementPage() {
             System & API Management
           </h1>
           <p className="text-muted-foreground mt-1">
-            Monitor integration health, inspect webhook traffic, and audit edge functions.
-            Flutterwave and Stripe probes below are legacy — not exposed in the user-facing app.
+            Every payment, banking, crypto, KYC and messaging provider in one place — toggle
+            each on or off, test its connection, and see at a glance which are active.
           </p>
         </div>
       </div>
@@ -389,18 +424,32 @@ export default function ApiManagementPage() {
 
         {/* Integrations */}
         <TabsContent value="integrations" className="mt-6">
-          <div className="flex justify-end mb-4">
+          <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">
+            <div className="flex items-center gap-2 text-sm">
+              <Badge className="bg-indigo-500/15 text-indigo-500 border-indigo-500/30 gap-1">
+                <CheckCircle2 className="h-3 w-3" /> {activeCount} active
+              </Badge>
+              <span className="text-muted-foreground">of {INTEGRATIONS.length} providers</span>
+            </div>
             <Button variant="outline" size="sm" onClick={() => refetchIntegrations()} disabled={loadingIntegrations}>
               <RefreshCw className={`h-4 w-4 mr-2 ${loadingIntegrations ? "animate-spin" : ""}`} />
               Refresh
             </Button>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {INTEGRATIONS.map((integ) => {
-              const status = integrationStatus(integ.key);
-              const enabled = isActiveInteg(integ.key);
-              const isPlaid = integ.key === "plaid";
-              return (
+          {INTEGRATION_CATEGORIES.map((category) => {
+            const items = INTEGRATIONS.filter((i) => i.category === category);
+            if (items.length === 0) return null;
+            return (
+              <div key={category} className="mb-8">
+                <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+                  {category}
+                </h2>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {items.map((integ) => {
+                    const status = integrationStatus(integ.key);
+                    const enabled = isActiveInteg(integ.key);
+                    const isPlaid = integ.key === "plaid";
+                    return (
                 <Card key={integ.key} className={cn(
                   "hover:border-primary/40 transition-colors",
                   enabled && "border-indigo-500/30 bg-indigo-500/[0.03]",
@@ -469,9 +518,12 @@ export default function ApiManagementPage() {
                     )}
                   </CardContent>
                 </Card>
-              );
-            })}
-          </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
         </TabsContent>
 
         {/* Webhook logs */}
