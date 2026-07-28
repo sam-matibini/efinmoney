@@ -1,12 +1,16 @@
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { ArrowRight, Upload, Check, Trash2, Clock, X } from "lucide-react";
+import { ArrowRight, Upload, Check, Trash2, Clock, X, Camera } from "lucide-react";
 import KybShell from "@/components/kyb/KybShell";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import SelfieCaptureModal from "@/components/kyc/SelfieCaptureModal";
 import { useKyb, BusinessDocument, KybDocumentRequirement } from "@/hooks/useKyb";
+
+// Owner requirement captured via camera rather than file upload.
+const SELFIE_DOC_TYPE = "owner_selfie";
 
 const StatusBadge = ({ status }: { status: BusinessDocument["status"] }) => {
   if (status === "approved")
@@ -43,6 +47,10 @@ const Documents = () => {
   } = useKyb();
 
   const [uploadingKey, setUploadingKey] = useState<string | null>(null);
+  const [selfieCtx, setSelfieCtx] = useState<{
+    req: KybDocumentRequirement;
+    ownerId?: string;
+  } | null>(null);
   const inputs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const businessReqs = requirements.filter((r) => r.applies_to === "business");
@@ -73,6 +81,20 @@ const Documents = () => {
       setUploadingKey(null);
       const el = inputs.current[key];
       if (el) el.value = "";
+    }
+  };
+
+  const captureSelfie = async (blob: Blob) => {
+    if (!selfieCtx) return;
+    const { req, ownerId } = selfieCtx;
+    const key = slotKey(req.document_type, ownerId);
+    setUploadingKey(key);
+    try {
+      const file = new File([blob], "selfie.jpg", { type: "image/jpeg" });
+      await uploadDocument.mutateAsync({ file, documentType: req.document_type, ownerId });
+      toast.success(`${req.label} captured.`);
+    } finally {
+      setUploadingKey(null);
     }
   };
 
@@ -139,22 +161,44 @@ const Documents = () => {
           </div>
         ))}
 
-        <input
-          ref={(el) => (inputs.current[key] = el)}
-          type="file"
-          className="hidden"
-          accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.doc,.docx"
-          onChange={(e) => pick(req, e.target.files?.[0], ownerId)}
-        />
-        <Button
-          variant="outline"
-          className="w-full"
-          disabled={uploadingKey === key}
-          onClick={() => inputs.current[key]?.click()}
-        >
-          <Upload className="w-4 h-4 mr-2" />
-          {uploadingKey === key ? "Uploading..." : uploaded.length ? "Upload another" : "Upload"}
-        </Button>
+        {req.document_type === SELFIE_DOC_TYPE ? (
+          <Button
+            variant="outline"
+            className="w-full"
+            disabled={uploadingKey === key}
+            onClick={() => setSelfieCtx({ req, ownerId })}
+          >
+            <Camera className="w-4 h-4 mr-2" />
+            {uploadingKey === key
+              ? "Saving..."
+              : uploaded.length
+                ? "Retake selfie"
+                : "Take selfie"}
+          </Button>
+        ) : (
+          <>
+            <input
+              ref={(el) => (inputs.current[key] = el)}
+              type="file"
+              className="hidden"
+              accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.doc,.docx"
+              onChange={(e) => pick(req, e.target.files?.[0], ownerId)}
+            />
+            <Button
+              variant="outline"
+              className="w-full"
+              disabled={uploadingKey === key}
+              onClick={() => inputs.current[key]?.click()}
+            >
+              <Upload className="w-4 h-4 mr-2" />
+              {uploadingKey === key
+                ? "Uploading..."
+                : uploaded.length
+                  ? "Upload another"
+                  : "Upload"}
+            </Button>
+          </>
+        )}
       </Card>
     );
   };
@@ -193,6 +237,14 @@ const Documents = () => {
         Continue to review
         <ArrowRight className="w-4 h-4 ml-2" />
       </Button>
+
+      <SelfieCaptureModal
+        open={!!selfieCtx}
+        onOpenChange={(o) => {
+          if (!o) setSelfieCtx(null);
+        }}
+        onCapture={captureSelfie}
+      />
     </KybShell>
   );
 };
