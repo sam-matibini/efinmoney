@@ -27,6 +27,9 @@ const Auth = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [signedUpEmail, setSignedUpEmail] = useState<string | null>(null);
   const [resending, setResending] = useState(false);
+  const [showForgot, setShowForgot] = useState(false);
+  const [resetSentTo, setResetSentTo] = useState<string | null>(null);
+  const [sendingReset, setSendingReset] = useState(false);
   const { signIn, signUp } = useAuth();
   const navigate = useNavigate();
 
@@ -74,6 +77,26 @@ const Auth = () => {
     }
   };
 
+  const handleSendReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) {
+      toast.error("Enter your email address first.");
+      return;
+    }
+    setSendingReset(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        // Lands on /auth/confirm, which verifies the link and forwards to
+        // /auth/reset-password to set the new password.
+        redirectTo: `${window.location.origin}/auth/confirm?type=recovery`,
+      });
+      if (error) toast.error(error.message);
+      else setResetSentTo(email);
+    } finally {
+      setSendingReset(false);
+    }
+  };
+
   const handleResend = async () => {
     if (!signedUpEmail) return;
     setResending(true);
@@ -104,7 +127,86 @@ const Auth = () => {
         </div>
       </header>
 
-      {signedUpEmail ? (
+      {resetSentTo ? (
+        <main className="flex-1 flex items-center justify-center px-6 py-12">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="w-full max-w-md text-center"
+          >
+            <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+              <MailCheck className="h-8 w-8 text-primary" />
+            </div>
+            <h1 className="text-3xl md:text-4xl font-black tracking-tight text-neutral-900">Check your inbox</h1>
+            <p className="mt-3 text-neutral-600">
+              If an account exists for <strong className="text-neutral-900">{resetSentTo}</strong>, we've sent a
+              password reset link. Click it to choose a new password.
+            </p>
+            <button
+              onClick={handleSendReset}
+              disabled={sendingReset}
+              className="mt-8 w-full h-12 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold disabled:opacity-50 inline-flex items-center justify-center gap-2 transition-all shadow-lg shadow-primary/20"
+            >
+              {sendingReset ? <LoadingSpinner size={20} /> : "Resend reset link"}
+            </button>
+            <p className="mt-6 text-center text-neutral-600">
+              Remembered it?
+              <button
+                onClick={() => { setResetSentTo(null); setShowForgot(false); setIsSignUp(false); }}
+                className="ml-2 text-primary hover:text-primary/80 font-bold"
+              >
+                Back to sign in
+              </button>
+            </p>
+          </motion.div>
+        </main>
+      ) : showForgot ? (
+        <main className="flex-1 flex items-center justify-center px-6 py-12">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="w-full max-w-md"
+          >
+            <div className="text-center mb-10">
+              <h1 className="text-4xl md:text-5xl font-black tracking-tight text-neutral-900">Reset your password</h1>
+              <p className="mt-3 text-neutral-600">
+                Enter your email and we'll send you a link to set a new password.
+              </p>
+            </div>
+            <form onSubmit={handleSendReset} className="space-y-5">
+              <div className="space-y-2">
+                <Label htmlFor="reset-email" className="text-neutral-700 font-medium">Email</Label>
+                <Input
+                  id="reset-email"
+                  type="email"
+                  placeholder="you@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="h-12 bg-white border-neutral-200 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
+                  required
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={sendingReset}
+                className="w-full h-12 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2 transition-all hover:-translate-y-0.5 shadow-lg shadow-primary/20"
+              >
+                {sendingReset ? <LoadingSpinner size={20} /> : (<>Send reset link <ArrowRight className="w-5 h-5" /></>)}
+              </button>
+            </form>
+            <p className="mt-8 text-center text-neutral-600">
+              <button
+                onClick={() => { setShowForgot(false); setIsSignUp(false); }}
+                className="inline-flex items-center gap-1 text-primary hover:text-primary/80 font-bold"
+              >
+                <ArrowLeft className="w-4 h-4" /> Back to sign in
+              </button>
+            </p>
+          </motion.div>
+        </main>
+      ) : signedUpEmail ? (
         <main className="flex-1 flex items-center justify-center px-6 py-12">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -255,7 +357,18 @@ const Auth = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password" className="text-neutral-700 font-medium">Password</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password" className="text-neutral-700 font-medium">Password</Label>
+                {!isSignUp && (
+                  <button
+                    type="button"
+                    onClick={() => setShowForgot(true)}
+                    className="text-sm font-medium text-primary hover:text-primary/80"
+                  >
+                    Forgot password?
+                  </button>
+                )}
+              </div>
               <div className="relative">
                 <Input
                   id="password"
