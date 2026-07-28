@@ -105,7 +105,7 @@ const AdminLayout = ({ children }: { children: ReactNode }) => {
 
   // Realtime: KYC submissions
   useEffect(() => {
-    if (!admin) return;
+    if (!admin?.id) return;
     const ch = supabase
       .channel("admin-kyc-realtime")
       .on(
@@ -134,7 +134,7 @@ const AdminLayout = ({ children }: { children: ReactNode }) => {
     return () => {
       supabase.removeChannel(ch);
     };
-  }, [admin, queryClient, navigate]);
+  }, [admin?.id, queryClient, navigate]);
 
   const handleSignOut = async () => {
     await signOut();
