@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Send, Loader2, Headphones, UserCheck, Inbox, AlertTriangle } from "lucide-react";
+import { Send, Loader2, Headphones, UserCheck, Inbox, AlertTriangle, Trash2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,9 +7,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
+import { useAdminAuth } from "@/contexts/AdminAuthContext";
 import {
   useSupportThreads, useThreadMessages, useSendMessage, useUpdateThread, useProfilesByIds,
-  type SupportThread, type ThreadStatus,
+  useDeleteThreads, type SupportThread, type ThreadStatus,
 } from "@/hooks/useSupport";
 import AttachmentItem from "@/components/support/AttachmentItem";
 
@@ -114,7 +115,7 @@ export default function SupportInboxPage() {
 
         {/* Conversation */}
         <div className="rounded-2xl border border-border overflow-hidden">
-          {active ? <Conversation key={active.id} thread={active} customerName={nameFor(active)} />
+          {active ? <Conversation key={active.id} thread={active} customerName={nameFor(active)} onDeleted={() => setActiveId(null)} />
             : <div className="h-full flex items-center justify-center text-sm text-muted-foreground">Select a conversation</div>}
         </div>
       </div>
@@ -122,13 +123,30 @@ export default function SupportInboxPage() {
   );
 }
 
-function Conversation({ thread, customerName }: { thread: SupportThread; customerName: string }) {
+function Conversation({ thread, customerName, onDeleted }: { thread: SupportThread; customerName: string; onDeleted: () => void }) {
   const { user } = useAuth();
+  const { admin } = useAdminAuth();
   const { data: messages = [] } = useThreadMessages(thread.id);
   const send = useSendMessage();
   const update = useUpdateThread();
+  const del = useDeleteThreads();
   const [text, setText] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  // Hard-delete is destructive and irreversible, so it's limited to super admins;
+  // everyone else uses "Closed" to shelve a ticket while keeping the record.
+  const canDelete = admin?.role === "super_admin";
+
+  const remove = async () => {
+    if (!window.confirm("Delete this conversation permanently? This cannot be undone.")) return;
+    try {
+      await del.mutateAsync([thread.id]);
+      toast.success("Conversation deleted");
+      onDeleted();
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  };
 
   useEffect(() => {
     if (thread.unread_for_staff) update.mutate({ id: thread.id, patch: { unread_for_staff: false } });
@@ -194,6 +212,19 @@ function Conversation({ thread, customerName }: { thread: SupportThread; custome
             <SelectItem value="closed">Closed</SelectItem>
           </SelectContent>
         </Select>
+        {canDelete && (
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10 shrink-0"
+            disabled={del.isPending}
+            aria-label="Delete conversation"
+            title="Delete conversation"
+            onClick={remove}
+          >
+            {del.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+          </Button>
+        )}
       </div>
 
       {/* messages */}
