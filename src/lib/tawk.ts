@@ -9,9 +9,35 @@ const TAWK_SRC = "https://embed.tawk.to/6a6609b9846c4d1d49b067ed/1juf9c01a";
 
 let loaded = false;
 
+// Tawk flips the browser tab title to "N new message" (and blinks it) whenever
+// a broadcast/triggered agent message arrives — even though our widget is
+// hidden, so the user has no conversation to read. Block just that title
+// mutation while letting the app's own document.title changes pass through.
+function blockTawkTitleNotifications() {
+  try {
+    const desc = Object.getOwnPropertyDescriptor(Document.prototype, "title");
+    if (!desc?.get || !desc.set) return;
+    const { get, set } = desc;
+    Object.defineProperty(document, "title", {
+      configurable: true,
+      get() {
+        return get.call(document);
+      },
+      set(value: string) {
+        if (/\bnew messages?\b/i.test(String(value))) return;
+        set.call(document, value);
+      },
+    });
+  } catch {
+    /* ignore */
+  }
+}
+
 export function loadTawk() {
   if (loaded || typeof window === "undefined") return;
   loaded = true;
+
+  blockTawkTitleNotifications();
 
   const w = window as typeof window & {
     Tawk_API?: Record<string, unknown>;
