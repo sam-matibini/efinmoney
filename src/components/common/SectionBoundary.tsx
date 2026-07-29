@@ -18,7 +18,7 @@ const DefaultFallback = ({ onReset }: { onReset: () => void }) => (
   </div>
 );
 
-export const SectionBoundary = ({ name, children, fallback }: Props) => (
+const SectionBoundary = ({ name, children, fallback }: Props) => (
   <ErrorBoundary
     fallback={({ resetErrorBoundary }) =>
       fallback ?? (
@@ -32,3 +32,6 @@ export const SectionBoundary = ({ name, children, fallback }: Props) => (
     {children}
   </ErrorBoundary>
 );
+
+export default SectionBoundary;
+export { SectionBoundary };
