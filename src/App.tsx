@@ -17,6 +17,9 @@ import { AdminAuthProvider } from "@/contexts/AdminAuthContext";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import SplashScreen from "@/components/SplashScreen";
 import GatedPage from "@/components/common/GatedPage";
+import { Button } from "@/components/ui/button";
+import { AlertCircle, RefreshCw } from "lucide-react";
+import { toast } from "sonner";
 
 // Core nav pages — eager so tab switches never wait on chunks
 import Index from "./pages/Index";
@@ -173,10 +176,29 @@ const RoleProtectedRoute = ({
 }) => {
   const { user, loading } = useAuth();
   const { isBootstrapped } = useAppSession();
-  const { isAdmin, isFinance, isCompliance, isLoading: rolesLoading } = useUserRoles();
+  const { isAdmin, isFinance, isCompliance, isLoading: rolesLoading, isError, refetch } = useUserRoles();
+  useEffect(() => {
+    if (isError) toast.error("Could not verify your access. Please try again.", { id: "role-fetch-error" });
+  }, [isError]);
   if (loading && !user) return <FullPageSpinner />;
   if (!user) return <Navigate to="/auth" replace />;
   if (rolesLoading && !isBootstrapped) return <FullPageSpinner />;
+  if (isError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-8">
+        <div className="flex flex-col items-center gap-4 text-center max-w-sm">
+          <AlertCircle className="h-10 w-10 text-destructive" />
+          <p className="text-sm text-muted-foreground">
+            Could not verify your account permissions. This may be a temporary network issue.
+          </p>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Try again
+          </Button>
+        </div>
+      </div>
+    );
+  }
   const roleMap = { admin: isAdmin, finance: isFinance, compliance: isCompliance };
   const hasAccess = allowedRoles.some((role) => roleMap[role]);
   if (!hasAccess) return <Navigate to="/" replace />;
