@@ -379,7 +379,7 @@ const SendPage = () => {
     setGhBankCode("");
     setGhAccountNumber("");
     setIntlLinkMode(false);
-  }, [targetCountryId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [targetCountryId, pendingBeneficiary]);
 
   const isNGNBank = targetCountry.code === "NGN";
   const isGhanaBank = targetCountry.code === "GHS" && ghPayoutMode === "bank";
@@ -718,11 +718,11 @@ const SendPage = () => {
       ? `${sourceSymbol}${fee.toFixed(2)} flat`
       : `${sourceSymbol}0.00 fee`;
 
-  const goToStep = (next: number) => {
+  const goToStep = useCallback((next: number) => {
     setDirection(next > step ? 1 : -1);
     setStep(next);
     if (next === 4) clearSendHandoff();
-  };
+  }, [step]);
 
   // For card payments we always charge in USD (or NGN for NGN wallets).
   const cardCurrency = cardChargeCurrency(sourceCurrency);
@@ -747,8 +747,7 @@ const SendPage = () => {
 
   const txRef = useMemo(
     () => (user ? `send-${user.id.slice(0, 8)}-${Date.now()}` : ""),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [step]
+    [step, user]
   );
 
   // Create transfer row + maybe save beneficiary. Returns id.
@@ -825,6 +824,8 @@ const SendPage = () => {
     return transfer.id;
   };
 
+  const createTransferRecordRef = useRef(createTransferRecord);
+  createTransferRecordRef.current = createTransferRecord;
 
   // Require the transaction PIN before any money actually moves.
   const requestConfirm = () => {
@@ -1216,7 +1217,7 @@ const SendPage = () => {
     navigate('/');
   };
 
-  const applyBeneficiary = (b: Beneficiary) => {
+  const applyBeneficiary = useCallback((b: Beneficiary) => {
     setRecipientName(b.name);
     setRecipientPhone(b.phone || "");
     setPickedBeneficiaryId(b.id);
@@ -1225,7 +1226,7 @@ const SendPage = () => {
       const c = findCountryByCode(b.country_code);
       if (c) setTargetCountryId(c.id);
     }
-  };
+  }, []);
 
   // Apply saved network / bank details for a picked beneficiary once the
   // destination country (and, for NGN, the banks list) is in place.
@@ -1271,7 +1272,7 @@ const SendPage = () => {
     }
 
     if (allApplied) setPendingBeneficiary(null);
-  }, [pendingBeneficiary, targetCountryId, ngnBanks, availableNetworks]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [pendingBeneficiary, targetCountryId, ngnBanks, availableNetworks]);
 
   useEffect(() => {
     const bid = searchParams.get("beneficiaryId");
@@ -1284,8 +1285,7 @@ const SendPage = () => {
         setSearchParams(searchParams, { replace: true });
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [beneficiaries]);
+  }, [beneficiaries, searchParams, goToStep, applyBeneficiary]);
 
   // Handoff from dashboard quick-send modal (sessionStorage + URL; survives Strict Mode remount)
   const handoffApplyingRef = useRef(false);
@@ -1363,11 +1363,11 @@ const SendPage = () => {
     setTimeout(() => {
       handoffApplyingRef.current = false;
     }, 200);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wallets, searchParams, beneficiaries]);
+  }, [wallets, searchParams, beneficiaries, goToStep]);
 
   // Resume card-funded send after collect (Nomba / Lenhub / Paytota / Swychr / Flutterwave)
   useEffect(() => {
+    const createTransferRecord = createTransferRecordRef.current;
     if (!wallets?.length || cardResumeLock.current) return;
 
     const intent = readCardSendIntent();
@@ -1641,8 +1641,7 @@ const SendPage = () => {
     };
 
     void finishPayout();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wallets, searchParams, lenhubResumeTick]);
+  }, [wallets, searchParams, lenhubResumeTick, goToStep]);
 
   const resetForm = () => {
     setDirection(-1);
