@@ -54,6 +54,7 @@ import HeroGlobe from "@/components/send/HeroGlobe";
 import FxTicker from "@/components/send/FxTicker";
 import LiveFxCalculator from "@/components/fx/LiveFxCalculator";
 import { parseAmount } from "@/components/fx/liveFxUtils";
+import SectionBoundary from "@/components/common/SectionBoundary";
 import { clearSendHandoff, readSendHandoff } from "@/lib/sendHandoff";
 import {
   clearCardSendIntent,
@@ -1827,7 +1828,7 @@ const SendPage = () => {
                   <X className="h-4 w-4" />
                 </Button>
               </div>
-              <LenhubFlutterTopUpCard
+              <SectionBoundary name="SendLenhubFlutterTopUp"><LenhubFlutterTopUpCard
                 walletId={selectedWallet.wallet_id}
                 walletCurrency={selectedWallet.currency_code}
                 fixedAmount={parsedAmount}
@@ -1840,7 +1841,7 @@ const SendPage = () => {
                   setShowLenhubCollect(false);
                   setLenhubResumeTick((t) => t + 1);
                 }}
-              />
+              /></SectionBoundary>
             </motion.div>
           </motion.div>
         )}
@@ -1962,7 +1963,7 @@ const SendPage = () => {
                     >
                       <TabsContent value="canada" forceMount className="mt-0">
                         {canadaLive ? (
-                          <CanadaSendFlow />
+                          <SectionBoundary name="CanadaSendFlow"><CanadaSendFlow /></SectionBoundary>
                         ) : null}
                       </TabsContent>
                     </motion.div>
@@ -1975,7 +1976,7 @@ const SendPage = () => {
                       transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
                     >
                       <TabsContent value="efinmoney" forceMount className="mt-0">
-                        <EfinmoneyP2PFlow />
+                        <SectionBoundary name="EfinmoneyP2PFlow"><EfinmoneyP2PFlow /></SectionBoundary>
                       </TabsContent>
                     </motion.div>
                   ) : (
@@ -1995,8 +1996,8 @@ const SendPage = () => {
                             transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
                             className="space-y-3"
                           >
-                            <HeroGlobe />
-                            <FxTicker />
+                            <SectionBoundary name="SendHeroGlobe"><HeroGlobe /></SectionBoundary>
+                            <SectionBoundary name="SendFxTicker"><FxTicker /></SectionBoundary>
                           </motion.div>
                         )}
 
@@ -2249,7 +2250,7 @@ const SendPage = () => {
                                     )}
 
                                     <motion.div custom={2} variants={fieldVariants} initial="hidden" animate="show" className="flex justify-center py-1">
-                                      <LiveFxCalculator
+                                      <SectionBoundary name="LiveFxCalculator"><LiveFxCalculator
                                         variant="app"
                                         className="max-w-none w-full"
                                         from={sourceCurrency}
@@ -2278,7 +2279,7 @@ const SendPage = () => {
                                         walletSymbol={selectedWallet?.symbol}
                                         showActions={false}
                                         showDisclaimer
-                                      />
+                                      /></SectionBoundary>
                                     </motion.div>
 
                                     {fundingSource === "card" && cardSendProvider && parsedAmount > 0
@@ -3027,21 +3028,21 @@ const SendPage = () => {
                                 transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
                               >
                                 {linkResult ? (
-                                  <PaymentLinkSuccess
+                                  <SectionBoundary name="PaymentLinkSuccess"><PaymentLinkSuccess
                                     result={linkResult}
                                     amountLabel={`${targetSymbol}${parsedAmount.toFixed(2)}`}
                                     recipientName={recipientName}
                                     onDone={resetForm}
-                                  />
+                                  /></SectionBoundary>
                                 ) : (
-                                  <TransferSuccess
+                                  <SectionBoundary name="TransferSuccess"><TransferSuccess
                                     transferId={lastTransferId}
                                     amount={parsedAmount}
                                     currency={sourceCurrency}
                                     recipientName={recipientName}
                                     targetFlag={targetCountry.flag}
                                     onSendAnother={resetForm}
-                                  />
+                                  /></SectionBoundary>
                                 )}
                               </motion.div>
                             )}

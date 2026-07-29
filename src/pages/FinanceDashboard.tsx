@@ -29,6 +29,7 @@ import { PeriodEndControlsPanel } from "@/components/finance/PeriodEndControlsPa
 import { EvidenceRepositoryPanel } from "@/components/finance/EvidenceRepositoryPanel";
 import PageHeroBanner from "@/components/common/PageHeroBanner";
 import AppPage from "@/components/layout/AppPage";
+import SectionBoundary from "@/components/common/SectionBoundary";
 import { PieChart, Landmark, FileSpreadsheet } from "lucide-react";
 
 const FinanceDashboard = () => {
@@ -92,16 +93,16 @@ const FinanceDashboard = () => {
                   <TabsTrigger value="tb">Trial Balance</TabsTrigger>
                 </TabsList>
                 <TabsContent value="coa">
-                  <ChartOfAccountsPanel onViewLedger={viewLedgerForAccount} />
+                  <SectionBoundary name="ChartOfAccountsPanel"><ChartOfAccountsPanel onViewLedger={viewLedgerForAccount} /></SectionBoundary>
                 </TabsContent>
                 <TabsContent value="journal">
-                  <JournalEntriesPanel />
+                  <SectionBoundary name="JournalEntriesPanel"><JournalEntriesPanel /></SectionBoundary>
                 </TabsContent>
                 <TabsContent value="gl">
-                  <GeneralLedgerPanel initialAccountId={glAccountId} />
+                  <SectionBoundary name="GeneralLedgerPanel"><GeneralLedgerPanel initialAccountId={glAccountId} /></SectionBoundary>
                 </TabsContent>
                 <TabsContent value="tb">
-                  <TrialBalancePanel />
+                  <SectionBoundary name="TrialBalancePanel"><TrialBalancePanel /></SectionBoundary>
                 </TabsContent>
               </Tabs>
             </TabsContent>
@@ -115,22 +116,22 @@ const FinanceDashboard = () => {
                   <TabsTrigger value="reconciliation">Reconciliation</TabsTrigger>
                 </TabsList>
                 <TabsContent value="accounts">
-                  <BankAccountsPanel />
+                  <SectionBoundary name="BankAccountsPanel"><BankAccountsPanel /></SectionBoundary>
                 </TabsContent>
                 <TabsContent value="transactions">
-                  <BankTransactionsPanel />
+                  <SectionBoundary name="BankTransactionsPanel"><BankTransactionsPanel /></SectionBoundary>
                 </TabsContent>
                 <TabsContent value="rules">
-                  <TransactionRulesPanel />
+                  <SectionBoundary name="TransactionRulesPanel"><TransactionRulesPanel /></SectionBoundary>
                 </TabsContent>
                 <TabsContent value="reconciliation">
-                  <ReconciliationPanel />
+                  <SectionBoundary name="ReconciliationPanel"><ReconciliationPanel /></SectionBoundary>
                 </TabsContent>
               </Tabs>
             </TabsContent>
 
             <TabsContent value="safeguarding" className="space-y-4">
-              <SafeguardingPanel />
+              <SectionBoundary name="SafeguardingPanel"><SafeguardingPanel /></SectionBoundary>
             </TabsContent>
 
             <TabsContent value="treasury" className="space-y-4">
@@ -140,10 +141,10 @@ const FinanceDashboard = () => {
                   <TabsTrigger value="stripe-fa">Stripe Treasury</TabsTrigger>
                 </TabsList>
                 <TabsContent value="worker">
-                  <TreasuryWorkerPanel />
+                  <SectionBoundary name="TreasuryWorkerPanel"><TreasuryWorkerPanel /></SectionBoundary>
                 </TabsContent>
                 <TabsContent value="stripe-fa">
-                  <TreasuryPanel />
+                  <SectionBoundary name="TreasuryPanel"><TreasuryPanel /></SectionBoundary>
                 </TabsContent>
               </Tabs>
             </TabsContent>
@@ -155,20 +156,20 @@ const FinanceDashboard = () => {
                   <TabsTrigger value="centre">Reports Centre</TabsTrigger>
                 </TabsList>
                 <TabsContent value="statements">
-                  <FinancialStatementsPanel />
+                  <SectionBoundary name="FinancialStatementsPanel"><FinancialStatementsPanel /></SectionBoundary>
                 </TabsContent>
                 <TabsContent value="centre">
-                  <ReportsCentrePanel />
+                  <SectionBoundary name="ReportsCentrePanel"><ReportsCentrePanel /></SectionBoundary>
                 </TabsContent>
               </Tabs>
             </TabsContent>
 
             <TabsContent value="sales-tax" className="space-y-4">
-              <SalesTaxPanel />
+              <SectionBoundary name="SalesTaxPanel"><SalesTaxPanel /></SectionBoundary>
             </TabsContent>
 
             <TabsContent value="invoices" className="space-y-4">
-              <SalesInvoicesPanel />
+              <SectionBoundary name="SalesInvoicesPanel"><SalesInvoicesPanel /></SectionBoundary>
             </TabsContent>
 
             <TabsContent value="purchases" className="space-y-4">
@@ -179,36 +180,36 @@ const FinanceDashboard = () => {
                   <TabsTrigger value="bills">Bills</TabsTrigger>
                   <TabsTrigger value="expenses">Expense Claims</TabsTrigger>
                 </TabsList>
-                <TabsContent value="vendors"><VendorsPanel /></TabsContent>
-                <TabsContent value="pos"><PurchaseOrdersPanel /></TabsContent>
-                <TabsContent value="bills"><PurchaseBillsPanel /></TabsContent>
-                <TabsContent value="expenses"><ExpenseClaimsPanel /></TabsContent>
+                <TabsContent value="vendors"><SectionBoundary name="VendorsPanel"><VendorsPanel /></SectionBoundary></TabsContent>
+                <TabsContent value="pos"><SectionBoundary name="PurchaseOrdersPanel"><PurchaseOrdersPanel /></SectionBoundary></TabsContent>
+                <TabsContent value="bills"><SectionBoundary name="PurchaseBillsPanel"><PurchaseBillsPanel /></SectionBoundary></TabsContent>
+                <TabsContent value="expenses"><SectionBoundary name="ExpenseClaimsPanel"><ExpenseClaimsPanel /></SectionBoundary></TabsContent>
               </Tabs>
             </TabsContent>
 
             <TabsContent value="fx" className="space-y-4">
-              <FxClearingExposurePanel />
-              <FxTradesPanel />
+              <SectionBoundary name="FxClearingExposurePanel"><FxClearingExposurePanel /></SectionBoundary>
+              <SectionBoundary name="FxTradesPanel"><FxTradesPanel /></SectionBoundary>
             </TabsContent>
 
             <TabsContent value="period-close" className="space-y-4">
-              <PeriodEndControlsPanel />
+              <SectionBoundary name="PeriodEndControlsPanel"><PeriodEndControlsPanel /></SectionBoundary>
             </TabsContent>
 
             <TabsContent value="settlement" className="space-y-4">
-              <SettlementReconciliationPanel />
+              <SectionBoundary name="SettlementReconciliationPanel"><SettlementReconciliationPanel /></SectionBoundary>
             </TabsContent>
 
             <TabsContent value="unclaimed" className="space-y-4">
-              <UnclaimedFundsPanel />
+              <SectionBoundary name="UnclaimedFundsPanel"><UnclaimedFundsPanel /></SectionBoundary>
             </TabsContent>
 
             <TabsContent value="crypto" className="space-y-4">
-              <CryptoTradesPanel />
+              <SectionBoundary name="CryptoTradesPanel"><CryptoTradesPanel /></SectionBoundary>
             </TabsContent>
 
             <TabsContent value="evidence" className="space-y-4">
-              <EvidenceRepositoryPanel />
+              <SectionBoundary name="EvidenceRepositoryPanel"><EvidenceRepositoryPanel /></SectionBoundary>
             </TabsContent>
           </Tabs>
         </motion.div>

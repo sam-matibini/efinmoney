@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import PageHeroBanner from "@/components/common/PageHeroBanner";
 import AppPage from "@/components/layout/AppPage";
+import { SectionBoundary } from "@/components/common/SectionBoundary";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -237,7 +238,7 @@ const CardsPage = () => {
             </motion.div>
           </motion.div>
 
-          <PageHeroBanner
+          <SectionBoundary name="CardsHero"><PageHeroBanner
             icon={CreditCard}
             label="Card portfolio"
             value={isLoading ? "Loading…" : `${cards.length} card${cards.length === 1 ? "" : "s"}`}
@@ -246,9 +247,9 @@ const CardsPage = () => {
               { icon: Plus, text: "Issue new or link existing cards" },
             ]}
             variant="rose"
-          />
+          /></SectionBoundary>
 
-          <motion.div
+          <SectionBoundary name="CardStack"><motion.div
             variants={{ hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 180, damping: 22 } } }}
             className="rounded-3xl border border-border/80 bg-card/40 backdrop-blur-xl p-4 sm:p-6 shadow-sm"
           >
@@ -394,24 +395,24 @@ const CardsPage = () => {
               }}
             />
           )}
-          </motion.div>
+          </motion.div></SectionBoundary>
 
 
 
-          <CardFeatureSpotlights
+          <SectionBoundary name="CardFeatureSpotlights"><CardFeatureSpotlights
             hasIssuedCard={isIssuedManageable(activeCard)}
             activeCardFrozen={activeCard?.status === "frozen"}
             onLock={handleFeatureLock}
             onCreateVirtual={handleFeatureVirtual}
             onSpendingLimits={handleFeatureLimits}
-          />
+          /></SectionBoundary>
 
           {productFeatures.swychr && (
-            <motion.div
+            <SectionBoundary name="SwychrCardsPanel"><motion.div
               variants={{ hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 180, damping: 22 } } }}
             >
               <SwychrCardsPanel />
-            </motion.div>
+            </motion.div></SectionBoundary>
           )}
         </motion.div>
       </AppPage>

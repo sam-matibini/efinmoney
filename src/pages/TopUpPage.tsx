@@ -82,6 +82,7 @@ import ComingSoon from "@/components/common/ComingSoon";
 import { isLiveTopupCurrency, productFeatures } from "@/lib/productFeatures";
 import PageHeroBanner from "@/components/common/PageHeroBanner";
 import AppPage from "@/components/layout/AppPage";
+import { SectionBoundary } from "@/components/common/SectionBoundary";
 import { currencySymbol } from "@/lib/currency";
 
 const MM_BY_CCY = Object.fromEntries(MM_COUNTRIES.map((c) => [c.currency, c]));
@@ -713,7 +714,7 @@ const TopUpPage = () => {
             </p>
           </div>
 
-          <PageHeroBanner
+          <SectionBoundary name="TopUpHero"><PageHeroBanner
             icon={Wallet}
             label={selectedWallet ? `${currency} wallet balance` : "Wallet top-up"}
             value={
@@ -726,14 +727,14 @@ const TopUpPage = () => {
               { icon: Globe, text: `${wallets?.length ?? 0} wallets available` },
             ]}
             variant="emerald"
-          />
+          /></SectionBoundary>
 
           {gateway === "flutterwave" && (currency === "USD" || currency === "CAD") && (
-            <FlutterwaveWesternTopUpHints currency={currency} />
+            <SectionBoundary name="FlutterwaveWesternTopUpHints"><FlutterwaveWesternTopUpHints currency={currency} /></SectionBoundary>
           )}
 
           {verifyState && (
-            <Card className={
+            <SectionBoundary name="VerifyState"><Card className={
               verifyState.status === "failed"
                 ? "border-destructive/50 bg-destructive/5"
                 : verifyState.status === "success"
@@ -753,7 +754,7 @@ const TopUpPage = () => {
                   <p className="text-sm text-muted-foreground">{verifyState.message}</p>
                 </div>
               </CardContent>
-            </Card>
+            </Card></SectionBoundary>
           )}
 
           <AlertDialog
@@ -785,7 +786,7 @@ const TopUpPage = () => {
           {/* Checkout shell */}
           <div className="rounded-2xl border border-border bg-gradient-to-b from-muted/40 to-background p-1 sm:p-1.5 space-y-1.5 sm:space-y-2">
           {/* Wallet selector */}
-          <section className="rounded-xl border border-border bg-card overflow-hidden">
+          <SectionBoundary name="WalletSelector"><section className="rounded-xl border border-border bg-card overflow-hidden">
             <header className="px-4 sm:px-5 py-4 border-b border-border bg-muted/30">
               <h2 className="text-base font-semibold tracking-tight">1. Choose wallet to top up</h2>
               <p className="mt-0.5 text-sm text-muted-foreground">Funds credit the wallet you select here.</p>
@@ -823,10 +824,10 @@ const TopUpPage = () => {
                 </div>
               )}
             </div>
-          </section>
+          </section></SectionBoundary>
 
           {showWesternProviderChoice && selectedWallet && productFeatures.flutterwave && (
-            <TopUpMethodPicker
+            <SectionBoundary name="WesternProviderPicker"><TopUpMethodPicker
               showProvider={showStaffRails}
               description={`Choose the experience that fits your ${currency} wallet.`}
               value={westernProvider}
@@ -849,11 +850,11 @@ const TopUpPage = () => {
                   icon: Globe,
                 },
               ]}
-            />
+            /></SectionBoundary>
           )}
 
           {showAfricanProviderChoice && selectedWallet && productFeatures.flutterwave && (
-            <TopUpMethodPicker
+            <SectionBoundary name="AfricanProviderPicker"><TopUpMethodPicker
               showProvider={showStaffRails}
               description={`Choose the experience that fits your ${currency} wallet.`}
               value={africanProvider}
@@ -876,65 +877,65 @@ const TopUpPage = () => {
                   icon: Building2,
                 },
               ]}
-            />
+            /></SectionBoundary>
           )}
 
           {showIntlMethodChoice && selectedWallet && liveTopup && (
-            <TopUpMethodPicker
+            <SectionBoundary name="IntlMethodPicker"><TopUpMethodPicker
               showProvider={showStaffRails}
               description={`Pick the option that works best for funding your ${currency} wallet.`}
               value={intlMethod}
               onChange={(id) => setIntlMethod(id as IntlTopupMethod)}
               options={intlPickerOptions}
-            />
+            /></SectionBoundary>
           )}
 
           {showAfricaMomoChoice && selectedWallet && liveTopup && (
-            <TopUpMethodPicker
+            <SectionBoundary name="AfricaMomoPicker"><TopUpMethodPicker
               showProvider={showStaffRails}
               description={`Pick the option that works best for funding your ${currency} wallet.`}
               value={africaMomoMethod}
               onChange={(id) => setAfricaMomoMethod(id as AfricaMomoTopupMethod)}
               options={africaPickerOptions}
-            />
+            /></SectionBoundary>
           )}
           </div>
 
           {!liveTopup && selectedWallet && (
-            <ComingSoon
+            <SectionBoundary name="ComingSoon"><ComingSoon
               title="Top-up not available for this currency"
               description={`${currency} wallet funding is not available. Try NGN, GHS, ZMW, KES, UGX, RWF, TZS, ZAR, XAF, XOF, MWK, USD, EUR, GBP, or CAD.`}
               backHref="/wallets"
               backLabel="View wallets"
-            />
+            /></SectionBoundary>
           )}
 
           {liveTopup && gateway === "unsupported" && selectedWallet && (
-            <Card>
+            <SectionBoundary name="Unsupported"><Card>
               <CardContent className="pt-6">
                 <p className="text-sm text-muted-foreground">
                   Top-up for <strong>{currency}</strong> is not yet available. Please contact support.
                 </p>
               </CardContent>
-            </Card>
+            </Card></SectionBoundary>
           )}
 
           {/* Flutterwave — MoMo (V4) + card/bank hosted Standard checkout (redirect, no PCI) */}
           {productFeatures.flutterwave && gateway === "flutterwave" && selectedWallet && liveTopup && (
             <div className="space-y-4">
               {(availableFlwMethods.includes("mobilemoney") || currency === "TZS") && (
-                <FlutterwaveMomoTopUpCard
+                <SectionBoundary name="FlutterwaveMomoTopUp"><FlutterwaveMomoTopUpCard
                   walletId={selectedWallet.wallet_id}
                   walletCurrency={currency}
                   onComplete={() => {
                     void queryClient.invalidateQueries({ queryKey: ["wallets"] });
                   }}
-                />
+                /></SectionBoundary>
               )}
               {(availableFlwMethods.includes("card") ||
                 availableFlwMethods.includes("banktransfer") ||
                 availableFlwMethods.includes("ussd")) && (
-                <FlutterwaveHostedTopUpCard
+                <SectionBoundary name="FlutterwaveHostedTopUp"><FlutterwaveHostedTopUpCard
                   walletId={selectedWallet.wallet_id}
                   walletCurrency={currency}
                   methods={availableFlwMethods.filter((m) =>
@@ -943,13 +944,13 @@ const TopUpPage = () => {
                   onComplete={() => {
                     void queryClient.invalidateQueries({ queryKey: ["wallets"] });
                   }}
-                />
+                /></SectionBoundary>
               )}
             </div>
           )}
 
           {/* Card or bank transfer (Fincra hosted) — always available when selected, not gated on Flutterwave */}
-          {gateway === "fincra" && selectedWallet && liveTopup && (
+          <SectionBoundary name="FincraTopUp">{gateway === "fincra" && selectedWallet && liveTopup && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">
@@ -1033,71 +1034,71 @@ const TopUpPage = () => {
                 </Button>
               </CardContent>
             </Card>
-          )}
+          )}</SectionBoundary>
 
           {/* Swychr — secondary hosted checkout (feature-flagged) */}
           {liveTopup && gateway === "swychr_pay" && selectedWallet && (
-            <SwychrTopUpCard
+            <SectionBoundary name="SwychrTopUp"><SwychrTopUpCard
               walletId={selectedWallet.wallet_id}
               walletCurrency={currency}
               onComplete={() => {
                 void queryClient.invalidateQueries({ queryKey: ["wallets"] });
               }}
-            />
+            /></SectionBoundary>
           )}
 
           {/* Pay by invoice */}
           {liveTopup && gateway === "paytota_pay" && selectedWallet && (
-            <PaytotaTopUpCard
+            <SectionBoundary name="PaytotaTopUp"><PaytotaTopUpCard
               walletId={selectedWallet.wallet_id}
               walletCurrency={currency}
               onComplete={() => {
                 void queryClient.invalidateQueries({ queryKey: ["wallets"] });
               }}
-            />
+            /></SectionBoundary>
           )}
 
           {/* Card checkout (Nomba) */}
           {liveTopup && gateway === "nomba_pay" && selectedWallet && (
-            <NombaTopUpCard
+            <SectionBoundary name="NombaTopUp"><NombaTopUpCard
               walletId={selectedWallet.wallet_id}
               walletCurrency={currency}
               onComplete={() => {
                 void queryClient.invalidateQueries({ queryKey: ["wallets"] });
               }}
-            />
+            /></SectionBoundary>
           )}
 
           {/* Lenhub Flutter — card (+ NGN bank transfer VA) */}
           {liveTopup && gateway === "lenhub_flutter" && selectedWallet && (
-            <LenhubFlutterTopUpCard
+            <SectionBoundary name="LenhubTopUp"><LenhubFlutterTopUpCard
               walletId={selectedWallet.wallet_id}
               walletCurrency={currency}
               onComplete={() => {
                 void queryClient.invalidateQueries({ queryKey: ["wallets"] });
               }}
-            />
+            /></SectionBoundary>
           )}
 
           {/* CAD Interac e-Transfer */}
           {productFeatures.fincraInterac && liveTopup && gateway === "fincra_interac" && selectedWallet && (
-            <CadInteracTopUpCard
+            <SectionBoundary name="CadInteracTopUp"><CadInteracTopUpCard
               walletId={selectedWallet.wallet_id}
               walletCurrency={currency}
               onComplete={() => {
                 void queryClient.invalidateQueries({ queryKey: ["wallets"] });
               }}
-            />
+            /></SectionBoundary>
           )}
 
           {/* Ghana Pay — direct MoMo collection for GHS */}
           {liveTopup && gateway === "ghana_pay" && selectedWallet && (
-            <GhanaTopUpCard walletId={selectedWallet.wallet_id} walletCurrency={currency} />
+            <SectionBoundary name="GhanaTopUp"><GhanaTopUpCard walletId={selectedWallet.wallet_id} walletCurrency={currency} /></SectionBoundary>
           )}
 
           {/* Zambia MoMo top-up */}
           {productFeatures.elicate && liveTopup && gateway === "elicate" && selectedWallet && (
-            <ElicateTopUpCard walletId={selectedWallet.wallet_id} walletCurrency={currency} />
+            <SectionBoundary name="ElicateTopUp"><ElicateTopUpCard walletId={selectedWallet.wallet_id} walletCurrency={currency} /></SectionBoundary>
           )}
         </motion.div>
     </AppPage>
