@@ -9,7 +9,7 @@ import { CountryFlag, CurrencyFlag } from "@/components/ui/FlagImage";
 import africaHero from "@/assets/landing-africa-hero.jpg";
 import africaBand from "@/assets/landing-africa-band.jpg";
 import b2bPhone from "@/assets/landing-b2b-phone.jpg";
-import efinConnectIntro from "@/assets/landing-efinconnect-intro.jpeg";
+import efinConnectIntro from "@/assets/Efinconnect.jpeg";
 import tourismKenya from "@/assets/landing-tourism-kenya.jpg";
 import tourismVicFalls from "@/assets/landing-tourism-victoria-falls.jpg";
 import tourismZanzibar from "@/assets/landing-tourism-zanzibar.jpg";
