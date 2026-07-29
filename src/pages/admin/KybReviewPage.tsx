@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { KybStatusBadge } from "@/pages/admin/KybQueuePage";
 import { UBO_THRESHOLD_PERCENT } from "@/hooks/useKyb";
@@ -29,6 +30,8 @@ const KybReviewPage = () => {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [note, setNote] = useState("");
+  const [rejectTarget, setRejectTarget] = useState<{ id: string; label: string } | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin-kyb", id],
@@ -468,9 +471,8 @@ const KybReviewPage = () => {
                   variant="ghost"
                   disabled={reviewDoc.isPending}
                   onClick={() => {
-                    const reason = window.prompt("Why is this document rejected?");
-                    if (reason === null) return;
-                    reviewDoc.mutate({ docId: d.id, status: "rejected", reason });
+                    setRejectReason("");
+                    setRejectTarget({ id: d.id, label: d.document_type.replace(/_/g, " ") });
                   }}
                 >
                   <X className="w-4 h-4 text-destructive" />
@@ -560,6 +562,42 @@ const KybReviewPage = () => {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={!!rejectTarget} onOpenChange={(open) => !open && setRejectTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reject document</DialogTitle>
+            <DialogDescription>
+              {rejectTarget && (
+                <>Provide a reason for rejecting <span className="font-medium capitalize">{rejectTarget.label}</span>. The applicant will see this message.</>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            value={rejectReason}
+            onChange={(e) => setRejectReason(e.target.value)}
+            placeholder="Reason for rejection (required)"
+            rows={4}
+            autoFocus
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRejectTarget(null)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              disabled={!rejectReason.trim() || reviewDoc.isPending}
+              onClick={() => {
+                if (!rejectTarget) return;
+                const reason = rejectReason.trim();
+                const docId = rejectTarget.id;
+                setRejectTarget(null);
+                reviewDoc.mutate({ docId, status: "rejected", reason });
+              }}
+            >
+              Reject document
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AdminLayout>
   );
 };

@@ -125,7 +125,7 @@ const InviteStaffModal = ({ open, onOpenChange }: Props) => {
                 <SelectValue placeholder="Select department" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">No department</SelectItem>
+                <SelectItem value="">No department</SelectItem>
                 {departments.map((d) => (
                   <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>
                 ))}

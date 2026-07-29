@@ -150,6 +150,10 @@ const KycReviewPage = () => {
     if (data?.kyc.internal_notes) setInternalNotes(data.kyc.internal_notes);
   }, [data?.kyc.internal_notes]);
 
+  const isFinal = data?.kyc
+    ? data.kyc.verification_status === "approved" || data.kyc.verification_status === "rejected"
+    : false;
+
   // Approve
   const [approveOpen, setApproveOpen] = useState(false);
   const [approveScope, setApproveScope] = useState<"id_only" | "id_and_address">("id_and_address");
@@ -295,8 +299,6 @@ const KycReviewPage = () => {
   const addrCountry = profile?.address_country;
   const countryMismatch = idCountry && addrCountry && idCountry !== addrCountry;
   const attempts = audit.filter((a) => a.action === "submitted").length;
-
-  const isFinal = kyc.verification_status === "approved" || kyc.verification_status === "rejected";
 
   return (
     <AdminLayout>
