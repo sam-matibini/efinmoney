@@ -74,9 +74,10 @@ interface Destination {
 
 // Worldwide card-payout corridors (Stripe Visa Direct / Mastercard Send).
 // Currency-scoped rather than per-country: USD reaches US + global cards, EUR
-// spans the EU-27, GBP is the UK.
+// spans the EU-27, GBP is the UK, CAD covers Interac e-Transfer + bank rails.
 const GLOBAL_DESTINATIONS: Destination[] = [
   { key: "USD", cc: "us", title: "International", subtitle: "US & global cards", code: "USD", search: "usd international united states us global america worldwide dollar" },
+  { key: "CAD", cc: "ca", title: "Canada", subtitle: "Interac e-Transfer", code: "CAD", search: "cad canada canadian dollar interac bank transfer eft" },
   { key: "EUR", cc: "eu", title: "European Union", subtitle: "EU-27 · Germany, France & more", code: "EUR", search: "eur euro europe eu germany france spain italy netherlands belgium portugal ireland austria" },
   { key: "GBP", cc: "gb", title: "United Kingdom", subtitle: "Bank transfer", code: "GBP", search: "gbp united kingdom uk britain england pound sterling" },
 ];
