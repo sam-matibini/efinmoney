@@ -13,20 +13,7 @@ import CountUp from "react-countup";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { getGreeting } from "@/lib/greeting";
-
-const buildUsdRateMap = (rates: { from_currency: string; to_currency: string; effective_rate: number }[]) => {
-  const map = new Map<string, number>();
-  map.set("USD", 1);
-  for (const r of rates) {
-    if (r.to_currency === "USD" && !map.has(r.from_currency)) map.set(r.from_currency, Number(r.effective_rate));
-  }
-  for (const r of rates) {
-    if (r.from_currency === "USD" && !map.has(r.to_currency) && Number(r.effective_rate) > 0) {
-      map.set(r.to_currency, 1 / Number(r.effective_rate));
-    }
-  }
-  return map;
-};
+import { buildUsdRateMap } from "@/lib/fx";
 
 const HeroBalance = () => {
   const reduceMotion = useReducedMotion();
