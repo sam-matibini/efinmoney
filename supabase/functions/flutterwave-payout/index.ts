@@ -146,7 +146,13 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "phone_number required for mobile money payout" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const useV4 = isFlwV4Configured();
+    // Prefer V3 for payouts when FLW_SECRET_KEY is set.
+    // V4 /direct-transfers hits Flutterwave from Supabase's dynamic egress IPs
+    // and fails with NON_WHITELISTED_IP. V3 via FLW_PROXY_URL uses our Cloudflare
+    // worker (same path that successfully queued NGN transfers in probes).
+    // Opt into V4 with FLW_PREFER_V4_PAYOUT=true once V4 IPs are whitelisted.
+    const preferV4Payout = Deno.env.get("FLW_PREFER_V4_PAYOUT") === "true";
+    const useV4 = isFlwV4Configured() && preferV4Payout;
     if (!useV4 && !Deno.env.get("FLW_SECRET_KEY")) {
       await supabase.from("transfers").update({ status: "processing", provider_reference: `STUB-${transfer_id.slice(0, 8)}` }).eq("id", transfer_id);
       await supabase.from("notifications").insert({ user_id: senderId, title: "Transfer queued", message: `Your ${currency} ${amount} transfer to ${recipient_name} is queued (Flutterwave not yet configured).`, type: "info" });

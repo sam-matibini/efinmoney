@@ -1,8 +1,12 @@
 // Flutterwave V3 shared helper. Uses FLW_SECRET_KEY (FLWSECK-...) bearer auth.
-// Optional: route through a Cloudflare Worker reverse proxy via FLW_PROXY_URL
-// (e.g. https://efin-flw-proxy.ukwenzyb.workers.dev) to get a trusted egress IP
-// for restricted corridors (ZMW, etc). The proxy must forward to api.flutterwave.com.
-const PROXY_BASE = (Deno.env.get("FLW_PROXY_URL") || "https://api.flutterwave.com").replace(/\/+$/, "");
+// Route through a Cloudflare Worker reverse proxy (FLW_PROXY_URL) so Flutterwave
+// can whitelist a stable egress IP — Supabase Edge has no static IP.
+// Default matches Fincra / Lenhub so payouts still work if the secret is missing.
+const DEFAULT_PROXY = "https://efin-flw-proxy.ukwenzyb.workers.dev";
+const PROXY_BASE = (
+  Deno.env.get("FLW_PROXY_URL")?.trim() ||
+  (Deno.env.get("FLW_USE_PROXY") === "false" ? "https://api.flutterwave.com" : DEFAULT_PROXY)
+).replace(/\/+$/, "");
 export const FLW_V3_BASE = `${PROXY_BASE}/v3`;
 
 export interface FlwV3Result { ok: boolean; status: number; json: any; }
