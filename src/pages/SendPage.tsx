@@ -2439,7 +2439,8 @@ const SendPage = () => {
                                       <Input
                                         placeholder="Full name as registered"
                                         value={recipientName}
-                                        onChange={(e) => setRecipientName(e.target.value)}
+                                        onChange={(e) => setRecipientName(e.target.value.replace(/[^\p{L}\p{M}'\-. ]/gu, "").slice(0, 100))}
+                                        maxLength={100}
                                         className="transition-shadow focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:shadow-[0_0_0_4px_hsl(var(--primary)/0.12)]"
                                       />
                                     </motion.div>
@@ -2531,8 +2532,9 @@ const SendPage = () => {
                                         <Input
                                           type="email"
                                           value={recipientEmail}
-                                          onChange={(e) => setRecipientEmail(e.target.value)}
+                                          onChange={(e) => setRecipientEmail(e.target.value.trimStart().slice(0, 254))}
                                           placeholder="jane@example.com"
+                                          maxLength={254}
                                           className="transition-shadow focus-visible:ring-2 focus-visible:ring-primary/40"
                                         />
                                         <p className="text-xs text-muted-foreground">
@@ -2769,6 +2771,7 @@ const SendPage = () => {
                                           <Label>Account Number</Label>
                                           <Input
                                             inputMode="numeric"
+                                            maxLength={20}
                                             placeholder="Recipient bank account number"
                                             value={ghAccountNumber}
                                             onChange={(e) => setGhAccountNumber(e.target.value.replace(/\D/g, "").slice(0, 20))}
@@ -2784,7 +2787,8 @@ const SendPage = () => {
                                         <Input
                                           placeholder="+254..."
                                           value={recipientPhone}
-                                          onChange={(e) => setRecipientPhone(e.target.value)}
+                                          onChange={(e) => setRecipientPhone(e.target.value.replace(/[^\d+]/g, "").slice(0, 15))}
+                                          maxLength={15}
                                           className="transition-shadow focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:shadow-[0_0_0_4px_hsl(var(--primary)/0.12)]"
                                         />
                                         <p className="text-sm text-muted-foreground">

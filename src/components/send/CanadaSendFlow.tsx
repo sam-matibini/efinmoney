@@ -1067,7 +1067,8 @@ const CanadaSendFlow = () => {
                   <Label>Full name {method === "paylink" && <span className="text-xs text-muted-foreground">(optional)</span>}</Label>
                   <Input
                     value={recipientName}
-                    onChange={(e) => { setRecipientName(e.target.value); setPickedBeneficiaryId(null); }}
+                    onChange={(e) => { setRecipientName(e.target.value.replace(/[^\p{L}\p{M}'\-. ]/gu, "").slice(0, 100)); setPickedBeneficiaryId(null); }}
+                    maxLength={100}
                     placeholder={method === "paylink" ? "Anyone with the link" : "Jane Doe"}
                   />
                 </div>
