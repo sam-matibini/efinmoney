@@ -5,12 +5,14 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { ExternalLink, Loader2 } from "lucide-react";
-import { initializeFlwPayment, minAmount, validateMinAmount } from "@/lib/flutterwave";
+import { initializeFlwPayment, minAmount, validateMinAmount, type FlwMethod } from "@/lib/flutterwave";
 import { currencySymbol } from "@/lib/currency";
 
 interface Props {
   walletId: string;
   walletCurrency: string;
+  /** Hosted checkout methods to offer (defaults to card). */
+  methods?: FlwMethod[];
   onComplete?: () => void;
 }
 
@@ -18,14 +20,38 @@ interface Props {
  * Company Flutterwave — hosted Standard checkout (redirect).
  * Card data is entered on Flutterwave's page (no PCI / no Rave v3 direct charge).
  */
-export default function FlutterwaveHostedTopUpCard({ walletId, walletCurrency, onComplete }: Props) {
+export default function FlutterwaveHostedTopUpCard({
+  walletId,
+  walletCurrency,
+  methods,
+  onComplete,
+}: Props) {
   const currency = walletCurrency.toUpperCase();
   const sym = currencySymbol(currency) || currency;
+  const available = (methods?.length ? methods : ["card"]).filter((m) =>
+    ["card", "banktransfer", "ussd"].includes(m),
+  ) as Array<"card" | "banktransfer" | "ussd">;
+  const [paymentMethod, setPaymentMethod] = useState<"card" | "banktransfer" | "ussd">(
+    available[0] || "card",
+  );
   const [amount, setAmount] = useState("");
   const [loading, setLoading] = useState(false);
 
   const payAmount = Number(amount);
   const amountOk = Number.isFinite(payAmount) && payAmount > 0;
+
+  const title =
+    paymentMethod === "banktransfer"
+      ? "Bank transfer"
+      : paymentMethod === "ussd"
+        ? "USSD"
+        : "Card checkout";
+  const description =
+    paymentMethod === "banktransfer"
+      ? "Pay with a bank transfer on a secure page, then return here when done."
+      : paymentMethod === "ussd"
+        ? "Complete USSD payment on a secure page, then return here when done."
+        : "Pay on a secure page — you’ll enter card details there, then return here when done.";
 
   const handlePay = async () => {
     const minErr = validateMinAmount(currency, payAmount);
@@ -39,16 +65,16 @@ export default function FlutterwaveHostedTopUpCard({ walletId, walletCurrency, o
       const result = await initializeFlwPayment({
         amount: payAmount,
         currency,
-        paymentMethod: "card",
+        paymentMethod,
         walletId,
         redirectUrl: `${window.location.origin}/wallet/topup?walletId=${encodeURIComponent(walletId)}&flw=1`,
       });
 
       if (!result.payment_link) {
-        throw new Error(result.error || "No Flutterwave checkout link returned");
+        throw new Error(result.error || "No checkout link returned");
       }
 
-      toast.message("Opening Flutterwave checkout…");
+      toast.message("Opening secure checkout…");
       onComplete?.();
       window.location.href = result.payment_link;
     } catch (e) {
@@ -61,12 +87,25 @@ export default function FlutterwaveHostedTopUpCard({ walletId, walletCurrency, o
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Card checkout</CardTitle>
-        <CardDescription>
-          Pay securely on Flutterwave — you’ll enter card details on their page, then return here when done.
-        </CardDescription>
+        <CardTitle className="text-base">{title}</CardTitle>
+        <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {available.length > 1 && (
+          <div className="flex flex-wrap gap-2">
+            {available.map((m) => (
+              <Button
+                key={m}
+                type="button"
+                size="sm"
+                variant={paymentMethod === m ? "default" : "outline"}
+                onClick={() => setPaymentMethod(m)}
+              >
+                {m === "card" ? "Card" : m === "banktransfer" ? "Bank transfer" : "USSD"}
+              </Button>
+            ))}
+          </div>
+        )}
         <div className="space-y-2">
           <Label htmlFor="flw-hosted-amount">Amount ({currency})</Label>
           <div className="relative">
@@ -79,26 +118,26 @@ export default function FlutterwaveHostedTopUpCard({ walletId, walletCurrency, o
               inputMode="decimal"
               placeholder="0.00"
               value={amount}
-              onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ""))}
+              onChange={(e) => setAmount(e.target.value)}
             />
           </div>
           <p className="text-xs text-muted-foreground">
             Minimum: {minAmount(currency)} {currency}
           </p>
         </div>
-        <Button className="w-full" size="lg" disabled={loading || !amountOk} onClick={handlePay}>
+        <Button className="w-full h-11" disabled={!amountOk || loading} onClick={() => void handlePay()}>
           {loading ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Starting…
+            </>
           ) : (
             <>
-              Continue to Flutterwave
-              <ExternalLink className="ml-2 h-4 w-4" />
+              Continue to checkout
+              <ExternalLink className="w-4 h-4 ml-2" />
             </>
           )}
         </Button>
-        <p className="text-xs text-muted-foreground">
-          Wallet credits when Flutterwave confirms payment (webhook). Keep this tab — you’ll return after checkout.
-        </p>
       </CardContent>
     </Card>
   );

@@ -16,7 +16,7 @@ export const productFeatures = {
   plaid: envFlag("VITE_FEATURE_PLAID", true),
   canadaDomestic: envFlag("VITE_FEATURE_CANADA_DOMESTIC", false),
   stripe: false,
-  /** Flutterwave V3 — TZS primary; other Africa corridors only when no dedicated live rail. */
+  /** Company Flutterwave — Africa collect + payout (NGN/GHS/KES/UGX/RWF/TZS/ZMW) + USD/CAD. */
   flutterwave: envFlag("VITE_FEATURE_FLUTTERWAVE", true),
   crypto: envFlag("VITE_FEATURE_CRYPTO", false),
   billPay: envFlag("VITE_FEATURE_BILL_PAY", true),
@@ -61,8 +61,10 @@ export function isLiveTopupCurrency(currency: string): boolean {
   if (productFeatures.paytota && ["UGX", "KES", "RWF"].includes(c)) return true;
   if (productFeatures.ghanaPay && c === "GHS") return true;
   if (productFeatures.elicate && c === "ZMW") return true;
-  // Flutterwave fills the TZS gap (not covered by Nomba/Paytota/Swychr/Elicate).
-  if (productFeatures.flutterwave && c === "TZS") return true;
+  // Company Flutterwave Africa + western card top-up
+  if (productFeatures.flutterwave && ["NGN", "GHS", "KES", "UGX", "RWF", "TZS", "ZMW", "USD", "CAD"].includes(c)) {
+    return true;
+  }
   return false;
 }
 
@@ -77,7 +79,12 @@ export function isLiveSendCorridor(countryCode: string): boolean {
   if (productFeatures.paytotaPayout && ["UGX", "UG", "KES", "KE", "RWF", "RW"].includes(code)) {
     return true;
   }
-  if (productFeatures.flutterwave && ["TZS", "TZ"].includes(code)) return true;
+  if (
+    productFeatures.flutterwave &&
+    ["NGN", "NG", "GHS", "GH", "KES", "KE", "UGX", "UG", "RWF", "RW", "TZS", "TZ", "ZMW", "ZM"].includes(code)
+  ) {
+    return true;
+  }
   if (productFeatures.otherAfricanCorridors) {
     return ["KES", "UGX", "TZS", "RWF", "ZMW", "KE", "UG", "TZ", "RW", "ZM"].includes(code);
   }

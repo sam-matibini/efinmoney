@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,12 @@ interface Props {
   walletId: string;
   walletCurrency: string;
   onComplete?: () => void;
+  /** Prefill amount (e.g. card-funded Send). */
+  fixedAmount?: number;
+  /** Lock the amount field when set with fixedAmount. */
+  amountReadOnly?: boolean;
+  /** Fired when wallet is credited (card or VA). */
+  onCredited?: (info: { localId: string; chargeId: string | null }) => void;
 }
 
 type VaDetails = {
@@ -48,7 +54,14 @@ function defaultCountry(currency: string): string {
  * Lenhub Flutter collect — card (all collect currencies) + NGN bank transfer (VA).
  * Card data is posted only to our edge function (never stored in DB).
  */
-export default function LenhubFlutterTopUpCard({ walletId, walletCurrency, onComplete }: Props) {
+export default function LenhubFlutterTopUpCard({
+  walletId,
+  walletCurrency,
+  onComplete,
+  fixedAmount,
+  amountReadOnly,
+  onCredited,
+}: Props) {
   const { user } = useAuth();
   const currency = walletCurrency.toUpperCase();
   const sym = currencySymbol(currency);
@@ -57,7 +70,9 @@ export default function LenhubFlutterTopUpCard({ walletId, walletCurrency, onCom
   const [payMode, setPayMode] = useState<"card" | "bank">(supportsBank ? "card" : "card");
   const [step, setStep] = useState<Step>("details");
   const [busy, setBusy] = useState(false);
-  const [amount, setAmount] = useState("");
+  const [amount, setAmount] = useState(
+    fixedAmount != null && fixedAmount > 0 ? String(fixedAmount) : "",
+  );
   const [email, setEmail] = useState(user?.email ?? "");
   const [localId, setLocalId] = useState<string | null>(null);
   const [chargeId, setChargeId] = useState<string | null>(null);
@@ -76,10 +91,27 @@ export default function LenhubFlutterTopUpCard({ walletId, walletCurrency, onCom
   const [va, setVa] = useState<VaDetails | null>(null);
   const [copied, setCopied] = useState(false);
   const [vaCredited, setVaCredited] = useState(false);
+  const creditedNotifiedRef = useRef(false);
 
   useEffect(() => {
     if (!email && user?.email) setEmail(user.email);
   }, [user?.email, email]);
+
+  useEffect(() => {
+    if (fixedAmount != null && fixedAmount > 0) {
+      setAmount(String(fixedAmount));
+    }
+  }, [fixedAmount]);
+
+  const notifyCredited = (lid?: string | null, cid?: string | null) => {
+    if (creditedNotifiedRef.current) return;
+    creditedNotifiedRef.current = true;
+    const id = (lid || localId || "").trim();
+    if (id) {
+      onCredited?.({ localId: id, chargeId: (cid ?? chargeId) || null });
+    }
+    onComplete?.();
+  };
 
   // Poll charge row while waiting for bank transfer confirmation
   useEffect(() => {
@@ -98,7 +130,7 @@ export default function LenhubFlutterTopUpCard({ walletId, walletCurrency, onCom
           toast.success(
             `${data.currency_code || currency} ${Number(data.amount).toLocaleString()} credited to your wallet`,
           );
-          onComplete?.();
+          notifyCredited(localId, chargeId);
         }
       } catch {
         /* ignore poll errors */
@@ -110,7 +142,8 @@ export default function LenhubFlutterTopUpCard({ walletId, walletCurrency, onCom
       cancelled = true;
       window.clearInterval(id);
     };
-  }, [va, localId, vaCredited, currency, onComplete]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [va, localId, vaCredited, currency, chargeId]);
 
   useEffect(() => {
     setCountry(defaultCountry(currency));
@@ -218,7 +251,7 @@ export default function LenhubFlutterTopUpCard({ walletId, walletCurrency, onCom
         toast.success(
           `${data?.currency || currency} ${Number(data?.amount || va?.amount || 0).toLocaleString()} credited to your wallet`,
         );
-        onComplete?.();
+        notifyCredited(localId, chargeId);
       } else {
         throw new Error(String(data?.message || data?.reason || "Could not credit wallet"));
       }
@@ -505,13 +538,45 @@ export default function LenhubFlutterTopUpCard({ walletId, walletCurrency, onCom
       }
       setStep("done");
       toast.success("Payment submitted — wallet updates when confirmed");
-      onComplete?.();
+      // Credit notify via poll below (webhook may lag)
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Confirm failed");
     } finally {
       setBusy(false);
     }
   };
+
+  // After card auth completes, poll until wallet credited (for Send resume / onCredited)
+  useEffect(() => {
+    if (step !== "done" || !localId) return;
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const { data } = await supabase
+          .from("lenhub_flutter_charges")
+          .select("status, credited_at, amount, currency_code")
+          .eq("id", localId)
+          .maybeSingle();
+        if (cancelled || !data) return;
+        if (data.credited_at || data.status === "credited") {
+          toast.success(
+            `${data.currency_code || currency} ${Number(data.amount).toLocaleString()} credited to your wallet`,
+          );
+          notifyCredited(localId, chargeId);
+          cancelled = true;
+        }
+      } catch {
+        /* ignore */
+      }
+    };
+    tick();
+    const id = window.setInterval(tick, 2000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, localId, chargeId, currency]);
 
   const title = currency === "NGN" ? "NGN card or bank" : "Card (direct)";
   const description =
@@ -533,7 +598,11 @@ export default function LenhubFlutterTopUpCard({ walletId, walletCurrency, onCom
             inputMode="decimal"
             placeholder={currency === "NGN" ? "1000" : "0.00"}
             value={amount}
-            onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ""))}
+            readOnly={Boolean(amountReadOnly && fixedAmount != null)}
+            onChange={(e) => {
+              if (amountReadOnly && fixedAmount != null) return;
+              setAmount(e.target.value.replace(/[^\d.]/g, ""));
+            }}
           />
         </div>
         {minHint && <p className="text-xs text-muted-foreground">{minHint}</p>}

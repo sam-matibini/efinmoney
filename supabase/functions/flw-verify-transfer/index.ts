@@ -132,13 +132,87 @@ Deno.serve(async (req) => {
       });
     }
 
-    const providerRef = transfer.provider_reference;
+    // Stuck after ledger debit but before a real provider handoff — retry payout now.
+    // This is the usual path when the client got a false "success" or the payout call failed silently.
+    const providerRef = transfer.provider_reference ? String(transfer.provider_reference) : "";
+    const stubRef = !providerRef || /^STUB-/i.test(providerRef);
+    if (
+      stubRef &&
+      ["funded", "processing", "initiated"].includes(String(transfer.status))
+    ) {
+      const payout = await retryPendingPayout(supabase, transfer);
+      const { data: fresh } = await supabase.from("transfers").select("*").eq("id", transfer_id).maybeSingle();
+      if (payout?.success === false || fresh?.status === "failed") {
+        return json({
+          success: true,
+          status: fresh?.status ?? "failed",
+          changed: true,
+          retried: true,
+          error: payout?.error || fresh?.failure_reason || "Payout failed",
+          provider_message: payout?.provider_message || null,
+          refunded: payout?.refunded === true,
+        });
+      }
+      if (payout?.pending_liquidity || payout?.queued) {
+        return json({
+          success: true,
+          status: fresh?.status ?? "pending_liquidity",
+          changed: true,
+          retried: true,
+          note: "pending_liquidity",
+        });
+      }
+      if (payout?.success && fresh) {
+        return json({
+          success: true,
+          status: fresh.status,
+          changed: fresh.status !== transfer.status,
+          retried: true,
+        });
+      }
+      // Still no provider ref — mark failed with a clear reason so UI is not stuck on Processing.
+      const reason =
+        payout?.error ||
+        payout?.provider_message ||
+        "Payout provider did not accept this transfer. Check Flutterwave transfer enablement and IP whitelist.";
+      if (fresh && !["failed", "completed", "cancelled"].includes(String(fresh.status))) {
+        const rev = await reverseTransferLedger(supabase, transfer_id);
+        await supabase.from("transfers").update({
+          status: "failed",
+          failure_reason: String(reason).slice(0, 500),
+        }).eq("id", transfer_id);
+        await supabase.from("notifications").insert({
+          user_id: transfer.sender_id,
+          title: rev.reversed ? "Transfer failed — refunded" : "Transfer failed",
+          message: rev.reversed
+            ? `${reason} Funds returned to your wallet.`
+            : String(reason),
+          type: "error",
+        });
+        return json({
+          success: true,
+          status: "failed",
+          changed: true,
+          retried: true,
+          error: reason,
+          refunded: rev.reversed,
+        });
+      }
+      return json({
+        success: true,
+        status: fresh?.status ?? transfer.status,
+        changed: false,
+        note: "no provider reference yet",
+        error: reason,
+      });
+    }
+
     if (!providerRef) {
       return json({ success: true, status: transfer.status, changed: false, note: "no provider reference yet" });
     }
 
     // Flutterwave V3: GET /transfers/{id}
-    const { ok, json: resp } = await flwV3Fetch(`/transfers/${encodeURIComponent(String(providerRef))}`, {
+    const { ok, json: resp } = await flwV3Fetch(`/transfers/${encodeURIComponent(providerRef)}`, {
       method: "GET", timeoutMs: 20_000,
     });
 

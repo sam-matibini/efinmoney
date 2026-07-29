@@ -1,12 +1,26 @@
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { Sparkles, Send, Plus, History, X, Loader2, Headphones } from "lucide-react";
-import { useAliceChat } from "@/hooks/useAliceChat";
+import ReactMarkdown from "react-markdown";
+import { useAliceChat, type AliceMessage } from "@/hooks/useAliceChat";
 import LiveSupportChat from "@/components/support/LiveSupportChat";
+
+/** Show human support after Alice has tried — not on a fresh empty chat. */
+function shouldOfferHumanSupport(messages: AliceMessage[]): boolean {
+  const replies = messages.filter((m) => m.role === "assistant" && !m.pending && m.content.trim());
+  if (replies.length === 0) return false;
+  if (replies.length >= 2) return true;
+  const last = replies[replies.length - 1].content;
+  if (last.startsWith("⚠️")) return true;
+  return /\b(talk to (a )?human|contact support|reach (out to )?support|speak (to|with) (our )?(support|a human|an agent|someone)|our support team|I('m| am) (not able|unable)|I can'?t (help|resolve|fix|fix that|do that)|beyond what I can|human support)\b/i.test(
+    last,
+  );
+}
 
 const STARTERS: Record<"user" | "admin", string[]> = {
   user: [
@@ -24,12 +38,14 @@ const STARTERS: Record<"user" | "admin", string[]> = {
 };
 
 export default function AliceWidget({ context }: { context: "user" | "admin" }) {
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<"alice" | "support">("alice");
   const [showHistory, setShowHistory] = useState(false);
   const [input, setInput] = useState("");
   const { messages, isSending, send, newChat, loadConversation, conversations } = useAliceChat(context);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const offerHumanSupport = context === "user" && shouldOfferHumanSupport(messages);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -196,11 +212,27 @@ export default function AliceWidget({ context }: { context: "user" | "admin" }) 
                 <div key={i} className={cn("flex", m.role === "user" ? "justify-end" : "justify-start")}>
                   <div
                     className={cn(
-                      "max-w-[85%] rounded-2xl px-3.5 py-2 text-sm whitespace-pre-wrap break-words",
-                      m.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted",
+                      "max-w-[85%] rounded-2xl px-3.5 py-2 text-sm break-words",
+                      m.role === "user" ? "bg-primary text-primary-foreground whitespace-pre-wrap" : "bg-muted",
                     )}
                   >
-                    {m.pending ? <Loader2 className="h-4 w-4 animate-spin" /> : m.content}
+                    {m.pending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : m.role === "assistant" ? (
+                      <div className="alice-md [&_p]:mb-2 [&_p:last-child]:mb-0 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-4 [&_li]:my-0.5 [&_strong]:font-semibold [&_a]:underline [&_a]:underline-offset-2">
+                        <ReactMarkdown
+                          components={{
+                            a: ({ href, children }) => (
+                              <a href={href} target="_blank" rel="noreferrer noopener">{children}</a>
+                            ),
+                          }}
+                        >
+                          {m.content}
+                        </ReactMarkdown>
+                      </div>
+                    ) : (
+                      m.content
+                    )}
                   </div>
                 </div>
               ))}
@@ -208,16 +240,16 @@ export default function AliceWidget({ context }: { context: "user" | "admin" }) 
             </div>
           </ScrollArea>
 
-          {/* Live support bridge + composer */}
+          {/* Human support — only after Alice has tried and still can’t resolve */}
           <div className="border-t shrink-0">
-            {context === "user" && (
+            {offerHumanSupport && (
               <button
                 type="button"
                 onClick={() => setMode("support")}
                 className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors border-b"
               >
                 <Headphones className="h-4 w-4 shrink-0" />
-                <span className="flex-1 text-left">Need a human? Talk to support</span>
+                <span className="flex-1 text-left">Still stuck? Talk to a human</span>
               </button>
             )}
             <form

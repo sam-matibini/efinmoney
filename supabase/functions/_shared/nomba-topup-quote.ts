@@ -6,7 +6,8 @@ export const NOMBA_TOPUP_FEE_FIXED: Record<string, number> = {
   USD: 0.30,
   EUR: 0.30,
   GBP: 0.30,
-  NGN: 100,
+  // Keep NGN fixed small — ₦100 was punishing small card sends (₦120 → ₦222 charge).
+  NGN: 10,
 };
 
 export type FxRateRow = {

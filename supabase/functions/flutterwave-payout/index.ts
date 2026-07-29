@@ -53,7 +53,15 @@ function normalizePhone(phone: string): string { return phone.replace(/\D/g, "")
 
 function isTemporaryProviderSetupError(message: string): boolean {
   const m = message.toLowerCase();
-  return m.includes("ip whitelisting") || m.includes("whitelist") || m.includes("access this service");
+  return (
+    m.includes("ip whitelisting") ||
+    m.includes("whitelist") ||
+    m.includes("non whitelisted") ||
+    m.includes("access this service") ||
+    m.includes("not enabled to make transfers") ||
+    m.includes("transfers currently unavailable") ||
+    m.includes("merchant is not enabled")
+  );
 }
 
 function isProviderBalanceError(message: string): boolean {

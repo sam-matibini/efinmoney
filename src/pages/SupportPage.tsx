@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   ArrowLeft, Plus, Send, Loader2, MessageSquare, Headphones,
   Paperclip, X, FileText, Share2, Mail, Smartphone, Download,
@@ -204,10 +205,19 @@ function ShareButton({ thread, messages }: { thread: SupportThread; messages: im
 /* ── Main page ──────────────────────────────────────────────────────────── */
 const SupportPage = () => {
   const { data: threads = [], isLoading } = useSupportThreads();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [activeId, setActiveId] = useState<string | null>(null);
   const [composingNew, setComposingNew] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const deleteThreads = useDeleteThreads();
+
+  useEffect(() => {
+    if (searchParams.get("new") !== "1") return;
+    setComposingNew(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete("new");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const active = threads.find((t) => t.id === activeId) || null;
 
@@ -243,7 +253,7 @@ const SupportPage = () => {
           <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center"><Headphones className="w-5 h-5" /></div>
           <div>
             <h1 className="text-xl font-bold">Support</h1>
-            <p className="text-sm text-muted-foreground">Message our team — we usually reply within a day</p>
+            <p className="text-sm text-muted-foreground">Message our team — replies show up here in real time</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -262,7 +272,7 @@ const SupportPage = () => {
         label="Support center"
         value={`${threads.length} conversation${threads.length === 1 ? "" : "s"}`}
         meta={[
-          { icon: MessageSquare, text: "We usually reply within one business day" },
+          { icon: MessageSquare, text: "Team replies appear here in real time" },
           { icon: Plus, text: "Start a new thread anytime" },
         ]}
         variant="sky"

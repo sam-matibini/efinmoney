@@ -35,6 +35,7 @@ export async function initiateSwychrCollection(params: {
   email?: string;
   name?: string;
   mobile?: string;
+  return_url?: string;
 }): Promise<SwychrCollectionResult> {
   const { data, error } = await supabase.functions.invoke("swychr-collection", { body: params });
   const payload = (data ?? {}) as SwychrCollectionResult & { error?: string; message?: string };

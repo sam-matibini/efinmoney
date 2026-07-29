@@ -24,6 +24,7 @@ import { toast } from "sonner";
 import { CheckCircle2, XCircle, CreditCard, Smartphone, Building2, Globe, Wallet, FileText, Landmark } from "lucide-react";
 import { useWallets } from "@/hooks/useWallets";
 import { useAuth } from "@/hooks/useAuth";
+import { useUserRoles } from "@/hooks/useUserRoles";
 import ElicateTopUpCard from "@/components/payments/ElicateTopUpCard";
 import CadInteracTopUpCard from "@/components/payments/CadInteracTopUpCard";
 import GhanaTopUpCard from "@/components/payments/GhanaTopUpCard";
@@ -44,6 +45,7 @@ import {
   type AfricanTopupProvider,
   LENHUB_FLUTTER_TOPUP_CURRENCIES,
   FLW_WESTERN_TOPUP_CURRENCIES,
+  FLW_AFRICA_TOPUP_CURRENCIES,
   FINCRA_AFRICA_TOPUP_CURRENCIES,
   type IntlTopupMethod,
   type AfricaMomoTopupMethod,
@@ -58,11 +60,18 @@ import {
   swychrGatewayLabel,
   intlMethodLabel,
   intlMethodDescription,
+  intlMethodBenefit,
+  intlMethodProvider,
   africaMomoMethodLabel,
   africaMomoMethodDescription,
+  africaMomoMethodBenefit,
+  africaMomoMethodProvider,
+  gatewayProviderLabel,
+  isNombaTopupComingSoon,
 } from "@/lib/walletTopupGateway";
 import { clearPendingSwychrTxn } from "@/lib/swychrPay";
 import FlutterwaveWesternTopUpHints from "@/components/wallets/FlutterwaveWesternTopUpHints";
+import TopUpMethodPicker from "@/components/payments/TopUpMethodPicker";
 import { buildFincraTopupRedirectUrl, parseFincraReturnReference, isFincraCheckoutCurrency } from "@/lib/fincraTopup";
 import { clearPendingNombaTxn } from "@/lib/nombaPay";
 import { clearPendingPaytotaTxn, confirmPaytotaPayment, readPendingPaytotaTxn } from "@/lib/paytotaPay";
@@ -82,27 +91,30 @@ type Gateway = WalletTopupGateway;
 function availableIntlMethods(currency: string): IntlTopupMethod[] {
   const c = currency.toUpperCase();
   const methods: IntlTopupMethod[] = [];
-  // Western multi-rail (USD/EUR/GBP/CAD)
+  // Western multi-rail (USD/EUR/GBP/CAD) — Nomba Express card shown but Coming soon
   if (MULTI_RAIL_TOPUP_CURRENCIES.includes(c)) {
     if (productFeatures.nombaNigeria) methods.push("nomba");
     if (productFeatures.fincra && ["USD", "EUR", "GBP", "CAD"].includes(c)) methods.push("fincra");
     if (productFeatures.paytota) methods.push("paytota");
     if (c === "CAD" && productFeatures.fincraInterac) methods.push("interac");
-    // Company Flutterwave card collect — USD/CAD only (not EUR/GBP on this merchant path)
     if (productFeatures.flutterwave && FLW_WESTERN_TOPUP_CURRENCIES.includes(c)) {
       methods.push("flutterwave");
     }
     if (productFeatures.lenhubFlutter) methods.push("lenhub");
     return methods;
   }
-  // NGN: Lenhub + Nomba + Fincra
+  // NGN: Nomba primary, then Lenhub + Fincra + company Flutterwave
   if (c === "NGN") {
-    if (productFeatures.lenhubFlutter) methods.push("lenhub");
     if (productFeatures.nombaNigeria) methods.push("nomba");
+    if (productFeatures.lenhubFlutter) methods.push("lenhub");
     if (productFeatures.fincra) methods.push("fincra");
+    if (productFeatures.flutterwave) methods.push("flutterwave");
     return methods;
   }
-  // Other Africa wallets: direct card as an optional extra rail (query ?method=lenhub)
+  // Africa collect: Lenhub Card (direct) is offered in the Africa MoMo chooser
+  if (AFRICA_MOMO_MULTI_RAIL_CURRENCIES.includes(c)) {
+    return methods;
+  }
   if (productFeatures.lenhubFlutter && LENHUB_FLUTTER_TOPUP_CURRENCIES.includes(c)) {
     methods.push("lenhub");
   }
@@ -119,30 +131,38 @@ function availableAfricaMomoMethods(currency: string): AfricaMomoTopupMethod[] {
   // Paytota first for East Africa MoMo (UGX/KES/RWF) so Top Up defaults to it
   if (productFeatures.paytota && PAYTOTA_AFRICA_TOPUP_CURRENCIES.includes(c)) methods.push("paytota");
   if (productFeatures.swychr && SWYCHR_TOPUP_CURRENCIES.includes(c)) methods.push("swychr");
-  // Flutterwave V4 MoMo — live on this merchant for KES/UGX/RWF/TZS
-  if (productFeatures.flutterwave && ["KES", "UGX", "RWF", "TZS"].includes(c)) methods.push("flutterwave");
+  // Company Flutterwave — Africa card / MoMo (NGN is on the intl NGN picker)
+  if (productFeatures.flutterwave && FLW_AFRICA_TOPUP_CURRENCIES.includes(c) && c !== "NGN") {
+    methods.push("flutterwave");
+  }
   // Fincra as extra hosted checkout where merchant collect works
   if (productFeatures.fincra && FINCRA_AFRICA_TOPUP_CURRENCIES.includes(c)) methods.push("fincra");
+  // Lenhub Card (direct) — always visible for GHS/KES/UGX/RWF/TZS when feature on
+  if (productFeatures.lenhubFlutter && LENHUB_FLUTTER_TOPUP_CURRENCIES.includes(c)) {
+    methods.push("lenhub");
+  }
   return methods;
 }
 
 function initialIntlMethod(params: URLSearchParams, currency: string): IntlTopupMethod | null {
   const methods = availableIntlMethods(currency);
   if (methods.length === 0) return null;
+  const selectable = methods.filter((m) => !(m === "nomba" && isNombaTopupComingSoon(currency)));
+  const pool = selectable.length > 0 ? selectable : methods;
   const fromQuery = params.get("method")?.toLowerCase() || params.get("provider")?.toLowerCase() || params.get("rail")?.toLowerCase();
-  if (fromQuery === "interac" && methods.includes("interac")) return "interac";
-  if ((fromQuery === "fincra" || fromQuery === "bank") && methods.includes("fincra")) return "fincra";
-  if (fromQuery === "bank" && methods.includes("lenhub") && currency.toUpperCase() === "NGN") return "lenhub";
-  if ((fromQuery === "paytota" || fromQuery === "invoice") && methods.includes("paytota")) return "paytota";
-  if ((fromQuery === "nomba" || fromQuery === "card" || fromQuery === "express") && methods.includes("nomba")) return "nomba";
-  if ((fromQuery === "lenhub" || fromQuery === "direct" || fromQuery === "ngn") && methods.includes("lenhub")) return "lenhub";
+  if (fromQuery === "interac" && pool.includes("interac")) return "interac";
+  if ((fromQuery === "fincra" || fromQuery === "bank") && pool.includes("fincra")) return "fincra";
+  if (fromQuery === "bank" && pool.includes("lenhub") && currency.toUpperCase() === "NGN") return "lenhub";
+  if ((fromQuery === "paytota" || fromQuery === "invoice") && pool.includes("paytota")) return "paytota";
+  if ((fromQuery === "nomba" || fromQuery === "card" || fromQuery === "express") && pool.includes("nomba")) return "nomba";
+  if ((fromQuery === "lenhub" || fromQuery === "direct" || fromQuery === "ngn") && pool.includes("lenhub")) return "lenhub";
   if (
     (fromQuery === "flutterwave" || fromQuery === "flw" || fromQuery === "company") &&
-    methods.includes("flutterwave")
+    pool.includes("flutterwave")
   ) {
     return "flutterwave";
   }
-  return methods[0];
+  return pool[0];
 }
 
 function initialAfricaMomoMethod(params: URLSearchParams, currency: string): AfricaMomoTopupMethod | null {
@@ -157,6 +177,9 @@ function initialAfricaMomoMethod(params: URLSearchParams, currency: string): Afr
   if ((fromQuery === "fincra" || fromQuery === "bank") && methods.includes("fincra")) return "fincra";
   if ((fromQuery === "ghana" || fromQuery === "ghana_pay") && methods.includes("ghana")) return "ghana";
   if ((fromQuery === "elicate" || fromQuery === "zambia") && methods.includes("elicate")) return "elicate";
+  if ((fromQuery === "lenhub" || fromQuery === "direct" || fromQuery === "card") && methods.includes("lenhub")) {
+    return "lenhub";
+  }
   return methods[0];
 }
 
@@ -208,6 +231,8 @@ const TopUpPage = () => {
   const [params, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { isAdmin, isFinance, isCompliance } = useUserRoles();
+  const showStaffRails = isAdmin || isFinance || isCompliance;
   const { data: wallets, isLoading: walletsLoading } = useWallets();
   const { data: fxRates = [] } = useFxRates();
 
@@ -278,18 +303,11 @@ const TopUpPage = () => {
       setIntlMethod(null);
       return;
     }
-    const ccy = currency.toUpperCase();
-    const onlyLenhubExtra = intlMethods.length === 1 && intlMethods[0] === "lenhub"
-      && !MULTI_RAIL_TOPUP_CURRENCIES.includes(ccy)
-      && ccy !== "NGN";
-    if (onlyLenhubExtra) {
-      const q = (params.get("method") || params.get("provider") || params.get("rail") || "").toLowerCase();
-      setIntlMethod(q === "lenhub" || q === "direct" ? "lenhub" : null);
-      return;
-    }
     const preferred = initialIntlMethod(params, currency);
     setIntlMethod((prev) => {
-      if (prev && intlMethods.includes(prev)) return prev;
+      if (prev && intlMethods.includes(prev) && !(prev === "nomba" && isNombaTopupComingSoon(currency))) {
+        return prev;
+      }
       return preferred;
     });
   }, [currency, intlMethods, params]);
@@ -333,7 +351,7 @@ const TopUpPage = () => {
     africaMomoMethod === "flutterwave" || intlMethod === "flutterwave";
   const preferInterac = intlMethod === "interac";
   const preferFincra = intlMethod === "fincra" || africaMomoMethod === "fincra";
-  const preferLenhubFlutter = intlMethod === "lenhub";
+  const preferLenhubFlutter = intlMethod === "lenhub" || africaMomoMethod === "lenhub";
   const preferSwychrResolved =
     africaMomoMethod === "swychr"
     || (
@@ -343,6 +361,7 @@ const TopUpPage = () => {
       && africaMomoMethod !== "flutterwave"
       && africaMomoMethod !== "ghana"
       && africaMomoMethod !== "elicate"
+      && africaMomoMethod !== "lenhub"
     );
   const preferPaytotaResolved =
     intlMethod === "paytota"
@@ -352,6 +371,7 @@ const TopUpPage = () => {
       && africaMomoMethod !== "fincra"
       && africaMomoMethod !== "swychr"
       && africaMomoMethod !== "flutterwave"
+      && africaMomoMethod !== "lenhub"
     );
   const gateway: Gateway = routeWalletTopupGateway(
     currency,
@@ -626,20 +646,71 @@ const TopUpPage = () => {
       };
     }
     if (gateway === "ghana_pay") return { label: "Mobile money", icon: Smartphone, color: "bg-yellow-500/10 text-yellow-700 border-yellow-500/30" };
-    if (gateway === "elicate") return { label: "Mobile Money", icon: Smartphone, color: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30" };
+    if (gateway === "elicate") return { label: "Mobile money", icon: Smartphone, color: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30" };
     if (gateway === "fincra_interac") return { label: "Interac e-Transfer", icon: Landmark, color: "bg-red-500/10 text-red-700 border-red-500/30" };
     if (gateway === "fincra") return { label: fincraGatewayLabel(currency), icon: Building2, color: "bg-teal-500/10 text-teal-600 border-teal-500/30" };
-    if (gateway === "flutterwave") return { label: "Card", icon: CreditCard, color: "bg-orange-500/10 text-orange-500 border-orange-500/30" };
+    if (gateway === "flutterwave") {
+      return {
+        label: currency === "NGN" ? "Card, bank or USSD" : "Card checkout",
+        icon: CreditCard,
+        color: "bg-orange-500/10 text-orange-500 border-orange-500/30",
+      };
+    }
     return { label: "Unavailable", icon: XCircle, color: "bg-muted text-muted-foreground" };
   }, [gateway, currency]);
+
+  const intlPickerOptions = useMemo(
+    () =>
+      intlMethods.map((m) => {
+        const Icon =
+          m === "paytota" ? FileText
+          : m === "interac" ? Landmark
+          : m === "fincra" ? Building2
+          : CreditCard;
+        return {
+          id: m,
+          title: intlMethodLabel(m, currency),
+          description: intlMethodDescription(m, currency),
+          benefit: intlMethodBenefit(m),
+          provider: intlMethodProvider(m),
+          comingSoon: m === "nomba" && isNombaTopupComingSoon(currency),
+          icon: Icon,
+        };
+      }),
+    [intlMethods, currency],
+  );
+
+  const africaPickerOptions = useMemo(
+    () =>
+      africaMomoMethods.map((m) => {
+        const Icon =
+          m === "paytota" ? FileText
+          : m === "fincra" ? Building2
+          : m === "lenhub" ? CreditCard
+          : Smartphone;
+        return {
+          id: m,
+          title: m === "fincra" ? fincraGatewayLabel(currency) : africaMomoMethodLabel(m),
+          description: africaMomoMethodDescription(m, currency),
+          benefit: africaMomoMethodBenefit(m),
+          provider: africaMomoMethodProvider(m),
+          icon: Icon,
+        };
+      }),
+    [africaMomoMethods, currency],
+  );
+
+  const staffGatewayProvider = showStaffRails ? gatewayProviderLabel(gateway) : null;
 
   return (
     <AppPage width="default">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
           <BackToDashboard />
           <div>
-            <h1 className="text-2xl font-display font-bold">Add Money</h1>
-            <p className="text-muted-foreground">Top up your wallet using the best route for your currency.</p>
+            <h1 className="text-2xl sm:text-3xl font-display font-bold tracking-tight">Add Money</h1>
+            <p className="text-muted-foreground text-sm sm:text-base mt-1">
+              Pick a wallet, choose how to pay, then enter the amount.
+            </p>
           </div>
 
           <PageHeroBanner
@@ -651,7 +722,7 @@ const TopUpPage = () => {
                 : "Select a wallet to fund"
             }
             meta={[
-              { icon: CreditCard, text: liveTopup ? `${nombaGatewayLabel(currency)} · card & bank routes` : "Choose a supported currency" },
+              { icon: CreditCard, text: liveTopup ? "Secure checkout for your currency" : "Choose a supported currency" },
               { icon: Globe, text: `${wallets?.length ?? 0} wallets available` },
             ]}
             variant="emerald"
@@ -711,19 +782,22 @@ const TopUpPage = () => {
             </AlertDialogContent>
           </AlertDialog>
 
+          {/* Checkout shell */}
+          <div className="rounded-2xl border border-border bg-gradient-to-b from-muted/40 to-background p-1 sm:p-1.5 space-y-1.5 sm:space-y-2">
           {/* Wallet selector */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">1. Choose wallet to top up</CardTitle>
-            </CardHeader>
-            <CardContent>
+          <section className="rounded-xl border border-border bg-card overflow-hidden">
+            <header className="px-4 sm:px-5 py-4 border-b border-border bg-muted/30">
+              <h2 className="text-base font-semibold tracking-tight">1. Choose wallet to top up</h2>
+              <p className="mt-0.5 text-sm text-muted-foreground">Funds credit the wallet you select here.</p>
+            </header>
+            <div className="p-4 sm:p-5">
               {walletsLoading ? (
                 <Skeleton className="h-12 w-full" />
               ) : !wallets || wallets.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No wallets available. Create one first.</p>
               ) : (
                 <Select value={selectedWalletId} onValueChange={setSelectedWalletId}>
-                  <SelectTrigger><SelectValue placeholder="Select wallet" /></SelectTrigger>
+                  <SelectTrigger className="h-12"><SelectValue placeholder="Select wallet" /></SelectTrigger>
                   <SelectContent>
                     {wallets.map((w) => (
                       <SelectItem key={w.wallet_id} value={w.wallet_id}>
@@ -736,189 +810,95 @@ const TopUpPage = () => {
 
               {selectedWallet && (
                 <div className="mt-3 flex items-center gap-2 flex-wrap">
-                  <span className="text-xs text-muted-foreground">Payment via</span>
+                  <span className="text-xs text-muted-foreground">Selected method</span>
                   <Badge variant="outline" className={gatewayBadge.color}>
                     <gatewayBadge.icon className="w-3 h-3 mr-1" />
                     {gatewayBadge.label}
                   </Badge>
+                  {staffGatewayProvider ? (
+                    <Badge variant="outline" className="border-dashed border-amber-600/40 bg-amber-500/10 text-amber-800 dark:text-amber-300 text-[10px] uppercase tracking-wide">
+                      {staffGatewayProvider}
+                    </Badge>
+                  ) : null}
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </section>
 
           {showWesternProviderChoice && selectedWallet && productFeatures.flutterwave && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">2. Choose how to pay</CardTitle>
-                <CardDescription>
-                  Pick a payment method for your {currency} wallet.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="grid gap-3 sm:grid-cols-2">
-                <button
-                  type="button"
-                  onClick={() => setWesternProvider("flutterwave")}
-                  className={cn(
-                    "rounded-lg border p-4 text-left transition-colors",
-                    westernProvider === "flutterwave"
-                      ? "border-orange-500 bg-orange-500/10 ring-1 ring-orange-500/40"
-                      : "border-border hover:border-orange-500/40",
-                  )}
-                >
-                  <div className="flex items-center gap-2 font-medium">
-                    <CreditCard className="h-4 w-4 text-orange-500" />
-                    Card
-                  </div>
-                  <p className="mt-1.5 text-xs text-muted-foreground">
-                    Flutterwave hosted checkout — pay on their page (no in-app card entry).
-                  </p>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setWesternProvider("fincra")}
-                  className={cn(
-                    "rounded-lg border p-4 text-left transition-colors",
-                    westernProvider === "fincra"
-                      ? "border-teal-500 bg-teal-500/10 ring-1 ring-teal-500/40"
-                      : "border-border hover:border-teal-500/40",
-                  )}
-                >
-                  <div className="flex items-center gap-2 font-medium">
-                    <Globe className="h-4 w-4 text-teal-600" />
-                    Bank or card
-                  </div>
-                  <p className="mt-1.5 text-xs text-muted-foreground">
-                    Hosted checkout for {currency} — card and bank transfer where supported.
-                  </p>
-                </button>
-              </CardContent>
-            </Card>
+            <TopUpMethodPicker
+              showProvider={showStaffRails}
+              description={`Choose the experience that fits your ${currency} wallet.`}
+              value={westernProvider}
+              onChange={(id) => setWesternProvider(id as WesternTopupProvider)}
+              options={[
+                {
+                  id: "flutterwave",
+                  title: "Card checkout",
+                  description: `Complete card payment on a secure page for ${currency}.`,
+                  benefit: "Hosted",
+                  provider: "Flutterwave",
+                  icon: CreditCard,
+                },
+                {
+                  id: "fincra",
+                  title: "Bank or card",
+                  description: `Pay with card or bank transfer on a secure page for ${currency}.`,
+                  benefit: "Flexible",
+                  provider: "Fincra",
+                  icon: Globe,
+                },
+              ]}
+            />
           )}
 
           {showAfricanProviderChoice && selectedWallet && productFeatures.flutterwave && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">2. Choose how to pay</CardTitle>
-                <CardDescription>
-                  Pick a payment method for your {currency} wallet.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="grid gap-3 sm:grid-cols-2">
-                <button
-                  type="button"
-                  onClick={() => setAfricanProvider("flutterwave")}
-                  className={cn(
-                    "rounded-lg border p-4 text-left transition-colors",
-                    africanProvider === "flutterwave"
-                      ? "border-orange-500 bg-orange-500/10 ring-1 ring-orange-500/40"
-                      : "border-border hover:border-orange-500/40",
-                  )}
-                >
-                  <div className="flex items-center gap-2 font-medium">
-                    <CreditCard className="h-4 w-4 text-orange-500" />
-                    Card
-                  </div>
-                  <p className="mt-1.5 text-xs text-muted-foreground">
-                    Card, bank transfer, USSD, or mobile money where supported.
-                  </p>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAfricanProvider("fincra")}
-                  className={cn(
-                    "rounded-lg border p-4 text-left transition-colors",
-                    africanProvider === "fincra"
-                      ? "border-teal-500 bg-teal-500/10 ring-1 ring-teal-500/40"
-                      : "border-border hover:border-teal-500/40",
-                  )}
-                >
-                  <div className="flex items-center gap-2 font-medium">
-                    <Building2 className="h-4 w-4 text-teal-600" />
-                    Card or bank transfer
-                  </div>
-                  <p className="mt-1.5 text-xs text-muted-foreground">
-                    Hosted checkout — card, bank transfer, mobile money by corridor.
-                  </p>
-                </button>
-              </CardContent>
-            </Card>
+            <TopUpMethodPicker
+              showProvider={showStaffRails}
+              description={`Choose the experience that fits your ${currency} wallet.`}
+              value={africanProvider}
+              onChange={(id) => setAfricanProvider(id as AfricanTopupProvider)}
+              options={[
+                {
+                  id: "flutterwave",
+                  title: "Card checkout",
+                  description: `Card, bank, USSD, or mobile money where supported for ${currency}.`,
+                  benefit: "Hosted",
+                  provider: "Flutterwave",
+                  icon: CreditCard,
+                },
+                {
+                  id: "fincra",
+                  title: fincraGatewayLabel(currency),
+                  description: `Card, bank transfer, or mobile money on a secure page for ${currency}.`,
+                  benefit: "Flexible",
+                  provider: "Fincra",
+                  icon: Building2,
+                },
+              ]}
+            />
           )}
 
           {showIntlMethodChoice && selectedWallet && liveTopup && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">2. Choose how to pay</CardTitle>
-                <CardDescription>
-                  Multiple ways to fund your {currency} wallet — pick one.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="grid gap-3 sm:grid-cols-2">
-                {intlMethods.map((m) => {
-                  const Icon = m === "paytota" ? FileText : m === "interac" ? Landmark : m === "fincra" ? Building2 : CreditCard;
-                  const selected = intlMethod === m;
-                  return (
-                    <button
-                      key={m}
-                      type="button"
-                      onClick={() => setIntlMethod(m)}
-                      className={cn(
-                        "rounded-lg border p-4 text-left transition-colors",
-                        selected
-                          ? "border-primary bg-primary/10 ring-1 ring-primary/40"
-                          : "border-border hover:border-primary/40",
-                      )}
-                    >
-                      <div className="flex items-center gap-2 font-medium">
-                        <Icon className="h-4 w-4 text-primary" />
-                        {intlMethodLabel(m, currency)}
-                      </div>
-                      <p className="mt-1.5 text-xs text-muted-foreground">
-                        {intlMethodDescription(m, currency)}
-                      </p>
-                    </button>
-                  );
-                })}
-              </CardContent>
-            </Card>
+            <TopUpMethodPicker
+              showProvider={showStaffRails}
+              description={`Pick the option that works best for funding your ${currency} wallet.`}
+              value={intlMethod}
+              onChange={(id) => setIntlMethod(id as IntlTopupMethod)}
+              options={intlPickerOptions}
+            />
           )}
 
           {showAfricaMomoChoice && selectedWallet && liveTopup && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">2. Choose how to pay</CardTitle>
-                <CardDescription>
-                  Multiple ways to fund your {currency} wallet — pick one.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="grid gap-3 sm:grid-cols-2">
-                {africaMomoMethods.map((m) => {
-                  const Icon = m === "paytota" ? FileText : m === "fincra" ? Building2 : Smartphone;
-                  const selected = africaMomoMethod === m;
-                  return (
-                    <button
-                      key={m}
-                      type="button"
-                      onClick={() => setAfricaMomoMethod(m)}
-                      className={cn(
-                        "rounded-lg border p-4 text-left transition-colors",
-                        selected
-                          ? "border-primary bg-primary/10 ring-1 ring-primary/40"
-                          : "border-border hover:border-primary/40",
-                      )}
-                    >
-                      <div className="flex items-center gap-2 font-medium">
-                        <Icon className="h-4 w-4 text-primary" />
-                        {m === "fincra" ? fincraGatewayLabel(currency) : africaMomoMethodLabel(m)}
-                      </div>
-                      <p className="mt-1.5 text-xs text-muted-foreground">
-                        {africaMomoMethodDescription(m, currency)}
-                      </p>
-                    </button>
-                  );
-                })}
-              </CardContent>
-            </Card>
+            <TopUpMethodPicker
+              showProvider={showStaffRails}
+              description={`Pick the option that works best for funding your ${currency} wallet.`}
+              value={africaMomoMethod}
+              onChange={(id) => setAfricaMomoMethod(id as AfricaMomoTopupMethod)}
+              options={africaPickerOptions}
+            />
           )}
+          </div>
 
           {!liveTopup && selectedWallet && (
             <ComingSoon
@@ -939,7 +919,7 @@ const TopUpPage = () => {
             </Card>
           )}
 
-          {/* Flutterwave — MoMo (V4) + card hosted Standard checkout (redirect, no PCI) */}
+          {/* Flutterwave — MoMo (V4) + card/bank hosted Standard checkout (redirect, no PCI) */}
           {productFeatures.flutterwave && gateway === "flutterwave" && selectedWallet && liveTopup && (
             <div className="space-y-4">
               {(availableFlwMethods.includes("mobilemoney") || currency === "TZS") && (
@@ -951,10 +931,15 @@ const TopUpPage = () => {
                   }}
                 />
               )}
-              {availableFlwMethods.includes("card") && (
+              {(availableFlwMethods.includes("card") ||
+                availableFlwMethods.includes("banktransfer") ||
+                availableFlwMethods.includes("ussd")) && (
                 <FlutterwaveHostedTopUpCard
                   walletId={selectedWallet.wallet_id}
                   walletCurrency={currency}
+                  methods={availableFlwMethods.filter((m) =>
+                    ["card", "banktransfer", "ussd"].includes(m),
+                  )}
                   onComplete={() => {
                     void queryClient.invalidateQueries({ queryKey: ["wallets"] });
                   }}

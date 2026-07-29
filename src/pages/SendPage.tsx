@@ -30,7 +30,7 @@ import { useFundingSources } from "@/hooks/useFundingSources";
 import { useSavedCards } from "@/hooks/useSavedCards";
 import { usePricingConfig } from "@/hooks/usePricingConfig";
 import { supabase } from "@/integrations/supabase/client";
-import { fetchFxRate, cardChargeCurrency, initializeFlwPayment } from "@/lib/flutterwave";
+import { fetchFxRate, cardChargeCurrency, initializeFlwPayment, verifyFlwPayment } from "@/lib/flutterwave";
 import {
   getNigeriaBanks,
   resolveNigeriaAccount,
@@ -57,10 +57,26 @@ import { parseAmount } from "@/components/fx/liveFxUtils";
 import { clearSendHandoff, readSendHandoff } from "@/lib/sendHandoff";
 import {
   clearCardSendIntent,
+  clearPendingFlwTxn,
   markCardSendIntentConsumed,
+  patchCardSendIntent,
   readCardSendIntent,
+  readPendingFlwTxn,
   saveCardSendIntent,
+  savePendingFlwTxn,
+  type CardSendProvider,
 } from "@/lib/cardSendIntent";
+import {
+  cardSendDestCurrencies,
+  cardSendMinAmount,
+  cardSendProviderBenefit,
+  cardSendProviderDescription,
+  cardSendProviderLabel,
+  cardSendProviderStaffName,
+  cardSendProvidersForCorridor,
+  flutterwaveCardSendPaymentMethod,
+  isCardSendCollectCurrency,
+} from "@/lib/cardSendRails";
 import {
   clearPendingNombaTxn,
   getNombaPayStatus,
@@ -70,8 +86,26 @@ import {
   readPendingNombaTxn,
   savePendingNombaTxn,
 } from "@/lib/nombaPay";
+import {
+  clearPendingPaytotaTxn,
+  confirmPaytotaPayment,
+  getPaytotaPayStatus,
+  initiatePaytotaCollection,
+  readPendingPaytotaTxn,
+  savePendingPaytotaTxn,
+} from "@/lib/paytotaPay";
+import {
+  clearPendingSwychrTxn,
+  getSwychrPayinStatus,
+  initiateSwychrCollection,
+  readPendingSwychrTxn,
+  savePendingSwychrTxn,
+  verifySwychrPayin,
+} from "@/lib/swychrPay";
 import { quoteDirectNombaTopup, quoteCadNombaTopup } from "@/lib/nombaTopupQuote";
 import { productFeatures } from "@/lib/productFeatures";
+import LenhubFlutterTopUpCard from "@/components/payments/LenhubFlutterTopUpCard";
+import { useUserRoles } from "@/hooks/useUserRoles";
 import { cn } from "@/lib/utils";
 import PageHeroBanner from "@/components/common/PageHeroBanner";
 import AppPage from "@/components/layout/AppPage";
@@ -165,10 +199,19 @@ const SendPage = () => {
   const [usePawapay, setUsePawapay] = useState<boolean>(false);
   const [usePaytota, setUsePaytota] = useState<boolean>(false);
   const [useFincra, setUseFincra] = useState<boolean>(import.meta.env.VITE_FINCRA_PAYOUT === "true");
+  /** White-label alternate: Lenhub Flutter NGN bank (default is Nomba). */
+  const [useLenhubFlutter, setUseLenhubFlutter] = useState(false);
+  /** White-label alternate: Swychr NGN bank. */
+  const [useSwychr, setUseSwychr] = useState(false);
+  /** White-label alternate: Flutterwave MoMo / bank. */
+  const [useFlutterwave, setUseFlutterwave] = useState(false);
+  const [cardSendProvider, setCardSendProvider] = useState<CardSendProvider | null>(null);
+  const [showLenhubCollect, setShowLenhubCollect] = useState(false);
   const [fromQuickSend, setFromQuickSend] = useState(false);
   const [cardResumeProcessing, setCardResumeProcessing] = useState(false);
   const [cardResumeStage, setCardResumeStage] = useState<CardResumeStage>("confirming");
   const cardResumeLock = useRef(false);
+  const [lenhubResumeTick, setLenhubResumeTick] = useState(0);
 
   // Ghana bank payout state (toggle between Mobile Money and Bank Transfer)
   const [ghPayoutMode, setGhPayoutMode] = useState<'mobile' | 'bank'>('mobile');
@@ -186,9 +229,17 @@ const SendPage = () => {
   const navigate = useNavigate();
 
   const { user } = useAuth();
+  const { isAdmin, isFinance, isCompliance } = useUserRoles();
+  const showStaffRails = isAdmin || isFinance || isCompliance;
   const [searchParams, setSearchParams] = useSearchParams();
   useEffect(() => {
     if (searchParams.get("payout") === "fincra") setUseFincra(true);
+    if (searchParams.get("payout") === "lenhub") setUseLenhubFlutter(true);
+    if (searchParams.get("payout") === "swychr") setUseSwychr(true);
+    if (searchParams.get("payout") === "paytota") setUsePaytota(true);
+    if (searchParams.get("payout") === "flutterwave" || searchParams.get("payout") === "flw") {
+      setUseFlutterwave(true);
+    }
   }, [searchParams]);
   const { data: beneficiaries } = useBeneficiaries();
 
@@ -293,9 +344,9 @@ const SendPage = () => {
   const sourceCurrency = fundingSource === 'wallet'
     ? (selectedWallet?.currency_code || profileCurrency || 'USD')
     : fundingSource === 'card'
-    ? (selectedWallet && isNombaTopupCurrency(selectedWallet.currency_code)
+    ? (selectedWallet && isCardSendCollectCurrency(selectedWallet.currency_code)
       ? selectedWallet.currency_code
-      : (profileCurrency && isNombaTopupCurrency(profileCurrency) ? profileCurrency : 'USD'))
+      : (profileCurrency && isCardSendCollectCurrency(profileCurrency) ? profileCurrency : 'USD'))
     : (selectedExternalSource?.currency_code || profileCurrency || 'USD');
   const sourceSymbol = currencySymbol(sourceCurrency);
   const targetSymbol = targetCountry.symbol || targetCountry.code;
@@ -523,19 +574,60 @@ const SendPage = () => {
     && parsedAmount > 0
     && parsedAmount > Number(selectedWallet.balance);
 
-  const nombaWallets = useMemo(
-    () => (wallets ?? []).filter((w) => isNombaTopupCurrency(w.currency_code)),
+  const cardWallets = useMemo(
+    () =>
+      (wallets ?? []).filter((w) => {
+        const c = w.currency_code.toUpperCase();
+        if (!isCardSendCollectCurrency(c)) return false;
+        if (c === "NGN") {
+          return productFeatures.nombaNigeria || productFeatures.lenhubFlutter || productFeatures.flutterwave;
+        }
+        if (["USD", "CAD"].includes(c)) {
+          return productFeatures.lenhubFlutter || productFeatures.paytota || productFeatures.flutterwave;
+        }
+        if (["EUR", "GBP"].includes(c)) {
+          return productFeatures.lenhubFlutter || productFeatures.paytota;
+        }
+        if (c === "GHS") return productFeatures.lenhubFlutter || productFeatures.flutterwave;
+        if (c === "RWF") return productFeatures.paytota || productFeatures.flutterwave;
+        if (c === "TZS" || c === "ZMW") return productFeatures.flutterwave;
+        if (c === "XAF" || c === "XOF") return productFeatures.swychr;
+        if (c === "KES" || c === "UGX") {
+          return productFeatures.lenhubFlutter || productFeatures.paytota || productFeatures.swychr || productFeatures.flutterwave;
+        }
+        return false;
+      }),
     [wallets],
   );
-  const nombaWalletCodes = useMemo(
-    () => [...new Set(nombaWallets.map((w) => w.currency_code))],
-    [nombaWallets],
+  const cardWalletCodes = useMemo(
+    () => [...new Set(cardWallets.map((w) => w.currency_code))],
+    [cardWallets],
   );
-  const cardPayoutCodes = useMemo(() => ["NGN", "GHS"], []);
-  const cardSendEnabled = productFeatures.nombaNigeria && nombaWallets.length > 0;
+  const cardPayoutCodes = useMemo(
+    () => cardSendDestCurrencies(sourceCurrency),
+    [sourceCurrency],
+  );
+  const cardTransferTypeForDest = useMemo((): "bank" | "mobile_money" => {
+    return targetCountry.code === "NGN" ? "bank" : "mobile_money";
+  }, [targetCountry.code]);
+  const availableCardProviders = useMemo(
+    () =>
+      fundingSource === "card"
+        ? cardSendProvidersForCorridor(sourceCurrency, targetCountry.code, cardTransferTypeForDest)
+        : [],
+    [fundingSource, sourceCurrency, targetCountry.code, cardTransferTypeForDest],
+  );
+  const cardSendEnabled = cardWallets.length > 0 && (
+    productFeatures.nombaNigeria
+    || productFeatures.lenhubFlutter
+    || productFeatures.paytota
+    || productFeatures.swychr
+    || productFeatures.flutterwave
+  );
 
   const cardCheckoutQuote = useMemo(() => {
     if (fundingSource !== "card" || parsedAmount <= 0) return null;
+    if (cardSendProvider !== "nomba") return null;
     if (sourceCurrency.toUpperCase() === "CAD" && fxRates?.length) {
       return quoteCadNombaTopup(parsedAmount, fxRates);
     }
@@ -543,27 +635,46 @@ const SendPage = () => {
       return quoteDirectNombaTopup(parsedAmount, sourceCurrency);
     }
     return null;
-  }, [fundingSource, parsedAmount, sourceCurrency, fxRates]);
+  }, [fundingSource, parsedAmount, sourceCurrency, fxRates, cardSendProvider]);
 
-  // When paying by card, pick a Nomba charge wallet + keep NG/GH payout destinations
+  // Prefer a valid card-collect wallet + destination when paying by card
   useEffect(() => {
     if (fundingSource !== "card") return;
-    if (nombaWallets.length === 0) return;
-    const currentOk = nombaWallets.some((w) => w.wallet_id === selectedWalletId);
+    if (cardWallets.length === 0) return;
+    const currentOk = cardWallets.some((w) => w.wallet_id === selectedWalletId);
     if (!currentOk) {
       const preferred =
-        nombaWallets.find((w) => w.currency_code === "USD")
-        || nombaWallets.find((w) => w.currency_code === "CAD")
-        || nombaWallets.find((w) => w.currency_code === (profileCurrency || ""))
-        || nombaWallets.find((w) => w.currency_code === "NGN")
-        || nombaWallets[0];
+        cardWallets.find((w) => w.currency_code === "NGN") || cardWallets[0];
       if (preferred) setSelectedWalletId(preferred.wallet_id);
     }
-    if (!cardPayoutCodes.includes(targetCountry.code)) {
-      const ng = findCountryByCode("NGN");
-      if (ng) setTargetCountryId(ng.id);
+    if (cardPayoutCodes.length > 0 && !cardPayoutCodes.includes(targetCountry.code)) {
+      const first = findCountryByCode(cardPayoutCodes[0]);
+      if (first) setTargetCountryId(first.id);
     }
-  }, [fundingSource, nombaWallets, selectedWalletId, targetCountry.code, profileCurrency, cardPayoutCodes]);
+  }, [fundingSource, cardWallets, selectedWalletId, targetCountry.code, cardPayoutCodes]);
+
+  // Keep card rail selection in sync with corridor (chooser when both Nomba + Lenhub)
+  useEffect(() => {
+    if (fundingSource !== "card") {
+      setCardSendProvider(null);
+      return;
+    }
+    if (availableCardProviders.length === 0) {
+      setCardSendProvider(null);
+      return;
+    }
+    setCardSendProvider((prev) => {
+      if (prev && availableCardProviders.includes(prev)) return prev;
+      return availableCardProviders[0];
+    });
+  }, [fundingSource, availableCardProviders]);
+
+  // Card send to GHS uses MoMo (Lenhub has no GH bank payout)
+  useEffect(() => {
+    if (fundingSource === "card" && targetCountry.code === "GHS" && ghPayoutMode !== "mobile") {
+      setGhPayoutMode("mobile");
+    }
+  }, [fundingSource, targetCountry.code, ghPayoutMode]);
 
   const walletCurrencyCodes = useMemo(
     () => [...new Set((wallets ?? []).map((w) => w.currency_code))],
@@ -761,7 +872,19 @@ const SendPage = () => {
         let data: any = null;
         let invokeErr: any = null;
         try {
-          const res = await supabase.functions.invoke('execute-transfer', { body: { transfer_id: tid, use_stellar: isNGNBank && useStellar, use_pawapay: !isBankPayout && usePawapay, use_paytota: canUsePaytotaPayout && usePaytota, use_fincra: useFincra && canUseFincra, recipient_country_hint: targetCountry.country } });
+          const res = await supabase.functions.invoke('execute-transfer', {
+            body: {
+              transfer_id: tid,
+              use_stellar: isNGNBank && useStellar,
+              use_pawapay: !isBankPayout && usePawapay,
+              use_paytota: canUsePaytotaPayout && usePaytota && !useFlutterwave,
+              use_fincra: useFincra && canUseFincra && !useFlutterwave,
+              use_lenhub_flutter: isNGNBank && useLenhubFlutter && !useFincra && !useSwychr && !useFlutterwave,
+              use_swychr: isNGNBank && useSwychr && !useFincra && !useLenhubFlutter && !useFlutterwave,
+              use_flutterwave: useFlutterwave && !useFincra && !usePaytota,
+              recipient_country_hint: targetCountry.country,
+            },
+          });
           data = res.data;
           invokeErr = res.error;
         } catch (err) {
@@ -773,15 +896,15 @@ const SendPage = () => {
         }
         if (data?.success === false || data?.error) {
           const refunded = data.refunded === true || data?.payout?.refunded === true;
-          const rawMsg = data.error || data?.payout?.error || 'Payout failed';
+          const rawMsg = data.error || data?.payout?.error || data?.provider_message || 'Payout failed';
           const msg = /trade region|trade context|not found for trade/i.test(String(rawMsg))
             ? 'This currency pair isn\'t supported for this corridor yet. Please switch to a CAD wallet or contact support.'
             : rawMsg;
           // Defensive: if the edge function reports a refund or payout failure
           // but didn't already mark the row failed, do it client-side so the
           // user isn't stuck on "processing".
-          const looksTerminal = /refund|payout failed|unavailable|provider setup/i.test(String(msg));
-          if (looksTerminal) {
+          const looksTerminal = /refund|payout failed|unavailable|provider setup|not enabled|whitelist|stub/i.test(String(msg));
+          if (looksTerminal || refunded || data?.success === false) {
             try {
               await supabase.from('transfers')
                 .update({ status: 'failed', failure_reason: String(msg).slice(0, 500) })
@@ -793,11 +916,41 @@ const SendPage = () => {
           } else {
             toast.error(msg, { duration: 8000 });
           }
+          // Still open tracking so the failure reason is visible on the page.
+          setLastTransferId(tid);
+          goToStep(4);
           return;
         }
         if (invokeErr) throw new Error(invokeErr.message || 'Payout failed');
-        // Reflect the debited balance and new activity across the app at once —
-        // wallet balances, the transfers list, and the dashboard's recent activity.
+        // Guard against false success (stub / funded with no provider handoff)
+        if (data?.payout?.stub === true || data?.payout?.success === false) {
+          const rawMsg = data?.payout?.error || data?.error || 'Payout provider did not accept this transfer.';
+          try {
+            await supabase.from('transfers')
+              .update({ status: 'failed', failure_reason: String(rawMsg).slice(0, 500) })
+              .eq('id', tid);
+          } catch { /* ignore */ }
+          toast.error(rawMsg, { duration: 10000 });
+          setLastTransferId(tid);
+          goToStep(4);
+          return;
+        }
+        try {
+          const { data: row } = await supabase.from('transfers').select('status,failure_reason,provider_reference').eq('id', tid).maybeSingle();
+          if (row?.status === 'failed') {
+            toast.error(row.failure_reason || 'Payout failed', { duration: 10000 });
+            setLastTransferId(tid);
+            goToStep(4);
+            return;
+          }
+          if (row && ['funded', 'initiated'].includes(row.status) && !row.provider_reference) {
+            const stuckMsg = 'Payout did not start with the provider. Tap Refresh on the tracking page to see the real error.';
+            toast.error(stuckMsg, { duration: 10000 });
+            setLastTransferId(tid);
+            goToStep(4);
+            return;
+          }
+        } catch { /* ignore */ }
         qc.invalidateQueries({ queryKey: ["wallets"] });
         qc.invalidateQueries({ queryKey: ["transfers"] });
         qc.invalidateQueries({ queryKey: ["dashboard-transfers"] });
@@ -848,24 +1001,23 @@ const SendPage = () => {
       return;
     }
 
-    // ── Card: Nomba hosted checkout → credit wallet → payout (NGN/GHS) ───
+    // ── Card: Nomba / Lenhub / Paytota / Swychr collect → credit → payout ─
     if (fundingSource === "card") {
       try {
-        if (!selectedWallet || !isNombaTopupCurrency(selectedWallet.currency_code)) {
-          toast.error("Pick a USD, CAD, EUR, GBP, or NGN wallet to pay by card.");
+        if (!selectedWallet || !isCardSendCollectCurrency(selectedWallet.currency_code)) {
+          toast.error("Pick a supported card currency wallet first.");
           setConfirming(false);
           return;
         }
-        const cardMin = nombaMinAmount(selectedWallet.currency_code);
-        if (parsedAmount < cardMin) {
-          toast.error(
-            `Card sends need at least ${selectedWallet.currency_code === "NGN" ? "₦" : selectedWallet.currency_code === "CAD" ? "C$" : "$"}${cardMin} so checkout can clear. Try a larger amount.`,
-          );
+        const provider = cardSendProvider || availableCardProviders[0];
+        if (!provider) {
+          toast.error("No card rail available for this corridor.");
           setConfirming(false);
           return;
         }
-        if (!cardPayoutCodes.includes(targetCountry.code)) {
-          toast.error("Card send currently supports Nigeria and Ghana only.");
+        const minAmt = cardSendMinAmount(provider, selectedWallet.currency_code);
+        if (parsedAmount < minAmt) {
+          toast.error(`Card sends need at least ${minAmt} ${selectedWallet.currency_code}.`);
           setConfirming(false);
           return;
         }
@@ -877,21 +1029,9 @@ const SendPage = () => {
 
         const ngnAcct = isNGNBank ? ngnAccountNumber.replace(/\D/g, "") : "";
         const ngnBank = isNGNBank ? (ngnBanks.find((b) => b.code === ngnBankCode)?.name || null) : null;
-        const ghAcct = isGhanaBank ? ghAccountNumber.replace(/\D/g, "") : "";
-        const ghBank = isGhanaBank ? (ghBanks.find((b) => b.code === ghBankCode)?.name || null) : null;
-
-        const returnUrl = `${window.location.origin}/send?cardSend=1&walletId=${encodeURIComponent(selectedWallet.wallet_id)}`;
-        const collection = await initiateNombaCollection({
-          credit_amount: parsedAmount,
-          amount: parsedAmount,
-          target_wallet_id: selectedWallet.wallet_id,
-          email: user.email,
-          corridor: selectedWallet.currency_code === "NGN" ? "nigeria" : "international",
-          return_url: returnUrl,
-        });
-
-        saveCardSendIntent({
-          nombaTxnId: collection.transaction_id,
+        const transferType: "bank" | "mobile_money" = isNGNBank ? "bank" : "mobile_money";
+        const payoutMethod = isNGNBank ? "bank" : (effectivePayoutMethod || "mobile_money");
+        const intentBase = {
           walletId: selectedWallet.wallet_id,
           sourceCurrency,
           sourceAmount: parsedAmount,
@@ -901,23 +1041,160 @@ const SendPage = () => {
           exchangeRate: effectiveRate,
           feeAmount: fee,
           recipientName,
-          recipientPhone: isBankPayout ? "" : recipientPhone,
-          payoutMethod: isBankPayout ? "bank" : effectivePayoutMethod,
-          transferType: isBankPayout ? "bank" : "mobile_money",
-          recipientAccount: isBankPayout ? (isNGNBank ? ngnAcct : ghAcct) : undefined,
-          recipientBankCode: isBankPayout ? (isNGNBank ? ngnBankCode : ghBankCode) : undefined,
-          recipientBankName: isBankPayout ? (isNGNBank ? ngnBank : ghBank) : null,
-          networkId: activeNetwork?.id || null,
-          ghPayoutMode,
-          useStellar: isNGNBank && useStellar,
-          usePawapay: !isBankPayout && usePawapay,
-          usePaytota: canUsePaytotaPayout && usePaytota,
-          useFincra: useFincra && canUseFincra,
+          recipientPhone: isNGNBank ? "" : recipientPhone,
+          payoutMethod,
+          transferType,
+          recipientAccount: isNGNBank ? ngnAcct : undefined,
+          recipientBankCode: isNGNBank ? ngnBankCode : undefined,
+          recipientBankName: isNGNBank ? ngnBank : null,
+          networkId: selectedNetworkId || null,
+          ghPayoutMode: targetCountry.code === "GHS" ? ("mobile" as const) : undefined,
+          useStellar: false,
+          usePawapay: false,
+          useFincra: false,
           recipientCountryHint: targetCountry.country,
-        });
-        savePendingNombaTxn(collection.transaction_id);
-        toast.message("Opening secure card checkout…");
-        window.location.href = collection.payment_link;
+        };
+
+        if (provider === "nomba") {
+          if (targetCountry.code !== "NGN" || !isNGNBank) {
+            toast.error("Express card currently pays out to Nigerian bank accounts only.");
+            setConfirming(false);
+            return;
+          }
+          const returnUrl = `${window.location.origin}/send?cardSend=1&provider=nomba&walletId=${encodeURIComponent(selectedWallet.wallet_id)}`;
+          const collection = await initiateNombaCollection({
+            credit_amount: parsedAmount,
+            amount: parsedAmount,
+            target_wallet_id: selectedWallet.wallet_id,
+            email: user.email,
+            corridor: "nigeria",
+            return_url: returnUrl,
+          });
+          if (!collection.payment_link) {
+            throw new Error("Checkout link was empty — try again or use wallet balance.");
+          }
+          saveCardSendIntent({
+            ...intentBase,
+            provider: "nomba",
+            nombaTxnId: collection.transaction_id,
+            usePaytota: false,
+            useLenhubFlutter: false,
+            useSwychr: false,
+          });
+          savePendingNombaTxn(collection.transaction_id);
+          toast.message("Opening secure card checkout…");
+          window.location.href = collection.payment_link;
+          return;
+        }
+
+        if (provider === "lenhub") {
+          saveCardSendIntent({
+            ...intentBase,
+            provider: "lenhub",
+            useLenhubFlutter: true,
+            usePaytota: false,
+            useSwychr: false,
+          });
+          setShowLenhubCollect(true);
+          setConfirming(false);
+          toast.message("Enter your card to fund this send…");
+          return;
+        }
+
+        if (provider === "paytota") {
+          const returnUrl = `${window.location.origin}/send?cardSend=1&provider=paytota&walletId=${encodeURIComponent(selectedWallet.wallet_id)}`;
+          const collection = await initiatePaytotaCollection({
+            amount: parsedAmount,
+            credit_amount: parsedAmount,
+            target_wallet_id: selectedWallet.wallet_id,
+            email: user.email,
+            phone: recipientPhone || undefined,
+            return_url: returnUrl,
+          });
+          saveCardSendIntent({
+            ...intentBase,
+            provider: "paytota",
+            paytotaTxnId: collection.transaction_id,
+            usePaytota: true,
+            useLenhubFlutter: false,
+            useSwychr: false,
+          });
+          savePendingPaytotaTxn(collection.transaction_id);
+          if (collection.payment_link) {
+            toast.message("Opening MoMo checkout…");
+            window.location.href = collection.payment_link;
+            return;
+          }
+          // Africa STK — stay on Send and poll
+          toast.message("Approve the payment on your phone…");
+          const next = new URLSearchParams(searchParams);
+          next.set("cardSend", "1");
+          next.set("provider", "paytota");
+          next.set("walletId", selectedWallet.wallet_id);
+          setSearchParams(next, { replace: true });
+          setConfirming(false);
+          return;
+        }
+
+        if (provider === "swychr") {
+          const returnUrl = `${window.location.origin}/send?cardSend=1&provider=swychr&walletId=${encodeURIComponent(selectedWallet.wallet_id)}`;
+          const collection = await initiateSwychrCollection({
+            amount: parsedAmount,
+            target_wallet_id: selectedWallet.wallet_id,
+            email: user.email,
+            name: recipientName || user.email.split("@")[0],
+            mobile: recipientPhone || undefined,
+            return_url: returnUrl,
+          });
+          const txnId = collection.swychr_transaction_id || collection.transaction_id;
+          if (!txnId || !collection.payment_link) {
+            throw new Error(collection.message || "Checkout link was empty");
+          }
+          saveCardSendIntent({
+            ...intentBase,
+            provider: "swychr",
+            swychrTxnId: txnId,
+            usePaytota: false,
+            useLenhubFlutter: false,
+            useSwychr: isNGNBank,
+          });
+          savePendingSwychrTxn(txnId);
+          toast.message("Opening mobile checkout…");
+          window.location.href = collection.payment_link;
+          return;
+        }
+
+        if (provider === "flutterwave") {
+          const returnUrl =
+            `${window.location.origin}/send?cardSend=1&provider=flutterwave&walletId=${encodeURIComponent(selectedWallet.wallet_id)}`;
+          const collection = await initializeFlwPayment({
+            amount: parsedAmount,
+            currency: selectedWallet.currency_code,
+            paymentMethod: flutterwaveCardSendPaymentMethod(selectedWallet.currency_code),
+            walletId: selectedWallet.wallet_id,
+            redirectUrl: returnUrl,
+            phone: recipientPhone || undefined,
+          });
+          const txRef = collection.reference;
+          if (!txRef || !collection.payment_link) {
+            throw new Error(collection.error || collection.message || "Checkout link was empty");
+          }
+          saveCardSendIntent({
+            ...intentBase,
+            provider: "flutterwave",
+            flwTxRef: txRef,
+            usePaytota: false,
+            useLenhubFlutter: false,
+            useSwychr: false,
+            useFlutterwave: true,
+          });
+          savePendingFlwTxn(txRef);
+          toast.message("Opening card checkout…");
+          window.location.href = collection.payment_link;
+          return;
+        }
+
+        throw new Error("Unsupported card rail");
       } catch (e: any) {
         toast.error(e?.message || "Could not start card checkout");
         setConfirming(false);
@@ -1088,38 +1365,77 @@ const SendPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wallets, searchParams, beneficiaries]);
 
-  // Resume card-funded send after Nomba hosted checkout returns
+  // Resume card-funded send after collect (Nomba / Lenhub / Paytota / Swychr / Flutterwave)
   useEffect(() => {
     if (!wallets?.length || cardResumeLock.current) return;
 
     const intent = readCardSendIntent();
     const cardSendFlag = searchParams.get("cardSend") === "1";
     const nombaStatus = searchParams.get("nomba");
-    const pendingTxn = intent?.nombaTxnId || readPendingNombaTxn();
+    const paytotaStatus = searchParams.get("paytota");
+    const swychrStatus = searchParams.get("swychr");
+    const flwStatus = searchParams.get("status") || searchParams.get("flw");
+    const flwTxFromUrl = searchParams.get("tx_ref") || searchParams.get("txRef");
+    const flwTxnIdFromUrl = searchParams.get("transaction_id");
+    const providerParam = (searchParams.get("provider") || intent?.provider || "").toLowerCase();
+    const pendingNomba = intent?.nombaTxnId || readPendingNombaTxn();
+    const pendingPaytota = intent?.paytotaTxnId || readPendingPaytotaTxn();
+    const pendingSwychr = intent?.swychrTxnId || readPendingSwychrTxn();
+    const pendingFlw = intent?.flwTxRef || readPendingFlwTxn() || flwTxFromUrl;
+    const lenhubReady = intent?.provider === "lenhub" && !!intent.lenhubChargeId && lenhubResumeTick > 0;
+
+    const stripResumeParams = (next: URLSearchParams) => {
+      for (const key of [
+        "cardSend", "nomba", "paytota", "swychr", "walletId", "orderId", "provider",
+        "transaction_id", "tx_ref", "txRef", "status", "flw",
+      ]) {
+        next.delete(key);
+      }
+    };
 
     if (!intent || intent.status === "consumed") {
-      if (cardSendFlag || nombaStatus) {
+      if (cardSendFlag || nombaStatus || paytotaStatus || swychrStatus || flwTxFromUrl) {
         const next = new URLSearchParams(searchParams);
-        next.delete("cardSend");
-        next.delete("nomba");
-        next.delete("walletId");
-        next.delete("orderId");
+        stripResumeParams(next);
         setSearchParams(next, { replace: true });
       }
       return;
     }
 
-    if (!cardSendFlag && nombaStatus !== "success" && nombaStatus !== "failed" && !pendingTxn) return;
+    const provider = (intent.provider || providerParam || "nomba") as CardSendProvider;
+    const failedReturn =
+      nombaStatus === "failed"
+      || paytotaStatus === "failed"
+      || paytotaStatus === "cancelled"
+      || swychrStatus === "failed"
+      || flwStatus === "cancelled"
+      || flwStatus === "failed";
 
-    if (nombaStatus === "failed") {
+    const shouldStart =
+      lenhubReady
+      || cardSendFlag
+      || nombaStatus === "success"
+      || paytotaStatus === "success"
+      || swychrStatus === "success"
+      || flwStatus === "successful"
+      || flwStatus === "success"
+      || flwStatus === "completed"
+      || (provider === "nomba" && !!pendingNomba)
+      || (provider === "paytota" && !!pendingPaytota)
+      || (provider === "swychr" && !!pendingSwychr)
+      || (provider === "flutterwave" && !!pendingFlw);
+
+    if (!shouldStart && !failedReturn) return;
+
+    if (failedReturn) {
       clearCardSendIntent();
       clearPendingNombaTxn();
+      clearPendingPaytotaTxn();
+      clearPendingSwychrTxn();
+      clearPendingFlwTxn();
       toast.error("Card payment failed or was cancelled. No transfer was sent.");
       const next = new URLSearchParams(searchParams);
-      next.delete("cardSend");
-      next.delete("nomba");
-      next.delete("walletId");
-      next.delete("orderId");
+      stripResumeParams(next);
       setSearchParams(next, { replace: true });
       return;
     }
@@ -1131,7 +1447,10 @@ const SendPage = () => {
     const stripParams = () => {
       const next = new URLSearchParams(searchParams);
       let changed = false;
-      for (const key of ["cardSend", "nomba", "walletId", "orderId"]) {
+      for (const key of [
+        "cardSend", "nomba", "paytota", "swychr", "walletId", "orderId", "provider",
+        "transaction_id", "tx_ref", "txRef", "status", "flw",
+      ]) {
         if (next.has(key)) {
           next.delete(key);
           changed = true;
@@ -1142,7 +1461,6 @@ const SendPage = () => {
 
     const finishPayout = async () => {
       try {
-        // Restore UI context
         setFundingSource("wallet");
         setSelectedWalletId(intent.walletId);
         setAmount(String(intent.sourceAmount));
@@ -1161,18 +1479,94 @@ const SendPage = () => {
         }
         if (intent.networkId) setSelectedNetworkId(intent.networkId);
 
-        // Wait until Nomba collection is completed (webhook may lag redirect)
         let paid = false;
-        for (let i = 0; i < 40; i++) {
-          const status = await getNombaPayStatus(intent.nombaTxnId);
-          if (status?.status === "completed") {
-            paid = true;
-            break;
+        if (provider === "lenhub") {
+          const chargeId = intent.lenhubChargeId;
+          if (!chargeId) throw new Error("Missing payment reference");
+          for (let i = 0; i < 40; i++) {
+            const { data } = await supabase
+              .from("lenhub_flutter_charges")
+              .select("status, credited_at")
+              .eq("id", chargeId)
+              .maybeSingle();
+            if (data?.credited_at || data?.status === "credited" || data?.status === "success") {
+              paid = true;
+              break;
+            }
+            if (data?.status === "failed" || data?.status === "cancelled") {
+              throw new Error("Card payment failed");
+            }
+            await new Promise((r) => setTimeout(r, 1500));
           }
-          if (status?.status === "failed" || status?.status === "cancelled") {
-            throw new Error(status.failure_reason || "Card payment failed");
+        } else if (provider === "paytota") {
+          const txnId = intent.paytotaTxnId || pendingPaytota;
+          if (!txnId) throw new Error("Missing payment reference");
+          for (let i = 0; i < 40; i++) {
+            try {
+              await confirmPaytotaPayment({
+                transaction_id: txnId,
+                wallet_id: intent.walletId,
+              });
+            } catch { /* ignore confirm errors while polling */ }
+            const status = await getPaytotaPayStatus(txnId);
+            if (status?.status === "completed") {
+              paid = true;
+              break;
+            }
+            if (status?.status === "failed" || status?.status === "cancelled") {
+              throw new Error(status.failure_reason || "Card payment failed");
+            }
+            await new Promise((r) => setTimeout(r, 1500));
           }
-          await new Promise((r) => setTimeout(r, 1500));
+        } else if (provider === "swychr") {
+          const txnId = intent.swychrTxnId || pendingSwychr;
+          if (!txnId) throw new Error("Missing payment reference");
+          for (let i = 0; i < 40; i++) {
+            try {
+              await verifySwychrPayin(txnId);
+            } catch { /* ignore */ }
+            const status = await getSwychrPayinStatus(txnId);
+            if (status?.status === "completed" || status?.status === "success" || status?.status === "credited") {
+              paid = true;
+              break;
+            }
+            if (status?.status === "failed" || status?.status === "cancelled") {
+              throw new Error(status.failure_reason || "Card payment failed");
+            }
+            await new Promise((r) => setTimeout(r, 1500));
+          }
+        } else if (provider === "flutterwave") {
+          const txRef = intent.flwTxRef || pendingFlw || undefined;
+          const txnId = intent.flwTransactionId || flwTxnIdFromUrl || undefined;
+          if (!txRef && !txnId) throw new Error("Missing payment reference");
+          for (let i = 0; i < 40; i++) {
+            const verified = await verifyFlwPayment({
+              tx_ref: txRef,
+              transaction_id: txnId,
+            });
+            if (verified?.verified) {
+              paid = true;
+              break;
+            }
+            if (verified?.status === "failed" || verified?.status === "cancelled") {
+              throw new Error(verified.error || "Card payment failed");
+            }
+            await new Promise((r) => setTimeout(r, 1500));
+          }
+        } else {
+          const txnId = intent.nombaTxnId || pendingNomba;
+          if (!txnId) throw new Error("Missing card payment reference");
+          for (let i = 0; i < 40; i++) {
+            const status = await getNombaPayStatus(txnId);
+            if (status?.status === "completed") {
+              paid = true;
+              break;
+            }
+            if (status?.status === "failed" || status?.status === "cancelled") {
+              throw new Error(status.failure_reason || "Card payment failed");
+            }
+            await new Promise((r) => setTimeout(r, 1500));
+          }
         }
         if (!paid) {
           throw new Error("Payment is still processing. We’ll finish the send once it clears — check back shortly or contact support.");
@@ -1202,18 +1596,26 @@ const SendPage = () => {
 
         markCardSendIntentConsumed();
         clearPendingNombaTxn();
+        clearPendingPaytotaTxn();
+        clearPendingSwychrTxn();
+        clearPendingFlwTxn();
         stripParams();
+        setShowLenhubCollect(false);
 
         const res = await supabase.functions.invoke("execute-transfer", {
           body: {
             transfer_id: tid,
             use_stellar: !!intent.useStellar,
             use_pawapay: !!intent.usePawapay,
-            use_paytota: !!intent.usePaytota,
+            use_paytota: !!intent.usePaytota || intent.provider === "paytota",
             use_fincra: !!intent.useFincra,
+            use_lenhub_flutter: !!intent.useLenhubFlutter || intent.provider === "lenhub",
+            use_swychr: !!intent.useSwychr || (intent.provider === "swychr" && intent.transferType === "bank"),
+            use_flutterwave: !!intent.useFlutterwave || intent.provider === "flutterwave",
             recipient_country_hint: intent.recipientCountryHint,
           },
-        });        let data: any = res.data;
+        });
+        let data: any = res.data;
         if (res.error && !data && (res.error as any)?.context?.response) {
           try { data = await (res.error as any).context.response.json(); } catch { /* ignore */ }
         }
@@ -1239,7 +1641,7 @@ const SendPage = () => {
 
     void finishPayout();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wallets, searchParams]);
+  }, [wallets, searchParams, lenhubResumeTick]);
 
   const resetForm = () => {
     setDirection(-1);
@@ -1267,7 +1669,9 @@ const SendPage = () => {
     && (fundingSource !== "card" || (
       cardSendEnabled
       && cardPayoutCodes.includes(targetCountry.code)
-      && parsedAmount >= nombaMinAmount(sourceCurrency)
+      && availableCardProviders.length > 0
+      && !!cardSendProvider
+      && parsedAmount >= cardSendMinAmount(cardSendProvider, sourceCurrency)
     ));
   const isStep2Valid = useLink
     ? (recipientName.trim().length > 2 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail) && parsedAmount > 0)
@@ -1286,7 +1690,9 @@ const SendPage = () => {
   const fundingOptions = ([
     { v: "wallet" as const, icon: Wallet, label: "Wallet" },
     ...(productFeatures.plaid ? [{ v: "bank" as const, icon: Landmark, label: "Bank" }] : []),
-    ...(productFeatures.nombaNigeria ? [{ v: "card" as const, icon: CreditCard, label: "Card" }] : []),
+    ...((productFeatures.nombaNigeria || productFeatures.lenhubFlutter || productFeatures.paytota || productFeatures.swychr || productFeatures.flutterwave)
+      ? [{ v: "card" as const, icon: CreditCard, label: "Card" }]
+      : []),
   ]);
 
   // Step transitions
@@ -1385,6 +1791,61 @@ const SendPage = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <AnimatePresence>
+        {showLenhubCollect && selectedWallet && (
+          <motion.div
+            key="lenhub-card-collect"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-background/80 backdrop-blur-md px-4 py-8"
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 12 }}
+              className="w-full max-w-lg space-y-3"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium">Card payment for this send</p>
+                  <p className="text-xs text-muted-foreground">
+                    Pay {currencySymbol(sourceCurrency)}
+                    {parsedAmount.toLocaleString()} {sourceCurrency} — then we deliver to your recipient.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setShowLenhubCollect(false);
+                    clearCardSendIntent();
+                  }}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              <LenhubFlutterTopUpCard
+                walletId={selectedWallet.wallet_id}
+                walletCurrency={selectedWallet.currency_code}
+                fixedAmount={parsedAmount}
+                amountReadOnly
+                onCredited={({ localId, chargeId }) => {
+                  patchCardSendIntent({
+                    lenhubChargeId: localId,
+                    lenhubProviderChargeId: chargeId || undefined,
+                  });
+                  setShowLenhubCollect(false);
+                  setLenhubResumeTick((t) => t + 1);
+                }}
+              />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <AppPage width="default" innerClassName="space-y-5 sm:space-y-6">
           <BackToDashboard />
           {/* Header — slides down with fade */}
@@ -1710,22 +2171,57 @@ const SendPage = () => {
                                             Pay by card, we deliver
                                           </p>
                                           <p className="text-xs text-muted-foreground leading-relaxed">
-                                            You’ll enter your card on our secure checkout. Once charged, we send to Nigeria (bank) or Ghana (mobile money).
+                                            Charge via card or MoMo checkout to fund the send. Destinations depend on the rail you pick.
                                           </p>
                                         </div>
-                                        {nombaWallets.length > 0 ? (
+                                        {cardWallets.length > 0 ? (
                                           <div className="space-y-2">
                                             <Label>Charge currency</Label>
-                                            <Select value={selectedWalletId || nombaWallets[0]?.wallet_id} onValueChange={setSelectedWalletId}>
+                                            <Select value={selectedWalletId || cardWallets[0]?.wallet_id} onValueChange={setSelectedWalletId}>
                                               <SelectTrigger><SelectValue placeholder="Select currency" /></SelectTrigger>
                                               <SelectContent>
-                                                {nombaWallets.map((w) => (
+                                                {cardWallets.map((w) => (
                                                   <SelectItem key={w.wallet_id} value={w.wallet_id}>
                                                     {w.flag_emoji} {w.currency_code} card checkout
                                                   </SelectItem>
                                                 ))}
                                               </SelectContent>
                                             </Select>
+                                            {availableCardProviders.length > 1 && (
+                                              <div className="space-y-2 pt-1">
+                                                <Label>Card method</Label>
+                                                <div className="grid gap-2 sm:grid-cols-2">
+                                                  {availableCardProviders.map((p) => (
+                                                    <button
+                                                      key={p}
+                                                      type="button"
+                                                      onClick={() => setCardSendProvider(p)}
+                                                      className={cn(
+                                                        "rounded-xl border px-3 py-2.5 text-left transition-colors",
+                                                        cardSendProvider === p
+                                                          ? "border-primary bg-primary/10"
+                                                          : "border-border hover:bg-muted/40",
+                                                      )}
+                                                    >
+                                                      <div className="flex items-center justify-between gap-2">
+                                                        <span className="text-sm font-medium">{cardSendProviderLabel(p)}</span>
+                                                        <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                                                          {cardSendProviderBenefit(p)}
+                                                        </span>
+                                                      </div>
+                                                      <p className="text-xs text-muted-foreground mt-1 leading-snug">
+                                                        {cardSendProviderDescription(p)}
+                                                      </p>
+                                                      {showStaffRails && (
+                                                        <p className="text-[10px] mt-1 text-amber-700 dark:text-amber-300">
+                                                          {cardSendProviderStaffName(p)}
+                                                        </p>
+                                                      )}
+                                                    </button>
+                                                  ))}
+                                                </div>
+                                              </div>
+                                            )}
                                             {cardCheckoutQuote && (
                                               <p className="text-xs text-muted-foreground">
                                                 Card charge ≈ {cardCheckoutQuote.checkoutCurrency}{" "}
@@ -1736,15 +2232,17 @@ const SendPage = () => {
                                                 {" "}(includes card processing fee)
                                               </p>
                                             )}
-                                            <p className="text-xs text-muted-foreground">
-                                              Minimum {sourceCurrency === "NGN" ? "₦" : sourceCurrency === "CAD" ? "C$" : "$"}
-                                              {nombaMinAmount(sourceCurrency)} for card checkout
-                                              {sourceCurrency === "CAD" ? " · CAD is charged in USD" : ""}.
-                                            </p>
+                                            {cardSendProvider && (
+                                              <p className="text-xs text-muted-foreground">
+                                                Minimum {cardSendMinAmount(cardSendProvider, sourceCurrency)} {sourceCurrency}
+                                                {cardSendProvider === "nomba" && sourceCurrency === "CAD" ? " · CAD is charged in USD" : ""}
+                                                {" "}for this checkout.
+                                              </p>
+                                            )}
                                           </div>
                                         ) : (
                                           <div className="rounded-lg border border-dashed border-border bg-muted/40 p-3 text-sm text-muted-foreground">
-                                            Create a USD, CAD, EUR, GBP, or NGN wallet first to pay by card.
+                                            Create a supported wallet (USD, CAD, EUR, GBP, NGN, GHS, KES, UGX, RWF, TZS, ZMW, XAF, or XOF) to pay by card.
                                           </div>
                                         )}
                                       </motion.div>
@@ -1762,7 +2260,7 @@ const SendPage = () => {
                                         onSendAmountChange={(v) => setAmount(v)}
                                         fromCurrencyFilter={
                                           fundingSource === "wallet" ? walletCurrencyCodes
-                                          : fundingSource === "card" ? nombaWalletCodes
+                                          : fundingSource === "card" ? cardWalletCodes
                                           : undefined
                                         }
                                         toCurrencyFilter={
@@ -1783,15 +2281,15 @@ const SendPage = () => {
                                       />
                                     </motion.div>
 
-                                    {fundingSource === "card" && parsedAmount > 0 && parsedAmount < nombaMinAmount(sourceCurrency) && (
+                                    {fundingSource === "card" && cardSendProvider && parsedAmount > 0
+                                      && parsedAmount < cardSendMinAmount(cardSendProvider, sourceCurrency) && (
                                       <motion.p
                                         initial={{ opacity: 0, x: -6 }}
                                         animate={{ opacity: 1, x: 0 }}
                                         className="text-sm font-medium text-destructive flex items-center justify-center gap-1"
                                       >
                                         <AlertCircle className="w-3.5 h-3.5" />
-                                        Card minimum is {sourceCurrency === "CAD" ? "C$" : sourceCurrency === "NGN" ? "₦" : "$"}
-                                        {nombaMinAmount(sourceCurrency)}
+                                        Card minimum is {cardSendMinAmount(cardSendProvider, sourceCurrency)} {sourceCurrency}
                                       </motion.p>
                                     )}
 
@@ -2098,7 +2596,7 @@ const SendPage = () => {
                                           )}
                                           <p className="text-xs text-muted-foreground">Funds will be deposited directly to the bank account above.</p>
                                         </motion.div>
-                                        {productFeatures.crypto && (
+                                        {fundingSource === "wallet" && productFeatures.crypto && (
                                         <motion.div custom={2.7} variants={fieldVariants} initial="hidden" animate="show" className="rounded-xl border border-primary/30 bg-gradient-to-br from-primary/5 via-background to-accent/5 p-4 space-y-2">
                                           <div className="flex items-start justify-between gap-3">
                                             <div className="flex-1">
@@ -2117,6 +2615,123 @@ const SendPage = () => {
                                             />
                                           </div>
                                         </motion.div>
+                                        )}
+                                        {productFeatures.lenhubFlutter && fundingSource === "wallet" && !useFincra && !useSwychr && !useFlutterwave && (
+                                          <motion.div custom={2.75} variants={fieldVariants} initial="hidden" animate="show" className="rounded-xl border border-primary/30 bg-gradient-to-br from-primary/5 via-background to-accent/5 p-4">
+                                            <div className="flex items-start justify-between gap-3">
+                                              <div className="flex-1">
+                                                <div className="flex items-center gap-2">
+                                                  <span className="text-sm font-medium">Direct bank rail</span>
+                                                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/15 text-primary font-mono uppercase">Alt</span>
+                                                  {showStaffRails && (
+                                                    <span className="text-[10px] text-amber-700 dark:text-amber-300">Lenhub</span>
+                                                  )}
+                                                </div>
+                                                <p className="text-xs text-muted-foreground mt-1">
+                                                  Use the alternate in-app bank rail instead of the default Express bank payout.
+                                                </p>
+                                              </div>
+                                              <Switch
+                                                checked={useLenhubFlutter}
+                                                onCheckedChange={(on) => {
+                                                  setUseLenhubFlutter(on);
+                                                  if (on) {
+                                                    setUseFincra(false);
+                                                    setUseSwychr(false);
+                                                    setUseFlutterwave(false);
+                                                  }
+                                                }}
+                                                aria-label="Use direct bank rail"
+                                              />
+                                            </div>
+                                          </motion.div>
+                                        )}
+                                        {productFeatures.swychr && fundingSource === "wallet" && !useFincra && !useLenhubFlutter && !useFlutterwave && (
+                                          <motion.div custom={2.76} variants={fieldVariants} initial="hidden" animate="show" className="rounded-xl border border-primary/30 bg-gradient-to-br from-primary/5 via-background to-accent/5 p-4">
+                                            <div className="flex items-start justify-between gap-3">
+                                              <div className="flex-1">
+                                                <div className="flex items-center gap-2">
+                                                  <span className="text-sm font-medium">Mobile checkout bank rail</span>
+                                                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/15 text-primary font-mono uppercase">Alt</span>
+                                                  {showStaffRails && (
+                                                    <span className="text-[10px] text-amber-700 dark:text-amber-300">Swychr</span>
+                                                  )}
+                                                </div>
+                                                <p className="text-xs text-muted-foreground mt-1">
+                                                  Route this NGN bank payout through the mobile-checkout bank rail.
+                                                </p>
+                                              </div>
+                                              <Switch
+                                                checked={useSwychr}
+                                                onCheckedChange={(on) => {
+                                                  setUseSwychr(on);
+                                                  if (on) {
+                                                    setUseFincra(false);
+                                                    setUseLenhubFlutter(false);
+                                                    setUseFlutterwave(false);
+                                                  }
+                                                }}
+                                                aria-label="Use mobile checkout bank rail"
+                                              />
+                                            </div>
+                                          </motion.div>
+                                        )}
+                                        {productFeatures.flutterwave && fundingSource === "wallet" && isNGNBank && !useFincra && !useLenhubFlutter && !useSwychr && (
+                                          <motion.div custom={2.77} variants={fieldVariants} initial="hidden" animate="show" className="rounded-xl border border-primary/30 bg-gradient-to-br from-primary/5 via-background to-accent/5 p-4">
+                                            <div className="flex items-start justify-between gap-3">
+                                              <div className="flex-1">
+                                                <div className="flex items-center gap-2">
+                                                  <span className="text-sm font-medium">Card checkout bank rail</span>
+                                                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/15 text-primary font-mono uppercase">Alt</span>
+                                                  {showStaffRails && (
+                                                    <span className="text-[10px] text-amber-700 dark:text-amber-300">Flutterwave</span>
+                                                  )}
+                                                </div>
+                                                <p className="text-xs text-muted-foreground mt-1">
+                                                  Route this NGN bank payout through card-checkout bank rail.
+                                                </p>
+                                              </div>
+                                              <Switch
+                                                checked={useFlutterwave}
+                                                onCheckedChange={(on) => {
+                                                  setUseFlutterwave(on);
+                                                  if (on) {
+                                                    setUseFincra(false);
+                                                    setUseLenhubFlutter(false);
+                                                    setUseSwychr(false);
+                                                  }
+                                                }}
+                                                aria-label="Use Flutterwave bank rail"
+                                              />
+                                            </div>
+                                          </motion.div>
+                                        )}
+                                        {fundingSource === "wallet" && productFeatures.flutterwave && canUseFincra && (
+                                          <motion.div custom={2.8} variants={fieldVariants} initial="hidden" animate="show" className="rounded-xl border border-teal-500/30 bg-gradient-to-br from-teal-500/5 via-background to-teal-500/5 p-4">
+                                            <div className="flex items-start justify-between gap-3">
+                                              <div className="flex-1">
+                                                <div className="flex items-center gap-2">
+                                                  <span className="text-sm font-medium">Fincra bank payout (test)</span>
+                                                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-700 dark:text-teal-300 font-mono uppercase">Test</span>
+                                                </div>
+                                                <p className="text-xs text-muted-foreground mt-1">
+                                                  Route this NGN payout through Fincra (not Nomba / Lenhub). Requires a funded Fincra NGN balance.
+                                                </p>
+                                              </div>
+                                              <Switch
+                                                checked={useFincra}
+                                                onCheckedChange={(on) => {
+                                                  setUseFincra(on);
+                                                  if (on) {
+                                                    setUseLenhubFlutter(false);
+                                                    setUseSwychr(false);
+                                                    setUseFlutterwave(false);
+                                                  }
+                                                }}
+                                                aria-label="Use alternate bank payout"
+                                              />
+                                            </div>
+                                          </motion.div>
                                         )}
                                       </>
                                     ) : isGhanaBank ? (
@@ -2174,7 +2789,14 @@ const SendPage = () => {
                                         <p className="text-sm text-muted-foreground">
                                           Funds will be sent via {effectiveMethodLabel}
                                         </p>
+                                        {fundingSource === "wallet" && productFeatures.lenhubFlutter && ["GHS", "KES", "UGX"].includes(targetCountry.code) && (
+                                          <p className="text-xs text-muted-foreground">
+                                            Delivered via mobile money to this number.
+                                          </p>
+                                        )}
                                       </motion.div>
+                                      {fundingSource === "wallet" && (
+                                        <>
                                       <motion.div custom={2.5} variants={fieldVariants} initial="hidden" animate="show" className="rounded-xl border border-indigo-500/30 bg-gradient-to-br from-indigo-500/5 via-background to-indigo-500/5 p-4">
                                         {productFeatures.flutterwave ? (
                                         <div className="flex items-start justify-between gap-3">
@@ -2204,20 +2826,56 @@ const SendPage = () => {
                                           <div className="flex items-start justify-between gap-3">
                                             <div className="flex-1">
                                               <div className="flex items-center gap-2">
-                                                <span className="text-sm font-medium">Paytota MoMo (test)</span>
-                                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-700 dark:text-sky-300 font-mono uppercase">Test</span>
+                                                <span className="text-sm font-medium">MoMo checkout rail</span>
+                                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-700 dark:text-sky-300 font-mono uppercase">Alt</span>
+                                                {showStaffRails && (
+                                                  <span className="text-[10px] text-amber-700 dark:text-amber-300">Paytota</span>
+                                                )}
                                               </div>
                                               <p className="text-xs text-muted-foreground mt-1">
-                                                Route this {targetCountry.code} mobile money payout through Paytota. Use this for Uganda MoMo testing.
+                                                Route this {targetCountry.code} mobile money payout through MoMo checkout instead of the default rail.
                                               </p>
                                             </div>
                                             <Switch
                                               checked={usePaytota}
                                               onCheckedChange={(on) => {
                                                 setUsePaytota(on);
-                                                if (on) setUseFincra(false);
+                                                if (on) {
+                                                  setUseFincra(false);
+                                                  setUseFlutterwave(false);
+                                                }
                                               }}
-                                              aria-label="Use Paytota MoMo payout"
+                                              aria-label="Use MoMo checkout payout"
+                                            />
+                                          </div>
+                                        </motion.div>
+                                      )}
+                                      {productFeatures.flutterwave && ["GHS", "KES", "UGX", "RWF", "TZS", "ZMW"].includes(targetCountry.code) && (
+                                        <motion.div custom={2.56} variants={fieldVariants} initial="hidden" animate="show" className="rounded-xl border border-orange-500/30 bg-gradient-to-br from-orange-500/5 via-background to-orange-500/5 p-4">
+                                          <div className="flex items-start justify-between gap-3">
+                                            <div className="flex-1">
+                                              <div className="flex items-center gap-2">
+                                                <span className="text-sm font-medium">Card checkout MoMo rail</span>
+                                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-700 dark:text-orange-300 font-mono uppercase">Alt</span>
+                                                {showStaffRails && (
+                                                  <span className="text-[10px] text-amber-700 dark:text-amber-300">Flutterwave</span>
+                                                )}
+                                              </div>
+                                              <p className="text-xs text-muted-foreground mt-1">
+                                                Route this {targetCountry.code} mobile money payout through card-checkout MoMo instead of the default rail.
+                                              </p>
+                                            </div>
+                                            <Switch
+                                              checked={useFlutterwave}
+                                              onCheckedChange={(on) => {
+                                                setUseFlutterwave(on);
+                                                if (on) {
+                                                  setUsePaytota(false);
+                                                  setUseFincra(false);
+                                                  setUsePawapay(false);
+                                                }
+                                              }}
+                                              aria-label="Use Flutterwave MoMo payout"
                                             />
                                           </div>
                                         </motion.div>
@@ -2238,12 +2896,17 @@ const SendPage = () => {
                                               checked={useFincra}
                                               onCheckedChange={(on) => {
                                                 setUseFincra(on);
-                                                if (on) setUsePaytota(false);
+                                                if (on) {
+                                                  setUsePaytota(false);
+                                                  setUseFlutterwave(false);
+                                                }
                                               }}
                                               aria-label="Use Fincra MoMo payout"
                                             />
                                           </div>
                                         </motion.div>
+                                      )}
+                                        </>
                                       )}
                                       </>
                                     )}

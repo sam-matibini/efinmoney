@@ -1,10 +1,23 @@
 /**
- * Persist a card-funded send across Nomba hosted checkout redirect.
+ * Persist a card-funded send across hosted/in-app collect.
  * After collection succeeds, Send page resumes and pays out from the credited wallet.
  */
 
+export type CardSendProvider = "nomba" | "lenhub" | "paytota" | "swychr" | "flutterwave";
+
 export type CardSendIntent = {
-  nombaTxnId: string;
+  provider: CardSendProvider;
+  nombaTxnId?: string;
+  lenhubChargeId?: string;
+  lenhubProviderChargeId?: string;
+  paytotaTxnId?: string;
+  swychrTxnId?: string;
+  /** Flutterwave tx_ref from flw-initialize-payment */
+  flwTxRef?: string;
+  flwTransactionId?: string;
+  useLenhubFlutter?: boolean;
+  useSwychr?: boolean;
+  useFlutterwave?: boolean;
   walletId: string;
   sourceCurrency: string;
   sourceAmount: number;
@@ -33,12 +46,26 @@ export type CardSendIntent = {
 };
 
 const STORAGE_KEY = "efm_card_send_intent";
-const TTL_MS = 60 * 60 * 1000; // 1 hour — checkout can take a while
+const TTL_MS = 60 * 60 * 1000;
+const FLW_PENDING_KEY = "efm_flw_card_send_txn";
 
-export function saveCardSendIntent(intent: Omit<CardSendIntent, "at" | "status"> & { status?: CardSendIntent["status"] }) {
+function inferProvider(intent: Partial<CardSendIntent>): CardSendProvider {
+  if (intent.provider) return intent.provider;
+  if (intent.nombaTxnId) return "nomba";
+  if (intent.lenhubChargeId) return "lenhub";
+  if (intent.paytotaTxnId) return "paytota";
+  if (intent.swychrTxnId) return "swychr";
+  if (intent.flwTxRef) return "flutterwave";
+  return "lenhub";
+}
+
+export function saveCardSendIntent(
+  intent: Omit<CardSendIntent, "at" | "status"> & { status?: CardSendIntent["status"] },
+) {
   try {
     const payload: CardSendIntent = {
       ...intent,
+      provider: inferProvider(intent),
       status: intent.status ?? "awaiting_payment",
       at: Date.now(),
     };
@@ -57,9 +84,23 @@ export function readCardSendIntent(): CardSendIntent | null {
       sessionStorage.removeItem(STORAGE_KEY);
       return null;
     }
+    parsed.provider = inferProvider(parsed);
     return parsed;
   } catch {
     return null;
+  }
+}
+
+export function patchCardSendIntent(patch: Partial<CardSendIntent>) {
+  try {
+    const cur = readCardSendIntent();
+    if (!cur) return;
+    sessionStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ ...cur, ...patch, at: Date.now() }),
+    );
+  } catch {
+    /* ignore */
   }
 }
 
@@ -79,6 +120,30 @@ export function markCardSendIntentConsumed() {
 export function clearCardSendIntent() {
   try {
     sessionStorage.removeItem(STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function savePendingFlwTxn(txRef: string) {
+  try {
+    sessionStorage.setItem(FLW_PENDING_KEY, txRef);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function readPendingFlwTxn(): string | null {
+  try {
+    return sessionStorage.getItem(FLW_PENDING_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function clearPendingFlwTxn() {
+  try {
+    sessionStorage.removeItem(FLW_PENDING_KEY);
   } catch {
     /* ignore */
   }

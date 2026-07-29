@@ -172,3 +172,32 @@ export const initializeFlwPayment = async (params: {
   if (!data?.success) throw new Error(data?.error || "Failed to initialize payment");
   return data as FlwInitResult;
 };
+
+/** Verify + credit after hosted checkout return (used by Top Up and card-send resume). */
+export async function verifyFlwPayment(params: {
+  transaction_id?: string;
+  tx_ref?: string;
+}): Promise<{
+  verified: boolean;
+  currency?: string;
+  amount?: number;
+  error?: string;
+  status?: string;
+}> {
+  const session = (await supabase.auth.getSession()).data.session;
+  const qs = new URLSearchParams();
+  if (params.transaction_id) qs.set("transaction_id", params.transaction_id);
+  if (params.tx_ref) qs.set("tx_ref", params.tx_ref);
+  const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/flw-verify-payment?${qs.toString()}`;
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${session?.access_token || ""}` },
+  });
+  const json = await res.json().catch(() => ({}));
+  return json as {
+    verified: boolean;
+    currency?: string;
+    amount?: number;
+    error?: string;
+    status?: string;
+  };
+}

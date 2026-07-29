@@ -99,7 +99,7 @@ export default function SwychrTopUpCard({ walletId, walletCurrency, onComplete }
           {swychrGatewayLabel(currency)}
         </CardTitle>
         <p className="text-sm text-muted-foreground">
-          Pay via Swychr mobile money checkout for your {currency} wallet.
+          Pay with mobile money on a secure page for your {currency} wallet.
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
