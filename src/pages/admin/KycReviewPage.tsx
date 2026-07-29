@@ -18,6 +18,7 @@ import { ArrowLeft, AlertTriangle, Clock, FileText, ShieldAlert, ZoomIn, ZoomOut
 import { format, formatDistanceToNow } from "date-fns";
 import { extractRiskTags } from "@/lib/personaTags";
 import { KycRiskTagChip } from "@/components/admin/KycRiskTagChip";
+import { z } from "zod";
 import SumsubCard from "@/components/admin/SumsubCard";
 
 const REJECTION_REASONS = [
@@ -29,6 +30,11 @@ const REJECTION_REASONS = [
   "Information mismatch",
   "Other (custom reason)",
 ];
+
+const KycActionResponseSchema = z.union([
+  z.object({ ok: z.literal(true) }).passthrough(),
+  z.object({ error: z.string() }),
+]);
 
 const useSignedUrl = (path: string | null | undefined) => {
   const [url, setUrl] = useState<string | null>(null);
@@ -151,10 +157,12 @@ const KycReviewPage = () => {
 
   const callEdge = async (fn: string, body: Record<string, unknown>) => {
     const { data: result, error } = await supabase.functions.invoke(fn, { body });
-    if (error || (result && result.error)) {
-      throw new Error((result && result.error) || error?.message || "Action failed");
-    }
-    return result;
+    if (error) throw new Error(error.message || "Action failed");
+    const parsed = KycActionResponseSchema.safeParse(result);
+    if (!parsed.success) throw new Error(`Unexpected response from ${fn}`);
+    const data = parsed.data as { error?: string };
+    if (data.error) throw new Error(data.error);
+    return parsed.data;
   };
 
   const handleApprove = async () => {

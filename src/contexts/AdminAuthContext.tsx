@@ -80,7 +80,14 @@ export const AdminAuthProvider = ({ children }: { children: ReactNode }) => {
       .select("id, role, status, full_name, email, department, permissions")
       .eq("id", uid)
       .maybeSingle();
-    if (error || !data) {
+    if (error) {
+      console.warn("AdminAuth: error fetching admin record", error);
+      setAdmin(null);
+      return null;
+    }
+    if (!data) {
+      console.warn("AdminAuth: no admin record found for user", uid);
+      toast.error("Unable to verify admin access. Please sign in again.");
       setAdmin(null);
       return null;
     }
@@ -120,9 +127,11 @@ export const AdminAuthProvider = ({ children }: { children: ReactNode }) => {
       console.warn('admin signOut error, forcing local clear', e);
     }
     try {
-      Object.keys(localStorage)
-        .filter((k) => k.startsWith('sb-') && k.endsWith('-auth-token'))
-        .forEach((k) => localStorage.removeItem(k));
+      const url = import.meta.env.VITE_SUPABASE_URL;
+      const projectRef = url ? new URL(url).hostname.split('.')[0] : null;
+      if (projectRef) {
+        localStorage.removeItem(`sb-${projectRef}-auth-token`);
+      }
     } catch {}
     setAdmin(null);
     setUser(null);

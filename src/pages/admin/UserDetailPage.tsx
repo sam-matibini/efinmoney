@@ -108,7 +108,7 @@ const UserDetailPage = () => {
 
 
 
-  const { data: profile, isLoading } = useQuery({
+  const { data: profile, isLoading: profileLoading } = useQuery({
     queryKey: ["admin-user-detail", id],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -122,7 +122,7 @@ const UserDetailPage = () => {
     enabled: !!id,
   });
 
-  const { data: kyc } = useQuery({
+  const { data: kyc, isLoading: kycLoading } = useQuery({
     queryKey: ["admin-user-kyc", id],
     queryFn: async () => {
       const { data } = await supabase.from("kyc_verifications").select("*").eq("user_id", id).maybeSingle();
@@ -131,7 +131,7 @@ const UserDetailPage = () => {
     enabled: !!id,
   });
 
-  const { data: tier } = useQuery({
+  const { data: tier, isLoading: tierLoading } = useQuery({
     queryKey: ["admin-user-tier", id],
     queryFn: async () => {
       const { data } = await supabase.from("user_risk_tiers").select("*").eq("user_id", id).maybeSingle();
@@ -140,7 +140,7 @@ const UserDetailPage = () => {
     enabled: !!id,
   });
 
-  const { data: wallets = [] } = useQuery({
+  const { data: wallets = [], isLoading: walletsLoading } = useQuery({
     queryKey: ["admin-user-wallets", id],
     queryFn: async () => {
       const { data, error } = await supabase.rpc("get_user_wallet_balances", { p_user_id: id! });
@@ -150,7 +150,7 @@ const UserDetailPage = () => {
     enabled: !!id,
   });
 
-  const { data: transfers = [] } = useQuery({
+  const { data: transfers = [], isLoading: transfersLoading } = useQuery({
     queryKey: ["admin-user-transfers", id],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -165,7 +165,7 @@ const UserDetailPage = () => {
     enabled: !!id,
   });
 
-  const { data: activities = [] } = useQuery({
+  const { data: activities = [], isLoading: activitiesLoading } = useQuery({
     queryKey: ["admin-user-activities", id],
     queryFn: async () => {
       const { data } = await supabase
@@ -179,7 +179,7 @@ const UserDetailPage = () => {
     enabled: !!id,
   });
 
-  const { data: communications = [] } = useQuery({
+  const { data: communications = [], isLoading: commsLoading } = useQuery({
     queryKey: ["admin-user-comms", id],
     queryFn: async () => {
       const { data } = await supabase
@@ -193,7 +193,7 @@ const UserDetailPage = () => {
     enabled: !!id,
   });
 
-  const { data: disputes = [] } = useQuery({
+  const { data: disputes = [], isLoading: disputesLoading } = useQuery({
     queryKey: ["admin-user-disputes", id],
     queryFn: async () => {
       const { data } = await supabase
@@ -207,7 +207,7 @@ const UserDetailPage = () => {
     enabled: !!id,
   });
 
-  const { data: alerts = [] } = useQuery({
+  const { data: alerts = [], isLoading: alertsLoading } = useQuery({
     queryKey: ["admin-user-alerts", id],
     queryFn: async () => {
       const { data } = await supabase
@@ -221,7 +221,7 @@ const UserDetailPage = () => {
     enabled: !!id,
   });
 
-  if (isLoading) {
+  if (profileLoading) {
     return (
       <AdminLayout>
         <div className="space-y-4">
@@ -330,13 +330,27 @@ const UserDetailPage = () => {
               <Card>
                 <CardHeader><CardTitle className="text-base flex items-center gap-2"><Shield className="w-4 h-4" /> KYC & Risk</CardTitle></CardHeader>
                 <CardContent className="space-y-3 text-sm">
-                  <Row label="Verification status" value={kyc?.verification_status || profile.kyc_status} />
-                  <Row label="ID status" value={kyc?.id_verification_status || "—"} />
-                  <Row label="Address status" value={kyc?.address_verification_status || "—"} />
-                  <Row label="Tier" value={tier?.current_tier || profile.kyc_tier} />
-                  <Row label="Daily limit" value={tier?.daily_transaction_limit ? `$${Number(tier.daily_transaction_limit).toLocaleString()}` : "—"} />
-                  <Row label="Monthly limit" value={tier?.monthly_transaction_limit ? `$${Number(tier.monthly_transaction_limit).toLocaleString()}` : "—"} />
-                  <Row label="KYC completed" value={profile.kyc_completed_at ? format(new Date(profile.kyc_completed_at), "PPP") : "—"} />
+                  {kycLoading || tierLoading ? (
+                    <>
+                      <Skeleton className="h-5 w-full" />
+                      <Skeleton className="h-5 w-full" />
+                      <Skeleton className="h-5 w-3/4" />
+                      <Skeleton className="h-5 w-1/2" />
+                      <Skeleton className="h-5 w-2/3" />
+                      <Skeleton className="h-5 w-2/3" />
+                      <Skeleton className="h-5 w-1/2" />
+                    </>
+                  ) : (
+                    <>
+                      <Row label="Verification status" value={kyc?.verification_status || profile.kyc_status} />
+                      <Row label="ID status" value={kyc?.id_verification_status || "—"} />
+                      <Row label="Address status" value={kyc?.address_verification_status || "—"} />
+                      <Row label="Tier" value={tier?.current_tier || profile.kyc_tier} />
+                      <Row label="Daily limit" value={tier?.daily_transaction_limit ? `$${Number(tier.daily_transaction_limit).toLocaleString()}` : "—"} />
+                      <Row label="Monthly limit" value={tier?.monthly_transaction_limit ? `$${Number(tier.monthly_transaction_limit).toLocaleString()}` : "—"} />
+                      <Row label="KYC completed" value={profile.kyc_completed_at ? format(new Date(profile.kyc_completed_at), "PPP") : "—"} />
+                    </>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -391,7 +405,13 @@ const UserDetailPage = () => {
             <Card>
               <CardHeader><CardTitle className="text-base flex items-center gap-2"><Wallet className="w-4 h-4" /> Wallets ({wallets.length})</CardTitle></CardHeader>
               <CardContent>
-                {wallets.length === 0 ? (
+                {walletsLoading ? (
+                  <div className="space-y-3">
+                    <Skeleton className="h-8 w-full" />
+                    <Skeleton className="h-8 w-full" />
+                    <Skeleton className="h-8 w-full" />
+                  </div>
+                ) : wallets.length === 0 ? (
                   <EmptyState icon={Wallet} title="No wallets yet" description="This user hasn't created any wallets." size="sm" />
                 ) : (
                   <Table>
@@ -435,7 +455,13 @@ const UserDetailPage = () => {
             <Card>
               <CardHeader><CardTitle className="text-base flex items-center gap-2"><ArrowRightLeft className="w-4 h-4" /> Recent transfers ({transfers.length})</CardTitle></CardHeader>
               <CardContent>
-                {transfers.length === 0 ? (
+                {transfersLoading ? (
+                  <div className="space-y-3">
+                    <Skeleton className="h-8 w-full" />
+                    <Skeleton className="h-8 w-full" />
+                    <Skeleton className="h-8 w-full" />
+                  </div>
+                ) : transfers.length === 0 ? (
                   <EmptyState icon={ArrowRightLeft} title="No transfers yet" description="This user hasn't sent or received any transfers." size="sm" />
                 ) : (
                   <div className="overflow-x-auto">
@@ -490,7 +516,13 @@ const UserDetailPage = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {activities.length === 0 ? (
+                  {activitiesLoading ? (
+                    <div className="space-y-3">
+                      <Skeleton className="h-12 w-full" />
+                      <Skeleton className="h-12 w-full" />
+                      <Skeleton className="h-12 w-2/3" />
+                    </div>
+                  ) : activities.length === 0 ? (
                     <p className="text-sm text-muted-foreground py-6 text-center">No activities logged</p>
                   ) : (
                     <ul className="space-y-3">
@@ -519,7 +551,13 @@ const UserDetailPage = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {communications.length === 0 ? (
+                  {commsLoading ? (
+                    <div className="space-y-3">
+                      <Skeleton className="h-12 w-full" />
+                      <Skeleton className="h-12 w-full" />
+                      <Skeleton className="h-12 w-2/3" />
+                    </div>
+                  ) : communications.length === 0 ? (
                     <p className="text-sm text-muted-foreground py-6 text-center">No messages exchanged</p>
                   ) : (
                     <ul className="space-y-3">
@@ -547,7 +585,13 @@ const UserDetailPage = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {disputes.length === 0 ? (
+                  {disputesLoading ? (
+                    <div className="space-y-3">
+                      <Skeleton className="h-12 w-full" />
+                      <Skeleton className="h-12 w-full" />
+                      <Skeleton className="h-12 w-2/3" />
+                    </div>
+                  ) : disputes.length === 0 ? (
                     <p className="text-sm text-muted-foreground py-6 text-center">No disputes raised</p>
                   ) : (
                     <ul className="space-y-3">
@@ -579,7 +623,13 @@ const UserDetailPage = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {alerts.length === 0 ? (
+                  {alertsLoading ? (
+                    <div className="space-y-3">
+                      <Skeleton className="h-12 w-full" />
+                      <Skeleton className="h-12 w-full" />
+                      <Skeleton className="h-12 w-2/3" />
+                    </div>
+                  ) : alerts.length === 0 ? (
                     <p className="text-sm text-muted-foreground py-6 text-center">No alerts triggered</p>
                   ) : (
                     <ul className="space-y-3">

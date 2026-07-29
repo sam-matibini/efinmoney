@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation, Outlet } from "react-router-dom";
 import ScrollToTop from "./components/ScrollToTop";
 import { useEffect, Suspense } from "react";
 import { lazyImport } from "@/lib/lazyImport";
@@ -33,8 +33,10 @@ import KycAppLayout from "@/components/layout/KycAppLayout";
 import ProtectedShell from "@/components/layout/ProtectedShell";
 import ClientShell from "@/components/layout/ClientShell";
 import KybGuard from "@/components/kyb/KybGuard";
-import AdminGuard from "@/components/admin-portal/AdminGuard";
-import AdminLayout from "@/components/admin-portal/AdminLayout";
+import {
+  AdminGuardShell,
+  AdminSidebarShell,
+} from "@/components/admin-portal/AdminRouteGuard";
 
 // Lazy-loaded pages (admin, onboarding, legal, rarely-used)
 const PrivacyPolicyPage = lazyImport(() => import("./pages/PrivacyPolicyPage"));
@@ -286,13 +288,15 @@ const AppRoutes = () => {
         </Route>
 
         {/* Admin-sidebar versions of Finance / Operations / Settings */}
-        <Route path="/admin/finance" element={<AdminAuthProvider><AdminGuard><AdminLayout><FinanceDashboard /></AdminLayout></AdminGuard></AdminAuthProvider>} />
-        <Route path="/admin/operations" element={<AdminAuthProvider><AdminGuard><AdminLayout><OperationsDashboard /></AdminLayout></AdminGuard></AdminAuthProvider>} />
-        <Route path="/admin/communication" element={<AdminAuthProvider><AdminGuard><AdminLayout><CommunicationHubPage /></AdminLayout></AdminGuard></AdminAuthProvider>} />
-        <Route path="/admin/support" element={<AdminAuthProvider><AdminGuard><AdminLayout><SupportInboxPage /></AdminLayout></AdminGuard></AdminAuthProvider>} />
-        <Route path="/admin/settings" element={<AdminAuthProvider><AdminGuard><AdminLayout><SettingsDashboard /></AdminLayout></AdminGuard></AdminAuthProvider>} />
-        <Route path="/admin/pricing" element={<AdminAuthProvider><AdminGuard><AdminLayout><PricingPage /></AdminLayout></AdminGuard></AdminAuthProvider>} />
-        <Route path="/admin/revenue" element={<AdminAuthProvider><AdminGuard><AdminLayout><RevenuePage /></AdminLayout></AdminGuard></AdminAuthProvider>} />
+        <Route element={<AdminSidebarShell />}>
+          <Route path="/admin/finance" element={<FinanceDashboard />} />
+          <Route path="/admin/operations" element={<OperationsDashboard />} />
+          <Route path="/admin/communication" element={<CommunicationHubPage />} />
+          <Route path="/admin/support" element={<SupportInboxPage />} />
+          <Route path="/admin/settings" element={<SettingsDashboard />} />
+          <Route path="/admin/pricing" element={<PricingPage />} />
+          <Route path="/admin/revenue" element={<RevenuePage />} />
+        </Route>
 
         <Route element={<ProtectedShellRoute />}>
           <Route path="/profile" element={<ProfileSettingsPage />} />
@@ -303,50 +307,52 @@ const AppRoutes = () => {
 
         <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
         <Route path="/admin/login" element={<AdminAuthProvider><AdminLogin /></AdminAuthProvider>} />
-        <Route path="/admin/dashboard" element={<AdminAuthProvider><AdminGuard><AdminDashboardPage /></AdminGuard></AdminAuthProvider>} />
-        <Route path="/admin/kyc" element={<AdminAuthProvider><AdminGuard><KycQueuePage /></AdminGuard></AdminAuthProvider>} />
-        <Route path="/admin/kyc/:id" element={<AdminAuthProvider><AdminGuard><KycReviewPage /></AdminGuard></AdminAuthProvider>} />
-        <Route path="/admin/kyb" element={<AdminAuthProvider><AdminGuard><KybQueuePage /></AdminGuard></AdminAuthProvider>} />
-        <Route path="/admin/kyb/:id" element={<AdminAuthProvider><AdminGuard><KybReviewPage /></AdminGuard></AdminAuthProvider>} />
-        <Route path="/admin/users" element={<AdminAuthProvider><AdminGuard><UsersPage /></AdminGuard></AdminAuthProvider>} />
-        <Route path="/admin/users/:id" element={<AdminAuthProvider><AdminGuard><UserDetailPage /></AdminGuard></AdminAuthProvider>} />
-        <Route path="/admin/risk-tiers" element={<AdminAuthProvider><AdminGuard><RiskTiersPage /></AdminGuard></AdminAuthProvider>} />
-        <Route path="/admin/audit-log" element={<AdminAuthProvider><AdminGuard><AuditLogPage /></AdminGuard></AdminAuthProvider>} />
-        <Route path="/admin/api" element={<AdminAuthProvider><AdminGuard><ApiManagementPage /></AdminGuard></AdminAuthProvider>} />
-        <Route path="/admin/kyc-config" element={<AdminAuthProvider><AdminGuard><KycConfigPage /></AdminGuard></AdminAuthProvider>} />
-        <Route path="/admin/diagnostics" element={<AdminAuthProvider><AdminGuard><SystemDiagnosticsPage /></AdminGuard></AdminAuthProvider>} />
-        <Route path="/admin/data-export" element={<AdminAuthProvider><AdminGuard><DataExportPage /></AdminGuard></AdminAuthProvider>} />
-        <Route path="/admin/staff" element={<AdminAuthProvider><AdminGuard><StaffPage /></AdminGuard></AdminAuthProvider>} />
-        <Route path="/admin/staff/:id" element={<AdminAuthProvider><AdminGuard><StaffDetailPage /></AdminGuard></AdminAuthProvider>} />
-        <Route path="/admin/onboarding" element={<AdminAuthProvider><AdminGuard><StaffOnboardingPage /></AdminGuard></AdminAuthProvider>} />
-        <Route path="/admin/board-dashboard" element={<AdminAuthProvider><AdminGuard><BoardDashboardPage /></AdminGuard></AdminAuthProvider>} />
-        <Route path="/admin/security" element={<AdminAuthProvider><AdminGuard><SecurityMonitoringPage /></AdminGuard></AdminAuthProvider>} />
-        <Route path="/admin/operational-risks" element={<AdminAuthProvider><AdminGuard><OperationalRiskPage /></AdminGuard></AdminAuthProvider>} />
-        <Route path="/admin/compliance-register" element={<AdminAuthProvider><AdminGuard><ComplianceRegisterPage /></AdminGuard></AdminAuthProvider>} />
-        <Route path="/admin/edd" element={<AdminAuthProvider><AdminGuard><EddWorkflowPage /></AdminGuard></AdminAuthProvider>} />
-        <Route path="/admin/auditor-portal" element={<AdminAuthProvider><AdminGuard><AuditorPortalPage /></AdminGuard></AdminAuthProvider>} />
-        <Route path="/admin/aml-policy" element={<AdminAuthProvider><AdminGuard><AmlPolicyPage /></AdminGuard></AdminAuthProvider>} />
-        <Route path="/admin/cdd" element={<AdminAuthProvider><AdminGuard><CddWorkflowPage /></AdminGuard></AdminAuthProvider>} />
-        <Route path="/admin/transaction-monitoring" element={<AdminAuthProvider><AdminGuard><TransactionMonitoringPage /></AdminGuard></AdminAuthProvider>} />
-        <Route path="/admin/sanctions" element={<AdminAuthProvider><AdminGuard><SanctionsScreeningPage /></AdminGuard></AdminAuthProvider>} />
-        <Route path="/admin/beneficial-ownership" element={<AdminAuthProvider><AdminGuard><BeneficialOwnershipPage /></AdminGuard></AdminAuthProvider>} />
-        <Route path="/admin/pep-screening" element={<AdminAuthProvider><AdminGuard><PepScreeningPage /></AdminGuard></AdminAuthProvider>} />
-        <Route path="/admin/str-filing" element={<AdminAuthProvider><AdminGuard><StrFilingPage /></AdminGuard></AdminAuthProvider>} />
-        <Route path="/admin/incidents" element={<AdminAuthProvider><AdminGuard><IncidentManagementPage /></AdminGuard></AdminAuthProvider>} />
-        <Route path="/admin/training" element={<AdminAuthProvider><AdminGuard><StaffTrainingPage /></AdminGuard></AdminAuthProvider>} />
-        <Route path="/admin/correspondent-banking" element={<AdminAuthProvider><AdminGuard><CorrespondentBankingPage /></AdminGuard></AdminAuthProvider>} />
-        <Route path="/admin/geographic-risk" element={<AdminAuthProvider><AdminGuard><GeographicRiskPage /></AdminGuard></AdminAuthProvider>} />
-        <Route path="/admin/travel-rule" element={<AdminAuthProvider><AdminGuard><TravelRulePage /></AdminGuard></AdminAuthProvider>} />
-        <Route path="/admin/lctr" element={<AdminAuthProvider><AdminGuard><LctrPage /></AdminGuard></AdminAuthProvider>} />
-        <Route path="/admin/eftr" element={<AdminAuthProvider><AdminGuard><EftrPage /></AdminGuard></AdminAuthProvider>} />
-        <Route path="/admin/trade-aml" element={<AdminAuthProvider><AdminGuard><TradeAmlPage /></AdminGuard></AdminAuthProvider>} />
-        <Route path="/admin/wire-transfers" element={<AdminAuthProvider><AdminGuard><WireTransfersPage /></AdminGuard></AdminAuthProvider>} />
-        <Route path="/admin/regulatory-changes" element={<AdminAuthProvider><AdminGuard><RegulatoryChangesPage /></AdminGuard></AdminAuthProvider>} />
-        <Route path="/admin/settlement-reconciliation" element={<AdminAuthProvider><AdminGuard><SettlementReconciliationPage /></AdminGuard></AdminAuthProvider>} />
-        <Route path="/admin/period-end-controls" element={<AdminAuthProvider><AdminGuard><PeriodEndControlsPage /></AdminGuard></AdminAuthProvider>} />
-        <Route path="/admin/evidence-repository" element={<AdminAuthProvider><AdminGuard><EvidenceRepositoryPage /></AdminGuard></AdminAuthProvider>} />
-        <Route path="/admin/payments/adyen" element={<AdminAuthProvider><AdminGuard><AdminAdyenLinksPage /></AdminGuard></AdminAuthProvider>} />
-        <Route path="/admin/payments/adyen/transactions" element={<AdminAuthProvider><AdminGuard><AdminAdyenTransactionsPage /></AdminGuard></AdminAuthProvider>} />
+        <Route element={<AdminGuardShell />}>
+          <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
+          <Route path="/admin/kyc" element={<KycQueuePage />} />
+          <Route path="/admin/kyc/:id" element={<KycReviewPage />} />
+          <Route path="/admin/kyb" element={<KybQueuePage />} />
+          <Route path="/admin/kyb/:id" element={<KybReviewPage />} />
+          <Route path="/admin/users" element={<UsersPage />} />
+          <Route path="/admin/users/:id" element={<UserDetailPage />} />
+          <Route path="/admin/risk-tiers" element={<RiskTiersPage />} />
+          <Route path="/admin/audit-log" element={<AuditLogPage />} />
+          <Route path="/admin/api" element={<ApiManagementPage />} />
+          <Route path="/admin/kyc-config" element={<KycConfigPage />} />
+          <Route path="/admin/diagnostics" element={<SystemDiagnosticsPage />} />
+          <Route path="/admin/data-export" element={<DataExportPage />} />
+          <Route path="/admin/staff" element={<StaffPage />} />
+          <Route path="/admin/staff/:id" element={<StaffDetailPage />} />
+          <Route path="/admin/onboarding" element={<StaffOnboardingPage />} />
+          <Route path="/admin/board-dashboard" element={<BoardDashboardPage />} />
+          <Route path="/admin/security" element={<SecurityMonitoringPage />} />
+          <Route path="/admin/operational-risks" element={<OperationalRiskPage />} />
+          <Route path="/admin/compliance-register" element={<ComplianceRegisterPage />} />
+          <Route path="/admin/edd" element={<EddWorkflowPage />} />
+          <Route path="/admin/auditor-portal" element={<AuditorPortalPage />} />
+          <Route path="/admin/aml-policy" element={<AmlPolicyPage />} />
+          <Route path="/admin/cdd" element={<CddWorkflowPage />} />
+          <Route path="/admin/transaction-monitoring" element={<TransactionMonitoringPage />} />
+          <Route path="/admin/sanctions" element={<SanctionsScreeningPage />} />
+          <Route path="/admin/beneficial-ownership" element={<BeneficialOwnershipPage />} />
+          <Route path="/admin/pep-screening" element={<PepScreeningPage />} />
+          <Route path="/admin/str-filing" element={<StrFilingPage />} />
+          <Route path="/admin/incidents" element={<IncidentManagementPage />} />
+          <Route path="/admin/training" element={<StaffTrainingPage />} />
+          <Route path="/admin/correspondent-banking" element={<CorrespondentBankingPage />} />
+          <Route path="/admin/geographic-risk" element={<GeographicRiskPage />} />
+          <Route path="/admin/travel-rule" element={<TravelRulePage />} />
+          <Route path="/admin/lctr" element={<LctrPage />} />
+          <Route path="/admin/eftr" element={<EftrPage />} />
+          <Route path="/admin/trade-aml" element={<TradeAmlPage />} />
+          <Route path="/admin/wire-transfers" element={<WireTransfersPage />} />
+          <Route path="/admin/regulatory-changes" element={<RegulatoryChangesPage />} />
+          <Route path="/admin/settlement-reconciliation" element={<SettlementReconciliationPage />} />
+          <Route path="/admin/period-end-controls" element={<PeriodEndControlsPage />} />
+          <Route path="/admin/evidence-repository" element={<EvidenceRepositoryPage />} />
+          <Route path="/admin/payments/adyen" element={<AdminAdyenLinksPage />} />
+          <Route path="/admin/payments/adyen/transactions" element={<AdminAdyenTransactionsPage />} />
+        </Route>
 
         <Route path="/auth" element={<PublicRoute><Auth /></PublicRoute>} />
         <Route path="/auth/confirm" element={<AuthConfirm />} />
