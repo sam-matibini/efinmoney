@@ -4,7 +4,6 @@ import { motion } from "framer-motion";
 import { ArrowRight, Target, Globe, ShieldCheck, Zap, Eye, Mail } from "lucide-react";
 import MarketingHeader from "@/components/marketing/MarketingHeader";
 import MarketingFooter from "@/components/marketing/MarketingFooter";
-import { CountryFlag } from "@/components/ui/FlagImage";
 
 const VALUES = [
   { icon: ShieldCheck, t: "Security first", d: "Bank-grade encryption, multi-factor authentication, and regulated MSB operations with a SOC 2 Type II posture." },
@@ -12,14 +11,33 @@ const VALUES = [
   { icon: Zap, t: "Speed that matters", d: "Transfers that settle in minutes, not days, so the people who depend on you don't wait." },
 ];
 
+// Real flag images (flagcdn) so every corridor renders across all platforms.
 const CORRIDORS = [
-  { country: "Canada", label: "Canada" },
-  { country: "United States", label: "USA" },
-  { country: "Nigeria", label: "Nigeria" },
-  { country: "Kenya", label: "Kenya" },
-  { country: "Ghana", label: "Ghana" },
-  { country: "Zambia", label: "Zambia" },
+  { cc: "ca", label: "Canada" },
+  { cc: "us", label: "USA" },
+  { cc: "gb", label: "United Kingdom" },
+  { cc: "eu", label: "Europe" },
+  { cc: "ng", label: "Nigeria" },
+  { cc: "gh", label: "Ghana" },
+  { cc: "ke", label: "Kenya" },
+  { cc: "za", label: "South Africa" },
+  { cc: "sn", label: "Senegal" },
+  { cc: "ug", label: "Uganda" },
+  { cc: "tz", label: "Tanzania" },
+  { cc: "zm", label: "Zambia" },
 ];
+
+function Flag({ cc, alt }: { cc: string; alt: string }) {
+  return (
+    <img
+      src={`https://flagcdn.com/w40/${cc}.png`}
+      srcSet={`https://flagcdn.com/w80/${cc}.png 2x`}
+      alt={alt}
+      loading="lazy"
+      className="h-5 w-5 shrink-0 rounded-full object-cover ring-1 ring-neutral-200"
+    />
+  );
+}
 
 export default function About() {
   useEffect(() => {
@@ -45,7 +63,7 @@ export default function About() {
             initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
             className="text-4xl md:text-6xl font-black tracking-tight leading-[1.05]"
           >
-            Connecting <span className="text-[hsl(var(--accent-amber))]">North America and Africa</span>, one transfer at a time.
+            Connecting <span className="text-[hsl(var(--accent-amber))]">people and businesses worldwide</span>, one transfer at a time.
           </motion.h1>
         </div>
         <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-white to-transparent pointer-events-none" />
@@ -60,8 +78,8 @@ export default function About() {
           <h2 className="text-3xl md:text-4xl font-black tracking-tight text-[hsl(var(--brand-900))]">Our mission</h2>
           <p className="mt-6 text-lg text-neutral-600 leading-relaxed">
             Moving money across borders should be as simple as sending a message. eFinMoney gives individuals and
-            businesses one account to hold multiple currencies and send funds between North America and Africa —
-            reaching bank accounts and mobile wallets directly, quickly and affordably.
+            businesses one account to hold multiple currencies and send funds worldwide — reaching bank accounts and
+            mobile wallets across Africa, plus card payouts in the US, Europe and the UK, quickly and affordably.
           </p>
         </div>
       </section>
@@ -74,13 +92,16 @@ export default function About() {
           </span>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             {CORRIDORS.map((c) => (
-              <span key={c.label} className="inline-flex items-center gap-2 text-sm font-bold px-4 py-2 rounded-full bg-white text-[hsl(var(--brand-900))] shadow-sm border border-neutral-200/80">
-                <CountryFlag country={c.country} size="md" /> {c.label}
+              <span key={c.label} className="inline-flex items-center gap-2 text-sm font-bold px-4 py-2 rounded-full bg-white text-[hsl(var(--brand-900))] shadow-sm border border-neutral-200/80 transition-transform hover:-translate-y-0.5">
+                <Flag cc={c.cc} alt={c.label} /> {c.label}
               </span>
             ))}
+            <span className="inline-flex items-center text-sm font-bold px-4 py-2 rounded-full bg-[hsl(var(--brand-900))] text-white shadow-sm">
+              + 30 more African destinations
+            </span>
           </div>
           <p className="mt-6 text-sm text-neutral-600">
-            With direct mobile-money payouts via MTN, Airtel, M-Pesa and Vodafone.
+            Card payouts in the US, Europe &amp; UK, plus direct mobile-money via MTN, Airtel, M-Pesa and Vodafone.
           </p>
         </div>
       </section>

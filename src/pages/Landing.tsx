@@ -5,7 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { ArrowRight, Globe, Shield, Zap, Wallet, Send, BarChart3, Layers, Check } from "lucide-react";
 import MarketingHeader from "@/components/marketing/MarketingHeader";
 import MarketingFooter from "@/components/marketing/MarketingFooter";
-import { CountryFlag } from "@/components/ui/FlagImage";
+import { CountryFlag, CurrencyFlag } from "@/components/ui/FlagImage";
 import africaHero from "@/assets/landing-africa-hero.jpg";
 import africaBand from "@/assets/landing-africa-band.jpg";
 import b2bPhone from "@/assets/landing-b2b-phone.jpg";
@@ -68,16 +68,16 @@ const WalletScreen = () => (
     <div className="text-[10px] text-indigo-600 mt-1 font-semibold">+2.4% today</div>
     <div className="mt-3 space-y-1.5">
       {[
-        { flag: "🇺🇸", c: "USD", b: "$10,170" },
-        { flag: "🇨🇦", c: "CAD", b: "C$407" },
-        { flag: "🇳🇬", c: "NGN", b: "₦789,980" },
-        { flag: "🇰🇪", c: "KES", b: "KSh 88,450" },
-        { flag: "🇬🇭", c: "GHS", b: "₵5,210" },
-        { flag: "🇿🇲", c: "ZMW", b: "ZK 8,900" },
+        { c: "USD", b: "$10,170" },
+        { c: "CAD", b: "C$407" },
+        { c: "NGN", b: "₦789,980" },
+        { c: "KES", b: "KSh 88,450" },
+        { c: "GHS", b: "₵5,210" },
+        { c: "ZMW", b: "ZK 8,900" },
       ].map((w) => (
         <div key={w.c} className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-neutral-50">
           <div className="flex items-center gap-1.5">
-            <span className="text-base">{w.flag}</span>
+            <CurrencyFlag code={w.c} size="sm" />
             <span className="text-[11px] font-bold text-neutral-900">{w.c}</span>
           </div>
           <span className="text-[11px] font-semibold text-neutral-700">{w.b}</span>
@@ -113,7 +113,9 @@ const ExchangeScreen = () => (
     <div className="mt-3 p-3 rounded-xl bg-neutral-50 border border-neutral-200">
       <div className="text-xs text-neutral-500">From</div>
       <div className="flex items-center justify-between mt-1">
-        <span className="text-lg font-bold text-neutral-900">🇺🇸 USD</span>
+        <span className="flex items-center gap-1.5 text-lg font-bold text-neutral-900">
+          <CurrencyFlag code="USD" size="md" /> USD
+        </span>
         <span className="text-lg font-black text-neutral-900">100.00</span>
       </div>
     </div>
@@ -123,7 +125,9 @@ const ExchangeScreen = () => (
     <div className="p-3 rounded-xl bg-indigo-50 border border-indigo-200">
       <div className="text-xs text-indigo-700">To</div>
       <div className="flex items-center justify-between mt-1">
-        <span className="text-lg font-bold text-neutral-900">🇨🇦 CAD</span>
+        <span className="flex items-center gap-1.5 text-lg font-bold text-neutral-900">
+          <CurrencyFlag code="CAD" size="md" /> CAD
+        </span>
         <span className="text-lg font-black text-indigo-700">136.42</span>
       </div>
     </div>
@@ -410,12 +414,12 @@ const Landing = () => {
 
           <div className="grid md:grid-cols-3 gap-5">
             {[
-              { img: tourismKenya, label: "🇰🇪 Maasai Mara · Kenya", alt: "Maasai Mara safari, Kenya" },
-              { img: tourismVicFalls, label: "🇿🇲 🇿🇼 Victoria Falls", alt: "Victoria Falls on the Zambia-Zimbabwe border" },
-              { img: tourismZanzibar, label: "🇹🇿 Zanzibar Coast", alt: "Zanzibar coastline with dhow boat" },
+              { img: tourismKenya, ccs: ["ke"], place: "Maasai Mara · Kenya", alt: "Maasai Mara safari, Kenya" },
+              { img: tourismVicFalls, ccs: ["zm", "zw"], place: "Victoria Falls", alt: "Victoria Falls on the Zambia-Zimbabwe border" },
+              { img: tourismZanzibar, ccs: ["tz"], place: "Zanzibar Coast", alt: "Zanzibar coastline with dhow boat" },
             ].map((t, i) => (
               <motion.div
-                key={t.label}
+                key={t.place}
                 initial={{ opacity: 0, y: 30 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-60px" }}
@@ -431,8 +435,20 @@ const Landing = () => {
                   className="w-full h-[280px] object-cover transition-transform duration-700 group-hover:scale-105"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-[hsl(var(--brand-900))]/70 via-transparent to-transparent" />
-                <span className="absolute bottom-4 left-4 text-[12px] font-bold px-3 py-1.5 rounded-full bg-white/95 text-[hsl(var(--brand-900))] backdrop-blur shadow-sm">
-                  {t.label}
+                <span className="absolute bottom-4 left-4 inline-flex items-center gap-2 text-[12px] font-bold px-3 py-1.5 rounded-full bg-white/95 text-[hsl(var(--brand-900))] backdrop-blur shadow-sm">
+                  <span className="flex items-center -space-x-1">
+                    {t.ccs.map((cc) => (
+                      <img
+                        key={cc}
+                        src={`https://flagcdn.com/w40/${cc}.png`}
+                        srcSet={`https://flagcdn.com/w80/${cc}.png 2x`}
+                        alt=""
+                        loading="lazy"
+                        className="h-4 w-4 rounded-full object-cover ring-1 ring-white"
+                      />
+                    ))}
+                  </span>
+                  {t.place}
                 </span>
               </motion.div>
             ))}

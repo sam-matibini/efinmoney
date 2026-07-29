@@ -5,9 +5,11 @@ const MotionLink = motion(Link);
 import { ArrowRight, Mail, Shield, Sparkles } from "lucide-react";
 import { Logo, Wordmark } from "@/components/Logo";
 
-const CORRIDOR_TICKER = [
-  "🇨🇦 CAD", "🇺🇸 USD", "🇳🇬 NGN", "🇰🇪 KES", "🇬🇭 GHS", "🇿🇲 ZMW", "🇺🇬 UGX", "🇹🇿 TZS",
-  "🇨🇦 CAD", "🇺🇸 USD", "🇳🇬 NGN", "🇰🇪 KES", "🇬🇭 GHS", "🇿🇲 ZMW", "🇺🇬 UGX", "🇹🇿 TZS",
+// Real flag images (flagcdn) — emoji flags don't render on Windows/Chrome.
+const CORRIDOR_TICKER: { cc: string; code: string }[] = [
+  { cc: "ca", code: "CAD" }, { cc: "us", code: "USD" }, { cc: "gb", code: "GBP" }, { cc: "eu", code: "EUR" },
+  { cc: "ng", code: "NGN" }, { cc: "ke", code: "KES" }, { cc: "gh", code: "GHS" }, { cc: "zm", code: "ZMW" },
+  { cc: "ug", code: "UGX" }, { cc: "tz", code: "TZS" }, { cc: "za", code: "ZAR" }, { cc: "rw", code: "RWF" },
 ];
 
 const NAV_PILLS: { label: string; href: string; external?: boolean }[] = [
@@ -37,10 +39,17 @@ export default function MarketingFooter() {
       {/* Corridor marquee — not a link column */}
       <div className="relative border-b border-white/10 overflow-hidden py-3.5 footer-marquee-mask">
         <div className="flex w-max footer-marquee-track gap-10 text-sm font-medium tracking-wide text-white/45">
-          {CORRIDOR_TICKER.map((item, i) => (
-            <span key={`${item}-${i}`} className="inline-flex items-center gap-2 shrink-0">
+          {[...CORRIDOR_TICKER, ...CORRIDOR_TICKER].map((item, i) => (
+            <span key={`${item.code}-${i}`} className="inline-flex items-center gap-2 shrink-0">
               <span className="text-white/25">◆</span>
-              {item}
+              <img
+                src={`https://flagcdn.com/w40/${item.cc}.png`}
+                srcSet={`https://flagcdn.com/w80/${item.cc}.png 2x`}
+                alt={item.code}
+                loading="lazy"
+                className="h-4 w-4 rounded-full object-cover ring-1 ring-white/20"
+              />
+              {item.code}
             </span>
           ))}
         </div>

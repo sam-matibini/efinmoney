@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import MarketingHeader from "@/components/marketing/MarketingHeader";
 import MarketingFooter from "@/components/marketing/MarketingFooter";
+import { CurrencyFlag } from "@/components/ui/FlagImage";
 
 const FEATURES = [
   {
@@ -60,7 +61,7 @@ const FEATURES = [
   },
 ];
 
-const CURRENCIES = ["USD", "CAD", "NGN", "GHS", "EUR", "GBP", "KES", "UGX"];
+const CURRENCIES = ["USD", "CAD", "GBP", "EUR", "NGN", "GHS", "KES", "UGX", "TZS", "ZMW", "ZAR", "RWF"];
 
 const FLOW = [
   { icon: Wallet, title: "Hold", text: "Keep balances in the currencies you need." },
@@ -145,8 +146,9 @@ export default function Features() {
             {CURRENCIES.map((c) => (
               <span
                 key={c}
-                className="px-3 py-1.5 rounded-full text-xs font-bold tracking-wide bg-white/10 border border-white/10 text-white/90"
+                className="inline-flex items-center gap-2 pl-1.5 pr-3 py-1.5 rounded-full text-xs font-bold tracking-wide bg-white/10 border border-white/10 text-white/90 transition-colors hover:bg-white/[0.16] hover:border-white/20"
               >
+                <CurrencyFlag code={c} size="sm" className="ring-white/25" />
                 {c}
               </span>
             ))}

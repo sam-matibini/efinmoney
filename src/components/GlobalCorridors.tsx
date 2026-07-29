@@ -30,10 +30,23 @@ const CORRIDORS = [
   { to: "Tanzania" },
 ];
 
+// Country name → ISO-3166 alpha-2 (lowercase) for flagcdn.com. Flag *emoji*
+// don't render on Windows/Chrome, so we use real flag images instead.
+const ISO_BY_NAME: Record<string, string> = {
+  Algeria: "dz", Angola: "ao", Benin: "bj", Botswana: "bw", "Burkina Faso": "bf",
+  Burundi: "bi", Cameroon: "cm", Congo: "cg", "DR Congo": "cd", Egypt: "eg",
+  Ethiopia: "et", Gambia: "gm", Ghana: "gh", Guinea: "gn", "Ivory Coast": "ci",
+  Kenya: "ke", Liberia: "lr", Madagascar: "mg", Malawi: "mw", Mali: "ml",
+  Morocco: "ma", Mozambique: "mz", Namibia: "na", Niger: "ne", Nigeria: "ng",
+  Rwanda: "rw", Senegal: "sn", "Sierra Leone": "sl", "South Africa": "za",
+  "South Sudan": "ss", Sudan: "sd", Tanzania: "tz", Togo: "tg", Tunisia: "tn",
+  Uganda: "ug", Zambia: "zm", Zimbabwe: "zw",
+};
+
 // A single row in the destination picker.
 interface Destination {
   key: string;
-  flag: string;
+  cc: string; // ISO-2 for the flag image (flagcdn)
   title: string;
   subtitle: string;
   code: string; // payout currency — drives routing + the badge
@@ -44,9 +57,9 @@ interface Destination {
 // Currency-scoped rather than per-country: USD reaches US + global cards, EUR
 // spans the EU-27, GBP is the UK.
 const GLOBAL_DESTINATIONS: Destination[] = [
-  { key: "USD", flag: "🌎", title: "International", subtitle: "US + global", code: "USD", search: "usd international united states us global america worldwide dollar" },
-  { key: "EUR", flag: "🇪🇺", title: "EU-27", subtitle: "Germany, France & more", code: "EUR", search: "eur euro europe eu germany france spain italy netherlands belgium portugal ireland austria" },
-  { key: "GBP", flag: "🇬🇧", title: "United Kingdom", subtitle: "Bank transfer", code: "GBP", search: "gbp united kingdom uk britain england pound sterling" },
+  { key: "USD", cc: "us", title: "International", subtitle: "US & global cards", code: "USD", search: "usd international united states us global america worldwide dollar" },
+  { key: "EUR", cc: "eu", title: "European Union", subtitle: "EU-27 · Germany, France & more", code: "EUR", search: "eur euro europe eu germany france spain italy netherlands belgium portugal ireland austria" },
+  { key: "GBP", cc: "gb", title: "United Kingdom", subtitle: "Bank transfer", code: "GBP", search: "gbp united kingdom uk britain england pound sterling" },
 ];
 
 // Every African destination we terminate in, straight from the product's
@@ -57,7 +70,7 @@ const AFRICAN_DESTINATIONS: Destination[] = COUNTRIES.filter((c) => c.region ===
   .sort((a, b) => a.country.localeCompare(b.country))
   .map((c) => ({
     key: c.id,
-    flag: c.flag,
+    cc: ISO_BY_NAME[c.id] ?? "",
     title: c.country,
     subtitle: c.method,
     code: c.code,
@@ -65,6 +78,29 @@ const AFRICAN_DESTINATIONS: Destination[] = COUNTRIES.filter((c) => c.region ===
   }));
 
 const TOTAL_DESTINATIONS = GLOBAL_DESTINATIONS.length + AFRICAN_DESTINATIONS.length;
+
+// Real flag image (flagcdn) — renders identically across every OS/browser.
+function Flag({ cc, alt, className = "" }: { cc: string; alt: string; className?: string }) {
+  if (!cc) {
+    return (
+      <span
+        className={`inline-flex items-center justify-center rounded-full bg-white/10 text-[10px] ${className}`}
+        aria-hidden
+      >
+        🌍
+      </span>
+    );
+  }
+  return (
+    <img
+      src={`https://flagcdn.com/w40/${cc}.png`}
+      srcSet={`https://flagcdn.com/w80/${cc}.png 2x`}
+      alt={alt}
+      loading="lazy"
+      className={`shrink-0 rounded-full object-cover ring-1 ring-white/25 ${className}`}
+    />
+  );
+}
 
 // Send a prospect into sign-up, remembering the corridor they picked so the
 // Send flow can pre-select the destination after they authenticate.
@@ -90,7 +126,7 @@ export default function GlobalCorridors({ videoSrc }: GlobalCorridorsProps) {
     () =>
       CORRIDORS.map((c) => {
         const info = findCountryById(c.to);
-        return { to: c.to, flag: info?.flag ?? "🏳️", code: info?.code };
+        return { to: c.to, cc: ISO_BY_NAME[c.to] ?? "", code: info?.code };
       }),
     [],
   );
@@ -142,9 +178,7 @@ export default function GlobalCorridors({ videoSrc }: GlobalCorridorsProps) {
       onSelect={() => handleSelect(d)}
       className="group mx-1 my-0.5 cursor-pointer rounded-xl px-3 py-2.5 text-white data-[selected=true]:bg-[#FFD700]/15 data-[selected=true]:text-white"
     >
-      <span className="mr-3 text-xl" aria-hidden="true">
-        {d.flag}
-      </span>
+      <Flag cc={d.cc} alt={d.title} className="mr-3 h-6 w-6" />
       <span className="flex min-w-0 flex-col">
         <span className="truncate text-[15px] font-semibold leading-tight">{d.title}</span>
         <span className="truncate text-[12px] text-white/45">{d.subtitle}</span>
@@ -242,8 +276,7 @@ export default function GlobalCorridors({ videoSrc }: GlobalCorridorsProps) {
             lineHeight: 1.65,
           }}
         >
-          Real-time transfers from Canada to {AFRICAN_DESTINATIONS.length} African
-          destinations — plus USD, EUR &amp; GBP payouts worldwide, at the best rates.
+          Global transfers, across the board — instant payouts at market-beating rates.
         </p>
 
         {/* Searchable destination picker — the full list, so nobody turns away */}
@@ -320,16 +353,17 @@ export default function GlobalCorridors({ videoSrc }: GlobalCorridorsProps) {
               key={c.to}
               type="button"
               onClick={() => navigate(corridorHref(c.code))}
-              className="flex items-center gap-2 rounded-full px-4 py-2 border transition-all hover:-translate-y-0.5 hover:border-[#FFD700]/70 hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FFD700]/60"
+              className="flex items-center gap-2.5 rounded-full py-1.5 pl-2 pr-4 border transition-all hover:-translate-y-0.5 hover:border-[#FFD700]/70 hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FFD700]/60"
               style={{
-                background: "rgba(255,255,255,0.15)",
+                background: "rgba(255,255,255,0.13)",
                 borderColor: "rgba(255,215,0,0.4)",
                 backdropFilter: "blur(8px)",
                 boxShadow: "0 2px 12px rgba(0,0,0,0.3)",
               }}
             >
-              <span className="text-base drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]" aria-hidden="true">
-                {c.flag}
+              <span className="flex items-center -space-x-1.5">
+                <Flag cc="ca" alt="Canada" className="h-5 w-5" />
+                <Flag cc={c.cc} alt={c.to} className="h-5 w-5" />
               </span>
               <span className="text-[13px] font-semibold text-white whitespace-nowrap">
                 Canada → {c.to}
