@@ -15,19 +15,37 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import africaHero from "@/assets/landing-africa-hero.jpg";
 
-// Featured corridors — the marquee routes shown as chips. The full, searchable
-// list below is derived live from the same COUNTRIES source the Send flow uses,
-// so marketing can never drift from what the product actually supports.
-const CORRIDORS = [
-  { to: "Nigeria" },
-  { to: "Ghana" },
-  { to: "Kenya" },
-  { to: "Senegal" },
-  { to: "Zimbabwe" },
-  { to: "Zambia" },
-  { to: "South Africa" },
-  { to: "Uganda" },
-  { to: "Tanzania" },
+// Featured corridors — marquee chips only. The searchable picker below is the
+// full product list; these just sample breadth (multi-origin + Africa + West).
+interface FeaturedCorridor {
+  from: string;
+  fromCc: string;
+  to: string;
+  /** Override destination flag / currency when `to` is not in COUNTRIES (e.g. EU, UK). */
+  toCc?: string;
+  code?: string;
+}
+
+const CORRIDORS: FeaturedCorridor[] = [
+  // Existing Canada → Africa routes (kept)
+  { from: "Canada", fromCc: "ca", to: "Nigeria" },
+  { from: "Canada", fromCc: "ca", to: "Ghana" },
+  { from: "Canada", fromCc: "ca", to: "Kenya" },
+  { from: "Canada", fromCc: "ca", to: "Senegal" },
+  { from: "Canada", fromCc: "ca", to: "Zimbabwe" },
+  { from: "Canada", fromCc: "ca", to: "Zambia" },
+  { from: "Canada", fromCc: "ca", to: "South Africa" },
+  { from: "Canada", fromCc: "ca", to: "Uganda" },
+  { from: "Canada", fromCc: "ca", to: "Tanzania" },
+  // Same destinations, other funded wallets (USD / GBP / EUR)
+  { from: "US", fromCc: "us", to: "Nigeria" },
+  { from: "US", fromCc: "us", to: "Kenya" },
+  { from: "UK", fromCc: "gb", to: "Ghana" },
+  { from: "UK", fromCc: "gb", to: "Uganda" },
+  { from: "Europe", fromCc: "eu", to: "Senegal" },
+  // Non-Africa samples (card / bank rails already in the picker)
+  { from: "Canada", fromCc: "ca", to: "United Kingdom", toCc: "gb", code: "GBP" },
+  { from: "US", fromCc: "us", to: "European Union", toCc: "eu", code: "EUR" },
 ];
 
 // Country name → ISO-3166 alpha-2 (lowercase) for flagcdn.com. Flag *emoji*
@@ -41,6 +59,7 @@ const ISO_BY_NAME: Record<string, string> = {
   Rwanda: "rw", Senegal: "sn", "Sierra Leone": "sl", "South Africa": "za",
   "South Sudan": "ss", Sudan: "sd", Tanzania: "tz", Togo: "tg", Tunisia: "tn",
   Uganda: "ug", Zambia: "zm", Zimbabwe: "zw",
+  "United Kingdom": "gb", "European Union": "eu", "United States": "us", Canada: "ca",
 };
 
 // A single row in the destination picker.
@@ -126,7 +145,13 @@ export default function GlobalCorridors({ videoSrc }: GlobalCorridorsProps) {
     () =>
       CORRIDORS.map((c) => {
         const info = findCountryById(c.to);
-        return { to: c.to, cc: ISO_BY_NAME[c.to] ?? "", code: info?.code };
+        return {
+          from: c.from,
+          fromCc: c.fromCc,
+          to: c.to,
+          toCc: c.toCc ?? ISO_BY_NAME[c.to] ?? "",
+          code: c.code ?? info?.code,
+        };
       }),
     [],
   );
@@ -343,14 +368,14 @@ export default function GlobalCorridors({ videoSrc }: GlobalCorridorsProps) {
           </Popover>
         </div>
 
-        {/* Featured corridors */}
+        {/* Featured corridors — sample only; full list is in the picker above */}
         <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/40">
-          Most popular routes
+          Popular routes · from CAD, USD, GBP &amp; EUR
         </p>
-        <div className="flex flex-wrap gap-2.5 justify-center mb-12 max-w-2xl mx-auto">
+        <div className="flex flex-wrap gap-2.5 justify-center mb-12 max-w-3xl mx-auto">
           {featured.map((c) => (
             <button
-              key={c.to}
+              key={`${c.from}-${c.to}`}
               type="button"
               onClick={() => navigate(corridorHref(c.code))}
               className="flex items-center gap-2.5 rounded-full py-1.5 pl-2 pr-4 border transition-all hover:-translate-y-0.5 hover:border-[#FFD700]/70 hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FFD700]/60"
@@ -362,11 +387,11 @@ export default function GlobalCorridors({ videoSrc }: GlobalCorridorsProps) {
               }}
             >
               <span className="flex items-center -space-x-1.5">
-                <Flag cc="ca" alt="Canada" className="h-5 w-5" />
-                <Flag cc={c.cc} alt={c.to} className="h-5 w-5" />
+                <Flag cc={c.fromCc} alt={c.from} className="h-5 w-5" />
+                <Flag cc={c.toCc} alt={c.to} className="h-5 w-5" />
               </span>
               <span className="text-[13px] font-semibold text-white whitespace-nowrap">
-                Canada → {c.to}
+                {c.from} → {c.to}
               </span>
             </button>
           ))}
