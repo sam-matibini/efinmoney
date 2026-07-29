@@ -7,6 +7,8 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  timedOut: boolean;
+  retry: () => void;
   signUp: (email: string, password: string, fullName: string, accountType?: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -18,6 +20,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [timedOut, setTimedOut] = useState(false);
 
   useEffect(() => {
     let settled = false;
@@ -49,14 +52,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       .finally(stopLoading);
 
     // Safety net: never leave the user stuck on the loading spinner if auth
-    // initialization stalls for any reason.
-    const timeout = window.setTimeout(stopLoading, 8000);
+    // initialization stalls for any reason. If we hit the timeout without
+    // resolution, surface that as `timedOut` so consumers can offer a retry
+    // instead of silently dropping the user on a blank page.
+    const timeout = window.setTimeout(() => {
+      if (!settled) setTimedOut(true);
+      stopLoading();
+    }, 8000);
 
     return () => {
       subscription.unsubscribe();
       window.clearTimeout(timeout);
     };
   }, []);
+
+  const retry = () => {
+    setTimedOut(false);
+    setLoading(true);
+    window.location.reload();
+  };
 
   const signUp = async (email: string, password: string, fullName: string, accountType?: string) => {
     try {
@@ -142,20 +156,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       await supabase.auth.signOut({ scope: 'local' });
     } catch (e) {
-      console.warn('signOut error, forcing local clear', e);
+      console.warn('signOut error', e);
     }
-    try {
-      Object.keys(localStorage)
-        .filter((k) => k.startsWith('sb-') && k.endsWith('-auth-token'))
-        .forEach((k) => localStorage.removeItem(k));
-    } catch {}
-    setSession(null);
-    setUser(null);
-    window.location.assign('/auth');
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signUp, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, timedOut, retry, signUp, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );

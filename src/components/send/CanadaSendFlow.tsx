@@ -517,8 +517,9 @@ const CanadaSendFlow = () => {
     if (b && isCanadaBeneficiary(b)) {
       applyCanadaBeneficiary(b);
       setStep(2);
-      searchParams.delete("beneficiaryId");
-      setSearchParams(searchParams, { replace: true });
+      const next = new URLSearchParams(searchParams);
+      next.delete("beneficiaryId");
+      setSearchParams(next, { replace: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [beneficiaries]);

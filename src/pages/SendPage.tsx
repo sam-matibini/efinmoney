@@ -958,8 +958,12 @@ const SendPage = () => {
         const redirectUrl = payout?.redirect_url;
         goToStep(4);
         if (redirectUrl) {
-          window.open(redirectUrl, '_blank', 'noopener,noreferrer');
-          toast.success('Please complete the verification on the payment page to finalize your transfer.', { duration: 10000 });
+          const opened = window.open(redirectUrl, '_blank', 'noopener,noreferrer');
+          if (!opened) {
+            toast.error('Pop-up blocked. Allow pop-ups for this site, then tap the link in your transfer to complete payment.', { duration: 10000 });
+          } else {
+            toast.success('Please complete the verification on the payment page to finalize your transfer.', { duration: 10000 });
+          }
         } else {
           toast.success(
             data?.pending_liquidity || data?.queued || payout?.queued || payout?.pending_liquidity
@@ -1279,8 +1283,9 @@ const SendPage = () => {
       if (b) {
         applyBeneficiary(b);
         goToStep(2);
-        searchParams.delete("beneficiaryId");
-        setSearchParams(searchParams, { replace: true });
+        const next = new URLSearchParams(searchParams);
+        next.delete("beneficiaryId");
+        setSearchParams(next, { replace: true });
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -105,7 +105,7 @@ export const useKyc = () => {
       const d = q.state.data as KycRecord | null | undefined;
       if (!d) return false;
       if (d.verification_status === "approved" || d.verification_status === "rejected") return false;
-      return d.persona_inquiry_id ? 1000 : 2500;
+      return d.persona_inquiry_id ? 3000 : 5000;
     },
 
     queryFn: async () => {
@@ -124,8 +124,8 @@ export const useKyc = () => {
     enabled: !!user,
     refetchInterval: (q) => {
       const d = q.state.data as RiskTier | null | undefined;
-      if (!d) return 1000;
-      return d.current_tier === "tier_3" ? false : 1000;
+      if (!d) return 3000;
+      return d.current_tier === "tier_3" ? false : 3000;
     },
 
     queryFn: async () => {

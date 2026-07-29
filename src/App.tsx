@@ -151,11 +151,28 @@ const queryClient = new QueryClient({
   },
 });
 
-const FullPageSpinner = () => (
-  <div className="min-h-screen flex items-center justify-center" style={{ background: "#07122e" }}>
-    <LoadingSpinner size={140} />
-  </div>
-);
+const FullPageSpinner = () => {
+  const { timedOut, retry } = useAuth();
+  if (timedOut) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-6 text-center" style={{ background: "#07122e" }}>
+        <p className="text-white text-base">Still loading. Please check your connection and try again.</p>
+        <button
+          type="button"
+          onClick={retry}
+          className="rounded-md bg-white/10 px-4 py-2 text-sm font-medium text-white hover:bg-white/20"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div className="min-h-screen flex items-center justify-center" style={{ background: "#07122e" }}>
+      <LoadingSpinner size={140} />
+    </div>
+  );
+};
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();

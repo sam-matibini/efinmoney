@@ -144,7 +144,6 @@ export const PersonaVerification = ({ userId, onComplete, onError, className, la
         mode: data?.mode,
         environment: data?.environment,
         environmentId: data?.environmentId,
-        inquiryId: data?.inquiryId,
         hasSessionToken: !!data?.sessionToken,
         alreadySubmitted: !!data?.alreadySubmitted,
         templateId: data?.templateId,
@@ -203,7 +202,7 @@ export const PersonaVerification = ({ userId, onComplete, onError, className, la
           client.open();
         },
         onComplete: ({ inquiryId, status }: { inquiryId: string; status: string }) => {
-          console.log("[Persona] onComplete", { inquiryId, status });
+          console.log("[Persona] onComplete", { status });
           // Silent — completion is confirmed by the bell notification, not a toast.
           onComplete?.({ inquiryId, status });
         },

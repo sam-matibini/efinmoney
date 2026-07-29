@@ -26,6 +26,24 @@ import { productFeatures } from "@/lib/productFeatures";
 // Synthetic wallet id used to represent the on-chain USDC option.
 const STELLAR_USDC_ID = "stellar-usdc";
 const FEE_RATE = 0.005;
+const MIN_AMOUNT = 0.01;
+const MAX_AMOUNT = 1_000_000;
+
+const friendlyFxError = (raw: string | undefined | null): string => {
+  const m = String(raw || "").toLowerCase();
+  if (!m) return "Exchange failed. Please try again.";
+  if (m.includes("rate limit")) return "Too many exchanges in a short window. Please wait a minute and try again.";
+  if (m.includes("insufficient")) return "Insufficient wallet balance for this exchange.";
+  if (m.includes("rate") && (m.includes("not available") || m.includes("unavailable")))
+    return "No exchange rate is available for this currency pair right now.";
+  if (m.includes("source wallet"))
+    return "Your source wallet is unavailable. Please refresh and try again.";
+  if (m.includes("destination wallet"))
+    return "Your destination wallet is unavailable. Please refresh and try again.";
+  if (m.includes("service temporarily unavailable"))
+    return "Exchange is temporarily unavailable. Please try again in a moment.";
+  return raw || "Exchange failed. Please try again.";
+};
 
 const parseAmt = (v: string) => {
   const n = parseFloat(String(v).replace(/,/g, ""));
@@ -220,18 +238,27 @@ const FxTradingPanel = () => {
       }, 4000);
     } catch (error: any) {
       console.error('Exchange error:', error);
-      toast.error(error?.message || 'Exchange failed. Please try again.');
+      toast.error(friendlyFxError(error?.message));
     } finally {
       setIsLoading(false);
     }
   };
 
   const isValid = parsedSend > 0 &&
+    parsedSend >= MIN_AMOUNT &&
+    parsedSend <= MAX_AMOUNT &&
     fromWallet &&
     toWallet &&
     fromWallet.wallet_id !== toWallet.wallet_id &&
     !!effectiveRate &&
     parsedSend <= Number(fromWallet.balance);
+
+  const amountError =
+    parsedSend > 0 && parsedSend < MIN_AMOUNT
+      ? `Minimum exchange is ${MIN_AMOUNT}.`
+      : parsedSend > MAX_AMOUNT
+        ? `Maximum exchange is ${MAX_AMOUNT.toLocaleString()}.`
+        : null;
 
   const rateLabel = useMemo(() => {
     if (!fromWallet || !toWallet || !effectiveRate) return null;
@@ -321,6 +348,9 @@ const FxTradingPanel = () => {
               <p className="text-xs text-muted-foreground">
               Available: {fromWallet?.symbol}{Number(fromWallet?.balance || 0).toFixed(2)}
             </p>
+            {amountError && (
+              <p className="text-xs text-destructive">{amountError}</p>
+            )}
           </div>
 
             <div className="-my-1 flex justify-center">

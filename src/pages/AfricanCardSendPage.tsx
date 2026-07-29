@@ -105,7 +105,8 @@ export default function AfricanCardSendPage() {
       setClientSecret(data.client_secret ?? null);
       setClientApiKey(data.client_api_key ?? null);
       if (data.checkout_url) {
-        window.open(data.checkout_url, "_blank");
+        const opened = window.open(data.checkout_url, "_blank");
+        if (!opened) toast.error("Pop-up blocked. Allow pop-ups to open the card payment page.");
       }
       toast.success("Transfer created — complete card payment below.");
     } catch (err: any) {

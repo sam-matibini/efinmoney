@@ -57,15 +57,16 @@ const StatsOverview = () => {
 
   // Convert each wallet to USD; track those without a rate
   let totalBalance = 0;
-  let excludedWallets = 0;
+  const excludedCurrencies = new Set<string>();
   for (const w of wallets || []) {
     const usd = convertToUsd(Number(w.balance), w.currency_code, rateMap);
     if (usd === null) {
-      if (Number(w.balance) > 0) excludedWallets++;
+      if (Number(w.balance) > 0) excludedCurrencies.add(w.currency_code);
     } else {
       totalBalance += usd;
     }
   }
+  const excludedCount = excludedCurrencies.size;
 
   // Past balance estimate using transfer outflow (USD-converted, skip unknowns)
   let growthLabel = 'N/A';
@@ -114,7 +115,8 @@ const StatsOverview = () => {
       icon: growthPositive ? TrendingUp : TrendingDown,
       positive: growthPositive,
       loading: walletsLoading || transfersLoading || fxLoading,
-      warn: excludedWallets > 0,
+      warn: excludedCount > 0,
+      excludedCurrencies: Array.from(excludedCurrencies),
     },
     {
       label: 'Recipients',
@@ -162,13 +164,13 @@ const StatsOverview = () => {
               <div className="p-1.5 sm:p-2 rounded-lg bg-primary/10">
                 <stat.icon className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
               </div>
-              {stat.warn && (
+                {stat.warn && (
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <AlertTriangle className="w-4 h-4 text-amber-500 cursor-help" />
                   </TooltipTrigger>
                   <TooltipContent>
-                    Some wallets excluded — rate unavailable
+                    Excluded: {stat.excludedCurrencies.join(", ")} (rate unavailable)
                   </TooltipContent>
                 </Tooltip>
               )}

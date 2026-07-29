@@ -279,7 +279,8 @@ export default function PaytotaTopUpCard({ walletId, walletCurrency, onComplete 
                   type="button"
                   className="flex-1"
                   onClick={() => {
-                    window.open(checkoutLink, "_blank", "noopener,noreferrer");
+                    const opened = window.open(checkoutLink, "_blank", "noopener,noreferrer");
+                    if (!opened) toast.error("Pop-up blocked. Allow pop-ups and tap this button again to open checkout.");
                   }}
                 >
                   <ExternalLink className="h-4 w-4 mr-2" />
