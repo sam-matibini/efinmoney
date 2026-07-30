@@ -1,56 +1,77 @@
-## Root cause
+## Goal
 
-Two independent problems produced this batch of errors:
+A centralized Payment Intelligence & Routing Engine: partner pricing and FX are stored as versioned data (never hardcoded, never overwritten), every candidate route is costed and scored, the best route is selected by a configurable strategy, and every decision is auditable and reportable by partner, corridor, currency, method, customer and period.
 
-**A. Missing database objects (most of the errors).** A live DB check confirms these objects do **not** exist in the current Lovable Cloud database:
+## Current state (verified)
 
-- Tables: `staff_audit_log`, `swychr_cards`, `swychr_payin_transactions`, `swychr_payout_transactions`
-- Function: `sweep_fx_clearing_to_gain_loss()`
+- The only pricing data in the database today is `pricing_config` with two rows (`transfer_base_fee` 0.30, `transfer_card_surcharge` 0) plus `cpn_corridors` (Circle-only markup_bps).
+- `src/hooks/usePricingRules.tsx` queries a `pricing_rules` table that does **not** exist in the database — that hook is dead code today.
+- There are 173 edge functions, with roughly 20 distinct payout/pay-in providers each invoked directly (`flutterwave-payout`, `nomba-payout`, `pawapay-payout`, `paytota-payout`, `fincra-payout`, `paysafe-payout`, `ghana-payout`, `mtn-momo-payout`, `initiate-cpn-payout`, Adyen/Stripe/Elicate pay-ins…). Rail choice today is hardcoded in client helpers such as `src/lib/canadaPayoutRails.ts` and `cardSendRails.ts`.
 
-Their migration files exist in `supabase/migrations/` (from `20260615…_staff_onboarding.sql`, `20260701140000_fx_clearing_sweep.sql`, `20260717100000_swychr.sql`) but never ran successfully against the current DB. Because they're missing, the auto-generated `src/integrations/supabase/types.ts` doesn't know about them, so every `.from('swychr_cards')`, `.from('staff_audit_log')`, `.rpc('sweep_fx_clearing_to_gain_loss')` fails typing — which cascades into the `SwychrTopUpCard` `status/amount/failure_reason` "does not exist" errors and the "Type instantiation is excessively deep" errors in `swychrPay.ts` / `TransferTrackingPage.tsx`.
+So this is greenfield data-wise, and the integration job is to put a decision layer *in front of* the existing provider functions rather than rewriting them.
 
-**B. Three unrelated code-level type mismatches:**
+## Phasing
 
-1. `CanadaSendFlow.tsx:1479` — object literal for `editing` prop is missing `address` and `tel` (added to `Beneficiary` in the latest migration).
-2. `Features.tsx:230, 268` — framer-motion `Variants` no longer accepts `ease: number[]`; it needs a fixed-length tuple or an easing string.
+Given the size, I propose four phases. Phase 1 and 2 give a working engine in shadow mode; Phase 3 turns on live routing and failover; Phase 4 is analytics depth.
 
-## Changes
+### Phase 1 — Data model + admin pricing management
 
-### 1. New migration `supabase/migrations/20260720010000_restore_missing_objects.sql`
+Migrations creating (all with GRANTs, RLS, admin/finance-only write, `updated_at` triggers):
 
-Re-declares the missing objects idempotently (safe if any partially exist):
+- `payment_partners` — identity, type (payin/payout/both), country, regulatory + API + integration status, settlement currency, settlement time, reliability score, compliance risk, priority, status. Also `function_slug` so the engine knows which edge function executes the route.
+- `partner_corridors`, `partner_payment_methods`, `partner_limits` (min/max/daily/monthly per corridor+method).
+- `partner_pricing` — direction, corridor, currencies, method, fee type (fixed/percent/tiered), fixed/percent/min/max fee, settlement fee, network fee, compliance fee, FX markup, `effective_from`/`effective_to`, `source` (api/file/manual), `updated_by`, status. **Append-only**: a new price closes the previous row's `effective_to` via trigger; nothing is ever updated in place.
+- `partner_fx_rates` — partner rate, mid-market reference, computed spread, timestamp, expiry, source, status. Also append-only.
+- `efinmoney_pricing` — customer-facing fee schedule by customer type, corridor, transaction type, fixed/percent/min/max fee, FX margin, effective dates.
+- `routing_rules` — named strategies with weights (profit, success rate, FX competitiveness, speed, risk), plus an `active` flag so the strategy is switchable without a deploy.
+- `partner_liquidity` — balance by currency, required reserve, daily utilization, available capacity.
+- `partner_performance` — rolling success rate, failure rate, avg processing time, reversals, computed nightly from `transfers`.
 
-- `CREATE TABLE IF NOT EXISTS public.staff_audit_log (…)` — copied verbatim from the staff-onboarding migration, plus its GRANTs, RLS enable, and policies (wrapped in `DO $$ … EXCEPTION WHEN duplicate_object THEN NULL; END $$` for policies).
-- `CREATE TABLE IF NOT EXISTS public.swychr_payin_transactions`, `swychr_payout_transactions`, `swychr_cardholders`, `swychr_cards`, `swychr_airtime_transactions` — copied from the swychr migration, plus GRANTs, RLS, policies.
-- `CREATE OR REPLACE FUNCTION public.sweep_fx_clearing_to_gain_loss()` — copied from the fx_clearing_sweep migration.
+Admin UI: a new **Partners & Pricing** section under `/settings` (new tabs) with CRUD panels for partners, corridors/limits/methods, pricing versions (with full history view and "supersede" instead of edit), eFinMoney customer pricing, FX rates, liquidity, and the routing strategy editor with live weight sliders. CSV/Excel upload for partner pricing and rate cards, with a preview-and-confirm step that records source + timestamp + user.
 
-Once applied, Lovable will regenerate `types.ts`, which resolves every "not assignable to `t4a_ytd_totals`" error, the `SwychrTopUpCard` column errors, and the two "Type instantiation is excessively deep" errors.
+### Phase 2 — Cost, profit and routing engine (shadow mode)
 
-### 2. `src/components/send/CanadaSendFlow.tsx` (line ~1505)
+New shared module `supabase/functions/_shared/routingEngine.ts` implementing the pipeline:
 
-Add the two now-required fields to the `editing` literal:
+1. **Eligibility** — filter partners by country, currency pair, method, amount vs limits, daily/monthly utilization, API status, compliance restrictions, customer risk tier, liquidity available.
+2. **Pricing** — resolve the pricing row and FX rate valid *at request time*; for partners exposing live quotes, call their quote endpoint with a short timeout and fall back to stored pricing.
+3. **Cost** — partner fee (with min/max), FX cost measured against the mid-market reference, plus network, settlement and compliance fees → total landed cost.
+4. **Revenue** — eFinMoney fee + FX margin from `efinmoney_pricing`.
+5. **Profit** — gross profit, gross margin %, then expected profit = gross profit × success probability − expected failure/return cost; contribution profit subtracts fraud, chargeback, screening, KYC and infrastructure allowances (configurable per-transaction rates).
+6. **Score & rank** — weighted score per the active `routing_rules` strategy (lowest cost / highest profit / highest expected profit / best overall).
 
-```ts
-notes: null,
-tags: [],
-address: null,
-tel: null,
-```
+New edge function `route-quote` returns the full ranked candidate list plus the recommendation, and persists it to `payment_routes` (the calculated snapshot) and `routing_decisions` (the audit record: every candidate's cost/profit/success rate, the winner, the rule used, pricing source, timestamp, operator override flag).
 
-### 3. `src/pages/Features.tsx` (lines 230, 268)
+Shadow mode: existing send flows call `route-quote` for logging and display only; the current hardcoded rail still executes. This lets us validate the numbers against real traffic before handing it the wheel.
 
-Replace `ease: [0.4, 0, 0.2, 1]` (typed as `number[]`) with the string easing that framer-motion accepts without a tuple cast:
+### Phase 3 — Live routing, override and failover
 
-```ts
-transition: { duration: 0.5, ease: "easeOut" }
-```
+- `execute-transfer` (and the pay-in funding path) calls `route-quote`, then dispatches to the selected partner's edge function via the `function_slug` mapping — no per-partner branching in the caller.
+- Operator override: authorized admins can pick a different candidate in the send/admin UI; the override and its reason are written to `routing_decisions`.
+- Failover chain: on a confirmed partner failure, retry the next-ranked eligible route, guarded by an idempotency key, retry counter, and a status re-check against the partner before re-attempting, so a payment is never executed twice.
+- Cost capture: `payment_transaction_costs` and `payment_transaction_revenue` rows are written at execution with the *actual* pricing used, then reconciled against partner settlement statements (`partner_settlements`, `partner_reconciliation`) to produce actual-vs-expected variance.
 
-Applied to both variants blocks.
+### Phase 4 — Dashboards
+
+New `/admin/routing` (or a tab in the Operations dashboard) with:
+
+- **Partner comparison** — pay-in/pay-out coverage, avg fee, FX rate, avg cost, success rate, profit.
+- **Corridor profitability** — volume, revenue, cost, gross profit, margin per corridor.
+- **Transaction drill-down** — per transaction: amount, customer fee/rate, partner selected, partner fee/rate, total cost, revenue, gross profit, margin, and the full routing decision trail.
+- **Daily / monthly rollups** and the KPI set (revenue and cost per transaction, margin, partner concentration, FX income vs FX cost, net FX margin).
+- **Partner profitability matrix** for management, with an overall score per partner.
+- Filters across date, country, corridor, currency, direction, partner, method, customer, transaction size.
+
+## Technical notes
+
+- Rollups use materialized views or scheduled aggregation into `partner_performance`, refreshed by a cron edge function, so dashboards stay fast as `transfers` grows.
+- FX mid-market reference reuses the existing `fx-engine` / `market-rates` feed; no new market data provider.
+- The dead `usePricingRules` hook is repointed at the new `partner_pricing`/`efinmoney_pricing` tables rather than left broken.
+- Everything routing-related is data-driven: adding a partner or changing strategy is a row change, not a deploy.
 
 ## Not changing
 
-- Business logic, RLS policies, or the ledger.
-- `types.ts` (auto-generated; regenerates from the migration).
-- Any of the earlier trial-balance / purchases / send-flow behavior.
+- The existing provider edge functions' internal logic, the double-entry ledger, or the compliance/AML engines.
+- Live traffic behaviour until Phase 3 is explicitly approved after shadow-mode results look right.
 
-After these three changes the reported TS errors go to zero. I'll verify by re-reading the build after applying.
+I suggest starting with Phase 1 only, so you can load real partner rate cards and confirm the model matches how your partners actually price before any routing logic is written.
