@@ -11,6 +11,8 @@ import LiveRoutingControlPanel from "./partners/LiveRoutingControlPanel";
 import RouteSimulatorPanel from "./partners/RouteSimulatorPanel";
 import RoutingAttemptsPanel from "./partners/RoutingAttemptsPanel";
 import ProfitabilityPanel from "./partners/ProfitabilityPanel";
+import CorridorReadinessPanel from "./partners/CorridorReadinessPanel";
+import CostAssurancePanel from "./partners/CostAssurancePanel";
 
 export const PartnerNetworkPanel = () => (
   <Tabs defaultValue="partners" className="space-y-4">
