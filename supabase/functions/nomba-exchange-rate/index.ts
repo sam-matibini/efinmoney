@@ -1,3 +1,4 @@
+import { createClient } from "npm:@supabase/supabase-js@2";
 import { fetchNombaExchangeRate, isNombaNigeriaConfigured } from "../_shared/nomba-nigeria.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -43,21 +44,43 @@ Deno.serve(async (req) => {
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    if (nombaError || !isNombaNigeriaConfigured()) {
+    // Fallback to internally stored FX rates (Nomba only quotes a subset of pairs)
+    const admin = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+    );
+    const { data: fxRow } = await admin
+      .from("fx_rates")
+      .select("effective_rate, rate, source, valid_from")
+      .eq("from_currency", from)
+      .eq("to_currency", to)
+      .order("valid_from", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const fallbackRate = Number(fxRow?.effective_rate ?? fxRow?.rate ?? 0);
+    if (fallbackRate > 0) {
       return new Response(JSON.stringify({
-        error: nombaError || "Nomba Nigeria not configured",
         from,
         to,
-        source: "nomba",
-      }), { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        pair: `${from}/${to}`,
+        bid_rate: String(fallbackRate),
+        ask_rate: String(fallbackRate),
+        mid_rate: String(fallbackRate),
+        effective_rate: fallbackRate,
+        source: fxRow?.source || "fx_rates",
+        nomba_error: nombaError,
+        rates: nombaRates,
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Internal fx_rates fallback disabled while debugging Nomba NGN quotes:
-    // const { data: fxRow } = await admin.from("fx_rates")...
+    return new Response(JSON.stringify({
+      error: nombaError || "Rate unavailable",
+      from,
+      to,
+      source: "nomba",
+    }), { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-    return new Response(JSON.stringify({ error: "Nomba rate unavailable", from, to, source: "nomba" }), {
-      status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
   } catch (err) {
     return new Response(JSON.stringify({ error: err instanceof Error ? err.message : "Unknown" }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
