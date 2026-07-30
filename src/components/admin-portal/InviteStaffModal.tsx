@@ -35,12 +35,22 @@ const InviteStaffModal = ({ open, onOpenChange }: Props) => {
   const [department, setDepartment] = useState("");
 
   const { data: departments = [] } = useQuery({
-    queryKey: ["admin-departments"],
+    queryKey: ["admin-departments-modal"],
     queryFn: async () => {
-      const { data, error } = await (supabase as any).from("departments").select("id, name").order("name");
-      if (error) throw error;
-      return (data || []) as { id: string; name: string }[];
+      try {
+        const { data, error } = await (supabase as any)
+          .from("departments")
+          .select("id, name")
+          .order("name");
+        if (error) throw error;
+        return (data || []) as { id: string; name: string }[];
+      } catch (e) {
+        console.warn("Failed to load departments for invite modal", e);
+        return [];
+      }
     },
+    enabled: open,
+    retry: false,
   });
 
   const invite = useMutation({

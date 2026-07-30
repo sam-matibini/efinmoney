@@ -16,7 +16,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { RoleBadge, StaffStatusBadge } from "@/components/admin-portal/Badges";
 import InviteStaffModal from "@/components/admin-portal/InviteStaffModal";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
-import { Search, UserPlus, Users as UsersIcon, UserCheck, Clock, ShieldX, Pencil, Trash2, Building2 } from "lucide-react";
+import { Search, UserPlus, Users as UsersIcon, UserCheck, Clock, ShieldX, Pencil, Trash2, Building2, ChevronDown, ChevronRight } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 
@@ -105,6 +105,7 @@ const StaffPage = () => {
   });
 
   const [deptFilter, setDeptFilter] = useState("");
+  const [expandedDept, setExpandedDept] = useState<string | null>(null);
 
   const filtered = staff.filter((s) => {
     const matchQuery = !query || (
@@ -269,18 +270,70 @@ const StaffPage = () => {
                 <p className="text-sm text-muted-foreground">No departments configured yet. Run the departments migration to seed defaults.</p>
               ) : (
                 <div className="space-y-1">
-                  {departments.map((d) => (
-                    <div key={d.id} className="flex items-center gap-3 py-2.5 px-3 rounded-lg hover:bg-muted/40 transition-colors text-sm">
-                      <Building2 className="w-4 h-4 text-muted-foreground shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium">{d.name}</div>
-                        <div className="text-xs text-muted-foreground truncate">{d.description || "—"}</div>
+                  {departments.map((d) => {
+                    const members = staff.filter((s) => s.department === d.name);
+                    const isOpen = expandedDept === d.name;
+                    return (
+                      <div key={d.id} className="rounded-lg border border-transparent hover:border-border transition-colors">
+                        <button
+                          type="button"
+                          onClick={() => setExpandedDept(isOpen ? null : d.name)}
+                          className="w-full flex items-center gap-3 py-2.5 px-3 rounded-lg hover:bg-muted/40 transition-colors text-sm text-left"
+                          aria-expanded={isOpen}
+                        >
+                          {isOpen ? (
+                            <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
+                          ) : (
+                            <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+                          )}
+                          <Building2 className="w-4 h-4 text-muted-foreground shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium">{d.name}</div>
+                            {!isOpen && (
+                              <div className="text-xs text-muted-foreground truncate">{d.description || "—"}</div>
+                            )}
+                          </div>
+                          <span className="text-xs text-muted-foreground tabular-nums shrink-0">
+                            {members.length} staff
+                          </span>
+                        </button>
+                        {isOpen && (
+                          <div className="pl-10 pr-3 pb-3 space-y-2">
+                            {d.description && (
+                              <p className="text-xs text-muted-foreground">{d.description}</p>
+                            )}
+                            {members.length === 0 ? (
+                              <p className="text-xs text-muted-foreground italic">No members yet.</p>
+                            ) : (
+                              <ul className="space-y-1">
+                                {members.map((m) => (
+                                  <li
+                                    key={m.id}
+                                    className="flex items-center gap-3 py-1.5 px-2 rounded-md hover:bg-muted/40 cursor-pointer"
+                                    onClick={() => navigate(`/admin/staff/${m.id}`)}
+                                  >
+                                    <Avatar className="w-7 h-7">
+                                      <AvatarFallback className="text-xs">
+                                        {(m.full_name || m.email || "S").charAt(0).toUpperCase()}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="text-sm font-medium truncate">
+                                        {m.full_name || m.email || "No name"}
+                                      </div>
+                                      <div className="text-xs text-muted-foreground truncate">{m.email}</div>
+                                    </div>
+                                    <RoleBadge role={m.role} />
+                                    <StaffStatusBadge status={m.status} />
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+                        )}
                       </div>
-                      <span className="text-xs text-muted-foreground tabular-nums shrink-0">
-                        {staff.filter((s) => s.department === d.name).length} staff
-                      </span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </CardContent>

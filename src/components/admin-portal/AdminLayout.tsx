@@ -117,6 +117,27 @@ const NAV_GROUPS: NavGroup[] = [
   },
 ];
 
+const ALL_GROUP_LABELS = NAV_GROUPS.map((g) => g.label);
+
+// Each role gets the sidebar groups that match their job. Super admin
+// sees everything; the rest are scoped to the modules they need to do
+// their work and nothing more.
+const ROLE_NAV_GROUPS: Record<string, ReadonlySet<string>> = {
+  super_admin: new Set(ALL_GROUP_LABELS),
+  compliance_officer: new Set([
+    "Users", "Queue", "Compliance", "Screening", "Monitoring", "Audit & Reporting",
+  ]),
+  finance_officer: new Set([
+    "Users", "Finance", "Audit & Reporting",
+  ]),
+  support_agent: new Set([
+    "Users", "Operations",
+  ]),
+  viewer: new Set([
+    "Users", "Audit & Reporting",
+  ]),
+};
+
 const AdminLayout = ({ children }: { children: ReactNode }) => {
   const { admin, signOut, hasPermission } = useAdminAuth();
   const navigate = useNavigate();
@@ -254,7 +275,13 @@ const AdminLayout = ({ children }: { children: ReactNode }) => {
     queryClient.invalidateQueries({ queryKey: ["admin-notifications", admin.id] });
   };
 
-  const allNavItems = [...TOP_NAV, ...NAV_GROUPS.flatMap((g) => g.items)];
+  const allowedForRole = admin ? ROLE_NAV_GROUPS[admin.role] : undefined;
+  const isGroupAllowed = (label: string) => !allowedForRole || allowedForRole.has(label);
+
+  const allNavItems = [
+    ...TOP_NAV,
+    ...NAV_GROUPS.filter((g) => isGroupAllowed(g.label)).flatMap((g) => g.items),
+  ];
 
   const renderNavItem = (item: NavItem) => {
     const Icon = item.icon;
@@ -290,6 +317,10 @@ const AdminLayout = ({ children }: { children: ReactNode }) => {
   };
 
   const renderNavGroup = (group: NavGroup) => {
+    // Hide groups the current role isn't allowed to see.
+    const allowedForRole = admin ? ROLE_NAV_GROUPS[admin.role] : undefined;
+    if (allowedForRole && !allowedForRole.has(group.label)) return null;
+
     const filteredItems = navSearch
       ? group.items.filter((item) => item.label.toLowerCase().includes(navSearch.toLowerCase()))
       : group.items;
