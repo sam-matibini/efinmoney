@@ -142,8 +142,8 @@ export async function resolveRoute(
     .from("partner_fx_rates")
     .select("partner_id, fx_spread_bps, rate_timestamp")
     .in("partner_id", partnerIds)
-    .eq("source_currency", srcCcy)
-    .eq("dest_currency", dstCcy)
+    .eq("base_currency", srcCcy)
+    .eq("quote_currency", dstCcy)
     .order("rate_timestamp", { ascending: false })
     .limit(200);
 
@@ -151,6 +151,7 @@ export async function resolveRoute(
     .from("partner_limits")
     .select("*")
     .in("partner_id", partnerIds);
+
 
   const fxByPartner = new Map<string, number>();
   for (const r of fxRows ?? []) {
@@ -206,6 +207,20 @@ export async function resolveRoute(
       excluded.push({ partner_code: label, reason: "insufficient partner liquidity" });
       continue;
     }
+    // A balance we can no longer trust is worse than no balance at all: the
+    // partner may already be drained. Skip stale snapshots on live routing.
+    if (liq) {
+      const staleMinutes = Number(partner.liquidity_stale_minutes ?? 720);
+      const ageMinutes = (Date.now() - new Date(liq.as_of).getTime()) / 60000;
+      if (staleMinutes > 0 && ageMinutes > staleMinutes) {
+        excluded.push({
+          partner_code: label,
+          reason: `liquidity snapshot stale (${Math.round(ageMinutes / 60)}h old)`,
+        });
+        continue;
+      }
+    }
+
 
     const pricing = ((pricingRows ?? []).find(
       (p: any) =>

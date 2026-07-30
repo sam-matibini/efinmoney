@@ -11,6 +11,8 @@ import LiveRoutingControlPanel from "./partners/LiveRoutingControlPanel";
 import RouteSimulatorPanel from "./partners/RouteSimulatorPanel";
 import RoutingAttemptsPanel from "./partners/RoutingAttemptsPanel";
 import ProfitabilityPanel from "./partners/ProfitabilityPanel";
+import CorridorReadinessPanel from "./partners/CorridorReadinessPanel";
+import CostAssurancePanel from "./partners/CostAssurancePanel";
 
 export const PartnerNetworkPanel = () => (
   <Tabs defaultValue="partners" className="space-y-4">
@@ -25,8 +27,10 @@ export const PartnerNetworkPanel = () => (
         <TabsTrigger value="strategy">Routing strategy</TabsTrigger>
         <TabsTrigger value="live">Live routing</TabsTrigger>
         <TabsTrigger value="simulator">Simulator</TabsTrigger>
+        <TabsTrigger value="readiness">Readiness</TabsTrigger>
         <TabsTrigger value="attempts">Attempts</TabsTrigger>
         <TabsTrigger value="profitability">Profitability</TabsTrigger>
+        <TabsTrigger value="cost">Cost assurance</TabsTrigger>
       </TabsList>
     </div>
 
@@ -63,8 +67,14 @@ export const PartnerNetworkPanel = () => (
     <TabsContent value="attempts">
       <SectionBoundary name="RoutingAttemptsPanel"><RoutingAttemptsPanel /></SectionBoundary>
     </TabsContent>
+    <TabsContent value="readiness">
+      <SectionBoundary name="CorridorReadinessPanel"><CorridorReadinessPanel /></SectionBoundary>
+    </TabsContent>
     <TabsContent value="profitability">
       <SectionBoundary name="ProfitabilityPanel"><ProfitabilityPanel /></SectionBoundary>
+    </TabsContent>
+    <TabsContent value="cost">
+      <SectionBoundary name="CostAssurancePanel"><CostAssurancePanel /></SectionBoundary>
     </TabsContent>
   </Tabs>
 );

@@ -3533,6 +3533,136 @@ export type Database = {
           },
         ]
       }
+      partner_invoice_lines: {
+        Row: {
+          amount: number | null
+          billed_fee: number
+          created_at: string
+          currency_code: string | null
+          expected_fee: number | null
+          id: string
+          invoice_id: string
+          match_status: string
+          notes: string | null
+          partner_reference: string | null
+          transaction_date: string | null
+          transfer_id: string | null
+          updated_at: string
+          variance: number | null
+        }
+        Insert: {
+          amount?: number | null
+          billed_fee?: number
+          created_at?: string
+          currency_code?: string | null
+          expected_fee?: number | null
+          id?: string
+          invoice_id: string
+          match_status?: string
+          notes?: string | null
+          partner_reference?: string | null
+          transaction_date?: string | null
+          transfer_id?: string | null
+          updated_at?: string
+          variance?: number | null
+        }
+        Update: {
+          amount?: number | null
+          billed_fee?: number
+          created_at?: string
+          currency_code?: string | null
+          expected_fee?: number | null
+          id?: string
+          invoice_id?: string
+          match_status?: string
+          notes?: string | null
+          partner_reference?: string | null
+          transaction_date?: string | null
+          transfer_id?: string | null
+          updated_at?: string
+          variance?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_invoice_lines_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "partner_invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      partner_invoices: {
+        Row: {
+          billed_total: number
+          created_at: string
+          currency_code: string
+          expected_total: number
+          id: string
+          invoice_number: string
+          matched_lines: number
+          missing_lines: number
+          notes: string | null
+          partner_id: string
+          period_end: string
+          period_start: string
+          reconciled_at: string | null
+          status: string
+          unmatched_lines: number
+          updated_at: string
+          uploaded_by: string | null
+          variance_total: number
+        }
+        Insert: {
+          billed_total?: number
+          created_at?: string
+          currency_code: string
+          expected_total?: number
+          id?: string
+          invoice_number: string
+          matched_lines?: number
+          missing_lines?: number
+          notes?: string | null
+          partner_id: string
+          period_end: string
+          period_start: string
+          reconciled_at?: string | null
+          status?: string
+          unmatched_lines?: number
+          updated_at?: string
+          uploaded_by?: string | null
+          variance_total?: number
+        }
+        Update: {
+          billed_total?: number
+          created_at?: string
+          currency_code?: string
+          expected_total?: number
+          id?: string
+          invoice_number?: string
+          matched_lines?: number
+          missing_lines?: number
+          notes?: string | null
+          partner_id?: string
+          period_end?: string
+          period_start?: string
+          reconciled_at?: string | null
+          status?: string
+          unmatched_lines?: number
+          updated_at?: string
+          uploaded_by?: string | null
+          variance_total?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_invoices_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "payment_partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       partner_limits: {
         Row: {
           corridor_id: string | null
@@ -3596,6 +3726,7 @@ export type Database = {
           daily_utilized: number
           id: string
           partner_id: string
+          refresh_error: string | null
           required_reserve: number
           source: Database["public"]["Enums"]["pricing_source"]
           updated_at: string
@@ -3608,6 +3739,7 @@ export type Database = {
           daily_utilized?: number
           id?: string
           partner_id: string
+          refresh_error?: string | null
           required_reserve?: number
           source?: Database["public"]["Enums"]["pricing_source"]
           updated_at?: string
@@ -3620,6 +3752,7 @@ export type Database = {
           daily_utilized?: number
           id?: string
           partner_id?: string
+          refresh_error?: string | null
           required_reserve?: number
           source?: Database["public"]["Enums"]["pricing_source"]
           updated_at?: string
@@ -3875,6 +4008,7 @@ export type Database = {
       payment_partners: {
         Row: {
           api_status: Database["public"]["Enums"]["partner_op_status"]
+          balance_function_slug: string | null
           code: string
           compliance_risk: Database["public"]["Enums"]["risk_rating"]
           country: string | null
@@ -3885,6 +4019,7 @@ export type Database = {
           expiry_date: string | null
           id: string
           integration_status: Database["public"]["Enums"]["partner_op_status"]
+          liquidity_stale_minutes: number
           max_transaction: number | null
           min_transaction: number | null
           monthly_limit: number | null
@@ -3906,6 +4041,7 @@ export type Database = {
         }
         Insert: {
           api_status?: Database["public"]["Enums"]["partner_op_status"]
+          balance_function_slug?: string | null
           code: string
           compliance_risk?: Database["public"]["Enums"]["risk_rating"]
           country?: string | null
@@ -3916,6 +4052,7 @@ export type Database = {
           expiry_date?: string | null
           id?: string
           integration_status?: Database["public"]["Enums"]["partner_op_status"]
+          liquidity_stale_minutes?: number
           max_transaction?: number | null
           min_transaction?: number | null
           monthly_limit?: number | null
@@ -3937,6 +4074,7 @@ export type Database = {
         }
         Update: {
           api_status?: Database["public"]["Enums"]["partner_op_status"]
+          balance_function_slug?: string | null
           code?: string
           compliance_risk?: Database["public"]["Enums"]["risk_rating"]
           country?: string | null
@@ -3947,6 +4085,7 @@ export type Database = {
           expiry_date?: string | null
           id?: string
           integration_status?: Database["public"]["Enums"]["partner_op_status"]
+          liquidity_stale_minutes?: number
           max_transaction?: number | null
           min_transaction?: number | null
           monthly_limit?: number | null
@@ -7460,6 +7599,42 @@ export type Database = {
           p_window_seconds: number
         }
         Returns: boolean
+      }
+      corridor_readiness: {
+        Args: never
+        Returns: {
+          corridor_id: string
+          dest_country: string
+          dest_currency: string
+          direction: string
+          enabled: boolean
+          has_fx: boolean
+          has_liquidity: boolean
+          has_performance: boolean
+          has_pricing: boolean
+          liquidity_stale: boolean
+          live_routing_enabled: boolean
+          partner_code: string
+          partner_id: string
+          partner_name: string
+          payment_method: string
+          ready: boolean
+          source_currency: string
+        }[]
+      }
+      cost_assurance_summary: {
+        Args: { p_from?: string; p_to?: string }
+        Returns: {
+          billed_total: number
+          expected_total: number
+          invoice_count: number
+          missing_lines: number
+          partner_code: string
+          partner_id: string
+          partner_name: string
+          unmatched_lines: number
+          variance_total: number
+        }[]
       }
       create_short_link: {
         Args: {

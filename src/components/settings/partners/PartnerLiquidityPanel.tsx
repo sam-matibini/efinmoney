@@ -15,14 +15,16 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, Droplets } from "lucide-react";
+import { Plus, Trash2, Droplets, RefreshCw, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
+import { useRefreshLiquidity } from "@/hooks/useCostAssurance";
 
 export const PartnerLiquidityPanel = () => {
   const { data: partners } = usePaymentPartners();
   const { data: liquidity, isLoading } = usePartnerLiquidity();
   const upsert = useUpsertLiquidity();
   const remove = useDeleteLiquidity();
+  const refresh = useRefreshLiquidity();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<Partial<PartnerLiquidity>>({
     currency_code: "",
@@ -45,16 +47,26 @@ export const PartnerLiquidityPanel = () => {
             Available payout capacity per partner and currency. A partner becomes ineligible when capacity is short.
           </CardDescription>
         </div>
-        <Button
-          size="sm"
-          onClick={() => {
-            setDraft({ partner_id: partners?.[0]?.id, currency_code: "", available_balance: 0, required_reserve: 0, daily_utilized: 0 });
-            setOpen(true);
-          }}
-          disabled={!partners?.length}
-        >
-          <Plus className="h-4 w-4 mr-1" /> Update balance
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => refresh.mutate()}
+            disabled={refresh.isPending}
+          >
+            <RefreshCw className={`h-4 w-4 mr-1 ${refresh.isPending ? "animate-spin" : ""}`} /> Refresh from partners
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => {
+              setDraft({ partner_id: partners?.[0]?.id, currency_code: "", available_balance: 0, required_reserve: 0, daily_utilized: 0 });
+              setOpen(true);
+            }}
+            disabled={!partners?.length}
+          >
+            <Plus className="h-4 w-4 mr-1" /> Update balance
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         {isLoading ? (
@@ -79,6 +91,7 @@ export const PartnerLiquidityPanel = () => {
               <TableBody>
                 {liquidity.map((l) => {
                   const capacity = l.available_balance - l.required_reserve - l.daily_utilized;
+                  const stale = Date.now() - new Date(l.as_of).getTime() > 12 * 3_600_000;
                   return (
                     <TableRow key={l.id}>
                       <TableCell className="font-medium">{nameOf(l.partner_id)}</TableCell>
@@ -89,7 +102,16 @@ export const PartnerLiquidityPanel = () => {
                       <TableCell className="text-right tabular-nums">
                         <Badge variant={capacity > 0 ? "secondary" : "destructive"}>{capacity.toLocaleString()}</Badge>
                       </TableCell>
-                      <TableCell className="text-xs">{format(new Date(l.as_of), "dd MMM yy HH:mm")}</TableCell>
+                      <TableCell className="text-xs">
+                        <span className={stale ? "text-amber-500" : ""}>
+                          {format(new Date(l.as_of), "dd MMM yy HH:mm")}
+                        </span>
+                        {stale && (
+                          <div className="flex items-center gap-1 text-amber-500">
+                            <AlertTriangle className="h-3 w-3" /> stale — skipped by router
+                          </div>
+                        )}
+                      </TableCell>
                       <TableCell className="text-right">
                         <Button variant="ghost" size="icon" onClick={() => remove.mutate(l.id)}>
                           <Trash2 className="h-4 w-4 text-destructive" />
