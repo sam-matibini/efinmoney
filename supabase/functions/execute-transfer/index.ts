@@ -833,6 +833,15 @@ Deno.serve(async (req) => {
       };
     }
 
+    // Shadow mode: record what the engine would have chosen for legacy-routed transfers.
+    if (!engineRouted) {
+      await observeRoute(supabase, routeRequest, {
+        transfer_id,
+        actual_partner_code: payoutResult?.rail ?? null,
+        requested_by: user.id,
+      });
+    }
+
     // Never leave the client with a fake success when no payout rail ran.
     if (payoutResult?.stub === true && payoutResult?.success !== true) {
       const reason = "Payout provider did not accept this transfer. Please try again or use another rail.";
