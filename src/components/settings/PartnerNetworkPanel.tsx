@@ -7,6 +7,9 @@ import PartnerFxRatesPanel from "./partners/PartnerFxRatesPanel";
 import EfinPricingPanel from "./partners/EfinPricingPanel";
 import PartnerLiquidityPanel from "./partners/PartnerLiquidityPanel";
 import RoutingStrategyPanel from "./partners/RoutingStrategyPanel";
+import LiveRoutingControlPanel from "./partners/LiveRoutingControlPanel";
+import RouteSimulatorPanel from "./partners/RouteSimulatorPanel";
+import RoutingAttemptsPanel from "./partners/RoutingAttemptsPanel";
 
 export const PartnerNetworkPanel = () => (
   <Tabs defaultValue="partners" className="space-y-4">
