@@ -158,11 +158,28 @@ const KybReviewPage = () => {
         })
         .eq("id", id);
       if (error) throw error;
+      return status;
     },
     onSuccess: (_r, status) => {
       toast.success(`Business ${status}.`);
       setNote("");
       invalidate();
+      // Best-effort confirmation email to the business contact
+      if (status === "approved" && b?.business_email) {
+        supabase.functions
+          .invoke("send-email", {
+            body: {
+              type: "kyb_update",
+              to: b.business_email,
+              data: {
+                legal_name: b.legal_name,
+                status: "approved",
+                app_url: window.location.origin,
+              },
+            },
+          })
+          .catch(() => { /* non-blocking */ });
+      }
     },
     // The trigger raises check_violation when required docs aren't all approved.
     onError: (e: any) => toast.error(e?.message || "Could not record the decision."),

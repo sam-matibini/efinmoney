@@ -78,7 +78,27 @@ function paymentLinkHtml(d: Record<string, any>) {
     </div>`;
 }
 
-function kycHtml(status: string) {
+function kycHtml(status: string, d: Record<string, any> = {}) {
+  const name = d.name ? `, ${d.name}` : "";
+  if (status === "approved") {
+    const isTier3 = d.scope === "id_and_address";
+    const tier = isTier3 ? "Tier 3" : "Tier 2";
+    const limits = isTier3
+      ? "up to $50,000/day and $500,000/month, including international transfers and virtual cards"
+      : "up to $5,000/day and $50,000/month";
+    return `
+      <div style="font-family:Inter,system-ui,sans-serif;max-width:560px;margin:auto;padding:24px;color:#0f172a">
+        <h1 style="font-size:22px;margin:0 0 12px">Identity verified ✅</h1>
+        <p style="line-height:1.55">Great news${name}! Your identity verification has been approved.</p>
+        <div style="margin:20px 0;padding:20px;border:1px solid #bbf7d0;border-radius:12px;background:#f0fdf4">
+          <p style="margin:0 0 4px;color:#065f46;font-size:12px;text-transform:uppercase;letter-spacing:0.05em">Account level</p>
+          <p style="margin:0;font-size:20px;font-weight:700;color:#065f46">${tier} — Verified</p>
+          <p style="margin:8px 0 0;color:#047857;font-size:13px;line-height:1.5">You can now send ${limits}.</p>
+        </div>
+        <p style="line-height:1.55">Sign in to your dashboard to start sending money.</p>
+        <p style="color:#64748b;font-size:12px;margin-top:32px">— eFinMoney Compliance</p>
+      </div>`;
+  }
   const pretty = status.charAt(0).toUpperCase() + status.slice(1);
   return `
     <div style="font-family:Inter,system-ui,sans-serif;max-width:560px;margin:auto;padding:24px;color:#0f172a">
@@ -175,8 +195,10 @@ Deno.serve(async (req) => {
       subject = `${data.sender_name || "Someone"} sent you ${amt}`;
       html = paymentLinkHtml(data);
     } else if (type === "kyc_update") {
-      subject = `KYC status updated: ${data.status}`;
-      html = kycHtml(data.status || "updated");
+      subject = data.status === "approved"
+        ? "Your identity has been verified — eFinMoney"
+        : `KYC status updated: ${data.status}`;
+      html = kycHtml(data.status || "updated", data);
     } else if (type === "kyb_update") {
       const subjects: Record<string, string> = {
         approved: `${data.legal_name || "Your business"} is verified`,

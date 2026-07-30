@@ -7,8 +7,6 @@ const corsHeaders = {
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-// Placeholder notifier — writes an entry to the public.notifications table.
-// Real email integration (Resend/SES) will be wired up in a later prompt.
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   if (req.method !== "POST") return json(405, { error: "Method not allowed" });
@@ -42,6 +40,28 @@ Deno.serve(async (req) => {
       type: "kyc",
       is_read: false,
     });
+
+    // Send confirmation email for KYC approval
+    if (type === "kyc_approved") {
+      try {
+        const { data: profile } = await admin
+          .from("profiles")
+          .select("email, full_name")
+          .eq("user_id", user_id)
+          .maybeSingle();
+        if (profile?.email) {
+          await admin.functions.invoke("send-email", {
+            body: {
+              type: "kyc_update",
+              to: profile.email,
+              data: { status: "approved", scope, name: profile.full_name },
+            },
+          });
+        }
+      } catch (emailErr) {
+        console.warn("[notify-user] email send failed:", emailErr);
+      }
+    }
 
     console.log(`[notify-user] queued ${type} for user ${user_id}`);
     return json(200, { ok: true });
