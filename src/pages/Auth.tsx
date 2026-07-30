@@ -467,7 +467,7 @@ const Auth = () => {
               <div className="space-y-4 rounded-2xl border border-neutral-200 bg-neutral-50/60 p-4">
                 <div className="flex items-center gap-2 text-sm font-medium text-neutral-700">
                   <MapPin className="h-4 w-4 text-primary" />
-                  Address <span className="text-xs font-normal text-neutral-500">· start typing to autofill</span>
+                  Address
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="streetAddress" className="text-neutral-700 font-medium">Street address</Label>
