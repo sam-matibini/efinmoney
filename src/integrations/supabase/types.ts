@@ -2260,6 +2260,66 @@ export type Database = {
           },
         ]
       }
+      efinmoney_pricing: {
+        Row: {
+          created_at: string
+          customer_type: string
+          dest_country: string | null
+          dest_currency: string
+          direction: Database["public"]["Enums"]["partner_direction"]
+          effective_from: string
+          effective_to: string | null
+          fixed_fee: number
+          fx_margin_bps: number
+          id: string
+          max_fee: number | null
+          min_fee: number | null
+          payment_method: string | null
+          percentage_fee: number
+          source_country: string | null
+          source_currency: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          customer_type?: string
+          dest_country?: string | null
+          dest_currency: string
+          direction: Database["public"]["Enums"]["partner_direction"]
+          effective_from?: string
+          effective_to?: string | null
+          fixed_fee?: number
+          fx_margin_bps?: number
+          id?: string
+          max_fee?: number | null
+          min_fee?: number | null
+          payment_method?: string | null
+          percentage_fee?: number
+          source_country?: string | null
+          source_currency: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          customer_type?: string
+          dest_country?: string | null
+          dest_currency?: string
+          direction?: Database["public"]["Enums"]["partner_direction"]
+          effective_from?: string
+          effective_to?: string | null
+          fixed_fee?: number
+          fx_margin_bps?: number
+          id?: string
+          max_fee?: number | null
+          min_fee?: number | null
+          payment_method?: string | null
+          percentage_fee?: number
+          source_country?: string | null
+          source_currency?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       expense_claim_items: {
         Row: {
           amount: number
@@ -3364,6 +3424,355 @@ export type Database = {
         }
         Relationships: []
       }
+      partner_corridors: {
+        Row: {
+          created_at: string
+          dest_country: string
+          dest_currency: string
+          direction: Database["public"]["Enums"]["partner_direction"]
+          enabled: boolean
+          est_minutes: number | null
+          id: string
+          partner_id: string
+          payment_method: string
+          source_country: string | null
+          source_currency: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          dest_country: string
+          dest_currency: string
+          direction: Database["public"]["Enums"]["partner_direction"]
+          enabled?: boolean
+          est_minutes?: number | null
+          id?: string
+          partner_id: string
+          payment_method: string
+          source_country?: string | null
+          source_currency: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          dest_country?: string
+          dest_currency?: string
+          direction?: Database["public"]["Enums"]["partner_direction"]
+          enabled?: boolean
+          est_minutes?: number | null
+          id?: string
+          partner_id?: string
+          payment_method?: string
+          source_country?: string | null
+          source_currency?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_corridors_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "payment_partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      partner_fx_rates: {
+        Row: {
+          base_currency: string
+          created_at: string
+          expires_at: string | null
+          fx_spread_bps: number | null
+          id: string
+          mid_market_rate: number | null
+          partner_id: string
+          partner_rate: number
+          quote_currency: string
+          rate_timestamp: string
+          source: Database["public"]["Enums"]["pricing_source"]
+          updated_by: string | null
+        }
+        Insert: {
+          base_currency: string
+          created_at?: string
+          expires_at?: string | null
+          fx_spread_bps?: number | null
+          id?: string
+          mid_market_rate?: number | null
+          partner_id: string
+          partner_rate: number
+          quote_currency: string
+          rate_timestamp?: string
+          source?: Database["public"]["Enums"]["pricing_source"]
+          updated_by?: string | null
+        }
+        Update: {
+          base_currency?: string
+          created_at?: string
+          expires_at?: string | null
+          fx_spread_bps?: number | null
+          id?: string
+          mid_market_rate?: number | null
+          partner_id?: string
+          partner_rate?: number
+          quote_currency?: string
+          rate_timestamp?: string
+          source?: Database["public"]["Enums"]["pricing_source"]
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_fx_rates_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "payment_partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      partner_limits: {
+        Row: {
+          corridor_id: string | null
+          created_at: string
+          currency_code: string
+          daily_limit: number | null
+          id: string
+          max_amount: number | null
+          min_amount: number | null
+          monthly_limit: number | null
+          partner_id: string
+          updated_at: string
+        }
+        Insert: {
+          corridor_id?: string | null
+          created_at?: string
+          currency_code: string
+          daily_limit?: number | null
+          id?: string
+          max_amount?: number | null
+          min_amount?: number | null
+          monthly_limit?: number | null
+          partner_id: string
+          updated_at?: string
+        }
+        Update: {
+          corridor_id?: string | null
+          created_at?: string
+          currency_code?: string
+          daily_limit?: number | null
+          id?: string
+          max_amount?: number | null
+          min_amount?: number | null
+          monthly_limit?: number | null
+          partner_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_limits_corridor_id_fkey"
+            columns: ["corridor_id"]
+            isOneToOne: false
+            referencedRelation: "partner_corridors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "partner_limits_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "payment_partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      partner_liquidity: {
+        Row: {
+          as_of: string
+          available_balance: number
+          created_at: string
+          currency_code: string
+          daily_utilized: number
+          id: string
+          partner_id: string
+          required_reserve: number
+          source: Database["public"]["Enums"]["pricing_source"]
+          updated_at: string
+        }
+        Insert: {
+          as_of?: string
+          available_balance?: number
+          created_at?: string
+          currency_code: string
+          daily_utilized?: number
+          id?: string
+          partner_id: string
+          required_reserve?: number
+          source?: Database["public"]["Enums"]["pricing_source"]
+          updated_at?: string
+        }
+        Update: {
+          as_of?: string
+          available_balance?: number
+          created_at?: string
+          currency_code?: string
+          daily_utilized?: number
+          id?: string
+          partner_id?: string
+          required_reserve?: number
+          source?: Database["public"]["Enums"]["pricing_source"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_liquidity_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "payment_partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      partner_performance: {
+        Row: {
+          avg_processing_seconds: number | null
+          computed_at: string
+          corridor_key: string
+          failure_count: number
+          id: string
+          partner_id: string
+          reversal_count: number
+          success_count: number
+          success_rate: number
+          total_count: number
+          window_days: number
+        }
+        Insert: {
+          avg_processing_seconds?: number | null
+          computed_at?: string
+          corridor_key?: string
+          failure_count?: number
+          id?: string
+          partner_id: string
+          reversal_count?: number
+          success_count?: number
+          success_rate?: number
+          total_count?: number
+          window_days?: number
+        }
+        Update: {
+          avg_processing_seconds?: number | null
+          computed_at?: string
+          corridor_key?: string
+          failure_count?: number
+          id?: string
+          partner_id?: string
+          reversal_count?: number
+          success_count?: number
+          success_rate?: number
+          total_count?: number
+          window_days?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_performance_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "payment_partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      partner_pricing: {
+        Row: {
+          compliance_fee: number
+          created_at: string
+          dest_country: string | null
+          dest_currency: string
+          direction: Database["public"]["Enums"]["partner_direction"]
+          effective_from: string
+          effective_to: string | null
+          fee_currency: string | null
+          fee_type: Database["public"]["Enums"]["partner_fee_type"]
+          fixed_fee: number
+          fx_markup_bps: number
+          id: string
+          max_fee: number | null
+          min_fee: number | null
+          network_fee: number
+          partner_id: string
+          payment_method: string
+          percentage_fee: number
+          settlement_fee: number
+          source: Database["public"]["Enums"]["pricing_source"]
+          source_country: string | null
+          source_currency: string
+          source_reference: string | null
+          tiers: Json
+          updated_by: string | null
+        }
+        Insert: {
+          compliance_fee?: number
+          created_at?: string
+          dest_country?: string | null
+          dest_currency: string
+          direction: Database["public"]["Enums"]["partner_direction"]
+          effective_from?: string
+          effective_to?: string | null
+          fee_currency?: string | null
+          fee_type?: Database["public"]["Enums"]["partner_fee_type"]
+          fixed_fee?: number
+          fx_markup_bps?: number
+          id?: string
+          max_fee?: number | null
+          min_fee?: number | null
+          network_fee?: number
+          partner_id: string
+          payment_method: string
+          percentage_fee?: number
+          settlement_fee?: number
+          source?: Database["public"]["Enums"]["pricing_source"]
+          source_country?: string | null
+          source_currency: string
+          source_reference?: string | null
+          tiers?: Json
+          updated_by?: string | null
+        }
+        Update: {
+          compliance_fee?: number
+          created_at?: string
+          dest_country?: string | null
+          dest_currency?: string
+          direction?: Database["public"]["Enums"]["partner_direction"]
+          effective_from?: string
+          effective_to?: string | null
+          fee_currency?: string | null
+          fee_type?: Database["public"]["Enums"]["partner_fee_type"]
+          fixed_fee?: number
+          fx_markup_bps?: number
+          id?: string
+          max_fee?: number | null
+          min_fee?: number | null
+          network_fee?: number
+          partner_id?: string
+          payment_method?: string
+          percentage_fee?: number
+          settlement_fee?: number
+          source?: Database["public"]["Enums"]["pricing_source"]
+          source_country?: string | null
+          source_currency?: string
+          source_reference?: string | null
+          tiers?: Json
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_pricing_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "payment_partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payment_link_payouts: {
         Row: {
           amount: number
@@ -3456,6 +3865,102 @@ export type Database = {
           source_ref?: string | null
           status?: Database["public"]["Enums"]["payment_link_status"]
           transfer_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      payment_partners: {
+        Row: {
+          api_status: Database["public"]["Enums"]["partner_op_status"]
+          code: string
+          compliance_risk: Database["public"]["Enums"]["risk_rating"]
+          country: string | null
+          created_at: string
+          daily_limit: number | null
+          direction: Database["public"]["Enums"]["partner_direction"]
+          effective_date: string | null
+          expiry_date: string | null
+          id: string
+          integration_status: Database["public"]["Enums"]["partner_op_status"]
+          max_transaction: number | null
+          min_transaction: number | null
+          monthly_limit: number | null
+          name: string
+          notes: string | null
+          payin_function_slug: string | null
+          payment_methods: string[]
+          payout_function_slug: string | null
+          priority: number
+          quote_function_slug: string | null
+          regulatory_status: string | null
+          reliability_score: number
+          settlement_currency: string | null
+          settlement_time: string | null
+          status: Database["public"]["Enums"]["partner_op_status"]
+          supported_countries: string[]
+          supported_currencies: string[]
+          updated_at: string
+        }
+        Insert: {
+          api_status?: Database["public"]["Enums"]["partner_op_status"]
+          code: string
+          compliance_risk?: Database["public"]["Enums"]["risk_rating"]
+          country?: string | null
+          created_at?: string
+          daily_limit?: number | null
+          direction?: Database["public"]["Enums"]["partner_direction"]
+          effective_date?: string | null
+          expiry_date?: string | null
+          id?: string
+          integration_status?: Database["public"]["Enums"]["partner_op_status"]
+          max_transaction?: number | null
+          min_transaction?: number | null
+          monthly_limit?: number | null
+          name: string
+          notes?: string | null
+          payin_function_slug?: string | null
+          payment_methods?: string[]
+          payout_function_slug?: string | null
+          priority?: number
+          quote_function_slug?: string | null
+          regulatory_status?: string | null
+          reliability_score?: number
+          settlement_currency?: string | null
+          settlement_time?: string | null
+          status?: Database["public"]["Enums"]["partner_op_status"]
+          supported_countries?: string[]
+          supported_currencies?: string[]
+          updated_at?: string
+        }
+        Update: {
+          api_status?: Database["public"]["Enums"]["partner_op_status"]
+          code?: string
+          compliance_risk?: Database["public"]["Enums"]["risk_rating"]
+          country?: string | null
+          created_at?: string
+          daily_limit?: number | null
+          direction?: Database["public"]["Enums"]["partner_direction"]
+          effective_date?: string | null
+          expiry_date?: string | null
+          id?: string
+          integration_status?: Database["public"]["Enums"]["partner_op_status"]
+          max_transaction?: number | null
+          min_transaction?: number | null
+          monthly_limit?: number | null
+          name?: string
+          notes?: string | null
+          payin_function_slug?: string | null
+          payment_methods?: string[]
+          payout_function_slug?: string | null
+          priority?: number
+          quote_function_slug?: string | null
+          regulatory_status?: string | null
+          reliability_score?: number
+          settlement_currency?: string | null
+          settlement_time?: string | null
+          status?: Database["public"]["Enums"]["partner_op_status"]
+          supported_countries?: string[]
+          supported_currencies?: string[]
           updated_at?: string
         }
         Relationships: []
@@ -4435,6 +4940,69 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      routing_rules: {
+        Row: {
+          chargeback_cost_percent: number
+          compliance_cost_fixed: number
+          created_at: string
+          failure_cost_percent: number
+          fraud_cost_percent: number
+          id: string
+          infrastructure_cost_fixed: number
+          is_active: boolean
+          max_retries: number
+          min_success_rate: number
+          name: string
+          strategy: Database["public"]["Enums"]["routing_strategy"]
+          updated_at: string
+          weight_fx: number
+          weight_profit: number
+          weight_risk: number
+          weight_speed: number
+          weight_success: number
+        }
+        Insert: {
+          chargeback_cost_percent?: number
+          compliance_cost_fixed?: number
+          created_at?: string
+          failure_cost_percent?: number
+          fraud_cost_percent?: number
+          id?: string
+          infrastructure_cost_fixed?: number
+          is_active?: boolean
+          max_retries?: number
+          min_success_rate?: number
+          name: string
+          strategy?: Database["public"]["Enums"]["routing_strategy"]
+          updated_at?: string
+          weight_fx?: number
+          weight_profit?: number
+          weight_risk?: number
+          weight_speed?: number
+          weight_success?: number
+        }
+        Update: {
+          chargeback_cost_percent?: number
+          compliance_cost_fixed?: number
+          created_at?: string
+          failure_cost_percent?: number
+          fraud_cost_percent?: number
+          id?: string
+          infrastructure_cost_fixed?: number
+          is_active?: boolean
+          max_retries?: number
+          min_success_rate?: number
+          name?: string
+          strategy?: Database["public"]["Enums"]["routing_strategy"]
+          updated_at?: string
+          weight_fx?: number
+          weight_profit?: number
+          weight_risk?: number
+          weight_speed?: number
+          weight_success?: number
+        }
+        Relationships: []
       }
       sales_invoice_items: {
         Row: {
@@ -6618,6 +7186,7 @@ export type Database = {
         Returns: boolean
       }
       is_kyc_reviewer: { Args: { _uid: string }; Returns: boolean }
+      is_pricing_manager: { Args: { _uid: string }; Returns: boolean }
       is_super_admin: { Args: { _uid: string }; Returns: boolean }
       lookup_efin_recipient: {
         Args: { p_query: string }
@@ -6744,6 +7313,9 @@ export type Database = {
         | "approved"
         | "rejected"
         | "expired"
+      partner_direction: "payin" | "payout" | "both"
+      partner_fee_type: "fixed" | "percentage" | "hybrid" | "tiered"
+      partner_op_status: "active" | "inactive" | "suspended" | "pending"
       payment_link_claim_method: "interac" | "card_push" | "eft"
       payment_link_source: "send" | "invoice"
       payment_link_status:
@@ -6761,6 +7333,7 @@ export type Database = {
         | "received"
         | "closed"
         | "cancelled"
+      pricing_source: "api" | "file" | "manual" | "partner_portal"
       reconciliation_status:
         | "pending"
         | "matched"
@@ -6773,6 +7346,12 @@ export type Database = {
         | "monthly"
         | "quarterly"
         | "yearly"
+      risk_rating: "low" | "medium" | "high"
+      routing_strategy:
+        | "lowest_cost"
+        | "highest_profit"
+        | "highest_expected_profit"
+        | "best_overall"
       tax_filing_frequency: "monthly" | "quarterly" | "annually"
       tax_filing_status:
         | "draft"
@@ -7040,6 +7619,9 @@ export const Constants = {
         "rejected",
         "expired",
       ],
+      partner_direction: ["payin", "payout", "both"],
+      partner_fee_type: ["fixed", "percentage", "hybrid", "tiered"],
+      partner_op_status: ["active", "inactive", "suspended", "pending"],
       payment_link_claim_method: ["interac", "card_push", "eft"],
       payment_link_source: ["send", "invoice"],
       payment_link_status: [
@@ -7059,6 +7641,7 @@ export const Constants = {
         "closed",
         "cancelled",
       ],
+      pricing_source: ["api", "file", "manual", "partner_portal"],
       reconciliation_status: [
         "pending",
         "matched",
@@ -7072,6 +7655,13 @@ export const Constants = {
         "monthly",
         "quarterly",
         "yearly",
+      ],
+      risk_rating: ["low", "medium", "high"],
+      routing_strategy: [
+        "lowest_cost",
+        "highest_profit",
+        "highest_expected_profit",
+        "best_overall",
       ],
       tax_filing_frequency: ["monthly", "quarterly", "annually"],
       tax_filing_status: [
