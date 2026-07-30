@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,7 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Users, Mail, Phone, Eye, Search, Shield, CheckCircle2, Clock, XCircle } from "lucide-react";
 import { format } from "date-fns";
-import EditUserModal from "@/components/admin/modals/EditUserModal";
+import { countryToCurrency, currencySymbol } from "@/lib/currency";
 
 interface UserProfile {
   id: string;
@@ -19,6 +20,8 @@ interface UserProfile {
   full_name: string | null;
   phone_number: string | null;
   country_code: string | null;
+  address_country: string | null;
+  default_currency: string | null;
   kyc_status: string;
   kyc_tier: string;
   risk_score: number | null;
@@ -27,6 +30,10 @@ interface UserProfile {
   efin_tag: string | null;
   created_at: string;
 }
+
+/** The person's country decides their currency; default_currency is the stored fallback. */
+const effectiveCurrency = (p: UserProfile): string =>
+  countryToCurrency(p.address_country || p.country_code) || p.default_currency || "USD";
 
 const kycStatusConfig: Record<string, { icon: typeof Clock; color: 'default' | 'secondary' | 'destructive'; label: string }> = {
   verified:    { icon: CheckCircle2, color: 'default',     label: 'Verified' },
@@ -46,21 +53,23 @@ const riskLabel = (score: number | null): { label: string; className: string } =
 };
 
 export const CrmCustomersPanel = () => {
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
-  const [editUser, setEditUser] = useState<UserProfile | null>(null);
 
   const { data: profiles = [], isLoading } = useQuery({
     queryKey: ['crm-profiles'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, user_id, email, full_name, phone_number, country_code, kyc_status, kyc_tier, risk_score, avatar_url, account_number, efin_tag, created_at')
+        .select('id, user_id, email, full_name, phone_number, country_code, address_country, default_currency, kyc_status, kyc_tier, risk_score, avatar_url, account_number, efin_tag, created_at')
         .order('created_at', { ascending: false })
         .limit(200);
       if (error) throw error;
       return (data || []) as UserProfile[];
     },
   });
+
+  const openCustomer = (userId: string) => navigate(`/admin/users/${userId}`);
 
   const filtered = profiles.filter(p => {
     const q = searchTerm.toLowerCase();
@@ -85,8 +94,7 @@ export const CrmCustomersPanel = () => {
   }
 
   return (
-    <>
-      <Card>
+    <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-4">
           <CardTitle className="flex items-center gap-2">
             <Users className="w-5 h-5" />
@@ -110,6 +118,7 @@ export const CrmCustomersPanel = () => {
                 <TableRow>
                   <TableHead>Customer</TableHead>
                   <TableHead>Contact</TableHead>
+                  <TableHead>Currency</TableHead>
                   <TableHead>KYC Status</TableHead>
                   <TableHead>Tier</TableHead>
                   <TableHead>Risk</TableHead>
@@ -120,7 +129,7 @@ export const CrmCustomersPanel = () => {
               <TableBody>
                 {filtered.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                       {searchTerm ? 'No customers match your search' : 'No customers found'}
                     </TableCell>
                   </TableRow>
@@ -131,8 +140,14 @@ export const CrmCustomersPanel = () => {
                     const risk = riskLabel(profile.risk_score);
                     const initials = (profile.full_name || 'U').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
 
+                    const ccy = effectiveCurrency(profile);
+
                     return (
-                      <TableRow key={profile.id} className="cursor-pointer hover:bg-muted/50">
+                      <TableRow
+                        key={profile.id}
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => openCustomer(profile.user_id)}
+                      >
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <Avatar className="w-8 h-8">
@@ -153,6 +168,11 @@ export const CrmCustomersPanel = () => {
                             {profile.email && <span className="flex items-center gap-1"><Mail className="w-3 h-3 shrink-0" />{profile.email}</span>}
                             {profile.phone_number && <span className="flex items-center gap-1"><Phone className="w-3 h-3 shrink-0" />{profile.phone_number}</span>}
                           </div>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm font-medium">
+                            {currencySymbol(ccy)} {ccy}
+                          </span>
                         </TableCell>
                         <TableCell>
                           <Badge variant={kyc.color} className="flex items-center gap-1 w-fit">
@@ -176,7 +196,8 @@ export const CrmCustomersPanel = () => {
                           <Button
                             size="icon"
                             variant="ghost"
-                            onClick={() => setEditUser(profile)}
+                            title="View full customer profile"
+                            onClick={(e) => { e.stopPropagation(); openCustomer(profile.user_id); }}
                           >
                             <Eye className="w-4 h-4" />
                           </Button>
@@ -189,14 +210,6 @@ export const CrmCustomersPanel = () => {
             </Table>
           </div>
         </CardContent>
-      </Card>
-
-      <EditUserModal
-        isOpen={editUser !== null}
-        user={editUser}
-        onClose={() => setEditUser(null)}
-        currentRoles={[]}
-      />
-    </>
+    </Card>
   );
 };

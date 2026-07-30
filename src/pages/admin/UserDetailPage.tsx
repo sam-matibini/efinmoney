@@ -21,7 +21,29 @@ import {
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
+import { countryToCurrency, currencySymbol } from "@/lib/currency";
 
+
+// support_threads / support_messages aren't in the generated types yet.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const db = supabase as unknown as { from: (t: string) => any };
+
+interface SupportThreadRow {
+  id: string;
+  subject: string;
+  status: string;
+  last_message_at: string;
+}
+
+interface SupportMessageRow {
+  id: string;
+  thread_id: string;
+  sender_role: "user" | "staff";
+  body: string;
+  created_at: string;
+}
+
+type SupportThreadWithMessages = SupportThreadRow & { messages: SupportMessageRow[] };
 
 const statusColor = (s: string | null | undefined) => {
   switch (s) {
@@ -165,13 +187,14 @@ const UserDetailPage = () => {
     enabled: !!id,
   });
 
+  // Outbound system notifications (KYC decisions, transfers, alerts) sent to this user.
   const { data: activities = [], isLoading: activitiesLoading } = useQuery({
     queryKey: ["admin-user-activities", id],
     queryFn: async () => {
       const { data } = await supabase
-        .from("crm_activities")
-        .select("id,activity_type,subject,description,due_date,completed_at,created_at")
-        .or(`customer_id.eq.${id},created_by.eq.${id}`)
+        .from("notifications")
+        .select("id,title,message,type,is_read,created_at")
+        .eq("user_id", id!)
         .order("created_at", { ascending: false })
         .limit(50);
       return data || [];
@@ -179,16 +202,32 @@ const UserDetailPage = () => {
     enabled: !!id,
   });
 
+  // Two-way support conversations: threads plus every message inside them.
   const { data: communications = [], isLoading: commsLoading } = useQuery({
     queryKey: ["admin-user-comms", id],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("customer_communications")
-        .select("id,channel,direction,subject,content,status,created_at")
+    queryFn: async (): Promise<SupportThreadWithMessages[]> => {
+      const { data: threadRows } = await db
+        .from("support_threads")
+        .select("id,subject,status,last_message_at")
         .eq("user_id", id!)
-        .order("created_at", { ascending: false })
-        .limit(50);
-      return data || [];
+        .order("last_message_at", { ascending: false })
+        .limit(25);
+      const threads = (threadRows || []) as SupportThreadRow[];
+      if (!threads.length) return [];
+
+      const { data: messageRows } = await db
+        .from("support_messages")
+        .select("id,thread_id,sender_role,body,created_at")
+        .in("thread_id", threads.map((t) => t.id))
+        .order("created_at", { ascending: true });
+
+      const byThread = new Map<string, SupportMessageRow[]>();
+      for (const m of (messageRows || []) as SupportMessageRow[]) {
+        const list = byThread.get(m.thread_id);
+        if (list) list.push(m);
+        else byThread.set(m.thread_id, [m]);
+      }
+      return threads.map((t) => ({ ...t, messages: byThread.get(t.id) || [] }));
     },
     enabled: !!id,
   });
@@ -248,6 +287,9 @@ const UserDetailPage = () => {
       </AdminLayout>
     );
   }
+
+  // The person's country decides their currency; default_currency is the stored fallback.
+  const countryCurrency = countryToCurrency(profile.address_country || profile.country_code);
 
   return (
     <AdminLayout>
@@ -320,8 +362,23 @@ const UserDetailPage = () => {
                   <Row label="Phone" value={profile.phone_number || "—"} />
                   <Row label="Account #" value={profile.account_number || "—"} icon={<Hash className="w-3.5 h-3.5" />} />
                   <Row label="eFin tag" value={profile.efin_tag ? `@${profile.efin_tag}` : "—"} icon={<AtSign className="w-3.5 h-3.5" />} />
-                  <Row label="Country" value={profile.country_code || "—"} icon={<MapPin className="w-3.5 h-3.5" />} />
-                  <Row label="Default currency" value={profile.default_currency || "—"} />
+                  <Row
+                    label="Country"
+                    value={profile.address_country || profile.country_code || "—"}
+                    icon={<MapPin className="w-3.5 h-3.5" />}
+                  />
+                  <Row
+                    label="Default currency"
+                    value={
+                      countryCurrency
+                        ? `${currencySymbol(countryCurrency)} ${countryCurrency}${
+                            profile.default_currency && profile.default_currency !== countryCurrency
+                              ? ` (stored: ${profile.default_currency})`
+                              : ""
+                          }`
+                        : profile.default_currency || "—"
+                    }
+                  />
                   <Row label="Risk score" value={String(profile.risk_score ?? 0)} />
                   <Row label="Joined" value={format(new Date(profile.created_at), "PPP")} icon={<Calendar className="w-3.5 h-3.5" />} />
                 </CardContent>
@@ -512,7 +569,7 @@ const UserDetailPage = () => {
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base flex items-center gap-2">
-                    <Activity className="w-4 h-4" /> Activities ({activities.length})
+                    <Activity className="w-4 h-4" /> Notifications sent ({activities.length})
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -523,19 +580,19 @@ const UserDetailPage = () => {
                       <Skeleton className="h-12 w-2/3" />
                     </div>
                   ) : activities.length === 0 ? (
-                    <p className="text-sm text-muted-foreground py-6 text-center">No activities logged</p>
+                    <p className="text-sm text-muted-foreground py-6 text-center">Nothing sent to this user yet</p>
                   ) : (
-                    <ul className="space-y-3">
+                    <ul className="space-y-3 max-h-96 overflow-y-auto">
                       {activities.map((a: any) => (
                         <li key={a.id} className="border-l-2 border-primary/40 pl-3">
                           <div className="flex items-center justify-between gap-2">
-                            <span className="font-medium text-sm">{a.subject}</span>
-                            <Badge variant="outline" className="text-xs capitalize">{a.activity_type}</Badge>
+                            <span className="font-medium text-sm">{a.title}</span>
+                            <Badge variant="outline" className="text-xs capitalize">{a.type}</Badge>
                           </div>
-                          {a.description && <p className="text-xs text-muted-foreground mt-1">{a.description}</p>}
+                          {a.message && <p className="text-xs text-muted-foreground mt-1">{a.message}</p>}
                           <p className="text-xs text-muted-foreground mt-1">
                             {format(new Date(a.created_at), "MMM d, yyyy HH:mm")}
-                            {a.completed_at && " · completed"}
+                            {a.is_read ? " · read" : " · unread"}
                           </p>
                         </li>
                       ))}
@@ -547,7 +604,7 @@ const UserDetailPage = () => {
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base flex items-center gap-2">
-                    <MessageSquare className="w-4 h-4" /> Communications ({communications.length})
+                    <MessageSquare className="w-4 h-4" /> Support conversations ({communications.length})
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -560,17 +617,28 @@ const UserDetailPage = () => {
                   ) : communications.length === 0 ? (
                     <p className="text-sm text-muted-foreground py-6 text-center">No messages exchanged</p>
                   ) : (
-                    <ul className="space-y-3">
-                      {communications.map((c: any) => (
-                        <li key={c.id} className="border-l-2 border-indigo-500/40 pl-3">
+                    <ul className="space-y-4 max-h-96 overflow-y-auto">
+                      {communications.map((t) => (
+                        <li key={t.id} className="border-l-2 border-indigo-500/40 pl-3">
                           <div className="flex items-center justify-between gap-2">
-                            <span className="font-medium text-sm truncate">{c.subject || c.channel}</span>
-                            <Badge variant="outline" className="text-xs capitalize">{c.direction}</Badge>
+                            <span className="font-medium text-sm truncate">{t.subject}</span>
+                            <Badge variant="outline" className={statusColor(t.status)}>{t.status}</Badge>
                           </div>
-                          <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{c.content}</p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {c.channel} · {format(new Date(c.created_at), "MMM d, yyyy HH:mm")} · {c.status}
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {t.messages.length} message{t.messages.length === 1 ? "" : "s"} · last{" "}
+                            {format(new Date(t.last_message_at), "MMM d, yyyy HH:mm")}
                           </p>
+                          <ul className="mt-2 space-y-1.5">
+                            {t.messages.map((m) => (
+                              <li key={m.id} className="text-xs">
+                                <span className={m.sender_role === "staff" ? "font-medium text-primary" : "font-medium"}>
+                                  {m.sender_role === "staff" ? "Staff" : "Customer"}
+                                </span>
+                                <span className="text-muted-foreground"> · {format(new Date(m.created_at), "MMM d HH:mm")}</span>
+                                <p className="text-muted-foreground whitespace-pre-wrap">{m.body}</p>
+                              </li>
+                            ))}
+                          </ul>
                         </li>
                       ))}
                     </ul>
