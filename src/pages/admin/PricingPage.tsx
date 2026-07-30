@@ -1,12 +1,12 @@
-import { useState, useRef } from "react";
-import { Tags, Plus, Trash2, Loader2, Save, X, AlertTriangle, RefreshCw, Download, Upload } from "lucide-react";
+import { useState } from "react";
+import { Tags, Plus, Trash2, Loader2, Save, X, AlertTriangle, RefreshCw } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger, DialogDescription,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -63,105 +63,13 @@ const EMPTY: NewPricingRule = {
   min_amount: 5, max_amount: 10000, enabled: true,
 };
 
-const CSV_HEADERS = ["name","source_currency","dest_country","dest_currency","payout_method","fee_percent","fee_fixed","fx_markup_percent","min_amount","max_amount","enabled"] as const;
-
-function rulesToCsv(rules: PricingRule[]): string {
-  const escape = (v: string | number | boolean | null) => {
-    const s = String(v ?? "");
-    return s.includes(",") ? `"${s}"` : s;
-  };
-  const rows = rules.map((r) =>
-    CSV_HEADERS.map((h) => escape(r[h as keyof PricingRule])).join(",")
-  );
-  return [CSV_HEADERS.join(","), ...rows].join("\n");
-}
-
-function parseCsv(text: string): Partial<NewPricingRule>[] {
-  const lines = text.trim().split(/\r?\n/);
-  if (lines.length < 2) return [];
-  const headers = lines[0].split(",").map((h) => h.trim().replace(/^"|"$/g, ""));
-  return lines.slice(1).map((line) => {
-    const vals = line.split(",").map((v) => v.trim().replace(/^"|"$/g, ""));
-    const row: Record<string, string> = {};
-    headers.forEach((h, i) => { row[h] = vals[i] ?? ""; });
-    return {
-      name:              row.name || undefined,
-      source_currency:   row.source_currency?.toUpperCase(),
-      dest_country:      row.dest_country?.toUpperCase(),
-      dest_currency:     row.dest_currency?.toUpperCase(),
-      payout_method:     row.payout_method,
-      fee_percent:       Number(row.fee_percent),
-      fee_fixed:         Number(row.fee_fixed),
-      fx_markup_percent: Number(row.fx_markup_percent),
-      min_amount:        Number(row.min_amount),
-      max_amount:        Number(row.max_amount),
-      enabled:           row.enabled?.toLowerCase() !== "false",
-    };
-  }).filter((r) => r.source_currency && r.dest_country && r.payout_method);
-}
-
 export default function PricingPage() {
   const qc = useQueryClient();
   const { data: rules = [], isLoading, isFetching } = usePricingRules();
   const create = useCreatePricingRule();
-  const update = useUpdatePricingRule();
   const del = useDeletePricingRule();
   const [addOpen, setAddOpen] = useState(false);
   const [draft, setDraft] = useState<NewPricingRule>(EMPTY);
-  const [csvRows, setCsvRows] = useState<Partial<NewPricingRule>[]>([]);
-  const [uploadOpen, setUploadOpen] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
-
-  const downloadCsv = () => {
-    const blob = new Blob([rulesToCsv(rules)], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "pricing_rules.csv";
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const parsed = parseCsv(ev.target?.result as string);
-      if (!parsed.length) { toast.error("No valid rows found in CSV"); return; }
-      setCsvRows(parsed);
-      setUploadOpen(true);
-    };
-    reader.readAsText(file);
-    e.target.value = "";
-  };
-
-  const applyUpload = async () => {
-    setUploading(true);
-    let created = 0; let updated = 0; let failed = 0;
-    for (const row of csvRows) {
-      const existing = rules.find(
-        (r) => r.source_currency === row.source_currency &&
-               r.dest_country   === row.dest_country &&
-               r.payout_method  === row.payout_method,
-      );
-      try {
-        if (existing) {
-          await update.mutateAsync({ id: existing.id, patch: row as Partial<PricingRule> });
-          updated++;
-        } else {
-          await create.mutateAsync(row);
-          created++;
-        }
-      } catch { failed++; }
-    }
-    setUploading(false);
-    setUploadOpen(false);
-    setCsvRows([]);
-    qc.invalidateQueries({ queryKey: ["pricing_rules"] });
-    toast.success(`Upload done — ${created} added, ${updated} updated${failed ? `, ${failed} failed` : ""}`);
-  };
 
   const submitNew = async () => {
     if (!draft.source_currency.trim() || !draft.dest_currency.trim() || !draft.dest_country.trim()) {
@@ -205,15 +113,6 @@ export default function PricingPage() {
             <RefreshCw className={`w-4 h-4 ${isFetching ? "animate-spin" : ""}`} />
             Refresh
           </Button>
-
-          <Button variant="outline" size="sm" className="gap-1.5" onClick={downloadCsv} disabled={!rules.length}>
-            <Download className="w-4 h-4" /> Download
-          </Button>
-
-          <Button variant="outline" size="sm" className="gap-1.5" onClick={() => fileRef.current?.click()}>
-            <Upload className="w-4 h-4" /> Upload
-          </Button>
-          <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={handleFileChange} />
 
           <Dialog open={addOpen} onOpenChange={setAddOpen}>
             <DialogTrigger asChild>
@@ -262,62 +161,6 @@ export default function PricingPage() {
       <p className="text-xs text-muted-foreground mt-3">
         Live corridors are active — fees and FX markup apply immediately to user transfer quotes. Toggle Live off to revert a corridor to global defaults.
       </p>
-
-      {/* CSV upload preview */}
-      <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Review CSV upload — {csvRows.length} row{csvRows.length !== 1 ? "s" : ""}</DialogTitle>
-            <DialogDescription>
-              Existing corridors (matched by source + destination + payout) will be updated; new ones will be created.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="overflow-x-auto max-h-72">
-            <table className="w-full text-xs">
-              <thead className="bg-muted/50 text-muted-foreground uppercase">
-                <tr>
-                  {["Corridor","Payout","Fee %","Fee $","FX %","Min","Max","Live","Action"].map((h) => (
-                    <th key={h} className="px-2 py-1.5 text-left font-semibold">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {csvRows.map((r, i) => {
-                  const exists = rules.some(
-                    (ex) => ex.source_currency === r.source_currency &&
-                             ex.dest_country   === r.dest_country &&
-                             ex.payout_method  === r.payout_method,
-                  );
-                  return (
-                    <tr key={i} className="hover:bg-muted/20">
-                      <td className="px-2 py-1.5 font-medium">{r.source_currency}→{r.dest_currency} <span className="text-muted-foreground">({r.dest_country})</span></td>
-                      <td className="px-2 py-1.5">{r.payout_method}</td>
-                      <td className="px-2 py-1.5 tabular-nums">{r.fee_percent}</td>
-                      <td className="px-2 py-1.5 tabular-nums">{r.fee_fixed}</td>
-                      <td className="px-2 py-1.5 tabular-nums">{r.fx_markup_percent}</td>
-                      <td className="px-2 py-1.5 tabular-nums">{r.min_amount}</td>
-                      <td className="px-2 py-1.5 tabular-nums">{r.max_amount}</td>
-                      <td className="px-2 py-1.5">{r.enabled ? "✓" : "—"}</td>
-                      <td className="px-2 py-1.5">
-                        <span className={exists ? "text-amber-600" : "text-emerald-600"}>
-                          {exists ? "update" : "create"}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setUploadOpen(false)}>Cancel</Button>
-            <Button onClick={applyUpload} disabled={uploading} className="gap-1.5">
-              {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-              {uploading ? "Applying…" : "Apply"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

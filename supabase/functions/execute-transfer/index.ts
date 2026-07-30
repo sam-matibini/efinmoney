@@ -1,6 +1,8 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { isGhanaPayConfigured } from "../_shared/ghana-pay.ts";
 import { isNombaNigeriaConfigured } from "../_shared/nomba-nigeria.ts";
+import { dispatchRoutedPayout } from "../_shared/routingExecute.ts";
+import { observeRoute } from "../_shared/routeResolver.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -430,8 +432,44 @@ Deno.serve(async (req) => {
     };
 
     let payoutResult: any = { stub: true };
+
+    // Routing engine (Phase 3): only takes over when an operator has switched the
+    // active rule to live AND enabled live routing on this corridor. Otherwise the
+    // existing hardcoded rails below run exactly as before.
+    const routeRequest = {
+      direction: "payout" as const,
+      source_currency: transfer.source_currency,
+      dest_currency: transfer.target_currency ?? transfer.source_currency,
+      source_country: transfer.sender_country ?? "CA",
+      dest_country: transfer.recipient_country ?? null,
+      payment_method: transfer.payout_method ?? null,
+      customer_type: "consumer",
+      amount: Number(transfer.source_amount) || 0,
+    };
+
+    let engineRouted = false;
     try {
-      if (isZambia && !wantFlutterwave) {
+      const dispatch = await dispatchRoutedPayout(supabase, routeRequest, {
+        transfer_id,
+        transfer,
+        requested_by: user.id,
+        supabaseUrl: Deno.env.get("SUPABASE_URL")!,
+        serviceKey,
+        authHeader,
+      });
+      if (dispatch.routed) {
+        engineRouted = true;
+        payoutResult = dispatch.payoutResult;
+        console.log("routed by engine", dispatch.partner_code, "attempts", dispatch.attempts);
+      }
+    } catch (e) {
+      console.error("routing engine dispatch failed, using legacy rails", e);
+    }
+
+    try {
+      if (engineRouted) {
+        // Routing engine already executed the payout.
+      } else if (isZambia && !wantFlutterwave) {
         const res = await fetch(
           `${Deno.env.get("SUPABASE_URL")}/functions/v1/elicate-payout`,
           {
@@ -793,6 +831,15 @@ Deno.serve(async (req) => {
         error: e instanceof Error ? e.message : "Payout trigger failed",
         code: "payout_trigger_error",
       };
+    }
+
+    // Shadow mode: record what the engine would have chosen for legacy-routed transfers.
+    if (!engineRouted) {
+      await observeRoute(supabase, routeRequest, {
+        transfer_id,
+        actual_partner_code: payoutResult?.rail ?? null,
+        requested_by: user.id,
+      });
     }
 
     // Never leave the client with a fake success when no payout rail ran.

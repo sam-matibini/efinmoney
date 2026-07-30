@@ -7,6 +7,9 @@ import PartnerFxRatesPanel from "./partners/PartnerFxRatesPanel";
 import EfinPricingPanel from "./partners/EfinPricingPanel";
 import PartnerLiquidityPanel from "./partners/PartnerLiquidityPanel";
 import RoutingStrategyPanel from "./partners/RoutingStrategyPanel";
+import LiveRoutingControlPanel from "./partners/LiveRoutingControlPanel";
+import RouteSimulatorPanel from "./partners/RouteSimulatorPanel";
+import RoutingAttemptsPanel from "./partners/RoutingAttemptsPanel";
 
 export const PartnerNetworkPanel = () => (
   <Tabs defaultValue="partners" className="space-y-4">
@@ -19,8 +22,14 @@ export const PartnerNetworkPanel = () => (
         <TabsTrigger value="customer">Customer pricing</TabsTrigger>
         <TabsTrigger value="liquidity">Liquidity</TabsTrigger>
         <TabsTrigger value="strategy">Routing strategy</TabsTrigger>
+        <TabsTrigger value="live">Live routing</TabsTrigger>
+        <TabsTrigger value="simulator">Simulator</TabsTrigger>
+        <TabsTrigger value="attempts">Attempts</TabsTrigger>
       </TabsList>
     </div>
+
+
+
 
     <TabsContent value="partners">
       <SectionBoundary name="PartnersPanel"><PartnersPanel /></SectionBoundary>
@@ -42,6 +51,15 @@ export const PartnerNetworkPanel = () => (
     </TabsContent>
     <TabsContent value="strategy">
       <SectionBoundary name="RoutingStrategyPanel"><RoutingStrategyPanel /></SectionBoundary>
+    </TabsContent>
+    <TabsContent value="live">
+      <SectionBoundary name="LiveRoutingControlPanel"><LiveRoutingControlPanel /></SectionBoundary>
+    </TabsContent>
+    <TabsContent value="simulator">
+      <SectionBoundary name="RouteSimulatorPanel"><RouteSimulatorPanel /></SectionBoundary>
+    </TabsContent>
+    <TabsContent value="attempts">
+      <SectionBoundary name="RoutingAttemptsPanel"><RoutingAttemptsPanel /></SectionBoundary>
     </TabsContent>
   </Tabs>
 );
