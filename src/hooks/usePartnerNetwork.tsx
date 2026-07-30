@@ -147,7 +147,7 @@ export interface PartnerLiquidity {
 }
 
 const numeric = <T,>(row: T, keys: (keyof T)[]): T => {
-  const out: Record<string, unknown> = { ...row };
+  const out = { ...(row as Record<string, unknown>) };
   keys.forEach((k) => {
     if (out[k as string] !== null && out[k as string] !== undefined) {
       out[k as string] = Number(out[k as string]);
