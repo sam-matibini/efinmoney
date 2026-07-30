@@ -40,6 +40,7 @@ interface SupportMessageRow {
   id: string;
   thread_id: string;
   sender_role: "user" | "staff";
+  sender_id?: string | null;
   body: string;
   created_at: string;
 }

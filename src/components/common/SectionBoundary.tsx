@@ -20,11 +20,9 @@ const DefaultFallback = ({ onReset }: { onReset: () => void }) => (
 
 const SectionBoundary = ({ name, children, fallback }: Props) => (
   <ErrorBoundary
-    fallback={({ resetErrorBoundary }) =>
-      fallback ?? (
-        <DefaultFallback onReset={resetErrorBoundary} />
-      )
-    }
+    fallback={({ resetError }) => (
+      <>{fallback ?? <DefaultFallback onReset={resetError} />}</>
+    )}
     onError={(error) => {
       console.error(`[SectionBoundary:${name}]`, error);
     }}
