@@ -98,23 +98,29 @@ const StaffPage = () => {
   const { data: departments = [] } = useQuery({
     queryKey: ["admin-departments"],
     queryFn: async () => {
-      const { data, error } = await (supabase as any).from("departments").select("id, name, description, permissions").order("name");
-      if (error) throw error;
-      return (data || []) as { id: string; name: string; description: string | null; permissions: unknown }[];
+      try {
+        const { data, error } = await (supabase as any).from("departments").select("id, name, description, permissions").order("name");
+        if (error) throw error;
+        return (data || []) as { id: string; name: string; description: string | null; permissions: unknown }[];
+      } catch (e) {
+        console.warn("Failed to load departments", e);
+        return [];
+      }
     },
+    retry: false,
   });
 
-  const [deptFilter, setDeptFilter] = useState("");
+  const [deptFilter, setDeptFilter] = useState("_all_");
   const [expandedDept, setExpandedDept] = useState<string | null>(null);
 
   const filtered = staff.filter((s) => {
     const matchQuery = !query || (
       s.full_name?.toLowerCase().includes(query.toLowerCase()) ||
       s.email?.toLowerCase().includes(query.toLowerCase()) ||
-      s.role.toLowerCase().includes(query.toLowerCase()) ||
+      s.role?.toLowerCase().includes(query.toLowerCase()) ||
       s.department?.toLowerCase().includes(query.toLowerCase())
     );
-    const matchDept = !deptFilter || s.department === deptFilter;
+    const matchDept = deptFilter === "_all_" || s.department === deptFilter;
     return matchQuery && matchDept;
   });
 
@@ -167,12 +173,12 @@ const StaffPage = () => {
           <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <CardTitle className="text-base">All staff ({filtered.length})</CardTitle>
             <div className="flex items-center gap-2">
-              <Select value={deptFilter} onValueChange={(v) => setDeptFilter(v === "all" ? "" : v)}>
+              <Select value={deptFilter} onValueChange={setDeptFilter}>
                 <SelectTrigger className="w-40">
                   <SelectValue placeholder="All depts" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All departments</SelectItem>
+                  <SelectItem value="_all_">All departments</SelectItem>
                   {departments.map((d) => (
                     <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>
                   ))}
@@ -231,11 +237,11 @@ const StaffPage = () => {
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell><RoleBadge role={s.role} /></TableCell>
+                        <TableCell><RoleBadge role={s.role ?? "viewer"} /></TableCell>
                         <TableCell><StaffStatusBadge status={s.status} /></TableCell>
                         <TableCell className="text-sm text-muted-foreground">{s.department || "—"}</TableCell>
                         <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                          {format(new Date(s.created_at), "MMM d, yyyy")}
+                          {s.created_at ? format(new Date(s.created_at), "MMM d, yyyy") : "—"}
                         </TableCell>
                         {canManage && (
                           <TableCell className="text-right">
