@@ -21,6 +21,8 @@ import PageHeroBanner from "@/components/common/PageHeroBanner";
 import AppPage from "@/components/layout/AppPage";
 import { ArrowRightLeft, User } from "lucide-react";
 
+const looseDb = supabase as unknown as { from: (t: string) => any };
+
 const refOf = (id: string) => `EFM-${id.replace(/-/g, "").slice(0, 8).toUpperCase()}`;
 
 const friendlyFailureReason = (reason: string): string => {
@@ -175,12 +177,12 @@ const TransferTrackingPage = () => {
         /^efmpayout-/i.test(String(transfer.provider_reference || ""))
         || /^EFM-[0-9a-f]{8}-\d+/i.test(String(transfer.provider_reference || ""))
         || /flutterwave|flw/i.test(String(transfer.failure_reason || ""));
-      const { data: swychrPayout } = await supabase
+      const { data: swychrPayout } = await looseDb
         .from("swychr_payout_transactions")
         .select("id")
         .eq("transfer_id", id)
         .maybeSingle();
-      const { data: nombaPayout } = await supabase
+      const { data: nombaPayout } = await looseDb
         .from("nomba_payout_transactions")
         .select("id")
         .eq("transfer_id", id)

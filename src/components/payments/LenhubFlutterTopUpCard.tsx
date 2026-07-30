@@ -10,6 +10,8 @@ import { currencySymbol } from "@/lib/currency";
 import { useAuth } from "@/hooks/useAuth";
 import { Building2, Check, Copy, CreditCard, Loader2 } from "lucide-react";
 
+const looseDb = supabase as unknown as { from: (t: string) => any };
+
 type Step = "details" | "pin" | "otp" | "avs" | "done";
 
 interface Props {
@@ -119,7 +121,7 @@ export default function LenhubFlutterTopUpCard({
     let cancelled = false;
     const tick = async () => {
       try {
-        const { data } = await supabase
+        const { data } = await looseDb
           .from("lenhub_flutter_charges")
           .select("status, credited_at, amount, currency_code")
           .eq("id", localId)
@@ -552,7 +554,7 @@ export default function LenhubFlutterTopUpCard({
     let cancelled = false;
     const tick = async () => {
       try {
-        const { data } = await supabase
+        const { data } = await looseDb
           .from("lenhub_flutter_charges")
           .select("status, credited_at, amount, currency_code")
           .eq("id", localId)
