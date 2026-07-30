@@ -42,6 +42,8 @@ export type LiveFxCalculatorProps = {
   /** Limit currency pickers (e.g. user wallets). */
   fromCurrencyFilter?: string[];
   toCurrencyFilter?: string[];
+  /** Codes that should appear at the top of the picker under a "Popular" group. */
+  priorityCodes?: readonly string[];
   /** Override quote math with app pricing (send page). */
   quoteRecipient?: (sendInFrom: number) => number;
   quoteSend?: (recvInTo: number) => number;
@@ -90,6 +92,7 @@ const LiveFxCalculator = ({
   onRecvAmountChange,
   fromCurrencyFilter,
   toCurrencyFilter,
+  priorityCodes,
   quoteRecipient: quoteRecipientOverride,
   quoteSend: quoteSendOverride,
   displayRate,
@@ -388,6 +391,7 @@ const LiveFxCalculator = ({
           onCurrencyChange={setFrom}
           loading={isLoading}
           currencyFilter={fromCurrencyFilter}
+          priorityCodes={priorityCodes}
           compact={embedded}
           shell={shell}
         />
@@ -423,6 +427,7 @@ const LiveFxCalculator = ({
           loading={isLoading}
           highlight
           currencyFilter={toCurrencyFilter}
+          priorityCodes={priorityCodes}
           compact={embedded}
           shell={shell}
         />
@@ -562,7 +567,7 @@ const Badge = ({ children, compact, shell }: { children: React.ReactNode; compac
 );
 
 const AmountRow = ({
-  label, value, onChange, currency, onCurrencyChange, loading, highlight, currencyFilter, compact, shell,
+  label, value, onChange, currency, onCurrencyChange, loading, highlight, currencyFilter, priorityCodes, compact, shell,
 }: {
   label: string;
   value: string;
@@ -572,6 +577,7 @@ const AmountRow = ({
   loading?: boolean;
   highlight?: boolean;
   currencyFilter?: string[];
+  priorityCodes?: readonly string[];
   compact?: boolean;
   shell: {
     amountRow: string;
@@ -596,17 +602,18 @@ const AmountRow = ({
         placeholder={loading ? "…" : "0.00"}
         className={`min-w-0 flex-1 border-0 bg-transparent font-black tabular-nums outline-none ${shell.amountInput} ${compact ? "text-xl" : "text-xl sm:text-2xl"}`}
       />
-      <CurrencyPicker value={currency} onChange={onCurrencyChange} currencyFilter={currencyFilter} shell={shell} />
+      <CurrencyPicker value={currency} onChange={onCurrencyChange} currencyFilter={currencyFilter} priorityCodes={priorityCodes} shell={shell} />
     </div>
   </div>
 );
 
 const CurrencyPicker = ({
-  value, onChange, currencyFilter, shell,
+  value, onChange, currencyFilter, priorityCodes, shell,
 }: {
   value: string;
   onChange: (v: string) => void;
   currencyFilter?: string[];
+  priorityCodes?: readonly string[];
   shell: {
     pickerBtn: string;
     popover: string;
@@ -617,9 +624,32 @@ const CurrencyPicker = ({
   };
 }) => {
   const [open, setOpen] = useState(false);
-  const options = currencyFilter?.length
+  const baseOptions = currencyFilter?.length
     ? WORLD_CURRENCIES.filter((c) => currencyFilter.includes(c.code))
     : WORLD_CURRENCIES;
+  const priority = priorityCodes?.length
+    ? baseOptions.filter((c) => priorityCodes.includes(c.code))
+    : [];
+  const rest = priority.length
+    ? baseOptions.filter((c) => !priorityCodes!.includes(c.code))
+    : baseOptions;
+  const renderItem = (c: typeof baseOptions[number]) => (
+    <CommandItem
+      key={c.code}
+      value={`${c.code} ${c.name} ${c.country}`}
+      onSelect={() => {
+        onChange(c.code);
+        setOpen(false);
+      }}
+      className={`flex items-center gap-2.5 cursor-pointer ${shell.popoverItem}`}
+    >
+      <Flag code={c.code} />
+      <span className="font-bold w-12 tabular-nums">{c.code}</span>
+      <span className={`flex-1 min-w-0 truncate ${shell.popoverMuted}`}>{c.name}</span>
+      <span className={`text-[10px] truncate max-w-[80px] ${shell.popoverMuted}`}>{c.country}</span>
+      {value === c.code && <Check className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />}
+    </CommandItem>
+  );
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -648,24 +678,13 @@ const CurrencyPicker = ({
           </div>
           <CommandList className="max-h-72">
             <CommandEmpty className={`py-6 text-center text-sm ${shell.popoverEmpty}`}>No match.</CommandEmpty>
-            <CommandGroup>
-              {options.map((c) => (
-                <CommandItem
-                  key={c.code}
-                  value={`${c.code} ${c.name} ${c.country}`}
-                  onSelect={() => {
-                    onChange(c.code);
-                    setOpen(false);
-                  }}
-                  className={`flex items-center gap-2.5 cursor-pointer ${shell.popoverItem}`}
-                >
-                  <Flag code={c.code} />
-                  <span className="font-bold w-12 tabular-nums">{c.code}</span>
-                  <span className={`flex-1 min-w-0 truncate ${shell.popoverMuted}`}>{c.name}</span>
-                  <span className={`text-[10px] truncate max-w-[80px] ${shell.popoverMuted}`}>{c.country}</span>
-                  {value === c.code && <Check className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />}
-                </CommandItem>
-              ))}
+            {priority.length > 0 && (
+              <CommandGroup heading="Popular">
+                {priority.map(renderItem)}
+              </CommandGroup>
+            )}
+            <CommandGroup heading={priority.length > 0 ? "All" : undefined}>
+              {rest.map(renderItem)}
             </CommandGroup>
           </CommandList>
         </Command>

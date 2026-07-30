@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import AnimatedCheck from "@/components/ui/AnimatedCheck";
 import { usePinGate } from "@/components/send/usePinGate";
+import { sortByPriority } from "@/lib/currencyPriority";
 
 interface Recipient {
   user_id: string;
@@ -267,13 +268,14 @@ const EfinmoneyP2PFlow = () => {
   const allDone = recipients.length > 0 && recipients.every((r) => r.status === "success" || r.status === "failed");
   const totalRecipients = recipients.length;
 
-  // Available currencies across all wallets + common fiats
+  // Available currencies across all wallets + common fiats. Sorted with
+  // CAD, USD, EUR, NGN first so the most-used rails aren't buried in alpha order.
   const currencyOptions = useMemo(() => {
     const codes = new Set<string>();
     wallets?.forEach((w) => codes.add(w.currency_code));
     ["USD", "CAD", "EUR", "GBP", "NGN", "KES", "GHS", "ZAR", "ZMW", "UGX", "TZS", "RWF", "MWK", "XAF", "XOF"].forEach((c) => codes.add(c));
     if (sender) codes.add(sender.currency_code);
-    return Array.from(codes).sort();
+    return sortByPriority(Array.from(codes));
   }, [wallets, sender]);
 
   // ── Search ──────────────────────────────────────────────────────────────

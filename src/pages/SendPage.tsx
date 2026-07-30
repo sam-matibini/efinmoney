@@ -112,6 +112,7 @@ import PageHeroBanner from "@/components/common/PageHeroBanner";
 import AppPage from "@/components/layout/AppPage";
 import TransferSuccess from "@/components/send/TransferSuccess";
 import { findCountryById, findCountryByCode, COUNTRIES } from "@/lib/countries";
+import { PRIORITY_SEND_CURRENCIES } from "@/lib/currencyPriority";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -181,7 +182,6 @@ const SendPage = () => {
   const [selectedSourceId, setSelectedSourceId] = useState<string>("");
   const [lastTransferId, setLastTransferId] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [savePromptOpen, setSavePromptOpen] = useState(false);   // Yes/No confirm
   const [saveModalOpen, setSaveModalOpen] = useState(false);     // pre-filled Add modal
   const [addCardOpen, setAddCardOpen] = useState(false);
   const [topUpOpen, setTopUpOpen] = useState(false);
@@ -822,7 +822,9 @@ const SendPage = () => {
           bank_account: overrides?.recipient_account ?? (isBankPayout ? bankAcct : null),
           bank_code: overrides?.recipient_bank_code ?? (isNGNBank ? ngnBankCode : null),
         } as any);
-        if (isNew && !pickedBeneficiaryId) setSavePromptOpen(true);
+        if (isNew) {
+          toast.success("Saved as a contact");
+        }
       } catch { /* non-fatal */ }
     }
     return transfer.id;
@@ -2275,6 +2277,7 @@ const SendPage = () => {
                                         toCurrencyFilter={
                                           fundingSource === "card" ? cardPayoutCodes : payoutCurrencyCodes
                                         }
+                                        priorityCodes={PRIORITY_SEND_CURRENCIES}
                                         quoteRecipient={rateAvailable ? calcQuoteRecipient : undefined}
                                         quoteSend={rateAvailable ? calcQuoteSend : undefined}
                                         displayRate={rateAvailable ? effectiveRate : null}
@@ -3107,23 +3110,6 @@ const SendPage = () => {
         onVerified={handlePinVerified}
         amountLabel={`${sourceSymbol}${parsedAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${sourceCurrency}`}
       />
-
-      <AlertDialog open={savePromptOpen} onOpenChange={setSavePromptOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>💾 Save {recipientName || "this recipient"} as a contact?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Save them for faster sending next time — no need to re-enter their details.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>No, thanks</AlertDialogCancel>
-            <AlertDialogAction onClick={() => { setSavePromptOpen(false); setSaveModalOpen(true); }}>
-              Yes, save contact
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       <AlertDialog open={cancelOpen} onOpenChange={setCancelOpen}>
         <AlertDialogContent>

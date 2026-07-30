@@ -211,5 +211,42 @@ export const recordTransferRecipient = async (params: {
     await supabase.from("beneficiaries" as any).update(patch).eq("id", found.id);
     return { beneficiary: { ...found, ...patch } as Beneficiary, isNew: false };
   }
-  return { beneficiary: null, isNew: true };
+
+  // No match — create a row from whatever we have. Skip silent insert when
+  // there's nothing useful to identify the recipient (no name, no phone/account).
+  const trimmedName = (params.name || "").trim();
+  if (!trimmedName && !params.phone && !params.eft_account && !params.interac_email) {
+    return { beneficiary: null, isNew: false };
+  }
+  const insertPayload: Record<string, any> = {
+    user_id: params.user_id,
+    name: trimmedName || (params.phone ? `Contact ${params.phone}` : "Saved contact"),
+    phone: params.phone ?? null,
+    country_code: params.country_code ?? null,
+    payout_method: params.payout_method ?? null,
+    network: params.network ?? null,
+    bank_name: params.bank_name ?? null,
+    bank_account: params.bank_account ?? null,
+    bank_code: params.bank_code ?? null,
+    currency_code: params.currency_code ?? null,
+    avatar_initials: initialsOf(trimmedName || params.phone || params.eft_account || params.interac_email || "C"),
+    category: "person",
+    email: params.email ?? null,
+    address: params.address ?? null,
+    tel: params.tel ?? null,
+    eft_institution: params.eft_institution ?? null,
+    eft_transit: params.eft_transit ?? null,
+    eft_account: params.eft_account ?? null,
+    eft_account_holder: params.eft_account_holder ?? null,
+    interac_email: params.interac_email ?? null,
+    transfer_count: 1,
+    last_sent_at: now,
+  };
+  const { data: created, error } = await supabase
+    .from("beneficiaries" as any)
+    .insert(insertPayload)
+    .select()
+    .single();
+  if (error) throw error;
+  return { beneficiary: created as unknown as Beneficiary, isNew: true };
 };
