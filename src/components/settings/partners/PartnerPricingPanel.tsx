@@ -16,7 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Upload, Tags, History } from "lucide-react";
+import { Plus, Upload, Tags, History, Download, FileDown } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
@@ -208,6 +208,12 @@ export const PartnerPricingPanel = () => {
                 e.target.value = "";
               }}
             />
+            <Button variant="outline" size="sm" onClick={() => downloadCsv("partner-pricing-template.csv", `${CSV_COLUMNS.join(",")}\n`)}>
+              <FileDown className="h-4 w-4 mr-1" /> Template
+            </Button>
+            <Button variant="outline" size="sm" onClick={exportCsv}>
+              <Download className="h-4 w-4 mr-1" /> Export CSV
+            </Button>
             <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()} disabled={bulk.isPending}>
               <Upload className="h-4 w-4 mr-1" /> Import CSV
             </Button>

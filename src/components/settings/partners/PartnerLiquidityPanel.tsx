@@ -45,16 +45,26 @@ export const PartnerLiquidityPanel = () => {
             Available payout capacity per partner and currency. A partner becomes ineligible when capacity is short.
           </CardDescription>
         </div>
-        <Button
-          size="sm"
-          onClick={() => {
-            setDraft({ partner_id: partners?.[0]?.id, currency_code: "", available_balance: 0, required_reserve: 0, daily_utilized: 0 });
-            setOpen(true);
-          }}
-          disabled={!partners?.length}
-        >
-          <Plus className="h-4 w-4 mr-1" /> Update balance
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => refresh.mutate()}
+            disabled={refresh.isPending}
+          >
+            <RefreshCw className={`h-4 w-4 mr-1 ${refresh.isPending ? "animate-spin" : ""}`} /> Refresh from partners
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => {
+              setDraft({ partner_id: partners?.[0]?.id, currency_code: "", available_balance: 0, required_reserve: 0, daily_utilized: 0 });
+              setOpen(true);
+            }}
+            disabled={!partners?.length}
+          >
+            <Plus className="h-4 w-4 mr-1" /> Update balance
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         {isLoading ? (
