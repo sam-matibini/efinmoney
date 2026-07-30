@@ -41,8 +41,8 @@ export interface PricingGapRow {
 }
 
 const since = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString();
-const num = <T extends Record<string, unknown>>(row: T, keys: string[]): T => {
-  const out: Record<string, unknown> = { ...row };
+const num = <T,>(row: T, keys: string[]): T => {
+  const out: Record<string, unknown> = { ...(row as Record<string, unknown>) };
   for (const k of keys) out[k] = Number(out[k] ?? 0);
   return out as T;
 };
