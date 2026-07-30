@@ -13,6 +13,7 @@ import RoutingAttemptsPanel from "./partners/RoutingAttemptsPanel";
 import ProfitabilityPanel from "./partners/ProfitabilityPanel";
 import CorridorReadinessPanel from "./partners/CorridorReadinessPanel";
 import CostAssurancePanel from "./partners/CostAssurancePanel";
+import NetworkActivationPanel from "./partners/NetworkActivationPanel";
 
 export const PartnerNetworkPanel = () => (
   <Tabs defaultValue="partners" className="space-y-4">
@@ -20,6 +21,7 @@ export const PartnerNetworkPanel = () => (
       <TabsList className="inline-flex w-auto">
         <TabsTrigger value="partners">Partners</TabsTrigger>
         <TabsTrigger value="corridors">Corridors</TabsTrigger>
+        <TabsTrigger value="activation">Activation</TabsTrigger>
         <TabsTrigger value="pricing">Partner pricing</TabsTrigger>
         <TabsTrigger value="fx">Partner FX</TabsTrigger>
         <TabsTrigger value="customer">Customer pricing</TabsTrigger>
@@ -42,6 +44,9 @@ export const PartnerNetworkPanel = () => (
     </TabsContent>
     <TabsContent value="corridors">
       <SectionBoundary name="PartnerCorridorsPanel"><PartnerCorridorsPanel /></SectionBoundary>
+    </TabsContent>
+    <TabsContent value="activation">
+      <SectionBoundary name="NetworkActivationPanel"><NetworkActivationPanel /></SectionBoundary>
     </TabsContent>
     <TabsContent value="pricing">
       <SectionBoundary name="PartnerPricingPanel"><PartnerPricingPanel /></SectionBoundary>
