@@ -14,6 +14,8 @@ import ProfitabilityPanel from "./partners/ProfitabilityPanel";
 import CorridorReadinessPanel from "./partners/CorridorReadinessPanel";
 import CostAssurancePanel from "./partners/CostAssurancePanel";
 import NetworkActivationPanel from "./partners/NetworkActivationPanel";
+import PartnerLimitsPanel from "./partners/PartnerLimitsPanel";
+import PartnerAlertsPanel from "./partners/PartnerAlertsPanel";
 
 export const PartnerNetworkPanel = () => (
   <Tabs defaultValue="partners" className="space-y-4">
