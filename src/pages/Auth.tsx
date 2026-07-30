@@ -5,10 +5,14 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Eye, EyeOff, ArrowRight, ArrowLeft, MailCheck, User, Building2, Check } from "lucide-react";
+import { Eye, EyeOff, ArrowRight, ArrowLeft, MailCheck, User, Building2, Check, X, Loader2, MapPin } from "lucide-react";
 import { Logo, Wordmark } from "@/components/Logo";
 import LoadingSpinner from "@/components/LoadingSpinner";
+import { PhotonAddressInput } from "@/components/PhotonAddressInput";
+import { verifyEmail } from "@/lib/emailValidation";
+import { ISO_COUNTRIES } from "@/lib/isoCountries";
 
 const isSafeRedirect = (path: string | null): path is string =>
   !!path && path.startsWith("/") && !path.startsWith("//");
@@ -20,9 +24,18 @@ const Auth = () => {
   const [isSignUp, setIsSignUp] = useState(modeParam !== "signin");
   const [accountType, setAccountType] = useState<"individual" | "business" | null>(null);
   const [email, setEmail] = useState("");
+  const [emailCheck, setEmailCheck] = useState<"idle" | "checking" | "valid" | "invalid">("idle");
+  const [emailCheckMessage, setEmailCheckMessage] = useState<string | null>(null);
+  const [emailSuggestion, setEmailSuggestion] = useState<string | null>(null);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [fullName, setFullName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [streetAddress, setStreetAddress] = useState("");
+  const [city, setCity] = useState("");
+  const [stateRegion, setStateRegion] = useState("");
+  const [postalCode, setPostalCode] = useState("");
+  const [country, setCountry] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [signedUpEmail, setSignedUpEmail] = useState<string | null>(null);
@@ -54,7 +67,32 @@ const Auth = () => {
           toast.error("Passwords do not match.");
           return;
         }
-        const { error } = await signUp(email, password, fullName, accountType ?? "individual");
+        if (emailCheck === "checking") {
+          toast.error("Please wait — we're still checking your email address.");
+          return;
+        }
+        if (emailCheck === "invalid") {
+          toast.error(emailCheckMessage ?? "Please enter a valid email address.");
+          return;
+        }
+        if (!streetAddress.trim() || !city.trim() || !country) {
+          toast.error("Please complete your address.");
+          return;
+        }
+        const { error } = await signUp(
+          email,
+          password,
+          firstName.trim(),
+          lastName.trim(),
+          accountType ?? "individual",
+          {
+            street: streetAddress.trim(),
+            city: city.trim(),
+            state: stateRegion.trim(),
+            postalCode: postalCode.trim(),
+            countryCode: country,
+          }
+        );
         if (error) toast.error(error.message);
         else {
           // Identity is required before transfers; preserve the deep-link for after KYC.
@@ -75,6 +113,17 @@ const Auth = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleEmailBlur = async () => {
+    if (!email.trim() || emailCheck === "checking") return;
+    setEmailCheck("checking");
+    setEmailCheckMessage(null);
+    setEmailSuggestion(null);
+    const result = await verifyEmail(email);
+    setEmailCheck(result.valid ? "valid" : "invalid");
+    setEmailCheckMessage(result.message ?? null);
+    setEmailSuggestion(result.suggestion ?? null);
   };
 
   const handleSendReset = async (e: React.FormEvent) => {
@@ -329,32 +378,173 @@ const Auth = () => {
           )}
           <form onSubmit={handleSubmit} className="space-y-5">
             {isSignUp && (
-              <div className="space-y-2">
-                <Label htmlFor="fullName" className="text-neutral-700 font-medium">Full name</Label>
-                <Input
-                  id="fullName"
-                  type="text"
-                  placeholder="John Doe"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  className="h-12 bg-white border-neutral-200 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
-                  required
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="firstName" className="text-neutral-700 font-medium">First name</Label>
+                  <Input
+                    id="firstName"
+                    type="text"
+                    placeholder="John"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    className="h-12 bg-white border-neutral-200 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
+                    autoComplete="given-name"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="lastName" className="text-neutral-700 font-medium">Last name</Label>
+                  <Input
+                    id="lastName"
+                    type="text"
+                    placeholder="Doe"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    className="h-12 bg-white border-neutral-200 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
+                    autoComplete="family-name"
+                    required
+                  />
+                </div>
               </div>
             )}
 
             <div className="space-y-2">
               <Label htmlFor="email" className="text-neutral-700 font-medium">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="h-12 bg-white border-neutral-200 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
-                required
-              />
+              <div className="relative">
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="you@example.com"
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    if (emailCheck !== "idle") {
+                      setEmailCheck("idle");
+                      setEmailCheckMessage(null);
+                      setEmailSuggestion(null);
+                    }
+                  }}
+                  onBlur={isSignUp ? handleEmailBlur : undefined}
+                  className="h-12 pr-10 bg-white border-neutral-200 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
+                  required
+                />
+                {isSignUp && emailCheck === "checking" && (
+                  <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400 animate-spin" />
+                )}
+                {isSignUp && emailCheck === "valid" && (
+                  <Check className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-green-600" />
+                )}
+                {isSignUp && emailCheck === "invalid" && (
+                  <X className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-red-600" />
+                )}
+              </div>
+              {isSignUp && emailCheck === "invalid" && emailCheckMessage && (
+                <p className="text-xs text-red-600">
+                  {emailCheckMessage}
+                  {emailSuggestion && (
+                    <>
+                      {" "}Did you mean{" "}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEmail(emailSuggestion);
+                          setEmailCheck("valid");
+                          setEmailCheckMessage(null);
+                          setEmailSuggestion(null);
+                        }}
+                        className="font-semibold text-primary hover:underline"
+                      >
+                        {emailSuggestion}
+                      </button>
+                      ?
+                    </>
+                  )}
+                </p>
+              )}
             </div>
+
+            {isSignUp && (
+              <div className="space-y-4 rounded-2xl border border-neutral-200 bg-neutral-50/60 p-4">
+                <div className="flex items-center gap-2 text-sm font-medium text-neutral-700">
+                  <MapPin className="h-4 w-4 text-primary" />
+                  Address <span className="text-xs font-normal text-neutral-500">· start typing to autofill</span>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="streetAddress" className="text-neutral-700 font-medium">Street address</Label>
+                  <PhotonAddressInput
+                    id="streetAddress"
+                    value={streetAddress}
+                    onChange={setStreetAddress}
+                    onPlace={(place) => {
+                      setStreetAddress(place.street);
+                      setCity(place.city);
+                      setStateRegion(place.state);
+                      setPostalCode(place.postalCode);
+                      if (place.countryCode) setCountry(place.countryCode);
+                    }}
+                    placeholder="Start typing your address…"
+                    autoComplete="address-line1"
+                    required
+                  />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="city" className="text-neutral-700 font-medium">City</Label>
+                    <Input
+                      id="city"
+                      type="text"
+                      placeholder="Toronto"
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                      className="h-12 bg-white border-neutral-200 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
+                      autoComplete="address-level2"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="stateRegion" className="text-neutral-700 font-medium">State / Province</Label>
+                    <Input
+                      id="stateRegion"
+                      type="text"
+                      placeholder="Ontario"
+                      value={stateRegion}
+                      onChange={(e) => setStateRegion(e.target.value)}
+                      className="h-12 bg-white border-neutral-200 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
+                      autoComplete="address-level1"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="postalCode" className="text-neutral-700 font-medium">Postal code</Label>
+                    <Input
+                      id="postalCode"
+                      type="text"
+                      placeholder="M5V 2H1"
+                      value={postalCode}
+                      onChange={(e) => setPostalCode(e.target.value)}
+                      className="h-12 bg-white border-neutral-200 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
+                      autoComplete="postal-code"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="country" className="text-neutral-700 font-medium">Country</Label>
+                    <Select value={country} onValueChange={setCountry} required>
+                      <SelectTrigger id="country" className="h-12 bg-white border-neutral-200 focus:ring-2 focus:ring-primary/20">
+                        <SelectValue placeholder="Select country" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ISO_COUNTRIES.map((c) => (
+                          <SelectItem key={c.code} value={c.code}>
+                            <span className="mr-2">{c.flag}</span>{c.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
@@ -444,6 +634,16 @@ const Auth = () => {
                 setIsSignUp(!isSignUp);
                 setConfirmPassword("");
                 setAccountType(null);
+                setFirstName("");
+                setLastName("");
+                setStreetAddress("");
+                setCity("");
+                setStateRegion("");
+                setPostalCode("");
+                setCountry("");
+                setEmailCheck("idle");
+                setEmailCheckMessage(null);
+                setEmailSuggestion(null);
               }}
               className="ml-2 text-primary hover:text-primary/80 font-bold"
             >
