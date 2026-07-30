@@ -148,8 +148,7 @@ Deno.serve(async (req) => {
       }
 
       const expected = round2(
-        (Number(econ.partner_fixed_fee ?? 0) || 0) +
-          (Number(econ.partner_percentage_fee ?? 0) || 0) +
+        (Number(econ.partner_fee_cost ?? 0) || 0) +
           (Number(econ.settlement_cost ?? 0) || 0) +
           (Number(econ.network_cost ?? 0) || 0) +
           (Number(econ.compliance_cost ?? 0) || 0),
