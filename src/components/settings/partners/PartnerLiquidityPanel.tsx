@@ -15,14 +15,16 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, Droplets } from "lucide-react";
+import { Plus, Trash2, Droplets, RefreshCw, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
+import { useRefreshLiquidity } from "@/hooks/useCostAssurance";
 
 export const PartnerLiquidityPanel = () => {
   const { data: partners } = usePaymentPartners();
   const { data: liquidity, isLoading } = usePartnerLiquidity();
   const upsert = useUpsertLiquidity();
   const remove = useDeleteLiquidity();
+  const refresh = useRefreshLiquidity();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<Partial<PartnerLiquidity>>({
     currency_code: "",
