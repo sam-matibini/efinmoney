@@ -113,11 +113,13 @@ import AppPage from "@/components/layout/AppPage";
 import TransferSuccess from "@/components/send/TransferSuccess";
 import { findCountryById, findCountryByCode, COUNTRIES } from "@/lib/countries";
 import {
-
-const looseDb = supabase as unknown as { from: (t: string) => any };
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+
+const looseDb = supabase as unknown as { from: (t: string) => any };
+
+
 
 type FundingSource = 'wallet' | 'bank' | 'card';
 type CardResumeStage = "confirming" | "sending";
