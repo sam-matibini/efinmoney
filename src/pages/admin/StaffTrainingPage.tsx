@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { GraduationCap, Plus, CheckCircle2 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format, isPast } from "date-fns";
@@ -18,7 +19,7 @@ import AdminLayout from "@/components/admin-portal/AdminLayout";
 export default function StaffTrainingPage() {
   const qc = useQueryClient();
   const [showAdd, setShowAdd] = useState(false);
-  const [form, setForm] = useState({ course_name: "", category: "aml", frequency_months: "12" });
+  const [form, setForm] = useState({ course_name: "", category: "aml", frequency_months: "12", is_mandatory: false });
   const [showLog, setShowLog] = useState(false);
   const [logForm, setLogForm] = useState({ course_id: "", course_name: "", score: "" });
 
@@ -47,7 +48,7 @@ export default function StaffTrainingPage() {
       const { error } = await (supabase as any).from("training_courses").insert({ ...form, frequency_months: Number(form.frequency_months) });
       if (error) throw error;
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["training-courses"] }); setShowAdd(false); setForm({ course_name: "", category: "aml", frequency_months: "12" }); toast.success("Course added"); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["training-courses"] }); setShowAdd(false); setForm({ course_name: "", category: "aml", frequency_months: "12", is_mandatory: false }); toast.success("Course added"); },
     onError: () => toast.error("Failed to add course"),
   });
 
@@ -145,6 +146,16 @@ export default function StaffTrainingPage() {
               </Select>
             </div>
             <div><Label>Frequency (months)</Label><Input value={form.frequency_months} onChange={(e) => setForm({ ...form, frequency_months: e.target.value })} type="number" /></div>
+            <div className="flex items-center gap-3 pt-1">
+              <Switch
+                id="mandatory-toggle"
+                checked={form.is_mandatory}
+                onCheckedChange={(v) => setForm({ ...form, is_mandatory: v })}
+              />
+              <Label htmlFor="mandatory-toggle" className="cursor-pointer">
+                Mandatory for all staff
+              </Label>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAdd(false)}>Cancel</Button>

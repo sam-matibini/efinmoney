@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Tags, Plus, Trash2, Loader2, Save, X, AlertTriangle } from "lucide-react";
+import { Tags, Plus, Trash2, Loader2, Save, X, AlertTriangle, RefreshCw } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -63,7 +64,8 @@ const EMPTY: NewPricingRule = {
 };
 
 export default function PricingPage() {
-  const { data: rules = [], isLoading } = usePricingRules();
+  const qc = useQueryClient();
+  const { data: rules = [], isLoading, isFetching } = usePricingRules();
   const create = useCreatePricingRule();
   const del = useDeletePricingRule();
   const [addOpen, setAddOpen] = useState(false);
@@ -100,10 +102,22 @@ export default function PricingPage() {
           </div>
         </div>
 
-        <Dialog open={addOpen} onOpenChange={setAddOpen}>
-          <DialogTrigger asChild>
-            <Button className="gap-2"><Plus className="w-4 h-4" /> Add corridor</Button>
-          </DialogTrigger>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            onClick={() => qc.invalidateQueries({ queryKey: ["pricing_rules"] })}
+            disabled={isFetching}
+          >
+            <RefreshCw className={`w-4 h-4 ${isFetching ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+
+          <Dialog open={addOpen} onOpenChange={setAddOpen}>
+            <DialogTrigger asChild>
+              <Button className="gap-2"><Plus className="w-4 h-4" /> Add corridor</Button>
+            </DialogTrigger>
           <DialogContent className="max-w-lg">
             <DialogHeader><DialogTitle>New pricing rule</DialogTitle></DialogHeader>
             <RuleForm value={draft} onChange={setDraft} existingRules={rules} />
@@ -114,7 +128,8 @@ export default function PricingPage() {
               </Button>
             </DialogFooter>
           </DialogContent>
-        </Dialog>
+          </Dialog>
+        </div>
       </div>
 
       <div className="rounded-2xl border border-border overflow-hidden">
