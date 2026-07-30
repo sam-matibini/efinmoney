@@ -1492,7 +1492,7 @@ const SendPage = () => {
           const chargeId = intent.lenhubChargeId;
           if (!chargeId) throw new Error("Missing payment reference");
           for (let i = 0; i < 40; i++) {
-            const { data } = await supabase
+            const { data } = await looseDb
               .from("lenhub_flutter_charges")
               .select("status, credited_at")
               .eq("id", chargeId)
