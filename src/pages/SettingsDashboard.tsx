@@ -57,6 +57,10 @@ const SettingsDashboard = () => {
               <SectionBoundary name="CurrencyManagementPanel"><CurrencyManagementPanel /></SectionBoundary>
             </TabsContent>
 
+            <TabsContent value="partners" className="space-y-4">
+              <SectionBoundary name="PartnerNetworkPanel"><PartnerNetworkPanel /></SectionBoundary>
+            </TabsContent>
+
             <TabsContent value="modules" className="space-y-4">
               <SectionBoundary name="ModuleAccessPanel"><ModuleAccessPanel /></SectionBoundary>
             </TabsContent>
