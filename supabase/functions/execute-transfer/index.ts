@@ -3,6 +3,7 @@ import { isGhanaPayConfigured } from "../_shared/ghana-pay.ts";
 import { isNombaNigeriaConfigured } from "../_shared/nomba-nigeria.ts";
 import { dispatchRoutedPayout } from "../_shared/routingExecute.ts";
 import { observeRoute } from "../_shared/routeResolver.ts";
+import { recordEconomics } from "../_shared/transactionEconomics.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
