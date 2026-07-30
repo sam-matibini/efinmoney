@@ -634,9 +634,39 @@ Deno.serve(async (req) => {
           const flwFallbackJson = await flwFallbackRes.json().catch(() => null);
           if (flwFallbackJson?.success || flwFallbackJson?.pending_liquidity || flwFallbackJson?.queued) {
             payoutResult = { ...flwFallbackJson, fincra_fallback: true, fincra_error: payoutResult?.error };
+          } else {
+            // Both Fincra (skip_reversal) and FLW failed. Neither reversed the ledger,
+            // so we must do it here to return funds and avoid a stuck "funded" transfer.
+            const finalError = (flwFallbackJson?.error || payoutResult?.error || "Payout failed on all available rails").slice(0, 500);
+            try {
+              const { data: existingRev } = await supabase.from("ledger_entries").select("id")
+                .eq("reference_type", "transfer_reversal").eq("reference_id", transfer_id).limit(1);
+              if (!existingRev?.length) {
+                const { data: originals } = await supabase.from("ledger_entries")
+                  .select("account_id, wallet_id, currency_code, debit_amount, credit_amount, description")
+                  .eq("reference_type", "transfer").eq("reference_id", transfer_id);
+                if (originals?.length) {
+                  const j = crypto.randomUUID();
+                  await supabase.from("ledger_entries").insert(originals.map((o) => ({
+                    journal_id: j, account_id: o.account_id, wallet_id: o.wallet_id,
+                    currency_code: o.currency_code, debit_amount: o.credit_amount, credit_amount: o.debit_amount,
+                    description: `REVERSAL: ${o.description ?? ""}`.slice(0, 500),
+                    reference_type: "transfer_reversal", reference_id: transfer_id,
+                  })));
+                }
+              }
+            } catch (revErr) {
+              console.error("fincra+flw double-failure reversal error", revErr);
+            }
+            await supabase.from("transfers").update({ status: "failed", failure_reason: finalError }).eq("id", transfer_id);
+            await supabase.from("notifications").insert({
+              user_id: transfer.sender_id,
+              title: "Transfer failed — refunded",
+              message: `${finalError}. Funds returned to your wallet.`,
+              type: "error",
+            }).catch(() => {});
+            payoutResult = { success: false, error: finalError, refunded: true };
           }
-          // If FLW also fails, payoutResult stays as Fincra's error and the
-          // existing reversal logic below will refund the user.
         }
       } else if (isNigeriaBank && nombaNigeriaOnly) {
         if (useStellar || useFincra || usePawapay || useMtnMomo) {
