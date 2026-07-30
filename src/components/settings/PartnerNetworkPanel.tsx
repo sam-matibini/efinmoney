@@ -52,6 +52,15 @@ export const PartnerNetworkPanel = () => (
     <TabsContent value="strategy">
       <SectionBoundary name="RoutingStrategyPanel"><RoutingStrategyPanel /></SectionBoundary>
     </TabsContent>
+    <TabsContent value="live">
+      <SectionBoundary name="LiveRoutingControlPanel"><LiveRoutingControlPanel /></SectionBoundary>
+    </TabsContent>
+    <TabsContent value="simulator">
+      <SectionBoundary name="RouteSimulatorPanel"><RouteSimulatorPanel /></SectionBoundary>
+    </TabsContent>
+    <TabsContent value="attempts">
+      <SectionBoundary name="RoutingAttemptsPanel"><RoutingAttemptsPanel /></SectionBoundary>
+    </TabsContent>
   </Tabs>
 );
 
