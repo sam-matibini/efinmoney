@@ -593,7 +593,7 @@ Deno.serve(async (req) => {
         );
         payoutResult = await res.json();
       } else if (useFincra) {
-        const res = await fetch(
+        const fincraRes = await fetch(
           `${Deno.env.get("SUPABASE_URL")}/functions/v1/fincra-payout`,
           {
             method: "POST",
@@ -607,10 +607,37 @@ Deno.serve(async (req) => {
               currency: transfer.target_currency ?? transfer.source_currency,
               network: resolveNetwork(transfer.payout_method, transfer.target_currency ?? transfer.source_currency),
               recipient_name: transfer.recipient_name,
+              skip_reversal: true,
             }),
           },
         );
-        payoutResult = await res.json();
+        payoutResult = await fincraRes.json();
+        // Fincra balance/availability failure — try Flutterwave before giving up.
+        if (payoutResult?.success === false) {
+          const flwFallbackRes = await fetch(
+            `${Deno.env.get("SUPABASE_URL")}/functions/v1/flutterwave-payout`,
+            {
+              method: "POST",
+              headers: internalHeaders,
+              body: JSON.stringify({
+                transfer_id,
+                phone_number: transfer.recipient_phone,
+                account_number: transfer.recipient_account,
+                bank_code: transfer.recipient_bank_code,
+                amount: Number(transfer.target_amount ?? transfer.source_amount),
+                currency: transfer.target_currency ?? transfer.source_currency,
+                network: resolveNetwork(transfer.payout_method, transfer.target_currency ?? transfer.source_currency),
+                recipient_name: transfer.recipient_name,
+              }),
+            },
+          );
+          const flwFallbackJson = await flwFallbackRes.json().catch(() => null);
+          if (flwFallbackJson?.success || flwFallbackJson?.pending_liquidity || flwFallbackJson?.queued) {
+            payoutResult = { ...flwFallbackJson, fincra_fallback: true, fincra_error: payoutResult?.error };
+          }
+          // If FLW also fails, payoutResult stays as Fincra's error and the
+          // existing reversal logic below will refund the user.
+        }
       } else if (isNigeriaBank && nombaNigeriaOnly) {
         if (useStellar || useFincra || usePawapay || useMtnMomo) {
           payoutResult = {

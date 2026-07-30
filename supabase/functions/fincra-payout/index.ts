@@ -15,6 +15,17 @@ interface PayoutRequest {
   currency: string;
   network: string;
   recipient_name: string;
+  // When true (set by execute-transfer for fallback logic), on Fincra API failure
+  // skip the ledger reversal and status update — execute-transfer will handle them.
+  skip_reversal?: boolean;
+}
+
+function isFincraBalanceError(message: string): boolean {
+  const m = message.toLowerCase();
+  return m.includes("insufficient funds in customer wallet") ||
+         m.includes("insufficient balance") ||
+         (m.includes("insufficient") && m.includes("wallet")) ||
+         m.includes("provider balance low");
 }
 
 const FINCRA_MM_CODE: Record<string, string> = {
@@ -92,7 +103,7 @@ Deno.serve(async (req) => {
     }
 
     const body: PayoutRequest = await req.json();
-    const { transfer_id, phone_number, account_number, bank_code, amount, currency, network, recipient_name } = body;
+    const { transfer_id, phone_number, account_number, bank_code, amount, currency, network, recipient_name, skip_reversal } = body;
     currentTransferId = transfer_id;
     currentUserId = userId;
 
@@ -181,6 +192,23 @@ Deno.serve(async (req) => {
 
     if (!ok) {
       const reason = String(json?.error || json?.message || `HTTP ${status}`);
+      const isBalanceError = isFincraBalanceError(reason);
+
+      // Always alert admins when Fincra's wallet is depleted.
+      if (isBalanceError) {
+        await supabase.from("admin_notifications").insert({
+          title: "Fincra wallet balance low",
+          message: `Payout for transfer ${transfer_id} failed: ${reason}. Top up the Fincra ${currency} wallet immediately.`,
+          type: "treasury",
+        }).catch(() => {/* non-blocking */});
+      }
+
+      // When called from execute-transfer with skip_reversal, don't touch the ledger
+      // or transfer status — execute-transfer will attempt a fallback rail first.
+      if (skip_reversal) {
+        return new Response(JSON.stringify({ success: false, error: reason, refunded: false }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
       const rev = await reverseTransferLedger(supabase, transfer_id);
       await supabase.from("transfers").update({ status: "failed", failure_reason: reason.slice(0, 500) }).eq("id", transfer_id);
       await supabase.from("notifications").insert({
