@@ -278,7 +278,7 @@ Deno.serve(async (req) => {
     if (stale.length) {
       await supabase
         .from("partner_alerts")
-        .update({ status: "resolved", resolved_at: nowIso, notes_source: undefined })
+        .update({ status: "resolved", resolved_at: nowIso })
         .in("id", stale.map((a: any) => a.id));
     }
 
