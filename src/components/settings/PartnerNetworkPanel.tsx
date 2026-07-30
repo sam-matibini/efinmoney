@@ -67,8 +67,14 @@ export const PartnerNetworkPanel = () => (
     <TabsContent value="attempts">
       <SectionBoundary name="RoutingAttemptsPanel"><RoutingAttemptsPanel /></SectionBoundary>
     </TabsContent>
+    <TabsContent value="readiness">
+      <SectionBoundary name="CorridorReadinessPanel"><CorridorReadinessPanel /></SectionBoundary>
+    </TabsContent>
     <TabsContent value="profitability">
       <SectionBoundary name="ProfitabilityPanel"><ProfitabilityPanel /></SectionBoundary>
+    </TabsContent>
+    <TabsContent value="cost">
+      <SectionBoundary name="CostAssurancePanel"><CostAssurancePanel /></SectionBoundary>
     </TabsContent>
   </Tabs>
 );
