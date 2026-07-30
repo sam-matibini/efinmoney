@@ -56,7 +56,40 @@ export interface PartnerInvoice {
   status: string;
   reconciled_at: string | null;
   created_at: string;
+  approved_total?: number;
+  disputed_total?: number;
+  approved_at?: string | null;
+  journal_id?: string | null;
+  settlement_id?: string | null;
+  paid_at?: string | null;
+  vendor_id?: string | null;
 }
+
+export interface PartnerSettlement {
+  id: string;
+  partner_id: string;
+  currency_code: string;
+  period_start: string | null;
+  period_end: string | null;
+  total_due: number;
+  amount_paid: number;
+  invoice_count: number;
+  payment_method: string | null;
+  payment_reference: string | null;
+  status: string;
+  journal_id: string | null;
+  notes: string | null;
+  paid_at: string | null;
+  created_at: string;
+}
+
+export interface LedgerAccountOption {
+  id: string;
+  code: string;
+  name: string;
+  currency_code: string | null;
+}
+
 
 export const useCorridorReadiness = () =>
   useQuery({
