@@ -22,7 +22,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Receipt, Upload, ScaleIcon } from "lucide-react";
+import { Receipt, Upload, Scale as ScaleIcon } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
