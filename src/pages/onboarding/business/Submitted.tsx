@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { Clock, Mail } from "lucide-react";
 import KybShell from "@/components/kyb/KybShell";
+import ApplicantKybMessages from "@/components/kyb/ApplicantKybMessages";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useKyb } from "@/hooks/useKyb";
@@ -43,6 +44,8 @@ const Submitted = () => {
           </p>
         </div>
       </Card>
+
+      {business?.id && <ApplicantKybMessages businessId={business.id} />}
 
       <Button onClick={() => navigate("/dashboard")} size="lg" className="w-full">
         Back to dashboard

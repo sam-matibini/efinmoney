@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { AlertTriangle } from "lucide-react";
 import KybShell from "@/components/kyb/KybShell";
+import ApplicantKybMessages from "@/components/kyb/ApplicantKybMessages";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useKyb } from "@/hooks/useKyb";
@@ -49,6 +50,8 @@ const Rejected = () => {
           ))}
         </Card>
       )}
+
+      {business?.id && <ApplicantKybMessages businessId={business.id} />}
 
       {suspended ? (
         <Button onClick={() => navigate("/support")} size="lg" className="w-full">

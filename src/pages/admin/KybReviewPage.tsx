@@ -1,19 +1,45 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { format } from "date-fns";
-import { ArrowLeft, Check, X, FileText, AlertTriangle } from "lucide-react";
+import { format, formatDistanceToNow } from "date-fns";
+import { ArrowLeft, Check, X, FileText, AlertTriangle, Upload, Send } from "lucide-react";
 import AdminLayout from "@/components/admin-portal/AdminLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { KybStatusBadge } from "@/pages/admin/KybQueuePage";
 import { UBO_THRESHOLD_PERCENT } from "@/hooks/useKyb";
+import { kybAudit, listKybMessages, postKybMessage, type KybMessage } from "@/lib/kybAdmin";
+import type { BusinessOwner } from "@/hooks/useKyb";
+
+const DOC_TYPES = [
+  { value: "registration_certificate", label: "Certificate of incorporation" },
+  { value: "articles_of_incorporation", label: "Articles of incorporation" },
+  { value: "proof_of_business_address", label: "Proof of business address" },
+  { value: "ownership_chart", label: "Ownership / control structure" },
+  { value: "bank_statement", label: "Business bank statement" },
+  { value: "business_name_registration", label: "Business name registration" },
+  { value: "cac_status_report", label: "CAC status report" },
+  { value: "tin_certificate", label: "TIN certificate" },
+  { value: "owner_government_id", label: "Owner government ID" },
+  { value: "owner_bvn", label: "Owner BVN" },
+  { value: "owner_proof_of_address", label: "Owner proof of address" },
+  { value: "other", label: "Other" },
+];
 
 const db = supabase as unknown as { from: (t: string) => any };
 const BUCKET = "business-documents";
@@ -32,12 +58,18 @@ const KybReviewPage = () => {
   const [note, setNote] = useState("");
   const [rejectTarget, setRejectTarget] = useState<{ id: string; label: string } | null>(null);
   const [rejectReason, setRejectReason] = useState("");
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadType, setUploadType] = useState("other");
+  const [uploadOwnerId, setUploadOwnerId] = useState<string>("");
+  const [newMessage, setNewMessage] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin-kyb", id],
     enabled: !!id,
     queryFn: async () => {
-      const [b, o, d, a, s] = await Promise.all([
+      const [b, o, d, a, s, m] = await Promise.all([
         db.from("business_profiles").select("*").eq("id", id).maybeSingle(),
         db
           .from("business_owners")
@@ -60,19 +92,83 @@ const KybReviewPage = () => {
           .eq("trigger", "kyb")
           .eq("trigger_ref", id)
           .order("match_count", { ascending: false }),
+        listKybMessages(id!),
       ]);
       if (b.error) throw b.error;
+      const reviewerId = b.data?.reviewed_by as string | null | undefined;
+      const reviewerName = reviewerId
+        ? (
+            await db
+              .from("profiles")
+              .select("user_id, full_name")
+              .eq("user_id", reviewerId)
+              .maybeSingle()
+          ).data?.full_name ?? null
+        : null;
       return {
         business: b.data,
         owners: (o.data || []) as any[],
         documents: (d.data || []) as any[],
         audit: (a.data || []) as any[],
         screenings: (s.data || []) as any[],
+        messages: m as KybMessage[],
+        reviewerName: reviewerName as string | null,
       };
     },
   });
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["admin-kyb", id] });
+
+  const uploadOnBehalf = useMutation({
+    mutationFn: async () => {
+      if (!id || !data?.business) throw new Error("Missing business.");
+      if (!uploadFile) throw new Error("Choose a file to upload.");
+      const ts = Date.now();
+      const ext = uploadFile.name.includes(".")
+        ? uploadFile.name.split(".").pop()
+        : "bin";
+      const safeType = uploadType.replace(/[^a-z0-9_]/gi, "_");
+      const path = `${data.business.owner_user_id}/${id}/${safeType}-${ts}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from(BUCKET)
+        .upload(path, uploadFile, { contentType: uploadFile.type || undefined, upsert: false });
+      if (upErr) throw upErr;
+      const { error: insErr } = await db.from("business_documents").insert({
+        business_profile_id: id,
+        business_owner_id: uploadOwnerId || null,
+        document_type: uploadType,
+        file_name: uploadFile.name,
+        file_path: path,
+        file_size: uploadFile.size,
+        mime_type: uploadFile.type || null,
+        status: "pending",
+      });
+      if (insErr) throw insErr;
+      await kybAudit(id, "doc_uploaded_by_admin", `${uploadType} uploaded on behalf of applicant.`);
+    },
+    onSuccess: () => {
+      toast.success("Document uploaded. Awaiting review.");
+      setUploadOpen(false);
+      setUploadFile(null);
+      setUploadType("other");
+      setUploadOwnerId("");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      invalidate();
+    },
+    onError: (e: any) => toast.error(e?.message || "Upload failed."),
+  });
+
+  const sendMessage = useMutation({
+    mutationFn: async (body: string) => {
+      if (!id) throw new Error("Missing business.");
+      await postKybMessage(id, body, "admin");
+    },
+    onSuccess: () => {
+      setNewMessage("");
+      invalidate();
+    },
+    onError: (e: any) => toast.error(e?.message || "Could not send the message."),
+  });
 
   const reviewDoc = useMutation({
     mutationFn: async ({
@@ -237,6 +333,17 @@ const KybReviewPage = () => {
             <h1 className="font-display text-2xl font-bold tracking-tight">{b.legal_name}</h1>
             <p className="text-sm text-muted-foreground">
               {b.entity_type?.replace(/_/g, " ")} · {b.incorporation_country}
+              {b.reviewed_at && data?.reviewerName && (
+                <>
+                  {" "}· reviewed by {data.reviewerName}{" "}
+                  {formatDistanceToNow(new Date(b.reviewed_at), { addSuffix: true })}
+                </>
+              )}
+              {b.reviewed_at && !data?.reviewerName && (
+                <>
+                  {" "}· reviewed {formatDistanceToNow(new Date(b.reviewed_at), { addSuffix: true })}
+                </>
+              )}
             </p>
           </div>
           <KybStatusBadge status={b.kyb_status} />
@@ -432,8 +539,16 @@ const KybReviewPage = () => {
         </Card>
 
         <Card>
-          <CardHeader>
+          <CardHeader className="flex-row items-center justify-between space-y-0">
             <CardTitle className="text-base">Documents</CardTitle>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setUploadOpen(true)}
+              disabled={uploadOnBehalf.isPending}
+            >
+              <Upload className="w-4 h-4 mr-1" /> Upload on behalf
+            </Button>
           </CardHeader>
           <CardContent className="space-y-2">
             {documents.length === 0 && (
@@ -578,6 +693,58 @@ const KybReviewPage = () => {
             ))}
           </CardContent>
         </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Messages with applicant</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {data!.messages.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No messages yet. Send a note when you need a document or clarification.
+              </p>
+            ) : (
+              <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                {data!.messages.map((m) => {
+                  const fromAdmin = m.author_role === "admin";
+                  return (
+                    <div
+                      key={m.id}
+                      className={`rounded-lg border p-3 ${
+                        fromAdmin ? "bg-primary/5 border-primary/20" : "bg-muted/40"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                        <span className="font-medium text-foreground">
+                          {fromAdmin ? "You" : "Applicant"}
+                        </span>
+                        <span>{format(new Date(m.created_at), "PPp")}</span>
+                      </div>
+                      <p className="text-sm whitespace-pre-wrap mt-1">{m.body}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <div className="space-y-2 pt-2 border-t">
+              <Textarea
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                placeholder="Write a message to the applicant. They will see it on their business status page."
+                rows={3}
+              />
+              <div className="flex justify-end">
+                <Button
+                  size="sm"
+                  disabled={!newMessage.trim() || sendMessage.isPending}
+                  onClick={() => sendMessage.mutate(newMessage)}
+                >
+                  <Send className="w-4 h-4 mr-1" /> Send
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <Dialog open={!!rejectTarget} onOpenChange={(open) => !open && setRejectTarget(null)}>
@@ -611,6 +778,74 @@ const KybReviewPage = () => {
               }}
             >
               Reject document
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={uploadOpen} onOpenChange={(open) => !open && setUploadOpen(false)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Upload document on behalf of applicant</DialogTitle>
+            <DialogDescription>
+              Use this when the applicant sent the file privately (email, support thread) and you
+              need to attach it to their record. It will be marked as pending and you can approve
+              it from the list above.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="kyb-upload-file">File</Label>
+              <Input
+                id="kyb-upload-file"
+                ref={fileInputRef}
+                type="file"
+                onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Document type</Label>
+              <Select value={uploadType} onValueChange={setUploadType}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {DOC_TYPES.map((t) => (
+                    <SelectItem key={t.value} value={t.value}>
+                      {t.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {data?.owners && data.owners.length > 0 && (
+              <div className="space-y-1.5">
+                <Label>Owner (optional)</Label>
+                <Select value={uploadOwnerId || "_none"} onValueChange={(v) => setUploadOwnerId(v === "_none" ? "" : v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Business-level document" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="_none">Business-level document</SelectItem>
+                    {data.owners.map((o: BusinessOwner) => (
+                      <SelectItem key={o.id} value={o.id}>
+                        {o.full_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUploadOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              disabled={!uploadFile || uploadOnBehalf.isPending}
+              onClick={() => uploadOnBehalf.mutate()}
+            >
+              {uploadOnBehalf.isPending ? "Uploading..." : "Upload"}
             </Button>
           </DialogFooter>
         </DialogContent>
