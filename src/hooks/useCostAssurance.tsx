@@ -188,3 +188,84 @@ export const useRefreshLiquidity = () => {
     onError: (e: Error) => toast.error(e.message),
   });
 };
+
+export const usePartnerSettlements = () =>
+  useQuery({
+    queryKey: ["partner_settlements"],
+    queryFn: async (): Promise<PartnerSettlement[]> => {
+      const { data, error } = await looseDb
+        .from("partner_settlements")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      return (data || []) as PartnerSettlement[];
+    },
+  });
+
+export const useSettlementAccounts = (currency?: string) =>
+  useQuery({
+    queryKey: ["settlement_accounts", currency],
+    queryFn: async (): Promise<LedgerAccountOption[]> => {
+      const { data, error } = await looseDb
+        .from("ledger_accounts")
+        .select("id, code, name, currency_code")
+        .eq("account_type", "asset")
+        .eq("is_active", true)
+        .order("code");
+      if (error) throw error;
+      const rows = (data || []) as LedgerAccountOption[];
+      return currency ? rows.filter((r) => !r.currency_code || r.currency_code === currency) : rows;
+    },
+  });
+
+export const useApproveInvoice = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: {
+      invoice_id: string;
+      action: "approve" | "dispute" | "void";
+      disputed_line_ids?: string[];
+      dispute_reason?: string;
+      notes?: string;
+    }) => {
+      const { data, error } = await looseDb.functions.invoke("partner-invoice-approve", { body: payload });
+      if (error) throw error;
+      if (data?.error) throw new Error(typeof data.error === "string" ? data.error : "Action failed");
+      return data;
+    },
+    onSuccess: (data: any) => {
+      qc.invalidateQueries({ queryKey: ["partner_invoices"] });
+      qc.invalidateQueries({ queryKey: ["partner_invoice_lines"] });
+      qc.invalidateQueries({ queryKey: ["cost_assurance_summary"] });
+      toast.success(data?.status === "approved" ? "Invoice approved and posted" : `Invoice ${data?.status}`);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+};
+
+export const usePaySettlement = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: {
+      partner_id: string;
+      currency_code: string;
+      invoice_ids: string[];
+      funding_account_id: string;
+      payment_method?: string;
+      payment_reference?: string;
+      notes?: string;
+    }) => {
+      const { data, error } = await looseDb.functions.invoke("partner-settlement-pay", { body: payload });
+      if (error) throw error;
+      if (data?.error) throw new Error(typeof data.error === "string" ? data.error : "Settlement failed");
+      return data;
+    },
+    onSuccess: (data: any) => {
+      qc.invalidateQueries({ queryKey: ["partner_invoices"] });
+      qc.invalidateQueries({ queryKey: ["partner_settlements"] });
+      toast.success(`Settled ${data?.invoices ?? 0} invoice(s)`);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+};
