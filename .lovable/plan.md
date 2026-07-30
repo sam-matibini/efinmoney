@@ -1,42 +1,33 @@
-## Phase 5 — Activation, Liquidity & Cost Assurance
+## Phase 7 — Partner Settlement, Invoice Ingestion & Margin Alerting
 
-### Why this phase
+Phases 1-6 delivered partners, corridors, pricing, FX, liquidity, routing (shadow → live → failover), profitability, readiness, cost assurance and network activation. Three gaps remain in the original spec:
 
-A live check of the engine's tables shows the machinery is built but starved of data: 13 payment partners exist, but there are **0 rows** in `partner_pricing`, `partner_fx_rates`, `partner_liquidity`, `partner_performance`, `routing_decisions`, and `transaction_economics`. Without pricing and liquidity, the router cannot rank anyone and the profitability dashboard has nothing to show. Phase 5 makes the engine usable in production.
+1. Partner invoices can be reconciled (`partner-invoice-reconcile` exists, `useCostAssurance` reads `partner_invoices`) but there is **no way to get invoices into the system** — no upload/ingestion UI.
+2. `partner_limits` is read by the route resolver but has **no management UI**, so limits can only be edited in the database.
+3. Profitability and readiness are pull-only dashboards — nothing proactively raises an alert when margin collapses, a corridor goes unready, or liquidity runs low.
 
-### 1. Seed and maintain partner data
+### What gets built
 
-- **Pricing seeding tool** — an admin action in the Pricing panel that generates a starter pricing row set for a selected partner across its enabled corridors, pre-filled with the partner's published rate card, so operators edit rather than type from scratch.
-- **CSV import/export** for `partner_pricing` (download current, edit, re-upload with validation and a diff preview before commit). This is how rate cards actually arrive from partners.
-- **Partner FX ingestion** — extend the existing `refresh-fx-rates` job to also write per-partner quotes into `partner_fx_rates` for partners that expose a rate endpoint, and allow manual entry for those that don't. Spread (`fx_spread_bps`) is already computed by a trigger.
+**A. Partner invoice ingestion**
+- New `PartnerInvoicesPanel.tsx` (tab "Invoices" in Partners & Routing): list invoices by partner/period with status, billed vs expected totals and variance.
+- CSV/JSON upload dialog: pick partner + period, paste or upload a line file (external reference, corridor, amount, currency, fee, fx cost). Rows land in `partner_invoices` + `partner_invoice_lines`.
+- "Reconcile" action per invoice calls the existing `partner-invoice-reconcile` function and shows matched / unmatched / missing lines with drill-down to the underlying `transaction_economics` rows.
 
-### 2. Liquidity awareness
+**B. Partner limits management**
+- New `PartnerLimitsPanel.tsx` (tab "Limits"): CRUD over `partner_limits` per partner/corridor — min/max per transaction, daily and monthly caps, currency.
+- Live usage bar per limit computed from transfers in the period, so operators see headroom before routing blocks a partner.
 
-- **Liquidity snapshot job** (`partner-liquidity-refresh`, every 15 minutes): pulls each partner's available balance where an API exists, records it in `partner_liquidity`, and marks stale entries.
-- **Router integration**: a partner whose available liquidity is below the transaction amount (or whose snapshot is stale beyond a threshold) is skipped with a recorded reason, so failover reaches for the next-best route instead of failing at the provider.
-- Liquidity panel gains a "low / stale" status treatment and a manual balance-override entry for partners without an API.
-
-### 3. Partner cost reconciliation
-
-- New `partner_invoices` and `partner_invoice_lines` tables plus a `partner-invoice-reconcile` function that matches a partner's billed fees against `transaction_economics` costs per transaction.
-- Output: a variance report (billed vs expected cost, unmatched transactions both ways) surfaced as a "Cost assurance" section in the Profitability tab. This is what catches silent partner over-billing.
-
-### 4. Operator alerting
-
-- A `routing-health-check` job (hourly) that raises admin notifications for: corridors transacting with no pricing on file, partners whose success rate drops below their configured floor, active kill switches, stale FX or liquidity data, and negative-margin corridors.
-- Alerts land in the existing admin notifications surface — no new inbox.
-
-### 5. Rollout controls
-
-- A per-corridor **readiness check** shown in the Live Routing panel: pricing present, FX present, liquidity fresh, performance history present. A corridor can only be flipped to live routing when its checks pass, which prevents enabling a route the engine can't price.
+**C. Margin & health alerting**
+- New edge function `partner-alerts-scan` (hourly cron, alongside the existing health/liquidity crons) that evaluates:
+  - corridor margin below a configured floor over the trailing window,
+  - negative-profit transactions,
+  - pricing coverage gaps with material volume,
+  - corridors flipped to not-ready or liquidity stale/low.
+- Findings are written to `compliance_alerts` (existing alert store, severity-tagged) so they surface in the Operations dashboard, and summarised in a new "Alerts" section on the Profitability panel with acknowledge/resolve.
+- Thresholds stored in `pricing_config` so no values are hardcoded.
 
 ### Technical notes
-
-- New tables follow the existing pattern: explicit GRANTs, RLS restricted via `is_pricing_manager()`, `created_at`/`updated_at` with the shared update trigger.
-- New scheduled functions are registered with `pg_cron` + `pg_net`, matching `partner-performance-refresh`.
-- Router changes live in `_shared/routeResolver.ts` (candidate filtering) and `_shared/routingExecute.ts` (skip reasons in `routing_attempts`) — no changes to `execute-transfer`'s payout rails.
-- UI additions reuse `PartnerNetworkPanel` tabs; no new routes.
-
-### Out of scope
-
-Real partner API credentials. Where a partner exposes no balance or rate API, the flow falls back to manual entry rather than blocking the phase.
+- Reuses existing hooks pattern (`usePartnerNetwork`, `useCostAssurance`); adds `usePartnerLimits` and extends `useCostAssurance` with invoice-create mutations.
+- No new tables required for A and B (`partner_invoices`, `partner_invoice_lines`, `partner_limits` already exist); a migration adds the alert threshold defaults and, if needed, an alert-type value for margin alerts.
+- Cron scheduling follows the same `pg_cron` + `net.http_post` pattern used for `routing-health-check`.
+- Access stays restricted to pricing managers / admins via the existing `is_pricing_manager` / `is_admin_user` checks.

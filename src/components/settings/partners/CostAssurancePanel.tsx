@@ -5,7 +5,9 @@ import {
   usePartnerInvoices,
   useReconcileInvoice,
   type InvoiceLineInput,
+  type PartnerInvoice,
 } from "@/hooks/useCostAssurance";
+import { usePartnerInvoiceLines } from "@/hooks/usePartnerOps";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,6 +51,8 @@ export const CostAssurancePanel = () => {
   const reconcile = useReconcileInvoice();
 
   const [open, setOpen] = useState(false);
+  const [detail, setDetail] = useState<PartnerInvoice | null>(null);
+  const { data: detailLines, isLoading: linesLoading } = usePartnerInvoiceLines(detail?.id);
   const fileRef = useRef<HTMLInputElement>(null);
   const [lines, setLines] = useState<InvoiceLineInput[]>([]);
   const [form, setForm] = useState({
@@ -204,7 +208,11 @@ export const CostAssurancePanel = () => {
                 </TableHeader>
                 <TableBody>
                   {invoices.map((inv) => (
-                    <TableRow key={inv.id}>
+                    <TableRow
+                      key={inv.id}
+                      className="cursor-pointer"
+                      onClick={() => setDetail(inv)}
+                    >
                       <TableCell className="font-medium">{inv.invoice_number}</TableCell>
                       <TableCell>{nameOf(inv.partner_id)}</TableCell>
                       <TableCell className="text-xs">
@@ -339,6 +347,65 @@ export const CostAssurancePanel = () => {
               {reconcile.isPending ? "Reconciling…" : "Reconcile"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Invoice {detail?.invoice_number}</DialogTitle>
+            <DialogDescription>
+              Line-by-line comparison of what the partner billed against the cost our rate cards predicted.
+            </DialogDescription>
+          </DialogHeader>
+          {linesLoading ? (
+            <Skeleton className="h-24 w-full" />
+          ) : !detailLines?.length ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">No lines recorded for this invoice.</p>
+          ) : (
+            <div className="max-h-[60vh] overflow-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Reference</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
+                    <TableHead className="text-right">Billed fee</TableHead>
+                    <TableHead className="text-right">Expected</TableHead>
+                    <TableHead className="text-right">Variance</TableHead>
+                    <TableHead>Match</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {detailLines.map((l) => (
+                    <TableRow key={l.id}>
+                      <TableCell className="font-mono text-xs">
+                        {l.partner_reference || l.transfer_id?.slice(0, 8) || "—"}
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        {l.transaction_date ? format(new Date(l.transaction_date), "dd MMM yy") : "—"}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {l.amount === null ? "—" : money(Number(l.amount))}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">{money(Number(l.billed_fee))}</TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {l.expected_fee === null ? "—" : money(Number(l.expected_fee))}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        <Badge
+                          variant={Math.abs(Number(l.variance ?? 0)) > 0.01 ? "destructive" : "secondary"}
+                        >
+                          {money(Number(l.variance ?? 0))}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-xs capitalize">{l.match_status.replace(/_/g, " ")}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
