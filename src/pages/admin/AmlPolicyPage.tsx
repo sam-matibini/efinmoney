@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Shield, Plus, CheckCircle2 } from "lucide-react";
+import { Shield, Plus, CheckCircle2, FileCheck } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
@@ -80,6 +80,35 @@ export default function AmlPolicyPage() {
                   <TableRow key={p.id}>
                     <TableCell className="font-medium">{p.policy_name}</TableCell>
                     <TableCell className="capitalize">{p.category.replace(/_/g, " ")}</TableCell>
+                    <TableCell className="font-mono text-xs">v{p.version}</TableCell>
+                    <TableCell>{statusBadge(p.status)}</TableCell>
+                    <TableCell className="text-xs">{p.effective_date ? format(new Date(p.effective_date), "MMM d, yyyy") : "—"}</TableCell>
+                    <TableCell className="text-xs">{p.review_date ? format(new Date(p.review_date), "MMM d, yyyy") : "—"}</TableCell>
+                    <TableCell className="text-right">
+                      {p.status === "draft" && <Button size="sm" variant="outline" onClick={() => activateMutation.mutate({ id: p.id, status: "active" })}><CheckCircle2 className="w-3.5 h-3.5 mr-1" />Activate</Button>}
+                      {p.status === "active" && <Button size="sm" variant="outline" onClick={() => activateMutation.mutate({ id: p.id, status: "archived" })}>Archive</Button>}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* KYC Policies section */}
+      <Card>
+        <CardHeader><CardTitle className="flex items-center gap-2"><FileCheck className="w-5 h-5" />KYC / CDD Policies</CardTitle></CardHeader>
+        <CardContent>
+          {isLoading ? <div className="space-y-2">{[...Array(2)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div> : (
+            <Table>
+              <TableHeader><TableRow><TableHead>Policy Name</TableHead><TableHead>Version</TableHead><TableHead>Status</TableHead><TableHead>Effective</TableHead><TableHead>Review</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
+              <TableBody>
+                {policies.filter((p: any) => p.category === "kyc").length === 0 ? (
+                  <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No KYC/CDD policies yet. Create one with category "KYC/CDD".</TableCell></TableRow>
+                ) : policies.filter((p: any) => p.category === "kyc").map((p: any) => (
+                  <TableRow key={p.id}>
+                    <TableCell className="font-medium">{p.policy_name}</TableCell>
                     <TableCell className="font-mono text-xs">v{p.version}</TableCell>
                     <TableCell>{statusBadge(p.status)}</TableCell>
                     <TableCell className="text-xs">{p.effective_date ? format(new Date(p.effective_date), "MMM d, yyyy") : "—"}</TableCell>

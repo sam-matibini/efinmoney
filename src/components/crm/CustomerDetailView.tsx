@@ -28,6 +28,7 @@ import { OnboardingProgressPanel } from "./OnboardingProgressPanel";
 import { CustomerDocumentsPanel } from "./CustomerDocumentsPanel";
 import { PortalAccessPanel } from "./PortalAccessPanel";
 import { BeneficialOwnersPanel } from "./BeneficialOwnersPanel";
+import { CustomerCommunicationsPanel } from "./CustomerCommunicationsPanel";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
@@ -277,6 +278,7 @@ export const CustomerDetailView = ({ customerId, onBack }: CustomerDetailViewPro
       <Tabs defaultValue="activities" className="space-y-4">
         <TabsList>
           <TabsTrigger value="activities">Activities</TabsTrigger>
+          <TabsTrigger value="comms">Communications</TabsTrigger>
           <TabsTrigger value="onboarding">Onboarding</TabsTrigger>
           <TabsTrigger value="documents">Documents</TabsTrigger>
           <TabsTrigger value="ubo">Beneficial Owners</TabsTrigger>
@@ -285,6 +287,10 @@ export const CustomerDetailView = ({ customerId, onBack }: CustomerDetailViewPro
 
         <TabsContent value="activities">
           <CrmActivitiesPanel customerId={customerId} />
+        </TabsContent>
+
+        <TabsContent value="comms">
+          <CustomerCommunicationsPanel customerId={customerId} />
         </TabsContent>
 
         <TabsContent value="onboarding">

@@ -304,13 +304,32 @@ function RuleForm({
     return { ...merged, name };
   };
 
+  const median = (arr: number[]) => {
+    if (!arr.length) return null;
+    const sorted = [...arr].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+  };
+
+  const suggestFromExisting = (destCountry: string) => {
+    const matches = existingRules.filter((r) => r.dest_country === destCountry);
+    if (!matches.length) return null;
+    return {
+      fee_percent:       median(matches.map((r) => r.fee_percent))       ?? value.fee_percent,
+      fee_fixed:         median(matches.map((r) => r.fee_fixed))         ?? value.fee_fixed,
+      fx_markup_percent: median(matches.map((r) => r.fx_markup_percent)) ?? value.fx_markup_percent,
+    };
+  };
+
   const handleSourceChange = (src: string) =>
     onChange(autoUpdateLabel({ source_currency: src }));
 
   const handleDestChange = (code: string) => {
     const dest = DEST_COUNTRIES.find((d) => d.code === code);
     if (!dest) return;
-    onChange(autoUpdateLabel({ dest_country: code, dest_currency: dest.currency }));
+    const base = autoUpdateLabel({ dest_country: code, dest_currency: dest.currency });
+    const suggestion = suggestFromExisting(code);
+    onChange(suggestion ? { ...base, ...suggestion } : base);
   };
 
   const handlePayoutChange = (payout: string) =>
@@ -364,6 +383,9 @@ function RuleForm({
       {destInfo && (
         <p className="text-xs text-muted-foreground -mt-1">
           Payout currency: <span className="font-semibold text-foreground">{destInfo.currency}</span> — set automatically from country
+          {suggestFromExisting(value.dest_country) && (
+            <span className="ml-2 text-primary">· Rates auto-filled from existing {destInfo.name} corridors</span>
+          )}
         </p>
       )}
 
