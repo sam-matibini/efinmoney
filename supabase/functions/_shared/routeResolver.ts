@@ -207,6 +207,20 @@ export async function resolveRoute(
       excluded.push({ partner_code: label, reason: "insufficient partner liquidity" });
       continue;
     }
+    // A balance we can no longer trust is worse than no balance at all: the
+    // partner may already be drained. Skip stale snapshots on live routing.
+    if (liq) {
+      const staleMinutes = Number(partner.liquidity_stale_minutes ?? 720);
+      const ageMinutes = (Date.now() - new Date(liq.as_of).getTime()) / 60000;
+      if (staleMinutes > 0 && ageMinutes > staleMinutes) {
+        excluded.push({
+          partner_code: label,
+          reason: `liquidity snapshot stale (${Math.round(ageMinutes / 60)}h old)`,
+        });
+        continue;
+      }
+    }
+
 
     const pricing = ((pricingRows ?? []).find(
       (p: any) =>
