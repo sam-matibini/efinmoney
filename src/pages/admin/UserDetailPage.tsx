@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,8 +16,9 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   ArrowLeft, Mail, Phone, MapPin, Calendar, Shield, Wallet, ArrowRightLeft,
   User as UserIcon, Hash, Activity, AlertTriangle, AtSign, MessageSquare, FileWarning, Headphones,
-  ShieldCheck, ShieldOff,
+  ShieldCheck, ShieldOff, Send, Loader2, ExternalLink,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
@@ -80,6 +81,8 @@ const UserDetailPage = () => {
   const [manualBusy, setManualBusy] = useState(false);
   const [revokeOpen, setRevokeOpen] = useState(false);
   const [revokeReason, setRevokeReason] = useState("");
+  const [replyText, setReplyText] = useState<Record<string, string>>({});
+  const [replySending, setReplySending] = useState<Record<string, boolean>>({});
 
   const ensureKycRow = async (): Promise<string | null> => {
     if (!id) return null;
@@ -268,6 +271,54 @@ const UserDetailPage = () => {
     },
     enabled: !!id,
   });
+
+  const staffSenderIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const t of communications) {
+      for (const m of t.messages) {
+        if (m.sender_role === "staff" && m.sender_id) ids.add(m.sender_id);
+      }
+    }
+    return Array.from(ids);
+  }, [communications]);
+
+  const { data: staffNames = {} } = useQuery({
+    queryKey: ["admin-user-staff-names", staffSenderIds],
+    queryFn: async (): Promise<Record<string, string>> => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("user_id, full_name, email")
+        .in("user_id", staffSenderIds);
+      const map: Record<string, string> = {};
+      for (const p of (data || []) as { user_id: string; full_name: string | null; email: string | null }[]) {
+        map[p.user_id] = p.full_name || p.email || "Staff";
+      }
+      return map;
+    },
+    enabled: staffSenderIds.length > 0,
+  });
+
+  const sendReply = async (threadId: string) => {
+    const body = (replyText[threadId] || "").trim();
+    if (!body) return;
+    setReplySending((s) => ({ ...s, [threadId]: true }));
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      const uid = auth.user?.id;
+      if (!uid) throw new Error("Not signed in");
+      const { error } = await db
+        .from("support_messages")
+        .insert({ thread_id: threadId, sender_role: "staff", sender_id: uid, body, attachments: [] });
+      if (error) throw error;
+      setReplyText((s) => ({ ...s, [threadId]: "" }));
+      queryClient.invalidateQueries({ queryKey: ["admin-user-comms", id] });
+      toast.success("Reply sent");
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setReplySending((s) => ({ ...s, [threadId]: false }));
+    }
+  };
 
   if (profileLoading) {
     return (
@@ -610,7 +661,7 @@ const UserDetailPage = () => {
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="lg:col-span-2">
                 <CardHeader>
                   <CardTitle className="text-base flex items-center gap-2">
                     <MessageSquare className="w-4 h-4" /> Support conversations ({communications.length})
@@ -626,31 +677,81 @@ const UserDetailPage = () => {
                   ) : communications.length === 0 ? (
                     <p className="text-sm text-muted-foreground py-6 text-center">No messages exchanged</p>
                   ) : (
-                    <ul className="space-y-4 max-h-96 overflow-y-auto">
+                    <div className="space-y-6">
                       {communications.map((t) => (
-                        <li key={t.id} className="border-l-2 border-indigo-500/40 pl-3">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="font-medium text-sm truncate">{t.subject}</span>
-                            <Badge variant="outline" className={statusColor(t.status)}>{t.status}</Badge>
+                        <div key={t.id} className="border border-border/60 rounded-lg overflow-hidden">
+                          {/* Thread header */}
+                          <div className="flex items-center justify-between gap-2 px-4 py-2.5 bg-muted/40 border-b border-border/60">
+                            <div className="min-w-0">
+                              <span className="font-medium text-sm truncate block">{t.subject}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {t.messages.length} message{t.messages.length === 1 ? "" : "s"} · last {format(new Date(t.last_message_at), "MMM d, yyyy HH:mm")}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <Badge variant="outline" className={statusColor(t.status)}>{t.status}</Badge>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 px-2 text-xs gap-1"
+                                onClick={() => navigate("/admin/support")}
+                              >
+                                <ExternalLink className="w-3 h-3" /> Inbox
+                              </Button>
+                            </div>
                           </div>
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            {t.messages.length} message{t.messages.length === 1 ? "" : "s"} · last{" "}
-                            {format(new Date(t.last_message_at), "MMM d, yyyy HH:mm")}
-                          </p>
-                          <ul className="mt-2 space-y-1.5">
+
+                          {/* Chat bubbles */}
+                          <div className="p-4 space-y-3 max-h-72 overflow-y-auto bg-background">
                             {t.messages.map((m) => (
-                              <li key={m.id} className="text-xs">
-                                <span className={m.sender_role === "staff" ? "font-medium text-primary" : "font-medium"}>
-                                  {m.sender_role === "staff" ? "Staff" : "Customer"}
-                                </span>
-                                <span className="text-muted-foreground"> · {format(new Date(m.created_at), "MMM d HH:mm")}</span>
-                                <p className="text-muted-foreground whitespace-pre-wrap">{m.body}</p>
-                              </li>
+                              <div key={m.id} className={cn("flex", m.sender_role === "staff" ? "justify-end" : "justify-start")}>
+                                <div className={cn(
+                                  "max-w-[78%] rounded-2xl px-3.5 py-2 text-xs",
+                                  m.sender_role === "staff"
+                                    ? "bg-primary text-primary-foreground rounded-tr-sm"
+                                    : "bg-muted text-foreground rounded-tl-sm"
+                                )}>
+                                  <div className={cn("font-semibold mb-0.5 flex items-center gap-1.5", m.sender_role === "staff" ? "text-primary-foreground/80" : "text-muted-foreground")}>
+                                    {m.sender_role === "staff"
+                                      ? (m.sender_id ? staffNames[m.sender_id] || "Staff" : "Staff")
+                                      : "Customer"}
+                                    <span className="font-normal">· {format(new Date(m.created_at), "MMM d, HH:mm")}</span>
+                                  </div>
+                                  <p className="whitespace-pre-wrap leading-relaxed">{m.body}</p>
+                                </div>
+                              </div>
                             ))}
-                          </ul>
-                        </li>
+                          </div>
+
+                          {/* Inline reply */}
+                          <div className="px-4 pb-4 pt-2 border-t border-border/60 bg-muted/20 flex gap-2 items-end">
+                            <Textarea
+                              value={replyText[t.id] || ""}
+                              onChange={(e) => setReplyText((s) => ({ ...s, [t.id]: e.target.value }))}
+                              placeholder="Reply as staff… (Enter to send, Shift+Enter for newline)"
+                              rows={2}
+                              className="text-sm resize-none flex-1"
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" && !e.shiftKey) {
+                                  e.preventDefault();
+                                  sendReply(t.id);
+                                }
+                              }}
+                            />
+                            <Button
+                              size="sm"
+                              className="h-9 px-3"
+                              disabled={replySending[t.id] || !(replyText[t.id] || "").trim()}
+                              onClick={() => sendReply(t.id)}
+                            >
+                              {replySending[t.id]
+                                ? <Loader2 className="w-4 h-4 animate-spin" />
+                                : <Send className="w-4 h-4" />}
+                            </Button>
+                          </div>
+                        </div>
                       ))}
-                    </ul>
+                    </div>
                   )}
                 </CardContent>
               </Card>
