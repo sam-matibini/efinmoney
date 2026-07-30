@@ -30,6 +30,15 @@ const kycStatusColors: Record<string, string> = {
   not_started: 'bg-muted text-muted-foreground',
 };
 
+const displayName = (fullName: string | null, email: string | null) => {
+  if (fullName && fullName.trim()) return fullName;
+  if (email) {
+    const local = email.split("@")[0].replace(/[._-]+/g, " ").trim();
+    if (local) return local.charAt(0).toUpperCase() + local.slice(1);
+  }
+  return "No name";
+};
+
 interface UserProfile {
   id: string;
   user_id: string;
@@ -185,7 +194,7 @@ export const UsersPanel = () => {
                               </AvatarFallback>
                             </Avatar>
                             <div>
-                              <p className="font-medium">{profile.full_name || 'No name'}</p>
+                              <p className="font-medium">{displayName(profile.full_name, profile.email)}</p>
                               <p className="text-xs text-muted-foreground">{profile.email}</p>
                             </div>
                           </div>

@@ -58,6 +58,15 @@ const kycVariant = (s: string) => {
   }
 };
 
+const displayName = (fullName: string | null, email: string | null) => {
+  if (fullName && fullName.trim()) return fullName;
+  if (email) {
+    const local = email.split("@")[0].replace(/[._-]+/g, " ").trim();
+    if (local) return local.charAt(0).toUpperCase() + local.slice(1);
+  }
+  return "No name";
+};
+
 const UsersPage = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -214,7 +223,7 @@ const UsersPage = () => {
                               <AvatarFallback>{(p.full_name || p.email || "U").charAt(0).toUpperCase()}</AvatarFallback>
                             </Avatar>
                             <div className="min-w-0">
-                              <div className="font-medium truncate">{p.full_name || "No name"}</div>
+                              <div className="font-medium truncate">{displayName(p.full_name, p.email)}</div>
                               <div className="text-xs text-muted-foreground truncate">{p.email}</div>
                             </div>
                           </div>
