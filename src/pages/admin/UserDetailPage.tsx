@@ -63,6 +63,15 @@ const statusColor = (s: string | null | undefined) => {
   }
 };
 
+const displayName = (fullName: string | null | undefined, email: string | null | undefined) => {
+  if (fullName && fullName.trim()) return fullName;
+  if (email) {
+    const local = email.split("@")[0].replace(/[._-]+/g, " ").trim();
+    if (local) return local.charAt(0).toUpperCase() + local.slice(1);
+  }
+  return "No name";
+};
+
 const UserDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -309,7 +318,7 @@ const UserDetailPage = () => {
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
-                <h1 className="font-display text-2xl font-semibold">{profile.full_name || "No name"}</h1>
+                <h1 className="font-display text-2xl font-semibold">{displayName(profile.full_name, profile.email)}</h1>
                 <div className="text-sm text-muted-foreground flex items-center gap-2 mt-1">
                   <Mail className="w-3.5 h-3.5" /> {profile.email}
                 </div>
