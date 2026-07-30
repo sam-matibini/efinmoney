@@ -4941,6 +4941,97 @@ export type Database = {
           },
         ]
       }
+      routing_decisions: {
+        Row: {
+          actual_partner_id: string | null
+          amount: number
+          best_expected_profit: number | null
+          candidates: Json
+          created_at: string
+          customer_type: string
+          dest_country: string | null
+          dest_currency: string
+          direction: Database["public"]["Enums"]["partner_direction"]
+          excluded: Json
+          id: string
+          mode: string
+          payment_method: string | null
+          requested_by: string | null
+          routing_rule_id: string | null
+          selected_partner_id: string | null
+          source_country: string | null
+          source_currency: string
+          strategy: Database["public"]["Enums"]["routing_strategy"]
+          transfer_id: string | null
+        }
+        Insert: {
+          actual_partner_id?: string | null
+          amount: number
+          best_expected_profit?: number | null
+          candidates?: Json
+          created_at?: string
+          customer_type?: string
+          dest_country?: string | null
+          dest_currency: string
+          direction: Database["public"]["Enums"]["partner_direction"]
+          excluded?: Json
+          id?: string
+          mode?: string
+          payment_method?: string | null
+          requested_by?: string | null
+          routing_rule_id?: string | null
+          selected_partner_id?: string | null
+          source_country?: string | null
+          source_currency: string
+          strategy: Database["public"]["Enums"]["routing_strategy"]
+          transfer_id?: string | null
+        }
+        Update: {
+          actual_partner_id?: string | null
+          amount?: number
+          best_expected_profit?: number | null
+          candidates?: Json
+          created_at?: string
+          customer_type?: string
+          dest_country?: string | null
+          dest_currency?: string
+          direction?: Database["public"]["Enums"]["partner_direction"]
+          excluded?: Json
+          id?: string
+          mode?: string
+          payment_method?: string | null
+          requested_by?: string | null
+          routing_rule_id?: string | null
+          selected_partner_id?: string | null
+          source_country?: string | null
+          source_currency?: string
+          strategy?: Database["public"]["Enums"]["routing_strategy"]
+          transfer_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "routing_decisions_actual_partner_id_fkey"
+            columns: ["actual_partner_id"]
+            isOneToOne: false
+            referencedRelation: "payment_partners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "routing_decisions_routing_rule_id_fkey"
+            columns: ["routing_rule_id"]
+            isOneToOne: false
+            referencedRelation: "routing_rules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "routing_decisions_selected_partner_id_fkey"
+            columns: ["selected_partner_id"]
+            isOneToOne: false
+            referencedRelation: "payment_partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       routing_rules: {
         Row: {
           chargeback_cost_percent: number
@@ -6149,6 +6240,108 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      transaction_economics: {
+        Row: {
+          amount: number
+          compliance_cost: number
+          created_at: string
+          currency_code: string
+          customer_fee_revenue: number
+          customer_fx_revenue: number
+          customer_type: string
+          dest_country: string | null
+          dest_currency: string
+          direction: Database["public"]["Enums"]["partner_direction"]
+          gross_profit: number
+          id: string
+          infrastructure_cost: number
+          margin_percent: number
+          network_cost: number
+          partner_fee_cost: number
+          partner_fx_cost: number
+          partner_id: string | null
+          payment_method: string | null
+          routing_decision_id: string | null
+          settled_at: string | null
+          settlement_cost: number
+          source_currency: string
+          total_cost: number
+          total_revenue: number
+          transfer_id: string | null
+        }
+        Insert: {
+          amount: number
+          compliance_cost?: number
+          created_at?: string
+          currency_code?: string
+          customer_fee_revenue?: number
+          customer_fx_revenue?: number
+          customer_type?: string
+          dest_country?: string | null
+          dest_currency: string
+          direction: Database["public"]["Enums"]["partner_direction"]
+          gross_profit?: number
+          id?: string
+          infrastructure_cost?: number
+          margin_percent?: number
+          network_cost?: number
+          partner_fee_cost?: number
+          partner_fx_cost?: number
+          partner_id?: string | null
+          payment_method?: string | null
+          routing_decision_id?: string | null
+          settled_at?: string | null
+          settlement_cost?: number
+          source_currency: string
+          total_cost?: number
+          total_revenue?: number
+          transfer_id?: string | null
+        }
+        Update: {
+          amount?: number
+          compliance_cost?: number
+          created_at?: string
+          currency_code?: string
+          customer_fee_revenue?: number
+          customer_fx_revenue?: number
+          customer_type?: string
+          dest_country?: string | null
+          dest_currency?: string
+          direction?: Database["public"]["Enums"]["partner_direction"]
+          gross_profit?: number
+          id?: string
+          infrastructure_cost?: number
+          margin_percent?: number
+          network_cost?: number
+          partner_fee_cost?: number
+          partner_fx_cost?: number
+          partner_id?: string | null
+          payment_method?: string | null
+          routing_decision_id?: string | null
+          settled_at?: string | null
+          settlement_cost?: number
+          source_currency?: string
+          total_cost?: number
+          total_revenue?: number
+          transfer_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transaction_economics_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "payment_partners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_economics_routing_decision_id_fkey"
+            columns: ["routing_decision_id"]
+            isOneToOne: false
+            referencedRelation: "routing_decisions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       transaction_interventions: {
         Row: {
