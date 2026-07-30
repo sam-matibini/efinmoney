@@ -8,6 +8,7 @@ import { CurrencyManagementPanel } from "@/components/settings/CurrencyManagemen
 import { CircleCpnConfigPanel } from "@/components/settings/CircleCpnConfigPanel";
 import PageHeroBanner from "@/components/common/PageHeroBanner";
 import AppPage from "@/components/layout/AppPage";
+import SectionBoundary from "@/components/common/SectionBoundary";
 import { Settings, Plug, SlidersHorizontal } from "lucide-react";
 
 const SettingsDashboard = () => {
@@ -47,27 +48,27 @@ const SettingsDashboard = () => {
             </div>
 
             <TabsContent value="pricing" className="space-y-4">
-              <PricingSettingsPanel />
+              <SectionBoundary name="PricingSettingsPanel"><PricingSettingsPanel /></SectionBoundary>
             </TabsContent>
 
             <TabsContent value="currencies" className="space-y-4">
-              <CurrencyManagementPanel />
+              <SectionBoundary name="CurrencyManagementPanel"><CurrencyManagementPanel /></SectionBoundary>
             </TabsContent>
 
             <TabsContent value="modules" className="space-y-4">
-              <ModuleAccessPanel />
+              <SectionBoundary name="ModuleAccessPanel"><ModuleAccessPanel /></SectionBoundary>
             </TabsContent>
 
             <TabsContent value="integrations" className="space-y-4">
-              <IntegrationsPanel />
+              <SectionBoundary name="IntegrationsPanel"><IntegrationsPanel /></SectionBoundary>
             </TabsContent>
 
             <TabsContent value="circle_cpn" className="space-y-4">
-              <CircleCpnConfigPanel />
+              <SectionBoundary name="CircleCpnConfigPanel"><CircleCpnConfigPanel /></SectionBoundary>
             </TabsContent>
 
             <TabsContent value="system" className="space-y-4">
-              <SystemSettingsPanel />
+              <SectionBoundary name="SystemSettingsPanel"><SystemSettingsPanel /></SectionBoundary>
             </TabsContent>
           </Tabs>
         </motion.div>

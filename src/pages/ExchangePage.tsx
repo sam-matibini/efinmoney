@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -60,6 +60,13 @@ const FxTradingPanel = () => {
   const [success, setSuccess] = useState(false);
   const [swapRotation, setSwapRotation] = useState(0);
   const [lastTxHash, setLastTxHash] = useState<string | null>(null);
+  const successTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (successTimer.current) clearTimeout(successTimer.current);
+    };
+  }, []);
 
   const { data: wallets } = useWallets();
   const { data: fxRates } = useFxRates();
@@ -231,7 +238,7 @@ const FxTradingPanel = () => {
       stellar.refetchBalance?.();
       toast.success(isCryptoSwap ? 'USDC delivered to your Stellar wallet!' : 'Exchange completed successfully!');
 
-      setTimeout(() => {
+      successTimer.current = setTimeout(() => {
         setSuccess(false);
         setSendAmount("");
         setRecvAmount("");

@@ -7,7 +7,7 @@ export type AppRole = 'admin' | 'user' | 'finance' | 'compliance';
 export const useUserRoles = () => {
   const { user } = useAuth();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['user-roles', user?.id],
     queryFn: async () => {
       if (!user) return { roles: [] as AppRole[], adminPortalRole: null as string | null, adminActive: false };
@@ -17,9 +17,8 @@ export const useUserRoles = () => {
         supabase.from('admin_users').select('role, status').eq('id', user.id).maybeSingle(),
       ]);
 
-      if (rolesRes.error) {
-        console.error('Error fetching user roles:', rolesRes.error);
-      }
+      if (rolesRes.error) throw rolesRes.error;
+      if (adminRes.error) throw adminRes.error;
 
       const roles = (rolesRes.data || []).map((r) => r.role as AppRole);
       const adminActive = adminRes.data?.status === 'active';
@@ -45,6 +44,8 @@ export const useUserRoles = () => {
   return {
     roles,
     isLoading,
+    isError,
+    refetch,
     hasRole,
     hasAnyRole,
     isAdmin,

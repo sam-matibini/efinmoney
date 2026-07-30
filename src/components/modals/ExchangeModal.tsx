@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { RefreshCw, ChevronDown, ArrowRight, AlertCircle, CheckCircle } from "lucide-react";
@@ -55,6 +55,13 @@ const ExchangeModal = ({ children }: ExchangeModalProps) => {
   const [showToDropdown, setShowToDropdown] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const successTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (successTimer.current) clearTimeout(successTimer.current);
+    };
+  }, []);
 
   const { data: wallets } = useWallets();
   const { data: fxRates } = useFxRates();
@@ -128,7 +135,7 @@ const ExchangeModal = ({ children }: ExchangeModalProps) => {
       setStep(2);
       queryClient.invalidateQueries({ queryKey: ['wallets'] });
       
-      setTimeout(() => {
+      successTimer.current = setTimeout(() => {
         setIsOpen(false);
         resetForm();
       }, 3000);

@@ -54,6 +54,7 @@ import HeroGlobe from "@/components/send/HeroGlobe";
 import FxTicker from "@/components/send/FxTicker";
 import LiveFxCalculator from "@/components/fx/LiveFxCalculator";
 import { parseAmount } from "@/components/fx/liveFxUtils";
+import SectionBoundary from "@/components/common/SectionBoundary";
 import { clearSendHandoff, readSendHandoff } from "@/lib/sendHandoff";
 import {
   clearCardSendIntent,
@@ -378,7 +379,7 @@ const SendPage = () => {
     setGhBankCode("");
     setGhAccountNumber("");
     setIntlLinkMode(false);
-  }, [targetCountryId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [targetCountryId, pendingBeneficiary]);
 
   const isNGNBank = targetCountry.code === "NGN";
   const isGhanaBank = targetCountry.code === "GHS" && ghPayoutMode === "bank";
@@ -717,11 +718,11 @@ const SendPage = () => {
       ? `${sourceSymbol}${fee.toFixed(2)} flat`
       : `${sourceSymbol}0.00 fee`;
 
-  const goToStep = (next: number) => {
+  const goToStep = useCallback((next: number) => {
     setDirection(next > step ? 1 : -1);
     setStep(next);
     if (next === 4) clearSendHandoff();
-  };
+  }, [step]);
 
   // For card payments we always charge in USD (or NGN for NGN wallets).
   const cardCurrency = cardChargeCurrency(sourceCurrency);
@@ -746,8 +747,7 @@ const SendPage = () => {
 
   const txRef = useMemo(
     () => (user ? `send-${user.id.slice(0, 8)}-${Date.now()}` : ""),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [step]
+    [step, user]
   );
 
   // Create transfer row + maybe save beneficiary. Returns id.
@@ -824,6 +824,8 @@ const SendPage = () => {
     return transfer.id;
   };
 
+  const createTransferRecordRef = useRef(createTransferRecord);
+  createTransferRecordRef.current = createTransferRecord;
 
   // Require the transaction PIN before any money actually moves.
   const requestConfirm = () => {
@@ -1219,7 +1221,7 @@ const SendPage = () => {
     navigate('/');
   };
 
-  const applyBeneficiary = (b: Beneficiary) => {
+  const applyBeneficiary = useCallback((b: Beneficiary) => {
     setRecipientName(b.name);
     setRecipientPhone(b.phone || "");
     setPickedBeneficiaryId(b.id);
@@ -1228,7 +1230,7 @@ const SendPage = () => {
       const c = findCountryByCode(b.country_code);
       if (c) setTargetCountryId(c.id);
     }
-  };
+  }, []);
 
   // Apply saved network / bank details for a picked beneficiary once the
   // destination country (and, for NGN, the banks list) is in place.
@@ -1274,7 +1276,7 @@ const SendPage = () => {
     }
 
     if (allApplied) setPendingBeneficiary(null);
-  }, [pendingBeneficiary, targetCountryId, ngnBanks, availableNetworks]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [pendingBeneficiary, targetCountryId, ngnBanks, availableNetworks]);
 
   useEffect(() => {
     const bid = searchParams.get("beneficiaryId");
@@ -1288,8 +1290,7 @@ const SendPage = () => {
         setSearchParams(next, { replace: true });
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [beneficiaries]);
+  }, [beneficiaries, searchParams, goToStep, applyBeneficiary]);
 
   // Handoff from dashboard quick-send modal (sessionStorage + URL; survives Strict Mode remount)
   const handoffApplyingRef = useRef(false);
@@ -1367,11 +1368,11 @@ const SendPage = () => {
     setTimeout(() => {
       handoffApplyingRef.current = false;
     }, 200);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wallets, searchParams, beneficiaries]);
+  }, [wallets, searchParams, beneficiaries, goToStep]);
 
   // Resume card-funded send after collect (Nomba / Lenhub / Paytota / Swychr / Flutterwave)
   useEffect(() => {
+    const createTransferRecord = createTransferRecordRef.current;
     if (!wallets?.length || cardResumeLock.current) return;
 
     const intent = readCardSendIntent();
@@ -1645,8 +1646,7 @@ const SendPage = () => {
     };
 
     void finishPayout();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wallets, searchParams, lenhubResumeTick]);
+  }, [wallets, searchParams, lenhubResumeTick, goToStep]);
 
   const resetForm = () => {
     setDirection(-1);
@@ -1832,7 +1832,7 @@ const SendPage = () => {
                   <X className="h-4 w-4" />
                 </Button>
               </div>
-              <LenhubFlutterTopUpCard
+              <SectionBoundary name="SendLenhubFlutterTopUp"><LenhubFlutterTopUpCard
                 walletId={selectedWallet.wallet_id}
                 walletCurrency={selectedWallet.currency_code}
                 fixedAmount={parsedAmount}
@@ -1845,7 +1845,7 @@ const SendPage = () => {
                   setShowLenhubCollect(false);
                   setLenhubResumeTick((t) => t + 1);
                 }}
-              />
+              /></SectionBoundary>
             </motion.div>
           </motion.div>
         )}
@@ -1967,7 +1967,7 @@ const SendPage = () => {
                     >
                       <TabsContent value="canada" forceMount className="mt-0">
                         {canadaLive ? (
-                          <CanadaSendFlow />
+                          <SectionBoundary name="CanadaSendFlow"><CanadaSendFlow /></SectionBoundary>
                         ) : null}
                       </TabsContent>
                     </motion.div>
@@ -1980,7 +1980,7 @@ const SendPage = () => {
                       transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
                     >
                       <TabsContent value="efinmoney" forceMount className="mt-0">
-                        <EfinmoneyP2PFlow />
+                        <SectionBoundary name="EfinmoneyP2PFlow"><EfinmoneyP2PFlow /></SectionBoundary>
                       </TabsContent>
                     </motion.div>
                   ) : (
@@ -2000,8 +2000,8 @@ const SendPage = () => {
                             transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
                             className="space-y-3"
                           >
-                            <HeroGlobe />
-                            <FxTicker />
+                            <SectionBoundary name="SendHeroGlobe"><HeroGlobe /></SectionBoundary>
+                            <SectionBoundary name="SendFxTicker"><FxTicker /></SectionBoundary>
                           </motion.div>
                         )}
 
@@ -2254,7 +2254,7 @@ const SendPage = () => {
                                     )}
 
                                     <motion.div custom={2} variants={fieldVariants} initial="hidden" animate="show" className="flex justify-center py-1">
-                                      <LiveFxCalculator
+                                      <SectionBoundary name="LiveFxCalculator"><LiveFxCalculator
                                         variant="app"
                                         className="max-w-none w-full"
                                         from={sourceCurrency}
@@ -2283,7 +2283,7 @@ const SendPage = () => {
                                         walletSymbol={selectedWallet?.symbol}
                                         showActions={false}
                                         showDisclaimer
-                                      />
+                                      /></SectionBoundary>
                                     </motion.div>
 
                                     {fundingSource === "card" && cardSendProvider && parsedAmount > 0
@@ -2443,7 +2443,8 @@ const SendPage = () => {
                                       <Input
                                         placeholder="Full name as registered"
                                         value={recipientName}
-                                        onChange={(e) => setRecipientName(e.target.value)}
+                                        onChange={(e) => setRecipientName(e.target.value.replace(/[^\p{L}\p{M}'\-. ]/gu, "").slice(0, 100))}
+                                        maxLength={100}
                                         className="transition-shadow focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:shadow-[0_0_0_4px_hsl(var(--primary)/0.12)]"
                                       />
                                     </motion.div>
@@ -2535,8 +2536,9 @@ const SendPage = () => {
                                         <Input
                                           type="email"
                                           value={recipientEmail}
-                                          onChange={(e) => setRecipientEmail(e.target.value)}
+                                          onChange={(e) => setRecipientEmail(e.target.value.trimStart().slice(0, 254))}
                                           placeholder="jane@example.com"
+                                          maxLength={254}
                                           className="transition-shadow focus-visible:ring-2 focus-visible:ring-primary/40"
                                         />
                                         <p className="text-xs text-muted-foreground">
@@ -2773,6 +2775,7 @@ const SendPage = () => {
                                           <Label>Account Number</Label>
                                           <Input
                                             inputMode="numeric"
+                                            maxLength={20}
                                             placeholder="Recipient bank account number"
                                             value={ghAccountNumber}
                                             onChange={(e) => setGhAccountNumber(e.target.value.replace(/\D/g, "").slice(0, 20))}
@@ -2788,7 +2791,8 @@ const SendPage = () => {
                                         <Input
                                           placeholder="+254..."
                                           value={recipientPhone}
-                                          onChange={(e) => setRecipientPhone(e.target.value)}
+                                          onChange={(e) => setRecipientPhone(e.target.value.replace(/[^\d+]/g, "").slice(0, 15))}
+                                          maxLength={15}
                                           className="transition-shadow focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:shadow-[0_0_0_4px_hsl(var(--primary)/0.12)]"
                                         />
                                         <p className="text-sm text-muted-foreground">
@@ -3032,21 +3036,21 @@ const SendPage = () => {
                                 transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
                               >
                                 {linkResult ? (
-                                  <PaymentLinkSuccess
+                                  <SectionBoundary name="PaymentLinkSuccess"><PaymentLinkSuccess
                                     result={linkResult}
                                     amountLabel={`${targetSymbol}${parsedAmount.toFixed(2)}`}
                                     recipientName={recipientName}
                                     onDone={resetForm}
-                                  />
+                                  /></SectionBoundary>
                                 ) : (
-                                  <TransferSuccess
+                                  <SectionBoundary name="TransferSuccess"><TransferSuccess
                                     transferId={lastTransferId}
                                     amount={parsedAmount}
                                     currency={sourceCurrency}
                                     recipientName={recipientName}
                                     targetFlag={targetCountry.flag}
                                     onSendAnother={resetForm}
-                                  />
+                                  /></SectionBoundary>
                                 )}
                               </motion.div>
                             )}
