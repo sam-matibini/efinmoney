@@ -101,7 +101,16 @@ export const PartnerLiquidityPanel = () => {
                       <TableCell className="text-right tabular-nums">
                         <Badge variant={capacity > 0 ? "secondary" : "destructive"}>{capacity.toLocaleString()}</Badge>
                       </TableCell>
-                      <TableCell className="text-xs">{format(new Date(l.as_of), "dd MMM yy HH:mm")}</TableCell>
+                      <TableCell className="text-xs">
+                        <span className={stale ? "text-amber-500" : ""}>
+                          {format(new Date(l.as_of), "dd MMM yy HH:mm")}
+                        </span>
+                        {stale && (
+                          <div className="flex items-center gap-1 text-amber-500">
+                            <AlertTriangle className="h-3 w-3" /> stale — skipped by router
+                          </div>
+                        )}
+                      </TableCell>
                       <TableCell className="text-right">
                         <Button variant="ghost" size="icon" onClick={() => remove.mutate(l.id)}>
                           <Trash2 className="h-4 w-4 text-destructive" />
