@@ -142,8 +142,8 @@ export async function resolveRoute(
     .from("partner_fx_rates")
     .select("partner_id, fx_spread_bps, rate_timestamp")
     .in("partner_id", partnerIds)
-    .eq("source_currency", srcCcy)
-    .eq("dest_currency", dstCcy)
+    .eq("base_currency", srcCcy)
+    .eq("quote_currency", dstCcy)
     .order("rate_timestamp", { ascending: false })
     .limit(200);
 
@@ -151,6 +151,7 @@ export async function resolveRoute(
     .from("partner_limits")
     .select("*")
     .in("partner_id", partnerIds);
+
 
   const fxByPartner = new Map<string, number>();
   for (const r of fxRows ?? []) {
