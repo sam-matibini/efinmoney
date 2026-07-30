@@ -150,15 +150,25 @@ Deno.serve(async (req) => {
     }
 
     if (findings.length) {
-      const { error } = await supabase.from("admin_notifications").insert(
+      // admin_notifications is per-admin; fan the findings out to every
+      // super admin and compliance/finance-capable admin user.
+      const { data: admins } = await supabase.from("admin_users").select("id");
+      const rows = (admins ?? []).flatMap((a: any) =>
         findings.map((f) => ({
-          title: f.title,
-          message: f.message.slice(0, 1000),
+          admin_id: a.id,
           type: "routing_health",
-          severity: f.severity,
+          payload: {
+            severity: f.severity,
+            title: f.title,
+            message: f.message.slice(0, 1000),
+            source: "routing-health-check",
+          },
         })),
       );
-      if (error) console.error("admin_notifications insert failed", error.message);
+      if (rows.length) {
+        const { error } = await supabase.from("admin_notifications").insert(rows);
+        if (error) console.error("admin_notifications insert failed", error.message);
+      }
     }
 
     return new Response(JSON.stringify({ success: true, findings }), {
