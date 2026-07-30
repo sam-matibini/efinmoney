@@ -91,6 +91,7 @@ export const PartnerLiquidityPanel = () => {
               <TableBody>
                 {liquidity.map((l) => {
                   const capacity = l.available_balance - l.required_reserve - l.daily_utilized;
+                  const stale = Date.now() - new Date(l.as_of).getTime() > 12 * 3_600_000;
                   return (
                     <TableRow key={l.id}>
                       <TableCell className="font-medium">{nameOf(l.partner_id)}</TableCell>
