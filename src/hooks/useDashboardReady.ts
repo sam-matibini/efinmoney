@@ -2,10 +2,9 @@ import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "./useAuth";
 
-const CRITICAL_PREFIXES = [
+const CRITICAL_KEYS = [
   "wallets",
   "dashboard-transfers",
-  "fx_rates",
   "profile",
   "kyc",
 ];
@@ -19,13 +18,19 @@ export function useDashboardReady() {
     if (!user) return;
 
     function check() {
-      const allDone = CRITICAL_PREFIXES.every((prefix) => {
+      const perUserDone = CRITICAL_KEYS.every((prefix) => {
         const state = queryClient.getQueryState([prefix, user.id]);
         if (!state) return false;
         if (state.fetchStatus === "fetching") return false;
         return state.status === "success";
       });
-      if (allDone) setReady(true);
+      // fx_rates is a global cache keyed without user.id
+      const fxState = queryClient.getQueryState(["fx_rates"]);
+      const fxDone =
+        !!fxState &&
+        fxState.fetchStatus !== "fetching" &&
+        fxState.status === "success";
+      if (perUserDone && fxDone) setReady(true);
     }
 
     check();
