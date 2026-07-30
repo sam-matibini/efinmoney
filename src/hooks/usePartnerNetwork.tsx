@@ -446,3 +446,49 @@ export const useUpsertLiquidity = () => {
 };
 
 export const { useRemove: useDeleteLiquidity } = crud<PartnerLiquidity>("partner_liquidity", "partner_liquidity");
+
+/* --------------------------- network activation -------------------------- */
+
+export type SeedScope = "pricing" | "fx" | "retail";
+
+export interface SeedSummary {
+  pricing: number;
+  fx: number;
+  retail: number;
+  skipped: string[];
+}
+
+export interface SeedResult {
+  success: boolean;
+  applied: boolean;
+  summary: SeedSummary;
+  preview?: {
+    pricing: Record<string, unknown>[];
+    fx: Record<string, unknown>[];
+    retail: Record<string, unknown>[];
+  };
+}
+
+export const useSeedPartnerNetwork = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { partnerId?: string; scopes: SeedScope[]; apply: boolean }): Promise<SeedResult> => {
+      const { data, error } = await supabase.functions.invoke("partner-network-seed", {
+        body: { partner_id: input.partnerId || null, scopes: input.scopes, apply: input.apply },
+      });
+      if (error) throw error;
+      if (data && (data as SeedResult).success === false) throw new Error((data as { error?: string }).error || "Seeding failed");
+      return data as SeedResult;
+    },
+    onSuccess: (res) => {
+      if (!res.applied) return;
+      qc.invalidateQueries({ queryKey: ["partner_pricing"] });
+      qc.invalidateQueries({ queryKey: ["partner_fx_rates"] });
+      qc.invalidateQueries({ queryKey: ["efinmoney_pricing"] });
+      qc.invalidateQueries({ queryKey: ["corridor_readiness"] });
+      const { pricing, fx, retail } = res.summary;
+      toast.success(`Seeded ${pricing} pricing, ${fx} FX and ${retail} retail rows`);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+};
