@@ -127,6 +127,45 @@ export const PartnerPricingPanel = () => {
     if (mapped.length) bulk.mutate(mapped);
   };
 
+  const downloadCsv = (filename: string, body: string) => {
+    const blob = new Blob([body], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportCsv = () => {
+    const rows = pricing ?? [];
+    if (!rows.length) {
+      toast.error("Nothing to export");
+      return;
+    }
+    const codeById = new Map(partners?.map((p) => [p.id, p.code]) ?? []);
+    const lines = rows.map((p) =>
+      [
+        codeById.get(p.partner_id) ?? "",
+        p.direction,
+        p.source_currency,
+        p.dest_currency,
+        p.dest_country ?? "",
+        p.payment_method,
+        p.fee_type,
+        p.fixed_fee,
+        p.percentage_fee,
+        p.min_fee ?? "",
+        p.max_fee ?? "",
+        p.fx_markup_bps,
+        p.settlement_fee,
+        p.network_fee,
+        p.compliance_fee,
+      ].join(","),
+    );
+    downloadCsv("partner-pricing.csv", [CSV_COLUMNS.join(","), ...lines].join("\n"));
+  };
+
   return (
     <Card>
       <CardHeader className="gap-3">
