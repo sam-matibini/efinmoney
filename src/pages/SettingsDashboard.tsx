@@ -41,6 +41,7 @@ const SettingsDashboard = () => {
               <TabsList className="inline-flex w-auto min-w-full lg:min-w-0">
                 <TabsTrigger value="pricing">Pricing & Fees</TabsTrigger>
                 <TabsTrigger value="currencies">Currencies</TabsTrigger>
+                <TabsTrigger value="partners">Partners & Routing</TabsTrigger>
                 <TabsTrigger value="modules">Module Access</TabsTrigger>
                 <TabsTrigger value="integrations">Integrations</TabsTrigger>
                 <TabsTrigger value="circle_cpn">Circle CPN</TabsTrigger>
