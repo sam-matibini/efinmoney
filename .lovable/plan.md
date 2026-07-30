@@ -1,65 +1,35 @@
-# Phase 3 — Live Routing, Overrides & Failover
+## Phase 4 — Profitability Engine & Performance Analytics
 
-Phase 2 left the engine observing only: it ranks partners and logs what it *would* do, but `execute-transfer` still picks rails from hardcoded country/currency rules. Phase 3 lets the engine actually choose the rail, with operator control and automatic failover.
+Phases 1–3 built partner pricing, the scoring engine, live routing and operator controls. What is still missing is the money view: the `transaction_economics`, `routing_decisions` and `partner_performance` tables all currently hold 0 rows, so no revenue, cost or success-rate data feeds back into routing or reporting. Phase 4 closes that loop.
 
-## Current state (verified)
+### 1. Capture economics on every transfer
 
-- `payment_partners`, `partner_corridors` and `routing_decisions` are all **empty** — the engine currently has nothing to rank, so shadow logging produces no candidates.
-- `payment_partners` already has `payin_function_slug` / `payout_function_slug` / `quote_function_slug` columns, so a partner row can point at the edge function that executes it.
-- One active routing rule exists ("Best Overall"), and `routing_rules` has no live/shadow switch yet.
+- On a successful payout dispatch (routed or legacy rail), write one `transaction_economics` row: customer fee revenue, FX revenue, partner fee/FX cost, settlement, network, compliance and infrastructure cost, plus derived total revenue, total cost, gross profit and margin.
+- Reuse the existing `routingEngine.ts` cost/revenue math so estimated and actual figures are computed identically.
+- For legacy (non-routed) transfers, derive revenue from `transfers.fee_amount` and the applied rate versus the mid-market rate, and cost from the matching `partner_pricing` row; flag rows where pricing is missing rather than silently assuming zero cost.
+- Backfill economics for the 23 already-completed transfers so the dashboard opens with real data.
 
-## 1. Seed the partner catalogue
+### 2. Partner performance refresh
 
-Populate `payment_partners` and `partner_corridors` from the rails already deployed, each mapped to its executing edge function:
+- New scheduled edge function `partner-performance-refresh` (hourly) that recomputes `partner_performance` per partner and corridor over 7/30/90-day windows: counts, success rate, reversal rate, average processing seconds — sourced from `transfers`, `routing_attempts` and `routing_decisions`.
+- The route scorer already reads `partner_performance`, so refreshed success rates immediately sharpen live route selection.
 
-| Partner | Function slug | Corridors |
-|---|---|---|
-| Flutterwave | `flutterwave-payout` | NGN, GHS, KES, UGX, TZS, ZMW |
-| PawaPay | `pawapay-payout` | 12 African mobile-money corridors incl. BWP |
-| Nomba | `nomba-payout` | NGN bank/transfer |
-| Ghana Pay | `ghana-payout` | GHS |
-| MTN MoMo | `mtn-momo-payout` | GH, UG, ZM |
-| Paysafe | `paysafe-payout` | CAD Interac / EFT |
-| Stripe | `stripe-payout`, `stripe-connect-instant-payout` | CAD card push, instant |
-| Circle CPN | `initiate-cpn-payout` | USDC-settled bank payouts |
-| Stellar SEP-31 | `stellar-sep31-payout` | NG, KE, ZM |
-| Yellowcard, Swychr, Paytota, Fincra | respective slugs | as configured |
+### 3. Profitability reporting
 
-Seeded with real pricing where known, and left with zero-cost pricing rows where a partner's commercials still need entering (visible as "pricing missing" in the admin UI rather than silently scoring as free).
+- Security-definer SQL functions (pricing-manager gated) that aggregate `transaction_economics` by partner, corridor, currency and period, returning volume, revenue, cost, profit and margin.
+- A second function for estimate-versus-actual variance, joining each economics row to its `routing_decisions` candidate so operators see where the engine's forecast drifted.
 
-## 2. Live routing switch + operator overrides
+### 4. Profitability dashboard UI
 
-New controls, all corridor-scoped so live routing can be rolled out one corridor at a time:
+New "Profitability" tab under Settings → Partners & Routing, with:
+- Period selector (7/30/90 days, custom) and headline cards: volume, revenue, cost, gross profit, blended margin.
+- Profit by partner, by corridor and by currency tables, sortable, with margin badges.
+- Estimate-vs-actual variance panel highlighting the largest deviations.
+- A "pricing gaps" list showing corridors transacting without a `partner_pricing` row — these are the blind spots costing unmeasured margin.
 
-- `routing_rules.execution_mode` — `shadow` (default, current behaviour) or `live`.
-- New `routing_overrides` table: pin a corridor to a specific partner, or block a partner on a corridor, with reason, operator, and optional expiry. Overrides beat the score.
-- Global kill switch that instantly returns all routing to the existing hardcoded logic.
+### Technical notes
 
-## 3. Failover execution
-
-New `routing-execute` shared module used by `execute-transfer`:
-
-1. Resolve ranked candidates (honouring overrides).
-2. Attempt candidate #1 by invoking its `payout_function_slug`.
-3. On a retryable failure (provider error, timeout, insufficient partner liquidity) fall through to the next candidate, up to `max_retries`.
-4. On non-retryable failures (invalid recipient details, compliance block) stop immediately — no failover.
-5. If the engine yields no candidates, or the corridor is not live, fall back to today's hardcoded smart-route path unchanged.
-
-Every attempt is written to a new `routing_attempts` table (partner, slug, outcome, provider error, latency, attempt number) and the winning partner is stamped onto `routing_decisions.actual_partner_id`, which makes the Phase 2 performance and profitability jobs reflect reality.
-
-## 4. Admin UI (Settings → Routing Intelligence)
-
-- **Live Control** tab: shadow/live toggle, per-corridor live enablement, kill switch, and an override manager (pin / block partner, with reason and expiry).
-- **Attempts** tab: recent executions showing each attempt in order, which partner won, failover chains and error messages.
-- Shadow Log gains an "engine agreed with actual rail?" column so the match rate is visible before going live.
-
-## Technical notes
-
-- Ledger postings, fee calculation and transfer status handling are untouched — Phase 3 only changes *which provider function is called*.
-- Failover is bounded by `routing_rules.max_retries` and never retries after funds have left the partner; the dispatcher treats an ambiguous provider response as non-retryable and marks the transfer for manual review.
-- Idempotency keys are derived per attempt (`transfer_id:partner_code:attempt_n`) so a retried attempt cannot double-pay.
-- New tables get RLS restricted to admin/finance via the existing `is_pricing_manager()` function, plus GRANTs for the app and backend services.
-
-## Default rollout
-
-Ships with `execution_mode = shadow` and no corridors live, so nothing changes in production until an operator flips a corridor to live.
+- Migration adds the aggregation functions plus an `economics_source` column (`routed` / `legacy` / `backfill`) on `transaction_economics`, and enables the hourly cron for `partner-performance-refresh`.
+- Economics writes are idempotent via the existing unique index on `transaction_economics.transfer_id`.
+- Recording economics never blocks a payout: failures are logged and swallowed, matching the existing `observeRoute` behaviour.
+- Frontend follows the established `usePartnerNetwork` / loose-`db` accessor pattern to keep generated Supabase types shallow.
