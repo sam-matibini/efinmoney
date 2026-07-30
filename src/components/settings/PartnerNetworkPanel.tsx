@@ -86,6 +86,12 @@ export const PartnerNetworkPanel = () => (
     <TabsContent value="cost">
       <SectionBoundary name="CostAssurancePanel"><CostAssurancePanel /></SectionBoundary>
     </TabsContent>
+    <TabsContent value="limits">
+      <SectionBoundary name="PartnerLimitsPanel"><PartnerLimitsPanel /></SectionBoundary>
+    </TabsContent>
+    <TabsContent value="alerts">
+      <SectionBoundary name="PartnerAlertsPanel"><PartnerAlertsPanel /></SectionBoundary>
+    </TabsContent>
   </Tabs>
 );
 
