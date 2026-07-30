@@ -35,6 +35,8 @@ export const PartnerNetworkPanel = () => (
         <TabsTrigger value="attempts">Attempts</TabsTrigger>
         <TabsTrigger value="profitability">Profitability</TabsTrigger>
         <TabsTrigger value="cost">Cost assurance</TabsTrigger>
+        <TabsTrigger value="settlements">Settlements</TabsTrigger>
+
         <TabsTrigger value="limits">Limits</TabsTrigger>
         <TabsTrigger value="alerts">Alerts</TabsTrigger>
       </TabsList>
