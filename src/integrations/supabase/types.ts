@@ -3613,6 +3613,8 @@ export type Database = {
           billed_fee: number
           created_at: string
           currency_code: string | null
+          dispute_reason: string | null
+          dispute_status: string
           expected_fee: number | null
           id: string
           invoice_id: string
@@ -3629,6 +3631,8 @@ export type Database = {
           billed_fee?: number
           created_at?: string
           currency_code?: string | null
+          dispute_reason?: string | null
+          dispute_status?: string
           expected_fee?: number | null
           id?: string
           invoice_id: string
@@ -3645,6 +3649,8 @@ export type Database = {
           billed_fee?: number
           created_at?: string
           currency_code?: string | null
+          dispute_reason?: string | null
+          dispute_status?: string
           expected_fee?: number | null
           id?: string
           invoice_id?: string
@@ -3668,64 +3674,88 @@ export type Database = {
       }
       partner_invoices: {
         Row: {
+          approved_at: string | null
+          approved_by: string | null
+          approved_total: number
           billed_total: number
           created_at: string
           currency_code: string
+          disputed_total: number
           expected_total: number
           id: string
           invoice_number: string
+          journal_id: string | null
           matched_lines: number
           missing_lines: number
           notes: string | null
+          paid_at: string | null
           partner_id: string
           period_end: string
           period_start: string
           reconciled_at: string | null
+          settlement_id: string | null
           status: string
           unmatched_lines: number
           updated_at: string
           uploaded_by: string | null
           variance_total: number
+          vendor_id: string | null
         }
         Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          approved_total?: number
           billed_total?: number
           created_at?: string
           currency_code: string
+          disputed_total?: number
           expected_total?: number
           id?: string
           invoice_number: string
+          journal_id?: string | null
           matched_lines?: number
           missing_lines?: number
           notes?: string | null
+          paid_at?: string | null
           partner_id: string
           period_end: string
           period_start: string
           reconciled_at?: string | null
+          settlement_id?: string | null
           status?: string
           unmatched_lines?: number
           updated_at?: string
           uploaded_by?: string | null
           variance_total?: number
+          vendor_id?: string | null
         }
         Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          approved_total?: number
           billed_total?: number
           created_at?: string
           currency_code?: string
+          disputed_total?: number
           expected_total?: number
           id?: string
           invoice_number?: string
+          journal_id?: string | null
           matched_lines?: number
           missing_lines?: number
           notes?: string | null
+          paid_at?: string | null
           partner_id?: string
           period_end?: string
           period_start?: string
           reconciled_at?: string | null
+          settlement_id?: string | null
           status?: string
           unmatched_lines?: number
           updated_at?: string
           uploaded_by?: string | null
           variance_total?: number
+          vendor_id?: string | null
         }
         Relationships: [
           {
@@ -3733,6 +3763,27 @@ export type Database = {
             columns: ["partner_id"]
             isOneToOne: false
             referencedRelation: "payment_partners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "partner_invoices_settlement_id_fkey"
+            columns: ["settlement_id"]
+            isOneToOne: false
+            referencedRelation: "partner_settlements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "partner_invoices_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "t4a_ytd_totals"
+            referencedColumns: ["vendor_id"]
+          },
+          {
+            foreignKeyName: "partner_invoices_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
             referencedColumns: ["id"]
           },
         ]
@@ -3976,6 +4027,74 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "partner_pricing_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "payment_partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      partner_settlements: {
+        Row: {
+          amount_paid: number
+          created_at: string
+          created_by: string | null
+          currency_code: string
+          id: string
+          invoice_count: number
+          journal_id: string | null
+          notes: string | null
+          paid_at: string | null
+          partner_id: string
+          payment_method: string | null
+          payment_reference: string | null
+          period_end: string | null
+          period_start: string | null
+          status: string
+          total_due: number
+          updated_at: string
+        }
+        Insert: {
+          amount_paid?: number
+          created_at?: string
+          created_by?: string | null
+          currency_code: string
+          id?: string
+          invoice_count?: number
+          journal_id?: string | null
+          notes?: string | null
+          paid_at?: string | null
+          partner_id: string
+          payment_method?: string | null
+          payment_reference?: string | null
+          period_end?: string | null
+          period_start?: string | null
+          status?: string
+          total_due?: number
+          updated_at?: string
+        }
+        Update: {
+          amount_paid?: number
+          created_at?: string
+          created_by?: string | null
+          currency_code?: string
+          id?: string
+          invoice_count?: number
+          journal_id?: string | null
+          notes?: string | null
+          paid_at?: string | null
+          partner_id?: string
+          payment_method?: string | null
+          payment_reference?: string | null
+          period_end?: string | null
+          period_start?: string | null
+          status?: string
+          total_due?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_settlements_partner_id_fkey"
             columns: ["partner_id"]
             isOneToOne: false
             referencedRelation: "payment_partners"
@@ -7720,6 +7839,11 @@ export type Database = {
         Returns: string
       }
       ensure_fx_clearing_account: { Args: { p_ccy: string }; Returns: string }
+      ensure_network_fee_account: { Args: { p_ccy: string }; Returns: string }
+      ensure_partner_payable_account: {
+        Args: { p_ccy: string }
+        Returns: string
+      }
       execute_fx_swap: {
         Args: {
           p_effective_rate: number
