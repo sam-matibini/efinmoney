@@ -32,7 +32,7 @@ const InviteStaffModal = ({ open, onOpenChange }: Props) => {
   const [email, setEmail] = useState("");
   const [fullName, setFullName] = useState("");
   const [role, setRole] = useState<AdminRole>("compliance_officer");
-  const [department, setDepartment] = useState("");
+  const [department, setDepartment] = useState("_none_");
 
   const { data: departments = [] } = useQuery({
     queryKey: ["admin-departments-modal"],
@@ -60,7 +60,7 @@ const InviteStaffModal = ({ open, onOpenChange }: Props) => {
           email: email.trim().toLowerCase(),
           full_name: fullName.trim(),
           role,
-          department: department || undefined,
+          department: department === "_none_" ? undefined : department || undefined,
           redirect_to: `${import.meta.env.VITE_APP_URL || window.location.origin}/admin/onboarding`,
         },
       });
@@ -74,7 +74,7 @@ const InviteStaffModal = ({ open, onOpenChange }: Props) => {
       setEmail("");
       setFullName("");
       setRole("compliance_officer");
-      setDepartment("");
+      setDepartment("_none_");
       onOpenChange(false);
     },
     onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Failed to invite staff"),
@@ -135,7 +135,7 @@ const InviteStaffModal = ({ open, onOpenChange }: Props) => {
                 <SelectValue placeholder="Select department" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">No department</SelectItem>
+                <SelectItem value="_none_">No department</SelectItem>
                 {departments.map((d) => (
                   <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>
                 ))}
