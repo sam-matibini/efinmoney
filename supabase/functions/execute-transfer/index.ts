@@ -3,6 +3,7 @@ import { isGhanaPayConfigured } from "../_shared/ghana-pay.ts";
 import { isNombaNigeriaConfigured } from "../_shared/nomba-nigeria.ts";
 import { dispatchRoutedPayout } from "../_shared/routingExecute.ts";
 import { observeRoute } from "../_shared/routeResolver.ts";
+import { recordEconomics } from "../_shared/transactionEconomics.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -841,6 +842,29 @@ Deno.serve(async (req) => {
         requested_by: user.id,
       });
     }
+
+    // Phase 4: capture the unit economics of every payout that actually left.
+    const payoutAccepted =
+      payoutResult?.stub !== true &&
+      payoutResult?.success !== false;
+    if (payoutAccepted) {
+      const { data: decisionRow } = await supabase
+        .from("routing_decisions")
+        .select("id")
+        .eq("transfer_id", transfer_id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      await recordEconomics(supabase, routeRequest, {
+        transfer_id,
+        partner_code: payoutResult?.rail ?? null,
+        routing_decision_id: decisionRow?.id ?? null,
+        source: engineRouted ? "routed" : "legacy",
+        actual_customer_fee: Number(transfer.fee_amount ?? 0),
+      });
+    }
+
 
     // Never leave the client with a fake success when no payout rail ran.
     if (payoutResult?.stub === true && payoutResult?.success !== true) {

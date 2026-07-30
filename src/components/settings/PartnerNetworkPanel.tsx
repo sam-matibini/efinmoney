@@ -10,6 +10,7 @@ import RoutingStrategyPanel from "./partners/RoutingStrategyPanel";
 import LiveRoutingControlPanel from "./partners/LiveRoutingControlPanel";
 import RouteSimulatorPanel from "./partners/RouteSimulatorPanel";
 import RoutingAttemptsPanel from "./partners/RoutingAttemptsPanel";
+import ProfitabilityPanel from "./partners/ProfitabilityPanel";
 
 export const PartnerNetworkPanel = () => (
   <Tabs defaultValue="partners" className="space-y-4">
@@ -25,6 +26,7 @@ export const PartnerNetworkPanel = () => (
         <TabsTrigger value="live">Live routing</TabsTrigger>
         <TabsTrigger value="simulator">Simulator</TabsTrigger>
         <TabsTrigger value="attempts">Attempts</TabsTrigger>
+        <TabsTrigger value="profitability">Profitability</TabsTrigger>
       </TabsList>
     </div>
 
@@ -60,6 +62,9 @@ export const PartnerNetworkPanel = () => (
     </TabsContent>
     <TabsContent value="attempts">
       <SectionBoundary name="RoutingAttemptsPanel"><RoutingAttemptsPanel /></SectionBoundary>
+    </TabsContent>
+    <TabsContent value="profitability">
+      <SectionBoundary name="ProfitabilityPanel"><ProfitabilityPanel /></SectionBoundary>
     </TabsContent>
   </Tabs>
 );

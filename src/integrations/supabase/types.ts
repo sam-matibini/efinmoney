@@ -6394,6 +6394,7 @@ export type Database = {
           dest_country: string | null
           dest_currency: string
           direction: Database["public"]["Enums"]["partner_direction"]
+          economics_source: string
           gross_profit: number
           id: string
           infrastructure_cost: number
@@ -6403,6 +6404,7 @@ export type Database = {
           partner_fx_cost: number
           partner_id: string | null
           payment_method: string | null
+          pricing_missing: boolean
           routing_decision_id: string | null
           settled_at: string | null
           settlement_cost: number
@@ -6422,6 +6424,7 @@ export type Database = {
           dest_country?: string | null
           dest_currency: string
           direction: Database["public"]["Enums"]["partner_direction"]
+          economics_source?: string
           gross_profit?: number
           id?: string
           infrastructure_cost?: number
@@ -6431,6 +6434,7 @@ export type Database = {
           partner_fx_cost?: number
           partner_id?: string | null
           payment_method?: string | null
+          pricing_missing?: boolean
           routing_decision_id?: string | null
           settled_at?: string | null
           settlement_cost?: number
@@ -6450,6 +6454,7 @@ export type Database = {
           dest_country?: string | null
           dest_currency?: string
           direction?: Database["public"]["Enums"]["partner_direction"]
+          economics_source?: string
           gross_profit?: number
           id?: string
           infrastructure_cost?: number
@@ -6459,6 +6464,7 @@ export type Database = {
           partner_fx_cost?: number
           partner_id?: string | null
           payment_method?: string | null
+          pricing_missing?: boolean
           routing_decision_id?: string | null
           settled_at?: string | null
           settlement_cost?: number
@@ -7533,11 +7539,52 @@ export type Database = {
           user_id: string
         }[]
       }
+      pricing_coverage_gaps: {
+        Args: { p_from?: string; p_to?: string }
+        Returns: {
+          dest_country: string
+          dest_currency: string
+          partner_code: string
+          partner_name: string
+          payment_method: string
+          source_currency: string
+          txn_count: number
+          volume: number
+        }[]
+      }
+      profitability_summary: {
+        Args: { p_from?: string; p_group_by?: string; p_to?: string }
+        Returns: {
+          cost: number
+          group_key: string
+          group_label: string
+          margin_percent: number
+          pricing_gaps: number
+          profit: number
+          revenue: number
+          txn_count: number
+          volume: number
+        }[]
+      }
       resolve_short_link: {
         Args: { p_code: string }
         Returns: {
           params: Json
           target_path: string
+        }[]
+      }
+      routing_profit_variance: {
+        Args: { p_from?: string; p_limit?: number; p_to?: string }
+        Returns: {
+          actual_partner: string
+          actual_profit: number
+          amount: number
+          corridor: string
+          created_at: string
+          expected_partner: string
+          expected_profit: number
+          transfer_id: string
+          variance: number
         }[]
       }
       run_compliance_checks: {
