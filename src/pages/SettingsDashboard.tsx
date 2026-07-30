@@ -6,6 +6,7 @@ import { SystemSettingsPanel } from "@/components/settings/SystemSettingsPanel";
 import { IntegrationsPanel } from "@/components/settings/IntegrationsPanel";
 import { CurrencyManagementPanel } from "@/components/settings/CurrencyManagementPanel";
 import { CircleCpnConfigPanel } from "@/components/settings/CircleCpnConfigPanel";
+import { PartnerNetworkPanel } from "@/components/settings/PartnerNetworkPanel";
 import PageHeroBanner from "@/components/common/PageHeroBanner";
 import AppPage from "@/components/layout/AppPage";
 import SectionBoundary from "@/components/common/SectionBoundary";
