@@ -430,8 +430,44 @@ Deno.serve(async (req) => {
     };
 
     let payoutResult: any = { stub: true };
+
+    // Routing engine (Phase 3): only takes over when an operator has switched the
+    // active rule to live AND enabled live routing on this corridor. Otherwise the
+    // existing hardcoded rails below run exactly as before.
+    const routeRequest = {
+      direction: "payout" as const,
+      source_currency: transfer.source_currency,
+      dest_currency: transfer.target_currency ?? transfer.source_currency,
+      source_country: transfer.sender_country ?? "CA",
+      dest_country: transfer.recipient_country ?? null,
+      payment_method: transfer.payout_method ?? null,
+      customer_type: "consumer",
+      amount: Number(transfer.source_amount) || 0,
+    };
+
+    let engineRouted = false;
     try {
-      if (isZambia && !wantFlutterwave) {
+      const dispatch = await dispatchRoutedPayout(supabase, routeRequest, {
+        transfer_id,
+        transfer,
+        requested_by: user.id,
+        supabaseUrl: Deno.env.get("SUPABASE_URL")!,
+        serviceKey,
+        authHeader,
+      });
+      if (dispatch.routed) {
+        engineRouted = true;
+        payoutResult = dispatch.payoutResult;
+        console.log("routed by engine", dispatch.partner_code, "attempts", dispatch.attempts);
+      }
+    } catch (e) {
+      console.error("routing engine dispatch failed, using legacy rails", e);
+    }
+
+    try {
+      if (engineRouted) {
+        // Routing engine already executed the payout.
+      } else if (isZambia && !wantFlutterwave) {
         const res = await fetch(
           `${Deno.env.get("SUPABASE_URL")}/functions/v1/elicate-payout`,
           {
