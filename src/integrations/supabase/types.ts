@@ -3433,6 +3433,7 @@ export type Database = {
           enabled: boolean
           est_minutes: number | null
           id: string
+          live_routing_enabled: boolean
           partner_id: string
           payment_method: string
           source_country: string | null
@@ -3447,6 +3448,7 @@ export type Database = {
           enabled?: boolean
           est_minutes?: number | null
           id?: string
+          live_routing_enabled?: boolean
           partner_id: string
           payment_method: string
           source_country?: string | null
@@ -3461,6 +3463,7 @@ export type Database = {
           enabled?: boolean
           est_minutes?: number | null
           id?: string
+          live_routing_enabled?: boolean
           partner_id?: string
           payment_method?: string
           source_country?: string | null
@@ -4941,6 +4944,79 @@ export type Database = {
           },
         ]
       }
+      routing_attempts: {
+        Row: {
+          attempt_number: number
+          created_at: string
+          error_message: string | null
+          function_slug: string | null
+          id: string
+          idempotency_key: string | null
+          latency_ms: number | null
+          outcome: string
+          partner_code: string | null
+          partner_id: string | null
+          provider_reference: string | null
+          retryable: boolean
+          routing_decision_id: string | null
+          transfer_id: string | null
+        }
+        Insert: {
+          attempt_number?: number
+          created_at?: string
+          error_message?: string | null
+          function_slug?: string | null
+          id?: string
+          idempotency_key?: string | null
+          latency_ms?: number | null
+          outcome: string
+          partner_code?: string | null
+          partner_id?: string | null
+          provider_reference?: string | null
+          retryable?: boolean
+          routing_decision_id?: string | null
+          transfer_id?: string | null
+        }
+        Update: {
+          attempt_number?: number
+          created_at?: string
+          error_message?: string | null
+          function_slug?: string | null
+          id?: string
+          idempotency_key?: string | null
+          latency_ms?: number | null
+          outcome?: string
+          partner_code?: string | null
+          partner_id?: string | null
+          provider_reference?: string | null
+          retryable?: boolean
+          routing_decision_id?: string | null
+          transfer_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "routing_attempts_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "payment_partners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "routing_attempts_routing_decision_id_fkey"
+            columns: ["routing_decision_id"]
+            isOneToOne: false
+            referencedRelation: "routing_decisions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "routing_attempts_transfer_id_fkey"
+            columns: ["transfer_id"]
+            isOneToOne: false
+            referencedRelation: "transfers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       routing_decisions: {
         Row: {
           actual_partner_id: string | null
@@ -5032,16 +5108,77 @@ export type Database = {
           },
         ]
       }
+      routing_overrides: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          dest_country: string | null
+          dest_currency: string | null
+          direction: string
+          expires_at: string | null
+          id: string
+          is_active: boolean
+          override_type: string
+          partner_id: string
+          payment_method: string | null
+          reason: string | null
+          source_currency: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          dest_country?: string | null
+          dest_currency?: string | null
+          direction?: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          override_type?: string
+          partner_id: string
+          payment_method?: string | null
+          reason?: string | null
+          source_currency?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          dest_country?: string | null
+          dest_currency?: string | null
+          direction?: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          override_type?: string
+          partner_id?: string
+          payment_method?: string | null
+          reason?: string | null
+          source_currency?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "routing_overrides_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "payment_partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       routing_rules: {
         Row: {
           chargeback_cost_percent: number
           compliance_cost_fixed: number
           created_at: string
+          execution_mode: string
           failure_cost_percent: number
           fraud_cost_percent: number
           id: string
           infrastructure_cost_fixed: number
           is_active: boolean
+          kill_switch: boolean
           max_retries: number
           min_success_rate: number
           name: string
@@ -5057,11 +5194,13 @@ export type Database = {
           chargeback_cost_percent?: number
           compliance_cost_fixed?: number
           created_at?: string
+          execution_mode?: string
           failure_cost_percent?: number
           fraud_cost_percent?: number
           id?: string
           infrastructure_cost_fixed?: number
           is_active?: boolean
+          kill_switch?: boolean
           max_retries?: number
           min_success_rate?: number
           name: string
@@ -5077,11 +5216,13 @@ export type Database = {
           chargeback_cost_percent?: number
           compliance_cost_fixed?: number
           created_at?: string
+          execution_mode?: string
           failure_cost_percent?: number
           fraud_cost_percent?: number
           id?: string
           infrastructure_cost_fixed?: number
           is_active?: boolean
+          kill_switch?: boolean
           max_retries?: number
           min_success_rate?: number
           name?: string
