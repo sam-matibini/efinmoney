@@ -843,6 +843,29 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Phase 4: capture the unit economics of every payout that actually left.
+    const payoutAccepted =
+      payoutResult?.stub !== true &&
+      payoutResult?.success !== false;
+    if (payoutAccepted) {
+      const { data: decisionRow } = await supabase
+        .from("routing_decisions")
+        .select("id")
+        .eq("transfer_id", transfer_id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      await recordEconomics(supabase, routeRequest, {
+        transfer_id,
+        partner_code: payoutResult?.rail ?? null,
+        routing_decision_id: decisionRow?.id ?? null,
+        source: engineRouted ? "routed" : "legacy",
+        actual_customer_fee: Number(transfer.fee_amount ?? 0),
+      });
+    }
+
+
     // Never leave the client with a fake success when no payout rail ran.
     if (payoutResult?.stub === true && payoutResult?.success !== true) {
       const reason = "Payout provider did not accept this transfer. Please try again or use another rail.";
