@@ -1,35 +1,42 @@
-## Phase 4 — Profitability Engine & Performance Analytics
+## Phase 5 — Activation, Liquidity & Cost Assurance
 
-Phases 1–3 built partner pricing, the scoring engine, live routing and operator controls. What is still missing is the money view: the `transaction_economics`, `routing_decisions` and `partner_performance` tables all currently hold 0 rows, so no revenue, cost or success-rate data feeds back into routing or reporting. Phase 4 closes that loop.
+### Why this phase
 
-### 1. Capture economics on every transfer
+A live check of the engine's tables shows the machinery is built but starved of data: 13 payment partners exist, but there are **0 rows** in `partner_pricing`, `partner_fx_rates`, `partner_liquidity`, `partner_performance`, `routing_decisions`, and `transaction_economics`. Without pricing and liquidity, the router cannot rank anyone and the profitability dashboard has nothing to show. Phase 5 makes the engine usable in production.
 
-- On a successful payout dispatch (routed or legacy rail), write one `transaction_economics` row: customer fee revenue, FX revenue, partner fee/FX cost, settlement, network, compliance and infrastructure cost, plus derived total revenue, total cost, gross profit and margin.
-- Reuse the existing `routingEngine.ts` cost/revenue math so estimated and actual figures are computed identically.
-- For legacy (non-routed) transfers, derive revenue from `transfers.fee_amount` and the applied rate versus the mid-market rate, and cost from the matching `partner_pricing` row; flag rows where pricing is missing rather than silently assuming zero cost.
-- Backfill economics for the 23 already-completed transfers so the dashboard opens with real data.
+### 1. Seed and maintain partner data
 
-### 2. Partner performance refresh
+- **Pricing seeding tool** — an admin action in the Pricing panel that generates a starter pricing row set for a selected partner across its enabled corridors, pre-filled with the partner's published rate card, so operators edit rather than type from scratch.
+- **CSV import/export** for `partner_pricing` (download current, edit, re-upload with validation and a diff preview before commit). This is how rate cards actually arrive from partners.
+- **Partner FX ingestion** — extend the existing `refresh-fx-rates` job to also write per-partner quotes into `partner_fx_rates` for partners that expose a rate endpoint, and allow manual entry for those that don't. Spread (`fx_spread_bps`) is already computed by a trigger.
 
-- New scheduled edge function `partner-performance-refresh` (hourly) that recomputes `partner_performance` per partner and corridor over 7/30/90-day windows: counts, success rate, reversal rate, average processing seconds — sourced from `transfers`, `routing_attempts` and `routing_decisions`.
-- The route scorer already reads `partner_performance`, so refreshed success rates immediately sharpen live route selection.
+### 2. Liquidity awareness
 
-### 3. Profitability reporting
+- **Liquidity snapshot job** (`partner-liquidity-refresh`, every 15 minutes): pulls each partner's available balance where an API exists, records it in `partner_liquidity`, and marks stale entries.
+- **Router integration**: a partner whose available liquidity is below the transaction amount (or whose snapshot is stale beyond a threshold) is skipped with a recorded reason, so failover reaches for the next-best route instead of failing at the provider.
+- Liquidity panel gains a "low / stale" status treatment and a manual balance-override entry for partners without an API.
 
-- Security-definer SQL functions (pricing-manager gated) that aggregate `transaction_economics` by partner, corridor, currency and period, returning volume, revenue, cost, profit and margin.
-- A second function for estimate-versus-actual variance, joining each economics row to its `routing_decisions` candidate so operators see where the engine's forecast drifted.
+### 3. Partner cost reconciliation
 
-### 4. Profitability dashboard UI
+- New `partner_invoices` and `partner_invoice_lines` tables plus a `partner-invoice-reconcile` function that matches a partner's billed fees against `transaction_economics` costs per transaction.
+- Output: a variance report (billed vs expected cost, unmatched transactions both ways) surfaced as a "Cost assurance" section in the Profitability tab. This is what catches silent partner over-billing.
 
-New "Profitability" tab under Settings → Partners & Routing, with:
-- Period selector (7/30/90 days, custom) and headline cards: volume, revenue, cost, gross profit, blended margin.
-- Profit by partner, by corridor and by currency tables, sortable, with margin badges.
-- Estimate-vs-actual variance panel highlighting the largest deviations.
-- A "pricing gaps" list showing corridors transacting without a `partner_pricing` row — these are the blind spots costing unmeasured margin.
+### 4. Operator alerting
+
+- A `routing-health-check` job (hourly) that raises admin notifications for: corridors transacting with no pricing on file, partners whose success rate drops below their configured floor, active kill switches, stale FX or liquidity data, and negative-margin corridors.
+- Alerts land in the existing admin notifications surface — no new inbox.
+
+### 5. Rollout controls
+
+- A per-corridor **readiness check** shown in the Live Routing panel: pricing present, FX present, liquidity fresh, performance history present. A corridor can only be flipped to live routing when its checks pass, which prevents enabling a route the engine can't price.
 
 ### Technical notes
 
-- Migration adds the aggregation functions plus an `economics_source` column (`routed` / `legacy` / `backfill`) on `transaction_economics`, and enables the hourly cron for `partner-performance-refresh`.
-- Economics writes are idempotent via the existing unique index on `transaction_economics.transfer_id`.
-- Recording economics never blocks a payout: failures are logged and swallowed, matching the existing `observeRoute` behaviour.
-- Frontend follows the established `usePartnerNetwork` / loose-`db` accessor pattern to keep generated Supabase types shallow.
+- New tables follow the existing pattern: explicit GRANTs, RLS restricted via `is_pricing_manager()`, `created_at`/`updated_at` with the shared update trigger.
+- New scheduled functions are registered with `pg_cron` + `pg_net`, matching `partner-performance-refresh`.
+- Router changes live in `_shared/routeResolver.ts` (candidate filtering) and `_shared/routingExecute.ts` (skip reasons in `routing_attempts`) — no changes to `execute-transfer`'s payout rails.
+- UI additions reuse `PartnerNetworkPanel` tabs; no new routes.
+
+### Out of scope
+
+Real partner API credentials. Where a partner exposes no balance or rate API, the flow falls back to manual entry rather than blocking the phase.
