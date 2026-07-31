@@ -5394,6 +5394,7 @@ export type Database = {
           city: string | null
           country_code: string | null
           created_at: string
+          date_of_birth: string | null
           default_currency: string | null
           efin_tag: string | null
           email: string | null
@@ -5403,6 +5404,7 @@ export type Database = {
           kyc_framework_version: number
           kyc_status: Database["public"]["Enums"]["kyc_status"]
           kyc_tier: Database["public"]["Enums"]["kyc_tier"]
+          occupation: string | null
           phone_number: string | null
           postal_code: string | null
           risk_score: number | null
@@ -5428,6 +5430,7 @@ export type Database = {
           city?: string | null
           country_code?: string | null
           created_at?: string
+          date_of_birth?: string | null
           default_currency?: string | null
           efin_tag?: string | null
           email?: string | null
@@ -5437,6 +5440,7 @@ export type Database = {
           kyc_framework_version?: number
           kyc_status?: Database["public"]["Enums"]["kyc_status"]
           kyc_tier?: Database["public"]["Enums"]["kyc_tier"]
+          occupation?: string | null
           phone_number?: string | null
           postal_code?: string | null
           risk_score?: number | null
@@ -5462,6 +5466,7 @@ export type Database = {
           city?: string | null
           country_code?: string | null
           created_at?: string
+          date_of_birth?: string | null
           default_currency?: string | null
           efin_tag?: string | null
           email?: string | null
@@ -5471,6 +5476,7 @@ export type Database = {
           kyc_framework_version?: number
           kyc_status?: Database["public"]["Enums"]["kyc_status"]
           kyc_tier?: Database["public"]["Enums"]["kyc_tier"]
+          occupation?: string | null
           phone_number?: string | null
           postal_code?: string | null
           risk_score?: number | null

@@ -9,7 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
-import { AtSign, Copy, Hash, User, Check, ChevronsUpDown } from "lucide-react";
+import { AtSign, Copy, Hash, User, Check, ChevronsUpDown, Lock } from "lucide-react";
 import { AvatarUpload } from "@/components/profile/AvatarUpload";
 import { normalizeToE164 } from "@/lib/phone";
 import PageHeroBanner from "@/components/common/PageHeroBanner";
@@ -34,6 +34,8 @@ const ProfileSettingsPage = () => {
   const [email, setEmail] = useState("");
   const [efinTag, setEfinTag] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
+  const [dateOfBirth, setDateOfBirth] = useState("");
+  const [occupation, setOccupation] = useState("");
   const [streetAddress, setStreetAddress] = useState("");
   const [city, setCity] = useState("");
   const [stateProvince, setStateProvince] = useState("");
@@ -43,6 +45,9 @@ const ProfileSettingsPage = () => {
   const [saving, setSaving] = useState(false);
   const [emailOptOut, setEmailOptOut] = useState(false);
 
+  /** Once identity is verified, legal name / DOB / phone / address are staff-only edits. */
+  const identityLocked = profile?.kyc_status === "verified";
+
   useEffect(() => {
     if (profile) {
       const p = profile as any;
@@ -50,6 +55,8 @@ const ProfileSettingsPage = () => {
       setEmail(p.email || user?.email || "");
       setEfinTag(p.efin_tag || "");
       setPhoneNumber(p.phone_number || "");
+      setDateOfBirth(p.date_of_birth || "");
+      setOccupation(p.occupation || "");
       setStreetAddress(p.street_address || "");
       setCity(p.city || "");
       setStateProvince(p.state_province || "");
@@ -101,20 +108,29 @@ const ProfileSettingsPage = () => {
         }
       }
 
+      const identityFields = identityLocked
+        ? {}
+        : {
+            full_name: fullName,
+            phone_number: normalizedPhone,
+            date_of_birth: dateOfBirth || null,
+            occupation: occupation || null,
+            street_address: streetAddress || null,
+            city: city || null,
+            state_province: stateProvince || null,
+            postal_code: postalCode || null,
+            address_country: addressCountry ? addressCountry.toUpperCase().slice(0, 2) : null,
+          };
+
       const { error } = await supabase
         .from('profiles')
         .update({
-          full_name: fullName,
           email,
           efin_tag: cleanTag || null,
-          phone_number: normalizedPhone,
-          street_address: streetAddress || null,
-          city: city || null,
-          state_province: stateProvince || null,
-          postal_code: postalCode || null,
-          address_country: addressCountry ? addressCountry.toUpperCase().slice(0, 2) : null,
+          ...identityFields,
         })
         .eq('user_id', user.id);
+
 
       if (error) {
         if (error.message.includes('duplicate') || error.code === '23505') {
@@ -214,13 +230,22 @@ const ProfileSettingsPage = () => {
         </Card>
 
         <Card className="p-6 space-y-4">
+          {identityLocked && (
+            <div className="flex items-start gap-3 rounded-lg border border-border bg-muted/40 p-3">
+              <Lock className="w-4 h-4 mt-0.5 text-muted-foreground shrink-0" />
+              <p className="text-xs text-muted-foreground">
+                Your identity has been verified. Legal name, date of birth, phone and address can only be changed by
+                support — contact us to request a correction. Your tag, email and avatar remain editable.
+              </p>
+            </div>
+          )}
           <div className="space-y-2">
             <Label htmlFor="fullName">Display Name</Label>
             <Input
               id="fullName"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
-              disabled={isLoading}
+              disabled={isLoading || identityLocked}
             />
           </div>
           <div className="space-y-2">
@@ -262,31 +287,55 @@ const ProfileSettingsPage = () => {
             </p>
           </div>
 
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="dob">Date of birth</Label>
+              <Input
+                id="dob"
+                type="date"
+                value={dateOfBirth}
+                onChange={(e) => setDateOfBirth(e.target.value)}
+                disabled={isLoading || identityLocked}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="occupation">Occupation</Label>
+              <Input
+                id="occupation"
+                value={occupation}
+                onChange={(e) => setOccupation(e.target.value)}
+                placeholder="Software engineer"
+                maxLength={120}
+                disabled={isLoading || identityLocked}
+              />
+            </div>
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="phone">Phone number</Label>
-            <Input id="phone" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} placeholder="+234 806 860 8302" />
+            <Input id="phone" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} placeholder="+234 806 860 8302" disabled={isLoading || identityLocked} />
             <p className="text-xs text-muted-foreground">
               Use + and country code (+1, +234, +44…). Local 0… numbers convert using Country below (NG→+234, CA→+1).
             </p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="street">Street address</Label>
-            <Input id="street" value={streetAddress} onChange={(e) => setStreetAddress(e.target.value)} placeholder="123 Main St" />
+            <Input id="street" value={streetAddress} onChange={(e) => setStreetAddress(e.target.value)} placeholder="123 Main St" disabled={isLoading || identityLocked} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label htmlFor="city">City</Label>
-              <Input id="city" value={city} onChange={(e) => setCity(e.target.value)} />
+              <Input id="city" value={city} onChange={(e) => setCity(e.target.value)} disabled={isLoading || identityLocked} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="state">State / Province</Label>
-              <Input id="state" value={stateProvince} onChange={(e) => setStateProvince(e.target.value)} placeholder="ON" />
+              <Input id="state" value={stateProvince} onChange={(e) => setStateProvince(e.target.value)} placeholder="ON" disabled={isLoading || identityLocked} />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label htmlFor="postal">Postal code</Label>
-              <Input id="postal" value={postalCode} onChange={(e) => setPostalCode(e.target.value)} placeholder="M5V 2T6" />
+              <Input id="postal" value={postalCode} onChange={(e) => setPostalCode(e.target.value)} placeholder="M5V 2T6" disabled={isLoading || identityLocked} />
             </div>
             <div className="space-y-2">
               <Label>Country</Label>
@@ -297,6 +346,7 @@ const ProfileSettingsPage = () => {
                     variant="outline"
                     role="combobox"
                     aria-expanded={countryOpen}
+                    disabled={isLoading || identityLocked}
                     className="w-full justify-between font-normal"
                   >
                     {findIsoCountry(addressCountry) ? (

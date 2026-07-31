@@ -1,19 +1,48 @@
-## What I verified
+## Goal
 
-- The settings table, its grants, primary key on `key`, RLS policies (read for any signed-in user; insert/update for `admin` role or super admins) and the `updated_at` trigger are all correct in the backend.
-- Network capture from your session shows the **Notification** save actually succeeded (HTTP 201 at 09:24 and 200 at 09:27) and the rows are in the database — yet a red "Could not save settings / Unexpected error" toast was shown.
-- No `security.*`, `email.*` or `data.*` rows exist yet, so at least one other section has never saved successfully.
-- Root cause of the useless message: the settings hook does `throw error`, where `error` is a Supabase error **object**, not an `Error` instance. Every save handler does `e instanceof Error ? e.message : "Unexpected error"`, so the real reason (code, message, hint) is always swallowed and shown as "Unexpected error". The exact failure for the non-saving sections is therefore still unconfirmed.
+Let admin staff correct and update a user's information from the admin portal — both while the user is still onboarding and after — with identity fields locked behind admin-only editing once KYC is approved, and every change written to the audit trail.
 
-## Plan
+## Current state (verified)
 
-1. **Surface the real error** — in `src/hooks/useSystemSettings.tsx`, convert Supabase errors into a proper `Error` carrying `message`, `code`, `details` and `hint` before throwing, so all settings toasts show the actual cause instead of "Unexpected error". Also log it to the console.
-2. **Reproduce each section** — drive the Settings page in a headless browser as the signed-in admin, click every Save button (General, Email, Notifications, Security, Data, Pricing, Module Access) and capture the request/response for each. This tells us definitively which sections fail and why.
-3. **Fix the confirmed cause(s)** — likely candidates given the code: numeric inputs sent as empty strings/NaN, a section saving `undefined` values, or a permission gap for admin-portal roles that aren't `admin` in user roles. Fix only what the reproduction shows (input coercion in the panel, or an RLS/role adjustment if that's the real blocker).
-4. **Prevent silent success-with-error** — verify the mutation's success path actually correlates with the toast shown, and clean up the duplicate `useSystemSettings` instances if one section's shared mutation state is producing a false failure toast.
-5. **Deployed build** — after the fix verifies locally, re-publish so `efinmoney.lovable.app` picks it up; the published bundle can be older than the settings work.
+- `public.profiles` holds name, email, phone, address, tag, currency/country — but has **no** date-of-birth or occupation column.
+- RLS already allows admins to update any profile ("Admins can update all profiles"); users can update their own.
+- `/profile` (ProfileSettingsPage) is the user's self-service editor; it has no KYC lock — a verified user can still change their legal name/address today.
+- Admin `/admin/users/:id` (UserDetailPage) is **read-only** — it renders profile rows but has no edit form.
+- `AdminAuthContext` already defines an `edit_users` permission (super_admin + compliance_officer).
+- `audit_logs` exists with an admin/compliance read policy and no insert policy — writes must come from the server.
+
+## What gets built
+
+### 1. Schema
+Add to `profiles`: `date_of_birth` (date), `occupation` (text). No other structural change; `default_currency`, `address_country`, `country_code` already exist.
+
+### 2. Server-side update path (`admin-update-user` edge function)
+A single authenticated function that:
+- verifies the caller is an active admin with `edit_users`;
+- accepts a whitelist of editable fields (full name, email, phone, DOB, occupation, street/city/state/postal/country, default currency, eFin tag);
+- validates input (E.164 phone, ISO-2 country, ISO-4217 currency, DOB ≥ 18 years and in the past, eFin tag pattern/uniqueness);
+- writes the change with service role and records an `audit_logs` row (`action: 'admin_update_profile'`, `table_name: 'profiles'`, `record_id`, `old_data`, `new_data` diff, actor `user_id`);
+- optionally updates the auth email when the email changes.
+
+### 3. Admin UI — Edit user
+On `/admin/users/:id`, add an **Edit** button on the header card opening a dialog (new `src/components/admin-portal/EditUserDialog.tsx`) with sections: Identity (name, DOB, occupation, email, phone), Address (street/city/state/postal/country combobox), Preferences (default currency, eFin tag). Save calls the edge function, invalidates the profile query, toasts the real error on failure. Button hidden/disabled unless `hasPermission("edit_users")`.
+
+Also add a **Change history** block in the Overview tab listing that user's `audit_logs` entries (what changed, by whom, when).
+
+### 4. KYC lock on the user's own profile
+In `ProfileSettingsPage`, once `kyc_status === 'verified'` (or tier ≥ tier_1 with approved verification), the identity fields — full name, DOB, phone, and address — become read-only with an inline note: "Verified details can only be changed by support. Contact us to request a change." Tag, email, avatar and email preferences stay user-editable. The same rule is enforced server-side in a profiles `BEFORE UPDATE` trigger so a verified user can't change locked columns via the API — admin updates (service role / admin role) bypass it.
+
+### 5. During onboarding
+Onboarding stays user-editable (KYC not yet approved), and the same admin Edit dialog works for in-progress users, so staff can fix a typo before approving from the KYC queue. A "Edit user details" link is added to the KYC review page header pointing at the same dialog.
 
 ## Technical notes
 
-- Files touched: `src/hooks/useSystemSettings.tsx` (error normalization), and whichever settings panel the reproduction implicates (`SystemSettingsPanel.tsx`, `PricingSettingsPanel.tsx`, `ModuleAccessPanel.tsx`).
-- No schema change is planned unless step 2 shows a genuine permission failure; grants and policies already check out.
+- DOB/occupation are added to the `useProfile` select list and `Profile` interface.
+- Currency options come from the existing `worldCurrencies.ts` / `CurrencyManagementPanel` source; countries from `ISO_COUNTRIES`.
+- Phone normalisation reuses `normalizeToE164`.
+- The lock trigger compares OLD/NEW on the locked columns only, and no-ops when `has_role(auth.uid(),'admin') or is_admin_user(auth.uid())`.
+
+## Out of scope
+
+- Changing a user's password or KYC decision (already handled by existing approve/reject flows).
+- Bulk edits or CSV import of user data.

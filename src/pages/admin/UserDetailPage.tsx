@@ -16,13 +16,15 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   ArrowLeft, Mail, Phone, MapPin, Calendar, Shield, Wallet, ArrowRightLeft,
   User as UserIcon, Hash, Activity, AlertTriangle, AtSign, MessageSquare, FileWarning, Headphones,
-  ShieldCheck, ShieldOff, Send, Loader2, ExternalLink,
+  ShieldCheck, ShieldOff, Send, Loader2, ExternalLink, Pencil,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
 import { countryToCurrency, currencySymbol } from "@/lib/currency";
+import EditUserDialog from "@/components/admin-portal/EditUserDialog";
+import UserChangeHistory from "@/components/admin-portal/UserChangeHistory";
 
 
 // support_threads / support_messages aren't in the generated types yet.
@@ -84,6 +86,7 @@ const UserDetailPage = () => {
   const [revokeReason, setRevokeReason] = useState("");
   const [replyText, setReplyText] = useState<Record<string, string>>({});
   const [replySending, setReplySending] = useState<Record<string, boolean>>({});
+  const [editOpen, setEditOpen] = useState(false);
 
   const ensureKycRow = async (): Promise<string | null> => {
     if (!id) return null;
@@ -401,9 +404,22 @@ const UserDetailPage = () => {
                   )}
                 </div>
               </div>
+              {hasPermission("edit_users") && (
+                <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
+                  <Pencil className="w-4 h-4 mr-1" /> Edit details
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>
+
+        <EditUserDialog
+          open={editOpen}
+          onOpenChange={setEditOpen}
+          profile={profile as never}
+          invalidateKeys={[["admin-user-detail", id], ["admin-users"]]}
+        />
+
 
         <Tabs defaultValue="overview" className="space-y-4">
           <TabsList className="flex-wrap h-auto">
@@ -421,6 +437,12 @@ const UserDetailPage = () => {
                   <Row label="Full name" value={profile.full_name || "—"} />
                   <Row label="Email" value={profile.email || "—"} />
                   <Row label="Phone" value={profile.phone_number || "—"} />
+                  <Row
+                    label="Date of birth"
+                    value={profile.date_of_birth ? format(new Date(`${profile.date_of_birth}T00:00:00`), "PPP") : "—"}
+                    icon={<Calendar className="w-3.5 h-3.5" />}
+                  />
+                  <Row label="Occupation" value={profile.occupation || "—"} />
                   <Row label="Account #" value={profile.account_number || "—"} icon={<Hash className="w-3.5 h-3.5" />} />
                   <Row label="eFin tag" value={profile.efin_tag ? `@${profile.efin_tag}` : "—"} icon={<AtSign className="w-3.5 h-3.5" />} />
                   <Row
@@ -515,7 +537,10 @@ const UserDetailPage = () => {
                 </div>
               </CardContent>
             </Card>
+
+            {id && <UserChangeHistory userId={id} />}
           </TabsContent>
+
 
 
 
