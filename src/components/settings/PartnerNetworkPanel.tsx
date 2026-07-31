@@ -21,6 +21,10 @@ import MarginGuardrailsPanel from "./partners/MarginGuardrailsPanel";
 import PricingRecommendationsPanel from "./partners/PricingRecommendationsPanel";
 import FeeAdjustmentsPanel from "./partners/FeeAdjustmentsPanel";
 import PartnerScorecardsPanel from "./partners/PartnerScorecardsPanel";
+import CorridorForecastPanel from "./partners/CorridorForecastPanel";
+import LiquidityForecastPanel from "./partners/LiquidityForecastPanel";
+import PartnerIncidentsPanel from "./partners/PartnerIncidentsPanel";
+
 
 
 
