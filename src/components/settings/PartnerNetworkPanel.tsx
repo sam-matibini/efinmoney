@@ -24,6 +24,7 @@ import PartnerScorecardsPanel from "./partners/PartnerScorecardsPanel";
 import CorridorForecastPanel from "./partners/CorridorForecastPanel";
 import LiquidityForecastPanel from "./partners/LiquidityForecastPanel";
 import PartnerIncidentsPanel from "./partners/PartnerIncidentsPanel";
+import ApiPartnersPanel from "./partners/ApiPartnersPanel";
 
 
 
