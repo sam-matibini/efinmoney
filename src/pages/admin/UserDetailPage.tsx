@@ -651,6 +651,7 @@ const UserDetailPage = () => {
           </TabsContent>
 
           <TabsContent value="crm" className="space-y-4">
+            <UserActivityTimeline userId={id!} canLog />
             <div className="grid lg:grid-cols-2 gap-4">
               <Card>
                 <CardHeader>
