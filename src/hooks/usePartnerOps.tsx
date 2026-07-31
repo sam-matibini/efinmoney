@@ -844,7 +844,7 @@ export const useUpdateFundingTask = () => {
     mutationFn: async (
       { id, status, notes }: { id: string; status: FundingTask["status"]; notes?: string },
     ) => {
-      const auth = (await db.auth.getUser()).data;
+      const { data: auth } = await supabase.auth.getUser();
       const { error } = await db
         .from("funding_tasks")
         .update({
