@@ -24,6 +24,7 @@ import PartnerScorecardsPanel from "./partners/PartnerScorecardsPanel";
 import CorridorForecastPanel from "./partners/CorridorForecastPanel";
 import LiquidityForecastPanel from "./partners/LiquidityForecastPanel";
 import PartnerIncidentsPanel from "./partners/PartnerIncidentsPanel";
+import ApiPartnersPanel from "./partners/ApiPartnersPanel";
 
 
 
@@ -57,6 +58,8 @@ export const PartnerNetworkPanel = () => (
         <TabsTrigger value="incidents">Incidents</TabsTrigger>
 
         <TabsTrigger value="limits">Limits</TabsTrigger>
+
+        <TabsTrigger value="api">API partners</TabsTrigger>
 
         <TabsTrigger value="alerts">Alerts</TabsTrigger>
       </TabsList>
@@ -137,6 +140,11 @@ export const PartnerNetworkPanel = () => (
     <TabsContent value="limits">
       <SectionBoundary name="PartnerLimitsPanel"><PartnerLimitsPanel /></SectionBoundary>
     </TabsContent>
+
+    <TabsContent value="api">
+      <SectionBoundary name="ApiPartnersPanel"><ApiPartnersPanel /></SectionBoundary>
+    </TabsContent>
+
 
     <TabsContent value="alerts">
       <SectionBoundary name="PartnerAlertsPanel"><PartnerAlertsPanel /></SectionBoundary>
