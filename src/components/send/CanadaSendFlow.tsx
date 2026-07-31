@@ -108,8 +108,12 @@ const elementWrapperClass =
 type DeliveryMethod = "interac" | "eft" | "card_push" | "stripe_connect" | "paylink";
 type FundingSource = "wallet" | "card";
 
-const DELIVERY_FEES: Record<DeliveryMethod, number> = { interac: 0.5, eft: 0, card_push: 1.0, stripe_connect: 1.0, paylink: 0 };
-const CARD_PROCESSING_FEE = 1.5;
+const DELIVERY_METHODS: DeliveryMethod[] = ["eft", "interac", "card_push", "stripe_connect", "paylink"];
+
+// Fallbacks only — used when the central rate card has no row for a method.
+// The authoritative price always comes from the `price-quote` function.
+const FALLBACK_DELIVERY_FEES: Record<DeliveryMethod, number> = { interac: 0.5, eft: 0, card_push: 1.0, stripe_connect: 1.0, paylink: 0 };
+const FALLBACK_CARD_PROCESSING_FEE = 1.5;
 
 const FLOW_STEPS = [
   { num: 1, label: "Amount" },
@@ -126,6 +130,8 @@ type DeliveryOption = {
   badge?: string;
   disabled?: boolean;
 };
+
+const formatFeeLabel = (fee: number) => (fee > 0 ? `C$${fee.toFixed(2)}` : "Free");
 
 function StepIndicator({ step }: { step: number }) {
   return (
@@ -533,7 +539,7 @@ const CanadaSendFlow = () => {
       id: "eft",
       title: "Bank transfer",
       subtitle: PAYSAFE_PAYOUTS_ENABLED ? "Direct deposit · 1–3 business days" : "Paysafe · unavailable in test",
-      feeLabel: "Free",
+      feeLabel: formatFeeLabel(feeForMethod("eft")),
       icon: Landmark,
       disabled: !PAYSAFE_PAYOUTS_ENABLED,
       badge: PAYSAFE_PAYOUTS_ENABLED ? undefined : "Paysafe test",
@@ -542,7 +548,7 @@ const CanadaSendFlow = () => {
       id: "interac" as const,
       title: "Interac e-Transfer",
       subtitle: "Email deposit · minutes",
-      feeLabel: "C$0.50",
+      feeLabel: formatFeeLabel(feeForMethod("interac")),
       icon: Zap,
       badge: "Beta",
     }] : []),
@@ -550,7 +556,7 @@ const CanadaSendFlow = () => {
       id: "card_push",
       title: "Instant to debit card",
       subtitle: "Visa Direct · seconds",
-      feeLabel: "C$1.00",
+      feeLabel: formatFeeLabel(feeForMethod("card_push")),
       icon: CreditCard,
       badge: "Stripe",
     },
@@ -558,7 +564,7 @@ const CanadaSendFlow = () => {
       id: "stripe_connect",
       title: "My Stripe account",
       subtitle: connectReady ? "Instant payout to your card" : "Finish setup at /stripe-connect",
-      feeLabel: "C$1.00",
+      feeLabel: formatFeeLabel(feeForMethod("stripe_connect")),
       icon: Building2,
       badge: connectReady ? "Stripe" : "Setup",
     },
@@ -566,11 +572,11 @@ const CanadaSendFlow = () => {
       id: "paylink",
       title: "Payment link",
       subtitle: "Recipient chooses how to claim",
-      feeLabel: "Free",
+      feeLabel: formatFeeLabel(feeForMethod("paylink")),
       icon: Link2,
       badge: "Stripe",
     },
-  ], [connectReady]);
+  ], [connectReady, feeForMethod]);
 
   const handleDeliverySelect = (opt: DeliveryOption) => {
     if (opt.id === "stripe_connect" && !connectReady) {
@@ -588,8 +594,39 @@ const CanadaSendFlow = () => {
   const fallbackWallet = (wallets || [])[0];
 
   const parsedAmount = Math.max(0, parseFloat(amount) || 0);
-  const deliveryFee = parsedAmount > 0 ? DELIVERY_FEES[method] : 0;
-  const cardFee = parsedAmount > 0 && funding === "card" ? CARD_PROCESSING_FEE : 0;
+
+  // Prices come from the central rate card (efinmoney_pricing) via the
+  // `price-quote` edge function — one leg per delivery method plus card funding.
+  const priceLegs = useMemo(() => [
+    ...DELIVERY_METHODS.map((m) => ({
+      label: m, direction: "payout" as const, payment_method: m, amount: parsedAmount,
+    })),
+    { label: "card_funding", direction: "payin" as const, payment_method: "card", amount: parsedAmount },
+  ], [parsedAmount]);
+
+  const { data: priceQuote } = usePriceQuote({
+    direction: "payout",
+    sourceCurrency: "CAD",
+    destCurrency: "CAD",
+    destCountry: "CA",
+    paymentMethod: method,
+    amount: parsedAmount,
+    legs: priceLegs,
+  });
+
+  const feeForMethod = useCallback((m: DeliveryMethod) => {
+    if (parsedAmount <= 0) return 0;
+    const leg = priceQuote?.legs?.find((l) => l.label === m);
+    return leg && !leg.pricingMissing ? Number(leg.fee) : FALLBACK_DELIVERY_FEES[m];
+  }, [priceQuote, parsedAmount]);
+
+  const deliveryFee = feeForMethod(method);
+  const cardFundingLeg = priceQuote?.legs?.find((l) => l.label === "card_funding");
+  const cardFee = parsedAmount > 0 && funding === "card"
+    ? (cardFundingLeg && !cardFundingLeg.pricingMissing
+      ? Number(cardFundingLeg.fee)
+      : FALLBACK_CARD_PROCESSING_FEE)
+    : 0;
   const totalFee = deliveryFee + cardFee;
   const receivedAmount = Math.max(0, parsedAmount - deliveryFee);
   const totalCharged = parsedAmount + cardFee;
