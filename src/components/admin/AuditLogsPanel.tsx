@@ -3,7 +3,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { format } from "date-fns";
 import { formatInSystemTz } from "@/lib/datetime";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Shield, UserCog, Fingerprint } from "lucide-react";
