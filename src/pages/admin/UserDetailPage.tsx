@@ -86,6 +86,7 @@ const UserDetailPage = () => {
   const [revokeReason, setRevokeReason] = useState("");
   const [replyText, setReplyText] = useState<Record<string, string>>({});
   const [replySending, setReplySending] = useState<Record<string, boolean>>({});
+  const [editOpen, setEditOpen] = useState(false);
 
   const ensureKycRow = async (): Promise<string | null> => {
     if (!id) return null;
