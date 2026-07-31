@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,7 +21,8 @@ const ID_TYPES = [
 ];
 
 const StaffOnboardingPage = () => {
-  const { user, admin, loading, signOut } = useAdminAuth();
+  const { user } = useAuth();
+  const { admin, loading, signOut } = useAdminAuth();
   const navigate = useNavigate();
 
   const [password, setPassword] = useState("");

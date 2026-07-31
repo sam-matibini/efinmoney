@@ -262,7 +262,7 @@ const AdminLayout = ({ children }: { children: ReactNode }) => {
 
   const handleSignOut = async () => {
     await signOut();
-    navigate("/admin/login");
+    navigate("/auth?next=/admin/dashboard");
   };
 
   const handleSearch = (e: React.FormEvent) => {

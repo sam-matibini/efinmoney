@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, ReactNode, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { User } from "@supabase/supabase-js";
 import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
 
 export type AdminRole =
   | "super_admin"
@@ -55,101 +55,114 @@ const ROLE_PERMISSIONS: Record<AdminRole, AdminAction[]> = {
 };
 
 interface AdminAuthContextType {
-  user: User | null;
   admin: AdminRecord | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   hasPermission: (action: AdminAction) => boolean;
   requirePermission: (action: AdminAction) => boolean;
-  checkLockout: (email: string) => Promise<{ locked: boolean; lockedUntil: string | null; remainingSeconds: number }>;
 }
 
 const AdminAuthContext = createContext<AdminAuthContextType | undefined>(undefined);
 
 const IDLE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 
+/**
+ * Thin wrapper around the shared `useAuth()` that adds admin-only concerns:
+ *   * loading the admin_users record for the signed-in user
+ *   * role + department permission checks
+ *   * admin-side 30-minute idle auto-logout
+ *
+ * Sign-in / sign-out / lockout all flow through the shared `useAuth` so
+ * there is exactly one Supabase auth subscription for the whole app.
+ */
 export const AdminAuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const { user, signOut: sharedSignOut } = useAuth();
   const [admin, setAdmin] = useState<AdminRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const fetchAdmin = useCallback(async (uid: string) => {
-    const { data, error } = await supabase
-      .from("admin_users")
-      .select("id, role, status, full_name, email, department, permissions")
-      .eq("id", uid)
-      .maybeSingle();
-    if (error) {
-      console.warn("AdminAuth: error fetching admin record", error);
-      setAdmin(null);
-      return null;
-    }
-    if (!data) {
-      console.warn("AdminAuth: no admin record found for user", uid);
-      toast.error("Unable to verify admin access. Please sign in again.");
-      setAdmin(null);
-      return null;
-    }
+  // Reset loading whenever the user identity changes (sign-in or sign-out).
+  useEffect(() => {
+    setLoading(true);
+  }, [user?.id]);
 
-    let departmentPermissions: AdminAction[] = [];
-    if (data.department) {
-      const { data: dept } = await (supabase as any)
-        .from("departments")
-        .select("permissions")
-        .eq("name", data.department)
+  // Fetch the admin record whenever the signed-in user changes.
+  useEffect(() => {
+    if (!user) {
+      setAdmin(null);
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from("admin_users")
+        .select("id, role, status, full_name, email, department, permissions")
+        .eq("id", user.id)
         .maybeSingle();
-      if (dept?.permissions && Array.isArray(dept.permissions)) {
-        departmentPermissions = dept.permissions.filter(
-          (p): p is AdminAction => typeof p === "string"
-        );
+      if (cancelled) return;
+      if (error) {
+        console.warn("AdminAuth: error fetching admin record", error);
+        setAdmin(null);
+        setLoading(false);
+        return;
       }
-    }
+      if (!data) {
+        // Signed in but not an admin — leave admin=null. AdminGuard handles redirect.
+        setAdmin(null);
+        setLoading(false);
+        return;
+      }
 
-    const rec: AdminRecord = {
-      id: data.id,
-      role: data.role as AdminRole,
-      status: (data.status as AdminStatus) ?? "active",
-      full_name: data.full_name,
-      email: (data as { email?: string | null }).email ?? null,
-      department: (data as { department?: string | null }).department ?? null,
-      departmentPermissions,
-      permissions: (data.permissions as Record<string, unknown>) || {},
+      let departmentPermissions: AdminAction[] = [];
+      if (data.department) {
+        const { data: dept } = await (supabase as any)
+          .from("departments")
+          .select("permissions")
+          .eq("name", data.department)
+          .maybeSingle();
+        if (dept?.permissions && Array.isArray(dept.permissions)) {
+          departmentPermissions = dept.permissions.filter(
+            (p): p is AdminAction => typeof p === "string"
+          );
+        }
+      }
+
+      const rec: AdminRecord = {
+        id: data.id,
+        role: data.role as AdminRole,
+        status: (data.status as AdminStatus) ?? "active",
+        full_name: data.full_name,
+        email: (data as { email?: string | null }).email ?? null,
+        department: (data as { department?: string | null }).department ?? null,
+        departmentPermissions,
+        permissions: (data.permissions as Record<string, unknown>) || {},
+      };
+      setAdmin(rec);
+      setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
     };
-    setAdmin(rec);
-    return rec;
-  }, []);
+  }, [user?.id]);
 
   const signOut = useCallback(async () => {
-    try {
-      await supabase.auth.signOut({ scope: 'local' });
-    } catch (e) {
-      console.warn('admin signOut error, forcing local clear', e);
-    }
-    try {
-      const url = import.meta.env.VITE_SUPABASE_URL;
-      const projectRef = url ? new URL(url).hostname.split('.')[0] : null;
-      if (projectRef) {
-        localStorage.removeItem(`sb-${projectRef}-auth-token`);
-      }
-    } catch {}
+    await sharedSignOut();
     setAdmin(null);
-    setUser(null);
-  }, []);
+  }, [sharedSignOut]);
 
-  // Idle auto-logout
+  // Idle auto-logout — only while a confirmed admin is signed in.
   const resetIdle = useCallback(() => {
     if (idleTimer.current) clearTimeout(idleTimer.current);
-    if (!user) return;
+    if (!admin) return;
     idleTimer.current = setTimeout(async () => {
       toast.warning("Session expired due to inactivity. Please sign in again.");
       await signOut();
     }, IDLE_TIMEOUT_MS);
-  }, [user, signOut]);
+  }, [admin, signOut]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!admin) return;
     const events = ["mousemove", "keydown", "click", "scroll", "touchstart"];
     const handler = () => resetIdle();
     events.forEach((e) => window.addEventListener(e, handler, { passive: true }));
@@ -158,106 +171,11 @@ export const AdminAuthProvider = ({ children }: { children: ReactNode }) => {
       events.forEach((e) => window.removeEventListener(e, handler));
       if (idleTimer.current) clearTimeout(idleTimer.current);
     };
-  }, [user, resetIdle]);
-
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        // Defer to avoid deadlock on auth callback
-        setTimeout(() => {
-          fetchAdmin(session.user.id).finally(() => setLoading(false));
-        }, 0);
-      } else {
-        setAdmin(null);
-        setLoading(false);
-      }
-    });
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchAdmin(session.user.id).finally(() => setLoading(false));
-      } else {
-        setLoading(false);
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, [fetchAdmin]);
-
-  const signIn = async (email: string, password: string) => {
-    try {
-      // 1. Check for an active lockout before we even attempt auth, so
-      //    the password is never sent to Supabase while locked.
-      const lockout = await (supabase as any).rpc("check_login_lockout", { p_email: email, p_kind: "admin" });
-      const lockoutData = (lockout as any)?.data;
-      if (lockoutData?.locked) {
-        const mins = Math.max(1, Math.ceil((lockoutData.remaining_seconds ?? 0) / 60));
-        return {
-          error: new Error(
-            `Too many failed sign-in attempts. This account is locked. Try again in ${mins} minute${mins === 1 ? "" : "s"}.`
-          ),
-        };
-      }
-
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
-      const rec = await fetchAdmin(data.user!.id);
-      if (!rec) {
-        await supabase.auth.signOut();
-        return { error: new Error("Access denied — this account is not registered as an administrator.") };
-      }
-      // 2. Successful sign-in: clear any admin lockout for this email.
-      try {
-        await (supabase as any).rpc("clear_login_lockout", { p_email: email, p_kind: "admin" });
-      } catch { /* best effort */ }
-      return { error: null };
-    } catch (e) {
-      // 3. Log the failure and surface the remaining-attempts / lockout info.
-      try {
-        const { data: failData } = await (supabase as any).rpc("log_login_failure", { p_email: email, p_kind: "admin" });
-        if (failData?.locked) {
-          const mins = Math.max(1, Math.ceil((failData.remaining_seconds ?? 0) / 60));
-          return {
-            error: new Error(
-              `Too many failed sign-in attempts. This account is now locked for 2 hours. Try again in ${mins} minute${mins === 1 ? "" : "s"}.`
-            ),
-          };
-        }
-        if (typeof failData?.remaining_attempts === "number" && failData.remaining_attempts > 0) {
-          return {
-            error: new Error(
-              `Incorrect email or password. ${failData.remaining_attempts} attempt${failData.remaining_attempts === 1 ? "" : "s"} left before your account is locked.`
-            ),
-          };
-        }
-      } catch (rpcErr) {
-        console.warn("[AdminAuth] log_login_failure RPC failed:", rpcErr);
-      }
-      return { error: e as Error };
-    }
-  };
-
-  const checkLockout = useCallback(async (email: string) => {
-    try {
-      const { data } = await (supabase as any).rpc("check_login_lockout", { p_email: email, p_kind: "admin" });
-      if (data?.locked) {
-        return {
-          locked: true,
-          lockedUntil: data.locked_until as string | null,
-          remainingSeconds: (data.remaining_seconds as number) ?? 0,
-        };
-      }
-    } catch { /* ignore */ }
-    return { locked: false, lockedUntil: null, remainingSeconds: 0 };
-  }, []);
+  }, [admin, resetIdle]);
 
   const hasPermission = useCallback((action: AdminAction) => {
     if (!admin || admin.status !== "active") return false;
-    // Role-based permissions
     if (ROLE_PERMISSIONS[admin.role]?.includes(action)) return true;
-    // Department-level permissions (union with role-based)
     if (admin.departmentPermissions?.includes(action)) return true;
     return false;
   }, [admin]);
@@ -269,7 +187,7 @@ export const AdminAuthProvider = ({ children }: { children: ReactNode }) => {
   }, [hasPermission]);
 
   return (
-    <AdminAuthContext.Provider value={{ user, admin, loading, signIn, signOut, hasPermission, requirePermission, checkLockout }}>
+    <AdminAuthContext.Provider value={{ admin, loading, signOut, hasPermission, requirePermission }}>
       {children}
     </AdminAuthContext.Provider>
   );

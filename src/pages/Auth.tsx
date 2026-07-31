@@ -23,7 +23,14 @@ const Auth = () => {
   const [params] = useSearchParams();
   const modeParam = params.get("mode");
   const redirectTo = params.get("redirect");
-  const [isSignUp, setIsSignUp] = useState(modeParam !== "signin");
+  const nextParam = params.get("next");
+  // The post-signin target. Prefer `next` (used by AdminGuard) over the
+  // older `redirect` so admins always get back to the admin portal.
+  const postSignInTarget = nextParam || redirectTo;
+  // Detect admin flow from the URL so the lockout banner + RPC use the
+  // stricter 3-attempt / 2h rules instead of the customer 10/1h.
+  const isAdminFlow = (postSignInTarget ?? "").startsWith("/admin");
+  const [isSignUp, setIsSignUp] = useState(modeParam !== "signin" && !nextParam);
   const [accountType, setAccountType] = useState<"individual" | "business" | null>(null);
   const [email, setEmail] = useState("");
   const [emailCheck, setEmailCheck] = useState<"idle" | "checking" | "valid" | "invalid">("idle");
@@ -51,7 +58,11 @@ const Auth = () => {
   const [sendingReset, setSendingReset] = useState(false);
   const { signIn, signUp } = useAuth();
   const navigate = useNavigate();
-  const lockout = useLoginLockout({ maxAttempts: 10, kind: "customer" });
+  const lockout = useLoginLockout({
+    maxAttempts: isAdminFlow ? 3 : 10,
+    kind: isAdminFlow ? "admin" : "customer",
+  });
+  const lockoutHours = isAdminFlow ? "2 hours" : "1 hour";
 
   useEffect(() => {
     if (modeParam) {
@@ -62,8 +73,10 @@ const Auth = () => {
   }, [modeParam]);
 
   useEffect(() => {
-    document.title = isSignUp ? "Create account · eFinMoney" : "Sign in · eFinMoney";
-  }, [isSignUp]);
+    document.title = isSignUp
+      ? (isAdminFlow ? "Admin sign in · eFinMoney" : "Create account · eFinMoney")
+      : (isAdminFlow ? "Admin sign in · eFinMoney" : "Sign in · eFinMoney");
+  }, [isSignUp, isAdminFlow]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -111,8 +124,8 @@ const Auth = () => {
         if (error) toast.error(error.message);
         else {
           // Identity is required before transfers; preserve the deep-link for after KYC.
-          if (isSafeRedirect(redirectTo)) {
-            try { sessionStorage.setItem("efm_post_kyc_redirect", redirectTo); } catch { /* noop */ }
+          if (isSafeRedirect(postSignInTarget)) {
+            try { sessionStorage.setItem("efm_post_kyc_redirect", postSignInTarget); } catch { /* noop */ }
           }
           // Email confirmation is required — show the "check your inbox" screen.
           setSignedUpEmail(email);
@@ -125,14 +138,15 @@ const Auth = () => {
           toast.error(`Account is locked. Try again in ${lockout.formatRemaining(current.remainingSeconds)}.`);
           return;
         }
-        const { error } = await signIn(email, password);
+        const signInKind: "admin" | "customer" = isAdminFlow ? "admin" : "customer";
+        const { error } = await signIn(email, password, signInKind);
         if (error) {
           toast.error(error.message);
           await lockout.applyError(error.message, email);
         } else {
           lockout.reset();
           toast.success("Welcome back!");
-          navigate(isSafeRedirect(redirectTo) ? redirectTo : "/dashboard");
+          navigate(isSafeRedirect(postSignInTarget) ? postSignInTarget : "/dashboard");
         }
       }
     } finally {
@@ -333,20 +347,24 @@ const Auth = () => {
         >
           <div className="text-center mb-10">
             <h1 className="text-4xl md:text-5xl font-black tracking-tight text-neutral-900">
-              {isSignUp
-                ? accountType === "business"
-                  ? "Create your business account"
-                  : "Create your account"
-                : "Welcome back"}
+              {isAdminFlow
+                ? "Admin sign in"
+                : isSignUp
+                  ? accountType === "business"
+                    ? "Create your business account"
+                    : "Create your account"
+                  : "Welcome back"}
             </h1>
             <p className="mt-3 text-neutral-600">
-              {isSignUp
-                ? accountType
-                  ? accountType === "business"
-                    ? "First, create your login — you'll add your company details next."
-                    : "Just a few details to get started."
-                  : "First, who is this account for?"
-                : "Sign in to access your wallets."}
+              {isAdminFlow
+                ? "Sign in to the eFin Money admin portal."
+                : isSignUp
+                  ? accountType
+                    ? accountType === "business"
+                      ? "First, create your login — you'll add your company details next."
+                      : "Just a few details to get started."
+                    : "First, who is this account for?"
+                  : "Sign in to access your wallets."}
             </p>
           </div>
 
@@ -407,8 +425,8 @@ const Auth = () => {
             formatRemaining={lockout.formatRemaining}
             attemptsLeft={lockout.attemptsLeft}
             showAttemptsWarning={lockout.showAttemptsWarning}
-            maxAttempts={10}
-            lockoutDuration="1 hour"
+            maxAttempts={isAdminFlow ? 3 : 10}
+            lockoutDuration={lockoutHours}
           />
 
           <form onSubmit={handleSubmit} className="space-y-5">
@@ -722,6 +740,7 @@ const Auth = () => {
           </>
           )}
 
+          {!isAdminFlow && (
           <p className="mt-8 text-center text-neutral-600">
             {isSignUp ? "Already have an account?" : "Don't have an account?"}
             <button
@@ -749,8 +768,9 @@ const Auth = () => {
               {isSignUp ? "Sign in" : "Create one"}
             </button>
           </p>
+          )}
 
-          {isSignUp && (
+          {isSignUp && !isAdminFlow && (
             <p className="mt-6 text-center text-xs text-neutral-400">
               By creating an account, you agree to our{" "}
               <Link to="/terms" className="text-primary hover:underline">Terms of Service</Link>{" "}

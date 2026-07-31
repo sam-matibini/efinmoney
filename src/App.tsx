@@ -86,7 +86,6 @@ const KybRejected = lazyImport(() => import("./pages/onboarding/business/Rejecte
 const BusinessOverview = lazyImport(() => import("./pages/business/BusinessOverview"));
 const ShortLinkResolver = lazyImport(() => import("./pages/ShortLinkResolver"));
 const ClaimPaymentLinkPage = lazyImport(() => import("./pages/ClaimPaymentLinkPage"));
-const AdminLogin = lazyImport(() => import("./pages/admin/AdminLogin"));
 const AdminDashboardPage = lazyImport(() => import("./pages/admin/AdminDashboardPage"));
 const KycQueuePage = lazyImport(() => import("./pages/admin/KycQueuePage"));
 const KycReviewPage = lazyImport(() => import("./pages/admin/KycReviewPage"));
@@ -346,7 +345,6 @@ const AppRoutes = () => {
         </Route>
 
         <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
-        <Route path="/admin/login" element={<AdminAuthProvider><AdminLogin /></AdminAuthProvider>} />
         <Route element={<AdminGuardShell />}>
           <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
           <Route path="/admin/kyc" element={<KycQueuePage />} />
@@ -430,17 +428,19 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider>
       <AuthProvider>
-        <AppBootstrap>
-          <TooltipProvider>
-            <SplashScreen />
-            <Toaster />
-            <Sonner />
-            <BrowserRouter>
-              <ScrollToTop />
-              <AppRoutes />
-            </BrowserRouter>
-          </TooltipProvider>
-        </AppBootstrap>
+        <AdminAuthProvider>
+          <AppBootstrap>
+            <TooltipProvider>
+              <SplashScreen />
+              <Toaster />
+              <Sonner />
+              <BrowserRouter>
+                <ScrollToTop />
+                <AppRoutes />
+              </BrowserRouter>
+            </TooltipProvider>
+          </AppBootstrap>
+        </AdminAuthProvider>
       </AuthProvider>
     </ThemeProvider>
   </QueryClientProvider>

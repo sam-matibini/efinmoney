@@ -1,12 +1,16 @@
 import { ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { Button } from "@/components/ui/button";
 import { ShieldX } from "lucide-react";
 
 const AdminGuard = ({ children }: { children: ReactNode }) => {
-  const { user, admin, loading, signOut } = useAdminAuth();
+  // Two questions, two hooks: are they logged in at all? (useAuth),
+  // and do they have an admin record? (useAdminAuth).
+  const { user } = useAuth();
+  const { admin, loading, signOut } = useAdminAuth();
   const location = useLocation();
 
   if (loading) {
@@ -18,7 +22,10 @@ const AdminGuard = ({ children }: { children: ReactNode }) => {
   }
 
   if (!user || !admin) {
-    return <Navigate to="/admin/login" replace state={{ from: location }} />;
+    // Route through the shared /auth page with `?next=` so the lockout
+    // banner knows to use admin thresholds (3 attempts / 2h).
+    const next = location.pathname + location.search;
+    return <Navigate to={`/auth?next=${encodeURIComponent(next)}`} replace />;
   }
 
   // Staff still onboarding -> send them to the wizard.

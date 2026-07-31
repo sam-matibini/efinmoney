@@ -27,9 +27,9 @@ interface AuthContextType {
       nationality?: string;
     }
   ) => Promise<{ error: Error | null }>;
-  signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
+  signIn: (email: string, password: string, p_kind?: "admin" | "customer") => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
-  checkLockout: (email: string) => Promise<{ locked: boolean; lockedUntil: string | null; remainingSeconds: number }>;
+  checkLockout: (email: string, p_kind?: "admin" | "customer") => Promise<{ locked: boolean; lockedUntil: string | null; remainingSeconds: number }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -214,10 +214,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (email: string, password: string, p_kind: "admin" | "customer" = "customer") => {
     try {
-      // 1. Check for an active customer lockout before sending the password.
-      const lockout = await (supabase as any).rpc("check_login_lockout", { p_email: email, p_kind: "customer" });
+      // 1. Check for an active lockout before sending the password.
+      const lockout = await (supabase as any).rpc("check_login_lockout", { p_email: email, p_kind });
       const lockoutData = (lockout as any)?.data;
       if (lockoutData?.locked) {
         const mins = Math.max(1, Math.ceil((lockoutData.remaining_seconds ?? 0) / 60));
@@ -230,20 +230,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
-      // 2. Successful sign-in: clear any customer lockout for this email.
+      // 2. Successful sign-in: clear any lockout for this email + kind.
       try {
-        await (supabase as any).rpc("clear_login_lockout", { p_email: email, p_kind: "customer" });
+        await (supabase as any).rpc("clear_login_lockout", { p_email: email, p_kind });
       } catch { /* best effort */ }
       return { error: null };
     } catch (e) {
       // 3. Log the failure and surface remaining-attempts / lockout info.
       try {
-        const { data: failData } = await (supabase as any).rpc("log_login_failure", { p_email: email, p_kind: "customer" });
+        const { data: failData } = await (supabase as any).rpc("log_login_failure", { p_email: email, p_kind });
         if (failData?.locked) {
           const mins = Math.max(1, Math.ceil((failData.remaining_seconds ?? 0) / 60));
+          const lockHours = p_kind === "admin" ? 2 : 1;
           return {
             error: new Error(
-              `Too many failed sign-in attempts. This account is now locked for 1 hour. Try again in ${mins} minute${mins === 1 ? "" : "s"}.`
+              `Too many failed sign-in attempts. This account is now locked for ${lockHours} hour${lockHours === 1 ? "" : "s"}. Try again in ${mins} minute${mins === 1 ? "" : "s"}.`
             ),
           };
         }
@@ -261,9 +262,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const checkLockout = async (email: string) => {
+  const checkLockout = async (email: string, p_kind: "admin" | "customer" = "customer") => {
     try {
-      const { data } = await (supabase as any).rpc("check_login_lockout", { p_email: email, p_kind: "customer" });
+      const { data } = await (supabase as any).rpc("check_login_lockout", { p_email: email, p_kind });
       if (data?.locked) {
         return {
           locked: true,
