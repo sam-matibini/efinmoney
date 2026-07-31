@@ -447,6 +447,149 @@ export type Database = {
         }
         Relationships: []
       }
+      api_partner_keys: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          key_hash: string
+          key_prefix: string
+          label: string | null
+          last_used_at: string | null
+          partner_id: string
+          revoked_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          key_hash: string
+          key_prefix: string
+          label?: string | null
+          last_used_at?: string | null
+          partner_id: string
+          revoked_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          key_hash?: string
+          key_prefix?: string
+          label?: string | null
+          last_used_at?: string | null
+          partner_id?: string
+          revoked_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "api_partner_keys_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "api_partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      api_partners: {
+        Row: {
+          allowed_endpoints: string[]
+          contact_email: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          notes: string | null
+          rate_limit_per_min: number
+          status: string
+          tier: string
+          updated_at: string
+        }
+        Insert: {
+          allowed_endpoints?: string[]
+          contact_email?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          rate_limit_per_min?: number
+          status?: string
+          tier?: string
+          updated_at?: string
+        }
+        Update: {
+          allowed_endpoints?: string[]
+          contact_email?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          rate_limit_per_min?: number
+          status?: string
+          tier?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      api_request_logs: {
+        Row: {
+          created_at: string
+          endpoint: string
+          error: string | null
+          id: string
+          ip: string | null
+          key_id: string | null
+          latency_ms: number | null
+          method: string
+          partner_id: string | null
+          status_code: number
+        }
+        Insert: {
+          created_at?: string
+          endpoint: string
+          error?: string | null
+          id?: string
+          ip?: string | null
+          key_id?: string | null
+          latency_ms?: number | null
+          method?: string
+          partner_id?: string | null
+          status_code: number
+        }
+        Update: {
+          created_at?: string
+          endpoint?: string
+          error?: string | null
+          id?: string
+          ip?: string | null
+          key_id?: string | null
+          latency_ms?: number | null
+          method?: string
+          partner_id?: string | null
+          status_code?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "api_request_logs_key_id_fkey"
+            columns: ["key_id"]
+            isOneToOne: false
+            referencedRelation: "api_partner_keys"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "api_request_logs_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "api_partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_logs: {
         Row: {
           action: string
@@ -8806,6 +8949,18 @@ export type Database = {
       validate_compliance_parameters: {
         Args: { p_parameters: Json; p_rule_type: string }
         Returns: boolean
+      }
+      verify_api_key: {
+        Args: { p_hash: string }
+        Returns: {
+          allowed_endpoints: string[]
+          key_id: string
+          partner_id: string
+          partner_name: string
+          rate_limit_per_min: number
+          status: string
+          tier: string
+        }[]
       }
       verify_transaction_pin: { Args: { p_pin: string }; Returns: Json }
     }
