@@ -4,6 +4,7 @@ import { isNombaNigeriaConfigured } from "../_shared/nomba-nigeria.ts";
 import { dispatchRoutedPayout } from "../_shared/routingExecute.ts";
 import { observeRoute } from "../_shared/routeResolver.ts";
 import { recordEconomics } from "../_shared/transactionEconomics.ts";
+import { assertQuotedFee } from "../_shared/pricingService.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -307,14 +308,14 @@ Deno.serve(async (req) => {
         });
       }
 
-      if (feeAcc && Number(transfer.fee_amount) > 0) {
+      if (feeAcc && feeAmount > 0) {
         entries.push({
           journal_id: journalId,
           account_id: feeAcc.id,
           wallet_id: null,
           currency_code: transfer.source_currency,
           debit_amount: 0,
-          credit_amount: Number(transfer.fee_amount),
+          credit_amount: feeAmount,
           description: "Transfer fee revenue",
           reference_type: "transfer",
           reference_id: transfer_id,
