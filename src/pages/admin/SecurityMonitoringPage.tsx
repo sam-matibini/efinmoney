@@ -9,18 +9,44 @@ import { format } from "date-fns";
 import AdminLayout from "@/components/admin-portal/AdminLayout";
 
 export default function SecurityMonitoringPage() {
-  // Single source of truth: security_events_view (counts audit_logs by
-  // action) + security_incidents table. Both poll every 10s with no
-  // staleTime so failed logins, privilege changes, data exports and
-  // suspicious access show up promptly after they occur.
-  const { data: events = [], isLoading: eventsLoading } = useQuery({
-    queryKey: ["security-events"],
-    queryFn: async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const db = supabase as any;
-      const { data } = await db.from("security_events_view").select("*");
-      return data || [];
-    },
+  // Aggregate counts for the 4 KPI cards. Read directly from audit_logs
+  // grouped by action (one round trip per card, no view needed) so the
+  // counts never get blocked by the security_events_view RLS quirks.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = supabase as any;
+  const fetchCount = async (action: string): Promise<number> => {
+    const { count, error } = await db
+      .from("audit_logs")
+      .select("id", { count: "exact", head: true })
+      .eq("action", action);
+    if (error) {
+      console.warn(`[SecurityMonitoring] count(${action}) failed:`, error);
+      return 0;
+    }
+    return count ?? 0;
+  };
+
+  const { data: failedLogins = 0 } = useQuery({
+    queryKey: ["security-count", "LOGIN_FAILED"],
+    queryFn: () => fetchCount("LOGIN_FAILED"),
+    refetchInterval: 10_000,
+    staleTime: 0,
+  });
+  const { data: privilegeChanges = 0 } = useQuery({
+    queryKey: ["security-count", "PRIVILEGE_CHANGE"],
+    queryFn: () => fetchCount("PRIVILEGE_CHANGE"),
+    refetchInterval: 10_000,
+    staleTime: 0,
+  });
+  const { data: dataExports = 0 } = useQuery({
+    queryKey: ["security-count", "DATA_EXPORT"],
+    queryFn: () => fetchCount("DATA_EXPORT"),
+    refetchInterval: 10_000,
+    staleTime: 0,
+  });
+  const { data: suspiciousAccess = 0 } = useQuery({
+    queryKey: ["security-count", "SUSPICIOUS_ACCESS"],
+    queryFn: () => fetchCount("SUSPICIOUS_ACCESS"),
     refetchInterval: 10_000,
     staleTime: 0,
   });
@@ -28,7 +54,7 @@ export default function SecurityMonitoringPage() {
   const { data: incidents = [], isLoading: incLoading } = useQuery({
     queryKey: ["security-incidents"],
     queryFn: async () => {
-      const { data } = await (supabase as any).from("security_incidents").select("*").order("created_at", { ascending: false }).limit(20);
+      const { data } = await db.from("security_incidents").select("*").order("created_at", { ascending: false }).limit(20);
       return data || [];
     },
     refetchInterval: 10_000,
@@ -40,7 +66,7 @@ export default function SecurityMonitoringPage() {
   const { data: recentFailedLogins = [], isLoading: recentLoading } = useQuery({
     queryKey: ["security-recent-failed-logins"],
     queryFn: async () => {
-      const { data } = await (supabase as any)
+      const { data } = await db
         .from("audit_logs")
         .select("id, created_at, new_data")
         .eq("action", "LOGIN_FAILED")
@@ -61,10 +87,10 @@ export default function SecurityMonitoringPage() {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card><CardContent className="pt-4 pb-3"><div className="text-2xl font-bold text-center text-red-500">{((events as any[])?.find((e: any) => e.event_type === "failed_login")?.event_count) ?? 0}</div><div className="text-xs text-center text-muted-foreground">Failed Logins</div></CardContent></Card>
-        <Card><CardContent className="pt-4 pb-3"><div className="text-2xl font-bold text-center text-amber-500">{((events as any[])?.find((e: any) => e.event_type === "privilege_escalation_attempt")?.event_count) ?? 0}</div><div className="text-xs text-center text-muted-foreground">Privilege Changes</div></CardContent></Card>
-        <Card><CardContent className="pt-4 pb-3"><div className="text-2xl font-bold text-center text-blue-500">{((events as any[])?.find((e: any) => e.event_type === "data_export")?.event_count) ?? 0}</div><div className="text-xs text-center text-muted-foreground">Data Exports</div></CardContent></Card>
-        <Card><CardContent className="pt-4 pb-3"><div className="text-2xl font-bold text-center text-purple-500">{((events as any[])?.find((e: any) => e.event_type === "suspicious_access")?.event_count) ?? 0}</div><div className="text-xs text-center text-muted-foreground">Suspicious Access</div></CardContent></Card>
+        <Card><CardContent className="pt-4 pb-3"><div className="text-2xl font-bold text-center text-red-500">{failedLogins}</div><div className="text-xs text-center text-muted-foreground">Failed Logins</div></CardContent></Card>
+        <Card><CardContent className="pt-4 pb-3"><div className="text-2xl font-bold text-center text-amber-500">{privilegeChanges}</div><div className="text-xs text-center text-muted-foreground">Privilege Changes</div></CardContent></Card>
+        <Card><CardContent className="pt-4 pb-3"><div className="text-2xl font-bold text-center text-blue-500">{dataExports}</div><div className="text-xs text-center text-muted-foreground">Data Exports</div></CardContent></Card>
+        <Card><CardContent className="pt-4 pb-3"><div className="text-2xl font-bold text-center text-purple-500">{suspiciousAccess}</div><div className="text-xs text-center text-muted-foreground">Suspicious Access</div></CardContent></Card>
       </div>
 
       <Card>
@@ -74,6 +100,7 @@ export default function SecurityMonitoringPage() {
             <Table>
               <TableHeader><TableRow><TableHead>Event</TableHead><TableHead>Severity</TableHead><TableHead>Description</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Date</TableHead></TableRow></TableHeader>
               <TableBody>
+                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                 {incidents.length === 0 ? <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">No security incidents</TableCell></TableRow> : incidents.map((i: any) => (
                   <TableRow key={i.id}>
                     <TableCell className="font-medium">{i.event_type}</TableCell>
@@ -96,7 +123,7 @@ export default function SecurityMonitoringPage() {
             <Table>
               <TableHeader><TableRow><TableHead>Email</TableHead><TableHead>Audience</TableHead><TableHead className="text-right">When</TableHead></TableRow></TableHeader>
               <TableBody>
-                {recentFailedLogins.length === 0 ? <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground">No failed login attempts</TableCell></TableRow> : recentFailedLogins.map((r: any) => {
+                {recentFailedLogins.length === 0 ? <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground">No failed login attempts</TableCell></TableRow> : recentFailedLogins.map((r: { id: string; created_at: string; new_data?: { kind?: string; email?: string } }) => {
                   const nd = r.new_data || {};
                   const kind = nd.kind ?? "admin";
                   const email = nd.email ?? "(unknown)";
