@@ -120,6 +120,32 @@ type ResolvedRate = {
   fee_rate: number;
 };
 
+/**
+ * Wallet-to-wallet FX swap fee comes from the central rate card
+ * (efinmoney_pricing, payment_method = 'fx_swap'), never a constant.
+ */
+async function resolveFxFeeRate(
+  supabase: ReturnType<typeof createClient>,
+  from_currency: string,
+  to_currency: string,
+): Promise<number> {
+  const { data, error } = await (supabase as any).rpc('resolve_customer_price', {
+    p_direction: 'payout',
+    p_source_currency: from_currency,
+    p_dest_currency: to_currency,
+    p_dest_country: null,
+    p_payment_method: 'fx_swap',
+    p_customer_type: 'consumer',
+  });
+  if (error) {
+    console.error('resolve_customer_price failed', error);
+    return 0;
+  }
+  const row = Array.isArray(data) ? data[0] : null;
+  if (!row) return 0;
+  return Number(row.percentage_fee ?? 0) / 100;
+}
+
 async function resolveFxRate(
   supabase: ReturnType<typeof createClient>,
   from_currency: string,
@@ -128,6 +154,8 @@ async function resolveFxRate(
   if (from_currency === to_currency) {
     return { effective_rate: 1, market_rate: 1, markup_rate: 0, fee_rate: 0 };
   }
+
+  const feeRate = await resolveFxFeeRate(supabase, from_currency, to_currency);
 
   const { data: rateData } = await supabase
     .from('fx_rates')
@@ -142,7 +170,7 @@ async function resolveFxRate(
       effective_rate: Number(rateData.effective_rate),
       market_rate: Number(rateData.rate),
       markup_rate: Number(rateData.markup_rate),
-      fee_rate: 0.005,
+      fee_rate: feeRate,
     };
   }
 
@@ -163,7 +191,7 @@ async function resolveFxRate(
     effective_rate: 1 / effective,
     market_rate: 1 / Number(reverseRate.rate),
     markup_rate: Number(reverseRate.markup_rate),
-    fee_rate: 0.005,
+    fee_rate: feeRate,
   };
 }
 
