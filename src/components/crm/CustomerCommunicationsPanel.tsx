@@ -12,6 +12,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { MessageSquare, Send, Mail, Phone, MessageCircle, Bell, ArrowUpRight, ArrowDownLeft } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import {
+  AttachmentLinks,
+  AttachmentPicker,
+  useCommunicationAttachments,
+} from "@/components/crm/CommunicationAttachments";
+import { sendCommunication, type StagedAttachment } from "@/lib/communications";
 
 interface Props {
   customerId: string;
@@ -38,6 +44,20 @@ export const CustomerCommunicationsPanel = ({ customerId }: Props) => {
   const [channel, setChannel] = useState("email");
   const [subject, setSubject] = useState("");
   const [content, setContent] = useState("");
+  const [files, setFiles] = useState<StagedAttachment[]>([]);
+
+  const { data: customer } = useQuery({
+    queryKey: ["customer-contact", customerId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("customers")
+        .select("name, email")
+        .eq("id", customerId)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
 
   const { data: comms = [], isLoading } = useQuery({
     queryKey: ["customer-comms", customerId],
@@ -56,29 +76,34 @@ export const CustomerCommunicationsPanel = ({ customerId }: Props) => {
   const send = useMutation({
     mutationFn: async () => {
       if (!content.trim()) throw new Error("Message is required");
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not signed in");
-      const { error } = await supabase.from("customer_communications").insert({
-        customer_id: customerId,
+      if (channel === "email" && !customer?.email) {
+        throw new Error("This customer has no email address on file");
+      }
+      await sendCommunication({
         channel,
-        subject: channel === "email" ? subject || null : null,
+        subject: channel === "email" ? subject : "",
         content: content.trim(),
-        direction: "outbound",
-        status: "sent",
-        sent_at: new Date().toISOString(),
-        created_by: user.id,
+        customer_id: customerId,
+        recipient_email: customer?.email ?? null,
+        recipient_name: customer?.name ?? null,
+        attachments: files,
       });
-      if (error) throw error;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["customer-comms", customerId] });
       qc.invalidateQueries({ queryKey: ["customer-communications"] });
-      toast.success("Message sent");
+      qc.invalidateQueries({ queryKey: ["communication-attachments"] });
+      toast.success(channel === "email" ? "Message sent" : "Interaction recorded");
       setSubject("");
       setContent("");
+      setFiles([]);
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  const { data: attachmentsByComm = {} } = useCommunicationAttachments(
+    comms.map((c: { id: string }) => c.id),
+  );
 
   const channelCfg = (ch: string) => CHANNELS.find((c) => c.value === ch) ?? CHANNELS[0];
 
@@ -128,7 +153,18 @@ export const CustomerCommunicationsPanel = ({ customerId }: Props) => {
               className="text-sm resize-none"
             />
           </div>
-          <div className="flex justify-end">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Documents</Label>
+            <AttachmentPicker files={files} onChange={setFiles} disabled={send.isPending} />
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs text-muted-foreground">
+              {channel === "email"
+                ? customer?.email
+                  ? `Sends to ${customer.email}`
+                  : "No email on file for this customer"
+                : "No provider connected — recorded on the customer timeline"}
+            </p>
             <Button
               size="sm"
               disabled={!content.trim() || send.isPending}
@@ -179,6 +215,7 @@ export const CustomerCommunicationsPanel = ({ customerId }: Props) => {
                           {c.status}
                         </Badge>
                       </div>
+                      <AttachmentLinks attachments={attachmentsByComm[c.id] || []} />
                     </div>
                     <Badge variant="outline" className="shrink-0 text-xs">
                       {c.direction === "outbound"
