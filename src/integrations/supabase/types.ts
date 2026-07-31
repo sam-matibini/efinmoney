@@ -8674,6 +8674,22 @@ export type Database = {
           volume: number
         }[]
       }
+      pricing_margin_statement: {
+        Args: { p_from?: string; p_group_by?: string; p_to?: string }
+        Returns: {
+          billed_cost: number
+          gross_margin: number
+          group_key: string
+          group_label: string
+          margin_percent: number
+          modelled_cost: number
+          modelled_revenue: number
+          posted_revenue: number
+          revenue_variance: number
+          txn_count: number
+          volume: number
+        }[]
+      }
       pricing_recommendations: {
         Args: { p_from: string; p_target_margin?: number; p_to: string }
         Returns: {
@@ -8712,11 +8728,50 @@ export type Database = {
           volume: number
         }[]
       }
+      resolve_customer_price: {
+        Args: {
+          p_at?: string
+          p_customer_type?: string
+          p_dest_country?: string
+          p_dest_currency: string
+          p_direction: string
+          p_payment_method?: string
+          p_source_currency: string
+        }
+        Returns: {
+          fixed_fee: number
+          fx_margin_bps: number
+          id: string
+          max_fee: number
+          min_fee: number
+          percentage_fee: number
+          specificity: number
+        }[]
+      }
       resolve_short_link: {
         Args: { p_code: string }
         Returns: {
           params: Json
           target_path: string
+        }[]
+      }
+      revenue_assurance_variance: {
+        Args: {
+          p_from?: string
+          p_limit?: number
+          p_min_variance?: number
+          p_to?: string
+        }
+        Returns: {
+          amount: number
+          corridor: string
+          created_at: string
+          currency_code: string
+          expected_revenue: number
+          payment_method: string
+          posted_revenue: number
+          transfer_id: string
+          variance: number
         }[]
       }
       routing_profit_variance: {
