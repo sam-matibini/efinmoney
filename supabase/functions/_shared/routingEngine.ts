@@ -58,7 +58,22 @@ export interface ScoredCandidate extends CandidateInput {
   score: number;
   pricing_missing: boolean;
   breakdown: Record<string, number>;
+  /** Profit as a percentage of the transaction amount (guardrail basis). */
+  volume_margin_percent?: number;
+  margin_floor_percent?: number | null;
+  margin_floor_action?: "warn" | "uplift" | "block" | null;
+  margin_floor_breached?: boolean;
+  margin_blocked?: boolean;
+  revenue_uplift?: number;
 }
+
+export interface MarginFloor {
+  id?: string | null;
+  scope?: string | null;
+  min_margin_percent: number;
+  action: "warn" | "uplift" | "block";
+}
+
 
 const num = (v: unknown, fallback = 0): number => {
   const n = Number(v);
@@ -189,7 +204,9 @@ export function scoreCandidates(
         customer_revenue: revenue.total,
         expected_profit: profit,
         margin_percent: revenue.total > 0 ? Math.round((profit / revenue.total) * 10000) / 100 : 0,
+        volume_margin_percent: amount > 0 ? Math.round((profit / amount) * 10000) / 100 : 0,
         score: Math.round(score * 10000) / 10000,
+
         pricing_missing: !c.pricing,
         breakdown: {
           profitScore: Math.round(profitScore * 1000) / 1000,
@@ -207,3 +224,69 @@ export function scoreCandidates(
     })
     .sort((a, b) => b.score - a.score || a.priority - b.priority);
 }
+
+/**
+ * Enforce a margin floor on scored candidates.
+ *
+ * The floor is expressed as profit over the transaction amount (the same basis
+ * the alert scan uses). Actions:
+ *  - `warn`   — flag only, ranking untouched.
+ *  - `uplift` — raise the customer revenue by the shortfall so the route clears
+ *               the floor, and record the uplift.
+ *  - `block`  — mark the candidate blocked so the resolver can drop it and fail
+ *               over to the next partner.
+ */
+export function applyMarginFloor(
+  candidates: ScoredCandidate[],
+  amount: number,
+  floor: MarginFloor | null,
+): { candidates: ScoredCandidate[]; blocked: ScoredCandidate[] } {
+  if (!floor || !(amount > 0) || !Number.isFinite(num(floor.min_margin_percent))) {
+    return { candidates, blocked: [] };
+  }
+
+  const minMargin = num(floor.min_margin_percent);
+  const action = floor.action ?? "warn";
+  const required = (amount * minMargin) / 100;
+  const blocked: ScoredCandidate[] = [];
+
+  const out = candidates.map((c) => {
+    const profit = num(c.expected_profit);
+    const breached = profit < required;
+    const base: ScoredCandidate = {
+      ...c,
+      margin_floor_percent: minMargin,
+      margin_floor_action: action,
+      margin_floor_breached: breached,
+      margin_blocked: false,
+      revenue_uplift: 0,
+    };
+    if (!breached) return base;
+
+    if (action === "uplift") {
+      const uplift = Math.round((required - profit) * 100) / 100;
+      const revenue = Math.round((num(c.customer_revenue) + uplift) * 100) / 100;
+      const newProfit = Math.round((revenue - num(c.total_cost)) * 100) / 100;
+      return {
+        ...base,
+        customer_revenue: revenue,
+        expected_profit: newProfit,
+        margin_percent: revenue > 0 ? Math.round((newProfit / revenue) * 10000) / 100 : 0,
+        volume_margin_percent: Math.round((newProfit / amount) * 10000) / 100,
+        revenue_uplift: uplift,
+      };
+    }
+
+    if (action === "block") {
+      const b = { ...base, margin_blocked: true };
+      blocked.push(b);
+      return b;
+    }
+
+    return base;
+  });
+
+  if (action !== "block") return { candidates: out, blocked: [] };
+  return { candidates: out.filter((c) => !c.margin_blocked), blocked };
+}
+

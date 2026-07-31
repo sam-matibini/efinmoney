@@ -17,6 +17,8 @@ import NetworkActivationPanel from "./partners/NetworkActivationPanel";
 import PartnerLimitsPanel from "./partners/PartnerLimitsPanel";
 import PartnerAlertsPanel from "./partners/PartnerAlertsPanel";
 import PartnerSettlementsPanel from "./partners/PartnerSettlementsPanel";
+import MarginGuardrailsPanel from "./partners/MarginGuardrailsPanel";
+import PricingRecommendationsPanel from "./partners/PricingRecommendationsPanel";
 
 
 export const PartnerNetworkPanel = () => (
@@ -39,6 +41,8 @@ export const PartnerNetworkPanel = () => (
         <TabsTrigger value="cost">Cost assurance</TabsTrigger>
         <TabsTrigger value="settlements">Settlements</TabsTrigger>
 
+        <TabsTrigger value="guardrails">Guardrails</TabsTrigger>
+        <TabsTrigger value="recommendations">Recommendations</TabsTrigger>
         <TabsTrigger value="limits">Limits</TabsTrigger>
         <TabsTrigger value="alerts">Alerts</TabsTrigger>
       </TabsList>
@@ -94,6 +98,12 @@ export const PartnerNetworkPanel = () => (
       <SectionBoundary name="PartnerSettlementsPanel"><PartnerSettlementsPanel /></SectionBoundary>
     </TabsContent>
 
+    <TabsContent value="guardrails">
+      <SectionBoundary name="MarginGuardrailsPanel"><MarginGuardrailsPanel /></SectionBoundary>
+    </TabsContent>
+    <TabsContent value="recommendations">
+      <SectionBoundary name="PricingRecommendationsPanel"><PricingRecommendationsPanel /></SectionBoundary>
+    </TabsContent>
     <TabsContent value="limits">
       <SectionBoundary name="PartnerLimitsPanel"><PartnerLimitsPanel /></SectionBoundary>
     </TabsContent>

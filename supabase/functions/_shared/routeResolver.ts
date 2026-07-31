@@ -2,9 +2,11 @@
 // tables, honouring operator overrides and the active routing rule.
 
 import {
+  applyMarginFloor,
   scoreCandidates,
   type CandidateInput,
   type CustomerPricingRow,
+  type MarginFloor,
   type PartnerPricingRow,
   type ScoredCandidate,
 } from "./routingEngine.ts";
@@ -32,6 +34,9 @@ export interface RouteResolution {
   candidates: ScoredCandidate[];
   excluded: Array<{ partner_code: string; reason: string }>;
   overrides: Array<{ type: string; partner_code: string; reason: string | null }>;
+  marginFloor?: (MarginFloor & { source: "corridor" | "global" }) | null;
+  marginBlocked?: Array<{ partner_code: string; expected_profit: number; margin_percent: number }>;
+  marginUplift?: number;
 }
 
 const up = (v: unknown) => String(v ?? "").toUpperCase();
@@ -283,6 +288,53 @@ export async function resolveRoute(
     customerPricing,
   );
 
+  // Margin guardrail: corridor-specific floor wins over the global default.
+  const { data: floorRows } = await supabase
+    .from("margin_floors")
+    .select("*")
+    .eq("is_active", true);
+
+  const corridorFloor = (floorRows ?? []).find((f: any) => {
+    if (f.scope !== "corridor") return false;
+    if (f.direction && f.direction !== direction && f.direction !== "both") return false;
+    if (f.source_currency && up(f.source_currency) !== srcCcy) return false;
+    if (f.dest_currency && up(f.dest_currency) !== dstCcy) return false;
+    if (f.dest_country && dstCountry && up(f.dest_country) !== dstCountry) return false;
+    if (f.payment_method && method && f.payment_method !== method) return false;
+    if (f.customer_type && f.customer_type !== (req.customer_type ?? "consumer")) return false;
+    return true;
+  });
+  const globalFloor = (floorRows ?? []).find((f: any) => f.scope === "global");
+  const floorRow = corridorFloor ?? globalFloor ?? null;
+
+  let marginFloor: RouteResolution["marginFloor"] = null;
+  let marginBlocked: RouteResolution["marginBlocked"] = [];
+  let marginUplift = 0;
+
+  if (floorRow) {
+    marginFloor = {
+      id: floorRow.id,
+      scope: floorRow.scope,
+      min_margin_percent: Number(floorRow.min_margin_percent) || 0,
+      action: (floorRow.action ?? "warn") as MarginFloor["action"],
+      source: corridorFloor ? "corridor" : "global",
+    };
+    const applied = applyMarginFloor(candidates, amount, marginFloor);
+    marginBlocked = applied.blocked.map((c) => ({
+      partner_code: c.partner_code,
+      expected_profit: c.expected_profit,
+      margin_percent: c.volume_margin_percent ?? 0,
+    }));
+    for (const b of applied.blocked) {
+      excluded.push({
+        partner_code: b.partner_code,
+        reason: `margin ${(b.volume_margin_percent ?? 0).toFixed(2)}% below floor ${marginFloor.min_margin_percent}%`,
+      });
+    }
+    candidates = applied.candidates;
+    marginUplift = candidates.reduce((s, c) => s + (c.revenue_uplift ?? 0), 0);
+  }
+
   // Pins float to the top, in override order.
   if (pinned.length) {
     const pinnedSet = new Set(pinned);
@@ -299,6 +351,9 @@ export async function resolveRoute(
     liveCorridor,
     candidates,
     excluded,
+    marginFloor,
+    marginBlocked,
+    marginUplift: Math.round(marginUplift * 100) / 100,
     overrides: applicableOverrides.map((o: any) => {
       const p = (partners ?? []).find((x: any) => x.id === o.partner_id);
       return { type: o.override_type, partner_code: p?.code ?? o.partner_id, reason: o.reason ?? null };

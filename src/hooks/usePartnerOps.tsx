@@ -223,3 +223,127 @@ export const usePartnerInvoiceLines = (invoiceId?: string) =>
       return (data || []) as PartnerInvoiceLine[];
     },
   });
+
+/* ---------------------------- margin guardrails --------------------------- */
+
+export type MarginFloorAction = "warn" | "uplift" | "block";
+
+export interface MarginFloor {
+  id: string;
+  scope: "global" | "corridor";
+  direction: string | null;
+  source_currency: string | null;
+  dest_currency: string | null;
+  dest_country: string | null;
+  payment_method: string | null;
+  customer_type: string | null;
+  min_margin_percent: number;
+  action: MarginFloorAction;
+  is_active: boolean;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export const useMarginFloors = () =>
+  useQuery({
+    queryKey: ["margin_floors"],
+    queryFn: async (): Promise<MarginFloor[]> => {
+      const { data, error } = await db
+        .from("margin_floors")
+        .select("*")
+        .order("scope")
+        .order("source_currency");
+      if (error) throw error;
+      return (data || []).map((r: MarginFloor) => ({
+        ...r,
+        min_margin_percent: Number(r.min_margin_percent ?? 0),
+      }));
+    },
+  });
+
+export const useSaveMarginFloor = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...row }: Partial<MarginFloor>) => {
+      const { error } = id
+        ? await db.from("margin_floors").update(row).eq("id", id)
+        : await db.from("margin_floors").insert(row);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["margin_floors"] });
+      toast.success("Margin floor saved");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+};
+
+export const useDeleteMarginFloor = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await db.from("margin_floors").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["margin_floors"] });
+      toast.success("Margin floor removed");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+};
+
+/* -------------------------- pricing recommendations ----------------------- */
+
+export interface PricingRecommendation {
+  group_key: string;
+  group_label: string;
+  source_currency: string;
+  dest_currency: string;
+  dest_country: string | null;
+  payment_method: string | null;
+  txn_count: number;
+  volume: number;
+  revenue: number;
+  modelled_cost: number;
+  billed_cost: number;
+  effective_cost: number;
+  current_margin_percent: number;
+  target_margin_percent: number;
+  current_fixed_fee: number;
+  current_percentage_fee: number;
+  recommended_percentage_fee: number;
+  fee_delta_percent: number;
+  revenue_uplift: number;
+}
+
+export const usePricingRecommendations = (days: number, targetMargin: number) =>
+  useQuery({
+    queryKey: ["pricing_recommendations", days, targetMargin],
+    queryFn: async (): Promise<PricingRecommendation[]> => {
+      const rpcDb = supabase as unknown as { rpc: (fn: string, a?: Record<string, unknown>) => any };
+      const { data, error } = await rpcDb.rpc("pricing_recommendations", {
+        p_from: new Date(Date.now() - days * 86_400_000).toISOString(),
+        p_to: new Date().toISOString(),
+        p_target_margin: targetMargin,
+      });
+      if (error) throw error;
+      return (data || []).map((r: PricingRecommendation) => ({
+        ...r,
+        txn_count: Number(r.txn_count ?? 0),
+        volume: Number(r.volume ?? 0),
+        revenue: Number(r.revenue ?? 0),
+        modelled_cost: Number(r.modelled_cost ?? 0),
+        billed_cost: Number(r.billed_cost ?? 0),
+        effective_cost: Number(r.effective_cost ?? 0),
+        current_margin_percent: Number(r.current_margin_percent ?? 0),
+        target_margin_percent: Number(r.target_margin_percent ?? 0),
+        current_fixed_fee: Number(r.current_fixed_fee ?? 0),
+        current_percentage_fee: Number(r.current_percentage_fee ?? 0),
+        recommended_percentage_fee: Number(r.recommended_percentage_fee ?? 0),
+        fee_delta_percent: Number(r.fee_delta_percent ?? 0),
+        revenue_uplift: Number(r.revenue_uplift ?? 0),
+      }));
+    },
+  });
