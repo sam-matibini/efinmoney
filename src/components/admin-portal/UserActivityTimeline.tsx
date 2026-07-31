@@ -19,6 +19,13 @@ import { format } from "date-fns";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useUserActivity, type ActivitySource, type UnifiedActivity } from "@/hooks/useUserActivity";
+import {
+  AttachmentLinks,
+  AttachmentPicker,
+  useCommunicationAttachments,
+} from "@/components/crm/CommunicationAttachments";
+import type { StagedAttachment } from "@/lib/communications";
+
 
 const FILTERS: { value: ActivitySource | "all"; label: string }[] = [
   { value: "all", label: "All" },
