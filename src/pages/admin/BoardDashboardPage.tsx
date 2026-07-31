@@ -1,8 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ShieldAlert, AlertTriangle, FileWarning, Activity, WifiOff, SearchCheck, ShieldCheck } from "lucide-react";
+import { ShieldAlert, AlertTriangle, FileWarning, Activity, WifiOff, SearchCheck, ShieldCheck, RefreshCw } from "lucide-react";
 import { useBoardDashboard } from "@/hooks/useBoardDashboard";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import AdminLayout from "@/components/admin-portal/AdminLayout";
 import { Button } from "@/components/ui/button";
 
@@ -24,12 +24,24 @@ export default function BoardDashboardPage() {
   return (
     <AdminLayout>
       <div className="container px-4 py-6 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Board Compliance Dashboard</h1>
-        <p className="text-muted-foreground">
-          Governance & regulatory oversight metrics
-          {m?.snapshot_at ? ` · As of ${format(new Date(m.snapshot_at), "MMM d, yyyy h:mm a")}` : ""}
-        </p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Board Compliance Dashboard</h1>
+          <p className="text-muted-foreground">
+            Governance & regulatory oversight metrics
+            {m?.snapshot_at ? ` · Updated ${formatDistanceToNow(new Date(m.snapshot_at), { addSuffix: true })} (${format(new Date(m.snapshot_at), "MMM d, h:mm a")})` : ""}
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => refetch()}
+          disabled={isFetching}
+          className="gap-2"
+        >
+          <RefreshCw className={`w-4 h-4 ${isFetching ? "animate-spin" : ""}`} />
+          {isFetching ? "Refreshing…" : "Refresh"}
+        </Button>
       </div>
 
       {isLoading ? (
