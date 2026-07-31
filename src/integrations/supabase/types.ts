@@ -8721,6 +8721,7 @@ export type Database = {
           variance_total: number
         }[]
       }
+      country_to_currency: { Args: { p_country: string }; Returns: string }
       create_short_link: {
         Args: {
           p_expires_at?: string
