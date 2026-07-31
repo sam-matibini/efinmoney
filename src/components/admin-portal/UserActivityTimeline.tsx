@@ -214,7 +214,12 @@ export default function UserActivityTimeline({ userId, canLog = false }: Props) 
                     placeholder="What was discussed or agreed?"
                   />
                 </div>
+                <div className="space-y-1.5">
+                  <Label>Documents</Label>
+                  <AttachmentPicker files={files} onChange={setFiles} disabled={saving} />
+                </div>
               </div>
+
               <DialogFooter>
                 <Button variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
                 <Button onClick={logInteraction} disabled={saving}>
