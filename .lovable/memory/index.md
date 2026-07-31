@@ -1,2 +1,3 @@
 - [Margin Guardrails](mem://features/margin-guardrails) — Routing margin floors (warn/uplift/block) + billed-cost pricing recommendations
 - [Automated Fee Adjustments](mem://features/automated-fee-adjustments) — Phase 11: fee proposal queue, approval workflow, versioned customer pricing writes
+- [Canonical Pricing Engine](mem://features/canonical-pricing-engine) — Single efinmoney_pricing rate card + resolve_customer_price; no hardcoded fees; fee revenue split 4100/4200/4250/4300; Pricing & Margin statement
