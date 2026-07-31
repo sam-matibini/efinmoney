@@ -171,12 +171,16 @@ const TransferTrackingPage = () => {
         && (transfer.payout_method === "bank" || transfer.transfer_type === "bank")
         && !!transfer.recipient_bank_code;
       const looksFincra = /^STUB-FINCRA/i.test(String(transfer.provider_reference || ""))
+        || /^FINCRA-PENDING/i.test(String(transfer.provider_reference || ""))
         || /fincra/i.test(String(transfer.provider_reference || ""))
-        || /fincra/i.test(String(transfer.failure_reason || ""));
+        || /fincra/i.test(String(transfer.failure_reason || ""))
+        || /fincra/i.test(String((transfer as { provider_charge_id?: string }).provider_charge_id || ""))
+        || (typeof sessionStorage !== "undefined" && sessionStorage.getItem(`efin_payout_rail:${id}`) === "fincra");
       const looksFlutterwave =
         /^efmpayout-/i.test(String(transfer.provider_reference || ""))
         || /^EFM-[0-9a-f]{8}-\d+/i.test(String(transfer.provider_reference || ""))
-        || /flutterwave|flw/i.test(String(transfer.failure_reason || ""));
+        || /flutterwave|flw/i.test(String(transfer.failure_reason || ""))
+        || /flutterwave/i.test(String((transfer as { provider_charge_id?: string }).provider_charge_id || ""));
       const { data: swychrPayout } = await looseDb
         .from("swychr_payout_transactions")
         .select("id")
@@ -189,6 +193,35 @@ const TransferTrackingPage = () => {
         .maybeSingle();
       // Fincra settles via webhook — don't poll Nomba/FLW (they 404 and confuse the timeline)
       if (looksFincra) {
+        const stubRef = !transfer.provider_reference
+          || /^STUB-/i.test(String(transfer.provider_reference))
+          || /^FINCRA-PENDING/i.test(String(transfer.provider_reference));
+        if (stubRef && ["funded", "processing", "initiated"].includes(transfer.status)) {
+          const { data: payData, error: payErr } = await supabase.functions.invoke("fincra-payout", {
+            body: {
+              transfer_id: id,
+              phone_number: transfer.recipient_phone,
+              account_number: transfer.recipient_account,
+              bank_code: transfer.recipient_bank_code,
+              amount: Number(transfer.target_amount ?? transfer.source_amount),
+              currency: transfer.target_currency ?? transfer.source_currency,
+              network: transfer.payout_method === "bank" ? "bank" : (transfer.payout_method || "bank"),
+              recipient_name: transfer.recipient_name,
+            },
+          });
+          const { data: fresh } = await supabase.from("transfers").select("*").eq("id", id).maybeSingle();
+          if (fresh) setTransfer(fresh as Transfer);
+          const errMsg = payData?.error || payData?.provider_message || payErr?.message;
+          if (fresh?.status === "failed" || payData?.success === false || errMsg) {
+            toast.error(friendlyFailureReason(String(errMsg || fresh?.failure_reason || "Fincra payout failed")), {
+              description: payData?.provider_message ? String(payData.provider_message) : undefined,
+              duration: 12000,
+            });
+          } else if (!silent) {
+            toast.info(`Transfer status: ${fresh?.status || transfer.status}`);
+          }
+          return;
+        }
         const { data: fresh } = await supabase.from("transfers").select("*").eq("id", id).maybeSingle();
         if (fresh) setTransfer(fresh as Transfer);
         if (!silent) toast.info(`Transfer status: ${fresh?.status || transfer.status}`);
@@ -197,6 +230,7 @@ const TransferTrackingPage = () => {
       // Prefer Nomba verify only when a Nomba payout row exists — NGN bank can also go via Flutterwave.
       // Stuck funded/processing with no real provider ref — call payout directly so
       // the provider's error is written to the transfer (works even before flw-verify deploy).
+      // Never auto-route Fincra-intended transfers onto Flutterwave.
       const stubRef = !transfer.provider_reference || /^STUB-/i.test(String(transfer.provider_reference));
       if (
         stubRef &&

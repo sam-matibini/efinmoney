@@ -376,11 +376,14 @@ Deno.serve(async (req) => {
       (recipientCountryHint ?? "").trim().toUpperCase() === "GHANA";
     const ghanaPayConfigured = isGhanaPayConfigured();
 
-    // Explicit Fincra opt-in (Send "Alternate bank payout" / Fincra MoMo toggle)
-    // must beat Lenhub → Nomba fallback, otherwise NGN always lands on Nomba.
-    const wantFincra = payload.use_fincra === true || transfer.use_fincra === true;
-    // Explicit Flutterwave opt-in (wallet / card-send chooser)
-    const wantFlutterwave = payload.use_flutterwave === true || transfer.use_flutterwave === true;
+    // Explicit rail opt-ins from the Send UI (boolean or string "true").
+    const flagOn = (v: unknown) => v === true || v === "true" || v === 1 || v === "1";
+    const wantFincra = flagOn(payload.use_fincra) || flagOn((transfer as { use_fincra?: unknown }).use_fincra)
+      || String(transfer.provider_charge_id || "").toLowerCase().includes("fincra");
+    // Explicit Flutterwave opt-in (wallet / card-send chooser) — never when Fincra was chosen.
+    const wantFlutterwave = !wantFincra && (
+      flagOn(payload.use_flutterwave) || flagOn((transfer as { use_flutterwave?: unknown }).use_flutterwave)
+    );
 
     // Lenhub Flutter — GHS/KES/UGX MoMo when enabled; NGN bank only if explicitly requested
     // (Nomba is the default NGN bank payout rail).
@@ -659,7 +662,12 @@ Deno.serve(async (req) => {
           },
         );
         payoutResult = await res.json();
-      } else if (useFincra) {
+      } else if (useFincra || wantFincra) {
+        // Stamp so tracking/refresh never hijacks this transfer onto Flutterwave.
+        await supabase.from("transfers").update({
+          provider_reference: `FINCRA-PENDING-${String(transfer_id).slice(0, 8)}`,
+          provider_charge_id: "rail:fincra",
+        }).eq("id", transfer_id);
         const fincraRes = await fetch(
           `${Deno.env.get("SUPABASE_URL")}/functions/v1/fincra-payout`,
           {
@@ -674,66 +682,19 @@ Deno.serve(async (req) => {
               currency: transfer.target_currency ?? transfer.source_currency,
               network: resolveNetwork(transfer.payout_method, transfer.target_currency ?? transfer.source_currency),
               recipient_name: transfer.recipient_name,
-              skip_reversal: true,
+              // Explicit Fincra toggle: reverse on failure (do NOT silently pay via Flutterwave).
+              skip_reversal: false,
             }),
           },
         );
         payoutResult = await fincraRes.json();
-        // Fincra balance/availability failure — try Flutterwave before giving up.
-        if (payoutResult?.success === false) {
-          const flwFallbackRes = await fetch(
-            `${Deno.env.get("SUPABASE_URL")}/functions/v1/flutterwave-payout`,
-            {
-              method: "POST",
-              headers: internalHeaders,
-              body: JSON.stringify({
-                transfer_id,
-                phone_number: transfer.recipient_phone,
-                account_number: transfer.recipient_account,
-                bank_code: transfer.recipient_bank_code,
-                amount: Number(transfer.target_amount ?? transfer.source_amount),
-                currency: transfer.target_currency ?? transfer.source_currency,
-                network: resolveNetwork(transfer.payout_method, transfer.target_currency ?? transfer.source_currency),
-                recipient_name: transfer.recipient_name,
-              }),
-            },
-          );
-          const flwFallbackJson = await flwFallbackRes.json().catch(() => null);
-          if (flwFallbackJson?.success || flwFallbackJson?.pending_liquidity || flwFallbackJson?.queued) {
-            payoutResult = { ...flwFallbackJson, fincra_fallback: true, fincra_error: payoutResult?.error };
-          } else {
-            // Both Fincra (skip_reversal) and FLW failed. Neither reversed the ledger,
-            // so we must do it here to return funds and avoid a stuck "funded" transfer.
-            const finalError = (flwFallbackJson?.error || payoutResult?.error || "Payout failed on all available rails").slice(0, 500);
-            try {
-              const { data: existingRev } = await supabase.from("ledger_entries").select("id")
-                .eq("reference_type", "transfer_reversal").eq("reference_id", transfer_id).limit(1);
-              if (!existingRev?.length) {
-                const { data: originals } = await supabase.from("ledger_entries")
-                  .select("account_id, wallet_id, currency_code, debit_amount, credit_amount, description")
-                  .eq("reference_type", "transfer").eq("reference_id", transfer_id);
-                if (originals?.length) {
-                  const j = crypto.randomUUID();
-                  await supabase.from("ledger_entries").insert(originals.map((o) => ({
-                    journal_id: j, account_id: o.account_id, wallet_id: o.wallet_id,
-                    currency_code: o.currency_code, debit_amount: o.credit_amount, credit_amount: o.debit_amount,
-                    description: `REVERSAL: ${o.description ?? ""}`.slice(0, 500),
-                    reference_type: "transfer_reversal", reference_id: transfer_id,
-                  })));
-                }
-              }
-            } catch (revErr) {
-              console.error("fincra+flw double-failure reversal error", revErr);
-            }
-            await supabase.from("transfers").update({ status: "failed", failure_reason: finalError }).eq("id", transfer_id);
-            await supabase.from("notifications").insert({
-              user_id: transfer.sender_id,
-              title: "Transfer failed — refunded",
-              message: `${finalError}. Funds returned to your wallet.`,
-              type: "error",
-            }).catch(() => {});
-            payoutResult = { success: false, error: finalError, refunded: true };
-          }
+        if (payoutResult && payoutResult.success !== true) {
+          payoutResult = {
+            ...payoutResult,
+            success: false,
+            rail: "fincra",
+            error: payoutResult.error || payoutResult.provider_message || "Fincra payout failed",
+          };
         }
       } else if (isNigeriaBank && nombaNigeriaOnly) {
         if (useStellar || useFincra || usePawapay || useMtnMomo) {
@@ -833,7 +794,8 @@ Deno.serve(async (req) => {
             payoutResult = { ...flwJson, paytota_fallback: true, paytota_error: payoutResult?.error };
           }
         }
-      } else {
+      } else if (!wantFincra) {
+        // Default Flutterwave — never when the user opted into Fincra.
         const res = await fetch(
           `${Deno.env.get("SUPABASE_URL")}/functions/v1/flutterwave-payout`,
           {
@@ -852,6 +814,13 @@ Deno.serve(async (req) => {
           },
         );
         payoutResult = await res.json();
+      } else {
+        payoutResult = {
+          success: false,
+          error: "Fincra was selected but payout did not run. Please retry or contact support.",
+          rail: "fincra",
+          code: "fincra_not_executed",
+        };
       }
     } catch (e) {
       console.error("Payout trigger error:", e);

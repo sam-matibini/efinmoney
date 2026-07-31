@@ -880,6 +880,16 @@ const SendPage = () => {
       if (!selectedWallet) { setConfirming(false); return; }
       try {
         const tid = await createTransferRecord();
+        const preferFincra = !!(useFincra && canUseFincra && !useFlutterwave);
+        const preferFlutterwave = !!(useFlutterwave && !useFincra && !usePaytota);
+        try {
+          if (preferFincra || preferFlutterwave) {
+            await supabase.from("transfers").update({
+              provider_charge_id: preferFincra ? "rail:fincra" : "rail:flutterwave",
+            }).eq("id", tid);
+          }
+          sessionStorage.setItem(`efin_payout_rail:${tid}`, preferFincra ? "fincra" : preferFlutterwave ? "flutterwave" : "default");
+        } catch { /* non-fatal */ }
         let data: any = null;
         let invokeErr: any = null;
         try {
@@ -888,11 +898,11 @@ const SendPage = () => {
               transfer_id: tid,
               use_stellar: isNGNBank && useStellar,
               use_pawapay: !isBankPayout && usePawapay,
-              use_paytota: canUsePaytotaPayout && usePaytota && !useFlutterwave,
-              use_fincra: useFincra && canUseFincra && !useFlutterwave,
+              use_paytota: canUsePaytotaPayout && usePaytota && !useFlutterwave && !preferFincra,
+              use_fincra: preferFincra,
               use_lenhub_flutter: isNGNBank && useLenhubFlutter && !useFincra && !useSwychr && !useFlutterwave,
               use_swychr: isNGNBank && useSwychr && !useFincra && !useLenhubFlutter && !useFlutterwave,
-              use_flutterwave: useFlutterwave && !useFincra && !usePaytota,
+              use_flutterwave: preferFlutterwave,
               recipient_country_hint: targetCountry.country,
             },
           });
@@ -2723,7 +2733,7 @@ const SendPage = () => {
                                             </div>
                                           </motion.div>
                                         )}
-                                        {fundingSource === "wallet" && productFeatures.flutterwave && canUseFincra && (
+                                        {fundingSource === "wallet" && productFeatures.fincra && canUseFincra && (
                                           <motion.div custom={2.8} variants={fieldVariants} initial="hidden" animate="show" className="rounded-xl border border-teal-500/30 bg-gradient-to-br from-teal-500/5 via-background to-teal-500/5 p-4">
                                             <div className="flex items-start justify-between gap-3">
                                               <div className="flex-1">
@@ -2899,7 +2909,7 @@ const SendPage = () => {
                                           </div>
                                         </motion.div>
                                       )}
-                                      {productFeatures.flutterwave && canUseFincra && (
+                                      {productFeatures.fincra && canUseFincra && (
                                         <motion.div custom={2.6} variants={fieldVariants} initial="hidden" animate="show" className="rounded-xl border border-teal-500/30 bg-gradient-to-br from-teal-500/5 via-background to-teal-500/5 p-4">
                                           <div className="flex items-start justify-between gap-3">
                                             <div className="flex-1">
