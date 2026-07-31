@@ -173,6 +173,12 @@ Deno.serve(async (req) => {
       if (taken) return json({ error: `@${changed.efin_tag} is already taken` }, 409);
     }
 
+    // When address_country changes, mirror it to country_code so both columns
+    // stay in sync and the wallet-default trigger fires on either lookup path.
+    if ("address_country" in changed && changed.address_country) {
+      changed.country_code = changed.address_country;
+    }
+
     const { error: updateErr } = await admin
       .from("profiles")
       .update({ ...changed, updated_at: new Date().toISOString() })
