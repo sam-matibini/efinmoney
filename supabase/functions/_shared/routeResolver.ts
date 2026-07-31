@@ -41,7 +41,10 @@ export interface RouteResolution {
   marginFloor?: (MarginFloor & { source: "corridor" | "global" }) | null;
   marginBlocked?: Array<{ partner_code: string; expected_profit: number; margin_percent: number }>;
   marginUplift?: number;
+  scoreGuard?: PartnerScoreGuard | null;
+  scoreBlocked?: Array<{ partner_code: string; performance_score: number; grade: string | null }>;
 }
+
 
 const up = (v: unknown) => String(v ?? "").toUpperCase();
 
