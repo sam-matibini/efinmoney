@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,19 +10,55 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
+import { useSystemSettings } from "@/hooks/useSystemSettings";
+import { useUserRoles } from "@/hooks/useUserRoles";
 import { 
   DollarSign, 
   Percent, 
   TrendingUp,
   Edit2,
   Save,
-  X
+  X,
+  Loader2
 } from "lucide-react";
 
 export const PricingSettingsPanel = () => {
   const queryClient = useQueryClient();
   const [editingPair, setEditingPair] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<Record<string, string>>({});
+
+  // Persisted pricing settings (benchmarks + transfer fee structure)
+  const { getNumber, isLoading: settingsLoading, saveSettings } = useSystemSettings();
+  const { isAdmin } = useUserRoles();
+  const [remitlyMargin, setRemitlyMargin] = useState("2.20");
+  const [remitlyFlat, setRemitlyFlat] = useState("3.99");
+  const [lemfiMargin, setLemfiMargin] = useState("1.80");
+  const [lemfiFlat, setLemfiFlat] = useState("0.00");
+  const [baseFee, setBaseFee] = useState("2.99");
+  const [percentFee, setPercentFee] = useState("0.5");
+  const [maxFee, setMaxFee] = useState("25.00");
+
+  useEffect(() => {
+    if (settingsLoading) return;
+    setRemitlyMargin(String(getNumber("pricing.benchmark_remitly_margin_pct", 2.2)));
+    setRemitlyFlat(String(getNumber("pricing.benchmark_remitly_flat_usd", 3.99)));
+    setLemfiMargin(String(getNumber("pricing.benchmark_lemfi_margin_pct", 1.8)));
+    setLemfiFlat(String(getNumber("pricing.benchmark_lemfi_flat_usd", 0)));
+    setBaseFee(String(getNumber("pricing.transfer_base_fee", 2.99)));
+    setPercentFee(String(getNumber("pricing.transfer_percent_fee", 0.5)));
+    setMaxFee(String(getNumber("pricing.transfer_max_fee", 25)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settingsLoading]);
+
+  const savePricing = async (values: Record<string, unknown>, label: string) => {
+    try {
+      await saveSettings.mutateAsync(values);
+      toast.success(`${label} saved`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not save settings");
+    }
+  };
+
 
   // Fetch FX rates for markup configuration
   const { data: fxRates, isLoading: fxLoading } = useQuery({
