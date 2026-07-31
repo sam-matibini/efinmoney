@@ -256,6 +256,30 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ------------------------------------------- pending fee-fix proposals
+    const { data: pendingProposals } = await supabase
+      .from("pricing_proposals")
+      .select("group_key, expected_revenue_uplift")
+      .eq("status", "pending");
+    if (pendingProposals?.length) {
+      const uplift = pendingProposals.reduce(
+        (s: number, p: any) => s + (Number(p.expected_revenue_uplift) || 0),
+        0,
+      );
+      findings.push({
+        fingerprint: "fee_adjustment:pending",
+        alert_type: "fee_adjustment",
+        severity: "info",
+        title: `${pendingProposals.length} fee adjustment proposal(s) awaiting review`,
+        message: `Automated pricing analysis has raised ${pendingProposals.length} customer fee proposal(s) worth an estimated ${uplift.toFixed(
+          2,
+        )} in additional revenue. Review them under Partners & Routing → Fee adjustments.`,
+        metrics: { pending: pendingProposals.length, expected_uplift: Number(uplift.toFixed(2)) },
+      });
+    }
+
+
+
     // ------------------------------------------------------ persist findings
     const nowIso = new Date().toISOString();
     const fingerprints = findings.map((f) => f.fingerprint);
