@@ -1,3 +1,4 @@
+import { SYSTEM_DEFAULT_CURRENCY } from '@/lib/systemDefaults';
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence, type Variants } from "framer-motion";
 import { useSearchParams, useNavigate, Link } from "react-router-dom";
@@ -342,18 +343,19 @@ const SendPage = () => {
     || savedCards.find(c => c.is_default)
     || savedCards[0];
 
-  const profileCurrency = profile?.default_currency
-    || countryToCurrency(profile?.country_code)
+  // Domicile country decides the base currency; stored preference is the fallback.
+  const profileCurrency = countryToCurrency(profile?.address_country || profile?.country_code)
+    || profile?.default_currency
     || wallets?.find(w => w.is_default)?.currency_code
     || null;
 
   const sourceCurrency = fundingSource === 'wallet'
-    ? (selectedWallet?.currency_code || profileCurrency || 'USD')
+    ? (selectedWallet?.currency_code || profileCurrency || SYSTEM_DEFAULT_CURRENCY)
     : fundingSource === 'card'
     ? (selectedWallet && isCardSendCollectCurrency(selectedWallet.currency_code)
       ? selectedWallet.currency_code
-      : (profileCurrency && isCardSendCollectCurrency(profileCurrency) ? profileCurrency : 'USD'))
-    : (selectedExternalSource?.currency_code || profileCurrency || 'USD');
+      : (profileCurrency && isCardSendCollectCurrency(profileCurrency) ? profileCurrency : SYSTEM_DEFAULT_CURRENCY))
+    : (selectedExternalSource?.currency_code || profileCurrency || SYSTEM_DEFAULT_CURRENCY);
   const sourceSymbol = currencySymbol(sourceCurrency);
   const targetSymbol = targetCountry.symbol || targetCountry.code;
 

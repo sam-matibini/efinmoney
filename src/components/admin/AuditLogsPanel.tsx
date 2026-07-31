@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { format } from "date-fns";
+import { formatInSystemTz } from "@/lib/datetime";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Shield, UserCog, Fingerprint } from "lucide-react";
 
@@ -164,7 +164,7 @@ export const AuditLogsPanel = () => {
                   return (
                     <TableRow key={`${log.source}-${log.id}`}>
                       <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-                        {format(new Date(log.created_at), "MMM d, yyyy HH:mm:ss")}
+                        {formatInSystemTz(log.created_at, { year: "numeric", month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" })}
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" className="gap-1">

@@ -1,3 +1,4 @@
+import { SYSTEM_DEFAULT_CURRENCY } from '@/lib/systemDefaults';
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -33,7 +34,7 @@ interface UserProfile {
 
 /** The person's country decides their currency; default_currency is the stored fallback. */
 const effectiveCurrency = (p: UserProfile): string =>
-  countryToCurrency(p.address_country || p.country_code) || p.default_currency || "USD";
+  countryToCurrency(p.address_country || p.country_code) || p.default_currency || SYSTEM_DEFAULT_CURRENCY;
 
 const kycStatusConfig: Record<string, { icon: typeof Clock; color: 'default' | 'secondary' | 'destructive'; label: string }> = {
   verified:    { icon: CheckCircle2, color: 'default',     label: 'Verified' },
