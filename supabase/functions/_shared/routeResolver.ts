@@ -2,9 +2,11 @@
 // tables, honouring operator overrides and the active routing rule.
 
 import {
+  applyMarginFloor,
   scoreCandidates,
   type CandidateInput,
   type CustomerPricingRow,
+  type MarginFloor,
   type PartnerPricingRow,
   type ScoredCandidate,
 } from "./routingEngine.ts";
