@@ -404,9 +404,22 @@ const UserDetailPage = () => {
                   )}
                 </div>
               </div>
+              {hasPermission("edit_users") && (
+                <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
+                  <Pencil className="w-4 h-4 mr-1" /> Edit details
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>
+
+        <EditUserDialog
+          open={editOpen}
+          onOpenChange={setEditOpen}
+          profile={profile as never}
+          invalidateKeys={[["admin-user-detail", id], ["admin-users"]]}
+        />
+
 
         <Tabs defaultValue="overview" className="space-y-4">
           <TabsList className="flex-wrap h-auto">
