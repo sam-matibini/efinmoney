@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import AdminLayout from "@/components/admin-portal/AdminLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   ArrowLeft, Mail, Phone, MapPin, Calendar, Shield, Wallet, ArrowRightLeft,
   User as UserIcon, Hash, Activity, AlertTriangle, AtSign, MessageSquare, FileWarning, Headphones,
-  ShieldCheck, ShieldOff, Send, Loader2, ExternalLink, Pencil,
+  ShieldCheck, ShieldOff, Send, Loader2, ExternalLink, Pencil, FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -495,6 +495,69 @@ const UserDetailPage = () => {
                 </CardContent>
               </Card>
             </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <FileText className="w-4 h-4" /> KYC documents
+                </CardTitle>
+                <CardDescription>Identity, address, and source-of-funds documents submitted for this user.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {kycLoading ? (
+                  <div className="space-y-2">
+                    <Skeleton className="h-10 w-full" />
+                    <Skeleton className="h-10 w-full" />
+                    <Skeleton className="h-10 w-2/3" />
+                  </div>
+                ) : (
+                  <div className="grid gap-2">
+                    {[
+                      { label: "ID document", url: kyc?.id_document_url, type: kyc?.id_document_type, country: kyc?.id_document_country, status: kyc?.id_verification_status, reason: kyc?.id_rejection_reason },
+                      { label: "Selfie / liveness", url: kyc?.selfie_url, type: null, country: null, status: kyc?.liveness_check_status, reason: null },
+                      { label: "Address proof", url: kyc?.address_document_url, type: kyc?.address_document_type, country: null, status: kyc?.address_verification_status, reason: kyc?.address_rejection_reason },
+                      { label: "Source of funds", url: kyc?.source_of_funds_url, type: kyc?.source_of_funds_type, country: null, status: kyc?.source_of_funds_status, reason: null },
+                    ].map((doc) => (
+                      <div key={doc.label} className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-medium">{doc.label}</div>
+                          <div className="text-xs text-muted-foreground truncate">
+                            {doc.type ? doc.type.replace(/_/g, " ") : "—"}
+                            {doc.country ? ` · ${doc.country}` : ""}
+                            {doc.url ? (
+                              <a
+                                href={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/kyc-documents/${doc.url}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="ml-2 text-primary hover:underline"
+                              >
+                                open
+                              </a>
+                            ) : (
+                              <span className="ml-2 text-muted-foreground">not uploaded</span>
+                            )}
+                          </div>
+                          {doc.reason && <div className="text-xs text-destructive mt-0.5">{doc.reason}</div>}
+                        </div>
+                        <Badge variant="outline" className={
+                          doc.status === "approved" ? "bg-indigo-500/10 text-indigo-500 border-indigo-500/20" :
+                          doc.status === "rejected" ? "bg-red-500/10 text-red-500 border-red-500/20" :
+                          doc.status === "pending" ? "bg-yellow-500/10 text-yellow-600 border-yellow-500/20" :
+                          "bg-muted text-muted-foreground"
+                        }>
+                          {doc.status || "—"}
+                        </Badge>
+                      </div>
+                    ))}
+                    {kyc?.persona_inquiry_id && (
+                      <div className="text-xs text-muted-foreground pt-1">
+                        Persona inquiry: <span className="font-mono">{kyc.persona_inquiry_id}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
             <Card>
               <CardHeader>

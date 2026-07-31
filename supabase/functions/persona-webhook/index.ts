@@ -8,6 +8,67 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+// Persona inquiries include the verified identity data as `included` items:
+//   inquiry, government_id, address, selfie, ...
+// On approval we copy the relevant fields onto profiles so the admin's
+// UserDetailPage doesn't show "—" for DOB, phone, address, etc. Best-effort:
+// each field is read defensively (Persona occasionally omits address on
+// digital wallets) and we only write fields that have a value, so a partial
+// payload never clobbers an existing good value with null.
+function extractPersonaFields(payload: any): {
+  full_name?: string;
+  date_of_birth?: string;
+  phone_number?: string;
+  nationality?: string;
+  street_address?: string;
+  city?: string;
+  state_province?: string;
+  postal_code?: string;
+  address_country?: string;
+  id_document_type?: string;
+  id_document_country?: string;
+} {
+  if (!payload) return {};
+  const included: any[] = Array.isArray(payload.included) ? payload.included : [];
+  const pick = (type: string) => included.find((i) => i?.type === type)?.attributes ?? {};
+  // The inline webhook event shape is payload.data.attributes.payload.data.attributes
+  // — fall back to it when the top-level `included` is absent.
+  const inlineA: any = payload?.data?.attributes?.payload?.data?.attributes ?? {};
+  const a = { ...inlineA, ...pick("government_id") };
+  const addr = { ...pick("address") };
+  const fields: Record<string, string | undefined> = {
+    full_name: [a.name_first, a.name_middle, a.name_last].filter(Boolean).join(" ") || undefined,
+    date_of_birth: a.birthdate || a.date_of_birth || undefined,
+    phone_number: a.phone_number || undefined,
+    nationality: a.nationality || undefined,
+    street_address: addr.street1 || a.address_street1 || undefined,
+    city: addr.city || a.address_city || undefined,
+    state_province: addr.subdivision || a.address_subdivision || undefined,
+    postal_code: addr.postal_code || a.address_postal_code || undefined,
+    address_country: addr.country_code || a.address_country_code || undefined,
+    id_document_type: a.identification_class || undefined,
+    id_document_country: a.identification_issuing_country || undefined,
+  };
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(fields)) {
+    if (typeof v === "string" && v.trim()) out[k] = v.trim();
+  }
+  return out;
+}
+
+async function syncPersonaFieldsToProfile(
+  supabase: any,
+  userId: string,
+  fields: Record<string, string>,
+) {
+  if (!userId || Object.keys(fields).length === 0) return;
+  try {
+    await supabase.from("profiles").update(fields).eq("user_id", userId);
+  } catch (e) {
+    console.error("persona: failed to sync fields to profile", e);
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -130,6 +191,7 @@ async function processEvent(supabase: any, eventType: string | null, inquiryId: 
       update.persona_decision = "approved";
       update.reviewed_at = new Date().toISOString();
       if (!kyc.submitted_at) update.submitted_at = new Date().toISOString();
+      await syncPersonaFieldsToProfile(supabase, kyc.user_id, extractPersonaFields(payload));
       auditAction = "persona_auto_approved_on_complete";
       break;
     case "inquiry.approved":
@@ -140,6 +202,7 @@ async function processEvent(supabase: any, eventType: string | null, inquiryId: 
       update.reviewed_at = new Date().toISOString();
       update.id_verification_status = "approved";
       update.liveness_check_status = "approved";
+      await syncPersonaFieldsToProfile(supabase, kyc.user_id, extractPersonaFields(payload));
       auditAction = "persona_auto_approved";
       break;
     case "inquiry.declined": {

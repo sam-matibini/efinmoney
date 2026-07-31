@@ -36,6 +36,10 @@ const Auth = () => {
   const [stateRegion, setStateRegion] = useState("");
   const [postalCode, setPostalCode] = useState("");
   const [country, setCountry] = useState("");
+  const [phone, setPhone] = useState("");
+  const [dob, setDob] = useState("");
+  const [occupation, setOccupation] = useState("");
+  const [nationality, setNationality] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [signedUpEmail, setSignedUpEmail] = useState<string | null>(null);
@@ -79,6 +83,10 @@ const Auth = () => {
           toast.error("Please complete your address.");
           return;
         }
+        if (!phone.trim() || !dob || !nationality) {
+          toast.error("Phone, date of birth, and nationality are required.");
+          return;
+        }
         const { error } = await signUp(
           email,
           password,
@@ -91,6 +99,10 @@ const Auth = () => {
             state: stateRegion.trim(),
             postalCode: postalCode.trim(),
             countryCode: country,
+            phone: phone.trim(),
+            dateOfBirth: dob,
+            occupation: occupation.trim(),
+            nationality,
           }
         );
         if (error) toast.error(error.message);
@@ -543,6 +555,61 @@ const Auth = () => {
                     </Select>
                   </div>
                 </div>
+
+                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="phone" className="text-neutral-700 font-medium">Phone number</Label>
+                    <Input
+                      id="phone"
+                      type="tel"
+                      placeholder="+14165550123"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      className="h-12 bg-white border-neutral-200 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
+                      autoComplete="tel"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="dob" className="text-neutral-700 font-medium">Date of birth</Label>
+                    <Input
+                      id="dob"
+                      type="date"
+                      value={dob}
+                      onChange={(e) => setDob(e.target.value)}
+                      className="h-12 bg-white border-neutral-200 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
+                      autoComplete="bday"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="occupation" className="text-neutral-700 font-medium">Occupation</Label>
+                    <Input
+                      id="occupation"
+                      type="text"
+                      placeholder="e.g. Software engineer"
+                      value={occupation}
+                      onChange={(e) => setOccupation(e.target.value)}
+                      className="h-12 bg-white border-neutral-200 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
+                      autoComplete="organization-title"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="nationality" className="text-neutral-700 font-medium">Nationality</Label>
+                    <Select value={nationality} onValueChange={setNationality} required>
+                      <SelectTrigger id="nationality" className="h-12 bg-white border-neutral-200 focus:ring-2 focus:ring-primary/20">
+                        <SelectValue placeholder="Select nationality" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ISO_COUNTRIES.map((c) => (
+                          <SelectItem key={c.code} value={c.code}>
+                            <span className="mr-2">{c.flag}</span>{c.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -641,6 +708,10 @@ const Auth = () => {
                 setStateRegion("");
                 setPostalCode("");
                 setCountry("");
+                setPhone("");
+                setDob("");
+                setOccupation("");
+                setNationality("");
                 setEmailCheck("idle");
                 setEmailCheckMessage(null);
                 setEmailSuggestion(null);

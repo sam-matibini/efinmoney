@@ -21,6 +21,10 @@ interface AuthContextType {
       state: string;
       postalCode: string;
       countryCode: string;
+      phone?: string;
+      dateOfBirth?: string;
+      occupation?: string;
+      nationality?: string;
     }
   ) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
@@ -118,6 +122,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       state: string;
       postalCode: string;
       countryCode: string;
+      phone?: string;
+      dateOfBirth?: string;
+      occupation?: string;
+      nationality?: string;
     }
   ) => {
     const fullName = `${firstName} ${lastName}`.trim();
@@ -139,7 +147,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (error) throw error;
 
-      // Update profile with full name + address after signup
+      // Update profile with full name + address + identity fields after signup
       if (!error) {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
@@ -151,6 +159,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             profileUpdate.state_province = address.state || null;
             profileUpdate.postal_code = address.postalCode || null;
             profileUpdate.address_country = address.countryCode || null;
+            if (address.phone)        profileUpdate.phone_number = address.phone;
+            if (address.dateOfBirth)  profileUpdate.date_of_birth = address.dateOfBirth;
+            if (address.occupation)   profileUpdate.occupation = address.occupation;
+            if (address.nationality)   profileUpdate.nationality = address.nationality;
           }
           await supabase
             .from('profiles')
