@@ -276,27 +276,9 @@ Deno.serve(async (req) => {
       }
     }
 
-    if (findings.length) {
-      const worst = findings.slice(0, 10);
-      await supabase.from("partner_alerts").upsert(
-        {
-          fingerprint: "partner_score:degraded",
-          alert_type: "partner_score",
-          severity: "warning",
-          title: `${findings.length} partner corridor(s) below performance expectations`,
-          message: worst
-            .map((f) =>
-              `${f.partner} · ${f.corridor}: score ${f.score} (grade ${f.grade}${
-                f.prev ? `, was ${f.prev}` : ""
-              })`
-            )
-            .join("\n"),
-          metrics: { count: findings.length, worst },
-          status: "open",
-        },
-        { onConflict: "fingerprint" },
-      );
-    }
+    // Alerting is owned by partner-alerts-scan, which reads partner_scorecards
+    // and de-duplicates/auto-resolves findings by fingerprint.
+
 
     return json({
       success: true,
