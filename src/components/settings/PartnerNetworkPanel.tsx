@@ -20,6 +20,8 @@ import PartnerSettlementsPanel from "./partners/PartnerSettlementsPanel";
 import MarginGuardrailsPanel from "./partners/MarginGuardrailsPanel";
 import PricingRecommendationsPanel from "./partners/PricingRecommendationsPanel";
 import FeeAdjustmentsPanel from "./partners/FeeAdjustmentsPanel";
+import PartnerScorecardsPanel from "./partners/PartnerScorecardsPanel";
+
 
 
 export const PartnerNetworkPanel = () => (
