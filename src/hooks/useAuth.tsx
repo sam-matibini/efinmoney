@@ -139,6 +139,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             full_name: fullName,
             first_name: firstName,
             last_name: lastName,
+            // Country is consumed by handle_new_user() to seed the right
+            // default wallet (e.g. NGN for a Nigerian signup) before the
+            // client-side profile update fires.
+            country: address?.countryCode ?? null,
             // Drives the post-confirmation route (KYB for business, KYC for individual).
             account_type: accountType === "business" ? "business" : "individual",
           },
