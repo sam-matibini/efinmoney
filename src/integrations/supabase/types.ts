@@ -4142,6 +4142,200 @@ export type Database = {
           },
         ]
       }
+      partner_score_weights: {
+        Row: {
+          below_threshold_action: string
+          created_at: string
+          enabled: boolean
+          id: string
+          lookback_days: number
+          max_score_influence: number
+          min_attempts: number
+          min_score_to_route: number
+          singleton: boolean
+          updated_at: string
+          updated_by: string | null
+          weight_cost_variance: number
+          weight_dispute: number
+          weight_liquidity: number
+          weight_margin: number
+          weight_speed: number
+          weight_success: number
+        }
+        Insert: {
+          below_threshold_action?: string
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          lookback_days?: number
+          max_score_influence?: number
+          min_attempts?: number
+          min_score_to_route?: number
+          singleton?: boolean
+          updated_at?: string
+          updated_by?: string | null
+          weight_cost_variance?: number
+          weight_dispute?: number
+          weight_liquidity?: number
+          weight_margin?: number
+          weight_speed?: number
+          weight_success?: number
+        }
+        Update: {
+          below_threshold_action?: string
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          lookback_days?: number
+          max_score_influence?: number
+          min_attempts?: number
+          min_score_to_route?: number
+          singleton?: boolean
+          updated_at?: string
+          updated_by?: string | null
+          weight_cost_variance?: number
+          weight_dispute?: number
+          weight_liquidity?: number
+          weight_margin?: number
+          weight_speed?: number
+          weight_success?: number
+        }
+        Relationships: []
+      }
+      partner_scorecards: {
+        Row: {
+          attempt_count: number
+          avg_settlement_minutes: number | null
+          composite_score: number
+          computed_at: string
+          confident: boolean
+          corridor_key: string
+          corridor_label: string | null
+          cost_variance_percent: number
+          created_at: string
+          dest_country: string | null
+          dest_currency: string | null
+          direction: string
+          dispute_count: number
+          dispute_rate: number
+          failure_count: number
+          grade: string
+          id: string
+          liquidity_incidents: number
+          margin_gap_percent: number
+          modelled_margin_percent: number
+          p95_settlement_minutes: number | null
+          partner_id: string
+          payment_method: string | null
+          period_end: string
+          period_start: string
+          previous_grade: string | null
+          previous_score: number | null
+          realised_margin_percent: number
+          score_cost_variance: number
+          score_dispute: number
+          score_liquidity: number
+          score_margin: number
+          score_speed: number
+          score_success: number
+          source_currency: string | null
+          success_count: number
+          success_rate: number
+          updated_at: string
+          window_days: number
+        }
+        Insert: {
+          attempt_count?: number
+          avg_settlement_minutes?: number | null
+          composite_score?: number
+          computed_at?: string
+          confident?: boolean
+          corridor_key: string
+          corridor_label?: string | null
+          cost_variance_percent?: number
+          created_at?: string
+          dest_country?: string | null
+          dest_currency?: string | null
+          direction?: string
+          dispute_count?: number
+          dispute_rate?: number
+          failure_count?: number
+          grade?: string
+          id?: string
+          liquidity_incidents?: number
+          margin_gap_percent?: number
+          modelled_margin_percent?: number
+          p95_settlement_minutes?: number | null
+          partner_id: string
+          payment_method?: string | null
+          period_end: string
+          period_start: string
+          previous_grade?: string | null
+          previous_score?: number | null
+          realised_margin_percent?: number
+          score_cost_variance?: number
+          score_dispute?: number
+          score_liquidity?: number
+          score_margin?: number
+          score_speed?: number
+          score_success?: number
+          source_currency?: string | null
+          success_count?: number
+          success_rate?: number
+          updated_at?: string
+          window_days?: number
+        }
+        Update: {
+          attempt_count?: number
+          avg_settlement_minutes?: number | null
+          composite_score?: number
+          computed_at?: string
+          confident?: boolean
+          corridor_key?: string
+          corridor_label?: string | null
+          cost_variance_percent?: number
+          created_at?: string
+          dest_country?: string | null
+          dest_currency?: string | null
+          direction?: string
+          dispute_count?: number
+          dispute_rate?: number
+          failure_count?: number
+          grade?: string
+          id?: string
+          liquidity_incidents?: number
+          margin_gap_percent?: number
+          modelled_margin_percent?: number
+          p95_settlement_minutes?: number | null
+          partner_id?: string
+          payment_method?: string | null
+          period_end?: string
+          period_start?: string
+          previous_grade?: string | null
+          previous_score?: number | null
+          realised_margin_percent?: number
+          score_cost_variance?: number
+          score_dispute?: number
+          score_liquidity?: number
+          score_margin?: number
+          score_speed?: number
+          score_success?: number
+          source_currency?: string | null
+          success_count?: number
+          success_rate?: number
+          updated_at?: string
+          window_days?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_scorecards_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "payment_partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       partner_settlements: {
         Row: {
           amount_paid: number
