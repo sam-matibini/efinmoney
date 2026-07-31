@@ -204,7 +204,9 @@ export function scoreCandidates(
         customer_revenue: revenue.total,
         expected_profit: profit,
         margin_percent: revenue.total > 0 ? Math.round((profit / revenue.total) * 10000) / 100 : 0,
+        volume_margin_percent: amount > 0 ? Math.round((profit / amount) * 10000) / 100 : 0,
         score: Math.round(score * 10000) / 10000,
+
         pricing_missing: !c.pricing,
         breakdown: {
           profitScore: Math.round(profitScore * 1000) / 1000,
