@@ -1,5 +1,7 @@
 // Map ISO country code -> representative IANA timezone for greeting purposes.
 // We only need a single TZ per country; for large countries we pick the capital/most populous.
+import { SYSTEM_TIMEZONE } from "./systemDefaults";
+
 const COUNTRY_TZ: Record<string, string> = {
   CA: "America/Toronto",
   US: "America/New_York",
@@ -42,11 +44,25 @@ const COUNTRY_TZ: Record<string, string> = {
   BR: "America/Sao_Paulo",
   MX: "America/Mexico_City",
   AR: "America/Argentina/Buenos_Aires",
+  BW: "Africa/Gaborone",
+  NA: "Africa/Windhoek",
+  ZW: "Africa/Harare",
+  MW: "Africa/Blantyre",
+  MZ: "Africa/Maputo",
+  ET: "Africa/Addis_Ababa",
+  SN: "Africa/Dakar",
+  CI: "Africa/Abidjan",
+  CM: "Africa/Douala",
+};
+
+/** ISO-2 country code → representative IANA timezone (null when unknown). */
+export const countryTimezone = (countryCode?: string | null): string | null => {
+  if (!countryCode) return null;
+  return COUNTRY_TZ[countryCode.trim().toUpperCase().slice(0, 2)] || null;
 };
 
 export const getHourForCountry = (countryCode?: string | null): number => {
-  const tz = countryCode ? COUNTRY_TZ[countryCode.toUpperCase()] : undefined;
-  if (!tz) return new Date().getHours();
+  const tz = countryTimezone(countryCode) ?? SYSTEM_TIMEZONE;
   try {
     const parts = new Intl.DateTimeFormat("en-US", {
       timeZone: tz,
