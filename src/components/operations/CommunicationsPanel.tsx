@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,8 +11,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { 
-  MessageSquare, 
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  MessageSquare,
   Plus,
   Mail,
   Phone,
@@ -21,10 +30,24 @@ import {
   Send,
   Search,
   ArrowUpRight,
-  ArrowDownLeft
+  ArrowDownLeft,
+  ChevronsUpDown,
+  Check,
+  Paperclip,
+  Loader2,
+  StickyNote,
+  CalendarClock,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { cn } from "@/lib/utils";
+import { useCommunicationRecipients, type CommunicationRecipient } from "@/hooks/useCommunicationRecipients";
+import {
+  AttachmentLinks,
+  AttachmentPicker,
+  useCommunicationAttachments,
+} from "@/components/crm/CommunicationAttachments";
+import { CHANNELS, sendCommunication, type StagedAttachment } from "@/lib/communications";
 
 const channelConfig: Record<string, { icon: typeof Mail; color: string; label: string }> = {
   email: { icon: Mail, color: 'bg-blue-500/10 text-blue-600', label: 'Email' },
@@ -33,10 +56,13 @@ const channelConfig: Record<string, { icon: typeof Mail; color: string; label: s
   whatsapp: { icon: MessageCircle, color: 'bg-indigo-500/10 text-indigo-600', label: 'WhatsApp' },
   push: { icon: Bell, color: 'bg-amber-500/10 text-amber-600', label: 'Push' },
   phone_call: { icon: Phone, color: 'bg-orange-500/10 text-orange-600', label: 'Phone Call' },
+  meeting: { icon: CalendarClock, color: 'bg-teal-500/10 text-teal-600', label: 'Meeting' },
+  note: { icon: StickyNote, color: 'bg-slate-500/10 text-slate-600', label: 'Note' },
 };
 
 const statusConfig: Record<string, { color: string }> = {
   draft: { color: 'bg-muted text-muted-foreground' },
+  logged: { color: 'bg-slate-500/10 text-slate-600' },
   scheduled: { color: 'bg-blue-500/10 text-blue-600' },
   sent: { color: 'bg-indigo-500/10 text-indigo-600' },
   delivered: { color: 'bg-indigo-500/10 text-indigo-600' },
@@ -44,76 +70,92 @@ const statusConfig: Record<string, { color: string }> = {
   read: { color: 'bg-purple-500/10 text-purple-600' },
 };
 
+interface CommunicationRow {
+  id: string;
+  channel: string;
+  direction: string;
+  subject: string | null;
+  content: string;
+  status: string;
+  created_at: string;
+  recipient_email: string | null;
+  recipient_name: string | null;
+  error_message: string | null;
+  customers?: { name: string | null; email: string | null } | null;
+}
+
+const emptyForm = {
+  channel: 'email',
+  subject: '',
+  content: '',
+  recipientKey: '',
+  manualEmail: '',
+};
+
 export const CommunicationsPanel = () => {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [formData, setFormData] = useState({
-    channel: 'email',
-    subject: '',
-    content: '',
-    customer_id: '',
-  });
+  const [recipientOpen, setRecipientOpen] = useState(false);
+  const [formData, setFormData] = useState(emptyForm);
+  const [files, setFiles] = useState<StagedAttachment[]>([]);
+  const [detail, setDetail] = useState<CommunicationRow | null>(null);
 
   const { data: communications = [], isLoading } = useQuery({
     queryKey: ['customer-communications'],
-    queryFn: async () => {
+    queryFn: async (): Promise<CommunicationRow[]> => {
       const { data, error } = await supabase
         .from('customer_communications')
         .select('*, customers(name, email)')
         .order('created_at', { ascending: false })
         .limit(100);
       if (error) throw error;
-      return data || [];
+      return (data || []) as unknown as CommunicationRow[];
     },
   });
 
-  const { data: customers = [] } = useQuery({
-    queryKey: ['customers-list'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('customers').select('id, name, email').order('name');
-      if (error) throw error;
-      return data || [];
-    },
-  });
+  const { data: recipients = [] } = useCommunicationRecipients();
+  const communicationIds = useMemo(() => communications.map((c) => c.id), [communications]);
+  const { data: attachmentsByComm = {} } = useCommunicationAttachments(communicationIds);
 
-  const createCommunication = useMutation({
-    mutationFn: async (data: any) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
+  const selected: CommunicationRecipient | undefined = recipients.find((r) => r.key === formData.recipientKey);
+  const channelMeta = CHANNELS[formData.channel];
+  const resolvedEmail = (formData.manualEmail || selected?.email || '').trim();
 
-      const { error } = await supabase.from('customer_communications').insert({
-        ...data,
-        direction: 'outbound',
-        status: 'sent',
-        sent_at: new Date().toISOString(),
-        created_by: user.id,
+  const send = useMutation({
+    mutationFn: async () => {
+      await sendCommunication({
+        channel: formData.channel,
+        subject: formData.subject,
+        content: formData.content,
+        customer_id: selected?.customer_id ?? null,
+        user_id: selected?.user_id ?? null,
+        recipient_email: resolvedEmail || null,
+        recipient_name: selected?.label ?? null,
+        attachments: files,
       });
-      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customer-communications'] });
-      toast.success('Message sent successfully');
+      queryClient.invalidateQueries({ queryKey: ['communication-attachments'] });
+      toast.success(channelMeta?.delivery === 'live' ? 'Message sent' : 'Interaction recorded');
       setIsCreateOpen(false);
-      resetForm();
+      setFormData(emptyForm);
+      setFiles([]);
     },
-    onError: (error: any) => toast.error(error.message),
+    onError: (error: Error) => toast.error(error.message || 'Could not send message'),
   });
 
-  const resetForm = () => {
-    setFormData({
-      channel: 'email',
-      subject: '',
-      content: '',
-      customer_id: '',
-    });
-  };
-
-  const filteredCommunications = communications.filter(c => 
-    c.subject?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.content?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.customers?.name?.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredCommunications = communications.filter((c) =>
+    [c.subject, c.content, c.customers?.name, c.recipient_email, c.recipient_name]
+      .filter(Boolean)
+      .some((v) => v!.toLowerCase().includes(searchTerm.toLowerCase())),
   );
+
+  const canSend =
+    !!formData.content.trim() &&
+    (formData.channel !== 'email' || (!!resolvedEmail && !!formData.subject.trim())) &&
+    (formData.channel !== 'in_app' || !!selected?.user_id);
 
   if (isLoading) {
     return (
@@ -197,7 +239,7 @@ export const CommunicationsPanel = () => {
               <DialogTrigger asChild>
                 <Button size="sm"><Plus className="w-4 h-4 mr-2" />New Message</Button>
               </DialogTrigger>
-              <DialogContent className="max-w-lg">
+              <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>Send Message</DialogTitle>
                 </DialogHeader>
@@ -208,51 +250,128 @@ export const CommunicationsPanel = () => {
                       <Select value={formData.channel} onValueChange={(v) => setFormData({ ...formData, channel: v })}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          {Object.entries(channelConfig).map(([key, config]) => (
-                            <SelectItem key={key} value={key}>{config.label}</SelectItem>
+                          {Object.entries(CHANNELS).map(([key, meta]) => (
+                            <SelectItem key={key} value={key}>
+                              <span className="flex items-center gap-2">
+                                {meta.label}
+                                <Badge
+                                  variant="outline"
+                                  className={cn(
+                                    "text-[10px] px-1.5 py-0",
+                                    meta.delivery === 'live' ? 'text-indigo-600' : 'text-muted-foreground',
+                                  )}
+                                >
+                                  {meta.delivery === 'live' ? 'Live' : 'Logged'}
+                                </Badge>
+                              </span>
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label>Customer</Label>
-                      <Select value={formData.customer_id} onValueChange={(v) => setFormData({ ...formData, customer_id: v })}>
-                        <SelectTrigger><SelectValue placeholder="Select customer" /></SelectTrigger>
-                        <SelectContent>
-                          {customers.map((customer) => (
-                            <SelectItem key={customer.id} value={customer.id}>{customer.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <Label>Recipient</Label>
+                      <Popover open={recipientOpen} onOpenChange={setRecipientOpen}>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
+                            <span className="truncate">{selected?.label || 'Select recipient'}</span>
+                            <ChevronsUpDown className="w-4 h-4 opacity-50 shrink-0" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[320px] p-0" align="start">
+                          <Command>
+                            <CommandInput placeholder="Search users and customers..." />
+                            <CommandList>
+                              <CommandEmpty>No match found.</CommandEmpty>
+                              <CommandGroup>
+                                {recipients.map((r) => (
+                                  <CommandItem
+                                    key={r.key}
+                                    value={`${r.label} ${r.email ?? ''}`}
+                                    onSelect={() => {
+                                      setFormData((f) => ({ ...f, recipientKey: r.key }));
+                                      setRecipientOpen(false);
+                                    }}
+                                  >
+                                    <Check
+                                      className={cn(
+                                        "mr-2 h-4 w-4",
+                                        formData.recipientKey === r.key ? "opacity-100" : "opacity-0",
+                                      )}
+                                    />
+                                    <span className="flex-1 truncate">
+                                      {r.label}
+                                      {r.email && (
+                                        <span className="block text-xs text-muted-foreground truncate">{r.email}</span>
+                                      )}
+                                    </span>
+                                    <Badge variant="outline" className="ml-2 text-[10px]">
+                                      {r.source === 'user' ? 'App user' : 'Customer'}
+                                    </Badge>
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
                     </div>
                   </div>
-                  {formData.channel === 'email' && (
-                    <div className="space-y-2">
-                      <Label>Subject</Label>
-                      <Input
-                        value={formData.subject}
-                        onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-                        placeholder="Email subject..."
-                      />
-                    </div>
+
+                  {channelMeta?.note && (
+                    <p className="text-xs text-muted-foreground">{channelMeta.note}</p>
                   )}
+
+                  {formData.channel === 'email' && (
+                    <>
+                      <div className="space-y-2">
+                        <Label>Send to</Label>
+                        <Input
+                          value={formData.manualEmail || selected?.email || ''}
+                          onChange={(e) => setFormData({ ...formData, manualEmail: e.target.value })}
+                          placeholder="name@example.com"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Subject</Label>
+                        <Input
+                          value={formData.subject}
+                          onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
+                          placeholder="Email subject..."
+                        />
+                      </div>
+                    </>
+                  )}
+
                   <div className="space-y-2">
                     <Label>Message</Label>
                     <Textarea
                       value={formData.content}
                       onChange={(e) => setFormData({ ...formData, content: e.target.value })}
                       placeholder="Type your message..."
-                      rows={4}
+                      rows={5}
                     />
                   </div>
+
+                  <div className="space-y-2">
+                    <Label>Documents</Label>
+                    <AttachmentPicker files={files} onChange={setFiles} disabled={send.isPending} />
+                    {files.length > 0 && formData.channel === 'email' && (
+                      <p className="text-xs text-muted-foreground">
+                        Recipients get secure download links that expire in 7 days.
+                      </p>
+                    )}
+                  </div>
+
                   <div className="flex justify-end gap-2">
                     <Button variant="outline" onClick={() => setIsCreateOpen(false)}>Cancel</Button>
-                    <Button
-                      onClick={() => createCommunication.mutate(formData)}
-                      disabled={!formData.content || createCommunication.isPending}
-                    >
-                      <Send className="w-4 h-4 mr-2" />
-                      Send
+                    <Button onClick={() => send.mutate()} disabled={!canSend || send.isPending}>
+                      {send.isPending ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Send className="w-4 h-4 mr-2" />
+                      )}
+                      {channelMeta?.delivery === 'live' ? 'Send' : 'Record'}
                     </Button>
                   </div>
                 </div>
@@ -267,7 +386,7 @@ export const CommunicationsPanel = () => {
                 <TableRow>
                   <TableHead>Channel</TableHead>
                   <TableHead>Direction</TableHead>
-                  <TableHead>Customer</TableHead>
+                  <TableHead>Recipient</TableHead>
                   <TableHead>Subject/Content</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Date</TableHead>
@@ -284,9 +403,14 @@ export const CommunicationsPanel = () => {
                   filteredCommunications.map((comm) => {
                     const channelCfg = channelConfig[comm.channel] || channelConfig.email;
                     const ChannelIcon = channelCfg.icon;
-                    
+                    const attachmentCount = (attachmentsByComm[comm.id] || []).length;
+
                     return (
-                      <TableRow key={comm.id}>
+                      <TableRow
+                        key={comm.id}
+                        className="cursor-pointer"
+                        onClick={() => setDetail(comm)}
+                      >
                         <TableCell>
                           <Badge className={channelCfg.color}>
                             <ChannelIcon className="w-3 h-3 mr-1" />
@@ -306,9 +430,19 @@ export const CommunicationsPanel = () => {
                             </Badge>
                           )}
                         </TableCell>
-                        <TableCell>{comm.customers?.name || '-'}</TableCell>
+                        <TableCell className="max-w-[180px] truncate">
+                          {comm.customers?.name || comm.recipient_name || comm.recipient_email || '-'}
+                        </TableCell>
                         <TableCell className="max-w-xs truncate">
-                          {comm.subject || comm.content?.slice(0, 50)}...
+                          <span className="flex items-center gap-2">
+                            {attachmentCount > 0 && (
+                              <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <Paperclip className="w-3 h-3" />
+                                {attachmentCount}
+                              </span>
+                            )}
+                            <span className="truncate">{comm.subject || comm.content?.slice(0, 60)}</span>
+                          </span>
                         </TableCell>
                         <TableCell>
                           <Badge className={statusConfig[comm.status]?.color || ''}>
@@ -327,6 +461,35 @@ export const CommunicationsPanel = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Detail */}
+      <Dialog open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{detail?.subject || channelConfig[detail?.channel || 'email']?.label}</DialogTitle>
+          </DialogHeader>
+          {detail && (
+            <div className="space-y-4 text-sm">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge className={statusConfig[detail.status]?.color || ''}>{detail.status}</Badge>
+                <span className="text-muted-foreground">
+                  {format(new Date(detail.created_at), 'PPp')}
+                </span>
+              </div>
+              {(detail.recipient_email || detail.recipient_name) && (
+                <p className="text-muted-foreground">
+                  To: {detail.recipient_name}{detail.recipient_email ? ` · ${detail.recipient_email}` : ''}
+                </p>
+              )}
+              <p className="whitespace-pre-wrap">{detail.content}</p>
+              {detail.error_message && (
+                <p className="rounded-md bg-red-500/10 px-3 py-2 text-red-600">{detail.error_message}</p>
+              )}
+              <AttachmentLinks attachments={attachmentsByComm[detail.id] || []} />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
