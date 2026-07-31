@@ -9,6 +9,7 @@
 //   5. Persist circle_transfer_id, return tracking info
 //   6. Reverse the ledger if Circle rejects
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { quotePrice } from "../_shared/pricingService.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { circleFetch, CIRCLE_ORIGINATOR_ID, CIRCLE_DEPOSIT_ADDRESS } from "../_shared/circle.ts";
 import { z } from "npm:zod@3";
@@ -93,7 +94,21 @@ Deno.serve(async (req) => {
     .maybeSingle();
   if (!corridor || !corridor.enabled) return json({ error: "Corridor not enabled" }, 400);
 
-  const totalDebit = Number((p.source_amount + p.platform_fee).toFixed(2));
+  // Re-quote server-side: never trust the client-supplied platform fee.
+  const cardQuote = await quotePrice(admin, {
+    direction: "payout",
+    sourceCurrency: p.source_currency,
+    destCurrency: p.dest_currency,
+    destCountry: p.dest_country,
+    paymentMethod: `cpn_${p.payout_method}`,
+    customerType: "consumer",
+    amount: p.source_amount,
+  });
+  const platformFee = cardQuote.pricingMissing
+    ? Number((p.source_amount * (Number(corridor.markup_bps ?? 0) / 10_000)).toFixed(2))
+    : Number((cardQuote.fee + cardQuote.fxRevenue).toFixed(2));
+
+  const totalDebit = Number((p.source_amount + platformFee).toFixed(2));
 
   // Balance check
   const { data: balRes } = await admin.rpc("get_wallet_balance", { p_wallet_id: p.source_wallet_id });
@@ -105,6 +120,7 @@ Deno.serve(async (req) => {
     .like("code", "21%").eq("currency_code", p.source_currency).limit(1).maybeSingle();
   const { data: cpnSettle } = await admin.from("ledger_accounts").select("id").eq("code", "1208").maybeSingle();
   const { data: fxIncome } = await admin.from("ledger_accounts").select("id").eq("code", "4100").maybeSingle();
+  const { data: transferFeeIncome } = await admin.from("ledger_accounts").select("id").eq("code", "4200").maybeSingle();
   if (!fiatLiab || !cpnSettle) return json({ error: "Ledger accounts missing" }, 500);
 
   // USDC equivalent (Circle settles in USDC)
@@ -131,7 +147,7 @@ Deno.serve(async (req) => {
     source_amount: p.source_amount,
     target_amount: p.dest_amount,
     exchange_rate: p.effective_rate,
-    fee_amount: Number((p.platform_fee + p.circle_fee).toFixed(2)),
+    fee_amount: Number((platformFee + p.circle_fee).toFixed(2)),
     status: "processing",
     funding_source: "wallet",
     circle_quote_id: p.quote_id ?? null,
@@ -156,17 +172,27 @@ Deno.serve(async (req) => {
       reference_type: "cpn_transfer", reference_id: transfer.id, created_by: user.id,
     },
   ];
-  if (fxIncome && p.platform_fee > 0) {
+  // Split our margin: explicit fees -> 4200 Transfer Fees, FX spread -> 4100 FX Gain.
+  const feePortion = cardQuote.pricingMissing ? 0 : Number(cardQuote.fee.toFixed(2));
+  const spreadPortion = Number((platformFee - feePortion).toFixed(2));
+  if (transferFeeIncome && feePortion > 0) {
+    entries.push({
+      journal_id: journalId, account_id: transferFeeIncome.id, wallet_id: null,
+      currency_code: p.source_currency, debit_amount: 0, credit_amount: feePortion,
+      description: "CPN transfer fee", reference_type: "cpn_transfer", reference_id: transfer.id, created_by: user.id,
+    });
+  }
+  if (fxIncome && spreadPortion > 0) {
     entries.push({
       journal_id: journalId, account_id: fxIncome.id, wallet_id: null,
-      currency_code: p.source_currency, debit_amount: 0, credit_amount: p.platform_fee,
+      currency_code: p.source_currency, debit_amount: 0, credit_amount: spreadPortion,
       description: "CPN spread", reference_type: "cpn_transfer", reference_id: transfer.id, created_by: user.id,
     });
   }
   // Balance the entry: DR=totalDebit, CR=usdcToSend (USDC) + platform_fee (source). The journal is multi-currency
   // so we balance by source-currency: DR totalDebit = CR platform_fee + CR source-equivalent of USDC.
   // Add a balancing entry for the source-currency cost of USDC sent.
-  const usdcCostInSource = Number((p.source_amount - p.platform_fee).toFixed(2));
+  const usdcCostInSource = Number((p.source_amount - platformFee).toFixed(2));
   // Add CR to a clearing line on fiat liab? Better: skip strict per-currency balance; ledger_entries
   // already supports multi-currency journals in this project (see execute_fx_swap).
 
