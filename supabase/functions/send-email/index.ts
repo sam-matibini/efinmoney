@@ -1,5 +1,5 @@
 // Send transactional emails via Resend.
-// Body: { type: 'welcome' | 'transfer_completed' | 'kyc_update' | 'kyb_update' | 'topup_completed' | 'payment_link', to: string, data?: Record<string, any> }
+// Body: { type: 'welcome' | 'transfer_completed' | 'kyc_update' | 'kyb_update' | 'topup_completed' | 'payment_link' | 'password_reset', to: string, data?: Record<string, any> }
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -324,6 +324,32 @@ function topupCompletedBody(d: Record<string, any>, appUrl: string) {
   `;
 }
 
+function passwordResetBody(d: Record<string, any>, appUrl: string) {
+  const actionLink = d.action_link || "#";
+  const expires = d.expires_in_minutes ?? 60;
+  return `
+    <div style="text-align:center;margin:0 0 18px">
+      <div style="display:inline-block;width:64px;height:64px;line-height:64px;border-radius:50%;background:linear-gradient(135deg,#fdb913 0%,#f59e0b 100%);color:#0e0a26;font-size:32px;box-shadow:0 8px 20px -6px rgba(245,158,11,0.5)">🔑</div>
+    </div>
+    <h1 style="margin:0 0 8px;font-family:'Space Grotesk','Inter',sans-serif;font-size:26px;font-weight:700;color:#0f172a;text-align:center;letter-spacing:-0.02em">Reset your password</h1>
+    <p style="margin:0 0 22px;line-height:1.6;color:#334155;text-align:center">We received a request to reset your eFinMoney password. Click the button below to confirm it's you and choose a new one.</p>
+    <div style="text-align:center;margin:0 0 18px">
+      <a href="${actionLink}" style="display:inline-block;background:linear-gradient(135deg,#fdb913 0%,#f59e0b 100%);color:#0e0a26;text-decoration:none;padding:14px 32px;border-radius:9999px;font-weight:700;font-size:15px;box-shadow:0 10px 24px -8px rgba(245,158,11,0.55),inset_0_1px_0_0_rgba(255,255,255,0.4)">
+        Reset password →
+      </a>
+    </div>
+    <p style="line-height:1.6;color:#64748b;font-size:13px;margin:0 0 8px;text-align:center">
+      Or paste this link into your browser:<br>
+      <a href="${actionLink}" style="color:#6d4ee0;word-break:break-all;font-size:12px">${actionLink}</a>
+    </p>
+    <div style="margin:24px 0 0;padding:14px 16px;border-left:3px solid #fdb913;background:linear-gradient(135deg,#fffbeb 0%,#fef3c7 100%);border-radius:0 8px 8px 0">
+      <p style="margin:0;color:#92400e;font-size:13px;line-height:1.5">
+        <strong>This link expires in ${expires} minutes.</strong> If you didn't request a password reset, you can safely ignore this email — your password won't change.
+      </p>
+    </div>
+  `;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -384,6 +410,10 @@ Deno.serve(async (req) => {
       subject = `Wallet topped up — ${sym}${amt} ${data.currency || ""}`;
       preheader = `${sym}${amt} ${data.currency || ""} credited to your wallet.`;
       bodyHtml = topupCompletedBody(data, appUrl);
+    } else if (type === "password_reset") {
+      subject = "Reset your eFinMoney password";
+      preheader = "We received a request to reset your password. The link expires in 60 minutes.";
+      bodyHtml = passwordResetBody(data, appUrl);
     } else {
       return new Response(JSON.stringify({ error: "unknown email type" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },

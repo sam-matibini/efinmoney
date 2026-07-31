@@ -174,10 +174,10 @@ const Auth = () => {
     }
     setSendingReset(true);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        // Lands on /auth/confirm, which verifies the link and forwards to
-        // /auth/reset-password to set the new password.
-        redirectTo: `${window.location.origin}/auth/confirm?type=recovery`,
+      // Route through our branded Edge Function so the user gets the
+      // eFinMoney-styled reset email instead of the stock Supabase one.
+      const { error } = await supabase.functions.invoke("send-password-reset", {
+        body: { email, next: "/auth" },
       });
       if (error) toast.error(error.message);
       else setResetSentTo(email);
