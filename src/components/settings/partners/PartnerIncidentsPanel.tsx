@@ -7,7 +7,7 @@ import {
   useSaveIncidentSettings,
   type IncidentSettings,
 } from "@/hooks/usePartnerOps";
-import { usePaymentPartners } from "@/hooks/usePaymentPartners";
+import { usePaymentPartners } from "@/hooks/usePartnerNetwork";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
