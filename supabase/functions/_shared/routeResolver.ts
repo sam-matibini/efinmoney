@@ -34,6 +34,9 @@ export interface RouteResolution {
   candidates: ScoredCandidate[];
   excluded: Array<{ partner_code: string; reason: string }>;
   overrides: Array<{ type: string; partner_code: string; reason: string | null }>;
+  marginFloor?: (MarginFloor & { source: "corridor" | "global" }) | null;
+  marginBlocked?: Array<{ partner_code: string; expected_profit: number; margin_percent: number }>;
+  marginUplift?: number;
 }
 
 const up = (v: unknown) => String(v ?? "").toUpperCase();
