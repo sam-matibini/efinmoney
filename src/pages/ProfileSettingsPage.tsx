@@ -108,20 +108,29 @@ const ProfileSettingsPage = () => {
         }
       }
 
+      const identityFields = identityLocked
+        ? {}
+        : {
+            full_name: fullName,
+            phone_number: normalizedPhone,
+            date_of_birth: dateOfBirth || null,
+            occupation: occupation || null,
+            street_address: streetAddress || null,
+            city: city || null,
+            state_province: stateProvince || null,
+            postal_code: postalCode || null,
+            address_country: addressCountry ? addressCountry.toUpperCase().slice(0, 2) : null,
+          };
+
       const { error } = await supabase
         .from('profiles')
         .update({
-          full_name: fullName,
           email,
           efin_tag: cleanTag || null,
-          phone_number: normalizedPhone,
-          street_address: streetAddress || null,
-          city: city || null,
-          state_province: stateProvince || null,
-          postal_code: postalCode || null,
-          address_country: addressCountry ? addressCountry.toUpperCase().slice(0, 2) : null,
+          ...identityFields,
         })
         .eq('user_id', user.id);
+
 
       if (error) {
         if (error.message.includes('duplicate') || error.code === '23505') {
