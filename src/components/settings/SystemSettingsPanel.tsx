@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -5,42 +6,98 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Skeleton } from "@/components/ui/skeleton";
 import { 
   Globe, 
   Mail, 
   Bell, 
   Lock, 
   Database,
-  Save
+  Save,
+  Loader2
 } from "lucide-react";
 import { SYSTEM_DEFAULT_CURRENCY, SYSTEM_TIMEZONE } from "@/lib/systemDefaults";
 import { systemTzLabel } from "@/lib/datetime";
+import { useSystemSettings } from "@/hooks/useSystemSettings";
+import { useUserRoles } from "@/hooks/useUserRoles";
+import { toast } from "@/hooks/use-toast";
 
-export const SystemSettingsPanel = () => {
+const GeneralSettingsCard = () => {
+  const { getString, isLoading, saveSettings } = useSystemSettings();
+  const { isAdmin } = useUserRoles();
+
+  const [companyName, setCompanyName] = useState("eFinMoney");
+  const [supportEmail, setSupportEmail] = useState("support@efinmoney.com");
+  const [currency, setCurrency] = useState(SYSTEM_DEFAULT_CURRENCY);
+  const [timezone, setTimezone] = useState(SYSTEM_TIMEZONE);
+
+  useEffect(() => {
+    if (isLoading) return;
+    setCompanyName(getString("general.company_name", "eFinMoney"));
+    setSupportEmail(getString("general.support_email", "support@efinmoney.com"));
+    setCurrency(getString("general.default_currency", SYSTEM_DEFAULT_CURRENCY));
+    setTimezone(getString("general.default_timezone", SYSTEM_TIMEZONE));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading]);
+
+  const handleSave = async () => {
+    try {
+      await saveSettings.mutateAsync({
+        "general.company_name": companyName.trim(),
+        "general.support_email": supportEmail.trim(),
+        "general.default_currency": currency,
+        "general.default_timezone": timezone,
+      });
+      toast({ title: "Settings saved", description: "General settings have been updated." });
+    } catch (e) {
+      toast({
+        title: "Could not save settings",
+        description: e instanceof Error ? e.message : "Unexpected error",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
-    <div className="space-y-6">
-      {/* General Settings */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Globe className="h-5 w-5" />
-            General Settings
-          </CardTitle>
-          <CardDescription>Configure basic system settings</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Globe className="h-5 w-5" />
+          General Settings
+        </CardTitle>
+        <CardDescription>Configure basic system settings</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {isLoading ? (
+          <div className="grid gap-4 md:grid-cols-2">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-16 w-full" />
+            ))}
+          </div>
+        ) : (
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="company_name">Company Name</Label>
-              <Input id="company_name" defaultValue="eFinMoney" />
+              <Input
+                id="company_name"
+                value={companyName}
+                onChange={(e) => setCompanyName(e.target.value)}
+                disabled={!isAdmin}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="support_email">Support Email</Label>
-              <Input id="support_email" type="email" defaultValue="support@efinmoney.com" />
+              <Input
+                id="support_email"
+                type="email"
+                value={supportEmail}
+                onChange={(e) => setSupportEmail(e.target.value)}
+                disabled={!isAdmin}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="default_currency">Default Currency</Label>
-              <Select defaultValue={SYSTEM_DEFAULT_CURRENCY}>
+              <Select value={currency} onValueChange={setCurrency} disabled={!isAdmin}>
                 <SelectTrigger id="default_currency">
                   <SelectValue />
                 </SelectTrigger>
@@ -59,7 +116,7 @@ export const SystemSettingsPanel = () => {
             </div>
             <div className="space-y-2">
               <Label htmlFor="timezone">Default Timezone</Label>
-              <Select defaultValue={SYSTEM_TIMEZONE}>
+              <Select value={timezone} onValueChange={setTimezone} disabled={!isAdmin}>
                 <SelectTrigger id="timezone">
                   <SelectValue />
                 </SelectTrigger>
@@ -77,14 +134,30 @@ export const SystemSettingsPanel = () => {
                 System records use {systemTzLabel()}. Customers see times in their own timezone (detected from their device or IP).
               </p>
             </div>
-
           </div>
-          <Button>
+        )}
+        <Button onClick={handleSave} disabled={!isAdmin || isLoading || saveSettings.isPending}>
+          {saveSettings.isPending ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
             <Save className="h-4 w-4 mr-2" />
-            Save General Settings
-          </Button>
-        </CardContent>
-      </Card>
+          )}
+          Save General Settings
+        </Button>
+        {!isAdmin && (
+          <p className="text-xs text-muted-foreground">Only administrators can change these settings.</p>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
+export const SystemSettingsPanel = () => {
+  return (
+    <div className="space-y-6">
+      {/* General Settings */}
+      <GeneralSettingsCard />
+
 
       {/* Email Settings */}
       <Card>
