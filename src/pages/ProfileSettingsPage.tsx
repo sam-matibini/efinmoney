@@ -287,31 +287,55 @@ const ProfileSettingsPage = () => {
             </p>
           </div>
 
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="dob">Date of birth</Label>
+              <Input
+                id="dob"
+                type="date"
+                value={dateOfBirth}
+                onChange={(e) => setDateOfBirth(e.target.value)}
+                disabled={isLoading || identityLocked}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="occupation">Occupation</Label>
+              <Input
+                id="occupation"
+                value={occupation}
+                onChange={(e) => setOccupation(e.target.value)}
+                placeholder="Software engineer"
+                maxLength={120}
+                disabled={isLoading || identityLocked}
+              />
+            </div>
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="phone">Phone number</Label>
-            <Input id="phone" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} placeholder="+234 806 860 8302" />
+            <Input id="phone" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} placeholder="+234 806 860 8302" disabled={isLoading || identityLocked} />
             <p className="text-xs text-muted-foreground">
               Use + and country code (+1, +234, +44…). Local 0… numbers convert using Country below (NG→+234, CA→+1).
             </p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="street">Street address</Label>
-            <Input id="street" value={streetAddress} onChange={(e) => setStreetAddress(e.target.value)} placeholder="123 Main St" />
+            <Input id="street" value={streetAddress} onChange={(e) => setStreetAddress(e.target.value)} placeholder="123 Main St" disabled={isLoading || identityLocked} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label htmlFor="city">City</Label>
-              <Input id="city" value={city} onChange={(e) => setCity(e.target.value)} />
+              <Input id="city" value={city} onChange={(e) => setCity(e.target.value)} disabled={isLoading || identityLocked} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="state">State / Province</Label>
-              <Input id="state" value={stateProvince} onChange={(e) => setStateProvince(e.target.value)} placeholder="ON" />
+              <Input id="state" value={stateProvince} onChange={(e) => setStateProvince(e.target.value)} placeholder="ON" disabled={isLoading || identityLocked} />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label htmlFor="postal">Postal code</Label>
-              <Input id="postal" value={postalCode} onChange={(e) => setPostalCode(e.target.value)} placeholder="M5V 2T6" />
+              <Input id="postal" value={postalCode} onChange={(e) => setPostalCode(e.target.value)} placeholder="M5V 2T6" disabled={isLoading || identityLocked} />
             </div>
             <div className="space-y-2">
               <Label>Country</Label>
@@ -322,6 +346,7 @@ const ProfileSettingsPage = () => {
                     variant="outline"
                     role="combobox"
                     aria-expanded={countryOpen}
+                    disabled={isLoading || identityLocked}
                     className="w-full justify-between font-normal"
                   >
                     {findIsoCountry(addressCountry) ? (
