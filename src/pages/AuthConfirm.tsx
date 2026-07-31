@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import LoadingSpinner from "@/components/LoadingSpinner";
-import { CheckCircle2, XCircle } from "lucide-react";
-import efinIcon from "@/assets/efin-icon.png";
+import { ArrowLeft, CheckCircle2, XCircle, MailCheck } from "lucide-react";
+import { BrandedScreen, BrandIconBadge, BrandPrimaryButton } from "@/components/brand/BrandedScreen";
 
 type EmailOtpType = "signup" | "invite" | "magiclink" | "recovery" | "email_change" | "email";
 
@@ -25,30 +25,36 @@ const recoveryTarget = (nextParam: string | null) => {
   return `/auth/reset-password?next=${encodeURIComponent(loginPath)}`;
 };
 
-const SUCCESS_COPY: Record<string, { title: string; body: string }> = {
+const SUCCESS_COPY: Record<string, { title: string; body: string; icon: React.ReactNode }> = {
   signup: {
-    title: "You're verified!",
+    title: "Email verified",
     body: "Your email has been confirmed and you're now signed in. Taking you to the next step…",
+    icon: <CheckCircle2 className="h-9 w-9" />,
   },
   invite: {
     title: "Invitation accepted",
     body: "Your email is confirmed and you're signed in. Let's finish setting up your staff account…",
+    icon: <CheckCircle2 className="h-9 w-9" />,
   },
   recovery: {
     title: "Identity confirmed",
     body: "Let's set a new password for your account. You'll be redirected to sign in when you're done.",
+    icon: <CheckCircle2 className="h-9 w-9" />,
   },
   email_change: {
     title: "Email updated",
     body: "Your new email address has been confirmed. Redirecting…",
+    icon: <CheckCircle2 className="h-9 w-9" />,
   },
   magiclink: {
     title: "You're signed in",
     body: "Magic link confirmed. Taking you to your dashboard…",
+    icon: <CheckCircle2 className="h-9 w-9" />,
   },
   email: {
-    title: "You're verified!",
+    title: "Email verified",
     body: "Your email has been confirmed and you're now signed in. Redirecting…",
+    icon: <CheckCircle2 className="h-9 w-9" />,
   },
 };
 
@@ -132,45 +138,53 @@ const AuthConfirm = () => {
   const copy = SUCCESS_COPY[type] || SUCCESS_COPY.signup;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4">
-      <div className="w-full max-w-md rounded-2xl border border-border bg-card p-8 text-center shadow-sm">
-        <img src={efinIcon} alt="eFinMoney" className="mx-auto mb-6 h-12 w-12 rounded-xl object-contain" />
+    <BrandedScreen
+      cardWidth="md"
+      topBarAction={
+        <Link to="/auth" className="inline-flex items-center gap-1.5 hover:text-amber-300 transition-colors">
+          <ArrowLeft className="w-4 h-4" /> Back to sign in
+        </Link>
+      }
+    >
+      {status === "verifying" && (
+        <>
+          <BrandIconBadge icon={<MailCheck className="h-9 w-9" />} tone="info" />
+          <h1 className="text-center text-2xl font-display font-bold text-foreground">Verifying your email</h1>
+          <p className="mt-2 text-center text-sm text-muted-foreground">
+            Hang tight — this only takes a moment.
+          </p>
+          <div className="mt-6 flex justify-center">
+            <LoadingSpinner size={40} />
+          </div>
+        </>
+      )}
 
-        {status === "verifying" && (
-          <>
-            <div className="flex justify-center"><LoadingSpinner size={72} /></div>
-            <h1 className="mt-6 text-xl font-display font-semibold text-foreground">Verifying your email…</h1>
-            <p className="mt-2 text-sm text-muted-foreground">Hang tight, this only takes a moment.</p>
-          </>
-        )}
+      {status === "success" && (
+        <>
+          <BrandIconBadge icon={copy.icon} tone="success" />
+          <h1 className="text-center text-2xl font-display font-bold text-foreground">{copy.title}</h1>
+          <p className="mt-2 text-center text-sm text-muted-foreground leading-relaxed">{copy.body}</p>
+          <BrandPrimaryButton onClick={() => navigate(dest, { replace: true })}>
+            Continue →
+          </BrandPrimaryButton>
+        </>
+      )}
 
-        {status === "success" && (
-          <>
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/10">
-              <CheckCircle2 className="h-9 w-9 text-emerald-500" />
-            </div>
-            <h1 className="mt-6 text-2xl font-display font-bold text-foreground">{copy.title}</h1>
-            <p className="mt-2 text-sm text-muted-foreground">{copy.body}</p>
-            <Button className="mt-6 w-full" onClick={() => navigate(dest, { replace: true })}>
-              Continue
-            </Button>
-          </>
-        )}
-
-        {status === "error" && (
-          <>
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10">
-              <XCircle className="h-9 w-9 text-destructive" />
-            </div>
-            <h1 className="mt-6 text-xl font-display font-semibold text-foreground">Verification failed</h1>
-            <p className="mt-2 text-sm text-muted-foreground">{errorMsg}</p>
-            <Button variant="outline" className="mt-6 w-full" onClick={() => navigate("/auth", { replace: true })}>
-              Back to sign in
-            </Button>
-          </>
-        )}
-      </div>
-    </div>
+      {status === "error" && (
+        <>
+          <BrandIconBadge icon={<XCircle className="h-9 w-9" />} tone="danger" />
+          <h1 className="text-center text-2xl font-display font-bold text-foreground">Verification failed</h1>
+          <p className="mt-2 text-center text-sm text-muted-foreground leading-relaxed">{errorMsg}</p>
+          <Button
+            variant="outline"
+            className="mt-7 w-full h-12 rounded-full font-bold"
+            onClick={() => navigate("/auth", { replace: true })}
+          >
+            Back to sign in
+          </Button>
+        </>
+      )}
+    </BrandedScreen>
   );
 };
 

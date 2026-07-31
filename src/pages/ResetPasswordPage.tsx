@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Lock } from "lucide-react";
+import { ArrowLeft, Lock, ShieldCheck } from "lucide-react";
 import LoadingSpinner from "@/components/LoadingSpinner";
-import efinIcon from "@/assets/efin-icon.png";
+import { BrandedScreen, BrandIconBadge, BrandPrimaryButton } from "@/components/brand/BrandedScreen";
 
 const isSafeRedirect = (path: string | null): path is string =>
   !!path && path.startsWith("/") && !path.startsWith("//");
@@ -65,57 +65,66 @@ const ResetPasswordPage = () => {
 
   if (checking) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-white to-amber-50/40">
         <LoadingSpinner size={72} />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4">
-      <div className="w-full max-w-md rounded-2xl border border-border bg-card p-8 shadow-sm">
-        <img src={efinIcon} alt="eFinMoney" className="mx-auto mb-6 h-12 w-12 rounded-xl object-contain" />
-        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-          <Lock className="h-6 w-6 text-primary" />
-        </div>
-        <h1 className="text-center text-2xl font-display font-bold text-foreground">Set a new password</h1>
-        <p className="mt-2 text-center text-sm text-muted-foreground">
-          Choose a strong password for your account. You'll be taken to sign in when you're done.
-        </p>
+    <BrandedScreen
+      cardWidth="md"
+      topBarAction={
+        <Link to="/auth" className="inline-flex items-center gap-1.5 hover:text-amber-300 transition-colors">
+          <ArrowLeft className="w-4 h-4" /> Back to sign in
+        </Link>
+      }
+    >
+      <BrandIconBadge icon={<Lock className="h-8 w-8" />} tone="info" />
+      <h1 className="text-center text-2xl font-display font-bold text-foreground">Set a new password</h1>
+      <p className="mt-2 text-center text-sm text-muted-foreground">
+        Choose a strong password for your account. You'll be taken to sign in when you're done.
+      </p>
 
-        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="newPwd">New password</Label>
-            <Input
-              id="newPwd"
-              type="password"
-              autoComplete="new-password"
-              required
-              minLength={8}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="At least 8 characters"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="confirmPwd">Confirm password</Label>
-            <Input
-              id="confirmPwd"
-              type="password"
-              autoComplete="new-password"
-              required
-              minLength={8}
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-            />
-          </div>
-          <Button type="submit" className="w-full" disabled={submitting || !password}>
-            {submitting && <LoadingSpinner size={16} className="mr-2" />}
-            Save password &amp; continue
-          </Button>
-        </form>
-      </div>
-    </div>
+      <form onSubmit={handleSubmit} className="mt-7 space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="newPwd" className="text-foreground font-medium">New password</Label>
+          <Input
+            id="newPwd"
+            type="password"
+            autoComplete="new-password"
+            required
+            minLength={8}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="At least 8 characters"
+            className="h-12 rounded-xl"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="confirmPwd" className="text-foreground font-medium">Confirm password</Label>
+          <Input
+            id="confirmPwd"
+            type="password"
+            autoComplete="new-password"
+            required
+            minLength={8}
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            className="h-12 rounded-xl"
+          />
+        </div>
+
+        <div className="flex items-start gap-2 rounded-xl bg-emerald-500/5 border border-emerald-500/20 p-3 text-xs text-emerald-700 dark:text-emerald-300">
+          <ShieldCheck className="h-4 w-4 flex-shrink-0 mt-0.5" />
+          <span>Use at least 8 characters. Mix in a number or symbol for a stronger password.</span>
+        </div>
+
+        <BrandPrimaryButton type="submit" disabled={submitting || !password}>
+          {submitting ? <LoadingSpinner size={18} /> : <>Save password &amp; continue →</>}
+        </BrandPrimaryButton>
+      </form>
+    </BrandedScreen>
   );
 };
 

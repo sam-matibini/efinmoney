@@ -15,6 +15,7 @@ import { verifyEmail } from "@/lib/emailValidation";
 import { ISO_COUNTRIES } from "@/lib/isoCountries";
 import { useLoginLockout } from "@/hooks/useLoginLockout";
 import { LoginLockoutBanners } from "@/components/auth/LoginLockoutBanners";
+import { BrandedScreen, BrandIconBadge, BrandPrimaryButton } from "@/components/brand/BrandedScreen";
 
 const isSafeRedirect = (path: string | null): path is string =>
   !!path && path.startsWith("/") && !path.startsWith("//");
@@ -216,127 +217,110 @@ const Auth = () => {
       </header>
 
       {resetSentTo ? (
-        <main className="flex-1 flex items-center justify-center px-6 py-12">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="w-full max-w-md text-center"
-          >
-            <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-              <MailCheck className="h-8 w-8 text-primary" />
-            </div>
-            <h1 className="text-3xl md:text-4xl font-black tracking-tight text-neutral-900">Check your inbox</h1>
-            <p className="mt-3 text-neutral-600">
-              If an account exists for <strong className="text-neutral-900">{resetSentTo}</strong>, we've sent a
-              password reset link. Click it to choose a new password.
-            </p>
+        <BrandedScreen
+          cardWidth="md"
+          topBarAction={
+            <Link to="/" className="inline-flex items-center gap-1.5 hover:text-amber-300 transition-colors">
+              <ArrowLeft className="w-4 h-4" /> Back to home
+            </Link>
+          }
+        >
+          <BrandIconBadge icon={<MailCheck className="h-9 w-9" />} tone="info" />
+          <h1 className="text-center text-2xl font-display font-bold text-foreground">Check your inbox</h1>
+          <p className="mt-2 text-center text-sm text-muted-foreground leading-relaxed">
+            If an account exists for <strong className="text-foreground">{resetSentTo}</strong>, we've sent a
+            password reset link. Click it to choose a new password.
+          </p>
+          <BrandPrimaryButton onClick={handleSendReset} disabled={sendingReset}>
+            {sendingReset ? <LoadingSpinner size={18} /> : "Resend reset link"}
+          </BrandPrimaryButton>
+          <p className="mt-5 text-center text-sm text-muted-foreground">
+            Remembered it?{" "}
             <button
-              onClick={handleSendReset}
-              disabled={sendingReset}
-              className="mt-8 w-full h-12 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold disabled:opacity-50 inline-flex items-center justify-center gap-2 transition-all shadow-lg shadow-primary/20"
+              onClick={() => { setResetSentTo(null); setShowForgot(false); setIsSignUp(false); }}
+              className="text-primary hover:text-primary/80 font-bold underline-offset-4 hover:underline"
             >
-              {sendingReset ? <LoadingSpinner size={20} /> : "Resend reset link"}
+              Back to sign in
             </button>
-            <p className="mt-6 text-center text-neutral-600">
-              Remembered it?
-              <button
-                onClick={() => { setResetSentTo(null); setShowForgot(false); setIsSignUp(false); }}
-                className="ml-2 text-primary hover:text-primary/80 font-bold"
-              >
-                Back to sign in
-              </button>
-            </p>
-          </motion.div>
-        </main>
+          </p>
+        </BrandedScreen>
       ) : showForgot ? (
-        <main className="flex-1 flex items-center justify-center px-6 py-12">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="w-full max-w-md"
-          >
-            <div className="text-center mb-10">
-              <h1 className="text-4xl md:text-5xl font-black tracking-tight text-neutral-900">Reset your password</h1>
-              <p className="mt-3 text-neutral-600">
-                Enter your email and we'll send you a link to set a new password.
-              </p>
+        <BrandedScreen
+          cardWidth="md"
+          topBarAction={
+            <Link to="/" className="inline-flex items-center gap-1.5 hover:text-amber-300 transition-colors">
+              <ArrowLeft className="w-4 h-4" /> Back to home
+            </Link>
+          }
+        >
+          <BrandIconBadge icon={<MailCheck className="h-8 w-8" />} tone="info" />
+          <h1 className="text-center text-2xl font-display font-bold text-foreground">Reset your password</h1>
+          <p className="mt-2 text-center text-sm text-muted-foreground">
+            Enter your email and we'll send you a link to set a new password.
+          </p>
+          <form onSubmit={handleSendReset} className="mt-7 space-y-5">
+            <div className="space-y-2">
+              <Label htmlFor="reset-email" className="text-foreground font-medium">Email</Label>
+              <Input
+                id="reset-email"
+                type="email"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="h-12 rounded-xl"
+                required
+              />
             </div>
-            <form onSubmit={handleSendReset} className="space-y-5">
-              <div className="space-y-2">
-                <Label htmlFor="reset-email" className="text-neutral-700 font-medium">Email</Label>
-                <Input
-                  id="reset-email"
-                  type="email"
-                  placeholder="you@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="h-12 bg-white border-neutral-200 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
-                  required
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={sendingReset}
-                className="w-full h-12 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2 transition-all hover:-translate-y-0.5 shadow-lg shadow-primary/20"
-              >
-                {sendingReset ? <LoadingSpinner size={20} /> : (<>Send reset link <ArrowRight className="w-5 h-5" /></>)}
-              </button>
-            </form>
-            <p className="mt-8 text-center text-neutral-600">
-              <button
-                onClick={() => { setShowForgot(false); setIsSignUp(false); }}
-                className="inline-flex items-center gap-1 text-primary hover:text-primary/80 font-bold"
-              >
-                <ArrowLeft className="w-4 h-4" /> Back to sign in
-              </button>
-            </p>
-          </motion.div>
-        </main>
-      ) : signedUpEmail ? (
-        <main className="flex-1 flex items-center justify-center px-6 py-12">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="w-full max-w-md text-center"
-          >
-            <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-              <MailCheck className="h-8 w-8 text-primary" />
-            </div>
-            <h1 className="text-3xl md:text-4xl font-black tracking-tight text-neutral-900">Check your inbox</h1>
-            <p className="mt-3 text-neutral-600">
-              We sent a verification link to <strong className="text-neutral-900">{signedUpEmail}</strong>.
-              Click it to confirm your email — you'll be signed in automatically and taken to the next step.
-            </p>
+            <BrandPrimaryButton type="submit" disabled={sendingReset}>
+              {sendingReset ? <LoadingSpinner size={18} /> : (<>Send reset link <ArrowRight className="w-5 h-5" /></>)}
+            </BrandPrimaryButton>
+          </form>
+          <p className="mt-5 text-center text-sm text-muted-foreground">
             <button
-              onClick={handleResend}
-              disabled={resending}
-              className="mt-8 w-full h-12 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold disabled:opacity-50 inline-flex items-center justify-center gap-2 transition-all shadow-lg shadow-primary/20"
+              onClick={() => { setShowForgot(false); setIsSignUp(false); }}
+              className="inline-flex items-center gap-1 text-primary hover:text-primary/80 font-bold underline-offset-4 hover:underline"
             >
-              {resending ? <LoadingSpinner size={20} /> : "Resend verification email"}
+              <ArrowLeft className="w-4 h-4" /> Back to sign in
             </button>
-            <p className="mt-6 text-center text-neutral-600">
-              Wrong email?
-              <button
-                onClick={() => { setSignedUpEmail(null); setIsSignUp(true); }}
-                className="ml-2 text-primary hover:text-primary/80 font-bold"
-              >
-                Go back
-              </button>
-            </p>
-            <p className="mt-2 text-center text-neutral-600">
-              Already verified?
-              <button
-                onClick={() => { setSignedUpEmail(null); setIsSignUp(false); }}
-                className="ml-2 text-primary hover:text-primary/80 font-bold"
-              >
-                Sign in
-              </button>
-            </p>
-          </motion.div>
-        </main>
+          </p>
+        </BrandedScreen>
+      ) : signedUpEmail ? (
+        <BrandedScreen
+          cardWidth="md"
+          topBarAction={
+            <Link to="/" className="inline-flex items-center gap-1.5 hover:text-amber-300 transition-colors">
+              <ArrowLeft className="w-4 h-4" /> Back to home
+            </Link>
+          }
+        >
+          <BrandIconBadge icon={<MailCheck className="h-9 w-9" />} tone="info" />
+          <h1 className="text-center text-2xl font-display font-bold text-foreground">Check your inbox</h1>
+          <p className="mt-2 text-center text-sm text-muted-foreground leading-relaxed">
+            We sent a verification link to <strong className="text-foreground">{signedUpEmail}</strong>.
+            Click it to confirm your email — you'll be signed in automatically and taken to the next step.
+          </p>
+          <BrandPrimaryButton onClick={handleResend} disabled={resending}>
+            {resending ? <LoadingSpinner size={18} /> : "Resend verification email"}
+          </BrandPrimaryButton>
+          <p className="mt-5 text-center text-sm text-muted-foreground">
+            Wrong email?{" "}
+            <button
+              onClick={() => { setSignedUpEmail(null); setIsSignUp(true); }}
+              className="text-primary hover:text-primary/80 font-bold underline-offset-4 hover:underline"
+            >
+              Go back
+            </button>
+          </p>
+          <p className="mt-1 text-center text-sm text-muted-foreground">
+            Already verified?{" "}
+            <button
+              onClick={() => { setSignedUpEmail(null); setIsSignUp(false); }}
+              className="text-primary hover:text-primary/80 font-bold underline-offset-4 hover:underline"
+            >
+              Sign in
+            </button>
+          </p>
+        </BrandedScreen>
       ) : (
       <main className="flex-1 flex items-center justify-center px-6 py-12">
         <motion.div
