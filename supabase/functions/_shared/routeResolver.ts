@@ -3,13 +3,17 @@
 
 import {
   applyMarginFloor,
+  applyPartnerScores,
   scoreCandidates,
   type CandidateInput,
   type CustomerPricingRow,
   type MarginFloor,
   type PartnerPricingRow,
+  type PartnerScoreGuard,
   type ScoredCandidate,
 } from "./routingEngine.ts";
+import { corridorKey } from "./partnerScorecards.ts";
+
 
 type Client = {
   from: (t: string) => any;
