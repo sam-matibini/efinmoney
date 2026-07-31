@@ -241,8 +241,35 @@ Deno.serve(async (req) => {
         });
       }
 
+      // Re-quote the fee from the central rate card so the ledger always reflects
+      // the canonical price, not whatever the client sent at creation time.
+      const { fee: quotedFee, quote: feeQuote, matched: feeMatched, claimed: claimedFee } =
+        await assertQuotedFee(
+          supabase,
+          {
+            direction: "payout",
+            sourceCurrency: transfer.source_currency,
+            destCurrency: transfer.target_currency ?? transfer.source_currency,
+            destCountry: transfer.recipient_country ?? null,
+            paymentMethod: transfer.payout_method ?? null,
+            customerType: "consumer",
+            amount: Number(transfer.source_amount),
+          },
+          transfer.fee_amount,
+        );
+
+      if (!feeMatched && !feeQuote.pricingMissing) {
+        console.warn(
+          `[pricing] fee variance on ${transfer_id}: claimed=${claimedFee} quoted=${quotedFee}`,
+        );
+        await supabase.from("transfers").update({ fee_amount: quotedFee }).eq("id", transfer_id);
+        transfer.fee_amount = quotedFee;
+      }
+
       const journalId = crypto.randomUUID();
-      const totalDebit = Number(transfer.source_amount) + Number(transfer.fee_amount || 0);
+      const feeAmount = Number(transfer.fee_amount || 0);
+      const totalDebit = Number(transfer.source_amount) + feeAmount;
+
 
       const entries: any[] = [
         {
