@@ -1,44 +1,19 @@
-# Make all Settings tabs save
+## What I verified
 
-Today only **General Settings** persists (to the `system_settings` key/value table via `useSystemSettings`). Currencies, Partners/Routing, Circle CPN and Integrations already write to their own tables. The remaining Save buttons are cosmetic: they either do nothing or only show a toast.
+- The settings table, its grants, primary key on `key`, RLS policies (read for any signed-in user; insert/update for `admin` role or super admins) and the `updated_at` trigger are all correct in the backend.
+- Network capture from your session shows the **Notification** save actually succeeded (HTTP 201 at 09:24 and 200 at 09:27) and the rows are in the database — yet a red "Could not save settings / Unexpected error" toast was shown.
+- No `security.*`, `email.*` or `data.*` rows exist yet, so at least one other section has never saved successfully.
+- Root cause of the useless message: the settings hook does `throw error`, where `error` is a Supabase error **object**, not an `Error` instance. Every save handler does `e instanceof Error ? e.message : "Unexpected error"`, so the real reason (code, message, hint) is always swallowed and shown as "Unexpected error". The exact failure for the non-saving sections is therefore still unconfirmed.
 
-## What is not saved today (verified in code)
+## Plan
 
-| Panel | Section | Current behaviour |
-|---|---|---|
-| System Settings | Email Configuration | Uncontrolled inputs, Save button has no handler |
-| System Settings | Notification Settings | Switches with `defaultChecked`, no handler |
-| System Settings | Security Settings | Uncontrolled inputs, no handler |
-| System Settings | Data Management | Uncontrolled inputs, no handler |
-| Pricing & Fees | Competitor Benchmark | Uncontrolled inputs, no handler |
-| Pricing & Fees | Transfer Fee Structure | Uncontrolled inputs, no handler |
-| Module Access | Module toggles | Local `useState` only; save shows a success toast without writing |
+1. **Surface the real error** — in `src/hooks/useSystemSettings.tsx`, convert Supabase errors into a proper `Error` carrying `message`, `code`, `details` and `hint` before throwing, so all settings toasts show the actual cause instead of "Unexpected error". Also log it to the console.
+2. **Reproduce each section** — drive the Settings page in a headless browser as the signed-in admin, click every Save button (General, Email, Notifications, Security, Data, Pricing, Module Access) and capture the request/response for each. This tells us definitively which sections fail and why.
+3. **Fix the confirmed cause(s)** — likely candidates given the code: numeric inputs sent as empty strings/NaN, a section saving `undefined` values, or a permission gap for admin-portal roles that aren't `admin` in user roles. Fix only what the reproduction shows (input coercion in the panel, or an RLS/role adjustment if that's the real blocker).
+4. **Prevent silent success-with-error** — verify the mutation's success path actually correlates with the toast shown, and clean up the duplicate `useSystemSettings` instances if one section's shared mutation state is producing a false failure toast.
+5. **Deployed build** — after the fix verifies locally, re-publish so `efinmoney.lovable.app` picks it up; the published bundle can be older than the settings work.
 
-## Approach
+## Technical notes
 
-Reuse the existing `system_settings` key/value table and `useSystemSettings` hook for all of these — no new tables needed. Each section becomes controlled state hydrated from the store, with a save that upserts its own keys and shows success/error toasts, plus loading skeletons and admin-only editing (same pattern already used by the General card).
-
-Key namespaces:
-
-```text
-email.smtp_host / smtp_port / smtp_user / footer_text
-notifications.transaction_alerts / compliance_alerts / low_balance_alerts / daily_summary
-security.require_2fa_admin / require_2fa_large_transfers / session_timeout_minutes /
-         max_login_attempts / twofa_threshold_usd / password_expiry_days
-data.audit_retention_days / transaction_retention_years / auto_backups
-pricing.benchmarks (per-competitor margin + flat fee)
-pricing.transfer_base_fee / transfer_percent_fee / transfer_max_fee
-modules.<module_id>.enabled
-```
-
-Module Access keeps its static module catalogue (names, icons, roles) in code and stores only the enabled flags, so toggles survive reloads.
-
-## Technical details
-
-- Extend `useSystemSettings` with typed `getNumber` and `getBoolean` helpers alongside the existing `getString`; save path stays the single `saveSettings` upsert.
-- Split `SystemSettingsPanel.tsx` into per-section card components (Email, Notifications, Security, Data) mirroring the existing `GeneralSettingsCard`, each with its own hydrate-on-load `useEffect` and save handler — keeps the file manageable.
-- `PricingSettingsPanel.tsx`: add controlled state and save handlers for the Benchmark and Transfer Fee cards; the FX/crypto tables already persist and stay untouched.
-- `ModuleAccessPanel.tsx`: hydrate `enabled` from settings, save all flags in one upsert.
-- Writes are admin-only at the database level (existing RLS on `system_settings`); the UI disables inputs and save buttons for non-admins to match.
-- **SMTP password**: not written to `system_settings` (that table is readable by any authenticated user). The field will be handled as a backend secret rather than a settings row, with the input labelled accordingly.
-- No database migration required.
+- Files touched: `src/hooks/useSystemSettings.tsx` (error normalization), and whichever settings panel the reproduction implicates (`SystemSettingsPanel.tsx`, `PricingSettingsPanel.tsx`, `ModuleAccessPanel.tsx`).
+- No schema change is planned unless step 2 shows a genuine permission failure; grants and policies already check out.
