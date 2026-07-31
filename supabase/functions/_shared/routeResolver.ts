@@ -129,6 +129,25 @@ export async function resolveRoute(
   );
   const pinned = applicableOverrides.filter((o: any) => o.override_type === "pin").map((o: any) => o.partner_id);
 
+  // 3b. Phase 13 — active incident suspensions are the hardest guardrail: they are
+  // applied before pricing, margin floors and performance scores, so a suspended
+  // partner can never be resurrected by a pin, an uplift or a strong score.
+  const wantedCorridor = corridorKey(srcCcy, dstCcy, dstCountry, method);
+  const { data: suspensionRows } = await supabase
+    .from("partner_suspensions")
+    .select("partner_id, corridor_key, scope, reason, suspended_until")
+    .eq("status", "active")
+    .in("partner_id", partnerIds);
+
+  const suspendedReasons = new Map<string, string>();
+  for (const s of suspensionRows ?? []) {
+    if (s.corridor_key && s.corridor_key !== wantedCorridor) continue;
+    if (!suspendedReasons.has(s.partner_id)) {
+      suspendedReasons.set(s.partner_id, s.reason ?? "partner suspended");
+    }
+  }
+
+
   // 4. Pricing / performance / liquidity
   const { data: pricingRows } = await supabase
     .from("partner_pricing")
@@ -181,6 +200,14 @@ export async function resolveRoute(
       excluded.push({ partner_code: label, reason: `partner ${partner.status}/${partner.integration_status}` });
       continue;
     }
+    if (suspendedReasons.has(partner.id)) {
+      excluded.push({
+        partner_code: label,
+        reason: `suspended: ${suspendedReasons.get(partner.id)}`,
+      });
+      continue;
+    }
+
     if (blocked.has(partner.id)) {
       excluded.push({ partner_code: label, reason: "blocked by operator override" });
       continue;

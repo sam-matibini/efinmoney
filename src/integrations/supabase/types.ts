@@ -1496,6 +1496,90 @@ export type Database = {
         }
         Relationships: []
       }
+      corridor_forecasts: {
+        Row: {
+          computed_at: string
+          confidence: string
+          corridor_key: string
+          corridor_label: string | null
+          created_at: string
+          dest_country: string | null
+          dest_currency: string | null
+          forecast_cost: number
+          forecast_gross_profit: number
+          forecast_margin_percent: number
+          forecast_revenue: number
+          forecast_txn_count: number
+          forecast_volume: number
+          forecast_volume_high: number
+          forecast_volume_low: number
+          history_days: number
+          history_txn_count: number
+          history_volume: number
+          horizon_days: number
+          id: string
+          method: string
+          payment_method: string | null
+          source_currency: string | null
+          trend_percent: number
+          updated_at: string
+        }
+        Insert: {
+          computed_at?: string
+          confidence?: string
+          corridor_key: string
+          corridor_label?: string | null
+          created_at?: string
+          dest_country?: string | null
+          dest_currency?: string | null
+          forecast_cost?: number
+          forecast_gross_profit?: number
+          forecast_margin_percent?: number
+          forecast_revenue?: number
+          forecast_txn_count?: number
+          forecast_volume?: number
+          forecast_volume_high?: number
+          forecast_volume_low?: number
+          history_days?: number
+          history_txn_count?: number
+          history_volume?: number
+          horizon_days: number
+          id?: string
+          method?: string
+          payment_method?: string | null
+          source_currency?: string | null
+          trend_percent?: number
+          updated_at?: string
+        }
+        Update: {
+          computed_at?: string
+          confidence?: string
+          corridor_key?: string
+          corridor_label?: string | null
+          created_at?: string
+          dest_country?: string | null
+          dest_currency?: string | null
+          forecast_cost?: number
+          forecast_gross_profit?: number
+          forecast_margin_percent?: number
+          forecast_revenue?: number
+          forecast_txn_count?: number
+          forecast_volume?: number
+          forecast_volume_high?: number
+          forecast_volume_low?: number
+          history_days?: number
+          history_txn_count?: number
+          history_volume?: number
+          horizon_days?: number
+          id?: string
+          method?: string
+          payment_method?: string | null
+          source_currency?: string | null
+          trend_percent?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       cpn_corridors: {
         Row: {
           created_at: string
@@ -2569,6 +2653,65 @@ export type Database = {
         }
         Relationships: []
       }
+      funding_tasks: {
+        Row: {
+          amount: number
+          assigned_to: string | null
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string
+          currency_code: string
+          days_to_dry: number | null
+          due_by: string | null
+          id: string
+          notes: string | null
+          partner_id: string
+          source: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          assigned_to?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          currency_code: string
+          days_to_dry?: number | null
+          due_by?: string | null
+          id?: string
+          notes?: string | null
+          partner_id: string
+          source?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          assigned_to?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          currency_code?: string
+          days_to_dry?: number | null
+          due_by?: string | null
+          id?: string
+          notes?: string | null
+          partner_id?: string
+          source?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "funding_tasks_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "payment_partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fx_rates: {
         Row: {
           created_at: string
@@ -2714,6 +2857,60 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      incident_settings: {
+        Row: {
+          auto_restore: boolean
+          cooldown_minutes: number
+          created_at: string
+          critical_alert_count: number
+          enabled: boolean
+          forecast_history_days: number
+          id: string
+          liquidity_warning_days: number
+          lookback_minutes: number
+          max_failure_rate_percent: number
+          min_attempts: number
+          min_score_to_operate: number
+          singleton: boolean
+          suspend_scope: string
+          updated_at: string
+        }
+        Insert: {
+          auto_restore?: boolean
+          cooldown_minutes?: number
+          created_at?: string
+          critical_alert_count?: number
+          enabled?: boolean
+          forecast_history_days?: number
+          id?: string
+          liquidity_warning_days?: number
+          lookback_minutes?: number
+          max_failure_rate_percent?: number
+          min_attempts?: number
+          min_score_to_operate?: number
+          singleton?: boolean
+          suspend_scope?: string
+          updated_at?: string
+        }
+        Update: {
+          auto_restore?: boolean
+          cooldown_minutes?: number
+          created_at?: string
+          critical_alert_count?: number
+          enabled?: boolean
+          forecast_history_days?: number
+          id?: string
+          liquidity_warning_days?: number
+          lookback_minutes?: number
+          max_failure_rate_percent?: number
+          min_attempts?: number
+          min_score_to_operate?: number
+          singleton?: boolean
+          suspend_scope?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       input_tax_credits: {
         Row: {
@@ -3321,6 +3518,65 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      liquidity_forecasts: {
+        Row: {
+          available_balance: number
+          computed_at: string
+          created_at: string
+          currency_code: string
+          days_to_dry: number | null
+          forecast_daily_burn: number
+          id: string
+          partner_id: string
+          recommended_topup: number
+          required_reserve: number
+          status: string
+          updated_at: string
+          usable_balance: number
+          warning_days: number
+        }
+        Insert: {
+          available_balance?: number
+          computed_at?: string
+          created_at?: string
+          currency_code: string
+          days_to_dry?: number | null
+          forecast_daily_burn?: number
+          id?: string
+          partner_id: string
+          recommended_topup?: number
+          required_reserve?: number
+          status?: string
+          updated_at?: string
+          usable_balance?: number
+          warning_days?: number
+        }
+        Update: {
+          available_balance?: number
+          computed_at?: string
+          created_at?: string
+          currency_code?: string
+          days_to_dry?: number | null
+          forecast_daily_burn?: number
+          id?: string
+          partner_id?: string
+          recommended_topup?: number
+          required_reserve?: number
+          status?: string
+          updated_at?: string
+          usable_balance?: number
+          warning_days?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "liquidity_forecasts_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "payment_partners"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       maker_checker_requests: {
         Row: {
@@ -4397,6 +4653,77 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "partner_settlements_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "payment_partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      partner_suspensions: {
+        Row: {
+          auto_restore: boolean
+          cooldown_minutes: number
+          corridor_key: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          lift_reason: string | null
+          lifted_at: string | null
+          lifted_by: string | null
+          partner_id: string
+          reason: string
+          scope: string
+          status: string
+          suspended_from: string
+          suspended_until: string | null
+          trigger_metrics: Json
+          trigger_source: string
+          updated_at: string
+        }
+        Insert: {
+          auto_restore?: boolean
+          cooldown_minutes?: number
+          corridor_key?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          lift_reason?: string | null
+          lifted_at?: string | null
+          lifted_by?: string | null
+          partner_id: string
+          reason: string
+          scope?: string
+          status?: string
+          suspended_from?: string
+          suspended_until?: string | null
+          trigger_metrics?: Json
+          trigger_source?: string
+          updated_at?: string
+        }
+        Update: {
+          auto_restore?: boolean
+          cooldown_minutes?: number
+          corridor_key?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          lift_reason?: string | null
+          lifted_at?: string | null
+          lifted_by?: string | null
+          partner_id?: string
+          reason?: string
+          scope?: string
+          status?: string
+          suspended_from?: string
+          suspended_until?: string | null
+          trigger_metrics?: Json
+          trigger_source?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_suspensions_partner_id_fkey"
             columns: ["partner_id"]
             isOneToOne: false
             referencedRelation: "payment_partners"

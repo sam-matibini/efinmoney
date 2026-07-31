@@ -21,6 +21,10 @@ import MarginGuardrailsPanel from "./partners/MarginGuardrailsPanel";
 import PricingRecommendationsPanel from "./partners/PricingRecommendationsPanel";
 import FeeAdjustmentsPanel from "./partners/FeeAdjustmentsPanel";
 import PartnerScorecardsPanel from "./partners/PartnerScorecardsPanel";
+import CorridorForecastPanel from "./partners/CorridorForecastPanel";
+import LiquidityForecastPanel from "./partners/LiquidityForecastPanel";
+import PartnerIncidentsPanel from "./partners/PartnerIncidentsPanel";
+
 
 
 
@@ -48,6 +52,10 @@ export const PartnerNetworkPanel = () => (
         <TabsTrigger value="recommendations">Recommendations</TabsTrigger>
         <TabsTrigger value="fee-adjustments">Fee adjustments</TabsTrigger>
         <TabsTrigger value="scorecards">Scorecards</TabsTrigger>
+        <TabsTrigger value="forecast">Forecast</TabsTrigger>
+        <TabsTrigger value="runway">Float runway</TabsTrigger>
+        <TabsTrigger value="incidents">Incidents</TabsTrigger>
+
         <TabsTrigger value="limits">Limits</TabsTrigger>
 
         <TabsTrigger value="alerts">Alerts</TabsTrigger>
@@ -116,6 +124,16 @@ export const PartnerNetworkPanel = () => (
     <TabsContent value="scorecards">
       <SectionBoundary name="PartnerScorecardsPanel"><PartnerScorecardsPanel /></SectionBoundary>
     </TabsContent>
+    <TabsContent value="forecast">
+      <SectionBoundary name="CorridorForecastPanel"><CorridorForecastPanel /></SectionBoundary>
+    </TabsContent>
+    <TabsContent value="runway">
+      <SectionBoundary name="LiquidityForecastPanel"><LiquidityForecastPanel /></SectionBoundary>
+    </TabsContent>
+    <TabsContent value="incidents">
+      <SectionBoundary name="PartnerIncidentsPanel"><PartnerIncidentsPanel /></SectionBoundary>
+    </TabsContent>
+
     <TabsContent value="limits">
       <SectionBoundary name="PartnerLimitsPanel"><PartnerLimitsPanel /></SectionBoundary>
     </TabsContent>
