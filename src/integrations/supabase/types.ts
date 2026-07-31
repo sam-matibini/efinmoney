@@ -3618,6 +3618,8 @@ export type Database = {
           expected_fee: number | null
           id: string
           invoice_id: string
+          match_method: string
+          match_reference: string | null
           match_status: string
           notes: string | null
           partner_reference: string | null
@@ -3636,6 +3638,8 @@ export type Database = {
           expected_fee?: number | null
           id?: string
           invoice_id: string
+          match_method?: string
+          match_reference?: string | null
           match_status?: string
           notes?: string | null
           partner_reference?: string | null
@@ -3654,6 +3658,8 @@ export type Database = {
           expected_fee?: number | null
           id?: string
           invoice_id?: string
+          match_method?: string
+          match_reference?: string | null
           match_status?: string
           notes?: string | null
           partner_reference?: string | null
@@ -4227,6 +4233,7 @@ export type Database = {
           reliability_score: number
           settlement_currency: string | null
           settlement_time: string | null
+          statement_mapping: Json
           status: Database["public"]["Enums"]["partner_op_status"]
           supported_countries: string[]
           supported_currencies: string[]
@@ -4260,6 +4267,7 @@ export type Database = {
           reliability_score?: number
           settlement_currency?: string | null
           settlement_time?: string | null
+          statement_mapping?: Json
           status?: Database["public"]["Enums"]["partner_op_status"]
           supported_countries?: string[]
           supported_currencies?: string[]
@@ -4293,6 +4301,7 @@ export type Database = {
           reliability_score?: number
           settlement_currency?: string | null
           settlement_time?: string | null
+          statement_mapping?: Json
           status?: Database["public"]["Enums"]["partner_op_status"]
           supported_countries?: string[]
           supported_currencies?: string[]
@@ -7785,6 +7794,15 @@ export type Database = {
     Functions: {
       _gen_short_code: { Args: { p_len?: number }; Returns: string }
       aml_normalize_name: { Args: { p_name: string }; Returns: string }
+      billed_cost_summary: {
+        Args: { p_from: string; p_group_by?: string; p_to: string }
+        Returns: {
+          billed_cost: number
+          billed_lines: number
+          group_key: string
+          group_label: string
+        }[]
+      }
       check_rate_limit: {
         Args: {
           p_key: string

@@ -1,37 +1,33 @@
-## Phase 8 — Partner Settlement, Payables & GL Posting
+## Phase 9 — Partner Statement Ingestion & Billed-Cost Reporting
 
-Phases 1–7 gave us pricing, routing, profitability, readiness, seeding, limits, alerts and invoice reconciliation. Today a reconciled partner invoice stops at a variance report: `partner_invoices` only has `draft`/`reconciled` status, no vendor link, no approval or dispute trail, and no accounting entry — partner cost never reaches the ledger, so the P&L understates network fees. Phase 8 closes that loop.
+Phase 8 closed the invoice → approval → payables → settlement loop. Two gaps remain before the cost side runs on its own:
+
+1. Invoices can only enter the system through a raw JSON call to `partner-invoice-reconcile` — there is no way for an ops user to load a partner statement file. Lines also only match when the partner happens to send our `transfer_id`; real statements carry the partner's own reference.
+2. The Profitability panel still shows only modelled cost from `transaction_economics`; the actual approved billed cost from Phase 8 invoices is never surfaced next to it (the last item of the Phase 8 plan).
 
 ### What gets built
 
-**1. Approve → dispute → settle workflow**
-- Invoice statuses: `draft → reconciled → disputed → approved → paid` (plus `void`).
-- Line-level dispute flag with a reason, so an invoice can be part-approved: approved lines post, disputed lines are held and rolled into a credit expectation.
-- Dispute summary per partner, feeding a new `invoice_dispute` alert type in the Phase 7 alerts panel.
+**1. Statement upload with column mapping**
+- New "Upload statement" dialog in the Cost assurance tab: pick partner, invoice number, period, currency, drop a CSV.
+- Parse the header client-side, let the user map each partner column to our fields (`partner_reference`, `transfer_id`, `transaction_date`, `currency_code`, `amount`, `billed_fee`), remember the mapping per partner so the next upload is one click.
+- Preview the first rows and the parsed totals before submitting to `partner-invoice-reconcile`.
+- Saved mapping stored on the partner record (a `statement_mapping` JSON column) so nothing new is hardcoded.
 
-**2. Partner payables in the ledger**
-- New liability accounts `2210 Partner Payables` (per settlement currency, created on demand like the FX clearing accounts).
-- On approval, post a balanced journal: DR `5300 Network Fees` for the approved billed total, CR `2210 Partner Payables`. Variance between billed and expected is posted to Network Fees as well (it is a real cost), and recorded on the invoice so Profitability can show billed-vs-forecast drift.
-- On settlement payment, post DR `2210 Partner Payables` / CR the settlement wallet or bank clearing account.
-- Journals reuse the existing `ledger_entries` + `journal_id` pattern and respect the `enforce_journal_currency_balance` trigger — one journal per currency, no cross-currency legs.
+**2. Reference-based line matching**
+- Extend `partner-invoice-reconcile` matching: when a line has no `transfer_id`, resolve it via the partner reference against `routing_attempts.partner_reference` / `transfers.provider_reference`, then fall back to a date + amount + currency window match.
+- Record on each line how it was matched (`match_method`: `transfer_id`, `reference`, `heuristic`, `unmatched`) so ops can see match quality, and show a match-rate figure on the invoice.
 
-**3. Settlement runs**
-- New `partner_settlements` table: partner, period, currency, invoice set, total due, amount paid, payment method/reference, status, journal id.
-- A settlement groups one or more approved invoices and records the actual outward payment (bank transfer, wallet debit, or manual).
+**3. Actual billed cost in Profitability**
+- New SQL function returning approved billed cost per profitability group (partner / corridor / currency / method) over the same window.
+- Profitability table gains "Billed cost" and "Billed vs modelled" columns, with the blended margin recalculated on billed cost where an approved invoice covers the period.
 
-**4. UI — new "Settlements" tab in Partners & Routing**
-- Invoice queue with variance, dispute count and one-click Approve / Dispute / Void.
-- Line drill-down (existing dialog) gains per-line dispute toggles.
-- Settlement builder: pick partner + currency, select approved invoices, record payment, see the resulting journal reference.
-- Aging view: outstanding payables by partner and currency.
-
-**5. Reporting tie-in**
-- Profitability panel gains an "actual billed cost" column sourced from approved invoices, next to the modelled cost already tracked in `transaction_economics`.
+**4. Payables aging & partner statement of account**
+- Aging buckets (current / 30 / 60 / 90+) on the Settlements tab, per partner and currency.
+- Per-partner statement view: invoices, approvals, disputes, settlements and outstanding balance in one list, exportable to CSV.
 
 ### Technical details
 
-- Migration: extend `partner_invoices` (`vendor_id`, `approved_by`, `approved_at`, `journal_id`, `settlement_id`, `disputed_total`), extend `partner_invoice_lines` (`dispute_status`, `dispute_reason`), create `partner_settlements` with GRANTs to `authenticated`/`service_role`, RLS scoped to `is_pricing_manager()`, and `updated_at` triggers — matching the existing partner tables.
-- Helper `ensure_partner_payable_account(currency)` mirroring `ensure_fx_clearing_account`.
-- Edge functions: `partner-invoice-approve` (validates, posts the expense journal) and `partner-settlement-pay` (posts the payment journal, marks invoices paid). Both service-role, JWT validated in code, role-checked against `is_pricing_manager`.
-- Hooks in `src/hooks/useCostAssurance.tsx` / `usePartnerOps.tsx`; new `PartnerSettlementsPanel.tsx` wired into `PartnerNetworkPanel.tsx`.
-- No hardcoded amounts: every posted figure comes from invoice lines or the settlement record.
+- Migration: `partner_invoice_lines.match_method` (text) and `match_reference` (text); `payment_partners.statement_mapping` (jsonb, default `{}`); new function `billed_cost_summary(p_from, p_to, p_group_by)` returning group key + approved billed total, security definer, restricted to `is_pricing_manager()`.
+- Edge function: extend `partner-invoice-reconcile` only — no new function. Matching order is deterministic (id → reference → date/amount window) and every fallback is recorded, never silently assumed.
+- Frontend: CSV parsing reuses the existing pricing import helper pattern in `NetworkActivationPanel`; new `StatementUploadDialog.tsx` under `src/components/settings/partners/`; hooks added to `useCostAssurance.tsx`; Profitability columns from a new `useBilledCost` hook in `useProfitability.tsx`; aging + statement views added to `PartnerSettlementsPanel.tsx`.
+- All figures derive from invoice lines, economics rows or ledger balances — no hardcoded amounts, and the double-entry posting from Phase 8 is untouched.
