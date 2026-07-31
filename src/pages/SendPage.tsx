@@ -514,7 +514,7 @@ const SendPage = () => {
   const { data: priceQuote } = usePriceQuote({
     direction: 'payout',
     sourceCurrency,
-    destCurrency: targetCountry.currency ?? targetCountry.code,
+    destCurrency: targetCountry.code,
     destCountry: targetCountry.code,
     paymentMethod: destPayoutMethod,
     amount: parsedAmount,
