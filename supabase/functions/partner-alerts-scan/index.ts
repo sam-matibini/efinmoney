@@ -216,6 +216,46 @@ Deno.serve(async (req) => {
       });
     }
 
+    // -------------------------------------------------- margin guardrails
+    // Routes the guardrail dropped or repriced in the window, grouped by corridor.
+    const { data: decisions } = await supabase
+      .from("routing_decisions")
+      .select("source_currency, dest_currency, excluded, candidates")
+      .gte("created_at", since)
+      .limit(2000);
+
+    interface GuardAgg { blocks: number; uplifts: number; uplift_amount: number }
+    const guard = new Map<string, GuardAgg>();
+    for (const d of (decisions ?? []) as any[]) {
+      const corridor = `${d.source_currency}→${d.dest_currency}`;
+      const blocks = (Array.isArray(d.excluded) ? d.excluded : []).filter((e: any) =>
+        typeof e?.reason === "string" && e.reason.includes("below floor"),
+      ).length;
+      const upliftRows = (Array.isArray(d.candidates) ? d.candidates : []).filter(
+        (c: any) => Number(c?.revenue_uplift) > 0,
+      );
+      if (!blocks && !upliftRows.length) continue;
+      const g = guard.get(corridor) ?? { blocks: 0, uplifts: 0, uplift_amount: 0 };
+      g.blocks += blocks;
+      g.uplifts += upliftRows.length ? 1 : 0;
+      g.uplift_amount += upliftRows.reduce((s: number, c: any) => s + (Number(c.revenue_uplift) || 0), 0);
+      guard.set(corridor, g);
+    }
+
+    for (const [corridor, g] of guard) {
+      findings.push({
+        fingerprint: `margin_block:${corridor}`,
+        alert_type: "margin_block",
+        severity: g.blocks > 0 ? "warning" : "info",
+        title: `Margin guardrail active on ${corridor}`,
+        message: `Over the last ${windowDays} days the margin floor blocked ${g.blocks} route candidate(s) and uplifted pricing on ${g.uplifts} quote(s) (${g.uplift_amount.toFixed(
+          2,
+        )} extra revenue) for ${corridor}. Review partner cost or customer pricing for this corridor.`,
+        corridor_key: corridor,
+        metrics: { blocks: g.blocks, uplifted_quotes: g.uplifts, uplift_amount: Number(g.uplift_amount.toFixed(2)), window_days: windowDays },
+      });
+    }
+
     // ------------------------------------------------------ persist findings
     const nowIso = new Date().toISOString();
     const fingerprints = findings.map((f) => f.fingerprint);
