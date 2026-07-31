@@ -34,6 +34,8 @@ const ProfileSettingsPage = () => {
   const [email, setEmail] = useState("");
   const [efinTag, setEfinTag] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
+  const [dateOfBirth, setDateOfBirth] = useState("");
+  const [occupation, setOccupation] = useState("");
   const [streetAddress, setStreetAddress] = useState("");
   const [city, setCity] = useState("");
   const [stateProvince, setStateProvince] = useState("");
@@ -42,6 +44,9 @@ const ProfileSettingsPage = () => {
   const [countryOpen, setCountryOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [emailOptOut, setEmailOptOut] = useState(false);
+
+  /** Once identity is verified, legal name / DOB / phone / address are staff-only edits. */
+  const identityLocked = profile?.kyc_status === "verified";
 
   useEffect(() => {
     if (profile) {
