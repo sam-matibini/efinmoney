@@ -57,6 +57,36 @@ Deno.serve(async (req) => {
     const { error: upErr } = await admin.from("kyc_verifications").update(update).eq("id", verification_id);
     if (upErr) return json(500, { error: upErr.message });
 
+    // Tier 3 is manual-only. The DB trigger caps automatic promotion at tier_2;
+    // only this code path (admin approval with scope='id_and_address') reaches tier_3.
+    if (scope === "id_and_address") {
+      const { data: t3Limits } = await admin
+        .from("tier_limits")
+        .select("daily_limit, monthly_limit, single_limit, features_enabled")
+        .eq("tier", "tier_3")
+        .maybeSingle();
+
+      if (t3Limits) {
+        await admin.from("user_risk_tiers").upsert(
+          {
+            user_id: kyc.user_id,
+            current_tier: "tier_3",
+            daily_transaction_limit: t3Limits.daily_limit,
+            monthly_transaction_limit: t3Limits.monthly_limit,
+            single_transaction_limit: t3Limits.single_limit,
+            features_enabled: t3Limits.features_enabled,
+            upgraded_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "user_id" },
+        );
+        await admin
+          .from("profiles")
+          .update({ kyc_tier: "tier_3", updated_at: new Date().toISOString() })
+          .eq("user_id", kyc.user_id);
+      }
+    }
+
     const noteParts: string[] = [
       scope === "id_and_address" ? "Approved ID + address (Tier 3)" : "Approved ID only (Tier 2)",
     ];
