@@ -710,3 +710,300 @@ export const useRunScorecardScan = () => {
     onError: (e: Error) => toast.error(e.message),
   });
 };
+
+/* ---------------- Phase 13 — forecasts, funding, incidents ---------------- */
+
+export interface CorridorForecast {
+  id: string;
+  corridor_key: string;
+  corridor_label: string | null;
+  source_currency: string | null;
+  dest_currency: string | null;
+  dest_country: string | null;
+  payment_method: string | null;
+  horizon_days: number;
+  history_days: number;
+  history_txn_count: number;
+  history_volume: number;
+  forecast_txn_count: number;
+  forecast_volume: number;
+  forecast_volume_low: number;
+  forecast_volume_high: number;
+  forecast_revenue: number;
+  forecast_cost: number;
+  forecast_gross_profit: number;
+  forecast_margin_percent: number;
+  trend_percent: number;
+  confidence: "low" | "base" | "high";
+  computed_at: string;
+}
+
+export const useCorridorForecasts = (horizon: number) =>
+  useQuery({
+    queryKey: ["corridor_forecasts", horizon],
+    queryFn: async (): Promise<CorridorForecast[]> => {
+      const { data, error } = await db
+        .from("corridor_forecasts")
+        .select("*")
+        .eq("horizon_days", horizon)
+        .order("forecast_volume", { ascending: false })
+        .limit(300);
+      if (error) throw error;
+      return (data || []).map((r: any) => ({
+        ...r,
+        history_volume: Number(r.history_volume ?? 0),
+        forecast_txn_count: Number(r.forecast_txn_count ?? 0),
+        forecast_volume: Number(r.forecast_volume ?? 0),
+        forecast_volume_low: Number(r.forecast_volume_low ?? 0),
+        forecast_volume_high: Number(r.forecast_volume_high ?? 0),
+        forecast_revenue: Number(r.forecast_revenue ?? 0),
+        forecast_cost: Number(r.forecast_cost ?? 0),
+        forecast_gross_profit: Number(r.forecast_gross_profit ?? 0),
+        forecast_margin_percent: Number(r.forecast_margin_percent ?? 0),
+        trend_percent: Number(r.trend_percent ?? 0),
+      })) as CorridorForecast[];
+    },
+  });
+
+export interface LiquidityForecast {
+  id: string;
+  partner_id: string;
+  currency_code: string;
+  available_balance: number;
+  required_reserve: number;
+  usable_balance: number;
+  forecast_daily_burn: number;
+  days_to_dry: number | null;
+  recommended_topup: number;
+  warning_days: number;
+  status: "ok" | "warning" | "critical";
+  computed_at: string;
+  partner_name?: string;
+}
+
+export const useLiquidityForecasts = () =>
+  useQuery({
+    queryKey: ["liquidity_forecasts"],
+    queryFn: async (): Promise<LiquidityForecast[]> => {
+      const { data, error } = await db
+        .from("liquidity_forecasts")
+        .select("*, payment_partners(name, code)")
+        .order("days_to_dry", { ascending: true, nullsFirst: false })
+        .limit(300);
+      if (error) throw error;
+      return (data || []).map((r: any) => ({
+        ...r,
+        available_balance: Number(r.available_balance ?? 0),
+        required_reserve: Number(r.required_reserve ?? 0),
+        usable_balance: Number(r.usable_balance ?? 0),
+        forecast_daily_burn: Number(r.forecast_daily_burn ?? 0),
+        days_to_dry: r.days_to_dry == null ? null : Number(r.days_to_dry),
+        recommended_topup: Number(r.recommended_topup ?? 0),
+        partner_name: r.payment_partners?.name ?? r.payment_partners?.code ?? "Partner",
+      })) as LiquidityForecast[];
+    },
+  });
+
+export interface FundingTask {
+  id: string;
+  partner_id: string;
+  currency_code: string;
+  amount: number;
+  due_by: string | null;
+  days_to_dry: number | null;
+  status: "open" | "in_progress" | "funded" | "cancelled";
+  source: string;
+  notes: string | null;
+  completed_at: string | null;
+  created_at: string;
+  partner_name?: string;
+}
+
+export const useFundingTasks = () =>
+  useQuery({
+    queryKey: ["funding_tasks"],
+    queryFn: async (): Promise<FundingTask[]> => {
+      const { data, error } = await db
+        .from("funding_tasks")
+        .select("*, payment_partners(name, code)")
+        .order("created_at", { ascending: false })
+        .limit(300);
+      if (error) throw error;
+      return (data || []).map((r: any) => ({
+        ...r,
+        amount: Number(r.amount ?? 0),
+        days_to_dry: r.days_to_dry == null ? null : Number(r.days_to_dry),
+        partner_name: r.payment_partners?.name ?? r.payment_partners?.code ?? "Partner",
+      })) as FundingTask[];
+    },
+  });
+
+export const useUpdateFundingTask = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (
+      { id, status, notes }: { id: string; status: FundingTask["status"]; notes?: string },
+    ) => {
+      const auth = (await db.auth.getUser()).data;
+      const { error } = await db
+        .from("funding_tasks")
+        .update({
+          status,
+          notes: notes ?? null,
+          completed_at: status === "funded" ? new Date().toISOString() : null,
+          completed_by: status === "funded" ? auth?.user?.id ?? null : null,
+        })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["funding_tasks"] });
+      toast.success("Funding task updated");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+};
+
+export const useRunForecastScan = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const { data, error } = await db.functions.invoke("corridor-forecast-scan", { body: {} });
+      if (error) throw error;
+      if (data && data.success === false) throw new Error(data.error || "Scan failed");
+      return data as { corridors: number; forecasts: number; tasks_opened: number };
+    },
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ["corridor_forecasts"] });
+      qc.invalidateQueries({ queryKey: ["liquidity_forecasts"] });
+      qc.invalidateQueries({ queryKey: ["funding_tasks"] });
+      toast.success(`Forecast refreshed — ${res.corridors} corridor(s), ${res.tasks_opened} funding task(s) opened`);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+};
+
+export interface IncidentSettings {
+  id: string;
+  enabled: boolean;
+  auto_restore: boolean;
+  cooldown_minutes: number;
+  lookback_minutes: number;
+  min_attempts: number;
+  max_failure_rate_percent: number;
+  critical_alert_count: number;
+  min_score_to_operate: number;
+  suspend_scope: "partner" | "corridor";
+  liquidity_warning_days: number;
+  forecast_history_days: number;
+}
+
+export const useIncidentSettings = () =>
+  useQuery({
+    queryKey: ["incident_settings"],
+    queryFn: async (): Promise<IncidentSettings | null> => {
+      const { data, error } = await db.from("incident_settings").select("*").maybeSingle();
+      if (error) throw error;
+      return (data as IncidentSettings) ?? null;
+    },
+  });
+
+export const useSaveIncidentSettings = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (patch: Partial<IncidentSettings>) => {
+      const { id, ...row } = patch;
+      const { error } = id
+        ? await db.from("incident_settings").update(row).eq("id", id)
+        : await db.from("incident_settings").insert({ ...row, singleton: true });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["incident_settings"] });
+      toast.success("Incident settings saved");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+};
+
+export interface PartnerSuspension {
+  id: string;
+  partner_id: string;
+  corridor_key: string | null;
+  scope: "partner" | "corridor";
+  reason: string;
+  trigger_source: "scorecard" | "alert" | "manual";
+  trigger_metrics: Record<string, unknown>;
+  status: "active" | "lifted";
+  auto_restore: boolean;
+  cooldown_minutes: number;
+  suspended_from: string;
+  suspended_until: string | null;
+  lifted_at: string | null;
+  lift_reason: string | null;
+  partner_name?: string;
+}
+
+export const usePartnerSuspensions = () =>
+  useQuery({
+    queryKey: ["partner_suspensions"],
+    queryFn: async (): Promise<PartnerSuspension[]> => {
+      const { data, error } = await db
+        .from("partner_suspensions")
+        .select("*, payment_partners(name, code)")
+        .order("suspended_from", { ascending: false })
+        .limit(200);
+      if (error) throw error;
+      return (data || []).map((r: any) => ({
+        ...r,
+        partner_name: r.payment_partners?.name ?? r.payment_partners?.code ?? "Partner",
+      })) as PartnerSuspension[];
+    },
+  });
+
+export const useIncidentAction = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (
+      payload:
+        | {
+          action: "suspend";
+          partner_id: string;
+          corridor_key?: string | null;
+          reason: string;
+          cooldown_minutes?: number;
+          auto_restore?: boolean;
+        }
+        | { action: "resume"; suspension_id: string; reason?: string },
+    ) => {
+      const { data, error } = await db.functions.invoke("partner-incident-apply", { body: payload });
+      if (error) throw error;
+      if (data && data.success === false) {
+        throw new Error(typeof data.error === "string" ? data.error : "Action failed");
+      }
+      return data;
+    },
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({ queryKey: ["partner_suspensions"] });
+      toast.success(vars.action === "suspend" ? "Partner suspended" : "Partner resumed");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+};
+
+export const useRunIncidentScan = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const { data, error } = await db.functions.invoke("partner-incident-scan", { body: {} });
+      if (error) throw error;
+      if (data && data.success === false) throw new Error(data.error || "Scan failed");
+      return data as { suspended: number; restored: number };
+    },
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ["partner_suspensions"] });
+      toast.success(`Incident scan done — ${res.suspended} suspended, ${res.restored} restored`);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+};
