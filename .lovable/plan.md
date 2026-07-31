@@ -1,36 +1,27 @@
-## Goal
+## What I verified
 
-Give the admin CRM tab a complete, searchable record of everything that has happened on a user's account: every email/SMS sent, in-app notifications, support conversations, staff-logged calls and notes, staff edits, and account/security events.
+- The save calls the `admin-update-user` function. A request at 10:09 UTC today returned **200** with `{"success":true,"changed":{"address_country":"CA","default_currency":"CAD"}}`, so the function is deployed and the permission/validation path works.
+- The toast text in your screenshot ("Failed to send a request to the Edge Function") is Supabase's `FunctionsFetchError` — the browser never got a response. It is not a validation or permission rejection (those return a JSON error the dialog already surfaces).
+- The function's `OPTIONS` handler returns only `Access-Control-Allow-Origin` and `Access-Control-Allow-Headers` — no `Access-Control-Allow-Methods` and no preflight cache — and each save currently does profile read, update, optional auth email sync, and an audit insert in one request, so a cold boot can outlast the client's patience.
+- The profile-lock trigger explicitly allows admin/staff edits, so it is not the blocker.
 
-## What exists today (verified)
+Diagnosis: the failure is a transport-level one (cold-boot / dropped preflight), not a rejected save. Fix = make the call resilient and the error honest.
 
-- `customer_communications` table exists (channel, direction, subject, content, status, metadata) but is **completely empty** — nothing writes to it. `send-email` has no logging code at all.
-- The CRM tab shows only two cards: in-app notifications and support conversations.
-- `audit_logs` captures staff profile edits only (1 row today).
-- No table records account/security events (logins, KYC transitions, wallet/card changes).
+## Changes
 
-## Plan
+1. `supabase/functions/admin-update-user/index.ts`
+   - Complete the CORS headers: add `Access-Control-Allow-Methods: POST, OPTIONS` and `Access-Control-Max-Age: 86400`, and return `200` on preflight.
+   - Move the non-critical tail work (auth email sync, audit-log insert) behind guards that never throw, so a slow/failed side-effect can't kill the response.
 
-### 1. Log every outbound message
-- `send-email` writes a `customer_communications` row for each send: resolve `user_id` from the recipient email, `channel: email`, `direction: outbound`, `template_id` = email type, subject/content, `status` = sent or failed, provider message id + error in `metadata`.
-- Same logging added wherever SMS/WhatsApp is dispatched, so all channels land in one table.
-- Backfill is not possible (no historical send records), so the log starts from now.
+2. `src/components/admin-portal/EditUserDialog.tsx`
+   - Route the call through a small retry wrapper: on a `FunctionsFetchError` (no HTTP response), retry once after ~800 ms — this absorbs the cold-boot case that produced your screenshot.
+   - If the retry also fails to reach the function, show an actionable message ("Couldn't reach the server — check your connection and try again") instead of the raw SDK string, and keep the dialog open with the entered values intact.
+   - Skip the round-trip entirely when nothing changed.
 
-### 2. Capture account activity
-- New `account_activity` table: user_id, event_type, description, actor (user vs staff vs system), ip/user-agent, metadata, created_at. Grants + RLS: users read their own; admin/support/compliance read all; inserts via triggers/service role.
-- Database triggers record: KYC status/tier changes, account status changes, wallet created/frozen, card issued/frozen/cancelled, transaction PIN set/changed, profile field changes.
-- Sign-in / sign-out events recorded from the auth context so logins appear in the timeline.
+3. Verification
+   - Re-deploy the function and call it directly to confirm the preflight and POST both respond.
+   - Save an edit for the user in your screenshot from the preview and confirm the success toast plus the audit-trail entry.
 
-### 3. Staff-logged interactions
-- "Log interaction" button in the CRM tab: channel (phone call, email, WhatsApp, SMS, note), direction, subject, notes. Writes to `customer_communications` with the acting staff member as `created_by`.
+## Technical note
 
-### 4. Unified activity timeline UI
-- New `UserActivityTimeline` component rendered in the CRM tab, merging five sources into one chronological feed: communications, notifications, support messages, `audit_logs`, `account_activity`.
-- Channel/type filter chips (All · Email · SMS · In-app · Support · Account · Staff actions), text search, relative + absolute timestamps, actor attribution, and paging (load more).
-- Existing notifications and support cards stay; the timeline sits above them as the master record.
-
-## Technical notes
-
-- One migration: create `account_activity` (+ grants, RLS, indexes) and the trigger functions; add indexes on `customer_communications(user_id, created_at)`.
-- Logging in `send-email` is best-effort — a logging failure must never block or fail an email send.
-- Timeline data is fetched through a single hook that runs the five queries in parallel and merges them client-side, keyed by user id.
+No schema changes and no change to what an admin is allowed to edit — this only touches CORS/response handling on the function and error handling in the dialog.
