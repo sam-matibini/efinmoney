@@ -65,7 +65,21 @@ export interface ScoredCandidate extends CandidateInput {
   margin_floor_breached?: boolean;
   margin_blocked?: boolean;
   revenue_uplift?: number;
+  /** Phase 12 — realised performance score (0..100) and its ranking effect. */
+  performance_score?: number | null;
+  performance_grade?: string | null;
+  performance_penalty?: number;
+  performance_blocked?: boolean;
 }
+
+export interface PartnerScoreGuard {
+  enabled: boolean;
+  min_score_to_route: number;
+  below_threshold_action: "warn" | "deprioritise" | "block";
+  /** Maximum share of the ranking score the performance modifier may move. */
+  max_score_influence: number;
+}
+
 
 export interface MarginFloor {
   id?: string | null;
