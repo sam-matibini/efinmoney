@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_activity: {
+        Row: {
+          actor_id: string | null
+          actor_type: string
+          created_at: string
+          description: string | null
+          event_type: string
+          id: string
+          ip_address: string | null
+          metadata: Json
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          actor_id?: string | null
+          actor_type?: string
+          created_at?: string
+          description?: string | null
+          event_type: string
+          id?: string
+          ip_address?: string | null
+          metadata?: Json
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          actor_id?: string | null
+          actor_type?: string
+          created_at?: string
+          description?: string | null
+          event_type?: string
+          id?: string
+          ip_address?: string | null
+          metadata?: Json
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       admin_notifications: {
         Row: {
           admin_id: string
@@ -8824,6 +8863,15 @@ export type Database = {
       is_kyc_reviewer: { Args: { _uid: string }; Returns: boolean }
       is_pricing_manager: { Args: { _uid: string }; Returns: boolean }
       is_super_admin: { Args: { _uid: string }; Returns: boolean }
+      log_account_activity: {
+        Args: {
+          p_description: string
+          p_event_type: string
+          p_metadata?: Json
+          p_user_id: string
+        }
+        Returns: undefined
+      }
       lookup_efin_recipient: {
         Args: { p_query: string }
         Returns: {

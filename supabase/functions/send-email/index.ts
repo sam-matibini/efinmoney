@@ -9,6 +9,64 @@ const corsHeaders = {
 
 const FROM = "eFinMoney <noreply@efinsuite.com>";
 
+/** Strip tags so the CRM timeline shows readable text rather than raw HTML. */
+function htmlToText(html: string) {
+  return html
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 4000);
+}
+
+/** Best-effort CRM log of an outbound email — never blocks or fails the send. */
+async function logCommunication(args: {
+  to: string;
+  subject: string;
+  html: string;
+  type: string;
+  status: "sent" | "failed";
+  metadata: Record<string, unknown>;
+}) {
+  try {
+    const url = Deno.env.get("SUPABASE_URL");
+    const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!url || !key) return;
+
+    const headers = {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+    };
+
+    const profileRes = await fetch(
+      `${url}/rest/v1/profiles?select=user_id&email=eq.${encodeURIComponent(args.to)}&limit=1`,
+      { headers },
+    );
+    const profiles = profileRes.ok ? await profileRes.json() : [];
+    const userId = Array.isArray(profiles) && profiles[0]?.user_id ? profiles[0].user_id : null;
+
+    await fetch(`${url}/rest/v1/customer_communications`, {
+      method: "POST",
+      headers: { ...headers, Prefer: "return=minimal" },
+      body: JSON.stringify({
+        user_id: userId,
+        channel: "email",
+        direction: "outbound",
+        subject: args.subject,
+        content: htmlToText(args.html),
+        template_id: args.type,
+        status: args.status,
+        sent_at: new Date().toISOString(),
+        metadata: { ...args.metadata, recipient: args.to },
+      }),
+    });
+  } catch (e) {
+    console.error("communication log failed (non-blocking):", e);
+  }
+}
+
 function welcomeHtml(name: string, accountNumber?: string, efinTag?: string | null, appUrl?: string) {
   const tagUrl = `${appUrl || "https://efin.money"}/profile`;
   return `
@@ -233,10 +291,13 @@ Deno.serve(async (req) => {
     const body = await res.json();
     if (!res.ok) {
       console.error("Resend error:", body);
+      await logCommunication({ to, subject, html, type, status: "failed", metadata: { error: body } });
       return new Response(JSON.stringify({ error: body }), {
         status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    await logCommunication({ to, subject, html, type, status: "sent", metadata: { provider: "resend", message_id: body.id, cc } });
 
     return new Response(JSON.stringify({ ok: true, id: body.id }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
