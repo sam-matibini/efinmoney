@@ -29,6 +29,23 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+/** Best-effort account-activity log for the CRM timeline — never blocks auth. */
+const logAccountActivity = (userId: string, eventType: string, description: string) => {
+  void supabase
+    .from('account_activity')
+    .insert({
+      user_id: userId,
+      event_type: eventType,
+      description,
+      actor_type: 'user',
+      actor_id: userId,
+      user_agent: typeof navigator !== 'undefined' ? navigator.userAgent.slice(0, 400) : null,
+    })
+    .then(({ error }) => {
+      if (error) console.warn('activity log failed:', error.message);
+    });
+};
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
