@@ -28,6 +28,13 @@ export interface BrandedScreenProps {
   cardWidth?: "sm" | "md" | "lg";
   /** Disable the background glow blobs (for dense auth pages). */
   flat?: boolean;
+  /**
+   * Hide the shell's own top bar — use this when BrandedScreen is
+   * mounted inside a page that already provides a header (e.g. the
+   * customer-facing Auth.tsx, which wraps every state in its own
+   * white header). The branded body + footer still render.
+   */
+  hideTopBar?: boolean;
 }
 
 const CARD_WIDTHS: Record<NonNullable<BrandedScreenProps["cardWidth"]>, string> = {
@@ -42,22 +49,25 @@ export function BrandedScreen({
   pageTitle,
   cardWidth = "md",
   flat = false,
+  hideTopBar = false,
 }: BrandedScreenProps) {
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-slate-50 via-white to-amber-50/40 dark:from-[hsl(var(--brand-900))] dark:via-[hsl(256_55%_10%)] dark:to-[hsl(256_60%_14%)] text-foreground">
-      {/* Top bar */}
-      <header className="relative z-10 bg-gradient-to-r from-[hsl(256_65%_10%)] via-[hsl(256_60%_15%)] to-[hsl(256_55%_18%)] text-white">
-        <div className="absolute inset-x-0 bottom-0 h-[3px] bg-gradient-to-r from-amber-400 via-amber-500 to-amber-400" />
-        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2.5 group">
-            <Logo static className="w-8 h-8 sm:w-9 sm:h-9" />
-            <Wordmark className="font-black text-lg sm:text-xl tracking-tight" />
-          </Link>
-          {topBarAction ? (
-            <div className="text-sm text-slate-200">{topBarAction}</div>
-          ) : null}
-        </div>
-      </header>
+      {/* Top bar (hidden when mounted inside a page that provides its own header) */}
+      {!hideTopBar && (
+        <header className="relative z-10 bg-gradient-to-r from-[hsl(256_65%_10%)] via-[hsl(256_60%_15%)] to-[hsl(256_55%_18%)] text-white">
+          <div className="absolute inset-x-0 bottom-0 h-[3px] bg-gradient-to-r from-amber-400 via-amber-500 to-amber-400" />
+          <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+            <Link to="/" className="flex items-center gap-2.5 group">
+              <Logo static className="w-8 h-8 sm:w-9 sm:h-9" />
+              <Wordmark className="font-black text-lg sm:text-xl tracking-tight" />
+            </Link>
+            {topBarAction ? (
+              <div className="text-sm text-slate-200">{topBarAction}</div>
+            ) : null}
+          </div>
+        </header>
+      )}
 
       {/* Body */}
       <main className="relative flex-1 flex items-center justify-center px-4 sm:px-6 py-10 sm:py-14 overflow-hidden">

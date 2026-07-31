@@ -219,11 +219,7 @@ const Auth = () => {
       {resetSentTo ? (
         <BrandedScreen
           cardWidth="md"
-          topBarAction={
-            <Link to="/" className="inline-flex items-center gap-1.5 hover:text-amber-300 transition-colors">
-              <ArrowLeft className="w-4 h-4" /> Back to home
-            </Link>
-          }
+          hideTopBar
         >
           <BrandIconBadge icon={<MailCheck className="h-9 w-9" />} tone="info" />
           <h1 className="text-center text-2xl font-display font-bold text-foreground">Check your inbox</h1>
@@ -247,11 +243,7 @@ const Auth = () => {
       ) : showForgot ? (
         <BrandedScreen
           cardWidth="md"
-          topBarAction={
-            <Link to="/" className="inline-flex items-center gap-1.5 hover:text-amber-300 transition-colors">
-              <ArrowLeft className="w-4 h-4" /> Back to home
-            </Link>
-          }
+          hideTopBar
         >
           <BrandIconBadge icon={<MailCheck className="h-8 w-8" />} tone="info" />
           <h1 className="text-center text-2xl font-display font-bold text-foreground">Reset your password</h1>
@@ -287,11 +279,7 @@ const Auth = () => {
       ) : signedUpEmail ? (
         <BrandedScreen
           cardWidth="md"
-          topBarAction={
-            <Link to="/" className="inline-flex items-center gap-1.5 hover:text-amber-300 transition-colors">
-              <ArrowLeft className="w-4 h-4" /> Back to home
-            </Link>
-          }
+          hideTopBar
         >
           <BrandIconBadge icon={<MailCheck className="h-9 w-9" />} tone="info" />
           <h1 className="text-center text-2xl font-display font-bold text-foreground">Check your inbox</h1>
