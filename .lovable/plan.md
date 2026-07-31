@@ -1,30 +1,36 @@
-## Phase 10 — Margin Guardrails & Pricing Optimisation
+## Phase 11 — Automated Fee Adjustments
 
-Phases 1-9 built pricing, routing, economics, cost assurance and settlement. Today margin problems are only detected *after* the fact: `partner-alerts-scan` raises a margin-floor alert hours later, and the routing engine happily executes a corridor at negative profit (no margin floor exists in `routingEngine.ts` — only a computed `margin_percent`). Retail pricing is also still adjusted by hand from the Profitability tab.
-
-Phase 10 closes that loop: enforce margin at quote time, and turn the observed cost data into concrete pricing recommendations.
+Phase 10 tells you *what* the customer fee should be (Pricing Recommendations) but a human still has to retype it into eFinMoney Pricing. Phase 11 closes the loop: recommendations become reviewable **proposals** that, once approved, write a new versioned `efinmoney_pricing` row automatically — with an optional scheduled auto-run.
 
 ### What gets built
 
-**1. Margin floor enforced at quote/execute time**
-- Per-corridor and global minimum margin (percent and absolute) stored in config, editable in the UI.
-- The routing engine scores candidates as today, then applies the floor: candidates under it are marked `below_floor` with the shortfall recorded on the routing attempt.
-- Configurable behaviour per corridor: `warn` (execute, flag), `uplift` (raise the customer fee to hit the floor, if retail pricing allows) or `block` (reject the quote with a clear message).
-- Every decision reason is persisted on `routing_decisions` so the Attempts tab shows exactly why a route was blocked or uplifted.
+**1. Proposal store (`pricing_proposals`)**
+One row per corridor fee change: direction, source/dest currency, dest country, payment method, customer type; current vs proposed fixed/percentage fee and fx markup; the evidence snapshot (volume, revenue, effective cost, current margin, target margin, expected revenue uplift); `source` (`auto_scan` | `manual`); `status` (`pending` → `approved` | `rejected` | `applied` | `superseded`); reviewer, review note, applied pricing row id, timestamps.
+Access restricted to pricing managers (`is_pricing_manager()`), plus service_role for the cron function.
 
-**2. Pricing recommendation engine**
-- New SQL function comparing, per corridor/method, actual billed cost (Phase 9) and modelled cost against current retail pricing over a window, returning the fee change needed to reach the target margin.
-- "Recommendations" tab: table of corridors with current fee, recommended fee, expected margin before/after, volume at risk, and confidence based on sample size.
-- One-click apply writes a new `efinmoney_pricing` version through the existing supersede path — never an in-place edit, so history stays intact.
+**2. Guardrails config (`fee_adjustment_settings`)**
+Single-row config: enabled on/off, target margin %, lookback days, minimum transaction count and minimum volume before a corridor qualifies, maximum allowed fee move per run (e.g. ±0.5pp, so a bad cost month can't 10× a fee), cooldown days between changes on the same corridor, and `auto_apply` (false by default → everything waits for approval).
 
-**3. Guardrail breach visibility**
-- Blocked/uplifted quotes counted on the Live routing panel and surfaced as a new `margin_block` alert type in the existing alerts scan.
-- Daily digest counters (blocks, uplifts, corridors below floor) on the Profitability header.
+**3. `pricing-adjust-scan` edge function (cron, daily)**
+Calls the existing `pricing_recommendations` RPC with the configured window and target margin, filters by the qualification and cap rules, skips corridors already inside cooldown or with an open proposal, supersedes stale pending proposals for the same corridor, then inserts fresh `pending` proposals. When `auto_apply` is on and the delta is within cap, it approves and applies in the same pass. Emits a `fee_adjustment` alert into `partner_alerts` summarising proposals raised.
 
-### Technical details
+**4. `pricing-proposal-apply` edge function**
+Approve/reject a proposal. On approve it inserts a new `efinmoney_pricing` row with `effective_from = now()` (existing versioning closes the prior row), stamps the proposal `applied` with the new row id, and writes an `audit_logs` entry. Rejection records the reviewer note only. JWT validated in-code and re-checks `is_pricing_manager` server-side.
 
-- Migration: `pricing_config` entries for `margin_floor_percent`, `margin_floor_min_amount`, `margin_floor_action`; `partner_corridors.margin_floor_percent` + `margin_floor_action` (nullable overrides); `routing_decisions.margin_action` + `margin_shortfall`; new function `pricing_recommendations(p_from, p_to, p_target_margin)` (security definer, `is_pricing_manager()` only).
-- `supabase/functions/_shared/routingEngine.ts`: add a `applyMarginFloor()` step after scoring, returning the action and shortfall; `routing-quote` and `routingExecute.ts` respect it. Failover keeps working — a blocked primary falls through to the next candidate before rejecting outright.
-- `partner-alerts-scan`: add the `margin_block` fingerprinted alert type; no new cron.
-- Frontend: `useMarginGuardrails` in `usePartnerOps.tsx`; new `MarginGuardrailsPanel.tsx` and `PricingRecommendationsPanel.tsx` under `src/components/settings/partners/`, wired as tabs in `PartnerNetworkPanel.tsx`; recommendation apply reuses the existing pricing mutation hooks.
-- No hardcoded rates or fees: floors come from config, recommendations derive from billed/modelled cost rows, and all pricing writes go through the versioned pricing tables.
+**5. UI — Settings → Partners & Routing → new "Fee Adjustments" tab**
+`FeeAdjustmentsPanel.tsx`: settings form for the guardrails above, a "Run scan now" button, and a proposal table (corridor, current → proposed fee, delta, margin now → after, evidence columns, status) with Approve / Reject actions and an expandable evidence row. Applied and rejected history behind a status filter.
+`PricingRecommendationsPanel.tsx` gets a **"Create proposal"** action per row so a manual recommendation can enter the same approval queue.
+Hooks added to `usePartnerOps.tsx` following the existing query/mutation pattern.
+
+### Technical notes
+- Fee writes always go through `efinmoney_pricing` inserts — no in-place updates — so history and the `effective_from/effective_to` chain stay intact.
+- Cost basis reuses `pricing_recommendations` (approved billed cost, falling back to modelled cost), so Phase 9 invoice reconciliation feeds this directly.
+- Cap, cooldown and minimum-volume checks run in the edge function and again at apply time, so a stale proposal can't slip through a later-tightened cap.
+- Cron registered daily; `auto_apply` ships off so the first weeks are review-only.
+
+### Order of work
+1. Migration: `pricing_proposals`, `fee_adjustment_settings`, grants, RLS.
+2. `pricing-adjust-scan` + `pricing-proposal-apply` edge functions, cron schedule.
+3. `usePartnerOps.tsx` hooks.
+4. `FeeAdjustmentsPanel.tsx` + tab wiring + Recommendations "Create proposal" action.
+5. Alert type in `partner-alerts-scan`; memory update.

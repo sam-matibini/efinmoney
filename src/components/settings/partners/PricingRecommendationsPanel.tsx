@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { usePricingRecommendations } from "@/hooks/usePartnerOps";
+import { useCreateManualProposal, usePricingRecommendations } from "@/hooks/usePartnerOps";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,7 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { TrendingUp } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Plus, TrendingUp } from "lucide-react";
 
 const money = (v: number) => Number(v || 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
 const pct = (v: number) => `${Number(v || 0).toFixed(2)}%`;
@@ -17,6 +18,7 @@ export const PricingRecommendationsPanel = () => {
   const [target, setTarget] = useState("3");
   const targetMargin = Number(target) || 0;
   const { data, isLoading } = usePricingRecommendations(days, targetMargin);
+  const createProposal = useCreateManualProposal();
 
   const totals = useMemo(() => {
     const rows = data ?? [];
@@ -103,6 +105,7 @@ export const PricingRecommendationsPanel = () => {
                   <TableHead className="text-right">Current fee %</TableHead>
                   <TableHead className="text-right">Recommended %</TableHead>
                   <TableHead className="text-right">Uplift</TableHead>
+                  <TableHead className="text-right">Propose</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -129,6 +132,16 @@ export const PricingRecommendationsPanel = () => {
                       </TableCell>
                       <TableCell className="text-right font-mono">
                         {r.revenue_uplift ? money(r.revenue_uplift) : "—"}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={createProposal.isPending}
+                          onClick={() => createProposal.mutate(r)}
+                        >
+                          <Plus className="mr-1 h-3.5 w-3.5" /> Proposal
+                        </Button>
                       </TableCell>
                     </TableRow>
                   );

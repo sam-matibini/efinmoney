@@ -1,1 +1,2 @@
 - [Margin Guardrails](mem://features/margin-guardrails) — Routing margin floors (warn/uplift/block) + billed-cost pricing recommendations
+- [Automated Fee Adjustments](mem://features/automated-fee-adjustments) — Phase 11: fee proposal queue, approval workflow, versioned customer pricing writes
