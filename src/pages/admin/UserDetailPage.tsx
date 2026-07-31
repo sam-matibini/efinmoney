@@ -16,7 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   ArrowLeft, Mail, Phone, MapPin, Calendar, Shield, Wallet, ArrowRightLeft,
   User as UserIcon, Hash, Activity, AlertTriangle, AtSign, MessageSquare, FileWarning, Headphones,
-  ShieldCheck, ShieldOff, Send, Loader2, ExternalLink, Pencil, FileText,
+  ShieldCheck, ShieldOff, Send, Loader2, ExternalLink, Pencil, FileText, Building2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -215,6 +215,50 @@ const UserDetailPage = () => {
         .order("created_at", { ascending: false })
         .limit(50);
       return data || [];
+    },
+    enabled: !!id,
+  });
+
+  // Beneficial owners / directors / signing officers for business users.
+  // Scoped via the user's business_profiles so a single user owning multiple
+  // businesses (allowed) shows every UBO across all of them.
+  type UboRow = {
+    id: string;
+    business_profile_id: string;
+    business_legal_name: string;
+    full_name: string;
+    role: string;
+    ownership_percent: number;
+    nationality: string | null;
+    date_of_birth: string | null;
+    occupation: string | null;
+    is_pep: boolean;
+    verification_status: string;
+    rejection_reason: string | null;
+  };
+  const { data: ubos = [], isLoading: ubosLoading } = useQuery({
+    queryKey: ["admin-user-ubos", id],
+    queryFn: async (): Promise<UboRow[]> => {
+      const { data: bizRows, error: bizErr } = await db
+        .from("business_profiles")
+        .select("id, legal_name, kyb_status")
+        .eq("owner_user_id", id!);
+      if (bizErr) throw bizErr;
+      const bizIds = (bizRows || []).map((b: { id: string }) => b.id);
+      if (bizIds.length === 0) return [];
+      const { data, error } = await db
+        .from("business_owners")
+        .select("id, business_profile_id, full_name, role, ownership_percent, nationality, date_of_birth, occupation, is_pep, verification_status, rejection_reason")
+        .in("business_profile_id", bizIds)
+        .order("ownership_percent", { ascending: false });
+      if (error) throw error;
+      const nameById = new Map<string, string>(
+        (bizRows || []).map((b: { id: string; legal_name: string }) => [b.id, b.legal_name])
+      );
+      return ((data || []) as Omit<UboRow, "business_legal_name">[]).map((o) => ({
+        ...o,
+        business_legal_name: nameById.get(o.business_profile_id) ?? "—",
+      }));
     },
     enabled: !!id,
   });
@@ -494,6 +538,18 @@ const UserDetailPage = () => {
                   )}
                 </CardContent>
               </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Activity className="w-4 h-4" /> Risk
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3 text-sm">
+                  <RiskScoreGauge score={profile.risk_score ?? 0} />
+                  <RiskBreakdown profile={profile as any} />
+                </CardContent>
+              </Card>
             </div>
 
             <Card>
@@ -558,6 +614,56 @@ const UserDetailPage = () => {
                 )}
               </CardContent>
             </Card>
+
+            {ubos.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Building2 className="w-4 h-4" /> Beneficial owners
+                  </CardTitle>
+                  <CardDescription>UBOs, directors, and signing officers for this user's business accounts.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {ubosLoading ? (
+                    <Skeleton className="h-10 w-full" />
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Role</TableHead>
+                          <TableHead className="text-right">Ownership</TableHead>
+                          <TableHead>Nationality</TableHead>
+                          <TableHead>Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {ubos.map((u) => (
+                          <TableRow key={u.id}>
+                            <TableCell>
+                              <div className="font-medium">{u.full_name}</div>
+                              {u.is_pep && <Badge variant="outline" className="mt-1 text-[10px]">PEP</Badge>}
+                            </TableCell>
+                            <TableCell className="capitalize text-sm">{u.role.replace(/_/g, " ")}</TableCell>
+                            <TableCell className="text-right tabular-nums">{u.ownership_percent}%</TableCell>
+                            <TableCell className="text-sm">{u.nationality || "—"}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className={
+                                u.verification_status === "approved" ? "bg-indigo-500/10 text-indigo-500 border-indigo-500/20" :
+                                u.verification_status === "rejected" ? "bg-red-500/10 text-red-500 border-red-500/20" :
+                                "bg-yellow-500/10 text-yellow-600 border-yellow-500/20"
+                              }>
+                                {u.verification_status}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
             <Card>
               <CardHeader>
@@ -955,5 +1061,66 @@ const Row = ({ label, value, icon }: { label: string; value: string; icon?: Reac
     <span className="font-medium text-right truncate max-w-[60%]">{value}</span>
   </div>
 );
+
+// 0-100 risk score gauge. Same formula as the DB trigger so the numbers
+// shown here are the same numbers the trigger computes. Mirrored client-side
+// for instant feedback; the trigger is the source of truth.
+function scoreColor(score: number): { bar: string; text: string; label: string } {
+  if (score <= 25) return { bar: "bg-emerald-500", text: "text-emerald-600", label: "Low" };
+  if (score <= 50) return { bar: "bg-amber-500",   text: "text-amber-600",   label: "Moderate" };
+  if (score <= 75) return { bar: "bg-orange-500",  text: "text-orange-600",  label: "Elevated" };
+  return                  { bar: "bg-red-500",     text: "text-red-600",     label: "High" };
+}
+
+const RiskScoreGauge = ({ score }: { score: number }) => {
+  const c = scoreColor(score);
+  return (
+    <div>
+      <div className="flex items-baseline justify-between">
+        <span className="text-xs text-muted-foreground">Composite score</span>
+        <span className={`text-2xl font-bold tabular-nums ${c.text}`}>{score}<span className="text-sm text-muted-foreground">/100</span></span>
+      </div>
+      <div className="mt-2 h-2 w-full rounded-full bg-muted overflow-hidden">
+        <div className={`h-full ${c.bar} transition-all`} style={{ width: `${Math.max(2, score)}%` }} />
+      </div>
+      <div className={`mt-1 text-xs font-medium ${c.text}`}>{c.label} risk</div>
+    </div>
+  );
+};
+
+// Mirrors public.compute_profile_risk_score() — keep in sync.
+const RiskBreakdown = ({ profile }: { profile: Record<string, unknown> }) => {
+  const kyc = String(profile.kyc_status ?? "—");
+  const tier = String(profile.kyc_tier ?? "—");
+  const factors: { label: string; impact: string; positive: boolean }[] = [];
+
+  if (kyc === "verified") {
+    factors.push({ label: "KYC verified", impact: "+20", positive: true });
+    if (tier === "tier_3") factors.push({ label: "Tier 3 (full KYC)", impact: "+40", positive: true });
+    else if (tier === "tier_2") factors.push({ label: "Tier 2 (ID only)", impact: "+20", positive: true });
+  }
+  if (!profile.date_of_birth) factors.push({ label: "Missing date of birth", impact: "−10", positive: false });
+  if (!profile.occupation)    factors.push({ label: "Missing occupation",    impact: "−10", positive: false });
+  if (!profile.nationality)   factors.push({ label: "Missing nationality",   impact: "−10", positive: false });
+
+  return (
+    <div className="space-y-1.5 pt-2">
+      <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Factors</div>
+      {factors.length === 0 ? (
+        <p className="text-xs text-muted-foreground">Score 0 — no KYC or identity data yet.</p>
+      ) : factors.map((f) => (
+        <div key={f.label} className="flex items-center justify-between text-xs">
+          <span className="text-muted-foreground">{f.label}</span>
+          <span className={f.positive ? "text-amber-600 font-medium" : "text-emerald-600 font-medium"}>
+            {f.impact}
+          </span>
+        </div>
+      ))}
+      <p className="text-[10px] text-muted-foreground pt-1">
+        Recomputed automatically by the DB trigger on every profile change.
+      </p>
+    </div>
+  );
+};
 
 export default UserDetailPage;
