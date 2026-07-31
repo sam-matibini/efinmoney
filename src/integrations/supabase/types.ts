@@ -1543,6 +1543,47 @@ export type Database = {
         }
         Relationships: []
       }
+      communication_attachments: {
+        Row: {
+          communication_id: string
+          created_at: string
+          file_name: string
+          file_path: string
+          id: string
+          mime_type: string | null
+          size_bytes: number | null
+          uploaded_by: string | null
+        }
+        Insert: {
+          communication_id: string
+          created_at?: string
+          file_name: string
+          file_path: string
+          id?: string
+          mime_type?: string | null
+          size_bytes?: number | null
+          uploaded_by?: string | null
+        }
+        Update: {
+          communication_id?: string
+          created_at?: string
+          file_name?: string
+          file_path?: string
+          id?: string
+          mime_type?: string | null
+          size_bytes?: number | null
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "communication_attachments_communication_id_fkey"
+            columns: ["communication_id"]
+            isOneToOne: false
+            referencedRelation: "customer_communications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       compliance_alerts: {
         Row: {
           alert_data: Json
@@ -2155,9 +2196,12 @@ export type Database = {
           created_by: string | null
           customer_id: string | null
           direction: string
+          error_message: string | null
           id: string
           metadata: Json | null
           read_at: string | null
+          recipient_email: string | null
+          recipient_name: string | null
           sent_at: string | null
           status: string
           subject: string | null
@@ -2171,9 +2215,12 @@ export type Database = {
           created_by?: string | null
           customer_id?: string | null
           direction: string
+          error_message?: string | null
           id?: string
           metadata?: Json | null
           read_at?: string | null
+          recipient_email?: string | null
+          recipient_name?: string | null
           sent_at?: string | null
           status?: string
           subject?: string | null
@@ -2187,9 +2234,12 @@ export type Database = {
           created_by?: string | null
           customer_id?: string | null
           direction?: string
+          error_message?: string | null
           id?: string
           metadata?: Json | null
           read_at?: string | null
+          recipient_email?: string | null
+          recipient_name?: string | null
           sent_at?: string | null
           status?: string
           subject?: string | null
