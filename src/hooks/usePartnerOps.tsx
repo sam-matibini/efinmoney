@@ -347,3 +347,210 @@ export const usePricingRecommendations = (days: number, targetMargin: number) =>
       }));
     },
   });
+
+/* ------------------------- automated fee adjustments ---------------------- */
+
+export interface FeeAdjustmentSettings {
+  id: string;
+  enabled: boolean;
+  auto_apply: boolean;
+  target_margin_percent: number;
+  lookback_days: number;
+  min_txn_count: number;
+  min_volume: number;
+  max_fee_delta_percent: number;
+  cooldown_days: number;
+}
+
+export const useFeeAdjustmentSettings = () =>
+  useQuery({
+    queryKey: ["fee_adjustment_settings"],
+    queryFn: async (): Promise<FeeAdjustmentSettings | null> => {
+      const { data, error } = await db
+        .from("fee_adjustment_settings")
+        .select("*")
+        .eq("is_singleton", true)
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) return null;
+      return {
+        ...data,
+        target_margin_percent: Number(data.target_margin_percent ?? 0),
+        lookback_days: Number(data.lookback_days ?? 30),
+        min_txn_count: Number(data.min_txn_count ?? 0),
+        min_volume: Number(data.min_volume ?? 0),
+        max_fee_delta_percent: Number(data.max_fee_delta_percent ?? 0),
+        cooldown_days: Number(data.cooldown_days ?? 0),
+      } as FeeAdjustmentSettings;
+    },
+  });
+
+export const useSaveFeeAdjustmentSettings = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (patch: Partial<FeeAdjustmentSettings>) => {
+      const { id, ...row } = patch;
+      const { error } = id
+        ? await db.from("fee_adjustment_settings").update(row).eq("id", id)
+        : await db.from("fee_adjustment_settings").insert({ ...row, is_singleton: true });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["fee_adjustment_settings"] });
+      toast.success("Settings saved");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+};
+
+export type PricingProposalStatus = "pending" | "approved" | "rejected" | "applied" | "superseded";
+
+export interface PricingProposal {
+  id: string;
+  group_key: string;
+  group_label: string;
+  direction: string;
+  source_currency: string;
+  dest_currency: string;
+  dest_country: string | null;
+  payment_method: string | null;
+  customer_type: string;
+  current_fixed_fee: number;
+  current_percentage_fee: number;
+  proposed_fixed_fee: number;
+  proposed_percentage_fee: number;
+  fee_delta_percent: number;
+  txn_count: number;
+  volume: number;
+  revenue: number;
+  effective_cost: number;
+  current_margin_percent: number;
+  target_margin_percent: number;
+  expected_revenue_uplift: number;
+  source: "auto_scan" | "manual";
+  status: PricingProposalStatus;
+  review_note: string | null;
+  reviewed_at: string | null;
+  applied_at: string | null;
+  created_at: string;
+}
+
+const numeric = (r: Record<string, unknown>): PricingProposal =>
+  ({
+    ...r,
+    current_fixed_fee: Number(r.current_fixed_fee ?? 0),
+    current_percentage_fee: Number(r.current_percentage_fee ?? 0),
+    proposed_fixed_fee: Number(r.proposed_fixed_fee ?? 0),
+    proposed_percentage_fee: Number(r.proposed_percentage_fee ?? 0),
+    fee_delta_percent: Number(r.fee_delta_percent ?? 0),
+    txn_count: Number(r.txn_count ?? 0),
+    volume: Number(r.volume ?? 0),
+    revenue: Number(r.revenue ?? 0),
+    effective_cost: Number(r.effective_cost ?? 0),
+    current_margin_percent: Number(r.current_margin_percent ?? 0),
+    target_margin_percent: Number(r.target_margin_percent ?? 0),
+    expected_revenue_uplift: Number(r.expected_revenue_uplift ?? 0),
+  }) as PricingProposal;
+
+export const usePricingProposals = (status: PricingProposalStatus | "all" = "pending") =>
+  useQuery({
+    queryKey: ["pricing_proposals", status],
+    queryFn: async (): Promise<PricingProposal[]> => {
+      let q = db
+        .from("pricing_proposals")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(300);
+      if (status !== "all") q = q.eq("status", status);
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data || []).map(numeric);
+    },
+  });
+
+export const useReviewPricingProposal = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, action, note }: { id: string; action: "approve" | "reject"; note?: string }) => {
+      const { data, error } = await db.functions.invoke("pricing-proposal-apply", {
+        body: { proposal_id: id, action, note },
+      });
+      if (error) throw error;
+      if (data && data.success === false) throw new Error(data.error || "Review failed");
+      return data as { status: string };
+    },
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ["pricing_proposals"] });
+      qc.invalidateQueries({ queryKey: ["efinmoney_pricing"] });
+      toast.success(res.status === "applied" ? "Proposal applied to customer pricing" : "Proposal rejected");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+};
+
+export const useRunFeeAdjustScan = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const { data, error } = await db.functions.invoke("pricing-adjust-scan", { body: { force: true } });
+      if (error) throw error;
+      if (data && data.success === false) throw new Error(data.error || "Scan failed");
+      return data as {
+        evaluated: number;
+        raised: number;
+        applied: number;
+        capped: number;
+        skipped_cooldown: number;
+        skipped_threshold: number;
+      };
+    },
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ["pricing_proposals"] });
+      toast.success(
+        `Scan complete — ${res.raised} proposal(s) raised, ${res.applied} auto-applied, ${res.capped} capped`,
+      );
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+};
+
+/** Turn a recommendation row into a pending proposal for review. */
+export const useCreateManualProposal = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (r: PricingRecommendation) => {
+      const { data: auth } = await supabase.auth.getUser();
+      const { error } = await db.from("pricing_proposals").insert({
+        group_key: r.group_key,
+        group_label: r.group_label,
+        direction: "payout",
+        source_currency: r.source_currency,
+        dest_currency: r.dest_currency,
+        dest_country: r.dest_country,
+        payment_method: r.payment_method,
+        customer_type: "consumer",
+        current_fixed_fee: r.current_fixed_fee,
+        current_percentage_fee: r.current_percentage_fee,
+        proposed_fixed_fee: r.current_fixed_fee,
+        proposed_percentage_fee: r.recommended_percentage_fee,
+        fee_delta_percent: r.recommended_percentage_fee - r.current_percentage_fee,
+        txn_count: r.txn_count,
+        volume: r.volume,
+        revenue: r.revenue,
+        effective_cost: r.effective_cost,
+        current_margin_percent: r.current_margin_percent,
+        target_margin_percent: r.target_margin_percent,
+        expected_revenue_uplift: r.revenue_uplift,
+        source: "manual",
+        status: "pending",
+        created_by: auth?.user?.id ?? null,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["pricing_proposals"] });
+      toast.success("Proposal queued for review");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+};
