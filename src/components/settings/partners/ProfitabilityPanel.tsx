@@ -5,12 +5,14 @@ import {
   usePricingGaps,
   type ProfitGroupBy,
 } from "@/hooks/useProfitability";
+import { useCostAssurance } from "@/hooks/useCostAssurance";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertTriangle, TrendingUp } from "lucide-react";
+
 
 const money = (n: number) =>
   n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -28,6 +30,18 @@ export const ProfitabilityPanel = () => {
   const { data: rows, isLoading, error } = useProfitabilitySummary(days, groupBy);
   const { data: variance } = useRoutingVariance(days);
   const { data: gaps } = usePricingGaps(days);
+  const { data: billedRows } = useCostAssurance(days);
+
+  // Actual billed partner cost is only attributable per partner, so we surface it in that grouping.
+  const showBilled = groupBy === "partner";
+  const billedByPartner = new Map<string, number>();
+  (billedRows ?? []).forEach((b) => {
+    billedByPartner.set(b.partner_name, (billedByPartner.get(b.partner_name) ?? 0) + b.billed_total);
+    if (b.partner_code) {
+      billedByPartner.set(b.partner_code, (billedByPartner.get(b.partner_code) ?? 0) + b.billed_total);
+    }
+  });
+  const billedFor = (label: string) => (showBilled ? billedByPartner.get(label) : undefined);
 
   const totals = (rows ?? []).reduce(
     (acc, r) => ({
@@ -40,6 +54,7 @@ export const ProfitabilityPanel = () => {
     { count: 0, volume: 0, revenue: 0, cost: 0, profit: 0 },
   );
   const blended = totals.revenue > 0 ? (totals.profit / totals.revenue) * 100 : 0;
+
 
   return (
     <div className="space-y-4">
@@ -105,13 +120,20 @@ export const ProfitabilityPanel = () => {
                   <TableHead className="text-right">Txns</TableHead>
                   <TableHead className="text-right">Volume</TableHead>
                   <TableHead className="text-right">Revenue</TableHead>
-                  <TableHead className="text-right">Cost</TableHead>
+                  <TableHead className="text-right">Modelled cost</TableHead>
+                  {showBilled && <TableHead className="text-right">Billed cost</TableHead>}
                   <TableHead className="text-right">Profit</TableHead>
                   <TableHead className="text-right">Margin</TableHead>
+                  {showBilled && <TableHead className="text-right">Billed margin</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rows.map((r) => (
+                {rows.map((r) => {
+                  const billed = billedFor(r.group_label);
+                  const billedProfit = billed === undefined ? null : r.revenue - billed;
+                  const billedMargin =
+                    billedProfit === null || r.revenue <= 0 ? null : (billedProfit / r.revenue) * 100;
+                  return (
                   <TableRow key={r.group_key}>
                     <TableCell className="font-medium">
                       {r.group_label}
@@ -125,14 +147,32 @@ export const ProfitabilityPanel = () => {
                     <TableCell className="text-right">{money(r.volume)}</TableCell>
                     <TableCell className="text-right">{money(r.revenue)}</TableCell>
                     <TableCell className="text-right">{money(r.cost)}</TableCell>
+                    {showBilled && (
+                      <TableCell className="text-right text-muted-foreground">
+                        {billed === undefined ? "—" : money(billed)}
+                      </TableCell>
+                    )}
                     <TableCell className="text-right">{money(r.profit)}</TableCell>
                     <TableCell className="text-right">
                       <Badge variant={r.margin_percent >= 0 ? "secondary" : "destructive"}>
                         {r.margin_percent.toFixed(1)}%
                       </Badge>
                     </TableCell>
+                    {showBilled && (
+                      <TableCell className="text-right">
+                        {billedMargin === null ? (
+                          "—"
+                        ) : (
+                          <Badge variant={billedMargin >= 0 ? "secondary" : "destructive"}>
+                            {billedMargin.toFixed(1)}%
+                          </Badge>
+                        )}
+                      </TableCell>
+                    )}
                   </TableRow>
-                ))}
+                  );
+                })}
+
               </TableBody>
             </Table>
           )}

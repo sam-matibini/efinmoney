@@ -202,8 +202,12 @@ export interface PartnerInvoiceLine {
   expected_fee: number | null;
   variance: number | null;
   match_status: string;
+  match_method?: string | null;
+  match_reference?: string | null;
+  dispute_status?: string | null;
   notes: string | null;
 }
+
 
 export const usePartnerInvoiceLines = (invoiceId?: string) =>
   useQuery({

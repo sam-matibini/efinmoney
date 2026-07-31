@@ -139,11 +139,30 @@ export const usePartnerInvoices = () =>
   });
 
 export interface InvoiceLineInput {
-  external_reference?: string | null;
+  partner_reference?: string | null;
   transfer_id?: string | null;
-  description?: string | null;
-  billed_amount: number;
+  transaction_date?: string | null;
+  currency_code?: string | null;
+  amount?: number | null;
+  billed_fee: number;
 }
+
+export const useSaveStatementMapping = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ partner_id, mapping }: { partner_id: string; mapping: Record<string, string> }) => {
+      const { error } = await looseDb
+        .from("payment_partners")
+        .update({ statement_mapping: mapping })
+        .eq("id", partner_id);
+      if (error) throw error;
+      return mapping;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["payment_partners"] }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+};
+
 
 export const useReconcileInvoice = () => {
   const qc = useQueryClient();

@@ -1,17 +1,14 @@
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { usePaymentPartners } from "@/hooks/usePartnerNetwork";
 import {
   useCostAssurance,
   usePartnerInvoices,
-  useReconcileInvoice,
-  type InvoiceLineInput,
   type PartnerInvoice,
 } from "@/hooks/useCostAssurance";
 import { usePartnerInvoiceLines } from "@/hooks/usePartnerOps";
+import StatementUploadDialog from "./StatementUploadDialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -19,28 +16,13 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Receipt, Upload, Scale as ScaleIcon } from "lucide-react";
-import { toast } from "sonner";
 import { format } from "date-fns";
 
-const INVOICE_CSV_COLUMNS = ["external_reference", "transfer_id", "description", "billed_amount"];
-
-const parseCsv = (text: string): Record<string, string>[] => {
-  const lines = text.trim().split(/\r?\n/).filter(Boolean);
-  if (lines.length < 2) return [];
-  const header = lines[0].split(",").map((h) => h.trim().toLowerCase());
-  return lines.slice(1).map((line) => {
-    const cells = line.split(",").map((c) => c.trim());
-    const row: Record<string, string> = {};
-    header.forEach((h, i) => (row[h] = cells[i] ?? ""));
-    return row;
-  });
-};
+const INVOICE_CSV_COLUMNS = ["partner_reference", "transfer_id", "transaction_date", "currency_code", "amount", "billed_fee"];
 
 const money = (v: number) => v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -48,20 +30,10 @@ export const CostAssurancePanel = () => {
   const { data: partners } = usePaymentPartners();
   const { data: summary, isLoading } = useCostAssurance(90);
   const { data: invoices } = usePartnerInvoices();
-  const reconcile = useReconcileInvoice();
 
   const [open, setOpen] = useState(false);
   const [detail, setDetail] = useState<PartnerInvoice | null>(null);
   const { data: detailLines, isLoading: linesLoading } = usePartnerInvoiceLines(detail?.id);
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [lines, setLines] = useState<InvoiceLineInput[]>([]);
-  const [form, setForm] = useState({
-    partner_id: "",
-    invoice_number: "",
-    period_start: "",
-    period_end: "",
-    currency_code: "CAD",
-  });
 
   const nameOf = (id: string) => partners?.find((p) => p.id === id)?.name || "—";
 
@@ -74,23 +46,6 @@ export const CostAssurancePanel = () => {
       unmatched: rows.reduce((s, r) => s + r.unmatched_lines + r.missing_lines, 0),
     };
   }, [summary]);
-
-  const onFile = async (file: File) => {
-    const rows = parseCsv(await file.text());
-    if (!rows.length) {
-      toast.error("No invoice lines found in file");
-      return;
-    }
-    setLines(
-      rows.map((r) => ({
-        external_reference: r.external_reference || null,
-        transfer_id: r.transfer_id || null,
-        description: r.description || null,
-        billed_amount: Number(r.billed_amount || 0),
-      })),
-    );
-    toast.success(`${rows.length} line(s) loaded`);
-  };
 
   const downloadTemplate = () => {
     const blob = new Blob([`${INVOICE_CSV_COLUMNS.join(",")}\n`], { type: "text/csv" });
@@ -119,10 +74,11 @@ export const CostAssurancePanel = () => {
               CSV template
             </Button>
             <Button size="sm" onClick={() => setOpen(true)} disabled={!partners?.length}>
-              <Upload className="h-4 w-4 mr-1" /> Reconcile invoice
+              <Upload className="h-4 w-4 mr-1" /> Upload statement
             </Button>
           </div>
         </CardHeader>
+
         <CardContent className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-4">
             {[
@@ -241,114 +197,8 @@ export const CostAssurancePanel = () => {
         </CardContent>
       </Card>
 
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-xl">
-          <DialogHeader>
-            <DialogTitle>Reconcile partner invoice</DialogTitle>
-            <DialogDescription>
-              Upload the partner's billing lines. Each line is matched to a transfer and compared with the cost our
-              rate card predicted.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="sm:col-span-2">
-              <Label>Partner</Label>
-              <Select value={form.partner_id} onValueChange={(v) => setForm({ ...form, partner_id: v })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select partner" />
-                </SelectTrigger>
-                <SelectContent>
-                  {partners?.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Invoice number</Label>
-              <Input
-                value={form.invoice_number}
-                onChange={(e) => setForm({ ...form, invoice_number: e.target.value })}
-              />
-            </div>
-            <div>
-              <Label>Currency</Label>
-              <Input
-                value={form.currency_code}
-                onChange={(e) => setForm({ ...form, currency_code: e.target.value.toUpperCase() })}
-              />
-            </div>
-            <div>
-              <Label>Period start</Label>
-              <Input
-                type="date"
-                value={form.period_start}
-                onChange={(e) => setForm({ ...form, period_start: e.target.value })}
-              />
-            </div>
-            <div>
-              <Label>Period end</Label>
-              <Input
-                type="date"
-                value={form.period_end}
-                onChange={(e) => setForm({ ...form, period_end: e.target.value })}
-              />
-            </div>
-            <div className="sm:col-span-2 space-y-2">
-              <Label>Invoice lines</Label>
-              <input
-                ref={fileRef}
-                type="file"
-                accept=".csv,text/csv"
-                className="hidden"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) onFile(f);
-                  e.target.value = "";
-                }}
-              />
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
-                  <Upload className="h-4 w-4 mr-1" /> Upload CSV
-                </Button>
-                <span className="text-xs text-muted-foreground">
-                  {lines.length ? `${lines.length} line(s) ready` : `Columns: ${INVOICE_CSV_COLUMNS.join(", ")}`}
-                </span>
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              disabled={
-                !form.partner_id ||
-                !form.invoice_number ||
-                !form.period_start ||
-                !form.period_end ||
-                !lines.length ||
-                reconcile.isPending
-              }
-              onClick={() =>
-                reconcile.mutate(
-                  { ...form, lines },
-                  {
-                    onSuccess: () => {
-                      setOpen(false);
-                      setLines([]);
-                    },
-                  },
-                )
-              }
-            >
-              {reconcile.isPending ? "Reconciling…" : "Reconcile"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <StatementUploadDialog open={open} onOpenChange={setOpen} />
+
 
       <Dialog open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
         <DialogContent className="max-w-3xl">
@@ -399,7 +249,15 @@ export const CostAssurancePanel = () => {
                           {money(Number(l.variance ?? 0))}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-xs capitalize">{l.match_status.replace(/_/g, " ")}</TableCell>
+                      <TableCell className="text-xs capitalize">
+                        {l.match_status.replace(/_/g, " ")}
+                        {l.match_method && (
+                          <span className="block text-[10px] text-muted-foreground">
+                            via {l.match_method.replace(/_/g, " ")}
+                          </span>
+                        )}
+                      </TableCell>
+
                     </TableRow>
                   ))}
                 </TableBody>

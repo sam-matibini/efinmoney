@@ -118,7 +118,87 @@ Deno.serve(async (req) => {
       .select("*")
       .eq("invoice_id", invoiceId);
 
-    const transferIds = (lines ?? []).map((l: any) => l.transfer_id).filter(Boolean);
+    // 3a. Resolve transfer ids for lines the partner billed under its own reference.
+    // Deterministic order: explicit transfer_id -> partner reference -> date/amount heuristic.
+    const resolved = new Map<string, { transfer_id: string | null; method: string; reference: string | null }>();
+    for (const l of lines ?? []) {
+      resolved.set(l.id, {
+        transfer_id: l.transfer_id ?? null,
+        method: l.transfer_id ? "transfer_id" : "unmatched",
+        reference: l.partner_reference ?? null,
+      });
+    }
+
+    const pendingRefs = (lines ?? [])
+      .filter((l: any) => !l.transfer_id && l.partner_reference)
+      .map((l: any) => String(l.partner_reference));
+
+    if (pendingRefs.length) {
+      const refToTransfer = new Map<string, string>();
+
+      const { data: attempts } = await supabase
+        .from("routing_attempts")
+        .select("transfer_id, provider_reference")
+        .in("provider_reference", pendingRefs.slice(0, 1000));
+      for (const a of attempts ?? []) {
+        if (a.provider_reference && a.transfer_id) refToTransfer.set(a.provider_reference, a.transfer_id);
+      }
+
+      const stillMissing = pendingRefs.filter((r) => !refToTransfer.has(r));
+      if (stillMissing.length) {
+        const { data: trs } = await supabase
+          .from("transfers")
+          .select("id, provider_reference")
+          .in("provider_reference", stillMissing.slice(0, 1000));
+        for (const t of trs ?? []) {
+          if (t.provider_reference) refToTransfer.set(t.provider_reference, t.id);
+        }
+      }
+
+      for (const l of lines ?? []) {
+        if (l.transfer_id || !l.partner_reference) continue;
+        const hit = refToTransfer.get(String(l.partner_reference));
+        if (hit) resolved.set(l.id, { transfer_id: hit, method: "reference", reference: l.partner_reference });
+      }
+    }
+
+    // 3b. Heuristic fallback: same partner, same currency, amount within a cent, date within one day.
+    const needHeuristic = (lines ?? []).filter(
+      (l: any) => !resolved.get(l.id)?.transfer_id && l.amount != null && l.transaction_date,
+    );
+    if (needHeuristic.length) {
+      const { data: periodEcon } = await supabase
+        .from("transaction_economics")
+        .select("transfer_id, amount, source_currency, created_at")
+        .eq("partner_id", invoice.partner_id)
+        .gte("created_at", invoice.period_start)
+        .lte("created_at", `${invoice.period_end}T23:59:59Z`);
+
+      const used = new Set<string>(
+        Array.from(resolved.values()).map((r) => r.transfer_id).filter(Boolean) as string[],
+      );
+      for (const l of needHeuristic) {
+        const lineDate = new Date(`${l.transaction_date}T00:00:00Z`).getTime();
+        const hit = (periodEcon ?? []).find((e: any) => {
+          if (!e.transfer_id || used.has(e.transfer_id)) return false;
+          if (l.currency_code && e.source_currency && e.source_currency !== l.currency_code) return false;
+          if (Math.abs(Number(e.amount ?? 0) - Number(l.amount ?? 0)) > 0.01) return false;
+          return Math.abs(new Date(e.created_at).getTime() - lineDate) <= 36 * 3600 * 1000;
+        });
+        if (hit) {
+          used.add(hit.transfer_id);
+          resolved.set(l.id, {
+            transfer_id: hit.transfer_id,
+            method: "heuristic",
+            reference: l.partner_reference ?? null,
+          });
+        }
+      }
+    }
+
+    const transferIds = Array.from(resolved.values())
+      .map((r) => r.transfer_id)
+      .filter(Boolean) as string[];
     const econByTransfer = new Map<string, any>();
     if (transferIds.length) {
       const { data: econ } = await supabase
@@ -137,12 +217,19 @@ Deno.serve(async (req) => {
       const billed = Number(line.billed_fee) || 0;
       billedTotal += billed;
 
-      const econ = line.transfer_id ? econByTransfer.get(line.transfer_id) : null;
+      const res = resolved.get(line.id);
+      const econ = res?.transfer_id ? econByTransfer.get(res.transfer_id) : null;
       if (!econ) {
         unmatched += 1;
         await supabase
           .from("partner_invoice_lines")
-          .update({ expected_fee: null, variance: null, match_status: "unmatched" })
+          .update({
+            expected_fee: null,
+            variance: null,
+            match_status: "unmatched",
+            match_method: "unmatched",
+            match_reference: res?.reference ?? null,
+          })
           .eq("id", line.id);
         continue;
       }
@@ -160,12 +247,16 @@ Deno.serve(async (req) => {
       await supabase
         .from("partner_invoice_lines")
         .update({
+          transfer_id: res?.transfer_id ?? line.transfer_id,
           expected_fee: expected,
           variance,
           match_status: Math.abs(variance) <= 0.01 ? "matched" : "variance",
+          match_method: res?.method ?? "transfer_id",
+          match_reference: res?.reference ?? null,
         })
         .eq("id", line.id);
     }
+
 
     // Transactions we paid for in the period that the partner never billed.
     const { count: periodCount } = await supabase

@@ -19,7 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Banknote, CheckCircle2, AlertTriangle, Wallet } from "lucide-react";
+import { Banknote, CheckCircle2, AlertTriangle, Wallet, Download } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 
@@ -72,18 +72,61 @@ export const PartnerSettlementsPanel = () => {
   );
 
   const aging = useMemo(() => {
-    const map = new Map<string, { partner_id: string; currency: string; outstanding: number; count: number }>();
+    const map = new Map<
+      string,
+      {
+        partner_id: string;
+        currency: string;
+        outstanding: number;
+        count: number;
+        b0: number;
+        b30: number;
+        b60: number;
+        b90: number;
+      }
+    >();
+    const today = Date.now();
     invoices
       .filter((i) => i.status === "approved")
       .forEach((i) => {
         const key = `${i.partner_id}|${i.currency_code}`;
-        const row = map.get(key) ?? { partner_id: i.partner_id, currency: i.currency_code, outstanding: 0, count: 0 };
-        row.outstanding += Number(i.approved_total ?? 0);
+        const row =
+          map.get(key) ??
+          { partner_id: i.partner_id, currency: i.currency_code, outstanding: 0, count: 0, b0: 0, b30: 0, b60: 0, b90: 0 };
+        const amount = Number(i.approved_total ?? 0);
+        const basis = new Date((i as { approved_at?: string | null }).approved_at ?? i.period_end).getTime();
+        const ageDays = Number.isNaN(basis) ? 0 : Math.max(0, Math.floor((today - basis) / 86_400_000));
+        if (ageDays <= 30) row.b0 += amount;
+        else if (ageDays <= 60) row.b30 += amount;
+        else if (ageDays <= 90) row.b60 += amount;
+        else row.b90 += amount;
+        row.outstanding += amount;
         row.count += 1;
         map.set(key, row);
       });
     return [...map.values()].sort((a, b) => b.outstanding - a.outstanding);
   }, [invoices]);
+
+  const exportStatement = () => {
+    if (!aging.length) {
+      toast.error("Nothing outstanding to export");
+      return;
+    }
+    const header = ["partner", "currency", "invoices", "0-30", "31-60", "61-90", "90+", "outstanding"];
+    const rows = aging.map((r) =>
+      [partnerName(r.partner_id), r.currency, r.count, r.b0, r.b30, r.b60, r.b90, r.outstanding]
+        .map((v) => `"${String(v).replace(/"/g, '""')}"`)
+        .join(","),
+    );
+    const blob = new Blob([[header.join(","), ...rows].join("\n")], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `partner-statement-of-account-${format(new Date(), "yyyy-MM-dd")}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
 
   const openReview = (inv: PartnerInvoice) => {
     setReviewInvoice(inv);
@@ -170,39 +213,61 @@ export const PartnerSettlementsPanel = () => {
         </CardContent>
       </Card>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6">
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <AlertTriangle className="h-4 w-4" /> Outstanding payables
-            </CardTitle>
-            <CardDescription>Approved invoices posted to Partner Payables but not yet settled.</CardDescription>
+          <CardHeader className="flex flex-row items-start justify-between gap-4">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <AlertTriangle className="h-4 w-4" /> Payables aging
+              </CardTitle>
+              <CardDescription>
+                Approved invoices posted to Partner Payables but not yet settled, bucketed by age.
+              </CardDescription>
+            </div>
+            <Button variant="outline" size="sm" onClick={exportStatement}>
+              <Download className="mr-1 h-4 w-4" /> Statement of account
+            </Button>
           </CardHeader>
           <CardContent>
             {aging.length === 0 ? (
               <p className="py-4 text-center text-sm text-muted-foreground">Nothing outstanding.</p>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Partner</TableHead>
-                    <TableHead>Currency</TableHead>
-                    <TableHead className="text-right">Invoices</TableHead>
-                    <TableHead className="text-right">Outstanding</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {aging.map((r) => (
-                    <TableRow key={`${r.partner_id}-${r.currency}`}>
-                      <TableCell>{partnerName(r.partner_id)}</TableCell>
-                      <TableCell>{r.currency}</TableCell>
-                      <TableCell className="text-right">{r.count}</TableCell>
-                      <TableCell className="text-right font-medium">{money(r.outstanding, r.currency)}</TableCell>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Partner</TableHead>
+                      <TableHead>Currency</TableHead>
+                      <TableHead className="text-right">Invoices</TableHead>
+                      <TableHead className="text-right">0–30d</TableHead>
+                      <TableHead className="text-right">31–60d</TableHead>
+                      <TableHead className="text-right">61–90d</TableHead>
+                      <TableHead className="text-right">90d+</TableHead>
+                      <TableHead className="text-right">Outstanding</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {aging.map((r) => (
+                      <TableRow key={`${r.partner_id}-${r.currency}`}>
+                        <TableCell>{partnerName(r.partner_id)}</TableCell>
+                        <TableCell>{r.currency}</TableCell>
+                        <TableCell className="text-right">{r.count}</TableCell>
+                        <TableCell className="text-right tabular-nums">{money(r.b0, r.currency)}</TableCell>
+                        <TableCell className="text-right tabular-nums">{money(r.b30, r.currency)}</TableCell>
+                        <TableCell className="text-right tabular-nums">{money(r.b60, r.currency)}</TableCell>
+                        <TableCell
+                          className={`text-right tabular-nums ${r.b90 > 0 ? "text-destructive font-medium" : ""}`}
+                        >
+                          {money(r.b90, r.currency)}
+                        </TableCell>
+                        <TableCell className="text-right font-medium">{money(r.outstanding, r.currency)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             )}
+
           </CardContent>
         </Card>
 

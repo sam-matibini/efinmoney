@@ -42,9 +42,11 @@ export interface PaymentPartner {
   priority: number;
   status: PartnerOpStatus;
   notes: string | null;
+  statement_mapping?: Record<string, string> | null;
   created_at: string;
   updated_at: string;
 }
+
 
 export interface PartnerCorridor {
   id: string;
