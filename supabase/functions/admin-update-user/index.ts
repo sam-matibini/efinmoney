@@ -3,6 +3,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Max-Age": "86400",
 };
 
 const json = (body: unknown, status = 200) =>
@@ -83,7 +85,7 @@ function validate(patch: Record<string, unknown>): string | null {
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response("ok", { status: 200, headers: corsHeaders });
 
   try {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -177,26 +179,33 @@ Deno.serve(async (req) => {
       .eq("user_id", targetUserId);
     if (updateErr) return json({ error: updateErr.message }, 400);
 
-    // Keep the auth account email in sync when the email changes
-    if ("email" in changed && changed.email) {
-      const { error: authErr } = await admin.auth.admin.updateUserById(targetUserId, {
-        email: String(changed.email),
-        email_confirm: true,
-      });
-      if (authErr) {
-        console.error("auth email sync failed", authErr.message);
+    // Side effects below must never fail the save — the profile is already updated.
+    try {
+      // Keep the auth account email in sync when the email changes
+      if ("email" in changed && changed.email) {
+        const { error: authErr } = await admin.auth.admin.updateUserById(targetUserId, {
+          email: String(changed.email),
+          email_confirm: true,
+        });
+        if (authErr) console.error("auth email sync failed", authErr.message);
       }
+    } catch (e) {
+      console.error("auth email sync threw", e);
     }
 
-    await admin.from("audit_logs").insert({
-      user_id: userData.user.id,
-      action: "admin_update_profile",
-      table_name: "profiles",
-      record_id: targetUserId,
-      old_data: previous,
-      new_data: changed,
-      user_agent: req.headers.get("user-agent"),
-    });
+    try {
+      await admin.from("audit_logs").insert({
+        user_id: userData.user.id,
+        action: "admin_update_profile",
+        table_name: "profiles",
+        record_id: targetUserId,
+        old_data: previous,
+        new_data: changed,
+        user_agent: req.headers.get("user-agent"),
+      });
+    } catch (e) {
+      console.error("audit log insert failed", e);
+    }
 
     return json({ success: true, changed });
   } catch (e) {

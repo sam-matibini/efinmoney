@@ -96,19 +96,41 @@ export default function EditUserDialog({ open, onOpenChange, profile, invalidate
   const set = (key: keyof FormState) => (value: string) => setForm((f) => ({ ...f, [key]: value }));
 
   const handleSave = async () => {
+    const original = toForm(profile);
+    const dirty = (Object.keys(form) as (keyof FormState)[]).some((k) => form[k].trim() !== original[k].trim());
+    if (!dirty) {
+      toast.success("No changes to save");
+      onOpenChange(false);
+      return;
+    }
+
     setSaving(true);
     try {
-      const { data, error } = await supabase.functions.invoke("admin-update-user", {
-        body: { user_id: profile.user_id, updates: form },
-      });
+      // Cold boots occasionally drop the request before a response arrives
+      // (FunctionsFetchError). Retry once before surfacing an error.
+      let data: unknown = null;
+      let error: unknown = null;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const res = await supabase.functions.invoke("admin-update-user", {
+          body: { user_id: profile.user_id, updates: form },
+        });
+        data = res.data;
+        error = res.error;
+        const isTransport = !!error && !(error as { context?: unknown }).context;
+        if (!isTransport) break;
+        if (attempt === 0) await new Promise((r) => setTimeout(r, 800));
+      }
+
       const payload = data as { success?: boolean; error?: string; changed?: Record<string, unknown> } | null;
       if (error) {
         // Edge function errors carry the JSON body in the response
-        let message = error.message;
+        let message = (error as Error).message;
         const ctx = (error as { context?: { json?: () => Promise<{ error?: string }> } }).context;
         if (ctx?.json) {
           const body = await ctx.json().catch(() => null);
           if (body?.error) message = body.error;
+        } else {
+          message = "Couldn't reach the server — check your connection and try again.";
         }
         throw new Error(message);
       }
