@@ -437,6 +437,12 @@ const UserDetailPage = () => {
                   <Row label="Full name" value={profile.full_name || "—"} />
                   <Row label="Email" value={profile.email || "—"} />
                   <Row label="Phone" value={profile.phone_number || "—"} />
+                  <Row
+                    label="Date of birth"
+                    value={profile.date_of_birth ? format(new Date(`${profile.date_of_birth}T00:00:00`), "PPP") : "—"}
+                    icon={<Calendar className="w-3.5 h-3.5" />}
+                  />
+                  <Row label="Occupation" value={profile.occupation || "—"} />
                   <Row label="Account #" value={profile.account_number || "—"} icon={<Hash className="w-3.5 h-3.5" />} />
                   <Row label="eFin tag" value={profile.efin_tag ? `@${profile.efin_tag}` : "—"} icon={<AtSign className="w-3.5 h-3.5" />} />
                   <Row
