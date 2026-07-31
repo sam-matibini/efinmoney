@@ -214,14 +214,18 @@ export const ModuleAccessPanel = () => {
                   id={module.id}
                   checked={module.enabled}
                   onCheckedChange={() => handleToggleModule(module.id)}
+                  disabled={!isAdmin || isLoading}
                 />
               </div>
             ))}
           </div>
-          <Button onClick={handleSave} className="mt-6">
-            <Save className="h-4 w-4 mr-2" />
+          <Button onClick={handleSave} className="mt-6" disabled={!isAdmin || isLoading || saveSettings.isPending}>
+            {saveSettings.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
             Save Changes
           </Button>
+          {!isAdmin && (
+            <p className="mt-2 text-xs text-muted-foreground">Only administrators can change module access.</p>
+          )}
         </CardContent>
       </Card>
     </div>
