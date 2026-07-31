@@ -16,13 +16,15 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   ArrowLeft, Mail, Phone, MapPin, Calendar, Shield, Wallet, ArrowRightLeft,
   User as UserIcon, Hash, Activity, AlertTriangle, AtSign, MessageSquare, FileWarning, Headphones,
-  ShieldCheck, ShieldOff, Send, Loader2, ExternalLink,
+  ShieldCheck, ShieldOff, Send, Loader2, ExternalLink, Pencil,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
 import { countryToCurrency, currencySymbol } from "@/lib/currency";
+import EditUserDialog from "@/components/admin-portal/EditUserDialog";
+import UserChangeHistory from "@/components/admin-portal/UserChangeHistory";
 
 
 // support_threads / support_messages aren't in the generated types yet.
