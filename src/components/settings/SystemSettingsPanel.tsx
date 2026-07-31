@@ -13,6 +13,8 @@ import {
   Database,
   Save
 } from "lucide-react";
+import { SYSTEM_DEFAULT_CURRENCY, SYSTEM_TIMEZONE } from "@/lib/systemDefaults";
+import { systemTzLabel } from "@/lib/datetime";
 
 export const SystemSettingsPanel = () => {
   return (
@@ -38,33 +40,44 @@ export const SystemSettingsPanel = () => {
             </div>
             <div className="space-y-2">
               <Label htmlFor="default_currency">Default Currency</Label>
-              <Select defaultValue="USD">
+              <Select defaultValue={SYSTEM_DEFAULT_CURRENCY}>
                 <SelectTrigger id="default_currency">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="CAD">CAD - Canadian Dollar</SelectItem>
                   <SelectItem value="USD">USD - US Dollar</SelectItem>
                   <SelectItem value="EUR">EUR - Euro</SelectItem>
                   <SelectItem value="GBP">GBP - British Pound</SelectItem>
                   <SelectItem value="NGN">NGN - Nigerian Naira</SelectItem>
+                  <SelectItem value="BWP">BWP - Botswana Pula</SelectItem>
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground">
+                Users' base currency follows their domicile country; this is the platform fallback.
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="timezone">Default Timezone</Label>
-              <Select defaultValue="UTC">
+              <Select defaultValue={SYSTEM_TIMEZONE}>
                 <SelectTrigger id="timezone">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="America/Chicago">Central Time (CST/CDT)</SelectItem>
                   <SelectItem value="UTC">UTC</SelectItem>
-                  <SelectItem value="America/New_York">Eastern Time</SelectItem>
+                  <SelectItem value="America/Toronto">Eastern Time</SelectItem>
                   <SelectItem value="America/Los_Angeles">Pacific Time</SelectItem>
                   <SelectItem value="Europe/London">London</SelectItem>
                   <SelectItem value="Africa/Lagos">Lagos</SelectItem>
+                  <SelectItem value="Africa/Gaborone">Gaborone</SelectItem>
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground">
+                System records use {systemTzLabel()}. Customers see times in their own timezone (detected from their device or IP).
+              </p>
             </div>
+
           </div>
           <Button>
             <Save className="h-4 w-4 mr-2" />
