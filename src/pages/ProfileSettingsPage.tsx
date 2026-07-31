@@ -55,6 +55,8 @@ const ProfileSettingsPage = () => {
       setEmail(p.email || user?.email || "");
       setEfinTag(p.efin_tag || "");
       setPhoneNumber(p.phone_number || "");
+      setDateOfBirth(p.date_of_birth || "");
+      setOccupation(p.occupation || "");
       setStreetAddress(p.street_address || "");
       setCity(p.city || "");
       setStateProvince(p.state_province || "");
