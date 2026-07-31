@@ -2452,6 +2452,54 @@ export type Database = {
         }
         Relationships: []
       }
+      fee_adjustment_settings: {
+        Row: {
+          auto_apply: boolean
+          cooldown_days: number
+          created_at: string
+          enabled: boolean
+          id: string
+          is_singleton: boolean
+          lookback_days: number
+          max_fee_delta_percent: number
+          min_txn_count: number
+          min_volume: number
+          target_margin_percent: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          auto_apply?: boolean
+          cooldown_days?: number
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          is_singleton?: boolean
+          lookback_days?: number
+          max_fee_delta_percent?: number
+          min_txn_count?: number
+          min_volume?: number
+          target_margin_percent?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          auto_apply?: boolean
+          cooldown_days?: number
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          is_singleton?: boolean
+          lookback_days?: number
+          max_fee_delta_percent?: number
+          min_txn_count?: number
+          min_volume?: number
+          target_margin_percent?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       flw_banks_cache: {
         Row: {
           banks: Json
@@ -4560,6 +4608,114 @@ export type Database = {
           updated_at?: string
           updated_by?: string | null
           value?: number
+        }
+        Relationships: []
+      }
+      pricing_proposals: {
+        Row: {
+          applied_at: string | null
+          applied_pricing_id: string | null
+          created_at: string
+          created_by: string | null
+          current_fixed_fee: number
+          current_fx_margin_bps: number
+          current_margin_percent: number
+          current_percentage_fee: number
+          customer_type: string
+          dest_country: string | null
+          dest_currency: string
+          direction: Database["public"]["Enums"]["partner_direction"]
+          effective_cost: number
+          expected_revenue_uplift: number
+          fee_delta_percent: number
+          group_key: string
+          group_label: string
+          id: string
+          payment_method: string | null
+          proposed_fixed_fee: number
+          proposed_fx_margin_bps: number
+          proposed_percentage_fee: number
+          revenue: number
+          review_note: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          source: string
+          source_currency: string
+          status: string
+          target_margin_percent: number
+          txn_count: number
+          updated_at: string
+          volume: number
+        }
+        Insert: {
+          applied_at?: string | null
+          applied_pricing_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          current_fixed_fee?: number
+          current_fx_margin_bps?: number
+          current_margin_percent?: number
+          current_percentage_fee?: number
+          customer_type?: string
+          dest_country?: string | null
+          dest_currency: string
+          direction?: Database["public"]["Enums"]["partner_direction"]
+          effective_cost?: number
+          expected_revenue_uplift?: number
+          fee_delta_percent?: number
+          group_key: string
+          group_label: string
+          id?: string
+          payment_method?: string | null
+          proposed_fixed_fee?: number
+          proposed_fx_margin_bps?: number
+          proposed_percentage_fee?: number
+          revenue?: number
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source?: string
+          source_currency: string
+          status?: string
+          target_margin_percent?: number
+          txn_count?: number
+          updated_at?: string
+          volume?: number
+        }
+        Update: {
+          applied_at?: string | null
+          applied_pricing_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          current_fixed_fee?: number
+          current_fx_margin_bps?: number
+          current_margin_percent?: number
+          current_percentage_fee?: number
+          customer_type?: string
+          dest_country?: string | null
+          dest_currency?: string
+          direction?: Database["public"]["Enums"]["partner_direction"]
+          effective_cost?: number
+          expected_revenue_uplift?: number
+          fee_delta_percent?: number
+          group_key?: string
+          group_label?: string
+          id?: string
+          payment_method?: string | null
+          proposed_fixed_fee?: number
+          proposed_fx_margin_bps?: number
+          proposed_percentage_fee?: number
+          revenue?: number
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source?: string
+          source_currency?: string
+          status?: string
+          target_margin_percent?: number
+          txn_count?: number
+          updated_at?: string
+          volume?: number
         }
         Relationships: []
       }
