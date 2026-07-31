@@ -84,11 +84,29 @@ export default function DataExportPage() {
 
   const visible = TABLES.filter((t) => t.includes(filter.toLowerCase().trim()));
 
+  const logExport = async (scope: string, rowCount: number) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      await (supabase as any).from("audit_logs").insert({
+        user_id: user?.id ?? null,
+        action: "DATA_EXPORT",
+        table_name: scope,
+        record_id: null,
+        old_data: null,
+        new_data: { row_count: rowCount },
+        user_agent: navigator.userAgent,
+      });
+    } catch {
+      // best-effort — don't fail the export if audit insert errors
+    }
+  };
+
   const exportOne = async (table: string) => {
     try {
       setBusy(table);
       const rows = await fetchTable(table);
       download(`${table}.csv`, toCSV(rows));
+      await logExport(table, rows.length);
       toast({ title: `Exported ${table}`, description: `${rows.length} rows` });
     } catch (e: any) {
       toast({ title: `Failed: ${table}`, description: e.message, variant: "destructive" });
@@ -101,11 +119,13 @@ export default function DataExportPage() {
     const zip = new JSZip();
     setBulkProgress({ done: 0, total: TABLES.length });
     const errors: string[] = [];
+    let totalRows = 0;
     for (let i = 0; i < TABLES.length; i++) {
       const t = TABLES[i];
       try {
         const rows = await fetchTable(t);
         zip.file(`${t}.csv`, toCSV(rows));
+        totalRows += rows.length;
       } catch (e: any) {
         errors.push(`${t}: ${e.message}`);
         zip.file(`${t}.ERROR.txt`, e.message);
@@ -114,6 +134,7 @@ export default function DataExportPage() {
     }
     const blob = await zip.generateAsync({ type: "blob" });
     download(`efinmoney-export-${new Date().toISOString().slice(0,10)}.zip`, blob);
+    await logExport(`bulk:${TABLES.length}`, totalRows);
     setBulkProgress(null);
     toast({
       title: "Bulk export complete",

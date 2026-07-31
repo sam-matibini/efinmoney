@@ -196,6 +196,11 @@ export const AdminAuthProvider = ({ children }: { children: ReactNode }) => {
       }
       return { error: null };
     } catch (e) {
+      // Best-effort: log the failed admin sign-in. Don't await failure
+      // propagation; if the RPC errors, we still surface the original auth error.
+      try {
+        await (supabase as any).rpc("log_admin_login_failure", { p_email: email });
+      } catch { /* ignore */ }
       return { error: e as Error };
     }
   };
