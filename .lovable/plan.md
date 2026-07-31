@@ -1,40 +1,32 @@
-# Partner API: corridor pricing & FX rates
+# Currency & Timezone Localization
 
-Give external API partners a keyed, read-only HTTP API to fetch eFinMoney FX rates and corridor pricing, reusing the existing canonical rate card (`efinmoney_pricing` / `resolve_customer_price`) and `fx_rates` — no new pricing logic, no duplication.
+## 1. System default currency → CAD
 
-## What partners get
+Today there is no persisted system settings record: the General Settings card in Settings → System Settings is a static form (defaults hardcoded to `USD` / `UTC`, Save button does nothing), and the rest of the app falls back to the literal `"USD"` in many places.
 
-Base URL: `https://<backend>/functions/v1/partner-api`, authenticated with `X-API-Key: efk_live_...`.
+Changes:
+- Add `src/lib/systemDefaults.ts` exporting `SYSTEM_DEFAULT_CURRENCY = "CAD"`, `SYSTEM_TIMEZONE = "America/Chicago"` (CST/CDT), and helpers.
+- Change the General Settings defaults in `SystemSettingsPanel.tsx` to CAD and Central Time, and add CAD to the currency options list.
+- Replace the hardcoded `"USD"` platform-level fallbacks with `SYSTEM_DEFAULT_CURRENCY` in the places where the fallback represents "the platform default" (dashboard stats, top-up/cards/send fallbacks, CRM/finance customer currency resolution). Places where `USD` is a genuine business value (USDC, USD corridors, FX pair bases) stay untouched.
 
-- `GET /v1/rates` — all currently-valid FX rates (mid + effective), optional `?base=USD&symbols=NGN,BWP,CAD`.
-- `GET /v1/rates/{from}/{to}` — single pair with 24h change; falls back to USD cross derivation.
-- `GET /v1/corridors` — supported corridors (source/dest currency, country, payment methods, enabled status).
-- `POST /v1/quote` — body `{direction, source_currency, dest_currency, dest_country, payment_method, amount}` → fee, fx_margin_bps, fx_revenue, rate, total, expires_at. Indicative only (no funds move).
+## 2. User base currency = domicile country's currency
 
-All responses JSON with `{ success, data, request_id }`; errors return `{ success:false, error, code }`.
+`countryToCurrency()` already maps ISO-2/ISO-3 → currency and is used ad-hoc in a few components.
 
-## Backend work
+Changes:
+- Add a `useBaseCurrency()` hook: resolves in order `profile.address_country` → `profile.country_code` → `profile.default_currency` → `SYSTEM_DEFAULT_CURRENCY` (CAD).
+- Use it in the main user-facing surfaces that currently do their own fallback: dashboard hero/stats, wallets, send, top-up, cards, statements.
+- On signup/onboarding completion, persist the derived currency into `profiles.default_currency` so server-side flows (edge functions reading `default_currency`) agree with the UI. A one-time backfill migration sets `default_currency` from the stored country for existing profiles that have no value or a mismatched one (only when the profile has a country on file).
 
-1. **Migration** — new tables (with GRANTs, RLS on, admin-only policies via `has_role`):
-   - `api_partners` (name, contact_email, status, tier, allowed_endpoints, created_by)
-   - `api_partner_keys` (partner_id, key_hash SHA-256, key_prefix, label, last_used_at, revoked_at) — raw key shown once at creation only
-   - `api_request_logs` (partner_id, endpoint, status_code, latency_ms, ip, created_at) for usage + rate limiting
-   - RPC `verify_api_key(p_hash)` (security definer) returning partner id/status/tier
-   - RPC `api_rate_limit_check(p_partner_id, p_limit, p_window_secs)` — DB-backed counter, same pattern as existing rate limiting.
+## 3. System time CST + IP-based user timezone
 
-2. **Edge function `partner-api`** (single function, path-suffix routing, `verify_jwt = false`):
-   - `_shared/partnerAuth.ts`: hash header key, verify, check status + rate limit, return partner context or 401/429.
-   - Rates handlers read `fx_rates` (same query shape as `market-rates`) and reuse `buildUsdRateMap` logic for cross pairs.
-   - Quote handler calls `quotePrice` from `_shared/pricingService.ts` — zero new pricing math.
-   - CORS headers on every response; log each request to `api_request_logs`.
-
-3. **Admin UI** — new "API Partners" section inside `SettingsDashboard` (Partner Network area): list partners, create partner, issue/revoke keys (raw key shown once with copy button), and a usage table from `api_request_logs`.
-
-4. **Docs** — `docs/PARTNER_API.md` with endpoints, auth, sample curl, error codes; linked from the admin panel.
+Changes:
+- New public edge function `geo-detect`: reads the caller IP from `x-forwarded-for`, looks up country + IANA timezone via a free IP geolocation lookup, returns `{ country, timezone, currency }`. Fails soft (returns null) so nothing breaks offline.
+- New `src/hooks/useUserTimezone.tsx`: prefers the browser's `Intl.DateTimeFormat().resolvedOptions().timeZone`, falls back to the `geo-detect` result (cached in `localStorage`), then to the country→timezone map already in `src/lib/greeting.ts`.
+- Add `formatInUserTz()` / `formatInSystemTz()` helpers in `src/lib/datetime.ts`. User-facing timestamps (transactions, statements, receipts, dashboard greeting) render in the detected user timezone; admin/system surfaces (audit log, admin dashboards, system settings) render in CST with an explicit `CST`/`CDT` label so operational records stay on one clock.
+- Extend the country→timezone map in `greeting.ts` with the remaining supported markets (BW, etc.) and default to `America/Chicago` instead of the machine clock.
 
 ## Technical notes
-
-- Keys are stored hashed only (SHA-256 of `efk_live_<random>`); prefix stored for display.
-- Rate limits by tier (e.g. 60 req/min standard) enforced in the DB, returning `429` with `Retry-After`.
-- Quotes are indicative; a `quote_id` is logged so a later transfer can reference it.
-- No service-role data is exposed — handlers select explicit columns only.
+- No schema changes beyond the optional `default_currency` backfill migration; no new tables.
+- `geo-detect` runs with `verify_jwt = false` in `config.toml` so it works pre-login, and only ever returns coarse geo data.
+- Ledger/accounting logic and FX pair bases are unaffected — this is presentation + default-selection only.
