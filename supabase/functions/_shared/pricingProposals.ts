@@ -115,12 +115,16 @@ export async function applyProposal(
   await supabase.from("audit_logs").insert({
     user_id: userId,
     action: "pricing_proposal_applied",
-    entity_type: "pricing_proposals",
-    entity_id: proposal.id,
-    metadata: {
+    table_name: "pricing_proposals",
+    record_id: proposal.id,
+    old_data: {
+      fixed_fee: Number(proposal.current_fixed_fee ?? 0),
+      percentage_fee: Number(proposal.current_percentage_fee ?? 0),
+    },
+    new_data: {
       corridor: proposal.group_key,
-      from_percentage_fee: Number(proposal.current_percentage_fee ?? 0),
-      to_percentage_fee: Number(proposal.proposed_percentage_fee ?? 0),
+      fixed_fee: Number(proposal.proposed_fixed_fee ?? 0),
+      percentage_fee: Number(proposal.proposed_percentage_fee ?? 0),
       efinmoney_pricing_id: inserted.id,
       source: proposal.source,
     },
