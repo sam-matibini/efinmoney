@@ -422,6 +422,9 @@ export async function resolveRoute(
     marginFloor,
     marginBlocked,
     marginUplift: Math.round(marginUplift * 100) / 100,
+    scoreGuard,
+    scoreBlocked,
+
     overrides: applicableOverrides.map((o: any) => {
       const p = (partners ?? []).find((x: any) => x.id === o.partner_id);
       return { type: o.override_type, partner_code: p?.code ?? o.partner_id, reason: o.reason ?? null };
