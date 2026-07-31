@@ -5,6 +5,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import * as StellarSdk from "npm:stellar-sdk@12";
 import { z } from "npm:zod@3";
+import { quotePrice } from "../_shared/pricingService.ts";
 import {
   HORIZON_URL,
   NETWORK_PASSPHRASE,
@@ -26,7 +27,6 @@ const BodySchema = z.object({
   to_currency: z.literal("USDC"),
 });
 
-const FEE_BPS = 50; // 0.50% spread
 
 async function validateTreasuryReady(seed: string) {
   const publicKey = StellarSdk.Keypair.fromSecret(seed).publicKey();
@@ -158,7 +158,17 @@ Deno.serve(async (req) => {
       effectiveRate = Number(rate.effective_rate);
     }
 
-    const feeAmount = Number((from_amount * (FEE_BPS / 10000)).toFixed(2));
+    // Fee comes from the central rate card — never a hardcoded constant.
+    const priceQuote = await quotePrice(admin, {
+      direction: "payout",
+      sourceCurrency: fromCurrency,
+      destCurrency: "USDC",
+      paymentMethod: "crypto_swap",
+      customerType: "consumer",
+      amount: from_amount,
+    });
+    const feeAmount = Number(priceQuote.fee.toFixed(2));
+    const feeBps = from_amount > 0 ? (feeAmount / from_amount) * 10000 : 0;
     const usdcAmount = Number(((from_amount - feeAmount) * effectiveRate).toFixed(7));
 
     if (usdcAmount <= 0) {
@@ -190,8 +200,9 @@ Deno.serve(async (req) => {
       .eq("currency_code", fromCurrency).limit(1).maybeSingle();
     const { data: usdcAssetAcc } = await admin
       .from("ledger_accounts").select("id").eq("code", "1261").maybeSingle();
-    const { data: fxIncome } = await admin
-      .from("ledger_accounts").select("id").eq("code", "4100").maybeSingle();
+    // Crypto spread is trading-fee revenue (4300), not an FX gain (4100).
+    const { data: cryptoFeeIncome } = await admin
+      .from("ledger_accounts").select("id").eq("code", "4300").maybeSingle();
 
     if (!fiatLiab || !usdcAssetAcc) {
       return new Response(JSON.stringify({ error: "Ledger accounts missing" }), {
@@ -217,9 +228,9 @@ Deno.serve(async (req) => {
         reference_type: "crypto_swap", created_by: user.id,
       },
     ];
-    if (fxIncome && feeAmount > 0) {
+    if (cryptoFeeIncome && feeAmount > 0) {
       entries.push({
-        journal_id: journalId, account_id: fxIncome.id,
+        journal_id: journalId, account_id: cryptoFeeIncome.id,
         wallet_id: null, currency_code: fromCurrency,
         debit_amount: 0, credit_amount: feeAmount,
         description: "Crypto swap spread", reference_type: "crypto_swap",
@@ -281,7 +292,7 @@ Deno.serve(async (req) => {
       user_id: user.id, from_wallet_id, to_wallet_id: null,
       from_currency: fromCurrency, to_currency: "USDC",
       from_amount, to_amount: usdcAmount,
-      market_rate: effectiveRate, markup_rate: FEE_BPS / 10000,
+      market_rate: effectiveRate, markup_rate: feeBps / 10000,
       effective_rate: effectiveRate, fee_amount: feeAmount,
       status: "executed", journal_id: journalId,
       executed_at: new Date().toISOString(),

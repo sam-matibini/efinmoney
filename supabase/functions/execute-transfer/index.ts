@@ -4,6 +4,7 @@ import { isNombaNigeriaConfigured } from "../_shared/nomba-nigeria.ts";
 import { dispatchRoutedPayout } from "../_shared/routingExecute.ts";
 import { observeRoute } from "../_shared/routeResolver.ts";
 import { recordEconomics } from "../_shared/transactionEconomics.ts";
+import { assertQuotedFee } from "../_shared/pricingService.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -241,8 +242,35 @@ Deno.serve(async (req) => {
         });
       }
 
+      // Re-quote the fee from the central rate card so the ledger always reflects
+      // the canonical price, not whatever the client sent at creation time.
+      const { fee: quotedFee, quote: feeQuote, matched: feeMatched, claimed: claimedFee } =
+        await assertQuotedFee(
+          supabase,
+          {
+            direction: "payout",
+            sourceCurrency: transfer.source_currency,
+            destCurrency: transfer.target_currency ?? transfer.source_currency,
+            destCountry: transfer.recipient_country ?? null,
+            paymentMethod: transfer.payout_method ?? null,
+            customerType: "consumer",
+            amount: Number(transfer.source_amount),
+          },
+          transfer.fee_amount,
+        );
+
+      if (!feeMatched && !feeQuote.pricingMissing) {
+        console.warn(
+          `[pricing] fee variance on ${transfer_id}: claimed=${claimedFee} quoted=${quotedFee}`,
+        );
+        await supabase.from("transfers").update({ fee_amount: quotedFee }).eq("id", transfer_id);
+        transfer.fee_amount = quotedFee;
+      }
+
       const journalId = crypto.randomUUID();
-      const totalDebit = Number(transfer.source_amount) + Number(transfer.fee_amount || 0);
+      const feeAmount = Number(transfer.fee_amount || 0);
+      const totalDebit = Number(transfer.source_amount) + feeAmount;
+
 
       const entries: any[] = [
         {
@@ -280,14 +308,14 @@ Deno.serve(async (req) => {
         });
       }
 
-      if (feeAcc && Number(transfer.fee_amount) > 0) {
+      if (feeAcc && feeAmount > 0) {
         entries.push({
           journal_id: journalId,
           account_id: feeAcc.id,
           wallet_id: null,
           currency_code: transfer.source_currency,
           debit_amount: 0,
-          credit_amount: Number(transfer.fee_amount),
+          credit_amount: feeAmount,
           description: "Transfer fee revenue",
           reference_type: "transfer",
           reference_id: transfer_id,

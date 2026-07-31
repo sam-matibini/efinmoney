@@ -1,58 +1,52 @@
-## Phase 13 — Forecasting, Pre-Funding & Incident Control
+## Goal
 
-Phases 10–12 measure what already happened. Phase 13 looks forward (what volume and margin is coming, and whether we can fund it) and closes the loop from alert to action.
+1. One source of truth for what a customer is charged — remove the four parallel pricing paths that currently bypass it.
+2. Make the pricing engine visible in the financial statements: revenue, partner cost, and margin reported from the same numbers the engine quoted.
 
-Also fixes a Phase 12 gap: `partner-scorecard-scan` exists and is deployed but has no cron job registered, so scorecards only update when someone clicks "Run scan now".
+## Current state (verified)
 
-### 1. Corridor forecasting engine
+Canonical engine: `efinmoney_pricing` (versioned rate card) + `_shared/routingEngine.ts` (`computeFee`, `computeCustomerRevenue`, `computePartnerCost`), consumed by `routeResolver.ts` and `transactionEconomics.ts`.
 
-New table `corridor_forecasts`: one row per corridor and horizon (7 / 30 / 90 day), holding forecast volume, transaction count, revenue, cost, gross profit, projected margin, the method used, and a confidence band (low/base/high).
+Bypasses found:
+- `src/components/send/CanadaSendFlow.tsx:111` — hardcoded `DELIVERY_FEES` and `CARD_PROCESSING_FEE = 1.5`, computed client-side and posted as `fee_amount`.
+- `supabase/functions/execute-crypto-swap/index.ts:29` — hardcoded `FEE_BPS = 50`.
+- `supabase/functions/fx-engine/index.ts:145` — hardcoded `fee_rate = 0.005` plus its own markup resolution.
+- `circle-quote` / `initiate-cpn-payout` — separate `cpn_corridors.markup_bps` + client-supplied `platform_fee`.
+- `execute-transfer` and `stripe-payout` post whatever `fee_amount` arrives, with no revalidation against the rate card.
 
-New edge function `corridor-forecast-scan` (daily cron): reads `transaction_economics` history per corridor, fits a simple trend + day-of-week seasonality baseline, projects volume forward, then applies current effective pricing and current partner costs to project revenue, cost and margin. Corridors with too little history are marked low-confidence rather than dropped.
+Financial statements (`FinancialStatementsPanel.tsx`, `TrialBalancePanel.tsx`) read `ledger_entries` bucketed by GL code prefix only. `transaction_economics` and `partner_invoices` do not feed them at all.
 
-### 2. Liquidity forecasting & pre-funding tasks
+## Part 1 — Consolidate the pricing engine
 
-New table `liquidity_forecasts` (per partner and currency: current available balance, required reserve, forecast daily burn, projected days-to-dry, recommended top-up amount) and `funding_tasks` (partner, currency, amount, due-by, status open/in_progress/funded/cancelled, assignee, notes).
+**1a. Single quote service.** Add `supabase/functions/_shared/pricingService.ts` exporting `quotePrice({ direction, sourceCurrency, destCurrency, destCountry, paymentMethod, customerType, amount })`. It resolves the active `efinmoney_pricing` row and delegates the arithmetic to the existing `routingEngine.computeFee` / `computeCustomerRevenue` — no new math, no new tables.
 
-`corridor-forecast-scan` also projects float burn-down: forecast corridor volume mapped to partner share (from recent routing attempts) against `partner_liquidity.available_balance` minus `required_reserve`. When projected days-to-dry falls below the configured warning window, it opens or updates a `funding_task` and raises a `liquidity_forecast` alert. Tasks dedupe per partner/currency so a daily scan doesn't spam the queue.
+**1b. Migrate the bypasses onto it.**
+- Seed `efinmoney_pricing` rows covering the currently hardcoded cases: Canada delivery methods (interac / eft / card_push / stripe_connect / paylink), crypto swap (0.50%), fx-engine default (0.50%), and each `cpn_corridors` corridor's markup. Migration only moves existing values into the table — no fee changes to customers.
+- Retire `cpn_corridors.markup_bps` as a pricing input; keep the column for one release marked deprecated, with `circle-quote` reading the rate card instead.
+- Delete the hardcoded constants in `execute-crypto-swap` and `fx-engine`; both call `quotePrice`.
+- Replace the client-side fee math in `CanadaSendFlow` with a call to the existing quote endpoint, so the UI displays the server's number rather than computing its own.
 
-### 3. Incident-driven auto-suspension
+**1c. Server-side authority.** `execute-transfer` re-quotes on the server and rejects (or corrects, per config) any `fee_amount` that disagrees with the rate card beyond a tolerance. Client-supplied `platform_fee` in `initiate-cpn-payout` is ignored in favour of the quote.
 
-New table `partner_suspensions`: partner, optional corridor key, reason, trigger source (`scorecard` | `alert` | `manual`), suspended_from/until, cooldown minutes, auto_restore flag, status, and who acted.
+**1d. Admin surface cleanup.** `PricingSettingsPanel`, `PricingPage`, and `EfinPricingPanel` all read/write `efinmoney_pricing`; consolidate into a single rate-card editor and have the others link to it, so there is one place to change a fee.
 
-New edge function `partner-incident-scan` (hourly cron) with a settings row (`incident_settings`): thresholds for consecutive critical alerts, failure-rate spike, and scorecard grade/score floor. When breached it suspends the partner (globally or corridor-scoped), writes an `audit_logs` entry and raises a `partner_suspended` alert. On the next pass, if the trigger condition has cleared and the cooldown has elapsed and `auto_restore` is on, it lifts the suspension automatically.
+## Part 2 — Pricing in the financial statements
 
-`routeResolver.ts` reads active suspensions before ranking and excludes suspended partners/corridors with reason `suspended: <cause>`, so failover to the next candidate is automatic. Suspension is checked before margin floors and scores — it is the hardest guardrail in the chain.
+**2a. Split revenue at posting time.** Every flow posts fee revenue and FX margin through the same helper, to distinct GL accounts already in the chart: `4200 Transfer Fees`, `4100 FX Gain`, `4300 Crypto Trading Fees`, `4250 Top-up Fee Revenue`. Partner cost posts to `5200 Provider Fees` / `5300 Network Fees` via the existing `ensure_network_fee_account` helper. This makes the income statement break revenue down by pricing component without changing its account-prefix logic.
 
-Manual suspend / resume from the UI goes through `partner-incident-apply` (pricing-manager authenticated), so every change is audited the same way.
+**2b. New "Pricing & Margin" statement.** Add a tab to `FinancialStatementsPanel` backed by a new SQL function `pricing_margin_statement(p_from, p_to, p_group_by)` that reports, per corridor/partner/method: posted revenue (from `ledger_entries`), modelled revenue and cost (from `transaction_economics`), billed partner cost (from approved `partner_invoices`), and the resulting gross margin — reconciling the three sources side by side.
 
-### 4. UI — three additions under Settings → Partners & Routing
+**2c. Revenue assurance reconciliation.** New function `revenue_assurance_variance(p_from, p_to)` comparing `transaction_economics.total_revenue` against the actual fee-revenue `ledger_entries` per transfer, surfacing any transaction where what was quoted differs from what was booked. Exposed as a variance table under the same tab and, when the variance exceeds a threshold, raised as a `revenue_variance` entry in the existing `partner_alerts` table (no new cron — folded into `partner-alerts-scan`).
 
-- **Forecasts** tab (`CorridorForecastPanel.tsx`): horizon selector, corridor table with projected volume, revenue, cost, margin and confidence, a sparkline of history vs forecast, and totals across the network.
-- **Funding** tab (`LiquidityForecastPanel.tsx`): partner/currency float table with days-to-dry and a colour-coded runway, plus the funding-task queue with mark-funded / cancel actions.
-- **Incidents** tab (`PartnerIncidentsPanel.tsx`): threshold settings form, active suspensions with time remaining and manual resume, suspension history, and a manual suspend dialog.
+**2d. Reports Centre.** Add the Pricing & Margin statement and the variance report to `ReportsCentrePanel` with the existing CSV export path.
 
-Hooks follow the existing `usePartnerOps.tsx` query/mutation pattern.
+## Technical notes
 
-### 5. Cron and alerting
+- No customer-visible price changes: the seeding migration copies today's effective values into `efinmoney_pricing`.
+- Pricing writes continue to go through versioned inserts (`effective_from`/`effective_to` supersede chain) — no in-place edits, history preserved.
+- Double-entry is untouched; new postings split existing revenue between accounts that already exist, so the trial balance stays balanced.
+- New SQL functions are `SECURITY DEFINER` gated on `is_pricing_manager()`, matching the existing reporting functions.
 
-- Register `partner-scorecard-scan` daily at 02:40 UTC (missing from Phase 12).
-- Register `corridor-forecast-scan` daily at 03:00 UTC.
-- Register `partner-incident-scan` hourly at :35.
-- `partner-alerts-scan` gains `liquidity_forecast`, `margin_forecast` (projected margin falling below floor) and `partner_suspended` alert types, using the existing fingerprint/auto-resolve pattern.
+## Order
 
-### Technical notes
-
-- Forecasting stays deterministic SQL/TypeScript — no model service, no new dependency. Method is recorded per row so it can be upgraded later without a schema change.
-- All new tables get GRANTs plus pricing-manager RLS, matching `pricing_proposals` and `partner_scorecards`.
-- Suspension checks are enforced server-side inside `routeResolver`, not in UI, so a stale browser can't route around them.
-- Auto-suspension ships enabled for `block`-severity triggers only, with `auto_restore` on and a 60-minute cooldown, so a transient partner outage self-heals.
-
-### Order of work
-
-1. Migration: `corridor_forecasts`, `liquidity_forecasts`, `funding_tasks`, `partner_suspensions`, `incident_settings` + grants/RLS.
-2. `corridor-forecast-scan`, `partner-incident-scan`, `partner-incident-apply` edge functions.
-3. `routeResolver.ts` suspension gate.
-4. Hooks in `usePartnerOps.tsx`.
-5. Three panels + tab wiring.
-6. Cron registration (including the missing scorecard job) and new alert types.
+Migration (seed rate card + new report functions) → `pricingService.ts` → migrate the four bypass flows → server-side fee validation in `execute-transfer` → statements tab and hooks → alert type and Reports Centre entries.

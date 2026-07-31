@@ -1,6 +1,7 @@
 // Fetch a Circle CPN quote for a given corridor + amount.
 // Returns rate, fees, ETA, and our final markup applied.
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { quotePrice } from "../_shared/pricingService.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { circleFetch, CIRCLE_ORIGINATOR_ID } from "../_shared/circle.ts";
 import { z } from "npm:zod@3";
@@ -81,10 +82,25 @@ Deno.serve(async (req) => {
   const circleFee = Number(q.fee ?? q.totalFees ?? 0);
   const destAmountRaw = Number(q.destinationAmount ?? q.targetAmount ?? 0);
 
-  // Apply our markup on top of Circle's rate
-  const markupRate = corridor.markup_bps / 10_000;
+  // Our margin comes from the central rate card. `cpn_corridors.markup_bps`
+  // is a deprecated fallback kept only for corridors not yet on the rate card.
+  const cardQuote = await quotePrice(admin, {
+    direction: "payout",
+    sourceCurrency: p.source_currency,
+    destCurrency: p.dest_currency,
+    destCountry: p.dest_country,
+    paymentMethod: `cpn_${p.payout_method}`,
+    customerType: "consumer",
+    amount: p.source_amount,
+  });
+
+  const markupRate = cardQuote.pricingMissing
+    ? Number(corridor.markup_bps ?? 0) / 10_000
+    : cardQuote.fxMarginBps / 10_000;
   const effectiveRate = circleRate * (1 - markupRate);
-  const platformFee = Number((p.source_amount * markupRate).toFixed(2));
+  const platformFee = cardQuote.pricingMissing
+    ? Number((p.source_amount * markupRate).toFixed(2))
+    : Number((cardQuote.fee + cardQuote.fxRevenue).toFixed(2));
   const destAmount = destAmountRaw > 0
     ? Number((destAmountRaw * (1 - markupRate)).toFixed(2))
     : Number(((p.source_amount - circleFee) * effectiveRate).toFixed(2));
@@ -101,6 +117,7 @@ Deno.serve(async (req) => {
     circle_fee: circleFee,
     platform_fee: platformFee,
     total_fee: Number((circleFee + platformFee).toFixed(2)),
+    pricing_source: cardQuote.pricingMissing ? "corridor_fallback" : "rate_card",
     est_minutes: corridor.est_minutes,
     expires_at: q.expiresAt ?? null,
     raw: q,

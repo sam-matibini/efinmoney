@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import PricingMarginPanel from "./PricingMarginPanel";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -930,11 +931,12 @@ export const FinancialStatementsPanel = () => {
 
       {/* Statements Tabs */}
       <Tabs defaultValue="balance-sheet" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="balance-sheet">Balance Sheet</TabsTrigger>
           <TabsTrigger value="income-statement">Income Statement</TabsTrigger>
           <TabsTrigger value="cash-flow">Cash Flow</TabsTrigger>
           <TabsTrigger value="changes-equity">Changes in Equity</TabsTrigger>
+          <TabsTrigger value="pricing-margin">Pricing &amp; Margin</TabsTrigger>
         </TabsList>
 
         {/* Balance Sheet */}
@@ -1238,6 +1240,10 @@ export const FinancialStatementsPanel = () => {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="pricing-margin">
+          <PricingMarginPanel />
         </TabsContent>
       </Tabs>
     </div>
