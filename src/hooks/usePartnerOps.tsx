@@ -554,3 +554,159 @@ export const useCreateManualProposal = () => {
     onError: (e: Error) => toast.error(e.message),
   });
 };
+
+/* --------------------- partner scorecards (Phase 12) --------------------- */
+
+export type ScoreAction = "warn" | "deprioritise" | "block";
+
+export interface PartnerScoreWeights {
+  id: string;
+  enabled: boolean;
+  lookback_days: number;
+  min_attempts: number;
+  weight_success: number;
+  weight_speed: number;
+  weight_dispute: number;
+  weight_cost_variance: number;
+  weight_margin: number;
+  weight_liquidity: number;
+  min_score_to_route: number;
+  below_threshold_action: ScoreAction;
+  max_score_influence: number;
+}
+
+export interface PartnerScorecard {
+  id: string;
+  partner_id: string;
+  corridor_key: string;
+  corridor_label: string | null;
+  direction: string;
+  source_currency: string | null;
+  dest_currency: string | null;
+  dest_country: string | null;
+  payment_method: string | null;
+  window_days: number;
+  attempt_count: number;
+  success_count: number;
+  failure_count: number;
+  success_rate: number;
+  avg_settlement_minutes: number | null;
+  p95_settlement_minutes: number | null;
+  dispute_count: number;
+  dispute_rate: number;
+  cost_variance_percent: number;
+  realised_margin_percent: number;
+  modelled_margin_percent: number;
+  margin_gap_percent: number;
+  liquidity_incidents: number;
+  score_success: number;
+  score_speed: number;
+  score_dispute: number;
+  score_cost_variance: number;
+  score_margin: number;
+  score_liquidity: number;
+  composite_score: number;
+  grade: string;
+  confident: boolean;
+  previous_score: number | null;
+  previous_grade: string | null;
+  computed_at: string;
+  partner_name?: string;
+}
+
+const numeriseCard = (r: any): PartnerScorecard => ({
+  ...r,
+  success_rate: Number(r.success_rate ?? 0),
+  avg_settlement_minutes: r.avg_settlement_minutes == null ? null : Number(r.avg_settlement_minutes),
+  p95_settlement_minutes: r.p95_settlement_minutes == null ? null : Number(r.p95_settlement_minutes),
+  dispute_rate: Number(r.dispute_rate ?? 0),
+  cost_variance_percent: Number(r.cost_variance_percent ?? 0),
+  realised_margin_percent: Number(r.realised_margin_percent ?? 0),
+  modelled_margin_percent: Number(r.modelled_margin_percent ?? 0),
+  margin_gap_percent: Number(r.margin_gap_percent ?? 0),
+  score_success: Number(r.score_success ?? 0),
+  score_speed: Number(r.score_speed ?? 0),
+  score_dispute: Number(r.score_dispute ?? 0),
+  score_cost_variance: Number(r.score_cost_variance ?? 0),
+  score_margin: Number(r.score_margin ?? 0),
+  score_liquidity: Number(r.score_liquidity ?? 0),
+  composite_score: Number(r.composite_score ?? 0),
+  previous_score: r.previous_score == null ? null : Number(r.previous_score),
+});
+
+export const usePartnerScorecards = () =>
+  useQuery({
+    queryKey: ["partner_scorecards"],
+    queryFn: async (): Promise<PartnerScorecard[]> => {
+      const { data, error } = await db
+        .from("partner_scorecards")
+        .select("*, payment_partners(name, code)")
+        .order("composite_score", { ascending: true })
+        .limit(500);
+      if (error) throw error;
+      return (data || []).map((r: any) =>
+        numeriseCard({
+          ...r,
+          partner_name: r.payment_partners?.name ?? r.payment_partners?.code ?? "Partner",
+        }),
+      );
+    },
+  });
+
+export const usePartnerScoreWeights = () =>
+  useQuery({
+    queryKey: ["partner_score_weights"],
+    queryFn: async (): Promise<PartnerScoreWeights | null> => {
+      const { data, error } = await db.from("partner_score_weights").select("*").maybeSingle();
+      if (error) throw error;
+      if (!data) return null;
+      return {
+        ...data,
+        lookback_days: Number(data.lookback_days ?? 30),
+        min_attempts: Number(data.min_attempts ?? 20),
+        weight_success: Number(data.weight_success ?? 0),
+        weight_speed: Number(data.weight_speed ?? 0),
+        weight_dispute: Number(data.weight_dispute ?? 0),
+        weight_cost_variance: Number(data.weight_cost_variance ?? 0),
+        weight_margin: Number(data.weight_margin ?? 0),
+        weight_liquidity: Number(data.weight_liquidity ?? 0),
+        min_score_to_route: Number(data.min_score_to_route ?? 60),
+        max_score_influence: Number(data.max_score_influence ?? 0.15),
+      } as PartnerScoreWeights;
+    },
+  });
+
+export const useSavePartnerScoreWeights = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (patch: Partial<PartnerScoreWeights>) => {
+      const { id, ...row } = patch;
+      const { error } = id
+        ? await db.from("partner_score_weights").update(row).eq("id", id)
+        : await db.from("partner_score_weights").insert({ ...row, singleton: true });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["partner_score_weights"] });
+      toast.success("Scoring settings saved");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+};
+
+export const useRunScorecardScan = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const { data, error } = await db.functions.invoke("partner-scorecard-scan", { body: {} });
+      if (error) throw error;
+      if (data && data.success === false) throw new Error(data.error || "Scan failed");
+      return data as { scorecards: number; corridors: number; flagged: number };
+    },
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ["partner_scorecards"] });
+      toast.success(`Scored ${res.scorecards} corridor(s) — ${res.flagged} flagged`);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+};
