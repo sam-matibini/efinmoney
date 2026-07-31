@@ -23,11 +23,21 @@ import DeleteUserModal from "./modals/DeleteUserModal";
 
 const kycStatusColors: Record<string, string> = {
   verified: 'bg-indigo-500/10 text-indigo-500',
+  approved: 'bg-indigo-500/10 text-indigo-500',
   pending: 'bg-yellow-500/10 text-yellow-500',
   submitted: 'bg-blue-500/10 text-blue-500',
   rejected: 'bg-red-500/10 text-red-500',
   expired: 'bg-gray-500/10 text-gray-500',
   not_started: 'bg-muted text-muted-foreground',
+};
+
+// If the DB status is stale (user reached tier_2+ but kyc_status wasn't synced),
+// derive "verified" from tier so the admin list never shows a false "pending".
+const resolveKycStatus = (status: string, tier: string) => {
+  if (status === 'pending' && (tier === 'tier_2' || tier === 'tier_3' || tier === 'tier_4')) {
+    return 'verified';
+  }
+  return status;
 };
 
 const displayName = (fullName: string | null, email: string | null) => {
@@ -214,9 +224,14 @@ export const UsersPanel = () => {
                           )}
                         </TableCell>
                         <TableCell>
-                          <Badge className={kycStatusColors[profile.kyc_status] || kycStatusColors.pending}>
-                            {profile.kyc_status}
-                          </Badge>
+                          {(() => {
+                            const resolved = resolveKycStatus(profile.kyc_status, profile.kyc_tier);
+                            return (
+                              <Badge className={kycStatusColors[resolved] || kycStatusColors.pending}>
+                                {resolved}
+                              </Badge>
+                            );
+                          })()}
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline">{profile.kyc_tier}</Badge>
