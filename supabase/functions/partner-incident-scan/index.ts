@@ -237,9 +237,13 @@ Deno.serve(async (req) => {
       for (const row of ins ?? []) {
         await supabase.from("audit_logs").insert({
           action: "partner_suspended",
-          entity_type: "payment_partner",
-          entity_id: row.partner_id,
-          metadata: { suspension_id: row.id, reason: row.reason, corridor_key: row.corridor_key },
+          table_name: "partner_suspensions",
+          record_id: row.id,
+          new_data: {
+            partner_id: row.partner_id,
+            reason: row.reason,
+            corridor_key: row.corridor_key,
+          },
         });
       }
     }
