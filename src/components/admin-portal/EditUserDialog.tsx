@@ -130,7 +130,11 @@ export default function EditUserDialog({ open, onOpenChange, profile, invalidate
           const body = await ctx.json().catch(() => null);
           if (body?.error) message = body.error;
         } else {
-          message = "Couldn't reach the server — check your connection and try again.";
+          // No response body at all. Surface the raw error in the toast AND
+          // log the full object to the console so the dev can see exactly
+          // what the network/edge function returned.
+          console.error("admin-update-user invoke failed:", error);
+          message = `Couldn't reach the server (${(error as Error).message || "no response"}). See DevTools console for details.`;
         }
         throw new Error(message);
       }
