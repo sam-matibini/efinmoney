@@ -33,7 +33,7 @@ const HeroBalance = () => {
 
   const firstName =
     user?.user_metadata?.full_name?.split(" ")[0] || user?.email?.split("@")[0] || "there";
-  const greeting = getGreeting(profile?.country_code).text;
+  const greeting = getGreeting(profile?.address_country || profile?.country_code).text;
 
   const rateMap = useMemo(() => buildUsdRateMap(fxRates || []), [fxRates]);
 
