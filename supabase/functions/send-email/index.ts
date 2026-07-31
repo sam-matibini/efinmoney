@@ -1,5 +1,5 @@
 // Send transactional emails via Resend.
-// Body: { type: 'welcome' | 'transfer_completed' | 'kyc_update' | 'kyb_update' | 'topup_completed' | 'payment_link' | 'password_reset', to: string, data?: Record<string, any> }
+// Body: { type: 'welcome' | 'transfer_completed' | 'kyc_update' | 'kyb_update' | 'topup_completed' | 'payment_link' | 'password_reset' | 'signup_confirmation' | 'email_change', to: string, data?: Record<string, any> }
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -350,6 +350,61 @@ function passwordResetBody(d: Record<string, any>, appUrl: string) {
   `;
 }
 
+function signupConfirmationBody(d: Record<string, any>, appUrl: string) {
+  const actionLink = d.action_link || "#";
+  const name = d.name || "";
+  const expires = d.expires_in_hours ?? 24;
+  return `
+    <div style="text-align:center;margin:0 0 18px">
+      <div style="display:inline-block;width:64px;height:64px;line-height:64px;border-radius:50%;background:linear-gradient(135deg,#fdb913 0%,#f59e0b 100%);color:#0e0a26;font-size:32px;box-shadow:0 8px 20px -6px rgba(245,158,11,0.5)">✉️</div>
+    </div>
+    <h1 style="margin:0 0 8px;font-family:'Space Grotesk','Inter',sans-serif;font-size:26px;font-weight:700;color:#0f172a;text-align:center;letter-spacing:-0.02em">Welcome${name ? ", " + name : ""}!</h1>
+    <p style="margin:0 0 8px;line-height:1.6;color:#334155;text-align:center;font-size:16px">Confirm your email to activate your eFinMoney account.</p>
+    <p style="margin:0 0 22px;line-height:1.6;color:#64748b;text-align:center;font-size:14px">Multi-currency wallets, cross-border payments, and your @efin tag are one click away.</p>
+    <div style="text-align:center;margin:0 0 18px">
+      <a href="${actionLink}" style="display:inline-block;background:linear-gradient(135deg,#fdb913 0%,#f59e0b 100%);color:#0e0a26;text-decoration:none;padding:14px 36px;border-radius:9999px;font-weight:700;font-size:15px;box-shadow:0 10px 24px -8px rgba(245,158,11,0.55),inset_0_1px_0_0_rgba(255,255,255,0.4)">
+        Confirm my email →
+      </a>
+    </div>
+    <p style="line-height:1.6;color:#64748b;font-size:13px;margin:0 0 8px;text-align:center">
+      Or paste this link into your browser:<br>
+      <a href="${actionLink}" style="color:#6d4ee0;word-break:break-all;font-size:12px">${actionLink}</a>
+    </p>
+    <div style="margin:24px 0 0;padding:14px 16px;border-left:3px solid #fdb913;background:linear-gradient(135deg,#fffbeb 0%,#fef3c7 100%);border-radius:0 8px 8px 0">
+      <p style="margin:0;color:#92400e;font-size:13px;line-height:1.5">
+        <strong>This link expires in ${expires} hours.</strong> Didn't sign up for an eFinMoney account? You can safely ignore this email.
+      </p>
+    </div>
+  `;
+}
+
+function emailChangeBody(d: Record<string, any>, appUrl: string) {
+  const actionLink = d.action_link || "#";
+  const newEmail = d.new_email || "";
+  const expires = d.expires_in_hours ?? 24;
+  return `
+    <div style="text-align:center;margin:0 0 18px">
+      <div style="display:inline-block;width:64px;height:64px;line-height:64px;border-radius:50%;background:linear-gradient(135deg,#fdb913 0%,#f59e0b 100%);color:#0e0a26;font-size:32px;box-shadow:0 8px 20px -6px rgba(245,158,11,0.5)">🔁</div>
+    </div>
+    <h1 style="margin:0 0 8px;font-family:'Space Grotesk','Inter',sans-serif;font-size:26px;font-weight:700;color:#0f172a;text-align:center;letter-spacing:-0.02em">Confirm your new email</h1>
+    <p style="margin:0 0 22px;line-height:1.6;color:#334155;text-align:center">Click the button below to confirm <strong style="color:#0f172a">${newEmail}</strong> as your new eFinMoney account email.</p>
+    <div style="text-align:center;margin:0 0 18px">
+      <a href="${actionLink}" style="display:inline-block;background:linear-gradient(135deg,#fdb913 0%,#f59e0b 100%);color:#0e0a26;text-decoration:none;padding:14px 36px;border-radius:9999px;font-weight:700;font-size:15px;box-shadow:0 10px 24px -8px rgba(245,158,11,0.55),inset_0_1px_0_0_rgba(255,255,255,0.4)">
+        Confirm new email →
+      </a>
+    </div>
+    <p style="line-height:1.6;color:#64748b;font-size:13px;margin:0 0 8px;text-align:center">
+      Or paste this link into your browser:<br>
+      <a href="${actionLink}" style="color:#6d4ee0;word-break:break-all;font-size:12px">${actionLink}</a>
+    </p>
+    <div style="margin:24px 0 0;padding:14px 16px;border-left:3px solid #fdb913;background:linear-gradient(135deg,#fffbeb 0%,#fef3c7 100%);border-radius:0 8px 8px 0">
+      <p style="margin:0;color:#92400e;font-size:13px;line-height:1.5">
+        <strong>This link expires in ${expires} hours.</strong> If you didn't request this change, you can safely ignore this email — your current email stays the same.
+      </p>
+    </div>
+  `;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -414,6 +469,15 @@ Deno.serve(async (req) => {
       subject = "Reset your eFinMoney password";
       preheader = "We received a request to reset your password. The link expires in 60 minutes.";
       bodyHtml = passwordResetBody(data, appUrl);
+    } else if (type === "signup_confirmation") {
+      const greet = data.name ? `, ${data.name}` : "";
+      subject = `Welcome${greet} — confirm your eFinMoney email`;
+      preheader = "Confirm your email to activate your eFinMoney account.";
+      bodyHtml = signupConfirmationBody(data, appUrl);
+    } else if (type === "email_change") {
+      subject = "Confirm your new eFinMoney email";
+      preheader = `Confirm ${data.new_email || "your new email"} as your eFinMoney account email.`;
+      bodyHtml = emailChangeBody(data, appUrl);
     } else {
       return new Response(JSON.stringify({ error: "unknown email type" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },

@@ -140,9 +140,20 @@ const ProfileSettingsPage = () => {
       }
 
       if (email !== user.email) {
-        const { error: emailError } = await supabase.auth.updateUser({ email });
-        if (emailError) throw emailError;
-        toast.success("Profile updated. Check your inbox to confirm new email.");
+        // Route the change through our branded Edge Function so the
+        // "Confirm your new email" message matches the rest of the
+        // eFinMoney transactional flow instead of using Supabase's
+        // stock template. (No current_password re-prompt — the form
+        // is gated by the active session, and adding a re-prompt here
+        // is out of scope.)
+        const { data: changeData, error: changeError } = await supabase.functions.invoke(
+          "send-email-change",
+          { body: { new_email: email, next: "/profile" } },
+        );
+        if (changeError) throw changeError;
+        const errBody = (changeData as { error?: string } | null) ?? null;
+        if (errBody?.error) throw new Error(errBody.error);
+        toast.success("Profile updated. Check your new email inbox to confirm the change.");
       } else {
         toast.success("Profile updated");
       }

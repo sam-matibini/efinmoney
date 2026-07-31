@@ -112,9 +112,11 @@ const AuthConfirm = () => {
         // Route new signups by the account type chosen at registration.
         // Falls back to the account-type picker if metadata is missing.
         let finalTarget = target;
+        let confirmedUser: { id: string; email?: string | null; user_metadata?: Record<string, unknown> } | null = null;
         if (otpType === "signup" && (!nextParam || nextParam === "/")) {
           try {
             const { data } = await supabase.auth.getUser();
+            confirmedUser = data.user;
             const at = (data.user?.user_metadata as { account_type?: string } | undefined)?.account_type;
             if (at === "business") finalTarget = "/onboarding/business/details";
             else if (at === "individual") finalTarget = "/onboarding/identity";
@@ -125,6 +127,43 @@ const AuthConfirm = () => {
         }
 
         setStatus("success");
+
+        // Send the welcome email for fresh signups (best effort — the
+        // user is already signed in and on their way, this just makes
+        // sure they get the account number + @efin tag invite in their
+        // inbox). The handle_new_user() trigger has had time to
+        // generate both by now.
+        if (otpType === "signup" && confirmedUser?.email) {
+          const meta = confirmedUser.user_metadata as
+            | { full_name?: string; first_name?: string; last_name?: string }
+            | undefined;
+          const name = meta?.full_name
+            || [meta?.first_name, meta?.last_name].filter(Boolean).join(" ")
+            || "";
+          (async () => {
+            // Wait briefly so the trigger that populates the account
+            // number has time to commit, then read the profile.
+            await new Promise((r) => setTimeout(r, 500));
+            const { data: profile } = await supabase
+              .from("profiles")
+              .select("account_number, efin_tag")
+              .eq("user_id", confirmedUser!.id)
+              .maybeSingle();
+            supabase.functions.invoke("send-email", {
+              body: {
+                type: "welcome",
+                to: confirmedUser!.email!,
+                data: {
+                  name,
+                  account_number: profile?.account_number ?? undefined,
+                  efin_tag: profile?.efin_tag ?? null,
+                  app_url: window.location.origin,
+                },
+              },
+            }).catch((e) => console.warn("welcome email failed", e));
+          })();
+        }
+
         window.setTimeout(() => navigate(finalTarget, { replace: true }), 2200);
       } catch (e) {
         setStatus("error");
