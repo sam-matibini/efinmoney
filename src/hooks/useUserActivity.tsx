@@ -59,7 +59,7 @@ export function useUserActivity(userId?: string) {
           .eq("user_id", uid)
           .order("created_at", { ascending: false })
           .limit(200),
-        supabase
+        db
           .from("audit_logs")
           .select("id,action,entity_type,entity_id,changes,actor_id,created_at")
           .eq("entity_id", uid)
