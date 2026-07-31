@@ -58,7 +58,22 @@ export interface ScoredCandidate extends CandidateInput {
   score: number;
   pricing_missing: boolean;
   breakdown: Record<string, number>;
+  /** Profit as a percentage of the transaction amount (guardrail basis). */
+  volume_margin_percent?: number;
+  margin_floor_percent?: number | null;
+  margin_floor_action?: "warn" | "uplift" | "block" | null;
+  margin_floor_breached?: boolean;
+  margin_blocked?: boolean;
+  revenue_uplift?: number;
 }
+
+export interface MarginFloor {
+  id?: string | null;
+  scope?: string | null;
+  min_margin_percent: number;
+  action: "warn" | "uplift" | "block";
+}
+
 
 const num = (v: unknown, fallback = 0): number => {
   const n = Number(v);
