@@ -155,19 +155,19 @@ export const PricingSettingsPanel = () => {
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label>Remitly — FX margin (%)</Label>
-              <Input type="number" defaultValue="2.20" step="0.01" />
+              <Input type="number" step="0.01" value={remitlyMargin} onChange={(e) => setRemitlyMargin(e.target.value)} disabled={!isAdmin || settingsLoading} />
             </div>
             <div className="space-y-2">
               <Label>Remitly — Flat fee (USD)</Label>
-              <Input type="number" defaultValue="3.99" step="0.01" />
+              <Input type="number" step="0.01" value={remitlyFlat} onChange={(e) => setRemitlyFlat(e.target.value)} disabled={!isAdmin || settingsLoading} />
             </div>
             <div className="space-y-2">
               <Label>LEMFI — FX margin (%)</Label>
-              <Input type="number" defaultValue="1.80" step="0.01" />
+              <Input type="number" step="0.01" value={lemfiMargin} onChange={(e) => setLemfiMargin(e.target.value)} disabled={!isAdmin || settingsLoading} />
             </div>
             <div className="space-y-2">
               <Label>LEMFI — Flat fee (USD)</Label>
-              <Input type="number" defaultValue="0.00" step="0.01" />
+              <Input type="number" step="0.01" value={lemfiFlat} onChange={(e) => setLemfiFlat(e.target.value)} disabled={!isAdmin || settingsLoading} />
             </div>
           </div>
           <div className="rounded-md border bg-muted/40 p-3 text-sm">
@@ -177,8 +177,21 @@ export const PricingSettingsPanel = () => {
               Current eFinMoney pricing: <span className="font-semibold text-foreground">0.80% FX + $0.99 flat</span>.
             </div>
           </div>
-          <Button>
-            <Save className="h-4 w-4 mr-2" />
+          <Button
+            disabled={!isAdmin || settingsLoading || saveSettings.isPending}
+            onClick={() =>
+              savePricing(
+                {
+                  "pricing.benchmark_remitly_margin_pct": Number(remitlyMargin) || 0,
+                  "pricing.benchmark_remitly_flat_usd": Number(remitlyFlat) || 0,
+                  "pricing.benchmark_lemfi_margin_pct": Number(lemfiMargin) || 0,
+                  "pricing.benchmark_lemfi_flat_usd": Number(lemfiFlat) || 0,
+                },
+                "Benchmarks",
+              )
+            }
+          >
+            {saveSettings.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
             Save Benchmarks
           </Button>
         </CardContent>
@@ -198,21 +211,35 @@ export const PricingSettingsPanel = () => {
           <div className="grid gap-4 md:grid-cols-3">
             <div className="space-y-2">
               <Label htmlFor="base_fee">Base Fee (USD)</Label>
-              <Input id="base_fee" type="number" defaultValue="2.99" step="0.01" />
+              <Input id="base_fee" type="number" step="0.01" value={baseFee} onChange={(e) => setBaseFee(e.target.value)} disabled={!isAdmin || settingsLoading} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="percent_fee">Percentage Fee (%)</Label>
-              <Input id="percent_fee" type="number" defaultValue="0.5" step="0.01" />
+              <Input id="percent_fee" type="number" step="0.01" value={percentFee} onChange={(e) => setPercentFee(e.target.value)} disabled={!isAdmin || settingsLoading} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="max_fee">Maximum Fee (USD)</Label>
-              <Input id="max_fee" type="number" defaultValue="25.00" step="0.01" />
+              <Input id="max_fee" type="number" step="0.01" value={maxFee} onChange={(e) => setMaxFee(e.target.value)} disabled={!isAdmin || settingsLoading} />
             </div>
           </div>
-          <Button className="mt-4">
-            <Save className="h-4 w-4 mr-2" />
+          <Button
+            className="mt-4"
+            disabled={!isAdmin || settingsLoading || saveSettings.isPending}
+            onClick={() =>
+              savePricing(
+                {
+                  "pricing.transfer_base_fee": Number(baseFee) || 0,
+                  "pricing.transfer_percent_fee": Number(percentFee) || 0,
+                  "pricing.transfer_max_fee": Number(maxFee) || 0,
+                },
+                "Transfer fees",
+              )
+            }
+          >
+            {saveSettings.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
             Save Transfer Fees
           </Button>
+
         </CardContent>
       </Card>
 
