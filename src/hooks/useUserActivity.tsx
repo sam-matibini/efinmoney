@@ -113,7 +113,7 @@ export function useUserActivity(userId?: string) {
         });
       }
 
-      for (const l of (audit.data || []) as any[]) {
+      for (const l of (((audit as any).data || []) as any[])) {
         items.push({
           id: `audit-${l.id}`,
           source: "staff_change",
