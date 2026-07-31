@@ -271,6 +271,10 @@ export default function UserActivityTimeline({ userId, canLog = false }: Props) 
                   {a.body && (
                     <p className="text-xs text-muted-foreground mt-1 line-clamp-4 whitespace-pre-wrap">{a.body}</p>
                   )}
+                  {a.source === "communication" && (
+                    <AttachmentLinks attachments={attachmentsByComm[a.id.replace(/^comm-/, "")] || []} />
+                  )}
+
                   {a.details && (
                     <p className="text-[11px] text-muted-foreground/80 mt-1">
                       {Object.entries(a.details)
