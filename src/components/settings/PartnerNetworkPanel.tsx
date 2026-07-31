@@ -17,6 +17,8 @@ import NetworkActivationPanel from "./partners/NetworkActivationPanel";
 import PartnerLimitsPanel from "./partners/PartnerLimitsPanel";
 import PartnerAlertsPanel from "./partners/PartnerAlertsPanel";
 import PartnerSettlementsPanel from "./partners/PartnerSettlementsPanel";
+import MarginGuardrailsPanel from "./partners/MarginGuardrailsPanel";
+import PricingRecommendationsPanel from "./partners/PricingRecommendationsPanel";
 
 
 export const PartnerNetworkPanel = () => (
