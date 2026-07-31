@@ -100,6 +100,7 @@ const ApiManagementPage = lazyImport(() => import("./pages/admin/ApiManagementPa
 const KycConfigPage = lazyImport(() => import("./pages/admin/KycConfigPage"));
 const UsersPage = lazyImport(() => import("./pages/admin/UsersPage"));
 const UserDetailPage = lazyImport(() => import("./pages/admin/UserDetailPage"));
+const BusinessesPage = lazyImport(() => import("./pages/admin/BusinessesPage"));
 const SystemDiagnosticsPage = lazyImport(() => import("./pages/admin/SystemDiagnosticsPage"));
 const DataExportPage = lazyImport(() => import("./pages/admin/DataExportPage"));
 const StaffPage = lazyImport(() => import("./pages/admin/StaffPage"));
@@ -354,6 +355,8 @@ const AppRoutes = () => {
           <Route path="/admin/kyb/:id" element={<KybReviewPage />} />
           <Route path="/admin/users" element={<UsersPage />} />
           <Route path="/admin/users/:id" element={<UserDetailPage />} />
+          <Route path="/admin/businesses" element={<BusinessesPage />} />
+          <Route path="/admin/businesses/:id" element={<KybReviewPage />} />
           <Route path="/admin/risk-tiers" element={<RiskTiersPage />} />
           <Route path="/admin/audit-log" element={<AuditLogPage />} />
           <Route path="/admin/api" element={<ApiManagementPage />} />

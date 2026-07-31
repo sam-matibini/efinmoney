@@ -44,6 +44,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: "Users", icon: Users, items: [
       { to: "/admin/users", label: "Users", icon: Users },
+      { to: "/admin/businesses", label: "Businesses", icon: Building2 },
       { to: "/admin/staff", label: "Staff", icon: UserCog, requiresStaffMgmt: true },
     ],
   },
