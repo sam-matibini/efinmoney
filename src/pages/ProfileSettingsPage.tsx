@@ -230,13 +230,22 @@ const ProfileSettingsPage = () => {
         </Card>
 
         <Card className="p-6 space-y-4">
+          {identityLocked && (
+            <div className="flex items-start gap-3 rounded-lg border border-border bg-muted/40 p-3">
+              <Lock className="w-4 h-4 mt-0.5 text-muted-foreground shrink-0" />
+              <p className="text-xs text-muted-foreground">
+                Your identity has been verified. Legal name, date of birth, phone and address can only be changed by
+                support — contact us to request a correction. Your tag, email and avatar remain editable.
+              </p>
+            </div>
+          )}
           <div className="space-y-2">
             <Label htmlFor="fullName">Display Name</Label>
             <Input
               id="fullName"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
-              disabled={isLoading}
+              disabled={isLoading || identityLocked}
             />
           </div>
           <div className="space-y-2">
