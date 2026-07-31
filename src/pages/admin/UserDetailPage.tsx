@@ -25,6 +25,7 @@ import { useAdminAuth } from "@/contexts/AdminAuthContext";
 import { countryToCurrency, currencySymbol } from "@/lib/currency";
 import EditUserDialog from "@/components/admin-portal/EditUserDialog";
 import UserChangeHistory from "@/components/admin-portal/UserChangeHistory";
+import UserActivityTimeline from "@/components/admin-portal/UserActivityTimeline";
 
 
 // support_threads / support_messages aren't in the generated types yet.
