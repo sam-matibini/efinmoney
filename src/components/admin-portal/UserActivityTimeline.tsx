@@ -73,6 +73,7 @@ export default function UserActivityTimeline({ userId, canLog = false }: Props) 
   const [direction, setDirection] = useState("outbound");
   const [subject, setSubject] = useState("");
   const [content, setContent] = useState("");
+  const [files, setFiles] = useState<StagedAttachment[]>([]);
 
   const visible = useMemo(
     () => (filter === "all" ? activities : activities.filter((a) => a.source === filter)),
@@ -85,6 +86,16 @@ export default function UserActivityTimeline({ userId, canLog = false }: Props) 
     return map;
   }, [activities]);
 
+  // Communication rows carry documents; look them up for the visible feed.
+  const communicationIds = useMemo(
+    () =>
+      activities
+        .filter((a) => a.source === "communication")
+        .map((a) => a.id.replace(/^comm-/, "")),
+    [activities],
+  );
+  const { data: attachmentsByComm = {} } = useCommunicationAttachments(communicationIds);
+
   const logInteraction = async () => {
     if (!content.trim()) {
       toast.error("Add a note describing the interaction");
@@ -93,29 +104,51 @@ export default function UserActivityTimeline({ userId, canLog = false }: Props) 
     setSaving(true);
     try {
       const { data: auth } = await supabase.auth.getUser();
-      const { error } = await supabase.from("customer_communications").insert({
-        user_id: userId,
-        channel,
-        direction,
-        subject: subject.trim() || null,
-        content: content.trim(),
-        status: "sent",
-        sent_at: new Date().toISOString(),
-        created_by: auth.user?.id ?? null,
-        metadata: { logged_manually: true },
-      });
+      const { data: inserted, error } = await supabase
+        .from("customer_communications")
+        .insert({
+          user_id: userId,
+          channel,
+          direction,
+          subject: subject.trim() || null,
+          content: content.trim(),
+          status: "sent",
+          sent_at: new Date().toISOString(),
+          created_by: auth.user?.id ?? null,
+          metadata: { logged_manually: true },
+        })
+        .select("id")
+        .single();
       if (error) throw error;
+
+      if (files.length && inserted?.id) {
+        const { error: attachError } = await supabase.from("communication_attachments").insert(
+          files.map((f) => ({
+            communication_id: inserted.id,
+            file_name: f.file_name,
+            file_path: f.file_path,
+            mime_type: f.mime_type,
+            size_bytes: f.size_bytes,
+            uploaded_by: auth.user?.id ?? null,
+          })),
+        );
+        if (attachError) throw attachError;
+      }
+
       toast.success("Interaction logged");
       setSubject("");
       setContent("");
+      setFiles([]);
       setOpen(false);
       queryClient.invalidateQueries({ queryKey: ["user-activity-timeline", userId] });
+      queryClient.invalidateQueries({ queryKey: ["communication-attachments"] });
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
       setSaving(false);
     }
   };
+
 
   return (
     <Card>
