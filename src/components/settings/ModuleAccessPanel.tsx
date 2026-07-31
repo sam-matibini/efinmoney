@@ -123,16 +123,37 @@ export const ModuleAccessPanel = () => {
     },
   ]);
 
+  const { getBoolean, isLoading, saveSettings } = useSystemSettings();
+  const { isAdmin } = useUserRoles();
+
+  useEffect(() => {
+    if (isLoading) return;
+    setModules(prev =>
+      prev.map(module => ({
+        ...module,
+        enabled: getBoolean(`modules.${module.id}.enabled`, module.enabled),
+      })),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading]);
+
   const handleToggleModule = (moduleId: string) => {
     setModules(prev => prev.map(module => 
       module.id === moduleId ? { ...module, enabled: !module.enabled } : module
     ));
   };
 
-  const handleSave = () => {
-    // In production, this would save to the database
-    toast.success("Module access settings saved");
+  const handleSave = async () => {
+    try {
+      await saveSettings.mutateAsync(
+        Object.fromEntries(modules.map(m => [`modules.${m.id}.enabled`, m.enabled])),
+      );
+      toast.success("Module access settings saved");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not save module access settings");
+    }
   };
+
 
   const getRoleBadgeVariant = (role: string) => {
     switch (role) {
