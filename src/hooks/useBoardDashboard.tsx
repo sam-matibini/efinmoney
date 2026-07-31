@@ -27,4 +27,5 @@ export const useBoardDashboard = () =>
       return data as BoardMetrics;
     },
     refetchInterval: 60_000,
+    retry: 1,
   });

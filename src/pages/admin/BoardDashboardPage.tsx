@@ -4,6 +4,7 @@ import { ShieldAlert, AlertTriangle, FileWarning, Activity, WifiOff, SearchCheck
 import { useBoardDashboard } from "@/hooks/useBoardDashboard";
 import { format } from "date-fns";
 import AdminLayout from "@/components/admin-portal/AdminLayout";
+import { Button } from "@/components/ui/button";
 
 const MetricCard = ({ label, value, icon, color }: { label: string; value: number; icon: React.ReactNode; color: string }) => (
   <Card>
@@ -18,7 +19,7 @@ const MetricCard = ({ label, value, icon, color }: { label: string; value: numbe
 );
 
 export default function BoardDashboardPage() {
-  const { data: m, isLoading } = useBoardDashboard();
+  const { data: m, isLoading, error, refetch, isFetching } = useBoardDashboard();
 
   return (
     <AdminLayout>
@@ -35,6 +36,18 @@ export default function BoardDashboardPage() {
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           {[...Array(10)].map((_, i) => (<Skeleton key={i} className="h-24" />))}
         </div>
+      ) : error ? (
+        <Card>
+          <CardContent className="py-8 space-y-3">
+            <p className="text-sm text-destructive font-medium">Failed to load board metrics.</p>
+            <p className="text-xs text-muted-foreground font-mono break-all">
+              {(error as Error)?.message || String(error)}
+            </p>
+            <Button size="sm" variant="outline" onClick={() => refetch()} disabled={isFetching}>
+              {isFetching ? "Retrying…" : "Retry"}
+            </Button>
+          </CardContent>
+        </Card>
       ) : m ? (
         <>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
