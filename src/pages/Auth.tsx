@@ -13,6 +13,8 @@ import LoadingSpinner from "@/components/LoadingSpinner";
 import { PhotonAddressInput } from "@/components/PhotonAddressInput";
 import { verifyEmail } from "@/lib/emailValidation";
 import { ISO_COUNTRIES } from "@/lib/isoCountries";
+import { useLoginLockout } from "@/hooks/useLoginLockout";
+import { LoginLockoutBanners } from "@/components/auth/LoginLockoutBanners";
 
 const isSafeRedirect = (path: string | null): path is string =>
   !!path && path.startsWith("/") && !path.startsWith("//");
@@ -49,6 +51,7 @@ const Auth = () => {
   const [sendingReset, setSendingReset] = useState(false);
   const { signIn, signUp } = useAuth();
   const navigate = useNavigate();
+  const lockout = useLoginLockout({ maxAttempts: 10, kind: "customer" });
 
   useEffect(() => {
     if (modeParam) {
@@ -115,9 +118,19 @@ const Auth = () => {
           setSignedUpEmail(email);
         }
       } else {
+        if (lockout.isLocked) return;
+        // Re-check lockout right before sending credentials.
+        const current = await lockout.checkLockout(email);
+        if (current.lockedUntil) {
+          toast.error(`Account is locked. Try again in ${lockout.formatRemaining(current.remainingSeconds)}.`);
+          return;
+        }
         const { error } = await signIn(email, password);
-        if (error) toast.error(error.message);
-        else {
+        if (error) {
+          toast.error(error.message);
+          await lockout.applyError(error.message, email);
+        } else {
+          lockout.reset();
           toast.success("Welcome back!");
           navigate(isSafeRedirect(redirectTo) ? redirectTo : "/dashboard");
         }
@@ -388,6 +401,16 @@ const Auth = () => {
               <ArrowLeft className="h-4 w-4 shrink-0 text-neutral-400" />
             </button>
           )}
+          <LoginLockoutBanners
+            isLocked={lockout.isLocked}
+            secondsLeft={lockout.secondsLeft}
+            formatRemaining={lockout.formatRemaining}
+            attemptsLeft={lockout.attemptsLeft}
+            showAttemptsWarning={lockout.showAttemptsWarning}
+            maxAttempts={10}
+            lockoutDuration="1 hour"
+          />
+
           <form onSubmit={handleSubmit} className="space-y-5">
             {isSignUp && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -439,6 +462,7 @@ const Auth = () => {
                   onBlur={isSignUp ? handleEmailBlur : undefined}
                   className="h-12 pr-10 bg-white border-neutral-200 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
                   required
+                  disabled={!isSignUp && lockout.isLocked}
                 />
                 {isSignUp && emailCheck === "checking" && (
                   <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400 animate-spin" />
@@ -636,11 +660,13 @@ const Auth = () => {
                   className="h-12 pr-12 bg-white border-neutral-200 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
                   required
                   minLength={6}
+                  disabled={!isSignUp && lockout.isLocked}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-700"
+                  disabled={!isSignUp && lockout.isLocked}
                 >
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
@@ -674,7 +700,7 @@ const Auth = () => {
 
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={isLoading || (!isSignUp && lockout.isLocked)}
               className="w-full h-12 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2 transition-all hover:-translate-y-0.5 shadow-lg shadow-primary/20"
             >
               {isLoading ? (
@@ -685,8 +711,10 @@ const Auth = () => {
                     ? accountType === "business"
                       ? "Continue to business setup"
                       : "Create account"
-                    : "Sign in"}
-                  <ArrowRight className="w-5 h-5" />
+                    : lockout.isLocked
+                      ? "Locked"
+                      : "Sign in"}
+                  {!lockout.isLocked && <ArrowRight className="w-5 h-5" />}
                 </>
               )}
             </button>

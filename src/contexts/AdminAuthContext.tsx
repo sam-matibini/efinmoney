@@ -62,6 +62,7 @@ interface AdminAuthContextType {
   signOut: () => Promise<void>;
   hasPermission: (action: AdminAction) => boolean;
   requirePermission: (action: AdminAction) => boolean;
+  checkLockout: (email: string) => Promise<{ locked: boolean; lockedUntil: string | null; remainingSeconds: number }>;
 }
 
 const AdminAuthContext = createContext<AdminAuthContextType | undefined>(undefined);
@@ -187,6 +188,19 @@ export const AdminAuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signIn = async (email: string, password: string) => {
     try {
+      // 1. Check for an active lockout before we even attempt auth, so
+      //    the password is never sent to Supabase while locked.
+      const lockout = await (supabase as any).rpc("check_login_lockout", { p_email: email, p_kind: "admin" });
+      const lockoutData = (lockout as any)?.data;
+      if (lockoutData?.locked) {
+        const mins = Math.max(1, Math.ceil((lockoutData.remaining_seconds ?? 0) / 60));
+        return {
+          error: new Error(
+            `Too many failed sign-in attempts. This account is locked. Try again in ${mins} minute${mins === 1 ? "" : "s"}.`
+          ),
+        };
+      }
+
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
       const rec = await fetchAdmin(data.user!.id);
@@ -194,16 +208,50 @@ export const AdminAuthProvider = ({ children }: { children: ReactNode }) => {
         await supabase.auth.signOut();
         return { error: new Error("Access denied — this account is not registered as an administrator.") };
       }
+      // 2. Successful sign-in: clear any admin lockout for this email.
+      try {
+        await (supabase as any).rpc("clear_login_lockout", { p_email: email, p_kind: "admin" });
+      } catch { /* best effort */ }
       return { error: null };
     } catch (e) {
-      // Best-effort: log the failed admin sign-in. Don't await failure
-      // propagation; if the RPC errors, we still surface the original auth error.
+      // 3. Log the failure and surface the remaining-attempts / lockout info.
       try {
-        await (supabase as any).rpc("log_admin_login_failure", { p_email: email });
-      } catch { /* ignore */ }
+        const { data: failData } = await (supabase as any).rpc("log_login_failure", { p_email: email, p_kind: "admin" });
+        if (failData?.locked) {
+          const mins = Math.max(1, Math.ceil((failData.remaining_seconds ?? 0) / 60));
+          return {
+            error: new Error(
+              `Too many failed sign-in attempts. This account is now locked for 2 hours. Try again in ${mins} minute${mins === 1 ? "" : "s"}.`
+            ),
+          };
+        }
+        if (typeof failData?.remaining_attempts === "number" && failData.remaining_attempts > 0) {
+          return {
+            error: new Error(
+              `Incorrect email or password. ${failData.remaining_attempts} attempt${failData.remaining_attempts === 1 ? "" : "s"} left before your account is locked.`
+            ),
+          };
+        }
+      } catch (rpcErr) {
+        console.warn("[AdminAuth] log_login_failure RPC failed:", rpcErr);
+      }
       return { error: e as Error };
     }
   };
+
+  const checkLockout = useCallback(async (email: string) => {
+    try {
+      const { data } = await (supabase as any).rpc("check_login_lockout", { p_email: email, p_kind: "admin" });
+      if (data?.locked) {
+        return {
+          locked: true,
+          lockedUntil: data.locked_until as string | null,
+          remainingSeconds: (data.remaining_seconds as number) ?? 0,
+        };
+      }
+    } catch { /* ignore */ }
+    return { locked: false, lockedUntil: null, remainingSeconds: 0 };
+  }, []);
 
   const hasPermission = useCallback((action: AdminAction) => {
     if (!admin || admin.status !== "active") return false;
@@ -221,7 +269,7 @@ export const AdminAuthProvider = ({ children }: { children: ReactNode }) => {
   }, [hasPermission]);
 
   return (
-    <AdminAuthContext.Provider value={{ user, admin, loading, signIn, signOut, hasPermission, requirePermission }}>
+    <AdminAuthContext.Provider value={{ user, admin, loading, signIn, signOut, hasPermission, requirePermission, checkLockout }}>
       {children}
     </AdminAuthContext.Provider>
   );
