@@ -1,9 +1,12 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Loader2 } from "lucide-react";
+import { useSystemSettings } from "@/hooks/useSystemSettings";
+import { useUserRoles } from "@/hooks/useUserRoles";
 import { toast } from "sonner";
 import { 
   Shield, 
@@ -120,16 +123,37 @@ export const ModuleAccessPanel = () => {
     },
   ]);
 
+  const { getBoolean, isLoading, saveSettings } = useSystemSettings();
+  const { isAdmin } = useUserRoles();
+
+  useEffect(() => {
+    if (isLoading) return;
+    setModules(prev =>
+      prev.map(module => ({
+        ...module,
+        enabled: getBoolean(`modules.${module.id}.enabled`, module.enabled),
+      })),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading]);
+
   const handleToggleModule = (moduleId: string) => {
     setModules(prev => prev.map(module => 
       module.id === moduleId ? { ...module, enabled: !module.enabled } : module
     ));
   };
 
-  const handleSave = () => {
-    // In production, this would save to the database
-    toast.success("Module access settings saved");
+  const handleSave = async () => {
+    try {
+      await saveSettings.mutateAsync(
+        Object.fromEntries(modules.map(m => [`modules.${m.id}.enabled`, m.enabled])),
+      );
+      toast.success("Module access settings saved");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not save module access settings");
+    }
   };
+
 
   const getRoleBadgeVariant = (role: string) => {
     switch (role) {
@@ -190,14 +214,18 @@ export const ModuleAccessPanel = () => {
                   id={module.id}
                   checked={module.enabled}
                   onCheckedChange={() => handleToggleModule(module.id)}
+                  disabled={!isAdmin || isLoading}
                 />
               </div>
             ))}
           </div>
-          <Button onClick={handleSave} className="mt-6">
-            <Save className="h-4 w-4 mr-2" />
+          <Button onClick={handleSave} className="mt-6" disabled={!isAdmin || isLoading || saveSettings.isPending}>
+            {saveSettings.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
             Save Changes
           </Button>
+          {!isAdmin && (
+            <p className="mt-2 text-xs text-muted-foreground">Only administrators can change module access.</p>
+          )}
         </CardContent>
       </Card>
     </div>

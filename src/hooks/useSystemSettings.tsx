@@ -40,5 +40,20 @@ export const useSystemSettings = () => {
     return typeof v === 'string' ? v : fallback;
   };
 
-  return { ...query, settings: query.data, getString, saveSettings };
+  const getNumber = (key: string, fallback = 0): number => {
+    const v = query.data?.[key];
+    if (typeof v === 'number') return v;
+    if (typeof v === 'string' && v.trim() !== '' && !Number.isNaN(Number(v))) return Number(v);
+    return fallback;
+  };
+
+  const getBoolean = (key: string, fallback = false): boolean => {
+    const v = query.data?.[key];
+    if (typeof v === 'boolean') return v;
+    if (v === 'true') return true;
+    if (v === 'false') return false;
+    return fallback;
+  };
+
+  return { ...query, settings: query.data, getString, getNumber, getBoolean, saveSettings };
 };

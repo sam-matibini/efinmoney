@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,19 +10,55 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
+import { useSystemSettings } from "@/hooks/useSystemSettings";
+import { useUserRoles } from "@/hooks/useUserRoles";
 import { 
   DollarSign, 
   Percent, 
   TrendingUp,
   Edit2,
   Save,
-  X
+  X,
+  Loader2
 } from "lucide-react";
 
 export const PricingSettingsPanel = () => {
   const queryClient = useQueryClient();
   const [editingPair, setEditingPair] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<Record<string, string>>({});
+
+  // Persisted pricing settings (benchmarks + transfer fee structure)
+  const { getNumber, isLoading: settingsLoading, saveSettings } = useSystemSettings();
+  const { isAdmin } = useUserRoles();
+  const [remitlyMargin, setRemitlyMargin] = useState("2.20");
+  const [remitlyFlat, setRemitlyFlat] = useState("3.99");
+  const [lemfiMargin, setLemfiMargin] = useState("1.80");
+  const [lemfiFlat, setLemfiFlat] = useState("0.00");
+  const [baseFee, setBaseFee] = useState("2.99");
+  const [percentFee, setPercentFee] = useState("0.5");
+  const [maxFee, setMaxFee] = useState("25.00");
+
+  useEffect(() => {
+    if (settingsLoading) return;
+    setRemitlyMargin(String(getNumber("pricing.benchmark_remitly_margin_pct", 2.2)));
+    setRemitlyFlat(String(getNumber("pricing.benchmark_remitly_flat_usd", 3.99)));
+    setLemfiMargin(String(getNumber("pricing.benchmark_lemfi_margin_pct", 1.8)));
+    setLemfiFlat(String(getNumber("pricing.benchmark_lemfi_flat_usd", 0)));
+    setBaseFee(String(getNumber("pricing.transfer_base_fee", 2.99)));
+    setPercentFee(String(getNumber("pricing.transfer_percent_fee", 0.5)));
+    setMaxFee(String(getNumber("pricing.transfer_max_fee", 25)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settingsLoading]);
+
+  const savePricing = async (values: Record<string, unknown>, label: string) => {
+    try {
+      await saveSettings.mutateAsync(values);
+      toast.success(`${label} saved`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not save settings");
+    }
+  };
+
 
   // Fetch FX rates for markup configuration
   const { data: fxRates, isLoading: fxLoading } = useQuery({
@@ -119,19 +155,19 @@ export const PricingSettingsPanel = () => {
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label>Remitly — FX margin (%)</Label>
-              <Input type="number" defaultValue="2.20" step="0.01" />
+              <Input type="number" step="0.01" value={remitlyMargin} onChange={(e) => setRemitlyMargin(e.target.value)} disabled={!isAdmin || settingsLoading} />
             </div>
             <div className="space-y-2">
               <Label>Remitly — Flat fee (USD)</Label>
-              <Input type="number" defaultValue="3.99" step="0.01" />
+              <Input type="number" step="0.01" value={remitlyFlat} onChange={(e) => setRemitlyFlat(e.target.value)} disabled={!isAdmin || settingsLoading} />
             </div>
             <div className="space-y-2">
               <Label>LEMFI — FX margin (%)</Label>
-              <Input type="number" defaultValue="1.80" step="0.01" />
+              <Input type="number" step="0.01" value={lemfiMargin} onChange={(e) => setLemfiMargin(e.target.value)} disabled={!isAdmin || settingsLoading} />
             </div>
             <div className="space-y-2">
               <Label>LEMFI — Flat fee (USD)</Label>
-              <Input type="number" defaultValue="0.00" step="0.01" />
+              <Input type="number" step="0.01" value={lemfiFlat} onChange={(e) => setLemfiFlat(e.target.value)} disabled={!isAdmin || settingsLoading} />
             </div>
           </div>
           <div className="rounded-md border bg-muted/40 p-3 text-sm">
@@ -141,8 +177,21 @@ export const PricingSettingsPanel = () => {
               Current eFinMoney pricing: <span className="font-semibold text-foreground">0.80% FX + $0.99 flat</span>.
             </div>
           </div>
-          <Button>
-            <Save className="h-4 w-4 mr-2" />
+          <Button
+            disabled={!isAdmin || settingsLoading || saveSettings.isPending}
+            onClick={() =>
+              savePricing(
+                {
+                  "pricing.benchmark_remitly_margin_pct": Number(remitlyMargin) || 0,
+                  "pricing.benchmark_remitly_flat_usd": Number(remitlyFlat) || 0,
+                  "pricing.benchmark_lemfi_margin_pct": Number(lemfiMargin) || 0,
+                  "pricing.benchmark_lemfi_flat_usd": Number(lemfiFlat) || 0,
+                },
+                "Benchmarks",
+              )
+            }
+          >
+            {saveSettings.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
             Save Benchmarks
           </Button>
         </CardContent>
@@ -162,21 +211,35 @@ export const PricingSettingsPanel = () => {
           <div className="grid gap-4 md:grid-cols-3">
             <div className="space-y-2">
               <Label htmlFor="base_fee">Base Fee (USD)</Label>
-              <Input id="base_fee" type="number" defaultValue="2.99" step="0.01" />
+              <Input id="base_fee" type="number" step="0.01" value={baseFee} onChange={(e) => setBaseFee(e.target.value)} disabled={!isAdmin || settingsLoading} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="percent_fee">Percentage Fee (%)</Label>
-              <Input id="percent_fee" type="number" defaultValue="0.5" step="0.01" />
+              <Input id="percent_fee" type="number" step="0.01" value={percentFee} onChange={(e) => setPercentFee(e.target.value)} disabled={!isAdmin || settingsLoading} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="max_fee">Maximum Fee (USD)</Label>
-              <Input id="max_fee" type="number" defaultValue="25.00" step="0.01" />
+              <Input id="max_fee" type="number" step="0.01" value={maxFee} onChange={(e) => setMaxFee(e.target.value)} disabled={!isAdmin || settingsLoading} />
             </div>
           </div>
-          <Button className="mt-4">
-            <Save className="h-4 w-4 mr-2" />
+          <Button
+            className="mt-4"
+            disabled={!isAdmin || settingsLoading || saveSettings.isPending}
+            onClick={() =>
+              savePricing(
+                {
+                  "pricing.transfer_base_fee": Number(baseFee) || 0,
+                  "pricing.transfer_percent_fee": Number(percentFee) || 0,
+                  "pricing.transfer_max_fee": Number(maxFee) || 0,
+                },
+                "Transfer fees",
+              )
+            }
+          >
+            {saveSettings.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
             Save Transfer Fees
           </Button>
+
         </CardContent>
       </Card>
 
