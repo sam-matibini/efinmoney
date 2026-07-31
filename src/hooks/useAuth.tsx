@@ -48,11 +48,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         stopLoading();
         if (session?.user) {
           identifyUser(session.user.id, { email: session.user.email });
+          if (event === 'SIGNED_IN') {
+            logAccountActivity(session.user.id, 'signed_in', 'Signed in');
+          }
         } else if (event === 'SIGNED_OUT') {
           resetAnalytics();
         }
       }
     );
+
 
     // THEN check for existing session. Guard against a rejected/hanging
     // getSession() (e.g. a stale token) trapping the app on the spinner.
