@@ -1,3 +1,4 @@
+import { SYSTEM_DEFAULT_CURRENCY } from '@/lib/systemDefaults';
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { CreditCard, Plus, Lock, Unlock, Settings, Trash2, Snowflake, Send, Wallet, ArrowRightLeft, Eye } from "lucide-react";
@@ -442,7 +443,7 @@ const CardsPage = () => {
                 last_four: editCard.last_four,
                 brand: editCard.card_network,
                 status: editCard.status,
-                currency: editCard.currency_code || "USD",
+                currency: editCard.currency_code || SYSTEM_DEFAULT_CURRENCY,
                 balance: Number(editCard.balance || 0),
                 expires: formatExpires(editCard.expires_at),
                 nickname: editCard.cardholder_name,
@@ -469,7 +470,7 @@ const CardsPage = () => {
                 last_four: deleteTarget.last_four,
                 brand: deleteTarget.card_network,
                 status: deleteTarget.status,
-                currency: "USD",
+                currency: SYSTEM_DEFAULT_CURRENCY,
                 balance: 0,
                 expires: formatExpires(deleteTarget.expires_at),
               }

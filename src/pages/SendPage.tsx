@@ -1,3 +1,4 @@
+import { SYSTEM_DEFAULT_CURRENCY } from '@/lib/systemDefaults';
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence, type Variants } from "framer-motion";
 import { useSearchParams, useNavigate, Link } from "react-router-dom";

@@ -1,3 +1,4 @@
+import { SYSTEM_DEFAULT_CURRENCY } from '@/lib/systemDefaults';
 import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
@@ -290,7 +291,7 @@ const TopUpPage = () => {
   }, [wallets, params, selectedWalletId]);
 
   const selectedWallet = wallets?.find((w) => w.wallet_id === selectedWalletId);
-  const currency = selectedWallet?.currency_code || "USD";
+  const currency = selectedWallet?.currency_code || SYSTEM_DEFAULT_CURRENCY;
   const showWesternProviderChoice = supportsWesternProviderChoice(currency);
   const showAfricanProviderChoice = supportsAfricanProviderChoice(currency);
   const intlMethods = useMemo(() => availableIntlMethods(currency), [currency]);

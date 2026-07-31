@@ -1,3 +1,4 @@
+import { SYSTEM_DEFAULT_CURRENCY } from '@/lib/systemDefaults';
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -25,7 +26,7 @@ export const CustomersPanel = () => {
     tax_id: '',
     payment_terms: 30,
     credit_limit: 0,
-    currency_code: 'USD',
+    currency_code: SYSTEM_DEFAULT_CURRENCY,
     notes: '',
   });
 
@@ -79,7 +80,7 @@ export const CustomersPanel = () => {
   });
 
   const resetForm = () => {
-    setFormData({ name: '', email: '', phone: '', address: '', tax_id: '', payment_terms: 30, credit_limit: 0, currency_code: 'USD', notes: '' });
+    setFormData({ name: '', email: '', phone: '', address: '', tax_id: '', payment_terms: 30, credit_limit: 0, currency_code: SYSTEM_DEFAULT_CURRENCY, notes: '' });
     setEditingCustomer(null);
     setIsDialogOpen(false);
   };
@@ -94,7 +95,7 @@ export const CustomersPanel = () => {
       tax_id: customer.tax_id || '',
       payment_terms: customer.payment_terms || 30,
       credit_limit: customer.credit_limit || 0,
-      currency_code: customer.currency_code || 'USD',
+      currency_code: customer.currency_code || SYSTEM_DEFAULT_CURRENCY,
       notes: customer.notes || '',
     });
     setIsDialogOpen(true);
