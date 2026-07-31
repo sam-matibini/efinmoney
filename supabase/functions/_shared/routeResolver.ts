@@ -200,6 +200,14 @@ export async function resolveRoute(
       excluded.push({ partner_code: label, reason: `partner ${partner.status}/${partner.integration_status}` });
       continue;
     }
+    if (suspendedReasons.has(partner.id)) {
+      excluded.push({
+        partner_code: label,
+        reason: `suspended: ${suspendedReasons.get(partner.id)}`,
+      });
+      continue;
+    }
+
     if (blocked.has(partner.id)) {
       excluded.push({ partner_code: label, reason: "blocked by operator override" });
       continue;
