@@ -4,6 +4,17 @@ import { useAuth } from './useAuth';
 
 export type SystemSettings = Record<string, unknown>;
 
+/** Supabase returns plain error objects, not Error instances — normalize so UI toasts show the cause. */
+const toError = (error: unknown, fallback: string): Error => {
+  if (error instanceof Error) return error;
+  const e = error as { message?: string; code?: string; details?: string; hint?: string } | null;
+  const parts = [e?.message, e?.details, e?.hint].filter(Boolean).join(' — ');
+  const err = new Error(parts || fallback);
+  if (e?.code) err.name = `PostgrestError ${e.code}`;
+  console.error('[system_settings]', error);
+  return err;
+};
+
 /** Key/value system settings stored in public.system_settings. */
 export const useSystemSettings = () => {
   const queryClient = useQueryClient();
@@ -13,7 +24,7 @@ export const useSystemSettings = () => {
     queryKey: ['system-settings'],
     queryFn: async (): Promise<SystemSettings> => {
       const { data, error } = await supabase.from('system_settings').select('key, value');
-      if (error) throw error;
+      if (error) throw toError(error, 'Could not load settings');
       return Object.fromEntries((data || []).map((r) => [r.key, r.value]));
     },
     staleTime: 5 * 60_000,
@@ -21,19 +32,24 @@ export const useSystemSettings = () => {
 
   const saveSettings = useMutation({
     mutationFn: async (values: SystemSettings) => {
-      const rows = Object.entries(values).map(([key, value]) => ({
-        key,
-        value: value as never,
-        updated_by: user?.id ?? null,
-        updated_at: new Date().toISOString(),
-      }));
+      if (!user?.id) throw new Error('You must be signed in to change settings.');
+      const rows = Object.entries(values)
+        .filter(([, value]) => value !== undefined)
+        .map(([key, value]) => ({
+          key,
+          value: (typeof value === 'number' && !Number.isFinite(value) ? null : value) as never,
+          updated_by: user.id,
+          updated_at: new Date().toISOString(),
+        }));
+      if (rows.length === 0) return;
       const { error } = await supabase.from('system_settings').upsert(rows, { onConflict: 'key' });
-      if (error) throw error;
+      if (error) throw toError(error, 'Could not save settings');
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['system-settings'] });
     },
   });
+
 
   const getString = (key: string, fallback = ''): string => {
     const v = query.data?.[key];
