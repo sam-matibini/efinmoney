@@ -233,10 +233,13 @@ Deno.serve(async (req) => {
     const body = await res.json();
     if (!res.ok) {
       console.error("Resend error:", body);
+      await logCommunication({ to, subject, html, type, status: "failed", metadata: { error: body } });
       return new Response(JSON.stringify({ error: body }), {
         status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    await logCommunication({ to, subject, html, type, status: "sent", metadata: { provider: "resend", message_id: body.id, cc } });
 
     return new Response(JSON.stringify({ ok: true, id: body.id }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
