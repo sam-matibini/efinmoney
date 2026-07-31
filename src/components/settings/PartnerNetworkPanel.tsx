@@ -20,6 +20,8 @@ import PartnerSettlementsPanel from "./partners/PartnerSettlementsPanel";
 import MarginGuardrailsPanel from "./partners/MarginGuardrailsPanel";
 import PricingRecommendationsPanel from "./partners/PricingRecommendationsPanel";
 import FeeAdjustmentsPanel from "./partners/FeeAdjustmentsPanel";
+import PartnerScorecardsPanel from "./partners/PartnerScorecardsPanel";
+
 
 
 export const PartnerNetworkPanel = () => (
@@ -45,7 +47,9 @@ export const PartnerNetworkPanel = () => (
         <TabsTrigger value="guardrails">Guardrails</TabsTrigger>
         <TabsTrigger value="recommendations">Recommendations</TabsTrigger>
         <TabsTrigger value="fee-adjustments">Fee adjustments</TabsTrigger>
+        <TabsTrigger value="scorecards">Scorecards</TabsTrigger>
         <TabsTrigger value="limits">Limits</TabsTrigger>
+
         <TabsTrigger value="alerts">Alerts</TabsTrigger>
       </TabsList>
     </div>
@@ -109,9 +113,13 @@ export const PartnerNetworkPanel = () => (
     <TabsContent value="fee-adjustments">
       <SectionBoundary name="FeeAdjustmentsPanel"><FeeAdjustmentsPanel /></SectionBoundary>
     </TabsContent>
+    <TabsContent value="scorecards">
+      <SectionBoundary name="PartnerScorecardsPanel"><PartnerScorecardsPanel /></SectionBoundary>
+    </TabsContent>
     <TabsContent value="limits">
       <SectionBoundary name="PartnerLimitsPanel"><PartnerLimitsPanel /></SectionBoundary>
     </TabsContent>
+
     <TabsContent value="alerts">
       <SectionBoundary name="PartnerAlertsPanel"><PartnerAlertsPanel /></SectionBoundary>
     </TabsContent>

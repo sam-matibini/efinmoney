@@ -278,6 +278,47 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ------------------------------------------- partner performance scores
+    const { data: scoreCfg } = await supabase
+      .from("partner_score_weights")
+      .select("min_score_to_route, below_threshold_action")
+      .maybeSingle();
+    const minScore = Number(scoreCfg?.min_score_to_route ?? 60);
+    const { data: weakCards } = await supabase
+      .from("partner_scorecards")
+      .select("partner_id, corridor_key, corridor_label, composite_score, grade, previous_grade, confident")
+      .eq("confident", true)
+      .lt("composite_score", minScore)
+      .order("composite_score", { ascending: true })
+      .limit(50);
+    if (weakCards?.length) {
+      const { data: scoredPartners } = await supabase
+        .from("payment_partners")
+        .select("id, code, name")
+        .in("id", Array.from(new Set(weakCards.map((c: any) => c.partner_id))));
+      const nameOf = new Map((scoredPartners ?? []).map((p: any) => [p.id, p.name ?? p.code]));
+      for (const c of weakCards) {
+        findings.push({
+          fingerprint: `partner_score:${c.partner_id}:${c.corridor_key}`,
+          alert_type: "partner_score",
+          severity: c.composite_score < minScore / 2 ? "critical" : "warning",
+          partner_id: c.partner_id,
+          corridor_key: c.corridor_key,
+          title: `${nameOf.get(c.partner_id) ?? "Partner"} scoring ${c.composite_score} on ${c.corridor_label ?? c.corridor_key}`,
+          message: `Realised performance score ${c.composite_score} (grade ${c.grade}${
+            c.previous_grade ? `, previously ${c.previous_grade}` : ""
+          }) is below the routing threshold of ${minScore}. Action: ${
+            scoreCfg?.below_threshold_action ?? "warn"
+          }. Review under Partners & Routing → Scorecards.`,
+          metrics: {
+            composite_score: Number(c.composite_score),
+            grade: c.grade,
+            previous_grade: c.previous_grade,
+            threshold: minScore,
+          },
+        });
+      }
+    }
 
 
     // ------------------------------------------------------ persist findings

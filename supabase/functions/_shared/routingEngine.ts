@@ -65,7 +65,21 @@ export interface ScoredCandidate extends CandidateInput {
   margin_floor_breached?: boolean;
   margin_blocked?: boolean;
   revenue_uplift?: number;
+  /** Phase 12 — realised performance score (0..100) and its ranking effect. */
+  performance_score?: number | null;
+  performance_grade?: string | null;
+  performance_penalty?: number;
+  performance_blocked?: boolean;
 }
+
+export interface PartnerScoreGuard {
+  enabled: boolean;
+  min_score_to_route: number;
+  below_threshold_action: "warn" | "deprioritise" | "block";
+  /** Maximum share of the ranking score the performance modifier may move. */
+  max_score_influence: number;
+}
+
 
 export interface MarginFloor {
   id?: string | null;
@@ -289,4 +303,67 @@ export function applyMarginFloor(
   if (action !== "block") return { candidates: out, blocked: [] };
   return { candidates: out.filter((c) => !c.margin_blocked), blocked };
 }
+
+/**
+ * Phase 12 — shade the ranking with realised partner performance.
+ *
+ * Applied AFTER the margin floor so guardrails stay authoritative: the score
+ * can only move the ranking value by `max_score_influence`, never enough to
+ * resurrect a margin-blocked candidate. Partners without a confident score are
+ * untouched (score `null` → neutral).
+ */
+export function applyPartnerScores(
+  candidates: ScoredCandidate[],
+  scores: Map<string, { score: number; grade: string }>,
+  guard: PartnerScoreGuard | null,
+): { candidates: ScoredCandidate[]; blocked: ScoredCandidate[] } {
+  if (!guard || !guard.enabled) return { candidates, blocked: [] };
+
+  const influence = clamp(num(guard.max_score_influence, 0.15), 0, 1);
+  const threshold = num(guard.min_score_to_route, 0);
+  const action = guard.below_threshold_action ?? "warn";
+  const blocked: ScoredCandidate[] = [];
+
+  const out = candidates.map((c) => {
+    const hit = scores.get(c.partner_id) ?? null;
+    if (!hit) {
+      return { ...c, performance_score: null, performance_grade: null, performance_penalty: 0, performance_blocked: false };
+    }
+
+    // 0..1 where 1 = perfect score; deviation from 100 costs ranking points.
+    const normalised = clamp(hit.score / 100);
+    const delta = Math.round((influence * (normalised - 1)) * 10000) / 10000; // <= 0
+    const below = hit.score < threshold;
+
+    const base: ScoredCandidate = {
+      ...c,
+      performance_score: hit.score,
+      performance_grade: hit.grade,
+      performance_penalty: Math.abs(delta),
+      performance_blocked: false,
+      score: Math.max(0, Math.round((num(c.score) + delta) * 10000) / 10000),
+      breakdown: { ...c.breakdown, performanceScore: normalised, performancePenalty: Math.abs(delta) },
+    };
+
+    if (!below) return base;
+
+    if (action === "block") {
+      const b = { ...base, performance_blocked: true };
+      blocked.push(b);
+      return b;
+    }
+
+    if (action === "deprioritise") {
+      // push below every scoring partner, but keep it as a failover option
+      return { ...base, score: Math.max(0, Math.round(base.score * 0.5 * 10000) / 10000) };
+    }
+
+    return base;
+  });
+
+  const kept = out.filter((c) => !c.performance_blocked)
+    .sort((a, b) => b.score - a.score || a.priority - b.priority);
+  return { candidates: kept, blocked };
+}
+
 

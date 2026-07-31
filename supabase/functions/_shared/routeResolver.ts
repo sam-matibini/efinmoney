@@ -3,13 +3,17 @@
 
 import {
   applyMarginFloor,
+  applyPartnerScores,
   scoreCandidates,
   type CandidateInput,
   type CustomerPricingRow,
   type MarginFloor,
   type PartnerPricingRow,
+  type PartnerScoreGuard,
   type ScoredCandidate,
 } from "./routingEngine.ts";
+import { corridorKey } from "./partnerScorecards.ts";
+
 
 type Client = {
   from: (t: string) => any;
@@ -37,7 +41,10 @@ export interface RouteResolution {
   marginFloor?: (MarginFloor & { source: "corridor" | "global" }) | null;
   marginBlocked?: Array<{ partner_code: string; expected_profit: number; margin_percent: number }>;
   marginUplift?: number;
+  scoreGuard?: PartnerScoreGuard | null;
+  scoreBlocked?: Array<{ partner_code: string; performance_score: number; grade: string | null }>;
 }
+
 
 const up = (v: unknown) => String(v ?? "").toUpperCase();
 
@@ -335,6 +342,67 @@ export async function resolveRoute(
     marginUplift = candidates.reduce((s, c) => s + (c.revenue_uplift ?? 0), 0);
   }
 
+  // Phase 12 — performance-weighted routing. Runs after the margin floor so
+  // guardrails remain authoritative; scores only shade the ranking.
+  let scoreGuard: PartnerScoreGuard | null = null;
+  let scoreBlocked: RouteResolution["scoreBlocked"] = [];
+
+  const { data: scoreCfg } = await supabase
+    .from("partner_score_weights")
+    .select("enabled, min_score_to_route, below_threshold_action, max_score_influence")
+    .maybeSingle();
+
+  if (scoreCfg?.enabled) {
+    scoreGuard = {
+      enabled: true,
+      min_score_to_route: Number(scoreCfg.min_score_to_route ?? 60),
+      below_threshold_action: (scoreCfg.below_threshold_action ?? "warn") as PartnerScoreGuard["below_threshold_action"],
+      max_score_influence: Number(scoreCfg.max_score_influence ?? 0.15),
+    };
+
+    const partnerIds = candidates.map((c) => c.partner_id);
+    const { data: cards } = partnerIds.length
+      ? await supabase
+        .from("partner_scorecards")
+        .select("partner_id, corridor_key, composite_score, grade, confident")
+        .in("partner_id", partnerIds)
+        .eq("confident", true)
+      : { data: [] as any[] };
+
+    const wanted = corridorKey(srcCcy, dstCcy, dstCountry, method);
+    const scores = new Map<string, { score: number; grade: string }>();
+    const fallback = new Map<string, { sum: number; n: number }>();
+    for (const c of cards ?? []) {
+      const entry = { score: Number(c.composite_score) || 0, grade: c.grade };
+      if (c.corridor_key === wanted) scores.set(c.partner_id, entry);
+      const agg = fallback.get(c.partner_id) ?? { sum: 0, n: 0 };
+      agg.sum += entry.score;
+      agg.n += 1;
+      fallback.set(c.partner_id, agg);
+    }
+    for (const [pid, agg] of fallback) {
+      if (!scores.has(pid) && agg.n > 0) {
+        const avg = Math.round((agg.sum / agg.n) * 100) / 100;
+        scores.set(pid, { score: avg, grade: "~" });
+      }
+    }
+
+    const scored = applyPartnerScores(candidates, scores, scoreGuard);
+    scoreBlocked = scored.blocked.map((c) => ({
+      partner_code: c.partner_code,
+      performance_score: c.performance_score ?? 0,
+      grade: c.performance_grade ?? null,
+    }));
+    for (const b of scored.blocked) {
+      excluded.push({
+        partner_code: b.partner_code,
+        reason: `performance score ${b.performance_score} below routing threshold ${scoreGuard.min_score_to_route}`,
+      });
+    }
+    candidates = scored.candidates;
+  }
+
+
   // Pins float to the top, in override order.
   if (pinned.length) {
     const pinnedSet = new Set(pinned);
@@ -354,6 +422,9 @@ export async function resolveRoute(
     marginFloor,
     marginBlocked,
     marginUplift: Math.round(marginUplift * 100) / 100,
+    scoreGuard,
+    scoreBlocked,
+
     overrides: applicableOverrides.map((o: any) => {
       const p = (partners ?? []).find((x: any) => x.id === o.partner_id);
       return { type: o.override_type, partner_code: p?.code ?? o.partner_id, reason: o.reason ?? null };
