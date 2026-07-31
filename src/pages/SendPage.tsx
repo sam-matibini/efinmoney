@@ -30,6 +30,7 @@ import { useFundingSources } from "@/hooks/useFundingSources";
 import { useSavedCards } from "@/hooks/useSavedCards";
 import { usePricingConfig } from "@/hooks/usePricingConfig";
 import { supabase } from "@/integrations/supabase/client";
+import { usePriceQuote } from "@/hooks/usePriceQuote";
 import { fetchFxRate, cardChargeCurrency, initializeFlwPayment, verifyFlwPayment } from "@/lib/flutterwave";
 import {
   getNigeriaBanks,
@@ -508,30 +509,29 @@ const SendPage = () => {
 
   const parsedAmount = Math.max(0, parseAmount(amount));
 
-  // --- Corridor pricing rule (from admin Pricing page) ---
+  // --- Canonical pricing (central rate card via price-quote) ---
   const destPayoutMethod = isBankPayout ? 'bank' : 'mobile_money';
-  const { data: corridorRule } = useQuery({
-    queryKey: ['pricing_rule', sourceCurrency, targetCountry.code, destPayoutMethod],
-    queryFn: async () => {
-      const { data } = await (supabase as any)
-        .from('pricing_rules')
-        .select('fee_percent,fee_fixed,fx_markup_percent,min_amount,max_amount')
-        .eq('source_currency', sourceCurrency)
-        .eq('dest_currency', targetCountry.code)
-        .eq('payout_method', destPayoutMethod)
-        .eq('enabled', true)
-        .maybeSingle();
-      return data as { fee_percent: number; fee_fixed: number; fx_markup_percent: number; min_amount: number; max_amount: number } | null;
-    },
-    enabled: !isSameCurrency && !!sourceCurrency && !!targetCountry.code,
-    staleTime: 120_000,
+  const { data: priceQuote } = usePriceQuote({
+    direction: 'payout',
+    sourceCurrency,
+    destCurrency: targetCountry.currency ?? targetCountry.code,
+    destCountry: targetCountry.code,
+    paymentMethod: destPayoutMethod,
+    amount: parsedAmount,
+    legs: fundingSource === 'card'
+      ? [{ label: 'card_funding', direction: 'payin' as const, payment_method: 'card', amount: parsedAmount }]
+      : [],
   });
 
-  // Fee: use corridor rule (percent + fixed) when available, fall back to global pricing_config
-  const baseFee = corridorRule && parsedAmount > 0
-    ? (parsedAmount * Number(corridorRule.fee_percent) / 100) + Number(corridorRule.fee_fixed)
+  const cardFundingLeg = priceQuote?.legs?.find((l) => l.label === 'card_funding');
+  const baseFee = priceQuote && !priceQuote.pricing_missing
+    ? Number(priceQuote.fee)
     : (pricing?.transfer_base_fee ?? 0);
-  const cardFee = fundingSource === 'card' ? (pricing?.transfer_card_surcharge ?? 0) : 0;
+  const cardFee = fundingSource === 'card'
+    ? (cardFundingLeg && !cardFundingLeg.pricingMissing
+      ? Number(cardFundingLeg.fee)
+      : (pricing?.transfer_card_surcharge ?? 0))
+    : 0;
   const fee = parsedAmount > 0 ? baseFee + cardFee : 0;
 
   const testRate = testSendFxRate(sourceCurrency, targetCountry.code);
@@ -542,8 +542,9 @@ const SendPage = () => {
     ? 1
     : testRate ?? nombaRate ?? resolvedDbRate ?? directDbRate ?? derivedRate ?? 0;
   // Apply FX markup from corridor rule (reduces effective rate by markup %) — skip for test overrides
-  const effectiveRate = rawRate > 0 && !testRate && corridorRule?.fx_markup_percent
-    ? rawRate * (1 - Number(corridorRule.fx_markup_percent) / 100)
+  const fxMarginBps = Number(priceQuote?.fx_margin_bps ?? 0);
+  const effectiveRate = rawRate > 0 && !testRate && fxMarginBps > 0
+    ? rawRate * (1 - fxMarginBps / 10_000)
     : rawRate;
   const rateAvailable = isSameCurrency || effectiveRate > 0;
   const rateSource = testRate
