@@ -537,7 +537,10 @@ const UserDetailPage = () => {
                 </div>
               </CardContent>
             </Card>
+
+            {id && <UserChangeHistory userId={id} />}
           </TabsContent>
+
 
 
 
