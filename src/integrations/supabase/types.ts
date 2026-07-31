@@ -3325,6 +3325,60 @@ export type Database = {
         }
         Relationships: []
       }
+      margin_floors: {
+        Row: {
+          action: string
+          created_at: string
+          customer_type: string | null
+          dest_country: string | null
+          dest_currency: string | null
+          direction: string | null
+          id: string
+          is_active: boolean
+          min_margin_percent: number
+          notes: string | null
+          payment_method: string | null
+          scope: string
+          source_currency: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          action?: string
+          created_at?: string
+          customer_type?: string | null
+          dest_country?: string | null
+          dest_currency?: string | null
+          direction?: string | null
+          id?: string
+          is_active?: boolean
+          min_margin_percent?: number
+          notes?: string | null
+          payment_method?: string | null
+          scope?: string
+          source_currency?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          customer_type?: string | null
+          dest_country?: string | null
+          dest_currency?: string | null
+          direction?: string | null
+          id?: string
+          is_active?: boolean
+          min_margin_percent?: number
+          notes?: string | null
+          payment_method?: string | null
+          scope?: string
+          source_currency?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           created_at: string
@@ -7939,6 +7993,30 @@ export type Database = {
           partner_name: string
           payment_method: string
           source_currency: string
+          txn_count: number
+          volume: number
+        }[]
+      }
+      pricing_recommendations: {
+        Args: { p_from: string; p_target_margin?: number; p_to: string }
+        Returns: {
+          billed_cost: number
+          current_fixed_fee: number
+          current_margin_percent: number
+          current_percentage_fee: number
+          dest_country: string
+          dest_currency: string
+          effective_cost: number
+          fee_delta_percent: number
+          group_key: string
+          group_label: string
+          modelled_cost: number
+          payment_method: string
+          recommended_percentage_fee: number
+          revenue: number
+          revenue_uplift: number
+          source_currency: string
+          target_margin_percent: number
           txn_count: number
           volume: number
         }[]
