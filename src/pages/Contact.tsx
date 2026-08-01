@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Mail, Clock, MessageSquare, Send, Loader2, CheckCircle2 } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Mail, Clock, MessageSquare, Send, Loader2, CheckCircle2, CalendarClock } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import MarketingHeader from "@/components/marketing/MarketingHeader";
