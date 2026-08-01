@@ -50,6 +50,7 @@ const Features = lazyImport(() => import("./pages/Features"));
 const HowItWorks = lazyImport(() => import("./pages/HowItWorks"));
 const About = lazyImport(() => import("./pages/About"));
 const Contact = lazyImport(() => import("./pages/Contact"));
+const BookPage = lazyImport(() => import("./pages/BookPage"));
 const AuthConfirm = lazyImport(() => import("./pages/AuthConfirm"));
 const ResetPasswordPage = lazyImport(() => import("./pages/ResetPasswordPage"));
 const FinanceDashboard = lazyImport(() => import("./pages/FinanceDashboard"));
@@ -288,6 +289,7 @@ const AppRoutes = () => {
         <Route path="/how-it-works" element={<HowItWorks />} />
         <Route path="/about" element={<About />} />
         <Route path="/contact" element={<Contact />} />
+        <Route path="/book" element={<BookPage />} />
 
         <Route element={<KycShellRoute />}>
           <Route path="/dashboard" element={<Index />} />

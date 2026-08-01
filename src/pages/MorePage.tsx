@@ -28,6 +28,7 @@ import {
   ExternalLink,
   Receipt,
   Building2,
+  CalendarClock,
 } from "lucide-react";
 import { productFeatures } from "@/lib/productFeatures";
 import PageHeroBanner from "@/components/common/PageHeroBanner";
@@ -268,6 +269,7 @@ const MorePage = () => {
               { icon: Globe, label: "App Language", onClick: () => {} },
               { icon: Users, label: "Affiliates & Referrals", onClick: () => {} },
               { icon: MessageSquare, label: "Talk to Support", onClick: () => navigate("/support") },
+              { icon: CalendarClock, label: "Book a call", onClick: () => navigate("/book") },
               { icon: ArrowLeftRight, label: "See our rates", onClick: () => navigate("/exchange") },
             ]}
           />
