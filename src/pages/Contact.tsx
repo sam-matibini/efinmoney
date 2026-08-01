@@ -107,7 +107,21 @@ export default function Contact() {
                 <p className="text-sm text-neutral-600">Signed in? Message us from the envelope in your dashboard header for a tracked conversation.</p>
               </div>
             </div>
+            <div className="flex items-start gap-3">
+              <div className="w-11 h-11 rounded-2xl bg-[hsl(var(--accent))] text-[hsl(var(--brand-700))] flex items-center justify-center shrink-0"><CalendarClock className="w-5 h-5" /></div>
+              <div>
+                <h3 className="font-bold text-[hsl(var(--brand-900))]">Book a call</h3>
+                <p className="text-sm text-neutral-600 mb-2">Speak with our AI receptionist and pick a time that works for you.</p>
+                <Link
+                  to="/book"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-[hsl(var(--brand-700))] px-4 py-2 text-sm font-semibold text-white hover:bg-[hsl(var(--brand-900))] transition-colors"
+                >
+                  Book a call
+                </Link>
+              </div>
+            </div>
           </div>
+
 
           {/* Form */}
           <div className="rounded-3xl border border-neutral-200 shadow-sm p-6 md:p-8">
