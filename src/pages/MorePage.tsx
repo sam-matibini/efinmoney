@@ -28,6 +28,7 @@ import {
   ExternalLink,
   Receipt,
   Building2,
+  CalendarClock,
 } from "lucide-react";
 import { productFeatures } from "@/lib/productFeatures";
 import PageHeroBanner from "@/components/common/PageHeroBanner";
