@@ -203,6 +203,18 @@ verify_jwt = false
 [functions.fincra-webhook]
 verify_jwt = false
 
+[functions.dodo-webhook]
+verify_jwt = false
+
+[functions.dodo-initialize-checkout]
+verify_jwt = false
+
+[functions.dodo-verify-payment]
+verify_jwt = false
+
+[functions.dodo-reconcile]
+verify_jwt = false
+
 [functions.fincra-cad-interac]
 verify_jwt = true
 

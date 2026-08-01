@@ -32,6 +32,7 @@ import GhanaTopUpCard from "@/components/payments/GhanaTopUpCard";
 import NombaTopUpCard from "@/components/payments/NombaTopUpCard";
 import LenhubFlutterTopUpCard from "@/components/payments/LenhubFlutterTopUpCard";
 import PaytotaTopUpCard from "@/components/payments/PaytotaTopUpCard";
+import DodoTopUpCard from "@/components/payments/DodoTopUpCard";
 import SwychrTopUpCard from "@/components/payments/SwychrTopUpCard";
 import { validateMinAmount, minAmount, type FlwMethod } from "@/lib/flutterwave";
 import LoadingSpinner from "@/components/LoadingSpinner";
@@ -76,6 +77,11 @@ import TopUpMethodPicker from "@/components/payments/TopUpMethodPicker";
 import { buildFincraTopupRedirectUrl, parseFincraReturnReference, isFincraCheckoutCurrency } from "@/lib/fincraTopup";
 import { clearPendingNombaTxn } from "@/lib/nombaPay";
 import { clearPendingPaytotaTxn, confirmPaytotaPayment, readPendingPaytotaTxn } from "@/lib/paytotaPay";
+import {
+  clearPendingDodoRef,
+  readPendingDodoRef,
+  verifyDodoPayment,
+} from "@/lib/dodoPayments";
 import { quoteCadNombaTopup } from "@/lib/nombaTopupQuote";
 import { useFxRates } from "@/hooks/useFxRates";
 import { cn } from "@/lib/utils";
@@ -98,6 +104,7 @@ function availableIntlMethods(currency: string): IntlTopupMethod[] {
     if (productFeatures.nombaNigeria) methods.push("nomba");
     if (productFeatures.fincra && ["USD", "EUR", "GBP", "CAD"].includes(c)) methods.push("fincra");
     if (productFeatures.paytota) methods.push("paytota");
+    if (productFeatures.dodo) methods.push("dodo");
     if (c === "CAD" && productFeatures.fincraInterac) methods.push("interac");
     if (productFeatures.flutterwave && FLW_WESTERN_TOPUP_CURRENCIES.includes(c)) {
       methods.push("flutterwave");
@@ -156,6 +163,7 @@ function initialIntlMethod(params: URLSearchParams, currency: string): IntlTopup
   if ((fromQuery === "fincra" || fromQuery === "bank") && pool.includes("fincra")) return "fincra";
   if (fromQuery === "bank" && pool.includes("lenhub") && currency.toUpperCase() === "NGN") return "lenhub";
   if ((fromQuery === "paytota" || fromQuery === "invoice") && pool.includes("paytota")) return "paytota";
+  if ((fromQuery === "dodo" || fromQuery === "global") && pool.includes("dodo")) return "dodo";
   if ((fromQuery === "nomba" || fromQuery === "card" || fromQuery === "express") && pool.includes("nomba")) return "nomba";
   if ((fromQuery === "lenhub" || fromQuery === "direct" || fromQuery === "ngn") && pool.includes("lenhub")) return "lenhub";
   if (
@@ -354,6 +362,7 @@ const TopUpPage = () => {
   const preferInterac = intlMethod === "interac";
   const preferFincra = intlMethod === "fincra" || africaMomoMethod === "fincra";
   const preferLenhubFlutter = intlMethod === "lenhub" || africaMomoMethod === "lenhub";
+  const preferDodo = intlMethod === "dodo";
   const preferSwychrResolved =
     africaMomoMethod === "swychr"
     || (
@@ -385,6 +394,7 @@ const TopUpPage = () => {
     preferFincra,
     preferFlutterwave,
     preferLenhubFlutter,
+    preferDodo,
   );
   const liveTopup = isLiveTopupCurrency(currency);
   const availableFlwMethods = FLW_METHODS_BY_CCY[currency] || ["card"];
@@ -474,6 +484,46 @@ const TopUpPage = () => {
         message,
       });
       clearLenhubReturnParams();
+      return;
+    }
+
+    const dodoFlag = params.get("dodo");
+    const dodoRef = params.get("ref") || readPendingDodoRef();
+    const dodoPaymentId = params.get("payment_id") || undefined;
+    const dodoStatus = params.get("status");
+    if (dodoFlag === "1" || dodoRef || dodoPaymentId) {
+      setVerifyState({ status: "verifying", message: "Confirming your Dodo payment…" });
+      (async () => {
+        try {
+          const result = await verifyDodoPayment({
+            reference: dodoRef || undefined,
+            payment_id: dodoPaymentId,
+          });
+          if (result.success) {
+            clearPendingDodoRef();
+            const message = result.already
+              ? "Payment already credited."
+              : "Payment received — your wallet has been updated.";
+            setVerifyState({ status: "success", message });
+            toast.success("Top-up complete");
+            void queryClient.invalidateQueries({ queryKey: ["wallets"] });
+          } else {
+            setVerifyState({
+              status: "verifying",
+              message:
+                result.message ||
+                (dodoStatus === "succeeded"
+                  ? "Payment succeeded at Dodo — finalizing wallet credit…"
+                  : "Waiting for Dodo confirmation — this can take a few seconds."),
+            });
+          }
+        } catch (e) {
+          setVerifyState({
+            status: "failed",
+            message: e instanceof Error ? e.message : "Could not confirm Dodo payment",
+          });
+        }
+      })();
       return;
     }
 
@@ -639,6 +689,7 @@ const TopUpPage = () => {
   const gatewayBadge = useMemo(() => {
     if (gateway === "swychr_pay") return { label: swychrGatewayLabel(currency), icon: Globe, color: "bg-violet-500/10 text-violet-700 border-violet-500/30" };
     if (gateway === "paytota_pay") return { label: paytotaGatewayLabel(currency), icon: FileText, color: "bg-sky-500/10 text-sky-700 border-sky-500/30" };
+    if (gateway === "dodo_pay") return { label: "Global card checkout", icon: Globe, color: "bg-fuchsia-500/10 text-fuchsia-700 border-fuchsia-500/30" };
     if (gateway === "nomba_pay") return { label: nombaGatewayLabel(currency), icon: CreditCard, color: "bg-green-600/10 text-green-700 border-green-600/30" };
     if (gateway === "lenhub_flutter") {
       return {
@@ -666,6 +717,7 @@ const TopUpPage = () => {
       intlMethods.map((m) => {
         const Icon =
           m === "paytota" ? FileText
+          : m === "dodo" ? Globe
           : m === "interac" ? Landmark
           : m === "fincra" ? Building2
           : CreditCard;
@@ -1051,6 +1103,17 @@ const TopUpPage = () => {
           {/* Pay by invoice */}
           {liveTopup && gateway === "paytota_pay" && selectedWallet && (
             <SectionBoundary name="PaytotaTopUp"><PaytotaTopUpCard
+              walletId={selectedWallet.wallet_id}
+              walletCurrency={currency}
+              onComplete={() => {
+                void queryClient.invalidateQueries({ queryKey: ["wallets"] });
+              }}
+            /></SectionBoundary>
+          )}
+
+          {/* Dodo Payments MoR checkout */}
+          {liveTopup && gateway === "dodo_pay" && selectedWallet && (
+            <SectionBoundary name="DodoTopUp"><DodoTopUpCard
               walletId={selectedWallet.wallet_id}
               walletCurrency={currency}
               onComplete={() => {

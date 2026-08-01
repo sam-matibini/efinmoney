@@ -57,3 +57,4 @@ tsconfig.app.tsbuildinfo
 scripts/.flw-probe.env
 scripts/.flw-v4.env
 scripts/.lenhub.env
+scripts/.dodo-reconcile.secret

@@ -28,6 +28,8 @@ export const productFeatures = {
   elicate: envFlag("VITE_FEATURE_ELICATE", true),
   /** Paytota invoice top-up for USD/EUR/GBP/CAD + East Africa MoMo (UGX/KES/RWF). */
   paytota: envFlag("VITE_FEATURE_PAYTOTA", true),
+  /** Dodo Payments MoR checkout — western wallet top-up (USD/CAD/EUR/GBP). */
+  dodo: envFlag("VITE_FEATURE_DODO", true),
   /** Paytota UGX/KES/RWF MoMo payout toggle on Send. */
   paytotaPayout: envFlag("VITE_FEATURE_PAYTOTA_PAYOUT", true),
   /** Fincra hosted checkout — western + Africa collect (NGN/GHS/KES/…). */
@@ -49,7 +51,7 @@ export function isFeatureEnabled(key: ProductFeatureKey): boolean {
 export function isLiveTopupCurrency(currency: string): boolean {
   const c = currency.toUpperCase();
   if (productFeatures.nombaNigeria && c === "NGN") return true;
-  if ((productFeatures.paytota || productFeatures.nombaNigeria || productFeatures.fincra || productFeatures.lenhubFlutter) && ["USD", "EUR", "GBP", "CAD"].includes(c)) {
+  if ((productFeatures.paytota || productFeatures.nombaNigeria || productFeatures.fincra || productFeatures.lenhubFlutter || productFeatures.dodo) && ["USD", "EUR", "GBP", "CAD"].includes(c)) {
     return true;
   }
   if (productFeatures.lenhubFlutter && ["NGN", "GHS", "KES", "UGX", "RWF", "TZS"].includes(c)) return true;

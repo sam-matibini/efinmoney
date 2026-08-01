@@ -40,6 +40,8 @@ export const PAYTOTA_TOPUP_CURRENCIES = [
   ...PAYTOTA_WESTERN_TOPUP_CURRENCIES,
   ...PAYTOTA_AFRICA_TOPUP_CURRENCIES,
 ];
+/** Dodo Payments MoR checkout — western wallet top-up. */
+export const DODO_TOPUP_CURRENCIES = ["USD", "CAD", "EUR", "GBP"];
 /** Fincra western hosted checkout. CAD uses USD charge → credit CAD wallet. */
 export const FINCRA_WESTERN_CHECKOUT_CURRENCIES = ["USD", "EUR", "GBP", "CAD"];
 /**
@@ -104,13 +106,14 @@ export type WalletTopupGateway =
   | "nomba_pay"
   | "swychr_pay"
   | "paytota_pay"
+  | "dodo_pay"
   | "lenhub_flutter"
   | "unsupported";
 
 export type WesternTopupProvider = "flutterwave" | "fincra";
 export type AfricanTopupProvider = "flutterwave" | "fincra";
 /** User-facing intl/CAD method pick (internal keys; UI uses white-label labels). */
-export type IntlTopupMethod = "nomba" | "paytota" | "fincra" | "interac" | "lenhub" | "flutterwave";
+export type IntlTopupMethod = "nomba" | "paytota" | "fincra" | "interac" | "lenhub" | "flutterwave" | "dodo";
 /** African multi-rail method pick. */
 export type AfricaMomoTopupMethod =
   | "swychr"
@@ -152,10 +155,13 @@ export function routeWalletTopupGateway(
   preferFincra = false,
   preferFlutterwave = false,
   preferLenhubFlutter = false,
+  preferDodo = false,
 ): WalletTopupGateway {
   const c = currency.toUpperCase();
   // Explicit Lenhub Flutter card rail
   if (preferLenhubFlutter && LENHUB_FLUTTER_TOPUP_CURRENCIES.includes(c)) return "lenhub_flutter";
+  // Explicit Dodo MoR checkout (western)
+  if (preferDodo && DODO_TOPUP_CURRENCIES.includes(c)) return "dodo_pay";
   // Explicit Interac (CAD) when user picked that method
   if (preferInterac && c === "CAD") return "fincra_interac";
   // Explicit Fincra hosted checkout (NGN + Africa + western) — before dedicated primary rails
@@ -181,7 +187,8 @@ export function routeWalletTopupGateway(
     !preferInterac &&
     !preferFincra &&
     !preferFlutterwave &&
-    !preferLenhubFlutter
+    !preferLenhubFlutter &&
+    !preferDodo
   ) {
     return "nomba_pay";
   }
@@ -236,6 +243,7 @@ export function nombaGatewayLabel(currency: string): string {
 /** Short benefit tag for the method picker (never a vendor name). */
 export function intlMethodBenefit(method: IntlTopupMethod): string {
   if (method === "paytota") return "Invoice";
+  if (method === "dodo") return "Global";
   if (method === "interac") return "Bank send";
   if (method === "fincra") return "Flexible";
   if (method === "lenhub") return "In-app";
@@ -256,6 +264,7 @@ export function africaMomoMethodBenefit(method: AfricaMomoTopupMethod): string {
 /** Processor name for staff/ops UI only — never show to customers. */
 export function intlMethodProvider(method: IntlTopupMethod): string {
   if (method === "paytota") return "Paytota";
+  if (method === "dodo") return "Dodo";
   if (method === "interac") return "Interac";
   if (method === "fincra") return "Fincra";
   if (method === "lenhub") return "Lenhub";
@@ -282,6 +291,7 @@ export function gatewayProviderLabel(gateway: WalletTopupGateway): string | null
   if (gateway === "elicate") return "Elicate";
   if (gateway === "fincra_interac") return "Interac";
   if (gateway === "fincra") return "Fincra";
+  if (gateway === "dodo_pay") return "Dodo";
   if (gateway === "flutterwave") return "Flutterwave";
   return null;
 }
@@ -290,6 +300,7 @@ export function intlMethodLabel(method: IntlTopupMethod, currency?: string): str
   if (method === "paytota") return "Pay by invoice";
   if (method === "interac") return "Interac e-Transfer";
   if (method === "fincra") return fincraGatewayLabel(currency || "");
+  if (method === "dodo") return "Global card checkout";
   if (method === "lenhub") {
     return currency?.toUpperCase() === "NGN" ? "NGN card or bank" : "Card (direct)";
   }
@@ -304,6 +315,9 @@ export function intlMethodDescription(method: IntlTopupMethod, currency: string)
   const c = currency.toUpperCase();
   if (method === "paytota") {
     return `Pay from a secure invoice link — your ${c} wallet credits after confirmation.`;
+  }
+  if (method === "dodo") {
+    return `Pay with card on a global checkout page — your ${c} wallet credits after confirmation.`;
   }
   if (method === "interac") {
     return "Send CAD from your Canadian bank with Interac e-Transfer.";

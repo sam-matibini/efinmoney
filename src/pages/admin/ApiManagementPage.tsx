@@ -53,6 +53,7 @@ const INTEGRATIONS: Array<{
   // Payments — Global & Cards
   { key: "stripe", name: "Stripe", description: "Card charges, Connect, Issuing & Treasury", category: "Payments — Global & Cards", envHints: ["STRIPE_SECRET_KEY"] },
   { key: "adyen", name: "Adyen", description: "Global card drop-in & payment links", category: "Payments — Global & Cards", envHints: ["ADYEN_API_KEY", "ADYEN_MERCHANT_ACCOUNT"] },
+  { key: "dodo", name: "Dodo Payments", description: "MoR global card checkout for USD/CAD/EUR/GBP wallet top-up", category: "Payments — Global & Cards", envHints: ["DODO_PAYMENTS_API_KEY", "DODO_PAYMENTS_WEBHOOK_KEY"] },
   { key: "paysafe", name: "Paysafe", description: "Canadian Interac & EFT payouts", category: "Payments — Global & Cards", envHints: ["PAYSAFE_API_KEY"] },
   // Banking
   { key: "plaid", name: "Plaid", description: "Bank account linking & balances (Canada domestic)", category: "Banking", envHints: ["PLAID_CLIENT_ID", "PLAID_SECRET"] },
@@ -137,6 +138,10 @@ const EDGE_FUNCTIONS: Array<{ name: string; description: string; jwt: boolean; c
   // Circle
   { name: "circle-reconcile",          description: "Reconcile Circle USDC transactions",       jwt: false, category: "Circle" },
   { name: "circle-webhook",            description: "Receives Circle events",                   jwt: false, category: "Circle" },
+  // Dodo Payments
+  { name: "dodo-initialize-checkout", description: "Create Dodo checkout for wallet top-up", jwt: true, category: "Dodo" },
+  { name: "dodo-verify-payment", description: "Verify Dodo payment on return URL", jwt: true, category: "Dodo" },
+  { name: "dodo-webhook", description: "Receives Dodo payment.succeeded events", jwt: false, category: "Dodo" },
   // Yellowcard
   { name: "yellowcard-payout",         description: "Initiates Yellowcard Africa payouts",      jwt: false, category: "Yellowcard" },
   { name: "yellowcard-webhook",        description: "Receives Yellowcard events",               jwt: false, category: "Yellowcard" },
