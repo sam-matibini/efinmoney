@@ -1,43 +1,28 @@
-## Current state (verified)
+## Goal
+Embed the Reception AI (ElevenLabs) booking assistant at a dedicated `/book` page, reachable both publicly and from inside the app.
 
-- `CommunicationsPanel.tsx` ("Communication Hub") only inserts a row into `customer_communications` and marks it `sent` — nothing is actually delivered. The channel picker offers email/SMS/WhatsApp/etc. regardless.
-- The recipient dropdown reads only the `customers` table, which currently holds 1 row — app users in `profiles` cannot be messaged.
-- `send-email` (Resend) works and already writes outbound emails to `customer_communications`, so the CRM timeline picks them up.
-- `customer_communications` has no attachment support; storage has no bucket for message files.
-- Only `RESEND_API_KEY` is configured — no SMS/WhatsApp provider.
+## What gets built
 
-## Plan
+1. **New page `src/pages/BookPage.tsx`**
+   - Renders the Reception AI iframe: `https://app.reception.ai/smb-public/book/efinmoney`, `allow="microphone"`, full-bleed inside the layout (not `position: fixed`, so the app's header/nav still work).
+   - Lightweight header bar with the eFinMoney logo, page title ("Book a call"), and a back link.
+   - Loading skeleton until the iframe fires `onLoad`, plus a fallback link ("Open the booking page in a new tab") if the embed is blocked.
+   - SEO: title/meta description, single H1, canonical.
 
-### 1. Database + storage
-- New table `communication_attachments`: `communication_id`, `file_name`, `file_path`, `mime_type`, `size_bytes`, `uploaded_by`. Staff read/write policies matching the existing `customer_communications` policies, plus service_role grants.
-- New private storage bucket `communication-attachments` with staff-only read/write policies on `storage.objects`.
-- Add `recipient_email`, `recipient_name`, and `error_message` columns to `customer_communications` so a message can target an app user or a plain address and record failures.
+2. **Routing (`src/App.tsx`)**
+   - Public route `/book` (lazy-loaded, alongside `/contact`, `/about`) so logged-out visitors and shared links work.
+   - Signed-in users hitting `/book` get the same page; no auth guard.
 
-### 2. Real sending — `send-communication` edge function
-- Verifies the caller is staff, validates channel/recipient/content.
-- **Email**: renders the staff message into the eFinMoney-branded HTML shell and sends via Resend. Attachments are not embedded — each file gets a signed download link (7-day expiry) rendered as a "Documents" block in the email, per your choice.
-- **In-app**: writes a `notifications` row for the target user.
-- **Phone call / meeting / note**: recorded as a logged interaction (no delivery attempt) — this is how staff capture calls.
-- **SMS / WhatsApp**: kept in the UI but clearly marked "logged only — no provider connected", saved with status `logged` instead of a fake `sent`. When you're ready to add Twilio, only this branch changes.
-- Every path writes one `customer_communications` row with real status (`sent` / `failed` / `logged`) and the provider message id or error in `metadata`.
-
-### 3. Communication Hub UI
-- Recipient picker becomes a searchable combobox over **app users (profiles) + CRM customers**, showing name, email and which source they came from; free-text email still allowed.
-- Channel select shows availability badges (Email = live, SMS/WhatsApp = logged only).
-- Attachment area: multi-file upload with progress, size/type validation, list with remove; files upload to the bucket before send and are linked to the created message.
-- Table rows gain an attachment (paperclip) indicator and a detail drawer showing full content, delivery status, error text, and downloadable attachments via signed URLs.
-- Failures surface the real provider error instead of a generic toast.
-
-### 4. Attachments across the CRM
-- Extend `CustomerCommunicationsPanel.tsx` and `UserActivityTimeline.tsx` so any message shown there lists its attachments with secure download links.
-- The "Log interaction" dialog in the timeline gains the same upload control, so staff can attach a scanned letter or signed form to a logged call.
-
-### 5. Verification
-- Send a live email from the hub with an attachment to a test address and confirm the Resend response, the `customer_communications` row, the attachment row, and a working signed link.
-- Confirm the message appears in the user's CRM timeline with the attachment.
+3. **Entry points**
+   - Marketing: "Book a call" button on the Contact page (and footer nav if one exists there).
+   - In-app: a "Book a call" item in `MorePage` / Support section linking to `/book`.
 
 ## Technical notes
+- The iframe needs `allow="microphone"`; browsers only grant mic in a secure context, which the preview and published domain both satisfy.
+- Use the app's layout container rather than `position: fixed; inset: 0` so mobile bottom nav isn't covered; the iframe gets a viewport-height-minus-chrome height (`h-[calc(100dvh-…)]`).
+- No backend, secrets, or database changes — pure frontend embed.
+- Styling uses existing semantic tokens (dark theme, Space Grotesk headings), no hardcoded colors.
 
-- Files are stored privately; nothing is served publicly. Links in emails are Supabase signed URLs with a 7-day expiry, regenerated on demand inside the app.
-- No fake "sent" statuses: unsupported channels are stored as `logged` so reporting stays honest.
-- SMS/WhatsApp go live later by adding provider credentials and one branch in `send-communication` — no UI or schema rework needed.
+## Out of scope
+- Any ElevenLabs SDK / `useConversation` integration — this is the hosted Reception AI page only.
+- Storing bookings in the app's database (bookings live in Reception AI).
