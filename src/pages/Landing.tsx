@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { ArrowRight, Globe, Shield, Zap, Wallet, Send, BarChart3, Layers, Check } from "lucide-react";
 import MarketingHeader from "@/components/marketing/MarketingHeader";
 import MarketingFooter from "@/components/marketing/MarketingFooter";
+import { openAlice } from "@/components/alice/aliceBus";
 import { CountryFlag, CurrencyFlag } from "@/components/ui/FlagImage";
 import africaHero from "@/assets/landing-africa-hero.jpg";
 import africaBand from "@/assets/landing-africa-band.jpg";
@@ -566,12 +567,13 @@ const Landing = () => {
               ))}
             </ul>
             <div className="mt-8 flex flex-wrap gap-3">
-              <Link
-                to="/contact"
+              <button
+                type="button"
+                onClick={() => openAlice("booking")}
                 className="inline-flex items-center gap-2 bg-[hsl(var(--accent-amber))] hover:brightness-110 text-[hsl(var(--brand-900))] font-bold px-6 py-3 rounded-full text-sm transition-all hover:-translate-y-0.5 shadow-cta-amber"
               >
                 Talk to sales <ArrowRight className="w-4 h-4" />
-              </Link>
+              </button>
               <Link
                 to="/auth"
                 className="inline-flex items-center gap-2 bg-[hsl(var(--brand-900))] text-white font-bold px-6 py-3 rounded-full text-sm transition-all hover:-translate-y-0.5"

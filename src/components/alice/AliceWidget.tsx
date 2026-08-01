@@ -5,10 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { Sparkles, Send, Plus, History, X, Loader2, Headphones } from "lucide-react";
+import { Sparkles, Send, Plus, History, X, Loader2, Headphones, CalendarClock, ArrowLeft } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { useAliceChat, type AliceMessage } from "@/hooks/useAliceChat";
 import LiveSupportChat from "@/components/support/LiveSupportChat";
+import BookingEmbed from "@/components/booking/BookingEmbed";
+import { ALICE_OPEN_EVENT, type AliceMode } from "@/components/alice/aliceBus";
 
 /** Show human support after Alice has tried — not on a fresh empty chat. */
 function shouldOfferHumanSupport(messages: AliceMessage[]): boolean {
@@ -40,7 +42,7 @@ const STARTERS: Record<"user" | "admin", string[]> = {
 export default function AliceWidget({ context }: { context: "user" | "admin" }) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
-  const [mode, setMode] = useState<"alice" | "support">("alice");
+  const [mode, setMode] = useState<AliceMode>("alice");
   const [showHistory, setShowHistory] = useState(false);
   const [input, setInput] = useState("");
   const { messages, isSending, send, newChat, loadConversation, conversations } = useAliceChat(context);
@@ -50,6 +52,17 @@ export default function AliceWidget({ context }: { context: "user" | "admin" }) 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  /* Open (and optionally jump to a mode) when another page fires the bus event. */
+  useEffect(() => {
+    const onOpen = (e: Event) => {
+      const detail = (e as CustomEvent<{ mode?: AliceMode }>).detail;
+      setOpen(true);
+      if (detail?.mode) setMode(detail.mode);
+    };
+    window.addEventListener(ALICE_OPEN_EVENT, onOpen);
+    return () => window.removeEventListener(ALICE_OPEN_EVENT, onOpen);
+  }, []);
 
   /* ── draggable launcher (position persisted per browser) ── */
   const SIZE = 56;
@@ -141,6 +154,24 @@ export default function AliceWidget({ context }: { context: "user" | "admin" }) 
         <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col gap-0" hideClose>
           {mode === "support" ? (
             <LiveSupportChat onBack={() => setMode("alice")} />
+          ) : mode === "booking" ? (
+            <div className="flex flex-col h-full">
+              <div className="flex items-center gap-2 px-4 h-14 border-b shrink-0">
+                <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setMode("alice")} aria-label="Back to Alice">
+                  <ArrowLeft className="h-4 w-4" />
+                </Button>
+                <div className="h-8 w-8 rounded-full bg-primary/10 text-primary flex items-center justify-center">
+                  <CalendarClock className="h-4 w-4" />
+                </div>
+                <div className="leading-tight flex-1">
+                  <div className="font-semibold text-sm">Book a call</div>
+                  <div className="text-xs text-muted-foreground">Talk to the eFinMoney team</div>
+                </div>
+              </div>
+              <div className="relative flex-1">
+                <BookingEmbed className="absolute inset-0" />
+              </div>
+            </div>
           ) : (
           <>
           {/* Header */}
@@ -204,6 +235,15 @@ export default function AliceWidget({ context }: { context: "user" | "admin" }) 
                         {s}
                       </button>
                     ))}
+                    {context === "user" && (
+                      <button
+                        onClick={() => setMode("booking")}
+                        className="flex items-center gap-2 text-left text-sm rounded-lg border px-3 py-2 hover:bg-muted/50 transition-colors"
+                      >
+                        <CalendarClock className="h-4 w-4 shrink-0 text-primary" />
+                        <span>Book a call with our team</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
@@ -243,14 +283,24 @@ export default function AliceWidget({ context }: { context: "user" | "admin" }) 
           {/* Human support — only after Alice has tried and still can’t resolve */}
           <div className="border-t shrink-0">
             {offerHumanSupport && (
-              <button
-                type="button"
-                onClick={() => setMode("support")}
-                className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors border-b"
-              >
-                <Headphones className="h-4 w-4 shrink-0" />
-                <span className="flex-1 text-left">Still stuck? Talk to a human</span>
-              </button>
+              <div className="border-b">
+                <button
+                  type="button"
+                  onClick={() => setMode("support")}
+                  className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors"
+                >
+                  <Headphones className="h-4 w-4 shrink-0" />
+                  <span className="flex-1 text-left">Still stuck? Talk to a human</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMode("booking")}
+                  className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors border-t"
+                >
+                  <CalendarClock className="h-4 w-4 shrink-0" />
+                  <span className="flex-1 text-left">Book a call with our team</span>
+                </button>
+              </div>
             )}
             <form
               onSubmit={(e) => { e.preventDefault(); submit(input); }}

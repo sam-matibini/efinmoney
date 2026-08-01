@@ -1,13 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, ExternalLink, Loader2 } from "lucide-react";
-
-const BOOKING_URL = "https://app.reception.ai/smb-public/book/efinmoney";
+import { ArrowLeft, ExternalLink } from "lucide-react";
+import BookingEmbed, { BOOKING_URL } from "@/components/booking/BookingEmbed";
 
 /** Hosted Reception AI voice booking assistant, embedded full-bleed. */
 export default function BookPage() {
-  const [loaded, setLoaded] = useState(false);
-
   useEffect(() => {
     document.title = "Book a call — eFinMoney";
 
@@ -65,19 +62,7 @@ export default function BookPage() {
       </header>
 
       <main className="relative flex-1">
-        {!loaded && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-background">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">Loading the booking assistant…</p>
-          </div>
-        )}
-        <iframe
-          src={BOOKING_URL}
-          title="Book a call with eFinMoney"
-          allow="microphone"
-          onLoad={() => setLoaded(true)}
-          className="h-[calc(100dvh-4.25rem)] w-full border-0"
-        />
+        <BookingEmbed className="absolute inset-0" />
       </main>
     </div>
   );

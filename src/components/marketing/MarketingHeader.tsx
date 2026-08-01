@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, lazy, Suspense } from "react";
 import { Link } from "react-router-dom";
 import {
   Menu, X, ChevronDown, Wallet, Send, Smartphone, Repeat, ArrowRight, CreditCard, Receipt,
 } from "lucide-react";
 import { Logo, Wordmark } from "@/components/Logo";
 import { cn } from "@/lib/utils";
+
+const PublicAliceLauncher = lazy(() => import("@/components/alice/PublicAliceLauncher"));
 
 const LIVE_ITEMS = [
   {
@@ -227,6 +229,10 @@ export default function MarketingHeader({ variant = "solid" }: { variant?: "tran
           </div>
         </div>
       )}
+
+      <Suspense fallback={null}>
+        <PublicAliceLauncher />
+      </Suspense>
     </header>
   );
 }

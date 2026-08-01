@@ -34,6 +34,7 @@ import { productFeatures } from "@/lib/productFeatures";
 import PageHeroBanner from "@/components/common/PageHeroBanner";
 import AppPage from "@/components/layout/AppPage";
 import { useKyb, KybStep } from "@/hooks/useKyb";
+import { openAlice } from "@/components/alice/aliceBus";
 
 interface Row {
   icon: any;
@@ -269,7 +270,7 @@ const MorePage = () => {
               { icon: Globe, label: "App Language", onClick: () => {} },
               { icon: Users, label: "Affiliates & Referrals", onClick: () => {} },
               { icon: MessageSquare, label: "Talk to Support", onClick: () => navigate("/support") },
-              { icon: CalendarClock, label: "Book a call", onClick: () => navigate("/book") },
+              { icon: CalendarClock, label: "Book a call", onClick: () => openAlice("booking") },
               { icon: ArrowLeftRight, label: "See our rates", onClick: () => navigate("/exchange") },
             ]}
           />

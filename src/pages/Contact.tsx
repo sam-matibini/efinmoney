@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Link } from "react-router-dom";
 import { Mail, Clock, MessageSquare, Send, Loader2, CheckCircle2, CalendarClock } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import MarketingHeader from "@/components/marketing/MarketingHeader";
 import MarketingFooter from "@/components/marketing/MarketingFooter";
+import { openAlice } from "@/components/alice/aliceBus";
 
 const SUPPORT_EMAIL = "support@efin.money";
 
@@ -113,12 +113,13 @@ export default function Contact() {
               <div>
                 <h3 className="font-bold text-[hsl(var(--brand-900))]">Book a call</h3>
                 <p className="text-sm text-neutral-600 mb-2">Speak with our AI receptionist and pick a time that works for you.</p>
-                <Link
-                  to="/book"
+                <button
+                  type="button"
+                  onClick={() => openAlice("booking")}
                   className="inline-flex items-center gap-1.5 rounded-full bg-[hsl(var(--brand-700))] px-4 py-2 text-sm font-semibold text-white hover:bg-[hsl(var(--brand-900))] transition-colors"
                 >
                   Book a call
-                </Link>
+                </button>
               </div>
             </div>
           </div>
