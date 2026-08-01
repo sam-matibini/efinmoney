@@ -50,6 +50,7 @@ const Features = lazyImport(() => import("./pages/Features"));
 const HowItWorks = lazyImport(() => import("./pages/HowItWorks"));
 const About = lazyImport(() => import("./pages/About"));
 const Contact = lazyImport(() => import("./pages/Contact"));
+const BookPage = lazyImport(() => import("./pages/BookPage"));
 const AuthConfirm = lazyImport(() => import("./pages/AuthConfirm"));
 const ResetPasswordPage = lazyImport(() => import("./pages/ResetPasswordPage"));
 const FinanceDashboard = lazyImport(() => import("./pages/FinanceDashboard"));
