@@ -226,6 +226,18 @@ export default function AliceWidget({ context }: { context: "user" | "admin" }) 
                     Hi, I'm Alice 👋 Ask me anything about EfinMoney{context === "admin" ? " or your operations" : " or your account"}.
                   </div>
                   <div className="flex flex-col gap-2">
+                    {context === "user" && (
+                      <>
+                        <button
+                          onClick={() => setMode("booking")}
+                          className="flex items-center gap-2 text-left text-sm rounded-lg border border-primary/40 bg-primary/5 px-3 py-2 hover:bg-primary/10 transition-colors"
+                        >
+                          <CalendarClock className="h-4 w-4 shrink-0 text-primary" />
+                          <span>Book a call with our team</span>
+                        </button>
+                        <div className="border-t my-1" />
+                      </>
+                    )}
                     {STARTERS[context].map((s) => (
                       <button
                         key={s}
@@ -235,15 +247,6 @@ export default function AliceWidget({ context }: { context: "user" | "admin" }) 
                         {s}
                       </button>
                     ))}
-                    {context === "user" && (
-                      <button
-                        onClick={() => setMode("booking")}
-                        className="flex items-center gap-2 text-left text-sm rounded-lg border px-3 py-2 hover:bg-muted/50 transition-colors"
-                      >
-                        <CalendarClock className="h-4 w-4 shrink-0 text-primary" />
-                        <span>Book a call with our team</span>
-                      </button>
-                    )}
                   </div>
                 </div>
               )}
