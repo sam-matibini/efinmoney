@@ -121,8 +121,16 @@ Deno.serve(async (req) => {
 
     const cfg = getFincraConfig();
     if (!cfg.secretKey || !cfg.businessId) {
-      await supabase.from("transfers").update({ status: "processing", provider_reference: `STUB-FINCRA-${transfer_id.slice(0, 8)}` }).eq("id", transfer_id);
-      return new Response(JSON.stringify({ success: true, stub: true, message: "Fincra not configured" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      const reason = "Fincra is not configured";
+      await supabase.from("transfers").update({
+        status: "failed",
+        failure_reason: reason,
+        provider_reference: `STUB-FINCRA-${transfer_id.slice(0, 8)}`,
+      }).eq("id", transfer_id);
+      return new Response(
+        JSON.stringify({ success: false, stub: true, error: reason, message: reason }),
+        { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
 
     const hasBankRail = !!(account_number && bank_code);

@@ -376,86 +376,37 @@ Deno.serve(async (req) => {
       (recipientCountryHint ?? "").trim().toUpperCase() === "GHANA";
     const ghanaPayConfigured = isGhanaPayConfigured();
 
-    // Explicit rail opt-ins from the Send UI (boolean or string "true").
-    const flagOn = (v: unknown) => v === true || v === "true" || v === 1 || v === "1";
-    const wantFincra = flagOn(payload.use_fincra) || flagOn((transfer as { use_fincra?: unknown }).use_fincra)
-      || String(transfer.provider_charge_id || "").toLowerCase().includes("fincra");
-    // Explicit Flutterwave opt-in (wallet / card-send chooser) — never when Fincra was chosen.
-    const wantFlutterwave = !wantFincra && (
-      flagOn(payload.use_flutterwave) || flagOn((transfer as { use_flutterwave?: unknown }).use_flutterwave)
+    const fincraConfigured = !!(
+      Deno.env.get("FINCRA_SECRET_KEY")?.trim()
+      && Deno.env.get("FINCRA_BUSINESS_ID")?.trim()
     );
-
-    // Lenhub Flutter — GHS/KES/UGX MoMo when enabled; NGN bank only if explicitly requested
-    // (Nomba is the default NGN bank payout rail).
-    const lenhubFlutterEnvOn = Deno.env.get("LENHUB_FLUTTER_ENABLED") !== "false"
-      && Deno.env.get("LENHUB_FLUTTER_PAYOUT") !== "false";
-    // EfinMoney OpenAPI: bank FX is NGN-only; MoMo is unified GHS/KES/UGX.
-    const LENHUB_FLUTTER_BANK = new Set(["NGN"]);
-    const LENHUB_FLUTTER_MOMO = new Set(["GHS", "KES", "UGX"]);
-    const hasLenhubBankRail = !!(transfer.recipient_account && transfer.recipient_bank_code)
-      && LENHUB_FLUTTER_BANK.has(targetCurrency);
-    const hasLenhubGhanaMomo = isMobileMoneyMethod && LENHUB_FLUTTER_MOMO.has(targetCurrency)
-      && !(transfer.recipient_account && transfer.recipient_bank_code);
-    const useLenhubFlutter =
-      lenhubFlutterEnvOn &&
-      !wantFincra &&
-      !wantFlutterwave &&
-      !isCanada &&
-      !isZambia &&
-      !usePawapay &&
-      !useMtnMomo &&
-      !useStellar &&
-      transfer.payout_method !== "card_push" &&
-      (
-        hasLenhubGhanaMomo
-        || (hasLenhubBankRail && payload.use_lenhub_flutter === true)
-      );
-
-    const useGhanaPay =
-      !useLenhubFlutter &&
-      !wantFlutterwave &&
-      ghanaPayConfigured &&
-      isGhana &&
-      !isCanada &&
-      !isZambia &&
-      !usePawapay &&
-      !useMtnMomo &&
-      !useStellar &&
-      transfer.payout_method !== "card_push" &&
-      !(transfer.recipient_account && transfer.recipient_bank_code) &&
-      !wantFincra &&
-      !(payload.use_pawapay === true || transfer.use_pawapay === true);
-    const useFincra =
-      wantFincra &&
-      !useGhanaPay &&
-      !useLenhubFlutter &&
-      !isCanada && !isZambia && !usePawapay && !useMtnMomo && !useStellar &&
-      transfer.payout_method !== "card_push";
-
-    // Paytota MoMo — opt-in via use_paytota or PAYTOTA_PAYOUT_ENABLED (UGX/KES/RWF)
-    const paytotaPayoutEnvOn = Deno.env.get("PAYTOTA_PAYOUT_ENABLED") === "true";
-    const paytotaMomoCurrencies = new Set(["UGX", "KES", "RWF"]);
-    const usePaytota =
-      !isCanada &&
-      !isZambia &&
-      !usePawapay &&
-      !useMtnMomo &&
-      !useStellar &&
-      !useGhanaPay &&
-      !useLenhubFlutter &&
-      !useFincra &&
-      !wantFlutterwave &&
-      isMobileMoneyMethod &&
-      paytotaMomoCurrencies.has(targetCurrency) &&
-      (payload.use_paytota === true || paytotaPayoutEnvOn);
-
+    const FINCRA_MOMO = new Set(["KES", "GHS", "UGX", "TZS", "ZMW", "RWF"]);
     const isNigeriaBank =
       targetCurrency === "NGN" &&
       transfer.payout_method === "bank" &&
       !!transfer.recipient_account &&
       !!transfer.recipient_bank_code;
-    // When Lenhub Flutter or Flutterwave is opted-in for NGN bank, Nomba is skipped.
-    const nombaNigeriaOnly = !useLenhubFlutter && !wantFlutterwave;
+
+    // Corridors Fincra can serve → fixed priority chain (not random).
+    // Order: Fincra → Flutterwave → Lenhub → Nomba → Paytota → Swychr
+    const fincraCapable =
+      !isCanada
+      && transfer.payout_method !== "card_push"
+      && (
+        (isMobileMoneyMethod && FINCRA_MOMO.has(targetCurrency))
+        || isNigeriaBank
+      );
+
+    const lenhubFlutterEnvOn = Deno.env.get("LENHUB_FLUTTER_ENABLED") !== "false"
+      && Deno.env.get("LENHUB_FLUTTER_PAYOUT") !== "false";
+    const LENHUB_FLUTTER_BANK = new Set(["NGN"]);
+    const LENHUB_FLUTTER_MOMO = new Set(["GHS", "KES", "UGX"]);
+    const hasLenhubBankRail = isNigeriaBank && LENHUB_FLUTTER_BANK.has(targetCurrency);
+    const hasLenhubMomoRail = isMobileMoneyMethod && LENHUB_FLUTTER_MOMO.has(targetCurrency)
+      && !(transfer.recipient_account && transfer.recipient_bank_code);
+    const paytotaMomoCurrencies = new Set(["UGX", "KES", "RWF"]);
+    const paytotaCapable = isMobileMoneyMethod && paytotaMomoCurrencies.has(targetCurrency);
+    const swychrEnabled = Deno.env.get("SWYCHR_ENABLED") === "true";
 
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
     const internalHeaders = {
@@ -498,22 +449,23 @@ Deno.serve(async (req) => {
       console.error("routing engine dispatch failed, using legacy rails", e);
     }
 
+    const flwBody = () => ({
+      transfer_id,
+      phone_number: transfer.recipient_phone,
+      account_number: transfer.recipient_account,
+      bank_code: transfer.recipient_bank_code,
+      amount: Number(transfer.target_amount ?? transfer.source_amount),
+      currency: transfer.target_currency ?? transfer.source_currency,
+      network: resolveNetwork(transfer.payout_method, transfer.target_currency ?? transfer.source_currency),
+      recipient_name: transfer.recipient_name,
+    });
+
+    const payoutOk = (r: any) =>
+      r && r.stub !== true && r.success !== false && (r.success === true || r.queued || r.pending_liquidity);
+
     try {
       if (engineRouted) {
         // Routing engine already executed the payout.
-      } else if (isZambia && !wantFlutterwave) {
-        const res = await fetch(
-          `${Deno.env.get("SUPABASE_URL")}/functions/v1/elicate-payout`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-internal-secret": Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "",
-            },
-            body: JSON.stringify({ transfer_id }),
-          },
-        );
-        payoutResult = await res.json();
       } else if (usePawapay) {
         const res = await fetch(
           `${Deno.env.get("SUPABASE_URL")}/functions/v1/pawapay-payout`,
@@ -540,7 +492,6 @@ Deno.serve(async (req) => {
           },
         );
         payoutResult = await res.json();
-
       } else if (useStellar) {
         const res = await fetch(
           `${Deno.env.get("SUPABASE_URL")}/functions/v1/stellar-sep31-payout`,
@@ -555,10 +506,6 @@ Deno.serve(async (req) => {
         );
         payoutResult = await res.json();
       } else if (transfer.payout_method === "card_push") {
-        // Stripe card-push (Visa Direct / Mastercard Send) to the recipient's
-        // debit card. Works for any Stripe corridor (CA/US/GB/EU-27) — the
-        // stripe-payout function enforces the supported-corridor allow-list,
-        // so this is intentionally NOT gated on isCanada.
         const fnBody: Record<string, unknown> = {
           transfer_id,
           card_token: payload.recipient_card_token,
@@ -584,8 +531,6 @@ Deno.serve(async (req) => {
         );
         payoutResult = await res.json();
       } else if (isCanada) {
-        // Canadian non-card_push payouts: self-payout to own connected
-        // account (stripe_connect) or Interac/EFT via Paysafe.
         const fnName = transfer.payout_method === "stripe_connect"
           ? "stripe-connect-instant-payout"
           : "paysafe-payout";
@@ -601,55 +546,162 @@ Deno.serve(async (req) => {
           },
         );
         payoutResult = await res.json();
-      } else if (useLenhubFlutter) {
-        const lfRes = await fetch(
-          `${Deno.env.get("SUPABASE_URL")}/functions/v1/lenhub-flutter-payout`,
-          {
-            method: "POST",
-            headers: internalHeaders,
-            body: JSON.stringify({ transfer_id }),
-          },
-        );
-        payoutResult = await lfRes.json().catch(() => ({
-          success: false,
-          error: `lenhub-flutter-payout HTTP ${lfRes.status}`,
-          rail: "lenhub_flutter",
-        }));
-        // Fallbacks: NGN bank → Nomba; GHS MoMo → Ghana Pay; else Flutterwave
-        if (payoutResult?.success === false) {
-          if (isNigeriaBank && isNombaNigeriaConfigured()) {
+      } else if (fincraCapable) {
+        // Fixed priority: Fincra → Flutterwave → Lenhub → Nomba → Paytota → Swychr
+        const attempts: string[] = [];
+        const tryNext = async (rail: string, fn: () => Promise<any>) => {
+          if (payoutOk(payoutResult)) return;
+          attempts.push(rail);
+          const r = await fn();
+          if (payoutOk(r)) {
+            payoutResult = { ...r, rail: r?.rail || rail, priority_chain: attempts };
+          } else {
+            payoutResult = {
+              ...(r || {}),
+              success: false,
+              rail,
+              error: r?.error || r?.provider_message || `${rail} payout failed`,
+              priority_chain: attempts,
+            };
+          }
+        };
+
+        // 1) Fincra
+        if (fincraConfigured && Deno.env.get("FINCRA_PAYOUT_SMART") !== "false") {
+          await tryNext("fincra", async () => {
+            await supabase.from("transfers").update({
+              provider_reference: `FINCRA-PENDING-${String(transfer_id).slice(0, 8)}`,
+              provider_charge_id: "rail:fincra",
+            }).eq("id", transfer_id);
+            const fincraRes = await fetch(
+              `${Deno.env.get("SUPABASE_URL")}/functions/v1/fincra-payout`,
+              {
+                method: "POST",
+                headers: internalHeaders,
+                body: JSON.stringify({
+                  ...flwBody(),
+                  // Keep wallet funded so we can fall through to the next rail.
+                  skip_reversal: true,
+                }),
+              },
+            );
+            return fincraRes.json().catch(() => ({
+              success: false,
+              error: `fincra-payout HTTP ${fincraRes.status}`,
+              rail: "fincra",
+            }));
+          });
+          if (!payoutOk(payoutResult)) {
+            await supabase.from("transfers").update({
+              provider_charge_id: null,
+              provider_reference: null,
+            }).eq("id", transfer_id);
+          }
+        }
+
+        // 2) Flutterwave
+        await tryNext("flutterwave", async () => {
+          const flwRes = await fetch(
+            `${Deno.env.get("SUPABASE_URL")}/functions/v1/flutterwave-payout`,
+            { method: "POST", headers: internalHeaders, body: JSON.stringify(flwBody()) },
+          );
+          return flwRes.json().catch(() => ({
+            success: false,
+            error: `flutterwave-payout HTTP ${flwRes.status}`,
+            rail: "flutterwave",
+          }));
+        });
+
+        // 3) Lenhub (NGN bank or GHS/KES/UGX MoMo)
+        if (lenhubFlutterEnvOn && (hasLenhubBankRail || hasLenhubMomoRail)) {
+          await tryNext("lenhub_flutter", async () => {
+            const lfRes = await fetch(
+              `${Deno.env.get("SUPABASE_URL")}/functions/v1/lenhub-flutter-payout`,
+              { method: "POST", headers: internalHeaders, body: JSON.stringify({ transfer_id }) },
+            );
+            return lfRes.json().catch(() => ({
+              success: false,
+              error: `lenhub-flutter-payout HTTP ${lfRes.status}`,
+              rail: "lenhub_flutter",
+            }));
+          });
+        }
+
+        // 4) Nomba (NGN bank)
+        if (isNigeriaBank && isNombaNigeriaConfigured()) {
+          await tryNext("nomba", async () => {
             const nombaRes = await fetch(
               `${Deno.env.get("SUPABASE_URL")}/functions/v1/nomba-payout`,
               { method: "POST", headers: internalHeaders, body: JSON.stringify({ transfer_id }) },
             );
-            const nombaJson = await nombaRes.json().catch(() => null);
-            if (nombaJson?.success) payoutResult = nombaJson;
-          } else if (hasLenhubGhanaMomo && ghanaPayConfigured) {
+            return nombaRes.json().catch(() => ({
+              success: false,
+              error: `nomba-payout HTTP ${nombaRes.status}`,
+              rail: "nomba",
+            }));
+          });
+        }
+
+        // 5) Paytota (UGX/KES/RWF MoMo)
+        if (paytotaCapable) {
+          await tryNext("paytota", async () => {
+            const paytotaRes = await fetch(
+              `${Deno.env.get("SUPABASE_URL")}/functions/v1/paytota-payout`,
+              { method: "POST", headers: internalHeaders, body: JSON.stringify({ transfer_id }) },
+            );
+            return paytotaRes.json().catch(() => ({
+              success: false,
+              error: `paytota-payout HTTP ${paytotaRes.status}`,
+              rail: "paytota",
+            }));
+          });
+        }
+
+        // 6) Swychr (NGN bank when enabled)
+        if (isNigeriaBank && swychrEnabled) {
+          await tryNext("swychr", async () => {
+            const swychrRes = await fetch(
+              `${Deno.env.get("SUPABASE_URL")}/functions/v1/swychr-payout`,
+              { method: "POST", headers: internalHeaders, body: JSON.stringify({ transfer_id }) },
+            );
+            return swychrRes.json().catch(() => ({
+              success: false,
+              error: `swychr-payout HTTP ${swychrRes.status}`,
+              rail: "swychr",
+            }));
+          });
+        }
+
+        // Ghana Pay as last MoMo safety for GHS if everything above failed
+        if (!payoutOk(payoutResult) && isGhana && isMobileMoneyMethod && ghanaPayConfigured) {
+          await tryNext("ghana_pay", async () => {
             const ghRes = await fetch(
               `${Deno.env.get("SUPABASE_URL")}/functions/v1/ghana-payout`,
               { method: "POST", headers: internalHeaders, body: JSON.stringify({ transfer_id }) },
             );
-            const ghJson = await ghRes.json().catch(() => null);
-            if (ghJson?.success) payoutResult = ghJson;
-          } else {
-            const flwRes = await fetch(
-              `${Deno.env.get("SUPABASE_URL")}/functions/v1/flutterwave-payout`,
-              { method: "POST", headers: internalHeaders, body: JSON.stringify({
-                transfer_id,
-                phone_number: transfer.recipient_phone,
-                account_number: transfer.recipient_account,
-                bank_code: transfer.recipient_bank_code,
-                amount: Number(transfer.target_amount ?? transfer.source_amount),
-                currency: transfer.target_currency ?? transfer.source_currency,
-                network: resolveNetwork(transfer.payout_method, transfer.target_currency ?? transfer.source_currency),
-                recipient_name: transfer.recipient_name,
-              }) },
-            );
-            const flwJson = await flwRes.json().catch(() => null);
-            if (flwJson?.success) payoutResult = flwJson;
-          }
+            return ghRes.json().catch(() => ({
+              success: false,
+              error: `ghana-payout HTTP ${ghRes.status}`,
+              rail: "ghana_pay",
+            }));
+          });
         }
-      } else if (useGhanaPay) {
+
+        console.log("priority payout chain", attempts, "final", payoutResult?.rail, payoutResult?.success);
+      } else if (isZambia) {
+        const res = await fetch(
+          `${Deno.env.get("SUPABASE_URL")}/functions/v1/elicate-payout`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-internal-secret": Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "",
+            },
+            body: JSON.stringify({ transfer_id }),
+          },
+        );
+        payoutResult = await res.json();
+      } else if (ghanaPayConfigured && isGhana && isMobileMoneyMethod) {
         const res = await fetch(
           `${Deno.env.get("SUPABASE_URL")}/functions/v1/ghana-payout`,
           {
@@ -662,165 +714,17 @@ Deno.serve(async (req) => {
           },
         );
         payoutResult = await res.json();
-      } else if (useFincra || wantFincra) {
-        // Stamp so tracking/refresh never hijacks this transfer onto Flutterwave.
-        await supabase.from("transfers").update({
-          provider_reference: `FINCRA-PENDING-${String(transfer_id).slice(0, 8)}`,
-          provider_charge_id: "rail:fincra",
-        }).eq("id", transfer_id);
-        const fincraRes = await fetch(
-          `${Deno.env.get("SUPABASE_URL")}/functions/v1/fincra-payout`,
-          {
-            method: "POST",
-            headers: internalHeaders,
-            body: JSON.stringify({
-              transfer_id,
-              phone_number: transfer.recipient_phone,
-              account_number: transfer.recipient_account,
-              bank_code: transfer.recipient_bank_code,
-              amount: Number(transfer.target_amount ?? transfer.source_amount),
-              currency: transfer.target_currency ?? transfer.source_currency,
-              network: resolveNetwork(transfer.payout_method, transfer.target_currency ?? transfer.source_currency),
-              recipient_name: transfer.recipient_name,
-              // Explicit Fincra toggle: reverse on failure (do NOT silently pay via Flutterwave).
-              skip_reversal: false,
-            }),
-          },
-        );
-        payoutResult = await fincraRes.json();
-        if (payoutResult && payoutResult.success !== true) {
-          payoutResult = {
-            ...payoutResult,
-            success: false,
-            rail: "fincra",
-            error: payoutResult.error || payoutResult.provider_message || "Fincra payout failed",
-          };
-        }
-      } else if (isNigeriaBank && nombaNigeriaOnly) {
-        if (useStellar || useFincra || usePawapay || useMtnMomo) {
-          payoutResult = {
-            success: false,
-            error: "NGN bank payout blocked: another rail flag is set (stellar/fincra/pawapay/mtn)",
-            code: "nomba_rail_conflict",
-            rail: "nomba",
-          };
-        } else {
-          const wantSwychr = payload.use_swychr === true || transfer.use_swychr === true;
-          const useSwychrPrimary = wantSwychr
-            || (Deno.env.get("SWYCHR_ENABLED") === "true"
-              && Deno.env.get("SWYCHR_PAYOUT_PRIMARY") !== "false"
-              && payload.use_swychr !== false);
-          const trySwychr = async () => {
-            const swychrRes = await fetch(
-              `${Deno.env.get("SUPABASE_URL")}/functions/v1/swychr-payout`,
-              { method: "POST", headers: internalHeaders, body: JSON.stringify({ transfer_id }) },
-            );
-            return swychrRes.json().catch(() => ({
-              success: false,
-              error: `swychr-payout returned HTTP ${swychrRes.status}`,
-              rail: "swychr",
-            }));
-          };
-          const tryNomba = async () => {
-            if (!isNombaNigeriaConfigured()) {
-              return {
-                success: false,
-                error: "Nomba Nigeria is not configured (set NOMBA_PAY_API_URL + NOMBA_PAY_USER on Supabase)",
-                code: "nomba_not_configured",
-                rail: "nomba",
-              };
-            }
-            const nombaRes = await fetch(
-              `${Deno.env.get("SUPABASE_URL")}/functions/v1/nomba-payout`,
-              { method: "POST", headers: internalHeaders, body: JSON.stringify({ transfer_id }) },
-            );
-            return nombaRes.json().catch(() => ({
-              success: false,
-              error: `nomba-payout returned HTTP ${nombaRes.status}`,
-              code: "nomba_http_error",
-              rail: "nomba",
-            }));
-          };
-
-          if (useSwychrPrimary) {
-            payoutResult = await trySwychr();
-            if (payoutResult?.success === false) {
-              const nombaJson = await tryNomba();
-              if (nombaJson?.success) payoutResult = nombaJson;
-            }
-          } else {
-            payoutResult = await tryNomba();
-            if (payoutResult?.success === false && (wantSwychr || Deno.env.get("SWYCHR_PAYOUT_FALLBACK") === "true")) {
-              const swychrJson = await trySwychr();
-              if (swychrJson?.success) payoutResult = swychrJson;
-            }
-          }
-        }
-      } else if (usePaytota) {
-        const paytotaRes = await fetch(
-          `${Deno.env.get("SUPABASE_URL")}/functions/v1/paytota-payout`,
-          {
-            method: "POST",
-            headers: internalHeaders,
-            body: JSON.stringify({ transfer_id }),
-          },
-        );
-        payoutResult = await paytotaRes.json().catch(() => ({
-          success: false,
-          error: `paytota-payout returned HTTP ${paytotaRes.status}`,
-          rail: "paytota",
-        }));
-        // On failure, fall through to Flutterwave (existing default) without removing that rail
-        if (payoutResult?.success === false) {
-          const flwRes = await fetch(
-            `${Deno.env.get("SUPABASE_URL")}/functions/v1/flutterwave-payout`,
-            {
-              method: "POST",
-              headers: internalHeaders,
-              body: JSON.stringify({
-                transfer_id,
-                phone_number: transfer.recipient_phone,
-                account_number: transfer.recipient_account,
-                bank_code: transfer.recipient_bank_code,
-                amount: Number(transfer.target_amount ?? transfer.source_amount),
-                currency: transfer.target_currency ?? transfer.source_currency,
-                network: resolveNetwork(transfer.payout_method, transfer.target_currency ?? transfer.source_currency),
-                recipient_name: transfer.recipient_name,
-              }),
-            },
-          );
-          const flwJson = await flwRes.json().catch(() => null);
-          if (flwJson?.success) {
-            payoutResult = { ...flwJson, paytota_fallback: true, paytota_error: payoutResult?.error };
-          }
-        }
-      } else if (!wantFincra) {
-        // Default Flutterwave — never when the user opted into Fincra.
+      } else {
+        // Other corridors → Flutterwave default
         const res = await fetch(
           `${Deno.env.get("SUPABASE_URL")}/functions/v1/flutterwave-payout`,
           {
             method: "POST",
             headers: internalHeaders,
-            body: JSON.stringify({
-              transfer_id,
-              phone_number: transfer.recipient_phone,
-              account_number: transfer.recipient_account,
-              bank_code: transfer.recipient_bank_code,
-              amount: Number(transfer.target_amount ?? transfer.source_amount),
-              currency: transfer.target_currency ?? transfer.source_currency,
-              network: resolveNetwork(transfer.payout_method, transfer.target_currency ?? transfer.source_currency),
-              recipient_name: transfer.recipient_name,
-            }),
+            body: JSON.stringify(flwBody()),
           },
         );
         payoutResult = await res.json();
-      } else {
-        payoutResult = {
-          success: false,
-          error: "Fincra was selected but payout did not run. Please retry or contact support.",
-          rail: "fincra",
-          code: "fincra_not_executed",
-        };
       }
     } catch (e) {
       console.error("Payout trigger error:", e);
@@ -829,6 +733,47 @@ Deno.serve(async (req) => {
         error: e instanceof Error ? e.message : "Payout trigger failed",
         code: "payout_trigger_error",
       };
+    }
+
+    // Priority chain used skip_reversal on Fincra — refund wallet if every rail failed.
+    if (
+      !engineRouted
+      && fincraCapable
+      && payoutResult
+      && payoutResult.success === false
+      && !payoutResult.pending_liquidity
+      && !payoutResult.queued
+    ) {
+      try {
+        const { data: existingRev } = await supabase.from("ledger_entries").select("id")
+          .eq("reference_type", "transfer_reversal").eq("reference_id", transfer_id).limit(1);
+        if (!existingRev?.length) {
+          const { data: originals } = await supabase.from("ledger_entries")
+            .select("account_id, wallet_id, currency_code, debit_amount, credit_amount, description")
+            .eq("reference_type", "transfer").eq("reference_id", transfer_id);
+          if (originals?.length) {
+            const j = crypto.randomUUID();
+            await supabase.from("ledger_entries").insert(originals.map((o) => ({
+              journal_id: j,
+              account_id: o.account_id,
+              wallet_id: o.wallet_id,
+              currency_code: o.currency_code,
+              debit_amount: o.credit_amount,
+              credit_amount: o.debit_amount,
+              description: `REVERSAL: ${o.description ?? ""}`.slice(0, 500),
+              reference_type: "transfer_reversal",
+              reference_id: transfer_id,
+            })));
+            payoutResult = { ...payoutResult, refunded: true };
+          }
+        }
+        await supabase.from("transfers").update({
+          status: "failed",
+          failure_reason: String(payoutResult.error || "Payout failed").slice(0, 500),
+        }).eq("id", transfer_id);
+      } catch (revErr) {
+        console.error("priority-chain reversal failed", revErr);
+      }
     }
 
     // Shadow mode: record what the engine would have chosen for legacy-routed transfers.

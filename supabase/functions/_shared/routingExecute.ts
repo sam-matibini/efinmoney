@@ -115,7 +115,7 @@ export async function dispatchRoutedPayout(
           amount: Number(t.target_amount ?? t.source_amount),
           currency: t.target_currency ?? t.source_currency,
           recipient_name: t.recipient_name,
-          account_number: t.recipient_account_number ?? null,
+          account_number: t.recipient_account ?? t.recipient_account_number ?? null,
           bank_code: t.recipient_bank_code ?? null,
           phone_number: t.recipient_phone ?? null,
           routed_by_engine: true,

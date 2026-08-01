@@ -109,6 +109,24 @@ export function cardSendProvidersForCorridor(
   return out;
 }
 
+/**
+ * Auto-pick card collect provider for a corridor (customer never chooses).
+ * Prefer stable live rails: Nomba → Lenhub → Flutterwave → Paytota → Swychr.
+ */
+export function pickBestCardProvider(
+  sourceCurrency: string,
+  destCurrency: string,
+  transferType: "bank" | "mobile_money",
+): CardSendProvider | null {
+  const available = cardSendProvidersForCorridor(sourceCurrency, destCurrency, transferType);
+  if (available.length === 0) return null;
+  const priority: CardSendProvider[] = ["nomba", "lenhub", "flutterwave", "paytota", "swychr"];
+  for (const p of priority) {
+    if (available.includes(p)) return p;
+  }
+  return available[0];
+}
+
 export function cardSendDestCurrencies(sourceCurrency: string): string[] {
   const s = sourceCurrency.toUpperCase();
   const dests = new Set<string>();
