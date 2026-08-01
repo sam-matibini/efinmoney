@@ -10,6 +10,7 @@ import { ShieldCheck, FileText, Briefcase, CheckCircle2, Clock } from "lucide-re
 import { useAuth } from "@/hooks/useAuth";
 import { useKyc } from "@/hooks/useKyc";
 import { supabase } from "@/integrations/supabase/client";
+import { sanitizeStorageFilename } from "@/lib/storageKey";
 import { toast } from "sonner";
 
 const SOURCE_OPTIONS = [
@@ -160,7 +161,7 @@ const Enhanced = () => {
           label="Address document"
           uploadedPath={addressUrl}
           onUpload={async (file) => {
-            const path = `${user!.id}/address/${Date.now()}-${file.name}`;
+            const path = `${user!.id}/address/${Date.now()}-${sanitizeStorageFilename(file.name)}`;
             const { error } = await supabase.storage.from("kyc-documents").upload(path, file, { upsert: true });
             if (error) throw error;
             setAddressUrl(path);
@@ -195,7 +196,7 @@ const Enhanced = () => {
           label="Supporting document"
           uploadedPath={sourceUrl}
           onUpload={async (file) => {
-            const path = `${user!.id}/source-of-funds/${Date.now()}-${file.name}`;
+            const path = `${user!.id}/source-of-funds/${Date.now()}-${sanitizeStorageFilename(file.name)}`;
             const { error } = await supabase.storage.from("kyc-documents").upload(path, file, { upsert: true });
             if (error) throw error;
             setSourceUrl(path);

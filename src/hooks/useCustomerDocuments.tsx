@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { sanitizeStorageFilename } from '@/lib/storageKey';
 import { toast } from 'sonner';
 
 export interface CustomerDocument {
@@ -45,7 +46,7 @@ export const useCustomerDocuments = (customerId: string) => {
       documentType: string;
       onboardingId?: string;
     }) => {
-      const filePath = `${customerId}/${Date.now()}-${file.name}`;
+      const filePath = `${customerId}/${Date.now()}-${sanitizeStorageFilename(file.name)}`;
       
       const { error: uploadError } = await supabase.storage
         .from('customer-documents')

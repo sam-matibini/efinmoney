@@ -1,6 +1,7 @@
 import { useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { sanitizeStorageFilename } from "@/lib/storageKey";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Paperclip, Upload, Trash2, FileText, ExternalLink } from "lucide-react";
@@ -38,7 +39,7 @@ export const AttachmentsPanel = ({ parentType, parentId, compact }: Props) => {
     mutationFn: async (file: File) => {
       if (!user?.id) throw new Error("Not signed in");
       if (file.size > 15 * 1024 * 1024) throw new Error("Max 15MB");
-      const path = `${user.id}/${parentType}/${parentId}/${Date.now()}-${file.name}`;
+      const path = `${user.id}/${parentType}/${parentId}/${Date.now()}-${sanitizeStorageFilename(file.name)}`;
       const { error: upErr } = await supabase.storage
         .from("purchase-documents")
         .upload(path, file, { contentType: file.type });

@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { sanitizeStorageFilename } from "@/lib/storageKey";
 import { useAuth } from "@/hooks/useAuth";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { useCustomerPortal } from "@/hooks/useCustomerPortal";
@@ -124,7 +125,7 @@ export const OnboardingWizard = () => {
       documentType: string;
       onboardingId: string;
     }) => {
-      const filePath = `${customerId}/${Date.now()}-${file.name}`;
+      const filePath = `${customerId}/${Date.now()}-${sanitizeStorageFilename(file.name)}`;
       
       const { error: uploadError } = await supabase.storage
         .from('customer-documents')
