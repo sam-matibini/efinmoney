@@ -130,7 +130,7 @@ export default function PaytotaTopUpCard({ walletId, walletCurrency, onComplete 
 
   const min = paytotaMinAmount(currency);
   const TitleIcon = africa ? Smartphone : FileText;
-  const title = africa ? "MoMo checkout" : "Pay by invoice";
+  const title = "Secure checkout";
 
   const handleConfirm = async () => {
     const amt = parsedAmount;

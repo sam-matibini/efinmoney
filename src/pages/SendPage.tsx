@@ -42,11 +42,12 @@ import { resolveEffectiveRate } from "@/lib/fx";
 import { currencySymbol, countryToCurrency } from "@/lib/currency";
 import { useProfile } from "@/hooks/useProfile";
 import { toast } from "sonner";
-import { ArrowRight, CheckCircle, Wallet, Landmark, CreditCard, AlertCircle, X, Search, Globe2, Lock, Loader2, Check, Shield, Users } from "lucide-react";
+import { ArrowRight, CheckCircle, Wallet, Landmark, CreditCard, AlertCircle, X, Search, Globe2, Lock, Loader2, Check, Shield, Users, ChevronDown } from "lucide-react";
 import { BrandFlag, CountryFlag } from "@/components/ui/FlagImage";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import CanadaSendFlow from "@/components/send/CanadaSendFlow";
 import EfinmoneyP2PFlow from "@/components/send/EfinmoneyP2PFlow";
+import MoneyFlowShell from "@/components/money/MoneyFlowShell";
 import { createPaymentLink, PaymentLinkSuccess, type PaymentLinkResult } from "@/components/send/PaymentLinkSuccess";
 import { isClaimCardCurrency } from "@/lib/stripeCorridors";
 import TransactionPinDialog from "@/components/send/TransactionPinDialog";
@@ -167,6 +168,7 @@ const SendPage = () => {
   const [step, setStep] = useState(1);
   const [direction, setDirection] = useState(1);
   const [fundingSource, setFundingSource] = useState<FundingSource>('wallet');
+  const [showOtherFunding, setShowOtherFunding] = useState(false);
   const [amount, setAmount] = useState("");
   const [selectedWalletId, setSelectedWalletId] = useState("");
   const [targetCountryId, setTargetCountryId] = useState<string>("Kenya");
@@ -1663,6 +1665,12 @@ const SendPage = () => {
       : []),
   ]);
 
+  useEffect(() => {
+    if (fundingSource === "bank" || fundingSource === "card") {
+      setShowOtherFunding(true);
+    }
+  }, [fundingSource]);
+
   // Step transitions
   const stepVariants = {
     enter: (dir: number) => ({ x: dir > 0 ? 60 : -60, opacity: 0 }),
@@ -1931,80 +1939,8 @@ const SendPage = () => {
                     >
                       <TabsContent value="international" forceMount className="mt-0 space-y-6">
 
-                        {/* Progress: Amount → Recipient → Confirm */}
-                        <div className="flex items-center justify-center gap-2">
-                          {[
-                            { n: 1, label: "Amount" },
-                            { n: 2, label: "Recipient" },
-                            { n: 3, label: "Confirm" },
-                          ].map(({ n: s, label }, idx) => {
-                            const completed = step > s;
-                            const active = step === s;
-                            return (
-                              <div key={s} className="flex items-center">
-                                <div className="flex flex-col items-center gap-1">
-                                <motion.div
-                                  initial={{ opacity: 0, x: -16, scale: 0.6 }}
-                                  animate={{
-                                    opacity: 1,
-                                    x: 0,
-                                    scale: active ? [1, 1.3, 1] : 1,
-                                    backgroundColor: completed || active
-                                      ? "hsl(var(--primary))"
-                                      : "hsl(var(--muted))",
-                                  }}
-                                  transition={{
-                                    delay: idx * 0.1 + 0.3,
-                                    scale: { duration: 0.5, ease: "easeOut" },
-                                    backgroundColor: { duration: 0.3 },
-                                  }}
-                                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                                    completed || active ? 'text-primary-foreground' : 'text-muted-foreground'
-                                  }`}
-                                >
-                                  <AnimatePresence mode="wait" initial={false}>
-                                    {completed ? (
-                                      <motion.span
-                                        key="check"
-                                        initial={{ scale: 0, rotate: -90 }}
-                                        animate={{ scale: 1, rotate: 0 }}
-                                        exit={{ scale: 0 }}
-                                        transition={{ type: "spring", stiffness: 400, damping: 16 }}
-                                      >
-                                        <CheckCircle className="w-4 h-4" />
-                                      </motion.span>
-                                    ) : (
-                                      <motion.span key="num" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                                        {s}
-                                      </motion.span>
-                                    )}
-                                  </AnimatePresence>
-                                </motion.div>
-                                <span className={cn(
-                                  "text-[10px] sm:text-xs font-medium",
-                                  active || completed ? "text-foreground" : "text-muted-foreground",
-                                )}>{label}</span>
-                                </div>
-                                {s < 3 && (
-                                  <motion.div
-                                    initial={{ scaleX: 0, opacity: 0 }}
-                                    animate={{
-                                      scaleX: 1,
-                                      opacity: 1,
-                                      backgroundColor: step > s ? 'hsl(var(--primary))' : 'hsl(var(--muted))',
-                                    }}
-                                    transition={{ delay: idx * 0.1 + 0.4, duration: 0.3 }}
-                                    style={{ originX: 0 }}
-                                    className="w-8 sm:w-12 h-0.5 mb-4"
-                                  />
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-
                         {/* Step cards with directional slide */}
-                        <div className="relative">
+                        <div className="relative max-w-lg mx-auto">
                           <AnimatePresence mode="wait" custom={direction} initial={false}>
                             {step === 1 && (
                               <motion.div
@@ -2016,35 +1952,60 @@ const SendPage = () => {
                                 exit="exit"
                                 transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
                               >
-                                <Card>
-                                  <CardHeader>
-                                    <CardTitle>Amount</CardTitle>
-                                    <p className="text-sm text-muted-foreground font-normal">How much you send and what they get</p>
-                                  </CardHeader>
-                                  <CardContent className="space-y-6">
-                                    <motion.div custom={0} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
-                                      <Label>Pay From</Label>
-                                      <div className={`grid gap-2 ${fundingOptions.length === 3 ? 'grid-cols-3' : fundingOptions.length === 2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                                        {fundingOptions.map(({ v, icon: Icon, label }) => (
-                                          <Button
-                                            key={v}
-                                            type="button"
-                                            variant={fundingSource === v ? 'default' : 'outline'}
-                                            className="flex flex-col items-center gap-1 h-auto py-3 transition-all hover:-translate-y-0.5"
-                                            onClick={() => setFundingSource(v)}
-                                          >
-                                            <Icon className="w-5 h-5" />
-                                            <span className="text-xs">{label}</span>
-                                          </Button>
-                                        ))}
-                                      </div>
-                                    </motion.div>
-
-                                    {fundingSource === 'wallet' && (
-                                      <motion.div custom={1} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
-                                        <Label>From Wallet</Label>
-                                        <Select value={selectedWalletId || selectedWallet?.wallet_id} onValueChange={setSelectedWalletId}>
-                                          <SelectTrigger><SelectValue placeholder="Select wallet" /></SelectTrigger>
+                                <MoneyFlowShell
+                                  steps={[
+                                    { n: 1, label: "Amount" },
+                                    { n: 2, label: "Recipient" },
+                                    { n: 3, label: "Confirm" },
+                                  ]}
+                                  currentStep={1}
+                                  title="Amount"
+                                  subtitle="How much you send and what they get"
+                                  footer={
+                                    <div className="space-y-3">
+                                      <motion.div
+                                        whileTap={{ scale: 0.97 }}
+                                        animate={isStep1Valid ? { boxShadow: [
+                                          "0 0 0 0 hsl(var(--primary) / 0)",
+                                          "0 0 0 6px hsl(var(--primary) / 0.15)",
+                                          "0 0 0 0 hsl(var(--primary) / 0)",
+                                        ] } : { boxShadow: "0 0 0 0 hsl(var(--primary) / 0)" }}
+                                        transition={isStep1Valid ? { duration: 1.8, repeat: Infinity, ease: "easeInOut" } : { duration: 0.2 }}
+                                        className="rounded-md"
+                                      >
+                                        <Button
+                                          className="w-full"
+                                          size="lg"
+                                          onClick={() => goToStep(2)}
+                                          disabled={!isStep1Valid}
+                                        >
+                                          Continue
+                                        </Button>
+                                      </motion.div>
+                                      <button
+                                        type="button"
+                                        onClick={() => navigate('/')}
+                                        className="block mx-auto text-sm text-muted-foreground hover:text-foreground transition-colors underline-offset-4 hover:underline"
+                                      >
+                                        Cancel
+                                      </button>
+                                    </div>
+                                  }
+                                >
+                                    <motion.div custom={0} variants={fieldVariants} initial="hidden" animate="show" className="space-y-3">
+                                      <div className="space-y-2">
+                                        <Label>From wallet</Label>
+                                        <Select
+                                          value={selectedWalletId || selectedWallet?.wallet_id}
+                                          onValueChange={(id) => {
+                                            setSelectedWalletId(id);
+                                            setFundingSource("wallet");
+                                          }}
+                                          disabled={fundingSource !== "wallet"}
+                                        >
+                                          <SelectTrigger className={fundingSource !== "wallet" ? "opacity-60" : undefined}>
+                                            <SelectValue placeholder="Select wallet" />
+                                          </SelectTrigger>
                                           <SelectContent>
                                             {wallets?.map((w) => {
                                               const cardCount = linkedCardCount[w.wallet_id] ?? 0;
@@ -2064,8 +2025,49 @@ const SendPage = () => {
                                             })}
                                           </SelectContent>
                                         </Select>
-                                      </motion.div>
-                                    )}
+                                        {fundingSource !== "wallet" && (
+                                          <button
+                                            type="button"
+                                            className="text-xs text-primary hover:underline"
+                                            onClick={() => {
+                                              setFundingSource("wallet");
+                                              setShowOtherFunding(false);
+                                            }}
+                                          >
+                                            Use wallet instead
+                                          </button>
+                                        )}
+                                      </div>
+
+                                      {fundingOptions.filter((o) => o.v !== "wallet").length > 0 && (
+                                        <div className="space-y-2">
+                                          <button
+                                            type="button"
+                                            className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                                            onClick={() => setShowOtherFunding((v) => !v)}
+                                          >
+                                            Other ways to pay
+                                            <ChevronDown className={cn("w-4 h-4 transition-transform", showOtherFunding && "rotate-180")} />
+                                          </button>
+                                          {showOtherFunding && (
+                                            <div className="grid grid-cols-2 gap-2">
+                                              {fundingOptions.filter((o) => o.v !== "wallet").map(({ v, icon: Icon, label }) => (
+                                                <Button
+                                                  key={v}
+                                                  type="button"
+                                                  variant={fundingSource === v ? "default" : "outline"}
+                                                  className="flex items-center gap-2 h-11"
+                                                  onClick={() => setFundingSource(v)}
+                                                >
+                                                  <Icon className="w-4 h-4" />
+                                                  <span className="text-sm">{label}</span>
+                                                </Button>
+                                              ))}
+                                            </div>
+                                          )}
+                                        </div>
+                                      )}
+                                    </motion.div>
 
                                     {fundingSource === 'bank' && (
                                       <motion.div custom={1} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
@@ -2095,10 +2097,6 @@ const SendPage = () => {
                                             <Button type="button" size="sm" className="w-full" onClick={startPlaidLink} disabled={plaidLinking}>
                                               <Landmark className="w-4 h-4 mr-2" />
                                               {plaidLinking ? "Starting…" : "Link bank account"}
-                                            </Button>
-                                            <Button type="button" variant="ghost" size="sm" className="w-full" onClick={() => setFundingSource('wallet')}>
-                                              <Wallet className="w-4 h-4 mr-2" />
-                                              Use wallet instead
                                             </Button>
                                           </div>
                                         )}
@@ -2184,37 +2182,7 @@ const SendPage = () => {
                                         No FX rate for {sourceCurrency} → {targetCountry.code}. Try another pair or funding source.
                                       </p>
                                     )}
-
-                                    <motion.div custom={6} variants={fieldVariants} initial="hidden" animate="show" className="space-y-3">
-                                      <motion.div
-                                        whileTap={{ scale: 0.97 }}
-                                        animate={isStep1Valid ? { boxShadow: [
-                                          "0 0 0 0 hsl(var(--primary) / 0)",
-                                          "0 0 0 6px hsl(var(--primary) / 0.15)",
-                                          "0 0 0 0 hsl(var(--primary) / 0)",
-                                        ] } : { boxShadow: "0 0 0 0 hsl(var(--primary) / 0)" }}
-                                        transition={isStep1Valid ? { duration: 1.8, repeat: Infinity, ease: "easeInOut" } : { duration: 0.2 }}
-                                        className="rounded-md"
-                                      >
-                                        <Button
-                                          className="w-full"
-                                          size="lg"
-                                          onClick={() => goToStep(2)}
-                                          disabled={!isStep1Valid}
-                                        >
-                                          Continue
-                                        </Button>
-                                      </motion.div>
-                                      <button
-                                        type="button"
-                                        onClick={() => navigate('/')}
-                                        className="block mx-auto text-sm text-muted-foreground hover:text-foreground transition-colors underline-offset-4 hover:underline"
-                                      >
-                                        Cancel
-                                      </button>
-                                    </motion.div>
-                                  </CardContent>
-                                </Card>
+                                </MoneyFlowShell>
                               </motion.div>
                             )}
 
@@ -2228,22 +2196,16 @@ const SendPage = () => {
                                 exit="exit"
                                 transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
                               >
-                                <Card>
-                                  <CardHeader className="flex-row items-start justify-between space-y-0 gap-3">
-                                    <div>
-                                      <CardTitle>Recipient</CardTitle>
-                                      <p className="text-sm text-muted-foreground font-normal mt-1">Who should receive the money</p>
-                                    </div>
-                                    <button
-                                      type="button"
-                                      onClick={() => navigate('/')}
-                                      aria-label="Close and return to dashboard"
-                                      className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                                    >
-                                      <X className="w-5 h-5" />
-                                    </button>
-                                  </CardHeader>
-                                  <CardContent className="space-y-6">
+                                <MoneyFlowShell
+                                  steps={[
+                                    { n: 1, label: "Amount" },
+                                    { n: 2, label: "Recipient" },
+                                    { n: 3, label: "Confirm" },
+                                  ]}
+                                  currentStep={2}
+                                  title="Recipient"
+                                  subtitle="Who should receive the money"
+                                >
                                     {fromQuickSend && parsedAmount > 0 && receivedAmount > 0 && (
                                       <motion.div
                                         custom={0}
@@ -2557,8 +2519,7 @@ const SendPage = () => {
                                         </Button>
                                       </motion.div>
                                     </motion.div>
-                                  </CardContent>
-                                </Card>
+                                </MoneyFlowShell>
                               </motion.div>
                             )}
 
@@ -2572,22 +2533,16 @@ const SendPage = () => {
                                 exit="exit"
                                 transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
                               >
-                                <Card>
-                                  <CardHeader className="flex-row items-start justify-between space-y-0 gap-3">
-                                    <div>
-                                      <CardTitle>Confirm</CardTitle>
-                                      <p className="text-sm text-muted-foreground font-normal mt-1">Review the quote, then send</p>
-                                    </div>
-                                    <button
-                                      type="button"
-                                      onClick={() => setCancelOpen(true)}
-                                      aria-label="Cancel transfer"
-                                      className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                                    >
-                                      <X className="w-5 h-5" />
-                                    </button>
-                                  </CardHeader>
-                                  <CardContent className="space-y-5">
+                                <MoneyFlowShell
+                                  steps={[
+                                    { n: 1, label: "Amount" },
+                                    { n: 2, label: "Recipient" },
+                                    { n: 3, label: "Confirm" },
+                                  ]}
+                                  currentStep={3}
+                                  title="Confirm"
+                                  subtitle="Review the quote, then send"
+                                >
                                     <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-2 text-sm">
                                       <div className="flex justify-between"><span className="text-muted-foreground">Recipient</span><span className="font-medium">{recipientName}</span></div>
                                       {useLink ? (
@@ -2642,8 +2597,7 @@ const SendPage = () => {
                                     >
                                       Cancel Transfer
                                     </Button>
-                                  </CardContent>
-                                </Card>
+                                </MoneyFlowShell>
                               </motion.div>
                             )}
 

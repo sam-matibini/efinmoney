@@ -179,7 +179,7 @@ export function routeWalletTopupGateway(
   if (preferSwychr && SWYCHR_TOPUP_CURRENCIES.includes(c)) return "swychr_pay";
   // Ghana MoMo (default GHS rail unless another rail selected above)
   if (GHANA_PAY_CURRENCIES.includes(c)) return "ghana_pay";
-  // Nomba: live for NGN only (western Express card is Coming soon — empty intl checkout links)
+  // NGN fallback: Nomba (Fincra/Flutterwave already returned when preferred by auto-pick)
   if (c === "NGN") return "nomba_pay";
   if (
     isNombaTopupLive(c) &&
@@ -192,7 +192,15 @@ export function routeWalletTopupGateway(
   ) {
     return "nomba_pay";
   }
-  // Default East Africa MoMo → Paytota (UGX/KES/RWF); Swychr for XAF/XOF (and when explicitly picked)
+  // Default Africa collect — Fincra when available, else Paytota (UGX/KES/RWF); Swychr for XAF/XOF
+  if (
+    FINCRA_AFRICA_TOPUP_CURRENCIES.includes(c) &&
+    !preferFlutterwave &&
+    !preferPaytota &&
+    !preferSwychr
+  ) {
+    return "fincra";
+  }
   if (PAYTOTA_AFRICA_TOPUP_CURRENCIES.includes(c) && !preferFlutterwave && !preferFincra && !preferSwychr) {
     return "paytota_pay";
   }
@@ -294,6 +302,60 @@ export function gatewayProviderLabel(gateway: WalletTopupGateway): string | null
   if (gateway === "dodo_pay") return "Dodo";
   if (gateway === "flutterwave") return "Flutterwave";
   return null;
+}
+
+/**
+ * Auto-pick top-up rail (customer never chooses).
+ * Aligns with send priority: Fincra → Flutterwave → Nomba → Paytota → Swychr.
+ * Lenhub is skipped (Flutterwave wrapper). CAD/USD skip Fincra (partner confirmed).
+ */
+export function pickBestIntlTopupMethod(
+  currency: string,
+  available: IntlTopupMethod[],
+): IntlTopupMethod | null {
+  if (available.length === 0) return null;
+  const c = currency.toUpperCase();
+  const live = available.filter((m) => !(m === "nomba" && isNombaTopupComingSoon(c)));
+  const pool = live.length > 0 ? live : available;
+
+  let priority: IntlTopupMethod[];
+  if (c === "USD" || c === "CAD") {
+    // Fincra confirmed no CAD/USD; Flutterwave western still pending approval
+    priority = ["paytota", "dodo", "interac", "nomba", "flutterwave", "fincra"];
+  } else if (c === "EUR" || c === "GBP") {
+    priority = ["fincra", "paytota", "dodo", "flutterwave", "nomba"];
+  } else if (c === "NGN") {
+    priority = ["fincra", "flutterwave", "nomba"];
+  } else {
+    priority = ["fincra", "flutterwave", "nomba", "paytota", "dodo", "interac"];
+  }
+
+  for (const p of priority) {
+    if (pool.includes(p)) return p;
+  }
+  return pool[0];
+}
+
+export function pickBestAfricaTopupMethod(
+  currency: string,
+  available: AfricaMomoTopupMethod[],
+): AfricaMomoTopupMethod | null {
+  if (available.length === 0) return null;
+  // Skip Lenhub in auto-pick (same Flutterwave stack)
+  const pool = available.filter((m) => m !== "lenhub");
+  const use = pool.length > 0 ? pool : available;
+  const priority: AfricaMomoTopupMethod[] = [
+    "fincra",
+    "flutterwave",
+    "paytota",
+    "swychr",
+    "ghana",
+    "elicate",
+  ];
+  for (const p of priority) {
+    if (use.includes(p)) return p;
+  }
+  return use[0];
 }
 
 export function intlMethodLabel(method: IntlTopupMethod, currency?: string): string {

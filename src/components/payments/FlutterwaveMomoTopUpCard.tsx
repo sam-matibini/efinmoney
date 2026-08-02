@@ -99,7 +99,7 @@ export default function FlutterwaveMomoTopUpCard({ walletId, walletCurrency, onC
         "Approve the payment on your phone. Your wallet will credit automatically.";
       setPendingNote(note);
       toast.success("Approve the payment on your phone", {
-        description: "We’ll credit your wallet when Flutterwave confirms.",
+        description: "We’ll credit your wallet when payment is confirmed.",
         duration: 12000,
       });
       onComplete?.();

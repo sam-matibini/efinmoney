@@ -13,7 +13,6 @@ import {
   readPendingSwychrTxn,
   savePendingSwychrTxn,
 } from "@/lib/swychrPay";
-import { swychrGatewayLabel } from "@/lib/walletTopupGateway";
 
 interface Props {
   walletId: string;
@@ -96,7 +95,7 @@ export default function SwychrTopUpCard({ walletId, walletCurrency, onComplete }
       <CardHeader className="pb-3">
         <CardTitle className="text-base flex items-center gap-2">
           <Globe className="h-4 w-4 text-violet-400" />
-          {swychrGatewayLabel(currency)}
+          Secure checkout
         </CardTitle>
         <p className="text-sm text-muted-foreground">
           Pay with mobile money on a secure page for your {currency} wallet.
@@ -126,7 +125,7 @@ export default function SwychrTopUpCard({ walletId, walletCurrency, onComplete }
           {loading ? (
             <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Opening checkout…</>
           ) : (
-            <><ExternalLink className="h-4 w-4 mr-2" />Continue to secure checkout</>
+            <><ExternalLink className="h-4 w-4 mr-2" />Continue</>
           )}
         </Button>
         <p className="text-xs text-muted-foreground flex items-center gap-1">

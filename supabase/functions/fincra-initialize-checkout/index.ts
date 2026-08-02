@@ -8,8 +8,8 @@ const corsHeaders = {
 };
 
 const PAYMENT_METHODS_BY_CCY: Record<string, string[]> = {
-  // Confirmed on live merchant probe (2026-07-22)
-  NGN: ["card", "bank_transfer", "payattitude"],
+  // Confirmed on live merchant — payattitude rejected for this account ("not available for NGN")
+  NGN: ["card", "bank_transfer"],
   KES: ["mobile_money"],
   GHS: ["mobile_money", "card"],
   UGX: ["mobile_money"],

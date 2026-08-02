@@ -25,6 +25,10 @@ interface Props {
   walletId: string;
   walletCurrency: string;
   onComplete?: () => void;
+  /** Prefill amount from parent Add Money shell */
+  initialAmount?: string;
+  /** Hide card chrome when nested in MoneyFlowShell */
+  embedded?: boolean;
 }
 
 function formatCredited(amount: number, currency: string): string {
@@ -33,16 +37,20 @@ function formatCredited(amount: number, currency: string): string {
   return `${sym}${amount.toLocaleString()} ${c}`;
 }
 
-export default function NombaTopUpCard({ walletId, walletCurrency, onComplete }: Props) {
+export default function NombaTopUpCard({ walletId, walletCurrency, onComplete, initialAmount, embedded }: Props) {
   const { user } = useAuth();
   const { data: fxRates = [] } = useFxRates();
   const currency = walletCurrency.toUpperCase();
   const isNigeria = isNombaNigeriaCurrency(currency);
   const isInternational = isNombaInternationalCurrency(currency);
   const isCadViaUsd = isNombaCadViaUsdCurrency(currency);
-  const [amount, setAmount] = useState("");
+  const [amount, setAmount] = useState(initialAmount ?? "");
   const [email, setEmail] = useState(user?.email ?? "");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (initialAmount != null && initialAmount !== "") setAmount(initialAmount);
+  }, [initialAmount]);
 
   useEffect(() => {
     if (!email && user?.email) setEmail(user.email);
@@ -131,22 +139,25 @@ export default function NombaTopUpCard({ walletId, walletCurrency, onComplete }:
     }
   };
 
-  const title = "Express card";
+  const title = "Secure checkout";
 
   const subtitle = isCadViaUsd
-    ? "Enter how much CAD you want in your wallet. You'll pay the USD equivalent at checkout — Canadian debit/credit cards are accepted."
+    ? "Enter how much CAD you want in your wallet. You'll pay the USD equivalent at checkout."
     : isInternational
-      ? `Fast card payment in ${currency} via our secure checkout.`
-      : "Fast debit or credit card payment via our secure checkout.";
+      ? `Card payment for your ${currency} wallet on a secure page.`
+      : "Card payment on a secure page. Your wallet credits when payment succeeds.";
 
   return (
     <Card className={
-      isCadViaUsd
+      embedded
+        ? "border-0 shadow-none bg-transparent"
+        : isCadViaUsd
         ? "border-red-500/30 bg-gradient-to-br from-red-950/15 to-background"
         : isInternational
           ? "border-indigo-500/30 bg-gradient-to-br from-indigo-950/20 to-background"
           : "border-green-600/30 bg-gradient-to-br from-green-950/20 to-background"
     }>
+      {!embedded && (
       <CardHeader className="pb-3">
         <CardTitle className="text-base flex items-center gap-2">
           {isCadViaUsd || isInternational
@@ -156,21 +167,24 @@ export default function NombaTopUpCard({ walletId, walletCurrency, onComplete }:
         </CardTitle>
         <p className="text-sm text-muted-foreground">{subtitle}</p>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <Label>Amount to credit ({currency})</Label>
-          <Input
-            type="number"
-            min={min}
-            step={isNigeria ? "1" : "0.01"}
-            placeholder={isCadViaUsd ? "e.g. 10" : isInternational ? "e.g. 50" : "e.g. 5000"}
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-          />
-          <p className="text-xs text-muted-foreground">
-            Minimum {formatCredited(min, currency)} · Includes eFin processing fee (1.9% + {currency === "CAD" ? "C$0.30" : currency === "NGN" ? "₦100" : "$0.30"})
-          </p>
-        </div>
+      )}
+      <CardContent className={embedded ? "p-0 space-y-4" : "space-y-4"}>
+        {(!embedded || !initialAmount) && (
+          <div className="space-y-2">
+            <Label>Amount to credit ({currency})</Label>
+            <Input
+              type="number"
+              min={min}
+              step={isNigeria ? "1" : "0.01"}
+              placeholder={isCadViaUsd ? "e.g. 10" : isInternational ? "e.g. 50" : "e.g. 5000"}
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Minimum {formatCredited(min, currency)} · Includes eFin processing fee (1.9% + {currency === "CAD" ? "C$0.30" : currency === "NGN" ? "₦100" : "$0.30"})
+            </p>
+          </div>
+        )}
 
         {quote && (
           <div className="rounded-lg border bg-muted/40 p-3 text-sm space-y-1.5">

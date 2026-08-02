@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,6 +14,8 @@ interface Props {
   /** Hosted checkout methods to offer (defaults to card). */
   methods?: FlwMethod[];
   onComplete?: () => void;
+  initialAmount?: string;
+  embedded?: boolean;
 }
 
 /**
@@ -25,6 +27,8 @@ export default function FlutterwaveHostedTopUpCard({
   walletCurrency,
   methods,
   onComplete,
+  initialAmount,
+  embedded,
 }: Props) {
   const currency = walletCurrency.toUpperCase();
   const sym = currencySymbol(currency) || currency;
@@ -34,24 +38,18 @@ export default function FlutterwaveHostedTopUpCard({
   const [paymentMethod, setPaymentMethod] = useState<"card" | "banktransfer" | "ussd">(
     available[0] || "card",
   );
-  const [amount, setAmount] = useState("");
+  const [amount, setAmount] = useState(initialAmount ?? "");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (initialAmount != null && initialAmount !== "") setAmount(initialAmount);
+  }, [initialAmount]);
 
   const payAmount = Number(amount);
   const amountOk = Number.isFinite(payAmount) && payAmount > 0;
 
-  const title =
-    paymentMethod === "banktransfer"
-      ? "Bank transfer"
-      : paymentMethod === "ussd"
-        ? "USSD"
-        : "Card checkout";
-  const description =
-    paymentMethod === "banktransfer"
-      ? "Pay with a bank transfer on a secure page, then return here when done."
-      : paymentMethod === "ussd"
-        ? "Complete USSD payment on a secure page, then return here when done."
-        : "Pay on a secure page — you’ll enter card details there, then return here when done.";
+  const title = "Secure checkout";
+  const description = "Complete payment on a secure page, then return here when done.";
 
   const handlePay = async () => {
     const minErr = validateMinAmount(currency, payAmount);
@@ -85,12 +83,14 @@ export default function FlutterwaveHostedTopUpCard({
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">{title}</CardTitle>
-        <CardDescription>{description}</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <Card className={embedded ? "border-0 shadow-none bg-transparent" : undefined}>
+      {!embedded && (
+        <CardHeader>
+          <CardTitle className="text-base">{title}</CardTitle>
+          <CardDescription>{description}</CardDescription>
+        </CardHeader>
+      )}
+      <CardContent className={embedded ? "p-0 space-y-4" : "space-y-4"}>
         {available.length > 1 && (
           <div className="flex flex-wrap gap-2">
             {available.map((m) => (
@@ -106,25 +106,27 @@ export default function FlutterwaveHostedTopUpCard({
             ))}
           </div>
         )}
-        <div className="space-y-2">
-          <Label htmlFor="flw-hosted-amount">Amount ({currency})</Label>
-          <div className="relative">
-            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
-              {sym}
-            </span>
-            <Input
-              id="flw-hosted-amount"
-              className="pl-9 h-12 text-lg"
-              inputMode="decimal"
-              placeholder="0.00"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-            />
+        {(!embedded || !initialAmount) && (
+          <div className="space-y-2">
+            <Label htmlFor="flw-hosted-amount">Amount ({currency})</Label>
+            <div className="relative">
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                {sym}
+              </span>
+              <Input
+                id="flw-hosted-amount"
+                className="pl-9 h-12 text-lg"
+                inputMode="decimal"
+                placeholder="0.00"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Minimum: {minAmount(currency)} {currency}
+            </p>
           </div>
-          <p className="text-xs text-muted-foreground">
-            Minimum: {minAmount(currency)} {currency}
-          </p>
-        </div>
+        )}
         <Button className="w-full h-11" disabled={!amountOk || loading} onClick={() => void handlePay()}>
           {loading ? (
             <>
@@ -133,7 +135,7 @@ export default function FlutterwaveHostedTopUpCard({
             </>
           ) : (
             <>
-              Continue to checkout
+              Continue
               <ExternalLink className="w-4 h-4 ml-2" />
             </>
           )}
