@@ -88,17 +88,11 @@ export function wiseTokenDiagnostics() {
 export async function resolveWiseProfileId(): Promise<string> {
   const cfg = getWiseConfig();
   const preferred = cfg.profileId;
-  const diag = wiseTokenDiagnostics();
-  if (diag.token_looks_like_uuid) {
-    throw new Error(
-      "WISE_API_TOKEN looks like a UUID (profile/subscription id). Set a Wise personal API token from Settings → API tokens instead.",
-    );
-  }
 
   const profilesRes = await wiseFetch("/v2/profiles");
   if (!profilesRes.ok) {
     const hint = profilesRes.status === 401 || profilesRes.status === 403
-      ? " Token rejected — recreate personal API token in Wise and update WISE_API_TOKEN secret."
+      ? " Token rejected — in Wise open API tokens → Copy key, then: supabase secrets set WISE_API_TOKEN=… and redeploy wise-topup-intent."
       : "";
     throw new Error(
       `Wise list profiles failed (${profilesRes.status}): ${JSON.stringify(profilesRes.json).slice(0, 200)}.${hint}`,
