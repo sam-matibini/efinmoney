@@ -17,7 +17,7 @@ function json(body: unknown, status = 200) {
   });
 }
 
-type DetailField = { type?: string; label?: string; value?: string; hidden?: boolean };
+type DetailField = { type?: string; label?: string; title?: string; value?: string; body?: string; hidden?: boolean };
 type ReceiveOption = { type?: string; title?: string; details?: DetailField[] };
 type AccountDetail = {
   id?: number | null;
@@ -38,10 +38,19 @@ function pickReceiveDetails(row: AccountDetail): { optionType: string; fields: A
   const chosen = local || intl || options[0];
   if (!chosen) return null;
   const fields = (chosen.details || [])
-    .filter((d) => !d.hidden && d.value)
+    .filter((d) => {
+      const hidden = Boolean((d as DetailField & { hidden?: boolean }).hidden);
+      const value = String((d as DetailField & { body?: string }).value || (d as { body?: string }).body || "").trim();
+      return !hidden && value;
+    })
     .map((d) => ({
-      label: String(d.label || d.type || "Detail"),
-      value: String(d.value),
+      label: String(
+        (d as DetailField).label ||
+          (d as { title?: string }).title ||
+          (d as DetailField).type ||
+          "Detail",
+      ),
+      value: String((d as DetailField).value || (d as { body?: string }).body || ""),
     }));
   if (fields.length === 0) return null;
   return { optionType: String(chosen.type || chosen.title || "LOCAL"), fields };
