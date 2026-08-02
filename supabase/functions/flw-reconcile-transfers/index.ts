@@ -45,13 +45,13 @@ Deno.serve(async (req) => {
 
     // Transfers we consider "in flight" at the provider.
     let q = db.from("transfers")
-      .select("id, sender_id, recipient_name, target_currency, target_amount, provider_reference, status")
+      .select("id, sender_id, recipient_name, target_currency, target_amount, provider_reference, provider_charge_id, status")
       .in("status", ["processing"])
       .not("provider_reference", "is", null)
       .order("created_at", { ascending: true })
       .limit(100);
     if (onlyId) q = db.from("transfers")
-      .select("id, sender_id, recipient_name, target_currency, target_amount, provider_reference, status")
+      .select("id, sender_id, recipient_name, target_currency, target_amount, provider_reference, provider_charge_id, status")
       .eq("id", onlyId);
 
     const { data: transfers, error } = await q;
@@ -61,6 +61,15 @@ Deno.serve(async (req) => {
     for (const t of transfers ?? []) {
       const flwId = String(t.provider_reference || "");
       if (!flwId) { results.push({ transfer_id: t.id, action: "skipped", reason: "no_provider_reference" }); continue; }
+      // Leave Fincra rows to fincra-reconcile-transfers (avoid FLW API noise on shared cron).
+      if (
+        /^FINCRA-PENDING/i.test(flwId)
+        || /^STUB-FINCRA/i.test(flwId)
+        || /rail:fincra/i.test(String((t as { provider_charge_id?: string }).provider_charge_id || ""))
+      ) {
+        results.push({ transfer_id: t.id, action: "skipped", reason: "fincra_rail" });
+        continue;
+      }
 
       const { ok, json: res } = await flwV3Fetch(`/transfers/${encodeURIComponent(flwId)}`, { method: "GET" });
       const flwStatus = String(res?.data?.status || "").toUpperCase();

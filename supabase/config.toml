@@ -227,6 +227,9 @@ verify_jwt = false
 [functions.fincra-verify-transfer]
 verify_jwt = false
 
+[functions.fincra-reconcile-transfers]
+verify_jwt = false
+
 # Client-called Stripe / Plaid functions: verify_jwt must be false so browser
 # OPTIONS preflight requests reach the function (they carry no Authorization header).
 [functions.stripe-payment-intent]
