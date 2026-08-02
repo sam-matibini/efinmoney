@@ -39,3 +39,33 @@ export async function wiseFetch(
   const json = await res.json().catch(() => ({}));
   return { ok: res.ok, status: res.status, json };
 }
+
+/**
+ * Wise account-details / balances need a numeric profile id.
+ * WISE_PROFILE_ID may be wrong (e.g. webhook subscription UUID) — fall back to business/first profile.
+ */
+export async function resolveWiseProfileId(): Promise<string> {
+  const cfg = getWiseConfig();
+  const preferred = cfg.profileId;
+
+  const profilesRes = await wiseFetch("/v2/profiles");
+  if (!profilesRes.ok) {
+    throw new Error(
+      `Wise list profiles failed (${profilesRes.status}): ${JSON.stringify(profilesRes.json).slice(0, 200)}`,
+    );
+  }
+  const profiles = Array.isArray(profilesRes.json)
+    ? profilesRes.json as Array<Record<string, unknown>>
+    : [];
+
+  const profile =
+    (preferred ? profiles.find((p) => String(p.id) === preferred) : null) ||
+    profiles.find((p) => String(p.type).toLowerCase() === "business") ||
+    profiles[0] ||
+    null;
+
+  if (!profile?.id) {
+    throw new Error("No Wise profiles returned for this API token");
+  }
+  return String(profile.id);
+}

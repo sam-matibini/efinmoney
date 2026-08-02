@@ -3,7 +3,7 @@
  * Create → show account details + unique payment reference → poll until webhook credits wallet.
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { getWiseConfig, wiseFetch } from "../_shared/wise.ts";
+import { getWiseConfig, wiseFetch, resolveWiseProfileId } from "../_shared/wise.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -48,28 +48,35 @@ function pickReceiveDetails(row: AccountDetail): { optionType: string; fields: A
 }
 
 async function fetchActiveAccountDetails(currency: string): Promise<{
-  fields: Array<{ label: string; value: string }>;
-  optionType: string;
-} | null> {
+  fields: Array<{ label: string; value: string }> | null;
+  optionType: string | null;
+  currenciesActive: string[];
+  profileId: string;
+}> {
   const cfg = getWiseConfig();
   if (!cfg.apiToken) throw new Error("WISE_API_TOKEN not configured");
-  if (!cfg.profileId) throw new Error("WISE_PROFILE_ID not configured");
 
-  const res = await wiseFetch(`/v1/profiles/${encodeURIComponent(cfg.profileId)}/account-details`);
+  const profileId = await resolveWiseProfileId();
+  const res = await wiseFetch(`/v1/profiles/${encodeURIComponent(profileId)}/account-details`);
   if (!res.ok) {
     throw new Error(
-      `Wise account-details failed (${res.status}): ${JSON.stringify(res.json).slice(0, 200)}`,
+      `Wise account-details failed (${res.status}): ${JSON.stringify(res.json).slice(0, 240)}`,
     );
   }
   const rows = Array.isArray(res.json) ? res.json as AccountDetail[] : [];
+  const activeRows = rows.filter((r) => String(r.status).toUpperCase() === "ACTIVE");
+  const currenciesActive = [...new Set(activeRows.map(currencyCodeOf).filter(Boolean))];
   const ccy = currency.toUpperCase();
-  const match = rows.find(
-    (r) => currencyCodeOf(r) === ccy && String(r.status).toUpperCase() === "ACTIVE",
-  );
-  if (!match) return null;
+  const match = activeRows.find((r) => currencyCodeOf(r) === ccy);
+  if (!match) {
+    console.warn("wise-topup-intent: no ACTIVE details for", ccy, "have", currenciesActive, "profile", profileId);
+    return { fields: null, optionType: null, currenciesActive, profileId };
+  }
   const picked = pickReceiveDetails(match);
-  if (!picked) return null;
-  return picked;
+  if (!picked) {
+    return { fields: null, optionType: null, currenciesActive, profileId };
+  }
+  return { fields: picked.fields, optionType: picked.optionType, currenciesActive, profileId };
 }
 
 Deno.serve(async (req) => {
@@ -89,7 +96,8 @@ Deno.serve(async (req) => {
 
     const admin = createClient(supabaseUrl, service);
     const cfg = getWiseConfig();
-    const configured = Boolean(cfg.apiToken && cfg.profileId);
+    // Token alone is enough; profile is resolved via /v2/profiles when needed
+    const configured = Boolean(cfg.apiToken);
 
     if (req.method === "GET") {
       const url = new URL(req.url);
@@ -168,19 +176,25 @@ Deno.serve(async (req) => {
     }
 
     const currency = String(wallet.currency_code).toUpperCase();
-    let receive: { fields: Array<{ label: string; value: string }>; optionType: string } | null;
+    let receive: Awaited<ReturnType<typeof fetchActiveAccountDetails>>;
     try {
       receive = await fetchActiveAccountDetails(currency);
     } catch (e) {
+      console.error("wise-topup-intent account-details", e);
       return json({
         error: e instanceof Error ? e.message : "Could not load Wise account details",
         code: "wise_account_details_failed",
       }, 502);
     }
-    if (!receive) {
+    if (!receive.fields || !receive.optionType) {
+      const have = receive.currenciesActive.length
+        ? ` Active on Wise: ${receive.currenciesActive.join(", ")}.`
+        : " No ACTIVE receive currencies on this Wise profile yet — open balances and issue account details in Wise Business.";
       return json({
-        error: `Wise does not have ACTIVE receive account details for ${currency}. Pick another currency or top-up method.`,
+        error: `Wise does not have ACTIVE receive account details for ${currency}.${have}`,
         code: "currency_unsupported",
+        currencies_active: receive.currenciesActive,
+        profile_id: receive.profileId,
       }, 400);
     }
 
