@@ -10,7 +10,15 @@ export function isFincraCheckoutCurrency(currency: string): boolean {
 
 /** Fincra appends ?reference=… to redirectUrl — do not put our own query string on it. */
 export function buildFincraTopupRedirectUrl(): { url: string; usesProductionReturn: boolean } {
-  const path = "/wallet/topup";
+  return buildFincraRedirectUrl("/wallet/topup");
+}
+
+/** Return to /send after card-funded collect (intent lives in sessionStorage). */
+export function buildFincraCardSendRedirectUrl(): { url: string; usesProductionReturn: boolean } {
+  return buildFincraRedirectUrl("/send");
+}
+
+function buildFincraRedirectUrl(path: string): { url: string; usesProductionReturn: boolean } {
   const isLocal = /^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname);
   const productionBase = (import.meta.env.VITE_APP_URL || "https://www.efin.money").replace(/\/+$/, "");
   if (isLocal) {
@@ -23,7 +31,7 @@ export function buildFincraTopupRedirectUrl(): { url: string; usesProductionRetu
   return { url: `${origin}${path}`, usesProductionReturn: false };
 }
 
-/** Parse reference implementation when Fincra concatenates ?reference onto a URL that already had ?provider=fincra */
+/** Parse reference when Fincra concatenates ?reference onto the return URL. */
 export function parseFincraReturnReference(search: string): string | null {
   const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
   const direct = params.get("reference");
@@ -33,6 +41,6 @@ export function parseFincraReturnReference(search: string): string | null {
   const embedded = provider.match(/(?:^|\?)reference=(.+)$/);
   if (embedded?.[1]) return decodeURIComponent(embedded[1]);
 
-  const loose = search.match(/reference=(topup-fincra-[^&]+|efm_fincra_[^&]+)/i);
+  const loose = search.match(/reference=((?:topup|cardsend)-fincra-[^&]+|efm_fincra_[^&]+)/i);
   return loose?.[1] ? decodeURIComponent(loose[1]) : null;
 }

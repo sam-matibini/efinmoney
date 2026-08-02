@@ -101,6 +101,11 @@ import {
 } from "@/lib/swychrPay";
 import { quoteDirectNombaTopup, quoteCadNombaTopup } from "@/lib/nombaTopupQuote";
 import { productFeatures } from "@/lib/productFeatures";
+import {
+  buildFincraCardSendRedirectUrl,
+  isFincraCheckoutCurrency,
+  parseFincraReturnReference,
+} from "@/lib/fincraTopup";
 import LenhubFlutterTopUpCard from "@/components/payments/LenhubFlutterTopUpCard";
 import { cn } from "@/lib/utils";
 import AppPage from "@/components/layout/AppPage";
@@ -579,7 +584,8 @@ const SendPage = () => {
     [fundingSource, sourceCurrency, targetCountry.code, cardTransferTypeForDest],
   );
   const cardSendEnabled = cardWallets.length > 0 && (
-    productFeatures.nombaNigeria
+    productFeatures.fincra
+    || productFeatures.nombaNigeria
     || productFeatures.lenhubFlutter
     || productFeatures.paytota
     || productFeatures.swychr
@@ -957,7 +963,7 @@ const SendPage = () => {
       return;
     }
 
-    // ── Card: Nomba / Lenhub / Paytota / Swychr collect → credit → payout ─
+    // ── Card: Fincra → Flutterwave → Nomba… collect → credit → payout ─
     if (fundingSource === "card") {
       try {
         if (!selectedWallet || !isCardSendCollectCurrency(selectedWallet.currency_code)) {
@@ -1012,8 +1018,50 @@ const SendPage = () => {
           useLenhubFlutter: false,
           useSwychr: false,
           useFlutterwave: false,
+          useFincraCollect: false,
           recipientCountryHint: targetCountry.country,
         };
+
+        if (provider === "fincra") {
+          if (!isFincraCheckoutCurrency(selectedWallet.currency_code)) {
+            toast.error(`Secure checkout does not support ${selectedWallet.currency_code}. Try another payment method.`);
+            setConfirming(false);
+            return;
+          }
+          const { url: redirectUrl, usesProductionReturn } = buildFincraCardSendRedirectUrl();
+          if (usesProductionReturn) {
+            toast.info("After payment, you will return to efin.money (required for checkout).");
+          }
+          const reference =
+            `cardsend-fincra-${(user.id || "anon").slice(0, 8)}-${selectedWallet.wallet_id.slice(0, 8)}-${Date.now()}`;
+          const { data, error } = await supabase.functions.invoke("fincra-initialize-checkout", {
+            body: {
+              amount: parsedAmount,
+              currency: selectedWallet.currency_code,
+              charge_amount: parsedAmount,
+              charge_currency: selectedWallet.currency_code,
+              credit_amount: parsedAmount,
+              credit_currency: selectedWallet.currency_code,
+              redirectUrl,
+              reference,
+              walletId: selectedWallet.wallet_id,
+            },
+          });
+          if (error) throw error;
+          const link = (data as { payment_link?: string; error?: string })?.payment_link;
+          if ((data as { error?: string })?.error || !link) {
+            throw new Error((data as { error?: string })?.error || "Checkout link was empty");
+          }
+          saveCardSendIntent({
+            ...intentBase,
+            provider: "fincra",
+            fincraReference: reference,
+            useFincraCollect: true,
+          });
+          toast.message("Opening secure card checkout…");
+          window.location.href = link;
+          return;
+        }
 
         if (provider === "nomba") {
           if (targetCountry.code !== "NGN" || !isNGNBank) {
@@ -1355,24 +1403,29 @@ const SendPage = () => {
     const flwStatus = searchParams.get("status") || searchParams.get("flw");
     const flwTxFromUrl = searchParams.get("tx_ref") || searchParams.get("txRef");
     const flwTxnIdFromUrl = searchParams.get("transaction_id");
+    const fincraRefFromUrl = parseFincraReturnReference(window.location.search);
     const providerParam = (searchParams.get("provider") || intent?.provider || "").toLowerCase();
     const pendingNomba = intent?.nombaTxnId || readPendingNombaTxn();
     const pendingPaytota = intent?.paytotaTxnId || readPendingPaytotaTxn();
     const pendingSwychr = intent?.swychrTxnId || readPendingSwychrTxn();
     const pendingFlw = intent?.flwTxRef || readPendingFlwTxn() || flwTxFromUrl;
+    const pendingFincra =
+      intent?.fincraReference
+      || (fincraRefFromUrl?.startsWith("cardsend-fincra-") ? fincraRefFromUrl : null);
     const lenhubReady = intent?.provider === "lenhub" && !!intent.lenhubChargeId && lenhubResumeTick > 0;
 
     const stripResumeParams = (next: URLSearchParams) => {
       for (const key of [
         "cardSend", "nomba", "paytota", "swychr", "walletId", "orderId", "provider",
-        "transaction_id", "tx_ref", "txRef", "status", "flw",
+        "transaction_id", "tx_ref", "txRef", "status", "flw", "reference",
       ]) {
         next.delete(key);
       }
     };
 
     if (!intent || intent.status === "consumed") {
-      if (cardSendFlag || nombaStatus || paytotaStatus || swychrStatus || flwTxFromUrl) {
+      if (cardSendFlag || nombaStatus || paytotaStatus || swychrStatus || flwTxFromUrl
+        || (fincraRefFromUrl?.startsWith("cardsend-fincra-"))) {
         const next = new URLSearchParams(searchParams);
         stripResumeParams(next);
         setSearchParams(next, { replace: true });
@@ -1401,7 +1454,9 @@ const SendPage = () => {
       || (provider === "nomba" && !!pendingNomba)
       || (provider === "paytota" && !!pendingPaytota)
       || (provider === "swychr" && !!pendingSwychr)
-      || (provider === "flutterwave" && !!pendingFlw);
+      || (provider === "flutterwave" && !!pendingFlw)
+      || (provider === "fincra" && !!pendingFincra)
+      || (!!fincraRefFromUrl?.startsWith("cardsend-fincra-") && provider === "fincra");
 
     if (!shouldStart && !failedReturn) return;
 
@@ -1427,7 +1482,7 @@ const SendPage = () => {
       let changed = false;
       for (const key of [
         "cardSend", "nomba", "paytota", "swychr", "walletId", "orderId", "provider",
-        "transaction_id", "tx_ref", "txRef", "status", "flw",
+        "transaction_id", "tx_ref", "txRef", "status", "flw", "reference",
       ]) {
         if (next.has(key)) {
           next.delete(key);
@@ -1528,6 +1583,26 @@ const SendPage = () => {
             }
             if (verified?.status === "failed" || verified?.status === "cancelled") {
               throw new Error(verified.error || "Card payment failed");
+            }
+            await new Promise((r) => setTimeout(r, 1500));
+          }
+        } else if (provider === "fincra") {
+          const reference = pendingFincra || intent.fincraReference;
+          if (!reference) throw new Error("Missing payment reference");
+          const session = (await supabase.auth.getSession()).data.session;
+          for (let i = 0; i < 40; i++) {
+            const url =
+              `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fincra-verify-payment?reference=${encodeURIComponent(reference)}`;
+            const res = await fetch(url, {
+              headers: { Authorization: `Bearer ${session?.access_token || ""}` },
+            });
+            const json = await res.json().catch(() => ({}));
+            if (json?.verified) {
+              paid = true;
+              break;
+            }
+            if (json?.status === "failed" || json?.status === "cancelled" || json?.error === "Payment failed") {
+              throw new Error(json?.error || "Card payment failed");
             }
             await new Promise((r) => setTimeout(r, 1500));
           }
@@ -2040,14 +2115,37 @@ const SendPage = () => {
                                       </div>
 
                                       {fundingOptions.filter((o) => o.v !== "wallet").length > 0 && (
-                                        <div className="space-y-2">
+                                        <div className="space-y-2 pt-1">
                                           <button
                                             type="button"
-                                            className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                                            aria-expanded={showOtherFunding}
+                                            className={cn(
+                                              "w-full flex items-center justify-between gap-3 rounded-xl border px-3.5 py-3 text-left transition-colors",
+                                              showOtherFunding || fundingSource !== "wallet"
+                                                ? "border-primary/40 bg-primary/5"
+                                                : "border-border bg-muted/40 hover:bg-muted/70 hover:border-border",
+                                            )}
                                             onClick={() => setShowOtherFunding((v) => !v)}
                                           >
-                                            Other ways to pay
-                                            <ChevronDown className={cn("w-4 h-4 transition-transform", showOtherFunding && "rotate-180")} />
+                                            <span className="flex items-center gap-2.5 min-w-0">
+                                              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-background border border-border">
+                                                <CreditCard className="w-4 h-4 text-primary" />
+                                              </span>
+                                              <span className="min-w-0">
+                                                <span className="block text-sm font-medium text-foreground">
+                                                  Pay with card or bank
+                                                </span>
+                                                <span className="block text-xs text-muted-foreground">
+                                                  Debit card now, then we send — or link a bank
+                                                </span>
+                                              </span>
+                                            </span>
+                                            <ChevronDown
+                                              className={cn(
+                                                "w-5 h-5 shrink-0 text-muted-foreground transition-transform",
+                                                showOtherFunding && "rotate-180",
+                                              )}
+                                            />
                                           </button>
                                           {showOtherFunding && (
                                             <div className="grid grid-cols-2 gap-2">

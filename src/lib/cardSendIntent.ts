@@ -3,7 +3,7 @@
  * After collection succeeds, Send page resumes and pays out from the credited wallet.
  */
 
-export type CardSendProvider = "nomba" | "lenhub" | "paytota" | "swychr" | "flutterwave";
+export type CardSendProvider = "fincra" | "nomba" | "lenhub" | "paytota" | "swychr" | "flutterwave";
 
 export type CardSendIntent = {
   provider: CardSendProvider;
@@ -15,9 +15,12 @@ export type CardSendIntent = {
   /** Flutterwave tx_ref from flw-initialize-payment */
   flwTxRef?: string;
   flwTransactionId?: string;
+  /** Fincra checkout merchant reference */
+  fincraReference?: string;
   useLenhubFlutter?: boolean;
   useSwychr?: boolean;
   useFlutterwave?: boolean;
+  useFincraCollect?: boolean;
   walletId: string;
   sourceCurrency: string;
   sourceAmount: number;
@@ -51,6 +54,7 @@ const FLW_PENDING_KEY = "efm_flw_card_send_txn";
 
 function inferProvider(intent: Partial<CardSendIntent>): CardSendProvider {
   if (intent.provider) return intent.provider;
+  if (intent.fincraReference) return "fincra";
   if (intent.nombaTxnId) return "nomba";
   if (intent.lenhubChargeId) return "lenhub";
   if (intent.paytotaTxnId) return "paytota";

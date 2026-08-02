@@ -203,6 +203,9 @@ verify_jwt = false
 [functions.fincra-webhook]
 verify_jwt = false
 
+[functions.wise-webhook]
+verify_jwt = false
+
 [functions.dodo-webhook]
 verify_jwt = false
 
