@@ -2,11 +2,11 @@
  * Wise Platform webhook receiver.
  * URL: https://dkdnwumllibwdlqbjkwy.supabase.co/functions/v1/wise-webhook
  *
- * Verifies X-Signature-SHA256 (RSA-SHA256 over raw body) using Wise's published
- * public keys. Logs events and updates transfers when a Wise transfer id matches.
+ * Subscribed today: Account deposits (balances#credit). Also handles balances#update.
+ * Verifies X-Signature-SHA256 (RSA-SHA256) with Wise published public keys.
  *
- * Set WISE_WEBHOOK_ENV=sandbox to use the sandbox public key (default: production).
- * Set WISE_SKIP_SIGNATURE=true only for local debugging (never in production).
+ * WISE_WEBHOOK_ENV=sandbox → sandbox public key (default: production).
+ * WISE_SKIP_SIGNATURE=true → local debug only.
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
@@ -17,7 +17,6 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, GET, HEAD, OPTIONS",
 };
 
-/** Wise production webhook public key (PEM). */
 const WISE_PROD_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvO8vXV+JksBzZAY6GhSO
 XdoTCfhXaaiZ+qAbtaDBiu2AGkGVpmEygFmWP4Li9m5+Ni85BhVvZOodM9epgW3F
@@ -28,7 +27,6 @@ Oj3Vos0VdBIs/gAyJ/4yyQFCXYte64I7ssrlbGRaco4nKF3HmaNhxwyKyJafz19e
 HwIDAQAB
 -----END PUBLIC KEY-----`;
 
-/** Wise sandbox webhook public key (PEM). */
 const WISE_SANDBOX_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwpb91cEYuyJNQepZAVfP
 ZIlPZfNUefH+n6w9SW3fykqKu938cR7WadQv87oF2VuT+fDt7kqeRziTmPSUhqPU
@@ -87,6 +85,10 @@ function mapWiseStateToStatus(state: string): string | null {
   return null;
 }
 
+function asObj(v: unknown): Record<string, unknown> {
+  return v && typeof v === "object" ? v as Record<string, unknown> : {};
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method === "GET" || req.method === "HEAD") {
@@ -95,6 +97,7 @@ Deno.serve(async (req) => {
         ok: true,
         endpoint: "wise-webhook",
         message: "Webhook is live. POST Wise signed events here.",
+        handles: ["balances#credit", "balances#update", "transfers#state-change"],
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
@@ -140,13 +143,23 @@ Deno.serve(async (req) => {
   }
 
   const eventType = String(event.event_type || event.event || event.trigger_on || "unknown");
-  const data = (event.data && typeof event.data === "object" ? event.data : event) as Record<string, unknown>;
-  const resource = (data.resource && typeof data.resource === "object"
-    ? data.resource
-    : data) as Record<string, unknown>;
+  const data = asObj(event.data && typeof event.data === "object" ? event.data : event);
+  const resource = asObj(data.resource && typeof data.resource === "object" ? data.resource : data);
+
+  const amount = Number(data.amount);
+  const currency = String(data.currency || "").toUpperCase() || null;
+  const transactionType = String(data.transaction_type || data.transactionType || "").toLowerCase() || null;
+  const balanceId = String(data.balance_id || resource.id || "");
+  const profileId = String(resource.profile_id || data.profile_id || "");
+  const occurredAt = String(data.occurred_at || data.occurredAt || event.sent_at || "") || null;
+  const postBalance = Number(data.post_transaction_balance_amount ?? data.post_transaction_balance);
+  const transferReference = String(data.transfer_reference || data.transferReference || "") || null;
+  const subscriptionId = String(event.subscription_id || "") || null;
 
   const wiseTransferId = String(
-    resource.id || data.transfer_id || data.transferId || data.id || "",
+    resource.id && eventType.includes("transfer")
+      ? resource.id
+      : data.transfer_id || data.transferId || "",
   );
   const currentState = String(
     data.current_state || data.currentState || resource.status || data.status || "",
@@ -154,8 +167,14 @@ Deno.serve(async (req) => {
 
   console.log("wise-webhook event", {
     eventType,
+    amount: Number.isFinite(amount) ? amount : null,
+    currency,
+    transactionType,
+    balanceId: balanceId || null,
+    profileId: profileId || null,
     wiseTransferId: wiseTransferId || null,
     currentState: currentState || null,
+    occurredAt,
   });
 
   const supabase = createClient(
@@ -163,20 +182,65 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
 
-  // Best-effort audit log (table may not exist yet)
+  // Persist full payload for ops / testing
   try {
     await supabase.from("provider_webhook_logs").insert({
       provider: "wise",
       event_type: eventType,
-      external_id: wiseTransferId || null,
+      external_id: balanceId || wiseTransferId || subscriptionId || null,
       payload: event,
       received_at: new Date().toISOString(),
     });
-  } catch {
-    // ignore missing table
+  } catch (e) {
+    console.warn("wise-webhook: provider_webhook_logs insert failed", e);
   }
 
-  // Update eFinMoney transfer when we can match Wise id / reference
+  // Account deposits / balance updates
+  const isBalanceEvent =
+    eventType === "balances#credit" ||
+    eventType === "balances#update" ||
+    eventType.includes("balances");
+
+  if (isBalanceEvent && Number.isFinite(amount) && amount !== 0 && currency) {
+    const txType = transactionType || (eventType === "balances#credit" ? "credit" : "unknown");
+    const idempotencyKey = [
+      "wise",
+      eventType,
+      balanceId || "nobid",
+      currency,
+      String(amount),
+      occurredAt || String(event.sent_at || ""),
+      transferReference || "",
+    ].join(":");
+
+    const { error: balErr } = await supabase.from("wise_balance_events").upsert({
+      event_type: eventType,
+      subscription_id: subscriptionId,
+      profile_id: profileId || null,
+      balance_id: balanceId || null,
+      transaction_type: txType,
+      amount,
+      currency,
+      post_balance: Number.isFinite(postBalance) ? postBalance : null,
+      occurred_at: occurredAt,
+      transfer_reference: transferReference,
+      payload: event,
+      idempotency_key: idempotencyKey,
+      processed_at: new Date().toISOString(),
+    }, { onConflict: "idempotency_key", ignoreDuplicates: true });
+
+    if (balErr) {
+      console.warn("wise-webhook: wise_balance_events upsert failed", balErr);
+    } else if (txType === "credit" || eventType === "balances#credit") {
+      await supabase.from("admin_notifications").insert({
+        title: "Wise balance credited",
+        message: `${currency} ${amount} deposited to Wise balance ${balanceId || "(unknown)"}${profileId ? ` (profile ${profileId})` : ""}.`,
+        type: "treasury",
+      }).catch(() => {/* ignore */});
+    }
+  }
+
+  // Transfer state changes (payout tracking)
   if (wiseTransferId && (eventType.includes("transfer") || currentState)) {
     const mapped = mapWiseStateToStatus(currentState);
     if (mapped) {
@@ -195,14 +259,22 @@ Deno.serve(async (req) => {
         if (mapped === "failed") {
           patch.failure_reason = `Wise state: ${currentState}`;
         }
+        if (mapped === "completed") {
+          patch.completed_at = new Date().toISOString();
+        }
         await supabase.from("transfers").update(patch).eq("id", byRef.id);
         console.log("wise-webhook: updated transfer", byRef.id, mapped);
       }
     }
   }
 
-  // Wise requires a direct 2xx — no redirects
-  return new Response(JSON.stringify({ received: true, event_type: eventType }), {
+  return new Response(JSON.stringify({
+    received: true,
+    event_type: eventType,
+    amount: Number.isFinite(amount) ? amount : null,
+    currency,
+    transaction_type: transactionType,
+  }), {
     status: 200,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });

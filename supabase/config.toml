@@ -206,6 +206,9 @@ verify_jwt = false
 [functions.wise-webhook]
 verify_jwt = false
 
+[functions.wise-smoke]
+verify_jwt = false
+
 [functions.dodo-webhook]
 verify_jwt = false
 
