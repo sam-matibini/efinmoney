@@ -209,6 +209,11 @@ verify_jwt = false
 [functions.wise-smoke]
 verify_jwt = false
 
+# Client-called Wise bank-deposit top-up (create/status/cancel + account details).
+# Secrets: WISE_API_TOKEN, WISE_PROFILE_ID. Redeploy wise-webhook + wise-topup-intent after migrate.
+[functions.wise-topup-intent]
+verify_jwt = false
+
 [functions.dodo-webhook]
 verify_jwt = false
 

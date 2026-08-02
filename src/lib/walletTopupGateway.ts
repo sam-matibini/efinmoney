@@ -108,12 +108,13 @@ export type WalletTopupGateway =
   | "paytota_pay"
   | "dodo_pay"
   | "lenhub_flutter"
+  | "wise_pay"
   | "unsupported";
 
 export type WesternTopupProvider = "flutterwave" | "fincra";
 export type AfricanTopupProvider = "flutterwave" | "fincra";
 /** User-facing intl/CAD method pick (internal keys; UI uses white-label labels). */
-export type IntlTopupMethod = "nomba" | "paytota" | "fincra" | "interac" | "lenhub" | "flutterwave" | "dodo";
+export type IntlTopupMethod = "nomba" | "paytota" | "fincra" | "interac" | "lenhub" | "flutterwave" | "dodo" | "wise";
 /** African multi-rail method pick. */
 export type AfricaMomoTopupMethod =
   | "swychr"
@@ -122,7 +123,8 @@ export type AfricaMomoTopupMethod =
   | "fincra"
   | "ghana"
   | "elicate"
-  | "lenhub";
+  | "lenhub"
+  | "wise";
 
 export function isFincraTopupCurrency(currency: string): boolean {
   return FINCRA_TOPUP_CURRENCIES.includes(currency.toUpperCase());
@@ -156,8 +158,11 @@ export function routeWalletTopupGateway(
   preferFlutterwave = false,
   preferLenhubFlutter = false,
   preferDodo = false,
+  preferWise = false,
 ): WalletTopupGateway {
   const c = currency.toUpperCase();
+  // Explicit Wise bank-deposit rail
+  if (preferWise) return "wise_pay";
   // Explicit Lenhub Flutter card rail
   if (preferLenhubFlutter && LENHUB_FLUTTER_TOPUP_CURRENCIES.includes(c)) return "lenhub_flutter";
   // Explicit Dodo MoR checkout (western)
@@ -253,6 +258,7 @@ export function intlMethodBenefit(method: IntlTopupMethod): string {
   if (method === "paytota") return "Invoice";
   if (method === "dodo") return "Global";
   if (method === "interac") return "Bank send";
+  if (method === "wise") return "Bank send";
   if (method === "fincra") return "Flexible";
   if (method === "lenhub") return "In-app";
   if (method === "flutterwave") return "Hosted";
@@ -263,6 +269,7 @@ export function africaMomoMethodBenefit(method: AfricaMomoTopupMethod): string {
   if (method === "paytota") return "Hosted";
   if (method === "flutterwave") return "Company";
   if (method === "fincra") return "Flexible";
+  if (method === "wise") return "Bank send";
   if (method === "ghana") return "Direct";
   if (method === "elicate") return "Direct";
   if (method === "lenhub") return "In-app";
@@ -274,6 +281,7 @@ export function intlMethodProvider(method: IntlTopupMethod): string {
   if (method === "paytota") return "Paytota";
   if (method === "dodo") return "Dodo";
   if (method === "interac") return "Interac";
+  if (method === "wise") return "Wise";
   if (method === "fincra") return "Fincra";
   if (method === "lenhub") return "Lenhub";
   if (method === "flutterwave") return "Flutterwave";
@@ -284,6 +292,7 @@ export function africaMomoMethodProvider(method: AfricaMomoTopupMethod): string 
   if (method === "paytota") return "Paytota";
   if (method === "flutterwave") return "Flutterwave";
   if (method === "fincra") return "Fincra";
+  if (method === "wise") return "Wise";
   if (method === "ghana") return "Ghana Pay";
   if (method === "elicate") return "Elicate";
   if (method === "lenhub") return "Lenhub";
@@ -298,6 +307,7 @@ export function gatewayProviderLabel(gateway: WalletTopupGateway): string | null
   if (gateway === "ghana_pay") return "Ghana Pay";
   if (gateway === "elicate") return "Elicate";
   if (gateway === "fincra_interac") return "Interac";
+  if (gateway === "wise_pay") return "Wise";
   if (gateway === "fincra") return "Fincra";
   if (gateway === "dodo_pay") return "Dodo";
   if (gateway === "flutterwave") return "Flutterwave";
@@ -319,15 +329,13 @@ export function pickBestIntlTopupMethod(
   const pool = live.length > 0 ? live : available;
 
   let priority: IntlTopupMethod[];
-  if (c === "USD" || c === "CAD") {
-    // Fincra confirmed no CAD/USD; Flutterwave western still pending approval
-    priority = ["paytota", "dodo", "interac", "nomba", "flutterwave", "fincra"];
-  } else if (c === "EUR" || c === "GBP") {
-    priority = ["fincra", "paytota", "dodo", "flutterwave", "nomba"];
+  if (c === "USD" || c === "CAD" || c === "GBP" || c === "EUR") {
+    // Wise bank deposit is primary for USD/CAD/GBP/EUR (shared receive account + unique ref)
+    priority = ["wise", "paytota", "dodo", "interac", "nomba", "flutterwave", "fincra"];
   } else if (c === "NGN") {
-    priority = ["fincra", "flutterwave", "nomba"];
+    priority = ["fincra", "flutterwave", "nomba", "wise"];
   } else {
-    priority = ["fincra", "flutterwave", "nomba", "paytota", "dodo", "interac"];
+    priority = ["fincra", "flutterwave", "nomba", "paytota", "dodo", "interac", "wise"];
   }
 
   for (const p of priority) {
@@ -351,6 +359,7 @@ export function pickBestAfricaTopupMethod(
     "swychr",
     "ghana",
     "elicate",
+    "wise",
   ];
   for (const p of priority) {
     if (use.includes(p)) return p;
@@ -361,6 +370,7 @@ export function pickBestAfricaTopupMethod(
 export function intlMethodLabel(method: IntlTopupMethod, currency?: string): string {
   if (method === "paytota") return "Pay by invoice";
   if (method === "interac") return "Interac e-Transfer";
+  if (method === "wise") return "Bank transfer";
   if (method === "fincra") return fincraGatewayLabel(currency || "");
   if (method === "dodo") return "Global card checkout";
   if (method === "lenhub") {
@@ -383,6 +393,9 @@ export function intlMethodDescription(method: IntlTopupMethod, currency: string)
   }
   if (method === "interac") {
     return "Send CAD from your Canadian bank with Interac e-Transfer.";
+  }
+  if (method === "wise") {
+    return `Send ${c} by bank transfer to our receive account — include your payment reference.`;
   }
   if (method === "lenhub") {
     if (c === "NGN") {
@@ -427,6 +440,7 @@ export function africaMomoMethodLabel(method: AfricaMomoTopupMethod): string {
   if (method === "paytota") return "MoMo checkout";
   if (method === "flutterwave") return "Card / mobile money";
   if (method === "fincra") return "Checkout (alt)";
+  if (method === "wise") return "Bank transfer";
   if (method === "ghana") return "Mobile money";
   if (method === "elicate") return "Mobile money";
   if (method === "lenhub") return "Card (direct)";
@@ -443,6 +457,9 @@ export function africaMomoMethodDescription(method: AfricaMomoTopupMethod, curre
   }
   if (method === "fincra") {
     return intlMethodDescription("fincra", c);
+  }
+  if (method === "wise") {
+    return `Send ${c} by bank transfer to our receive account — include your payment reference.`;
   }
   if (method === "ghana") {
     return `Pay with Ghana mobile money to fund your ${c} wallet.`;

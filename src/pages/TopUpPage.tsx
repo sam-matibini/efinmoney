@@ -26,6 +26,7 @@ import { useWallets } from "@/hooks/useWallets";
 import { useAuth } from "@/hooks/useAuth";
 import ElicateTopUpCard from "@/components/payments/ElicateTopUpCard";
 import CadInteracTopUpCard from "@/components/payments/CadInteracTopUpCard";
+import WiseTopUpCard from "@/components/payments/WiseTopUpCard";
 import GhanaTopUpCard from "@/components/payments/GhanaTopUpCard";
 import NombaTopUpCard from "@/components/payments/NombaTopUpCard";
 import LenhubFlutterTopUpCard from "@/components/payments/LenhubFlutterTopUpCard";
@@ -91,6 +92,7 @@ function availableIntlMethods(currency: string): IntlTopupMethod[] {
     if (productFeatures.paytota) methods.push("paytota");
     if (productFeatures.dodo) methods.push("dodo");
     if (c === "CAD" && productFeatures.fincraInterac) methods.push("interac");
+    if (productFeatures.wise) methods.push("wise");
     if (productFeatures.flutterwave && FLW_WESTERN_TOPUP_CURRENCIES.includes(c)) {
       methods.push("flutterwave");
     }
@@ -101,11 +103,14 @@ function availableIntlMethods(currency: string): IntlTopupMethod[] {
     if (productFeatures.fincra) methods.push("fincra");
     if (productFeatures.flutterwave) methods.push("flutterwave");
     if (productFeatures.nombaNigeria) methods.push("nomba");
+    if (productFeatures.wise) methods.push("wise");
     return methods;
   }
   if (AFRICA_MOMO_MULTI_RAIL_CURRENCIES.includes(c)) {
     return methods;
   }
+  // Other wallet currencies: Wise bank deposit when feature is on (API rejects if no ACTIVE details)
+  if (productFeatures.wise) methods.push("wise");
   return methods;
 }
 
@@ -121,6 +126,7 @@ function availableAfricaMomoMethods(currency: string): AfricaMomoTopupMethod[] {
   if (productFeatures.swychr && SWYCHR_TOPUP_CURRENCIES.includes(c)) methods.push("swychr");
   if (c === "GHS" && productFeatures.ghanaPay) methods.push("ghana");
   if (c === "ZMW" && productFeatures.elicate) methods.push("elicate");
+  if (productFeatures.wise) methods.push("wise");
   return methods;
 }
 
@@ -130,6 +136,7 @@ function initialIntlMethod(params: URLSearchParams, currency: string): IntlTopup
   if (methods.length === 0) return null;
   const fromQuery = params.get("method")?.toLowerCase() || params.get("provider")?.toLowerCase() || params.get("rail")?.toLowerCase();
   if (fromQuery === "interac" && methods.includes("interac")) return "interac";
+  if ((fromQuery === "wise" || fromQuery === "bank-transfer") && methods.includes("wise")) return "wise";
   if ((fromQuery === "fincra" || fromQuery === "bank") && methods.includes("fincra")) return "fincra";
   if ((fromQuery === "paytota" || fromQuery === "invoice") && methods.includes("paytota")) return "paytota";
   if ((fromQuery === "dodo" || fromQuery === "global") && methods.includes("dodo")) return "dodo";
@@ -155,6 +162,7 @@ function initialAfricaMomoMethod(params: URLSearchParams, currency: string): Afr
   if ((fromQuery === "fincra" || fromQuery === "bank") && methods.includes("fincra")) return "fincra";
   if ((fromQuery === "ghana" || fromQuery === "ghana_pay") && methods.includes("ghana")) return "ghana";
   if ((fromQuery === "elicate" || fromQuery === "zambia") && methods.includes("elicate")) return "elicate";
+  if ((fromQuery === "wise" || fromQuery === "bank-transfer") && methods.includes("wise")) return "wise";
   return pickBestAfricaTopupMethod(currency, methods);
 }
 
@@ -297,6 +305,7 @@ const TopUpPage = () => {
   const preferFlutterwave =
     africaMomoMethod === "flutterwave" || intlMethod === "flutterwave";
   const preferInterac = intlMethod === "interac";
+  const preferWise = intlMethod === "wise" || africaMomoMethod === "wise";
   const preferFincra = intlMethod === "fincra" || africaMomoMethod === "fincra";
   const preferLenhubFlutter = intlMethod === "lenhub" || africaMomoMethod === "lenhub";
   const preferDodo = intlMethod === "dodo";
@@ -332,6 +341,7 @@ const TopUpPage = () => {
     preferFlutterwave,
     preferLenhubFlutter,
     preferDodo,
+    preferWise,
   );
   const liveTopup = isLiveTopupCurrency(currency);
   const availableFlwMethods = FLW_METHODS_BY_CCY[currency] || ["card"];
@@ -960,6 +970,16 @@ const TopUpPage = () => {
               {productFeatures.fincraInterac && gateway === "fincra_interac" && (
                 <SectionBoundary name="CadInteracTopUp">
                   <CadInteracTopUpCard
+                    walletId={selectedWallet.wallet_id}
+                    walletCurrency={currency}
+                    onComplete={invalidateWallets}
+                  />
+                </SectionBoundary>
+              )}
+
+              {productFeatures.wise && gateway === "wise_pay" && (
+                <SectionBoundary name="WiseTopUp">
+                  <WiseTopUpCard
                     walletId={selectedWallet.wallet_id}
                     walletCurrency={currency}
                     onComplete={invalidateWallets}

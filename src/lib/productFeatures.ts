@@ -36,6 +36,8 @@ export const productFeatures = {
   fincra: envFlag("VITE_FEATURE_FINCRA", true),
   /** Fincra CAD Interac e-Transfer collections (platform alias + intent matching). */
   fincraInterac: envFlag("VITE_FEATURE_FINCRA_INTERAC", false),
+  /** Wise bank-deposit top-up (shared receive account + unique payment reference). */
+  wise: envFlag("VITE_FEATURE_WISE", true),
   /** Lenhub Flutter wrapper — card collect (USD/CAD/…) + FX bank/MoMo payouts. */
   lenhubFlutter: envFlag("VITE_FEATURE_LENHUB_FLUTTER", true),
   adyen: envFlag("VITE_FEATURE_ADYEN", false),
@@ -59,6 +61,7 @@ export function isLiveTopupCurrency(currency: string): boolean {
     return true;
   }
   if (productFeatures.fincraInterac && c === "CAD") return true;
+  if (productFeatures.wise) return true;
   if (productFeatures.swychr && ["XAF", "KES", "XOF", "UGX"].includes(c)) return true;
   if (productFeatures.paytota && ["UGX", "KES", "RWF"].includes(c)) return true;
   if (productFeatures.ghanaPay && c === "GHS") return true;

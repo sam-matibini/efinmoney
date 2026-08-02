@@ -2,13 +2,14 @@
  * Wise Platform webhook receiver.
  * URL: https://dkdnwumllibwdlqbjkwy.supabase.co/functions/v1/wise-webhook
  *
- * Subscribed today: Account deposits (balances#credit). Also handles balances#update.
- * Verifies X-Signature-SHA256 (RSA-SHA256) with Wise published public keys.
+ * balances#credit / balances#update (credit) → match wise_topup_intents → credit wallet.
+ * transfers#state-change → update matching transfers by provider_reference.
  *
  * WISE_WEBHOOK_ENV=sandbox → sandbox public key (default: production).
  * WISE_SKIP_SIGNATURE=true → local debug only.
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { creditWalletViaWise } from "../_shared/wise-credit.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -87,6 +88,11 @@ function mapWiseStateToStatus(state: string): string | null {
 
 function asObj(v: unknown): Record<string, unknown> {
   return v && typeof v === "object" ? v as Record<string, unknown> : {};
+}
+
+function extractRefNeedle(raw: string): string | null {
+  const m = raw.match(/efm-wise-[a-z0-9]+-\d+/i);
+  return m?.[0] || null;
 }
 
 Deno.serve(async (req) => {
@@ -174,6 +180,7 @@ Deno.serve(async (req) => {
     profileId: profileId || null,
     wiseTransferId: wiseTransferId || null,
     currentState: currentState || null,
+    transferReference,
     occurredAt,
   });
 
@@ -182,7 +189,6 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
 
-  // Persist full payload for ops / testing
   try {
     await supabase.from("provider_webhook_logs").insert({
       provider: "wise",
@@ -195,11 +201,14 @@ Deno.serve(async (req) => {
     console.warn("wise-webhook: provider_webhook_logs insert failed", e);
   }
 
-  // Account deposits / balance updates
   const isBalanceEvent =
     eventType === "balances#credit" ||
     eventType === "balances#update" ||
     eventType.includes("balances");
+  const isCredit =
+    eventType === "balances#credit" ||
+    transactionType === "credit" ||
+    (isBalanceEvent && Number.isFinite(amount) && amount > 0 && transactionType !== "debit");
 
   if (isBalanceEvent && Number.isFinite(amount) && amount !== 0 && currency) {
     const txType = transactionType || (eventType === "balances#credit" ? "credit" : "unknown");
@@ -231,16 +240,84 @@ Deno.serve(async (req) => {
 
     if (balErr) {
       console.warn("wise-webhook: wise_balance_events upsert failed", balErr);
-    } else if (txType === "credit" || eventType === "balances#credit") {
-      await supabase.from("admin_notifications").insert({
-        title: "Wise balance credited",
-        message: `${currency} ${amount} deposited to Wise balance ${balanceId || "(unknown)"}${profileId ? ` (profile ${profileId})` : ""}.`,
-        type: "treasury",
-      }).catch(() => {/* ignore */});
+    }
+
+    if (isCredit && amount > 0) {
+      const nowIso = new Date().toISOString();
+      const haystack = `${transferReference || ""} ${rawBody}`.toLowerCase();
+      const needle = extractRefNeedle(haystack) || extractRefNeedle(transferReference || "");
+
+      let intent: {
+        id: string;
+        user_id: string;
+        wallet_id: string;
+        amount: number;
+        currency_code: string;
+        reference: string;
+      } | null = null;
+
+      if (needle) {
+        const { data } = await supabase
+          .from("wise_topup_intents")
+          .select("id, user_id, wallet_id, amount, currency_code, reference")
+          .eq("reference", needle)
+          .eq("status", "pending")
+          .gt("expires_at", nowIso)
+          .maybeSingle();
+        intent = data;
+      }
+
+      if (!intent) {
+        const { data: candidates } = await supabase
+          .from("wise_topup_intents")
+          .select("id, user_id, wallet_id, amount, currency_code, reference")
+          .eq("status", "pending")
+          .eq("currency_code", currency)
+          .gt("expires_at", nowIso)
+          .order("created_at", { ascending: true })
+          .limit(30);
+        intent = (candidates ?? []).find((row) => {
+          const expected = Number(row.amount);
+          return Number.isFinite(expected) && Math.abs(expected - amount) < 0.02;
+        }) ?? null;
+      }
+
+      if (intent) {
+        try {
+          const creditIdem = `wise-intent-${intent.id}-${idempotencyKey}`;
+          const result = await creditWalletViaWise(
+            supabase,
+            intent.user_id,
+            intent.currency_code,
+            Number(intent.amount),
+            creditIdem,
+            intent.wallet_id,
+            `Wise top-up (${intent.reference})`,
+          );
+          await supabase.from("wise_topup_intents").update({
+            status: "completed",
+            provider_reference: transferReference || balanceId || idempotencyKey,
+            credited_at: nowIso,
+          }).eq("id", intent.id).eq("status", "pending");
+          console.log("wise-webhook: credited intent", intent.id, result);
+        } catch (creditErr) {
+          console.error("wise-webhook: credit failed", creditErr);
+          await supabase.from("admin_notifications").insert({
+            title: "Wise top-up credit failed",
+            message: `Intent ${intent.reference}: ${creditErr instanceof Error ? creditErr.message : String(creditErr)}`,
+            type: "treasury",
+          }).catch(() => {/* ignore */});
+        }
+      } else if (txType === "credit" || eventType === "balances#credit") {
+        await supabase.from("admin_notifications").insert({
+          title: "Wise balance credited (unmatched)",
+          message: `${currency} ${amount} deposited — no pending top-up intent matched. Balance ${balanceId || "(unknown)"}.`,
+          type: "treasury",
+        }).catch(() => {/* ignore */});
+      }
     }
   }
 
-  // Transfer state changes (payout tracking)
   if (wiseTransferId && (eventType.includes("transfer") || currentState)) {
     const mapped = mapWiseStateToStatus(currentState);
     if (mapped) {
