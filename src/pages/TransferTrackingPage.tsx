@@ -191,7 +191,7 @@ const TransferTrackingPage = () => {
         .select("id")
         .eq("transfer_id", id)
         .maybeSingle();
-      // Fincra settles via webhook — don't poll Nomba/FLW (they 404 and confuse the timeline)
+      // Fincra: retry if never submitted; otherwise poll Fincra status (webhooks can lag)
       if (looksFincra) {
         const stubRef = !transfer.provider_reference
           || /^STUB-/i.test(String(transfer.provider_reference))
@@ -222,9 +222,26 @@ const TransferTrackingPage = () => {
           }
           return;
         }
+
+        const { data, error } = await supabase.functions.invoke("fincra-verify-transfer", {
+          body: { transfer_id: id },
+        });
+        if (error) throw error;
         const { data: fresh } = await supabase.from("transfers").select("*").eq("id", id).maybeSingle();
         if (fresh) setTransfer(fresh as Transfer);
-        if (!silent) toast.info(`Transfer status: ${fresh?.status || transfer.status}`);
+        if (data?.changed && data?.status === "completed") {
+          if (!silent) toast.success("Delivered! Your transfer is complete.");
+        } else if (data?.status === "failed" || data?.error) {
+          toast.error(friendlyFailureReason(String(data.error || fresh?.failure_reason || "Payout failed")), {
+            duration: 12000,
+          });
+        } else if (!silent) {
+          toast.info(
+            data?.provider_status
+              ? `Fincra status: ${data.provider_status}`
+              : `Transfer status: ${fresh?.status || transfer.status}`,
+          );
+        }
         return;
       }
       // Prefer Nomba verify only when a Nomba payout row exists — NGN bank can also go via Flutterwave.
