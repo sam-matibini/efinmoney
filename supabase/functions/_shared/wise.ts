@@ -13,10 +13,19 @@ export function getWiseConfig() {
   };
 }
 
+export type WiseFetchResult = {
+  ok: boolean;
+  status: number;
+  json: unknown;
+  text: string;
+  scaApproval: string | null;
+  scaResult: string | null;
+};
+
 export async function wiseFetch(
   path: string,
   opts: { method?: string; body?: string; query?: Record<string, string> } = {},
-): Promise<{ ok: boolean; status: number; json: unknown }> {
+): Promise<WiseFetchResult> {
   const cfg = getWiseConfig();
   if (!cfg.apiToken) throw new Error("WISE_API_TOKEN not configured");
 
@@ -36,8 +45,40 @@ export async function wiseFetch(
     },
     body: opts.body,
   });
-  const json = await res.json().catch(() => ({}));
-  return { ok: res.ok, status: res.status, json };
+  const text = await res.text();
+  let json: unknown = {};
+  try {
+    json = text ? JSON.parse(text) : {};
+  } catch {
+    json = { raw: text.slice(0, 300) };
+  }
+  return {
+    ok: res.ok,
+    status: res.status,
+    json,
+    text,
+    scaApproval: res.headers.get("x-2fa-approval"),
+    scaResult: res.headers.get("x-2fa-approval-result"),
+  };
+}
+
+function looksLikeUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+/** Safe token shape for diagnostics (never return the secret). */
+export function wiseTokenDiagnostics() {
+  const cfg = getWiseConfig();
+  const token = cfg.apiToken;
+  return {
+    has_token: Boolean(token),
+    token_length: token.length,
+    token_looks_like_uuid: token ? looksLikeUuid(token) : false,
+    token_prefix: token ? `${token.slice(0, 4)}…` : null,
+    profile_id_secret_set: Boolean(cfg.profileId),
+    profile_id_looks_like_uuid: cfg.profileId ? looksLikeUuid(cfg.profileId) : false,
+    env: cfg.sandbox ? "sandbox" : "production",
+  };
 }
 
 /**
@@ -47,11 +88,20 @@ export async function wiseFetch(
 export async function resolveWiseProfileId(): Promise<string> {
   const cfg = getWiseConfig();
   const preferred = cfg.profileId;
+  const diag = wiseTokenDiagnostics();
+  if (diag.token_looks_like_uuid) {
+    throw new Error(
+      "WISE_API_TOKEN looks like a UUID (profile/subscription id). Set a Wise personal API token from Settings → API tokens instead.",
+    );
+  }
 
   const profilesRes = await wiseFetch("/v2/profiles");
   if (!profilesRes.ok) {
+    const hint = profilesRes.status === 401 || profilesRes.status === 403
+      ? " Token rejected — recreate personal API token in Wise and update WISE_API_TOKEN secret."
+      : "";
     throw new Error(
-      `Wise list profiles failed (${profilesRes.status}): ${JSON.stringify(profilesRes.json).slice(0, 200)}`,
+      `Wise list profiles failed (${profilesRes.status}): ${JSON.stringify(profilesRes.json).slice(0, 200)}.${hint}`,
     );
   }
   const profiles = Array.isArray(profilesRes.json)

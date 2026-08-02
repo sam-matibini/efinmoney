@@ -107,7 +107,19 @@ export default function WiseTopUpCard({ walletId, walletCurrency, onComplete }: 
       const { data, error } = await supabase.functions.invoke("wise-topup-intent", {
         body: { action: "create", amount: amt, wallet_id: walletId },
       });
-      if (error) throw error;
+      if (error) {
+        let msg = error.message || "Could not start Wise top-up";
+        try {
+          const ctx = (error as { context?: Response }).context;
+          if (ctx) {
+            const body = await ctx.json().catch(() => null) as { error?: string } | null;
+            if (body?.error) msg = body.error;
+          }
+        } catch {
+          /* ignore */
+        }
+        throw new Error(msg);
+      }
       if (data?.error) throw new Error(data.error);
       setIntent(data.intent);
       setDetails(Array.isArray(data.account_details) ? data.account_details : []);

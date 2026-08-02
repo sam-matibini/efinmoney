@@ -3,7 +3,7 @@
  * Create → show account details + unique payment reference → poll until webhook credits wallet.
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { getWiseConfig, wiseFetch, resolveWiseProfileId } from "../_shared/wise.ts";
+import { getWiseConfig, wiseFetch, resolveWiseProfileId, wiseTokenDiagnostics } from "../_shared/wise.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -59,8 +59,9 @@ async function fetchActiveAccountDetails(currency: string): Promise<{
   const profileId = await resolveWiseProfileId();
   const res = await wiseFetch(`/v1/profiles/${encodeURIComponent(profileId)}/account-details`);
   if (!res.ok) {
+    const sca = res.scaResult ? ` sca=${res.scaResult}` : "";
     throw new Error(
-      `Wise account-details failed (${res.status}): ${JSON.stringify(res.json).slice(0, 240)}`,
+      `Wise account-details failed (${res.status})${sca}: ${JSON.stringify(res.json).slice(0, 240)}`,
     );
   }
   const rows = Array.isArray(res.json) ? res.json as AccountDetail[] : [];
@@ -101,6 +102,35 @@ Deno.serve(async (req) => {
 
     if (req.method === "GET") {
       const url = new URL(req.url);
+      if (url.searchParams.get("diagnose") === "1") {
+        const tokenDiag = wiseTokenDiagnostics();
+        const out: Record<string, unknown> = { ok: false, ...tokenDiag };
+        try {
+          const profileId = await resolveWiseProfileId();
+          out.profile_id_resolved = profileId;
+          const details = await wiseFetch(`/v1/profiles/${encodeURIComponent(profileId)}/account-details`);
+          out.account_details_status = details.status;
+          out.account_details_sca = details.scaResult;
+          if (details.ok && Array.isArray(details.json)) {
+            const rows = details.json as AccountDetail[];
+            out.currencies_active = [
+              ...new Set(
+                rows
+                  .filter((r) => String(r.status).toUpperCase() === "ACTIVE")
+                  .map(currencyCodeOf)
+                  .filter(Boolean),
+              ),
+            ];
+            out.ok = true;
+          } else {
+            out.account_details_error = details.json;
+          }
+        } catch (e) {
+          out.error = e instanceof Error ? e.message : String(e);
+        }
+        return json(out, out.ok ? 200 : 502);
+      }
+
       const intentId = url.searchParams.get("intent_id");
       if (intentId) {
         const { data, error } = await admin
@@ -135,6 +165,36 @@ Deno.serve(async (req) => {
       intent_id?: string;
     };
     const action = String(body.action || "create").toLowerCase();
+
+    if (action === "diagnose") {
+      const tokenDiag = wiseTokenDiagnostics();
+      const out: Record<string, unknown> = { ok: false, ...tokenDiag };
+      try {
+        const profileId = await resolveWiseProfileId();
+        out.profile_id_resolved = profileId;
+        const details = await wiseFetch(`/v1/profiles/${encodeURIComponent(profileId)}/account-details`);
+        out.account_details_status = details.status;
+        out.account_details_sca = details.scaResult;
+        if (details.ok && Array.isArray(details.json)) {
+          const rows = details.json as AccountDetail[];
+          out.currencies_active = [
+            ...new Set(
+              rows
+                .filter((r) => String(r.status).toUpperCase() === "ACTIVE")
+                .map(currencyCodeOf)
+                .filter(Boolean),
+            ),
+          ];
+          out.ok = true;
+        } else {
+          out.account_details_error = details.json;
+          out.error = `account-details ${details.status}`;
+        }
+      } catch (e) {
+        out.error = e instanceof Error ? e.message : String(e);
+      }
+      return json(out, out.ok ? 200 : 502);
+    }
 
     if (action === "cancel") {
       const intentId = String(body.intent_id || "");
