@@ -206,6 +206,7 @@ const SendPage = () => {
   const [cardResumeProcessing, setCardResumeProcessing] = useState(false);
   const [cardResumeStage, setCardResumeStage] = useState<CardResumeStage>("confirming");
   const cardResumeLock = useRef(false);
+  const cardResumeAbort = useRef(false);
   const [lenhubResumeTick, setLenhubResumeTick] = useState(0);
 
   // Ghana bank payout state (toggle between Mobile Money and Bank Transfer)
@@ -1440,8 +1441,13 @@ const SendPage = () => {
       || paytotaStatus === "cancelled"
       || swychrStatus === "failed"
       || flwStatus === "cancelled"
-      || flwStatus === "failed";
+      || flwStatus === "failed"
+      || searchParams.get("cancelled") === "1"
+      || searchParams.get("cancel") === "1";
 
+    // Only resume when the PSP actually returned us (URL evidence).
+    // Do NOT start from sessionStorage alone — browser Back from checkout
+    // restores /send with a pending intent and would fake "Confirming…".
     const shouldStart =
       lenhubReady
       || cardSendFlag
@@ -1451,11 +1457,8 @@ const SendPage = () => {
       || flwStatus === "successful"
       || flwStatus === "success"
       || flwStatus === "completed"
-      || (provider === "nomba" && !!pendingNomba)
-      || (provider === "paytota" && !!pendingPaytota)
-      || (provider === "swychr" && !!pendingSwychr)
-      || (provider === "flutterwave" && !!pendingFlw)
-      || (provider === "fincra" && !!pendingFincra)
+      || !!flwTxFromUrl
+      || !!flwTxnIdFromUrl
       || (!!fincraRefFromUrl?.startsWith("cardsend-fincra-") && provider === "fincra");
 
     if (!shouldStart && !failedReturn) return;
@@ -1474,6 +1477,7 @@ const SendPage = () => {
     }
 
     cardResumeLock.current = true;
+    cardResumeAbort.current = false;
     setCardResumeStage("confirming");
     setCardResumeProcessing(true);
 
@@ -1493,7 +1497,19 @@ const SendPage = () => {
     };
 
     const finishPayout = async () => {
+      const sleep = (ms: number) => new Promise<void>((resolve, reject) => {
+        const t = setTimeout(() => {
+          if (cardResumeAbort.current) reject(new Error("cancelled"));
+          else resolve();
+        }, ms);
+        if (cardResumeAbort.current) {
+          clearTimeout(t);
+          reject(new Error("cancelled"));
+        }
+      });
+
       try {
+        if (cardResumeAbort.current) throw new Error("cancelled");
         setFundingSource("wallet");
         setSelectedWalletId(intent.walletId);
         setAmount(String(intent.sourceAmount));
@@ -1517,6 +1533,7 @@ const SendPage = () => {
           const chargeId = intent.lenhubChargeId;
           if (!chargeId) throw new Error("Missing payment reference");
           for (let i = 0; i < 40; i++) {
+            if (cardResumeAbort.current) throw new Error("cancelled");
             const { data } = await looseDb
               .from("lenhub_flutter_charges")
               .select("status, credited_at")
@@ -1529,12 +1546,13 @@ const SendPage = () => {
             if (data?.status === "failed" || data?.status === "cancelled") {
               throw new Error("Card payment failed");
             }
-            await new Promise((r) => setTimeout(r, 1500));
+            await sleep(1500);
           }
         } else if (provider === "paytota") {
           const txnId = intent.paytotaTxnId || pendingPaytota;
           if (!txnId) throw new Error("Missing payment reference");
           for (let i = 0; i < 40; i++) {
+            if (cardResumeAbort.current) throw new Error("cancelled");
             try {
               await confirmPaytotaPayment({
                 transaction_id: txnId,
@@ -1549,12 +1567,13 @@ const SendPage = () => {
             if (status?.status === "failed" || status?.status === "cancelled") {
               throw new Error(status.failure_reason || "Card payment failed");
             }
-            await new Promise((r) => setTimeout(r, 1500));
+            await sleep(1500);
           }
         } else if (provider === "swychr") {
           const txnId = intent.swychrTxnId || pendingSwychr;
           if (!txnId) throw new Error("Missing payment reference");
           for (let i = 0; i < 40; i++) {
+            if (cardResumeAbort.current) throw new Error("cancelled");
             try {
               await verifySwychrPayin(txnId);
             } catch { /* ignore */ }
@@ -1566,13 +1585,14 @@ const SendPage = () => {
             if (status?.status === "failed" || status?.status === "cancelled") {
               throw new Error(status.failure_reason || "Card payment failed");
             }
-            await new Promise((r) => setTimeout(r, 1500));
+            await sleep(1500);
           }
         } else if (provider === "flutterwave") {
           const txRef = intent.flwTxRef || pendingFlw || undefined;
           const txnId = intent.flwTransactionId || flwTxnIdFromUrl || undefined;
           if (!txRef && !txnId) throw new Error("Missing payment reference");
           for (let i = 0; i < 40; i++) {
+            if (cardResumeAbort.current) throw new Error("cancelled");
             const verified = await verifyFlwPayment({
               tx_ref: txRef,
               transaction_id: txnId,
@@ -1584,13 +1604,14 @@ const SendPage = () => {
             if (verified?.status === "failed" || verified?.status === "cancelled") {
               throw new Error(verified.error || "Card payment failed");
             }
-            await new Promise((r) => setTimeout(r, 1500));
+            await sleep(1500);
           }
         } else if (provider === "fincra") {
           const reference = pendingFincra || intent.fincraReference;
           if (!reference) throw new Error("Missing payment reference");
           const session = (await supabase.auth.getSession()).data.session;
           for (let i = 0; i < 40; i++) {
+            if (cardResumeAbort.current) throw new Error("cancelled");
             const url =
               `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fincra-verify-payment?reference=${encodeURIComponent(reference)}`;
             const res = await fetch(url, {
@@ -1604,12 +1625,13 @@ const SendPage = () => {
             if (json?.status === "failed" || json?.status === "cancelled" || json?.error === "Payment failed") {
               throw new Error(json?.error || "Card payment failed");
             }
-            await new Promise((r) => setTimeout(r, 1500));
+            await sleep(1500);
           }
         } else {
           const txnId = intent.nombaTxnId || pendingNomba;
           if (!txnId) throw new Error("Missing card payment reference");
           for (let i = 0; i < 40; i++) {
+            if (cardResumeAbort.current) throw new Error("cancelled");
             const status = await getNombaPayStatus(txnId);
             if (status?.status === "completed") {
               paid = true;
@@ -1618,9 +1640,10 @@ const SendPage = () => {
             if (status?.status === "failed" || status?.status === "cancelled") {
               throw new Error(status.failure_reason || "Card payment failed");
             }
-            await new Promise((r) => setTimeout(r, 1500));
+            await sleep(1500);
           }
         }
+        if (cardResumeAbort.current) throw new Error("cancelled");
         if (!paid) {
           throw new Error("Payment is still processing. We’ll finish the send once it clears — check back shortly or contact support.");
         }
@@ -1676,12 +1699,17 @@ const SendPage = () => {
         toast.success("Card charged — transfer sent to your recipient!");
         goToStep(4);
       } catch (e: any) {
-        toast.error(e?.message || "Could not complete transfer after card payment");
+        if (e?.message === "cancelled" || cardResumeAbort.current) {
+          toast.message("Payment cancelled", { description: "No transfer was sent." });
+        } else {
+          toast.error(e?.message || "Could not complete transfer after card payment");
+        }
         stripParams();
       } finally {
         setCardResumeProcessing(false);
         setCardResumeStage("confirming");
         cardResumeLock.current = false;
+        cardResumeAbort.current = false;
       }
     };
 
@@ -1837,6 +1865,29 @@ const SendPage = () => {
                   <Lock className="h-3 w-3" />
                   Please don’t close this window
                 </p>
+
+                {cardResumeStage === "confirming" && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="text-muted-foreground"
+                    onClick={() => {
+                      cardResumeAbort.current = true;
+                      clearCardSendIntent();
+                      clearPendingNombaTxn();
+                      clearPendingPaytotaTxn();
+                      clearPendingSwychrTxn();
+                      clearPendingFlwTxn();
+                      setCardResumeProcessing(false);
+                      setCardResumeStage("confirming");
+                      cardResumeLock.current = false;
+                      toast.message("Payment cancelled", { description: "No transfer was sent." });
+                    }}
+                  >
+                    I didn’t complete payment
+                  </Button>
+                )}
               </div>
             </motion.div>
           </motion.div>
