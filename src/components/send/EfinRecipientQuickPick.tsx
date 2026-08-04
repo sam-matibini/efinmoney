@@ -10,6 +10,7 @@ import LoadingSpinner from "@/components/LoadingSpinner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import { avatarColorClasses } from "@/lib/avatarColor";
 
 export interface QuickPickRecipient {
   user_id: string;
