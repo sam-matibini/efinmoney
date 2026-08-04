@@ -361,13 +361,13 @@ Deno.serve(async (req) => {
           });
         }
         const next = normalizeNextAction(data.next_action as Record<string, unknown> | undefined);
-        if (next?.mode && next.providerType) {
+        if (next?.mode) {
           return ok({
             success: true,
             requires_auth: true,
             auth: {
               mode: next.mode,
-              provider_type: next.providerType,
+              provider_type: next.providerType || next.rawType || next.mode,
               redirect: next.redirect,
               message: String(data.next_action_message || data.message || ""),
             },
@@ -377,17 +377,24 @@ Deno.serve(async (req) => {
           });
         }
         if (data.next_action) {
+          const providerMessage = String(data.next_action_message || data.message || "");
           console.log("flw-card-charge unsupported follow-up action", {
             charge_id: chargeIdFollowUp,
             next_action_type: next?.providerType || null,
+            raw_next_action: JSON.stringify(data.next_action),
+            provider_message: providerMessage || null,
           });
           return ok({
             success: false,
-            error: `Unsupported bank security check: ${next?.providerType || "unknown"}. Please retry or use another payment method.`,
-            provider_action_type: next?.providerType || null,
+            error: providerMessage ||
+              `Unsupported bank security check: ${next?.providerType || "unknown"}. Please retry or use another payment method.`,
+            provider_action_type: next?.providerType || next?.rawType || null,
+            provider_message: providerMessage || null,
+            charge_id: chargeIdFollowUp,
             code: "unsupported_auth_action",
           });
         }
+
         return ok({
           success: true,
           pending_verification: true,
