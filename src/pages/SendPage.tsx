@@ -52,6 +52,8 @@ import EfinmoneyP2PFlow from "@/components/send/EfinmoneyP2PFlow";
 import MoneyFlowShell from "@/components/money/MoneyFlowShell";
 import PaymentMethodRow, { type PaymentMethodOption } from "@/components/money/PaymentMethodRow";
 import MethodCheckoutPanel from "@/components/send/MethodCheckoutPanel";
+import SendHeaderCountry from "@/components/send/SendHeaderCountry";
+import RecipientQuickBox from "@/components/send/RecipientQuickBox";
 import FlutterwaveCardForm from "@/components/payments/FlutterwaveCardForm";
 
 
