@@ -353,6 +353,15 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
                 <div className="flex items-center gap-2 p-3 text-sm text-muted-foreground">
                   <LoadingSpinner size={14} /> Searching…
                 </div>
+              ) : listError ? (
+                <div className="flex items-center justify-between gap-2 p-3">
+                  <span className="text-sm text-destructive">
+                    {listError instanceof Error ? listError.message : "Couldn't load eFinMoney users"}
+                  </span>
+                  <Button size="sm" variant="ghost" onClick={() => refetchList()}>
+                    Retry
+                  </Button>
+                </div>
               ) : suggestions.length === 0 ? (
                 <div className="flex items-center justify-between gap-2 p-3">
                   <span className="text-sm text-muted-foreground">No eFinMoney user found</span>
