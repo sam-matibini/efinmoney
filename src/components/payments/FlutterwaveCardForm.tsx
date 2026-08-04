@@ -131,12 +131,16 @@ const CHALLENGE_COPY: Record<string, { title: string; sub: string; label: string
   },
 };
 
+export type AvsPayload = { address: string; city: string; state: string; country: string; zipcode: string };
+
 function ChallengePanel({
   mode,
   loading,
   redirectUrl,
   providerMessage,
+  initialAvs,
   onSubmitCode,
+  onSubmitAvs,
   onOpenRedirect,
   onCancel,
 }: {
@@ -144,11 +148,20 @@ function ChallengePanel({
   loading: boolean;
   redirectUrl?: string | null;
   providerMessage?: string | null;
+  initialAvs?: Partial<AvsPayload>;
   onSubmitCode: (code: string) => void;
+  onSubmitAvs: (avs: AvsPayload) => void;
   onOpenRedirect: () => void;
   onCancel: () => void;
 }) {
   const [code, setCode] = useState("");
+  const [avs, setAvs] = useState<AvsPayload>({
+    address: initialAvs?.address ?? "",
+    city: initialAvs?.city ?? "",
+    state: initialAvs?.state ?? "",
+    country: initialAvs?.country ?? "",
+    zipcode: initialAvs?.zipcode ?? "",
+  });
   const ref = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -157,6 +170,7 @@ function ChallengePanel({
 
   const copy = CHALLENGE_COPY[mode] ?? CHALLENGE_COPY.otp;
   const isRedirect = mode === "redirect";
+  const isAvs = mode === "avs";
 
   return (
     <div
@@ -179,6 +193,46 @@ function ChallengePanel({
         <Button type="button" size="lg" className="w-full" onClick={onOpenRedirect} disabled={!redirectUrl}>
           Open verification window
         </Button>
+      ) : isAvs ? (
+        <>
+          <div className="space-y-2">
+            <Label className="text-xs">Billing street</Label>
+            <Input value={avs.address} onChange={(e) => setAvs({ ...avs, address: e.target.value })} autoFocus />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label className="text-xs">City</Label>
+              <Input value={avs.city} onChange={(e) => setAvs({ ...avs, city: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs">State / Province</Label>
+              <Input value={avs.state} onChange={(e) => setAvs({ ...avs, state: e.target.value })} />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label className="text-xs">Country (2-letter)</Label>
+              <Input
+                value={avs.country}
+                maxLength={2}
+                onChange={(e) => setAvs({ ...avs, country: e.target.value.toUpperCase().replace(/[^A-Z]/g, "") })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs">Postal / ZIP code</Label>
+              <Input value={avs.zipcode} onChange={(e) => setAvs({ ...avs, zipcode: e.target.value.toUpperCase() })} />
+            </div>
+          </div>
+          <Button
+            type="button"
+            size="lg"
+            className="w-full"
+            disabled={loading || !avs.address.trim() || !avs.city.trim() || !avs.zipcode.trim()}
+            onClick={() => onSubmitAvs(avs)}
+          >
+            {loading ? <><LoadingSpinner size={16} className="mr-2" /> Verifying…</> : "Confirm address & Pay"}
+          </Button>
+        </>
       ) : (
         <>
           <div className="space-y-2">
@@ -205,6 +259,7 @@ function ChallengePanel({
           </Button>
         </>
       )}
+
 
       <button
         type="button"
