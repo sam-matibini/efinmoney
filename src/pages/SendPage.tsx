@@ -817,7 +817,7 @@ const SendPage = () => {
     setCreatingLink(true);
     try {
       const result = await createPaymentLink({
-        amount: totalCharge,
+        amount: parsedAmount,
         currency: targetCountry.code,
         sender_wallet_id: linkWallet.wallet_id,
         recipient_name: recipientName || null,
