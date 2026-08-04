@@ -2531,40 +2531,6 @@ const SendPage = () => {
                                     </motion.div>
 
 
-                                    <motion.div custom={2} variants={fieldVariants} initial="hidden" animate="show" className="flex justify-center py-1">
-                                      <SectionBoundary name="LiveFxCalculator"><LiveFxCalculator
-                                        variant="app"
-                                        showDisclaimer={false}
-                                        className="max-w-none w-full"
-                                        from={sourceCurrency}
-                                        to={targetCountry.code}
-                                        sendAmount={amount}
-                                        onFromChange={handleCalcFromChange}
-                                        onToChange={handleCalcToChange}
-                                        onSendAmountChange={(v) => setAmount(v)}
-                                        fromCurrencyFilter={
-                                          fundingSource === "wallet" ? walletCurrencyCodes
-                                          : fundingSource === "card" ? cardWalletCodes
-                                          : undefined
-                                        }
-                                        toCurrencyFilter={
-                                          fundingSource === "card" ? cardPayoutCodes : payoutCurrencyCodes
-                                        }
-                                        priorityCodes={PRIORITY_SEND_CURRENCIES}
-                                        quoteRecipient={rateAvailable ? calcQuoteRecipient : undefined}
-                                        quoteSend={rateAvailable ? calcQuoteSend : undefined}
-                                        displayRate={rateAvailable ? effectiveRate : null}
-                                       feeLabel={feeDisplayLabel}
-                                       feeNote={feeNote}
-                                        walletBalance={
-                                          fundingSource === "wallet" && selectedWallet
-                                            ? Number(selectedWallet.balance)
-                                            : null
-                                        }
-                                        walletSymbol={selectedWallet?.symbol}
-                                        showActions={false}
-                                      /></SectionBoundary>
-                                    </motion.div>
 
 
 
