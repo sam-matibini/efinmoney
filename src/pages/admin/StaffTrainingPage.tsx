@@ -42,6 +42,15 @@ export default function StaffTrainingPage() {
     refetchInterval: 60_000,
   });
 
+  const { data: staff = [] } = useQuery({
+    queryKey: ["training-staff"],
+    queryFn: async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data } = await (supabase as any).from("admin_users").select("*");
+      return data || [];
+    },
+  });
+
   const addCourse = useMutation({
     mutationFn: async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -52,20 +61,57 @@ export default function StaffTrainingPage() {
     onError: () => toast.error("Failed to add course"),
   });
 
+  const setMandatory = useMutation({
+    mutationFn: async ({ id, value }: { id: string; value: boolean }) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase as any).from("training_courses").update({ is_mandatory: value }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["training-courses"] }); toast.success("Course updated"); },
+    onError: () => toast.error("Failed to update course"),
+  });
+
   const logCompletion = useMutation({
     mutationFn: async () => {
       const user = (await supabase.auth.getUser()).data.user;
       const score = logForm.score ? Number(logForm.score) : null;
-      const expiry = new Date(); expiry.setMonth(expiry.getMonth() + 12);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase as any).from("training_records").insert({ staff_id: user?.id, course_id: logForm.course_id || null, course_name: logForm.course_name, completed_at: new Date().toISOString(), score, passed: !score || score >= 70, expiry_date: expiry.toISOString().split("T")[0] });
+      const course = courses.find((c: any) => c.id === logForm.course_id);
+      const months = Number(course?.frequency_months) || 12;
+      const passMark = Number(course?.pass_mark) || 70;
+      const expiry = new Date(); expiry.setMonth(expiry.getMonth() + months);
+      const staffId = logForm.staff_id || user?.id;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase as any).from("training_records").insert({ staff_id: staffId, course_id: logForm.course_id || null, course_name: logForm.course_name, completed_at: new Date().toISOString(), score, passed: score == null || score >= passMark, expiry_date: expiry.toISOString().split("T")[0] });
       if (error) throw error;
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["training-records"] }); setShowLog(false); setLogForm({ course_id: "", course_name: "", score: "" }); toast.success("Completion logged"); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["training-records"] }); setShowLog(false); setLogForm({ course_id: "", course_name: "", score: "", staff_id: "" }); toast.success("Completion logged"); },
     onError: () => toast.error("Failed to log completion"),
   });
 
   const expired = records.filter((r: any) => r.expiry_date && isPast(new Date(r.expiry_date))).length;
+
+  // Compliance matrix: latest passing record per (staff, mandatory course)
+  const mandatory = courses.filter((c: any) => c.is_mandatory);
+  const staffRows = staff.length
+    ? staff.map((s: any) => ({ id: s.user_id || s.id, name: s.full_name || s.email || s.user_id || s.id }))
+    : Array.from(new Set(records.map((r: any) => r.staff_id).filter(Boolean))).map((id: any) => ({ id, name: id }));
+
+  const cellStatus = (staffId: string, course: any) => {
+    const hits = records.filter((r: any) => r.staff_id === staffId && (r.course_id === course.id || r.course_name === course.course_name) && r.passed);
+    if (!hits.length) return "missing";
+    const newest = hits.reduce((a: any, b: any) => (new Date(a.completed_at) > new Date(b.completed_at) ? a : b));
+    if (newest.expiry_date && isPast(new Date(newest.expiry_date))) return "expired";
+    return "current";
+  };
+
+  const statusBadge = (s: string) =>
+    s === "current" ? <Badge className="bg-emerald-500/10 text-emerald-600">Current</Badge>
+      : s === "expired" ? <Badge className="bg-amber-500/10 text-amber-600">Expired</Badge>
+      : <Badge className="bg-red-500/10 text-red-600">Missing</Badge>;
+
+  const gaps = staffRows.reduce((n, s) => n + mandatory.filter((c: any) => cellStatus(s.id, c) !== "current").length, 0);
+
 
   return (
     <AdminLayout>
