@@ -2134,8 +2134,13 @@ const SendPage = () => {
                                     { n: 2, label: "Confirm" },
                                   ]}
                                   currentStep={1}
-                                  title={`Send money to ${targetCountry.country}`}
-                                  subtitle="Recipient, amount and how you pay"
+                                  title="Send money to"
+                                  headerRight={
+                                    <SendHeaderCountry
+                                      value={targetCountryId}
+                                      onChange={setTargetCountryId}
+                                    />
+                                  }
 
                                   footer={
                                     <div className="space-y-3">
