@@ -1343,7 +1343,7 @@ const SendPage = () => {
       const b = beneficiaries.find((x) => x.id === bid);
       if (b) {
         applyBeneficiary(b);
-        goToStep(2);
+        goToStep(1);
         const next = new URLSearchParams(searchParams);
         next.delete("beneficiaryId");
         setSearchParams(next, { replace: true });
@@ -1404,7 +1404,7 @@ const SendPage = () => {
     }
 
     setFromQuickSend(true);
-    setTimeout(() => goToStep(2), 0);
+    setTimeout(() => goToStep(1), 0);
 
     const destCode = toCode;
     if (destCode && beneficiaries?.length) {
@@ -2141,19 +2141,19 @@ const SendPage = () => {
                                     <div className="space-y-3">
                                       <motion.div
                                         whileTap={{ scale: 0.97 }}
-                                        animate={isStep1Valid ? { boxShadow: [
+                                        animate={isStep1Valid && isStep2Valid ? { boxShadow: [
                                           "0 0 0 0 hsl(var(--primary) / 0)",
                                           "0 0 0 6px hsl(var(--primary) / 0.15)",
                                           "0 0 0 0 hsl(var(--primary) / 0)",
                                         ] } : { boxShadow: "0 0 0 0 hsl(var(--primary) / 0)" }}
-                                        transition={isStep1Valid ? { duration: 1.8, repeat: Infinity, ease: "easeInOut" } : { duration: 0.2 }}
+                                        transition={isStep1Valid && isStep2Valid ? { duration: 1.8, repeat: Infinity, ease: "easeInOut" } : { duration: 0.2 }}
                                         className="rounded-md"
                                       >
                                         <Button
                                           className="w-full"
                                           size="lg"
-                                          onClick={() => goToStep(2)}
-                                          disabled={!isStep1Valid}
+                                          onClick={() => goToStep(3)}
+                                          disabled={!isStep1Valid || !isStep2Valid}
                                         >
                                           Continue
                                         </Button>
@@ -2581,11 +2581,10 @@ const SendPage = () => {
                               >
                                 <MoneyFlowShell
                                   steps={[
-                                    { n: 1, label: "Amount" },
-                                    { n: 2, label: "Recipient" },
-                                    { n: 3, label: "Confirm" },
+                                    { n: 1, label: "Details" },
+                                    { n: 2, label: "Confirm" },
                                   ]}
-                                  currentStep={3}
+                                  currentStep={2}
                                   title="Confirm"
                                   subtitle="Review the quote, then send"
                                 >
@@ -2635,7 +2634,7 @@ const SendPage = () => {
                                         <Button
                                           variant="outline"
                                           className="w-full"
-                                          onClick={() => goToStep(2)}
+                                          onClick={() => goToStep(1)}
                                           disabled={confirming}
                                         >
                                           Back
@@ -2643,7 +2642,7 @@ const SendPage = () => {
                                       </div>
                                     ) : (
                                     <div className="flex gap-3">
-                                      <Button variant="outline" className="flex-1" onClick={() => goToStep(2)} disabled={confirming || creatingLink}>Back</Button>
+                                      <Button variant="outline" className="flex-1" onClick={() => goToStep(1)} disabled={confirming || creatingLink}>Back</Button>
                                       <Button className="flex-1" onClick={useLink ? handleCreateLink : requestConfirm} disabled={confirming || creatingLink}>
                                         {(confirming || creatingLink) ? (
                                           <span className="inline-flex items-center gap-2">
