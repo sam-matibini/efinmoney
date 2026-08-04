@@ -672,6 +672,158 @@ const TopUpPage = () => {
     void queryClient.invalidateQueries({ queryKey: ["wallets"] });
   };
 
+  const [selectedMethodId, setSelectedMethodId] = useState<string>("");
+
+  const payMethods: CheckoutMethod[] = [];
+  if (selectedWallet && liveTopup) {
+    const walletId = selectedWallet.wallet_id;
+    if (productFeatures.flutterwave && gateway === "flutterwave") {
+      if (availableFlwMethods.includes("mobilemoney") || currency === "TZS") {
+        payMethods.push({
+          id: "flw_momo",
+          label: "Mobile money",
+          description: "Pay from your mobile wallet",
+          content: (
+            <SectionBoundary name="FlutterwaveMomoTopUp">
+              <FlutterwaveMomoTopUpCard walletId={walletId} walletCurrency={currency} onComplete={invalidateWallets} />
+            </SectionBoundary>
+          ),
+        });
+      }
+      const hosted = availableFlwMethods.filter((m) => ["card", "banktransfer", "ussd"].includes(m));
+      if (hosted.length > 0) {
+        payMethods.push({
+          id: "flw_hosted",
+          label: "Card, bank transfer or USSD",
+          description: "Secure hosted checkout",
+          content: (
+            <SectionBoundary name="FlutterwaveHostedTopUp">
+              <FlutterwaveHostedTopUpCard
+                walletId={walletId}
+                walletCurrency={currency}
+                methods={hosted}
+                initialAmount={amount}
+                embedded
+                onComplete={invalidateWallets}
+              />
+            </SectionBoundary>
+          ),
+        });
+      }
+    }
+    if (gateway === "swychr_pay") {
+      payMethods.push({
+        id: "swychr",
+        label: "Mobile money & card",
+        description: "Powered by Swychr",
+        content: (
+          <SectionBoundary name="SwychrTopUp">
+            <SwychrTopUpCard walletId={walletId} walletCurrency={currency} onComplete={invalidateWallets} />
+          </SectionBoundary>
+        ),
+      });
+    }
+    if (gateway === "paytota_pay") {
+      payMethods.push({
+        id: "paytota",
+        label: "Mobile money",
+        description: "Powered by Paytota",
+        content: (
+          <SectionBoundary name="PaytotaTopUp">
+            <PaytotaTopUpCard walletId={walletId} walletCurrency={currency} onComplete={invalidateWallets} />
+          </SectionBoundary>
+        ),
+      });
+    }
+    if (gateway === "dodo_pay") {
+      payMethods.push({
+        id: "dodo",
+        label: "Card",
+        description: "Visa, Mastercard, Amex",
+        content: (
+          <SectionBoundary name="DodoTopUp">
+            <DodoTopUpCard walletId={walletId} walletCurrency={currency} initialAmount={amount} embedded onComplete={invalidateWallets} />
+          </SectionBoundary>
+        ),
+      });
+    }
+    if (gateway === "nomba_pay") {
+      payMethods.push({
+        id: "nomba",
+        label: "Card or bank transfer",
+        description: "Powered by Nomba",
+        content: (
+          <SectionBoundary name="NombaTopUp">
+            <NombaTopUpCard walletId={walletId} walletCurrency={currency} initialAmount={amount} embedded onComplete={invalidateWallets} />
+          </SectionBoundary>
+        ),
+      });
+    }
+    if (gateway === "lenhub_flutter") {
+      payMethods.push({
+        id: "lenhub",
+        label: "Card or bank transfer",
+        content: (
+          <SectionBoundary name="LenhubTopUp">
+            <LenhubFlutterTopUpCard walletId={walletId} walletCurrency={currency} onComplete={invalidateWallets} />
+          </SectionBoundary>
+        ),
+      });
+    }
+    if (productFeatures.fincraInterac && gateway === "fincra_interac") {
+      payMethods.push({
+        id: "interac",
+        label: "Interac e-Transfer",
+        description: "Send from your Canadian bank",
+        content: (
+          <SectionBoundary name="CadInteracTopUp">
+            <CadInteracTopUpCard walletId={walletId} walletCurrency={currency} onComplete={invalidateWallets} />
+          </SectionBoundary>
+        ),
+      });
+    }
+    if (productFeatures.wise && gateway === "wise_pay") {
+      payMethods.push({
+        id: "wise",
+        label: "Bank transfer",
+        description: "Powered by Wise",
+        content: (
+          <SectionBoundary name="WiseTopUp">
+            <WiseTopUpCard walletId={walletId} walletCurrency={currency} onComplete={invalidateWallets} />
+          </SectionBoundary>
+        ),
+      });
+    }
+    if (gateway === "ghana_pay") {
+      payMethods.push({
+        id: "ghana",
+        label: "Mobile money",
+        description: "MTN, Telecel, AirtelTigo",
+        content: (
+          <SectionBoundary name="GhanaTopUp">
+            <GhanaTopUpCard walletId={walletId} walletCurrency={currency} />
+          </SectionBoundary>
+        ),
+      });
+    }
+    if (productFeatures.elicate && gateway === "elicate") {
+      payMethods.push({
+        id: "elicate",
+        label: "Card",
+        content: (
+          <SectionBoundary name="ElicateTopUp">
+            <ElicateTopUpCard walletId={walletId} walletCurrency={currency} />
+          </SectionBoundary>
+        ),
+      });
+    }
+  }
+
+  const activeMethodId =
+    payMethods.some((m) => m.id === selectedMethodId) ? selectedMethodId : payMethods[0]?.id || "";
+
+
+
   return (
     <AppPage width="default">
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
