@@ -1741,7 +1741,6 @@ const SendPage = () => {
 
   const isStep1Valid =
     parsedAmount > 0
-    && parsedAmount > fee
     && receivedAmount > 0
     && rateAvailable
     && !noLinkedSource
