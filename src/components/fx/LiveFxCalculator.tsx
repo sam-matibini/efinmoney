@@ -381,7 +381,9 @@ const LiveFxCalculator = ({
             <div className="px-3 py-2.5">
               <div className="mb-1 text-[9.5px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">You send</div>
               <div className="flex items-center gap-1.5">
+                <Flag code={from} size={18} />
                 <span className="text-base font-bold text-muted-foreground">{from}</span>
+
                 <input
                   inputMode="decimal"
                   value={sendAmtFormatted}
