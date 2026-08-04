@@ -586,7 +586,9 @@ export default function FlutterwaveCardForm({
         <EfinmoneyBranding />
       </form>
 
-      {stage !== "idle" && stage !== "success" && <ProcessingOverlay stage={stage as Exclude<Stage, "idle" | "success">} />}
+      {stage !== "idle" && stage !== "success" && stage !== "auth" && (
+        <ProcessingOverlay stage={stage as Exclude<Stage, "idle" | "success" | "auth">} />
+      )}
     </div>
   );
 }
