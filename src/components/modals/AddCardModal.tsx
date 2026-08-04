@@ -18,6 +18,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { SYSTEM_DEFAULT_CURRENCY } from "@/lib/systemDefaults";
+
 import { useCardMutations, type CreatedCardResult, type CardType, type CardNetwork } from "@/hooks/useCards";
 import { useWallets } from "@/hooks/useWallets";
 import { Copy, Check, Eye, EyeOff } from "lucide-react";
