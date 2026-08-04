@@ -44,7 +44,7 @@ import { resolveEffectiveRate } from "@/lib/fx";
 import { currencySymbol, countryToCurrency } from "@/lib/currency";
 import { useProfile } from "@/hooks/useProfile";
 import { toast } from "sonner";
-import { ArrowRight, CheckCircle, Wallet, Landmark, CreditCard, AlertCircle, X, Search, Globe2, Lock, Loader2, Check, Shield, Users, ChevronDown } from "lucide-react";
+import { ArrowRight, CheckCircle, Wallet, Landmark, CreditCard, AlertCircle, X, Search, Globe2, Lock, Loader2, Check, Shield, Users, UserPlus, ChevronDown } from "lucide-react";
 import { BrandFlag, CountryFlag } from "@/components/ui/FlagImage";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import CanadaSendFlow from "@/components/send/CanadaSendFlow";
