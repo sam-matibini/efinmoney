@@ -33,6 +33,13 @@ export const COUNTRY_NAME_TO_CODE: Record<string, string> = {
   Canada: "CA", "United States": "US", Nigeria: "NG", Ghana: "GH",
   "United Kingdom": "GB", Senegal: "SN", Cameroon: "CM",
   Rwanda: "RW", "South Africa": "ZA",
+  "Ivory Coast": "CI", Mozambique: "MZ", Malawi: "MW", Benin: "BJ", Togo: "TG",
+  "Burkina Faso": "BF", Mali: "ML", Niger: "NE", Guinea: "GN",
+  "Sierra Leone": "SL", Liberia: "LR", Gambia: "GM", Congo: "CG",
+  "DR Congo": "CD", Angola: "AO", Namibia: "NA", Botswana: "BW",
+  Madagascar: "MG", "South Sudan": "SS", Sudan: "SD", Tunisia: "TN",
+  Algeria: "DZ", "Trinidad & Tobago": "TT", Barbados: "BB", Haiti: "HT",
+  UAE: "AE", Qatar: "QA", Kuwait: "KW", Oman: "OM", Jordan: "JO", Lebanon: "LB",
 };
 
 export const flagForCountryName = (name?: string | null): string => {
