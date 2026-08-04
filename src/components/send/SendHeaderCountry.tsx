@@ -51,7 +51,7 @@ export default function SendHeaderCountry({ value, onChange, filterIds }: Props)
                   }}
                   className="flex items-center gap-2.5 cursor-pointer"
                 >
-                  <span className="text-base leading-none">{c.flag}</span>
+                  <CountryFlag country={c.country} size="sm" />
                   <span className="flex-1 min-w-0 truncate">{c.country}</span>
                   <span className="text-[10px] font-semibold text-muted-foreground">{c.code}</span>
                   {c.id === value && <Check className="w-4 h-4 text-primary" />}
