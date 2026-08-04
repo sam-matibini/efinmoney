@@ -2035,13 +2035,13 @@ const SendPage = () => {
             >
               <TabsList
                 className={cn(
-                  "relative grid w-full max-w-lg mx-auto h-10 overflow-hidden",
+                  "relative grid w-full max-w-lg mx-auto h-11 overflow-hidden bg-transparent p-1",
                   canadaLive ? "grid-cols-3" : "grid-cols-2",
                 )}
               >
-                {/* Sliding pill */}
+                {/* Active-cell focus ring */}
                 <motion.div
-                  className="absolute top-1 bottom-1 rounded-sm bg-background shadow-sm"
+                  className="absolute top-1 bottom-1 rounded-lg border-2 border-white/80 dark:border-white/20 bg-transparent pointer-events-none"
                   initial={false}
                   animate={{
                     left: canadaLive
@@ -2060,23 +2060,17 @@ const SendPage = () => {
                   }}
                   transition={{ type: "spring", stiffness: 380, damping: 30 }}
                 />
-                <TabsTrigger value="international" className="relative z-10 gap-1.5 px-2 sm:gap-2 sm:px-3 text-xs sm:text-sm text-muted-foreground data-[state=active]:text-pay-bank data-[state=active]:bg-transparent data-[state=active]:shadow-none">
-                  <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-pay-bank/15 text-pay-bank ring-1 ring-pay-bank/25">
-                    <Globe2 className="h-2.5 w-2.5" aria-hidden />
-                  </span>
+                <TabsTrigger value="international" className="relative z-10 gap-1.5 rounded-lg px-2 sm:gap-2 sm:px-3 text-xs sm:text-sm font-medium bg-pay-bank/15 text-pay-bank transition-colors hover:bg-pay-bank/25 data-[state=active]:bg-pay-bank data-[state=active]:text-pay-bank-foreground data-[state=active]:shadow-none">
+                  <Globe2 className="h-3.5 w-3.5" aria-hidden />
                   Other
                 </TabsTrigger>
-                <TabsTrigger value="efinmoney" className="relative z-10 gap-1.5 px-2 sm:gap-2 sm:px-3 text-xs sm:text-sm text-muted-foreground data-[state=active]:text-pay-wallet data-[state=active]:bg-transparent data-[state=active]:shadow-none">
-                  <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-pay-wallet/15 text-pay-wallet ring-1 ring-pay-wallet/25">
-                    <BrandFlag size="xs" />
-                  </span>
+                <TabsTrigger value="efinmoney" className="relative z-10 gap-1.5 rounded-lg px-2 sm:gap-2 sm:px-3 text-xs sm:text-sm font-medium bg-pay-wallet/15 text-pay-wallet transition-colors hover:bg-pay-wallet/25 data-[state=active]:bg-pay-wallet data-[state=active]:text-pay-wallet-foreground data-[state=active]:shadow-none">
+                  <BrandFlag size="xs" />
                   eFinMoney
                 </TabsTrigger>
                 {canadaLive && (
-                  <TabsTrigger value="canada" className="relative z-10 gap-1.5 px-2 sm:gap-2 sm:px-3 text-xs sm:text-sm text-muted-foreground data-[state=active]:text-pay-card data-[state=active]:bg-transparent data-[state=active]:shadow-none">
-                    <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-pay-card/15 text-pay-card ring-1 ring-pay-card/25">
-                      <CountryFlag country="CA" size="xs" />
-                    </span>
+                  <TabsTrigger value="canada" className="relative z-10 gap-1.5 rounded-lg px-2 sm:gap-2 sm:px-3 text-xs sm:text-sm font-medium bg-pay-card/15 text-pay-card transition-colors hover:bg-pay-card/25 data-[state=active]:bg-pay-card data-[state=active]:text-pay-card-foreground data-[state=active]:shadow-none">
+                    <CountryFlag country="CA" size="xs" />
                     Domestic
                   </TabsTrigger>
                 )}
