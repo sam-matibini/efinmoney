@@ -1,6 +1,7 @@
-import { AlertCircle, CreditCard, Landmark, Lock, Wallet as WalletIcon } from "lucide-react";
+import { AlertCircle, CreditCard, Landmark, Lock, Plus, Wallet as WalletIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export interface PanelWallet {
@@ -18,6 +19,14 @@ export interface PanelBankSource {
   last_four?: string | null;
 }
 
+export interface PanelSavedCard {
+  id: string;
+  card_brand?: string | null;
+  last_four?: string | null;
+  exp_month?: number | null;
+  exp_year?: number | null;
+}
+
 interface Props {
   method: "card" | "bank" | "wallet";
   /** Wallets valid for the active method. */
@@ -31,6 +40,13 @@ interface Props {
   onSourceChange: (id: string) => void;
   onLinkBank: () => void;
   linkingBank?: boolean;
+
+  /** Saved cards + quick-add hooks */
+  savedCards?: PanelSavedCard[];
+  selectedCardId?: string;
+  onCardChange?: (id: string) => void;
+  onAddCard?: () => void;
+  onAddWallet?: () => void;
 
   /** Money summary — fee is charged on top of the send amount. */
   amount: number;
@@ -47,6 +63,32 @@ interface Props {
   insufficientBalance?: boolean;
   onTopUp?: () => void;
 }
+
+type QuickTone = "card" | "bank" | "wallet";
+
+const quickToneClass: Record<QuickTone, string> = {
+  card: "border-pay-card/40 text-pay-card hover:bg-pay-card/10",
+  bank: "border-pay-bank/40 text-pay-bank hover:bg-pay-bank/10",
+  wallet: "border-pay-wallet/40 text-pay-wallet hover:bg-pay-wallet/10",
+};
+
+const QuickAddRow = ({
+  tone, label, onClick, disabled,
+}: { tone: QuickTone; label: string; onClick: () => void; disabled?: boolean }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    disabled={disabled}
+    className={cn(
+      "flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed px-3 py-2 text-xs font-semibold transition-colors disabled:opacity-50 disabled:pointer-events-none",
+      quickToneClass[tone],
+    )}
+  >
+    <Plus className="h-3.5 w-3.5" />
+    {label}
+  </button>
+);
+
 
 const money = (v: number) =>
   v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -78,6 +120,11 @@ const MethodCheckoutPanel = ({
   onSourceChange,
   onLinkBank,
   linkingBank,
+  savedCards = [],
+  selectedCardId,
+  onCardChange,
+  onAddCard,
+  onAddWallet,
   amount,
   fee,
   total,
@@ -126,8 +173,9 @@ const MethodCheckoutPanel = ({
         </div>
 
         {wallets.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-border bg-muted/40 p-3 text-sm text-muted-foreground">
-            Create a supported wallet to pay by card.
+          <div className="space-y-2 rounded-lg border border-dashed border-border bg-muted/40 p-3">
+            <p className="text-sm text-muted-foreground">Create a supported wallet to pay by card.</p>
+            {onAddWallet && <QuickAddRow tone="wallet" label="Quick add wallet" onClick={onAddWallet} />}
           </div>
         ) : (
           <>
@@ -137,8 +185,53 @@ const MethodCheckoutPanel = ({
               debitLabel="Charged to your card"
             />
             {cardChargeNote && <p className="text-[11px] text-muted-foreground">{cardChargeNote}</p>}
-            <div className="rounded-lg border border-border bg-background/60 p-3 space-y-1.5">
+            <div className="rounded-lg border border-border bg-background/60 p-3 space-y-2">
               <p className="text-xs font-medium">Card details</p>
+
+              {savedCards.length > 0 && (
+                <div className="space-y-1.5">
+                  {savedCards.map((c) => {
+                    const selected = c.id === selectedCardId;
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => onCardChange?.(c.id)}
+                        aria-pressed={selected}
+                        className={cn(
+                          "flex w-full items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-colors",
+                          selected ? "border-pay-card bg-pay-card/10" : "border-border hover:bg-muted/50",
+                        )}
+                      >
+                        <span className={cn(
+                          "flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2",
+                          selected ? "border-pay-card" : "border-muted-foreground/40",
+                        )}>
+                          {selected && <span className="h-2 w-2 rounded-full bg-pay-card" />}
+                        </span>
+                        <CreditCard className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        <span className="min-w-0 flex-1 truncate text-xs font-medium capitalize">
+                          {c.card_brand || "Card"} •••• {c.last_four || "----"}
+                        </span>
+                        {c.exp_month && c.exp_year && (
+                          <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
+                            {String(c.exp_month).padStart(2, "0")}/{String(c.exp_year).slice(-2)}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {onAddCard && (
+                <QuickAddRow
+                  tone="card"
+                  label={savedCards.length > 0 ? "Quick add new card" : "Quick add card details"}
+                  onClick={onAddCard}
+                />
+              )}
+
               <p className="text-[11px] text-muted-foreground">
                 {inlineEntry
                   ? "You'll enter your cardholder name, card number, expiry date and CVV on the next step. We never store your full card number."
@@ -148,6 +241,7 @@ const MethodCheckoutPanel = ({
                 <Lock className="w-3 h-3" /> Visa · Mastercard · Amex · Verve
               </p>
             </div>
+
 
             {!cardProviderReady && amount > 0 && (
               <p className="flex items-start gap-1.5 text-[11px] text-destructive">
@@ -184,6 +278,12 @@ const MethodCheckoutPanel = ({
                 </SelectContent>
               </Select>
             </div>
+            <QuickAddRow
+              tone="bank"
+              label={linkingBank ? "Starting…" : "Quick add bank account"}
+              onClick={onLinkBank}
+              disabled={linkingBank}
+            />
             <ChargeSummary
               amount={amount} fee={fee} total={total} currency={currency} symbol={symbol}
               debitLabel="Debited from your bank"
@@ -215,12 +315,14 @@ const MethodCheckoutPanel = ({
         <p className="text-sm font-semibold">Pay from wallet balance</p>
       </div>
       {wallets.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-border bg-muted/40 p-3 text-sm text-muted-foreground">
-          You have no wallets yet.
+        <div className="space-y-2 rounded-lg border border-dashed border-border bg-muted/40 p-3">
+          <p className="text-sm text-muted-foreground">You have no wallets yet.</p>
+          {onAddWallet && <QuickAddRow tone="wallet" label="Quick add wallet" onClick={onAddWallet} />}
         </div>
       ) : (
         <>
           {walletSelect("From wallet")}
+          {onAddWallet && <QuickAddRow tone="wallet" label="Quick add wallet" onClick={onAddWallet} />}
           <ChargeSummary
             amount={amount} fee={fee} total={total} currency={currency} symbol={symbol}
             debitLabel="Debited from wallet"

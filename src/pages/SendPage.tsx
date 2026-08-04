@@ -10,6 +10,7 @@ import ContactsPickerModal from "@/components/modals/ContactsPickerModal";
 import AddBeneficiaryModal from "@/components/modals/AddBeneficiaryModal";
 import ContactQuickField from "@/components/send/ContactQuickField";
 import AddCardModal from "@/components/modals/AddCardModal";
+import CreateWalletModal from "@/components/modals/CreateWalletModal";
 import TopUpModal from "@/components/modals/TopUpModal";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useBeneficiaries, recordTransferRecipient, type Beneficiary } from "@/hooks/useBeneficiaries";
@@ -190,6 +191,7 @@ const SendPage = () => {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [saveModalOpen, setSaveModalOpen] = useState(false);     // pre-filled Add modal
   const [addCardOpen, setAddCardOpen] = useState(false);
+  const createWalletTriggerRef = useRef<HTMLButtonElement>(null);
   const [topUpOpen, setTopUpOpen] = useState(false);
   const [pickedBeneficiaryId, setPickedBeneficiaryId] = useState<string | null>(null);
   const [pendingBeneficiary, setPendingBeneficiary] = useState<Beneficiary | null>(null);
@@ -2183,6 +2185,17 @@ const SendPage = () => {
                                         onSourceChange={setSelectedSourceId}
                                         onLinkBank={startPlaidLink}
                                         linkingBank={plaidLinking}
+                                        savedCards={savedCards.map((c) => ({
+                                          id: c.stripe_payment_method_id,
+                                          card_brand: c.card_brand,
+                                          last_four: c.last_four,
+                                          exp_month: c.exp_month,
+                                          exp_year: c.exp_year,
+                                        }))}
+                                        selectedCardId={activeSavedCard?.stripe_payment_method_id}
+                                        onCardChange={setSelectedSavedCardId}
+                                        onAddCard={() => setAddCardOpen(true)}
+                                        onAddWallet={() => createWalletTriggerRef.current?.click()}
                                         amount={parsedAmount}
                                         fee={fee}
                                         total={totalCharge}
@@ -2818,6 +2831,9 @@ const SendPage = () => {
         } as any}
       />
       <AddCardModal isOpen={addCardOpen} onClose={() => setAddCardOpen(false)} defaultMode="link" />
+      <CreateWalletModal>
+        <button type="button" ref={createWalletTriggerRef} className="hidden" aria-hidden="true" tabIndex={-1} />
+      </CreateWalletModal>
       <TopUpModal open={topUpOpen} onOpenChange={setTopUpOpen} defaultWalletId={selectedWallet?.wallet_id} title="Top up wallet" />
     </>
   );
