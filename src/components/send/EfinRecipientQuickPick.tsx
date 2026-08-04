@@ -391,7 +391,7 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
                             i === highlight ? "bg-muted" : ""
                           }`}
                         >
-                          <Avatar url={s.avatar_url} label={initials({ ...s, email: s.email_masked })} />
+                          <Avatar url={s.avatar_url} label={initials({ ...s, email: s.email_masked })} seed={s.user_id} />
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-medium text-foreground">
                               {s.full_name || s.efin_tag || s.email_masked}
