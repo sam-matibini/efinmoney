@@ -21,7 +21,7 @@ export default function StaffTrainingPage() {
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({ course_name: "", category: "aml", frequency_months: "12", is_mandatory: false });
   const [showLog, setShowLog] = useState(false);
-  const [logForm, setLogForm] = useState({ course_id: "", course_name: "", score: "" });
+  const [logForm, setLogForm] = useState({ course_id: "", course_name: "", score: "", staff_id: "" });
 
   const { data: courses = [], isLoading: cLoading } = useQuery({
     queryKey: ["training-courses"],
@@ -42,6 +42,15 @@ export default function StaffTrainingPage() {
     refetchInterval: 60_000,
   });
 
+  const { data: staff = [] } = useQuery({
+    queryKey: ["training-staff"],
+    queryFn: async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data } = await (supabase as any).from("admin_users").select("*");
+      return data || [];
+    },
+  });
+
   const addCourse = useMutation({
     mutationFn: async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -52,20 +61,57 @@ export default function StaffTrainingPage() {
     onError: () => toast.error("Failed to add course"),
   });
 
+  const setMandatory = useMutation({
+    mutationFn: async ({ id, value }: { id: string; value: boolean }) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase as any).from("training_courses").update({ is_mandatory: value }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["training-courses"] }); toast.success("Course updated"); },
+    onError: () => toast.error("Failed to update course"),
+  });
+
   const logCompletion = useMutation({
     mutationFn: async () => {
       const user = (await supabase.auth.getUser()).data.user;
       const score = logForm.score ? Number(logForm.score) : null;
-      const expiry = new Date(); expiry.setMonth(expiry.getMonth() + 12);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase as any).from("training_records").insert({ staff_id: user?.id, course_id: logForm.course_id || null, course_name: logForm.course_name, completed_at: new Date().toISOString(), score, passed: !score || score >= 70, expiry_date: expiry.toISOString().split("T")[0] });
+      const course = courses.find((c: any) => c.id === logForm.course_id);
+      const months = Number(course?.frequency_months) || 12;
+      const passMark = Number(course?.pass_mark) || 70;
+      const expiry = new Date(); expiry.setMonth(expiry.getMonth() + months);
+      const staffId = logForm.staff_id || user?.id;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase as any).from("training_records").insert({ staff_id: staffId, course_id: logForm.course_id || null, course_name: logForm.course_name, completed_at: new Date().toISOString(), score, passed: score == null || score >= passMark, expiry_date: expiry.toISOString().split("T")[0] });
       if (error) throw error;
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["training-records"] }); setShowLog(false); setLogForm({ course_id: "", course_name: "", score: "" }); toast.success("Completion logged"); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["training-records"] }); setShowLog(false); setLogForm({ course_id: "", course_name: "", score: "", staff_id: "" }); toast.success("Completion logged"); },
     onError: () => toast.error("Failed to log completion"),
   });
 
   const expired = records.filter((r: any) => r.expiry_date && isPast(new Date(r.expiry_date))).length;
+
+  // Compliance matrix: latest passing record per (staff, mandatory course)
+  const mandatory = courses.filter((c: any) => c.is_mandatory);
+  const staffRows = staff.length
+    ? staff.map((s: any) => ({ id: s.user_id || s.id, name: s.full_name || s.email || s.user_id || s.id }))
+    : Array.from(new Set(records.map((r: any) => r.staff_id).filter(Boolean))).map((id: any) => ({ id, name: id }));
+
+  const cellStatus = (staffId: string, course: any) => {
+    const hits = records.filter((r: any) => r.staff_id === staffId && (r.course_id === course.id || r.course_name === course.course_name) && r.passed);
+    if (!hits.length) return "missing";
+    const newest = hits.reduce((a: any, b: any) => (new Date(a.completed_at) > new Date(b.completed_at) ? a : b));
+    if (newest.expiry_date && isPast(new Date(newest.expiry_date))) return "expired";
+    return "current";
+  };
+
+  const statusBadge = (s: string) =>
+    s === "current" ? <Badge className="bg-emerald-500/10 text-emerald-600">Current</Badge>
+      : s === "expired" ? <Badge className="bg-amber-500/10 text-amber-600">Expired</Badge>
+      : <Badge className="bg-red-500/10 text-red-600">Missing</Badge>;
+
+  const gaps = staffRows.reduce((n, s) => n + mandatory.filter((c: any) => cellStatus(s.id, c) !== "current").length, 0);
+
 
   return (
     <AdminLayout>
@@ -78,10 +124,11 @@ export default function StaffTrainingPage() {
         </div>
       </div>
 
-      <div className="grid sm:grid-cols-3 gap-3">
-        <Card><CardContent className="pt-4 pb-3"><div className="text-2xl font-bold">{courses.length}</div><div className="text-xs text-muted-foreground">Courses</div></CardContent></Card>
+      <div className="grid sm:grid-cols-4 gap-3">
+        <Card><CardContent className="pt-4 pb-3"><div className="text-2xl font-bold">{courses.length}</div><div className="text-xs text-muted-foreground">Courses ({mandatory.length} mandatory)</div></CardContent></Card>
         <Card><CardContent className="pt-4 pb-3"><div className="text-2xl font-bold">{records.length}</div><div className="text-xs text-muted-foreground">Completions</div></CardContent></Card>
         <Card><CardContent className="pt-4 pb-3"><div className="text-2xl font-bold text-red-500">{expired}</div><div className="text-xs text-muted-foreground">Expired certs</div></CardContent></Card>
+        <Card><CardContent className="pt-4 pb-3"><div className={`text-2xl font-bold ${gaps ? "text-amber-500" : "text-emerald-500"}`}>{gaps}</div><div className="text-xs text-muted-foreground">Mandatory gaps</div></CardContent></Card>
       </div>
 
       <Card>
@@ -89,13 +136,19 @@ export default function StaffTrainingPage() {
         <CardContent>
           {cLoading ? <Skeleton className="h-24 w-full" /> : (
             <Table>
-              <TableHeader><TableRow><TableHead>Course</TableHead><TableHead>Category</TableHead><TableHead>Mandatory</TableHead><TableHead>Frequency</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Course</TableHead><TableHead>Category</TableHead><TableHead>Mandatory</TableHead><TableHead>Pass mark</TableHead><TableHead>Frequency</TableHead></TableRow></TableHeader>
               <TableBody>
-                {courses.length === 0 ? <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground">No courses. Add your first course above.</TableCell></TableRow> : courses.map((c: any) => (
+                {courses.length === 0 ? <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">No courses. Add your first course above.</TableCell></TableRow> : courses.map((c: any) => (
                   <TableRow key={c.id}>
                     <TableCell className="font-medium">{c.course_name}</TableCell>
                     <TableCell className="capitalize">{c.category}</TableCell>
-                    <TableCell>{c.is_mandatory ? <Badge className="bg-red-500/10 text-red-600">Mandatory</Badge> : <Badge className="bg-muted">Optional</Badge>}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Switch checked={!!c.is_mandatory} onCheckedChange={(v) => setMandatory.mutate({ id: c.id, value: v })} />
+                        {c.is_mandatory ? <Badge className="bg-red-500/10 text-red-600">Mandatory</Badge> : <Badge className="bg-muted">Optional</Badge>}
+                      </div>
+                    </TableCell>
+                    <TableCell className="font-mono">{c.pass_mark ?? 70}%</TableCell>
                     <TableCell>Every {c.frequency_months} months</TableCell>
                   </TableRow>
                 ))}
@@ -104,6 +157,33 @@ export default function StaffTrainingPage() {
           )}
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader><CardTitle>Mandatory Training Compliance Matrix</CardTitle></CardHeader>
+        <CardContent className="overflow-x-auto">
+          {mandatory.length === 0 || staffRows.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Add mandatory courses and staff records to see the matrix.</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Staff</TableHead>
+                  {mandatory.map((c: any) => <TableHead key={c.id}>{c.course_name}</TableHead>)}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {staffRows.map((s) => (
+                  <TableRow key={s.id}>
+                    <TableCell className="font-medium">{s.name}</TableCell>
+                    {mandatory.map((c: any) => <TableCell key={c.id}>{statusBadge(cellStatus(s.id, c))}</TableCell>)}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
 
       <Card>
         <CardHeader><CardTitle>Completion Records</CardTitle></CardHeader>
@@ -174,6 +254,14 @@ export default function StaffTrainingPage() {
                 <SelectContent>{courses.map((c: any) => <SelectItem key={c.id} value={c.id}>{c.course_name}</SelectItem>)}</SelectContent>
               </Select>
             </div>
+            {staffRows.length > 0 && (
+              <div><Label>Staff member</Label>
+                <Select value={logForm.staff_id} onValueChange={(v) => setLogForm({ ...logForm, staff_id: v })}>
+                  <SelectTrigger><SelectValue placeholder="Myself" /></SelectTrigger>
+                  <SelectContent>{staffRows.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+            )}
             <div><Label>Score (%)</Label><Input value={logForm.score} onChange={(e) => setLogForm({ ...logForm, score: e.target.value })} type="number" placeholder="e.g., 85" /></div>
           </div>
           <DialogFooter>

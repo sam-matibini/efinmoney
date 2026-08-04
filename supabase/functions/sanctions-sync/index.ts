@@ -1,5 +1,5 @@
-// Sanctions list ingestion — pulls OFAC SDN and UN consolidated lists into
-// public.aml_watchlist (upsert on source+source_id). Fault-tolerant per source:
+// Sanctions list ingestion — pulls OFAC SDN, UN consolidated and Global Affairs
+// Canada (SEMA) lists into public.aml_watchlist (upsert on source+source_id).
 // if one provider is unreachable the others still apply. Invoked on demand from
 // the Sanctions Screening page and (optionally) on a schedule.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
@@ -12,7 +12,7 @@ const corsHeaders = {
 type EntityType = "individual" | "entity" | "vessel" | "aircraft" | "unknown";
 
 interface WatchRow {
-  source: "ofac" | "un";
+  source: "ofac" | "un" | "gac";
   source_id: string;
   name: string;
   name_normalized: string;
@@ -153,6 +153,74 @@ async function syncUn(): Promise<WatchRow[]> {
   return rows;
 }
 
+/* ── Global Affairs Canada — SEMA consolidated autonomous sanctions ── */
+const GAC_URL =
+  "https://www.international.gc.ca/world-monde/assets/office_docs/international_relations-relations_internationales/sanctions/sema-lmes.xml";
+
+async function syncGac(): Promise<WatchRow[]> {
+  const res = await fetch(GAC_URL);
+  if (!res.ok) throw new Error(`GAC SEMA fetch failed [${res.status}]`);
+  const xml = await res.text();
+  const rows: WatchRow[] = [];
+  let idx = 0;
+
+  for (const block of allTags(xml, "record")) {
+    const country = tag(block, "Country") || tag(block, "Pays") || "";
+    const entity = tag(block, "Entity");
+    const given = tag(block, "GivenName");
+    const last = tag(block, "LastName");
+    const name = (entity || [given, last].filter(Boolean).join(" ")).trim();
+    if (!name) continue;
+    const schedule = tag(block, "Schedule") || "";
+    const item = tag(block, "Item") || String(++idx);
+    const aliases = (tag(block, "Aliases") || "")
+      .split(/\s*[;,]\s*/).map((a) => a.trim()).filter(Boolean);
+
+    rows.push({
+      source: "gac",
+      source_id: `${country}-${schedule}-${item}`.replace(/\s+/g, "_"),
+      name,
+      name_normalized: normalize(name),
+      aliases,
+      entity_type: entity ? "entity" : "individual",
+      programs: [`SEMA ${country}`.trim(), schedule].filter(Boolean) as string[],
+      countries: country ? [country] : [],
+      nationalities: [],
+      remarks: tag(block, "DateOfBirth") ? `DOB: ${tag(block, "DateOfBirth")}` : null,
+      source_url: GAC_URL,
+      raw: { country, schedule, item, name },
+    });
+  }
+  return rows;
+}
+
+/** Flag countries named by the GAC list in the geographic risk register. */
+async function flagCanadaSanctionedCountries(
+  supabase: ReturnType<typeof createClient>,
+  rows: WatchRow[],
+) {
+  const names = new Set(
+    rows.flatMap((r) => r.countries).map((c) => c.toLowerCase().trim()).filter(Boolean),
+  );
+  if (!names.size) return 0;
+  const { data } = await supabase
+    .from("geographic_risk_ratings")
+    .select("id, country_name, canada_sanctions");
+  const list = (data || []) as { id: string; country_name: string; canada_sanctions: boolean }[];
+  let updated = 0;
+  for (const c of list) {
+    const hit = names.has((c.country_name || "").toLowerCase().trim());
+    if (hit !== Boolean(c.canada_sanctions)) {
+      await supabase
+        .from("geographic_risk_ratings")
+        .update({ canada_sanctions: hit, updated_at: new Date().toISOString() })
+        .eq("id", c.id);
+      updated++;
+    }
+  }
+  return updated;
+}
+
 async function upsertAll(supabase: ReturnType<typeof createClient>, rows: WatchRow[]) {
   const CHUNK = 500;
   let upserted = 0;
@@ -176,20 +244,39 @@ Deno.serve(async (req) => {
   );
 
   const result: Record<string, { count: number; error?: string }> = {};
+  let countriesFlagged = 0;
 
-  for (const [name, fn] of [["ofac", syncOfac], ["un", syncUn]] as const) {
+  for (const [name, fn] of [["ofac", syncOfac], ["un", syncUn], ["gac", syncGac]] as const) {
+    const startedAt = new Date().toISOString();
     try {
       const rows = await fn();
       const n = await upsertAll(supabase, rows);
+      if (name === "gac") countriesFlagged = await flagCanadaSanctionedCountries(supabase, rows);
       result[name] = { count: n };
+      await supabase.from("sanctions_sync_runs").insert({
+        source: name, status: "success", rows_upserted: n,
+        started_at: startedAt, finished_at: new Date().toISOString(),
+      });
     } catch (err) {
-      result[name] = { count: 0, error: err instanceof Error ? err.message : "failed" };
+      const message = err instanceof Error ? err.message : "failed";
+      result[name] = { count: 0, error: message };
+      await supabase.from("sanctions_sync_runs").insert({
+        source: name, status: "error", rows_upserted: 0, error: message,
+        started_at: startedAt, finished_at: new Date().toISOString(),
+      });
     }
   }
 
   const total = Object.values(result).reduce((s, r) => s + r.count, 0);
   return new Response(
-    JSON.stringify({ success: total > 0, total, sources: result, synced_at: new Date().toISOString() }),
+    JSON.stringify({
+      success: total > 0,
+      total,
+      sources: result,
+      countries_flagged: countriesFlagged,
+      synced_at: new Date().toISOString(),
+    }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } },
   );
 });
+
