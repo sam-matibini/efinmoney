@@ -2167,197 +2167,6 @@ const SendPage = () => {
                                       </button>
                                     </div>
                                   }
-                                >
-                                    <motion.div custom={0} variants={fieldVariants} initial="hidden" animate="show" className="space-y-3">
-                                      <div className="space-y-2">
-                                        <Label>Pay with</Label>
-                                        <PaymentMethodRow
-                                          options={fundingMethodOptions}
-                                          value={fundingSource}
-                                          onChange={(v) => setFundingSource(v)}
-                                        />
-                                      </div>
-
-                                    </motion.div>
-
-                                    <motion.div custom={1} variants={fieldVariants} initial="hidden" animate="show">
-                                      <MethodCheckoutPanel
-                                        method={fundingSource as "card" | "bank" | "wallet"}
-                                        wallets={(fundingSource === "card" ? cardWallets : (wallets ?? [])).map((w) => ({
-                                          wallet_id: w.wallet_id,
-                                          currency_code: w.currency_code,
-                                          symbol: w.symbol,
-                                          balance: w.balance,
-                                          flag_emoji: w.flag_emoji,
-                                        }))}
-                                        selectedWalletId={selectedWalletId || selectedWallet?.wallet_id}
-                                        onWalletChange={(id) => setSelectedWalletId(id)}
-                                        linkedCardCount={linkedCardCount}
-                                        bankSources={bankSources}
-                                        selectedSourceId={selectedSourceId || bankSources[0]?.id}
-                                        onSourceChange={setSelectedSourceId}
-                                        onLinkBank={startPlaidLink}
-                                        linkingBank={plaidLinking}
-                                        savedCards={savedCards.map((c) => ({
-                                          id: c.stripe_payment_method_id,
-                                          card_brand: c.card_brand,
-                                          last_four: c.last_four,
-                                          exp_month: c.exp_month,
-                                          exp_year: c.exp_year,
-                                        }))}
-                                        selectedCardId={activeSavedCard?.stripe_payment_method_id}
-                                        onCardChange={setSelectedSavedCardId}
-                                        onAddCard={() => setAddCardOpen(true)}
-                                        onAddWallet={() => createWalletTriggerRef.current?.click()}
-                                        amount={parsedAmount}
-                                        fee={fee}
-                                        total={totalCharge}
-                                        currency={sourceCurrency}
-                                        symbol={sourceSymbol}
-                                        cardProviderReady={!!cardSendProvider}
-                                        cardChargeNote={
-                                          cardCheckoutQuote
-                                            ? `Card charge ≈ ${cardCheckoutQuote.checkoutCurrency} ${cardCheckoutQuote.checkoutAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${cardSendProvider === "nomba" && sourceCurrency === "CAD" ? " · CAD charged in USD" : ""}`
-                                            : null
-                                        }
-                                        cardMinNote={
-                                          cardSendProvider
-                                            ? `Minimum card send is ${cardSendMinAmount(cardSendProvider, sourceCurrency)} ${sourceCurrency}.`
-                                            : null
-                                        }
-                                        inlineEntry={inlineCardEntry}
-                                        insufficientBalance={insufficientFunds}
-                                        onTopUp={() => navigate("/wallet/topup")}
-                                      />
-                                    </motion.div>
-
-
-                                    <motion.div custom={2} variants={fieldVariants} initial="hidden" animate="show" className="flex justify-center py-1">
-                                      <SectionBoundary name="LiveFxCalculator"><LiveFxCalculator
-                                        variant="app"
-                                        showDisclaimer={false}
-                                        className="max-w-none w-full"
-                                        from={sourceCurrency}
-                                        to={targetCountry.code}
-                                        sendAmount={amount}
-                                        onFromChange={handleCalcFromChange}
-                                        onToChange={handleCalcToChange}
-                                        onSendAmountChange={(v) => setAmount(v)}
-                                        fromCurrencyFilter={
-                                          fundingSource === "wallet" ? walletCurrencyCodes
-                                          : fundingSource === "card" ? cardWalletCodes
-                                          : undefined
-                                        }
-                                        toCurrencyFilter={
-                                          fundingSource === "card" ? cardPayoutCodes : payoutCurrencyCodes
-                                        }
-                                        priorityCodes={PRIORITY_SEND_CURRENCIES}
-                                        quoteRecipient={rateAvailable ? calcQuoteRecipient : undefined}
-                                        quoteSend={rateAvailable ? calcQuoteSend : undefined}
-                                        displayRate={rateAvailable ? effectiveRate : null}
-                                       feeLabel={feeDisplayLabel}
-                                       feeNote={feeNote}
-                                        walletBalance={
-                                          fundingSource === "wallet" && selectedWallet
-                                            ? Number(selectedWallet.balance)
-                                            : null
-                                        }
-                                        walletSymbol={selectedWallet?.symbol}
-                                        showActions={false}
-                                      /></SectionBoundary>
-                                    </motion.div>
-
-
-
-
-                                    {fundingSource === "card" && cardSendProvider && parsedAmount > 0
-                                      && parsedAmount < cardSendMinAmount(cardSendProvider, sourceCurrency) && (
-                                      <motion.p
-                                        initial={{ opacity: 0, x: -6 }}
-                                        animate={{ opacity: 1, x: 0 }}
-                                        className="text-sm font-medium text-destructive flex items-center justify-center gap-1"
-                                      >
-                                        <AlertCircle className="w-3.5 h-3.5" />
-                                        Card minimum is {cardSendMinAmount(cardSendProvider, sourceCurrency)} {sourceCurrency}
-                                      </motion.p>
-                                    )}
-
-                                    {insufficientFunds && (
-                                      <motion.p
-                                        initial={{ opacity: 0, x: -6 }}
-                                        animate={{ opacity: 1, x: 0 }}
-                                        className="text-sm font-medium text-destructive flex items-center justify-center gap-1"
-                                      >
-                                        <AlertCircle className="w-3.5 h-3.5" /> Insufficient wallet balance
-                                      </motion.p>
-                                    )}
-
-                                    {!rateAvailable && (
-                                      <p className="text-sm text-center text-muted-foreground">
-                                        No FX rate for {sourceCurrency} → {targetCountry.code}. Try another pair or funding source.
-                                      </p>
-                                    )}
-                                </MoneyFlowShell>
-                              </motion.div>
-                            )}
-
-                            {step === 2 && (
-                              <motion.div
-                                key="step2"
-                                custom={direction}
-                                variants={stepVariants}
-                                initial="enter"
-                                animate="center"
-                                exit="exit"
-                                transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-                              >
-                                <MoneyFlowShell
-                                  steps={[
-                                    { n: 1, label: "Amount" },
-                                    { n: 2, label: "Recipient" },
-                                    { n: 3, label: "Confirm" },
-                                  ]}
-                                  currentStep={2}
-                                  title="Recipient"
-                                  subtitle="Who should receive the money"
-                                >
-                                    {fromQuickSend && parsedAmount > 0 && receivedAmount > 0 && (
-                                      <motion.div
-                                        custom={0}
-                                        variants={fieldVariants}
-                                        initial="hidden"
-                                        animate="show"
-                                        className="rounded-xl border border-primary/25 bg-primary/5 p-4 space-y-2"
-                                      >
-                                        <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
-                                          Ready from calculator
-                                        </p>
-                                        <p className="text-base font-bold tabular-nums">
-                                          {sourceSymbol}
-                                          {parsedAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{" "}
-                                          {sourceCurrency}
-                                          <span className="mx-2 text-muted-foreground font-normal">→</span>
-                                          {targetSymbol}
-                                          {receivedAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{" "}
-                                          {targetCountry.code}
-                                        </p>
-                                        <p className="text-xs text-muted-foreground">
-                                          Wallet funded · pick a saved contact below or enter details
-                                        </p>
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            setFromQuickSend(false);
-                                            clearSendHandoff();
-                                            goToStep(1);
-                                          }}
-                                          className="text-xs font-medium text-primary hover:underline"
-                                        >
-                                          Edit amount or funding
-                                        </button>
-                                      </motion.div>
-                                    )}
-
                                     <motion.div custom={0} variants={fieldVariants} initial="hidden" animate="show" className="space-y-3">
                                       <ContactQuickField
                                         label="To"
@@ -2623,27 +2432,140 @@ const SendPage = () => {
                                       </>
                                     )}
 
+                                >
+                                    <motion.div custom={0} variants={fieldVariants} initial="hidden" animate="show" className="space-y-3">
+                                      <div className="space-y-2">
+                                        <Label>Pay with</Label>
+                                        <PaymentMethodRow
+                                          options={fundingMethodOptions}
+                                          value={fundingSource}
+                                          onChange={(v) => setFundingSource(v)}
+                                        />
+                                      </div>
 
-                                    <motion.div custom={3} variants={fieldVariants} initial="hidden" animate="show" className="flex gap-3">
-                                      <Button variant="outline" className="flex-1" onClick={() => goToStep(1)}>Back</Button>
-                                      <motion.div
-                                        whileTap={{ scale: 0.97 }}
-                                        animate={isStep2Valid && !createTransfer.isPending ? { boxShadow: [
-                                          "0 0 0 0 hsl(var(--primary) / 0)",
-                                          "0 0 0 6px hsl(var(--primary) / 0.15)",
-                                          "0 0 0 0 hsl(var(--primary) / 0)",
-                                        ] } : { boxShadow: "0 0 0 0 hsl(var(--primary) / 0)" }}
-                                        transition={isStep2Valid && !createTransfer.isPending ? { duration: 1.8, repeat: Infinity, ease: "easeInOut" } : { duration: 0.2 }}
-                                        className="flex-1 rounded-md"
-                                      >
-                                        <Button className="w-full" onClick={() => goToStep(3)} disabled={!isStep2Valid}>
-                                          Continue
-                                        </Button>
-                                      </motion.div>
                                     </motion.div>
+
+                                    <motion.div custom={1} variants={fieldVariants} initial="hidden" animate="show">
+                                      <MethodCheckoutPanel
+                                        method={fundingSource as "card" | "bank" | "wallet"}
+                                        wallets={(fundingSource === "card" ? cardWallets : (wallets ?? [])).map((w) => ({
+                                          wallet_id: w.wallet_id,
+                                          currency_code: w.currency_code,
+                                          symbol: w.symbol,
+                                          balance: w.balance,
+                                          flag_emoji: w.flag_emoji,
+                                        }))}
+                                        selectedWalletId={selectedWalletId || selectedWallet?.wallet_id}
+                                        onWalletChange={(id) => setSelectedWalletId(id)}
+                                        linkedCardCount={linkedCardCount}
+                                        bankSources={bankSources}
+                                        selectedSourceId={selectedSourceId || bankSources[0]?.id}
+                                        onSourceChange={setSelectedSourceId}
+                                        onLinkBank={startPlaidLink}
+                                        linkingBank={plaidLinking}
+                                        savedCards={savedCards.map((c) => ({
+                                          id: c.stripe_payment_method_id,
+                                          card_brand: c.card_brand,
+                                          last_four: c.last_four,
+                                          exp_month: c.exp_month,
+                                          exp_year: c.exp_year,
+                                        }))}
+                                        selectedCardId={activeSavedCard?.stripe_payment_method_id}
+                                        onCardChange={setSelectedSavedCardId}
+                                        onAddCard={() => setAddCardOpen(true)}
+                                        onAddWallet={() => createWalletTriggerRef.current?.click()}
+                                        amount={parsedAmount}
+                                        fee={fee}
+                                        total={totalCharge}
+                                        currency={sourceCurrency}
+                                        symbol={sourceSymbol}
+                                        cardProviderReady={!!cardSendProvider}
+                                        cardChargeNote={
+                                          cardCheckoutQuote
+                                            ? `Card charge ≈ ${cardCheckoutQuote.checkoutCurrency} ${cardCheckoutQuote.checkoutAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${cardSendProvider === "nomba" && sourceCurrency === "CAD" ? " · CAD charged in USD" : ""}`
+                                            : null
+                                        }
+                                        cardMinNote={
+                                          cardSendProvider
+                                            ? `Minimum card send is ${cardSendMinAmount(cardSendProvider, sourceCurrency)} ${sourceCurrency}.`
+                                            : null
+                                        }
+                                        inlineEntry={inlineCardEntry}
+                                        insufficientBalance={insufficientFunds}
+                                        onTopUp={() => navigate("/wallet/topup")}
+                                      />
+                                    </motion.div>
+
+
+                                    <motion.div custom={2} variants={fieldVariants} initial="hidden" animate="show" className="flex justify-center py-1">
+                                      <SectionBoundary name="LiveFxCalculator"><LiveFxCalculator
+                                        variant="app"
+                                        showDisclaimer={false}
+                                        className="max-w-none w-full"
+                                        from={sourceCurrency}
+                                        to={targetCountry.code}
+                                        sendAmount={amount}
+                                        onFromChange={handleCalcFromChange}
+                                        onToChange={handleCalcToChange}
+                                        onSendAmountChange={(v) => setAmount(v)}
+                                        fromCurrencyFilter={
+                                          fundingSource === "wallet" ? walletCurrencyCodes
+                                          : fundingSource === "card" ? cardWalletCodes
+                                          : undefined
+                                        }
+                                        toCurrencyFilter={
+                                          fundingSource === "card" ? cardPayoutCodes : payoutCurrencyCodes
+                                        }
+                                        priorityCodes={PRIORITY_SEND_CURRENCIES}
+                                        quoteRecipient={rateAvailable ? calcQuoteRecipient : undefined}
+                                        quoteSend={rateAvailable ? calcQuoteSend : undefined}
+                                        displayRate={rateAvailable ? effectiveRate : null}
+                                       feeLabel={feeDisplayLabel}
+                                       feeNote={feeNote}
+                                        walletBalance={
+                                          fundingSource === "wallet" && selectedWallet
+                                            ? Number(selectedWallet.balance)
+                                            : null
+                                        }
+                                        walletSymbol={selectedWallet?.symbol}
+                                        showActions={false}
+                                      /></SectionBoundary>
+                                    </motion.div>
+
+
+
+
+                                    {fundingSource === "card" && cardSendProvider && parsedAmount > 0
+                                      && parsedAmount < cardSendMinAmount(cardSendProvider, sourceCurrency) && (
+                                      <motion.p
+                                        initial={{ opacity: 0, x: -6 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        className="text-sm font-medium text-destructive flex items-center justify-center gap-1"
+                                      >
+                                        <AlertCircle className="w-3.5 h-3.5" />
+                                        Card minimum is {cardSendMinAmount(cardSendProvider, sourceCurrency)} {sourceCurrency}
+                                      </motion.p>
+                                    )}
+
+                                    {insufficientFunds && (
+                                      <motion.p
+                                        initial={{ opacity: 0, x: -6 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        className="text-sm font-medium text-destructive flex items-center justify-center gap-1"
+                                      >
+                                        <AlertCircle className="w-3.5 h-3.5" /> Insufficient wallet balance
+                                      </motion.p>
+                                    )}
+
+                                    {!rateAvailable && (
+                                      <p className="text-sm text-center text-muted-foreground">
+                                        No FX rate for {sourceCurrency} → {targetCountry.code}. Try another pair or funding source.
+                                      </p>
+                                    )}
                                 </MoneyFlowShell>
                               </motion.div>
                             )}
+
 
                             {step === 3 && (
                               <motion.div
