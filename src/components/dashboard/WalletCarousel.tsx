@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import CreateWalletModal from "@/components/modals/CreateWalletModal";
 import AnimatedNumber from "@/components/ui/AnimatedNumber";
 import { flagForCurrency } from "@/lib/flags";
+import { CurrencyFlag } from "@/components/ui/FlagImage";
 
 const gradients: Record<string, string> = {
   USD: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)",
@@ -111,7 +112,6 @@ const WalletCarousel = () => {
         {list.map((w, idx) => {
           const isActive = idx === activeIndex;
           const gradient = gradients[w.currency_code] || fallbackGradient;
-          const flag = flagForCurrency(w.currency_code) !== "🌍" ? flagForCurrency(w.currency_code) : (w.flag_emoji || "💰");
           return (
             <TiltCard
               key={w.wallet_id}
@@ -121,9 +121,7 @@ const WalletCarousel = () => {
               onClick={() => navigate(`/wallets/${w.wallet_id}/statement`)}
             >
               {/* Big flag top right */}
-              <span className="absolute top-3 right-3 text-[40px] leading-none drop-shadow-md select-none pointer-events-none z-10">
-                {flag}
-              </span>
+              <CurrencyFlag code={w.currency_code} size="xl" className="absolute top-3 right-3 drop-shadow-md select-none pointer-events-none z-10" />
 
               {/* Floating bubbles */}
               <span className="absolute top-6 left-10 w-2 h-2 rounded-full bg-white/40 animate-bubble-drift" style={{ animationDelay: "0s" }} />
@@ -141,7 +139,7 @@ const WalletCarousel = () => {
               <div className="relative h-full p-5 flex flex-col justify-between">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-3xl drop-shadow-sm shrink-0">{flag}</span>
+                    <CurrencyFlag code={w.currency_code} size="lg" className="drop-shadow-sm" />
                     <div className="min-w-0">
                       <p className="font-display font-semibold text-sm">{w.currency_code}</p>
                       <div className="flex items-center gap-1.5 flex-wrap">

@@ -7,6 +7,8 @@ const SIZES = {
   xs: { box: "h-3.5 w-3.5", icon: "h-2 w-2" },
   sm: { box: "h-4 w-4", icon: "h-2.5 w-2.5" },
   md: { box: "h-5 w-5", icon: "h-3 w-3" },
+  lg: { box: "h-7 w-7", icon: "h-4 w-4" },
+  xl: { box: "h-10 w-10", icon: "h-5 w-5" },
 } as const;
 
 type Size = keyof typeof SIZES;
@@ -16,16 +18,19 @@ const FlagImg = ({
   alt,
   size = "sm",
   className = "",
+  title,
 }: {
   cc: string;
   alt: string;
   size?: Size;
   className?: string;
+  title?: string;
 }) => (
   <img
     src={`https://flagcdn.com/w40/${cc}.png`}
     srcSet={`https://flagcdn.com/w80/${cc}.png 2x`}
     alt={alt}
+    title={title}
     loading="lazy"
     className={`${SIZES[size].box} shrink-0 rounded-full object-cover ring-1 ring-border ${className}`}
   />
@@ -44,14 +49,16 @@ export const CurrencyFlag = ({
   code,
   size = "sm",
   className = "",
+  title,
 }: {
   code?: string | null;
   size?: Size;
   className?: string;
+  title?: string;
 }) => {
   const cc = code ? WORLD_CURRENCY_MAP[code.toUpperCase()]?.cc : null;
   if (!cc) return <GlobeFallback size={size} className={className} />;
-  return <FlagImg cc={cc} alt={code || ""} size={size} className={className} />;
+  return <FlagImg cc={cc} alt={code || ""} size={size} className={className} title={title ?? code ?? undefined} />;
 };
 
 export const CountryFlag = ({
@@ -65,7 +72,7 @@ export const CountryFlag = ({
 }) => {
   const cc = normalizeCountryCode(country);
   if (!cc) return <GlobeFallback size={size} className={className} />;
-  return <FlagImg cc={cc} alt={country || ""} size={size} className={className} />;
+  return <FlagImg cc={cc} alt={country || ""} size={size} className={className} title={country ?? undefined} />;
 };
 
 export const BrandFlag = ({ size = "sm", className = "" }: { size?: Size; className?: string }) => (
