@@ -1374,6 +1374,33 @@ const SendPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingBeneficiary, targetCountryId, ngnBanks, ghBanks, availableNetworks]);
 
+  // Short summary of what got prefilled from the selected contact.
+  const prefillSummary = useMemo(() => {
+    if (!pickedBeneficiaryId) return "";
+    const parts: string[] = [];
+    if (isNGNBank) {
+      const bank = ngnBanks.find((x) => x.code === ngnBankCode)?.name;
+      if (bank) parts.push(bank);
+      if (ngnAccountNumber) parts.push(ngnAccountNumber);
+    } else if (isGhanaBank) {
+      const bank = ghBanks.find((x) => x.code === ghBankCode)?.name;
+      if (bank) parts.push(bank);
+      if (ghAccountNumber) parts.push(ghAccountNumber);
+    } else {
+      if (activeNetwork?.label) parts.push(activeNetwork.label);
+      if (recipientPhone) parts.push(recipientPhone);
+    }
+    return parts.join(" · ");
+  }, [pickedBeneficiaryId, isNGNBank, isGhanaBank, ngnBanks, ngnBankCode, ngnAccountNumber, ghBanks, ghBankCode, ghAccountNumber, activeNetwork, recipientPhone]);
+
+  const phonePlaceholder = useMemo(() => {
+    const mm = MM_COUNTRIES.find(
+      (c) => c.currency === targetCountry.code || c.name.toLowerCase() === targetCountry.id.toLowerCase(),
+    );
+    return `${mm?.dialCode ?? "+"}...`;
+  }, [targetCountry]);
+
+
 
   useEffect(() => {
     const bid = searchParams.get("beneficiaryId");
