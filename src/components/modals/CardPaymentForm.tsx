@@ -32,6 +32,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { AlertCircle, CheckCircle2, CreditCard, Lock, Plus } from "lucide-react";
 import LoadingSpinner from "@/components/LoadingSpinner";
+import { CurrencyFlag } from "@/components/ui/FlagImage";
+
 
 interface Props {
   defaultWalletId?: string;
@@ -316,8 +318,9 @@ function SavedCardTopUp({
             <SelectContent>
               {wallets.map((item) => (
                 <SelectItem key={item.wallet_id} value={item.wallet_id}>
-                  {item.flag_emoji} {item.currency_code} — {item.symbol}{Number(item.balance).toFixed(2)}
+                  <span className="inline-flex items-center gap-2"><CurrencyFlag code={item.currency_code} size="sm" />{item.currency_code} — {item.symbol}{Number(item.balance).toFixed(2)}</span>
                 </SelectItem>
+
               ))}
             </SelectContent>
           </Select>
@@ -526,8 +529,9 @@ function NewCardTopUp({
               <SelectContent>
                 {wallets.map((item) => (
                   <SelectItem key={item.wallet_id} value={item.wallet_id}>
-                    {item.flag_emoji} {item.currency_code} — {item.symbol}{Number(item.balance).toFixed(2)}
+                    <span className="inline-flex items-center gap-2"><CurrencyFlag code={item.currency_code} size="sm" />{item.currency_code} — {item.symbol}{Number(item.balance).toFixed(2)}</span>
                   </SelectItem>
+
                 ))}
               </SelectContent>
             </Select>

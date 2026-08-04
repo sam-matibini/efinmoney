@@ -14,7 +14,6 @@ import { toast } from "sonner";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { RefreshCw, ArrowUpDown, TrendingUp, CheckCircle, Bitcoin, DollarSign, ExternalLink, Sparkles } from "lucide-react";
 import { CryptoTradingPanel } from "@/components/crypto/CryptoTradingPanel";
-import { flagForCurrency } from "@/lib/flags";
 import { resolveEffectiveRate } from "@/lib/fx";
 import { getNombaExchangeRate, isNgnPair } from "@/lib/nombaNigeria";
 import { CurrencyFlag } from "@/components/ui/FlagImage";
@@ -385,7 +384,7 @@ const FxTradingPanel = () => {
                   <SelectItem key={w.wallet_id} value={w.wallet_id}>
                       <span className="inline-flex items-center gap-2">
                         {w.isStellar ? (
-                          <span className="text-base">{w.flag_emoji}</span>
+                          <CurrencyFlag code={w.currency_code} size="sm" />
                         ) : (
                           <CurrencyFlag code={w.currency_code} size="sm" />
                         )}
@@ -503,7 +502,7 @@ const LiveFxRatesCard = () => {
         <div className="space-y-3">
           {nombaUsdNgn?.effective_rate ? (
             <div className="flex justify-between items-center text-sm">
-              <span>{flagForCurrency("USD")} USD → {flagForCurrency("NGN")} NGN</span>
+              <span className="inline-flex items-center gap-1"><CurrencyFlag code="USD" size="xs" />USD → <CurrencyFlag code="NGN" size="xs" />NGN</span>
               <span className="font-mono flex items-center gap-2">
                 {Number(nombaUsdNgn.effective_rate).toFixed(4)}
                 <span className="text-[10px] uppercase text-emerald-600 font-semibold">Live</span>
@@ -512,7 +511,7 @@ const LiveFxRatesCard = () => {
           ) : null}
           {fxRates?.slice(0, 4).map((rate) => (
               <div key={rate.id} className="flex justify-between items-center text-sm">
-                <span>{flagForCurrency(rate.from_currency)} {rate.from_currency} → {flagForCurrency(rate.to_currency)} {rate.to_currency}</span>
+                <span className="inline-flex items-center gap-1"><CurrencyFlag code={rate.from_currency} size="xs" />{rate.from_currency} → <CurrencyFlag code={rate.to_currency} size="xs" />{rate.to_currency}</span>
                 <span className="font-mono">{Number(rate.effective_rate).toFixed(4)}</span>
               </div>
             ))}

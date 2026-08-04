@@ -16,6 +16,8 @@ import {
 } from "@/lib/cardIssueErrors";
 import { Sparkles, Wifi, CreditCard, Smartphone, AlertCircle } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CurrencyFlag } from "@/components/ui/FlagImage";
+
 
 interface IssueVirtualCardModalProps {
   open: boolean;
@@ -230,8 +232,9 @@ const IssueVirtualCardModal = ({ open, onClose, onCreated }: IssueVirtualCardMod
                 )}
                 {matchingWallets.map((w: any) => (
                   <SelectItem key={w.wallet_id} value={w.wallet_id}>
-                    {w.flag_emoji} {w.currency_code} — {w.symbol}{Number(w.balance).toFixed(2)}
+                    <span className="inline-flex items-center gap-2"><CurrencyFlag code={w.currency_code} size="sm" />{w.currency_code} — {w.symbol}{Number(w.balance).toFixed(2)}</span>
                   </SelectItem>
+
                 ))}
               </SelectContent>
             </Select>

@@ -80,6 +80,7 @@ import CheckoutShell from "@/components/money/CheckoutShell";
 import CheckoutMethodList, { type CheckoutMethod } from "@/components/money/CheckoutMethodList";
 import PaymentMethodRow, { type PaymentMethodOption, type PayTone } from "@/components/money/PaymentMethodRow";
 import { CreditCard as PayCardIcon, Landmark as PayBankIcon, Smartphone as PayMobileIcon, Wallet as PayWalletIcon } from "lucide-react";
+import { CurrencyFlag } from "@/components/ui/FlagImage";
 
 const MM_BY_CCY = Object.fromEntries(MM_COUNTRIES.map((c) => [c.currency, c]));
 
@@ -921,7 +922,7 @@ const TopUpPage = () => {
           <CheckoutShell
             payTo={`Add money to your ${currency} wallet`}
             amount={`${currencySymbol(currency)}${(amountNum || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-            amountNote={`${selectedWallet.flag_emoji || ""} ${currency} wallet · ${selectedWallet.symbol}${Number(selectedWallet.balance).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} available`}
+            amountNote={`${currency} wallet · ${selectedWallet.symbol}${Number(selectedWallet.balance).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} available`}
             lines={[
               { label: "Wallet top-up", sublabel: `${currency} balance credit`, value: `${currencySymbol(currency)}${(amountNum || 0).toFixed(2)}` },
               { label: "Provider fees", sublabel: "Charged by the payment method", value: "At checkout", muted: true },
@@ -1001,8 +1002,7 @@ const TopUpPage = () => {
                     <SelectContent>
                       {wallets.map((w) => (
                         <SelectItem key={w.wallet_id} value={w.wallet_id}>
-                          {w.flag_emoji} {w.currency_code} - {w.symbol}
-                          {Number(w.balance).toLocaleString()}
+                          <span className="inline-flex items-center gap-2"><CurrencyFlag code={w.currency_code} size="sm" />{w.currency_code} - {w.symbol}{Number(w.balance).toLocaleString()}</span>
                         </SelectItem>
                       ))}
                     </SelectContent>

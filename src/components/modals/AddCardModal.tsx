@@ -27,6 +27,7 @@ import { toast } from "sonner";
 import SaveCardForm from "@/components/cards/SaveCardForm";
 import ManualCardForm from "@/components/cards/ManualCardForm";
 import { STRIPE_PAYMENTS_ENABLED } from "@/lib/stripeDisabled";
+import { CurrencyFlag } from "@/components/ui/FlagImage";
 
 
 interface AddCardModalProps {
@@ -268,7 +269,7 @@ const AddCardModal = ({ isOpen, onClose, defaultMode = "issue" }: AddCardModalPr
                         <SelectItem value="none">No wallet — fund later</SelectItem>
                         {wallets?.map((w) => (
                           <SelectItem key={w.wallet_id} value={w.wallet_id}>
-                            {w.flag_emoji} {w.currency_code} — {w.symbol}{Number(w.balance).toFixed(2)}
+                            <span className="inline-flex items-center gap-2"><CurrencyFlag code={w.currency_code} size="sm" />{w.currency_code} — {w.symbol}{Number(w.balance).toFixed(2)}</span>
                           </SelectItem>
                         ))}
                       </SelectContent>

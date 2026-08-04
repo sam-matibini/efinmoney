@@ -5,6 +5,7 @@ import { QRCodeCanvas } from "qrcode.react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { useProfile } from "@/hooks/useProfile";
+import { CurrencyFlag } from "@/components/ui/FlagImage";
 
 interface ReceiveMoneyModalProps {
   isOpen: boolean;
@@ -14,7 +15,7 @@ interface ReceiveMoneyModalProps {
     currency: string;
     balance: number;
     symbol: string;
-    flag: string;
+    flag?: string;
   } | null;
 }
 
@@ -64,7 +65,7 @@ const ReceiveMoneyModal = ({ isOpen, onClose, wallet }: ReceiveMoneyModalProps) 
       <DialogContent className="sm:max-w-md bg-card border-border">
         <DialogHeader>
           <DialogTitle className="font-display text-foreground flex items-center gap-2">
-            <span className="text-2xl">{wallet.flag}</span>
+            <CurrencyFlag code={wallet.currency} size="md" />
             Receive {wallet.currency}
           </DialogTitle>
         </DialogHeader>

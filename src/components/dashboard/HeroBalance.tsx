@@ -7,13 +7,13 @@ import { useWalletCards } from "@/hooks/useWalletCards";
 import { useDashboardTransfers } from "@/hooks/useDashboardTransfers";
 import { useFxRates } from "@/hooks/useFxRates";
 import { Skeleton } from "@/components/ui/skeleton";
-import { flagForCurrency } from "@/lib/flags";
 import AnimatedNumber from "@/components/ui/AnimatedNumber";
 import CountUp from "react-countup";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { getGreeting } from "@/lib/greeting";
 import { buildUsdRateMap } from "@/lib/fx";
+import { CurrencyFlag } from "@/components/ui/FlagImage";
 
 const HeroBalance = () => {
   const reduceMotion = useReducedMotion();
@@ -282,8 +282,7 @@ const HeroBalance = () => {
         >
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold bg-muted/60 text-foreground dark:bg-white/10 dark:text-white/85">
             {(wallets || []).slice(0, 6).map((w) => {
-              const f = flagForCurrency(w.currency_code);
-              return <span key={w.wallet_id} title={w.currency_code}>{f !== "🌍" ? f : (w.flag_emoji || "💰")}</span>;
+              return <CurrencyFlag key={w.wallet_id} code={w.currency_code} size="xs" title={w.currency_code} />;
             })}
             {walletCount === 0 && <WalletIcon className="w-3 h-3" />}
           </span>

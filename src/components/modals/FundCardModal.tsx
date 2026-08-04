@@ -15,6 +15,8 @@ import { useWallets } from "@/hooks/useWallets";
 import { useCardMutations, type Card } from "@/hooks/useCards";
 import { useAuth } from "@/hooks/useAuth";
 import WalletFundingPanel from "@/components/wallets/WalletFundingPanel";
+import { CurrencyFlag } from "@/components/ui/FlagImage";
+
 
 interface FundCardModalProps {
   open: boolean;
@@ -102,8 +104,9 @@ const FundCardModal = ({ open, onClose, card }: FundCardModalProps) => {
                 <SelectContent>
                   {matchingWallets.map((w) => (
                     <SelectItem key={w.wallet_id} value={w.wallet_id}>
-                      {w.flag_emoji} {w.currency_code} — {w.symbol}{Number(w.balance).toFixed(2)}
+                      <span className="inline-flex items-center gap-2"><CurrencyFlag code={w.currency_code} size="sm" />{w.currency_code} — {w.symbol}{Number(w.balance).toFixed(2)}</span>
                     </SelectItem>
+
                   ))}
                 </SelectContent>
               </Select>
@@ -163,7 +166,6 @@ const FundCardModal = ({ open, onClose, card }: FundCardModalProps) => {
                   walletId={walletId}
                   currency={currency}
                   symbol={selectedWallet.symbol}
-                  flag={selectedWallet.flag_emoji ?? ""}
                   balance={walletBalance}
                   defaultAmount={parsedAmount > 0 ? parsedAmount : undefined}
                   onFunded={handleFunded}

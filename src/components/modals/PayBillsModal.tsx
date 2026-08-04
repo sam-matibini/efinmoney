@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useWallets } from "@/hooks/useWallets";
 import { useCreateTransfer } from "@/hooks/useTransfers";
 import { toast } from "sonner";
+import { CurrencyFlag } from "@/components/ui/FlagImage";
+
 
 interface PayBillsModalProps {
   children: React.ReactNode;
@@ -106,8 +108,9 @@ const PayBillsModal = ({ children }: PayBillsModalProps) => {
               <SelectContent>
                 {(wallets || []).map(w => (
                   <SelectItem key={w.wallet_id} value={w.wallet_id}>
-                    {w.flag_emoji} {w.currency_code} — {w.symbol}{Number(w.balance).toLocaleString()}
+                    <span className="inline-flex items-center gap-2"><CurrencyFlag code={w.currency_code} size="sm" />{w.currency_code} — {w.symbol}{Number(w.balance).toLocaleString()}</span>
                   </SelectItem>
+
                 ))}
               </SelectContent>
             </Select>

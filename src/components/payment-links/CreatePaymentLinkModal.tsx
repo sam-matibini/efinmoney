@@ -22,6 +22,7 @@ import { useWallets } from "@/hooks/useWallets";
 import { createPaymentLink, PaymentLinkSuccess, type PaymentLinkResult } from "@/components/send/PaymentLinkSuccess";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { CurrencyFlag } from "@/components/ui/FlagImage";
 
 interface CreatePaymentLinkModalProps {
   open: boolean;
@@ -150,8 +151,7 @@ const CreatePaymentLinkModal = ({
                     <SelectContent>
                       {activeWallets.map((w) => (
                         <SelectItem key={w.wallet_id} value={w.wallet_id}>
-                          {w.flag_emoji} {w.currency_code} — {w.symbol}
-                          {Number(w.balance).toLocaleString(undefined, { minimumFractionDigits: 2 })} available
+                          <span className="inline-flex items-center gap-2"><CurrencyFlag code={w.currency_code} size="sm" />{w.currency_code} — {w.symbol}{Number(w.balance).toLocaleString(undefined, { minimumFractionDigits: 2 })} available</span>
                         </SelectItem>
                       ))}
                     </SelectContent>

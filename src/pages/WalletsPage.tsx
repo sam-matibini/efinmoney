@@ -14,7 +14,6 @@ import CreateWalletModal from "@/components/modals/CreateWalletModal";
 import WalletTransferModal from "@/components/modals/WalletTransferModal";
 import EditWalletModal from "@/components/modals/EditWalletModal";
 import DeleteWalletModal from "@/components/modals/DeleteWalletModal";
-import { flagForCurrency } from "@/lib/flags";
 import StellarNetworkCard from "@/components/wallets/StellarNetworkCard";
 import PageHeroBanner from "@/components/common/PageHeroBanner";
 import AppPage from "@/components/layout/AppPage";
@@ -24,7 +23,7 @@ type WalletModalData = {
   currency: string;
   balance: number;
   symbol: string;
-  flag: string;
+  flag?: string;
 } | null;
 
 const WalletsPage = () => {
@@ -153,7 +152,6 @@ const WalletsPage = () => {
                     currency={wallet.currency_code}
                     balance={Number(wallet.balance)}
                     symbol={wallet.symbol}
-                    flag={flagForCurrency(wallet.currency_code) !== '🌍' ? flagForCurrency(wallet.currency_code) : (wallet.flag_emoji || '💰')}
                     isMain={index === 0}
                     isDefault={wallet.is_default}
                     status={wallet.status}

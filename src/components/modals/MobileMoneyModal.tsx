@@ -22,6 +22,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useBeneficiaries, useCreateBeneficiary, initialsOf, type Beneficiary } from "@/hooks/useBeneficiaries";
 import ContactsPickerModal from "@/components/modals/ContactsPickerModal";
 import { Users, UserPlus } from "lucide-react";
+import { CountryFlag, CurrencyFlag } from "@/components/ui/FlagImage";
+
 
 type FundingSource = 'wallet' | 'bank' | 'flutterwave';
 
@@ -289,7 +291,7 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
                   className="w-full justify-between font-normal"
                 >
                   <span className="flex items-center gap-2">
-                    <span className="text-lg leading-none">{country.flag}</span>
+                    <CountryFlag country={country.name} size="md" />
                     <span>{country.name}</span>
                     <span className="text-muted-foreground text-xs">({country.currency})</span>
                   </span>
@@ -318,7 +320,8 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
                           }}
                         >
                           <Check className={cn("mr-2 h-4 w-4", countryCode === c.code ? "opacity-100" : "opacity-0")} />
-                          <span className="mr-2 text-lg">{c.flag}</span>
+                          <CountryFlag country={c.name} size="sm" className="mr-2" />
+
                           <span>{c.name}</span>
                           <span className="ml-auto text-xs text-muted-foreground">{c.currency}</span>
                         </CommandItem>
@@ -336,7 +339,7 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
                           }}
                         >
                           <Check className={cn("mr-2 h-4 w-4", countryCode === c.code ? "opacity-100" : "opacity-0")} />
-                          <span className="mr-2 text-lg">{c.flag}</span>
+                          <CountryFlag country={c.name} size="sm" className="mr-2" />
                           <span>{c.name}</span>
                           <span className="ml-auto text-xs text-muted-foreground">{c.currency}</span>
                         </CommandItem>
@@ -363,7 +366,7 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
 
           {/* Summary */}
           <div className="rounded-lg border border-border bg-muted/30 p-3 flex items-center gap-3">
-            <span className="text-3xl leading-none">{country.flag}</span>
+            <CountryFlag country={country.name} size="md" />
             <div className="text-sm">
               <div className="font-medium">{country.name} — {network.label}</div>
               <div className="text-xs text-muted-foreground">Charged in {chargeCurrency}</div>
@@ -437,7 +440,7 @@ const MobileMoneyModal = ({ children }: MobileMoneyModalProps) => {
                 <SelectContent>
                   {(wallets || []).map((w) => (
                     <SelectItem key={w.wallet_id} value={w.wallet_id}>
-                      {w.flag_emoji} {w.currency_code} — {w.symbol}{Number(w.balance).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      <span className="inline-flex items-center gap-2"><CurrencyFlag code={w.currency_code} size="sm" />{w.currency_code} — {w.symbol}{Number(w.balance).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </SelectItem>
                   ))}
                 </SelectContent>

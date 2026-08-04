@@ -26,6 +26,7 @@ import { countryToCurrency, currencySymbol } from "@/lib/currency";
 import EditUserDialog from "@/components/admin-portal/EditUserDialog";
 import UserChangeHistory from "@/components/admin-portal/UserChangeHistory";
 import UserActivityTimeline from "@/components/admin-portal/UserActivityTimeline";
+import { CurrencyFlag } from "@/components/ui/FlagImage";
 
 
 // support_threads / support_messages aren't in the generated types yet.
@@ -741,7 +742,7 @@ const UserDetailPage = () => {
                         <TableRow key={w.wallet_id}>
                           <TableCell>
                             <div className="flex items-center gap-2">
-                              <span className="text-xl">{w.flag_emoji}</span>
+                              <CurrencyFlag code={w.currency_code} size="sm" />
                               <div>
                                 <div className="font-medium">{w.currency_code}</div>
                                 <div className="text-xs text-muted-foreground">{w.currency_name}</div>

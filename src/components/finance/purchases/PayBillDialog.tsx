@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useWallets } from "@/hooks/useWallets";
 import { toast } from "sonner";
+import { CurrencyFlag } from "@/components/ui/FlagImage";
 
 interface PayBillDialogProps {
   bill: any | null;
@@ -120,7 +121,7 @@ export const PayBillDialog = ({ bill, onClose }: PayBillDialogProps) => {
                 <SelectContent>
                   {wallets.map((w) => (
                     <SelectItem key={w.wallet_id} value={w.wallet_id}>
-                      {w.flag_emoji} {w.currency_code} — {w.symbol}{Number(w.balance).toLocaleString()}
+                      <span className="inline-flex items-center gap-2"><CurrencyFlag code={w.currency_code} size="sm" />{w.currency_code} — {w.symbol}{Number(w.balance).toLocaleString()}</span>
                     </SelectItem>
                   ))}
                 </SelectContent>

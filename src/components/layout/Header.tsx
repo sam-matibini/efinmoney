@@ -41,8 +41,10 @@ import { useWallets } from "@/hooks/useWallets";
 import { useProfile } from "@/hooks/useProfile";
 import { prefetchRoute } from "@/lib/prefetchRoute";
 import { avatarInitials, resolveAvatarUrl } from "@/lib/avatar";
+import { CountryFlag, CurrencyFlag } from "@/components/ui/FlagImage";
 import {
   headerIconBase,
+
   headerIconInteractive,
   headerIconVariants,
   headerNavTrack,
@@ -126,12 +128,9 @@ const Header = () => {
   if (isAdmin) navItems.push(buildNavItem("Admin", "/admin"));
 
   const countryBadge = profile?.country_code ?? defaultWallet?.currency_code?.slice(0, 2) ?? null;
-  const walletFlag = defaultWallet?.flag_emoji;
-  const isAsciiFlag = (value: string) => /^[A-Z]{2}$/.test(value);
-  const showEmojiFlag = Boolean(walletFlag && !isAsciiFlag(walletFlag));
-  const localeDisplay = showEmojiFlag
-    ? walletFlag
-    : (countryBadge ?? (walletFlag && isAsciiFlag(walletFlag) ? walletFlag : null));
+  const localeCountry = profile?.country_code ?? null;
+  const localeCurrency = defaultWallet?.currency_code ?? null;
+  const localeDisplay = localeCountry || localeCurrency;
 
   const isNavActive = (href: string) =>
     href === "/dashboard"
@@ -307,7 +306,9 @@ const Header = () => {
                   </Avatar>
                   {localeDisplay && (
                     <span className={profileBadgeClass} title={`Default: ${defaultWallet?.currency_code ?? localeDisplay}`}>
-                      {localeDisplay}
+                      {localeCountry
+                        ? <CountryFlag country={localeCountry} size="sm" />
+                        : <CurrencyFlag code={localeCurrency} size="sm" />}
                     </span>
                   )}
                 </motion.button>
