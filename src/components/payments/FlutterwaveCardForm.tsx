@@ -98,8 +98,23 @@ function ProcessingOverlay({ stage }: { stage: Exclude<Stage, "idle" | "success"
         <p className="text-xs text-muted-foreground">{STAGE_COPY[stage].sub}</p>
       </div>
       <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-        <Lock className="h-3 w-3" /> Secured by eFinMoney
+        <Logo static className="h-4 w-4" />
+        <Lock className="h-3 w-3" /> Secured by <Wordmark subtle className="text-[11px] font-semibold" />
       </div>
+    </div>
+  );
+}
+
+function CheckoutBrandHeader() {
+  return (
+    <div className="flex items-center justify-between gap-3 border-b border-border pb-3">
+      <div className="flex items-center gap-2">
+        <Logo static className="h-7 w-7" />
+        <Wordmark subtle className="text-base font-display font-semibold" />
+      </div>
+      <span className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
+        <Lock className="h-3 w-3" /> Secure checkout
+      </span>
     </div>
   );
 }
@@ -107,11 +122,9 @@ function ProcessingOverlay({ stage }: { stage: Exclude<Stage, "idle" | "success"
 function EfinmoneyBranding() {
   return (
     <div className="flex items-center justify-center gap-2 py-2">
-      <div className="h-6 w-6 rounded-md bg-emerald-600 flex items-center justify-center">
-        <span className="text-white text-[10px] font-bold">e</span>
-      </div>
+      <Logo static className="h-6 w-6" />
       <span className="text-xs text-muted-foreground">
-        Payment powered by <span className="font-semibold text-emerald-600">eFinMoney</span>
+        Payment powered by <Wordmark subtle className="text-xs font-semibold" />
       </span>
     </div>
   );
