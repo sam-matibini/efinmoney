@@ -2035,7 +2035,7 @@ const SendPage = () => {
             >
               <TabsList
                 className={cn(
-                  "relative grid w-full h-11 sm:h-12 overflow-hidden",
+                  "relative grid w-full max-w-lg mx-auto h-10 overflow-hidden",
                   canadaLive ? "grid-cols-3" : "grid-cols-2",
                 )}
               >
