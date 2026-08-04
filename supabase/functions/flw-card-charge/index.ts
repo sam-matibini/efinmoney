@@ -211,15 +211,27 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Follow-up PIN / OTP on an existing charge
+      // Follow-up PIN / OTP / AVS on an existing charge
       const authObj = authorization && typeof authorization === "object"
         ? authorization as Record<string, unknown>
         : null;
       const pinVal = pin ? String(pin) : (authObj?.pin != null ? String(authObj.pin) : "");
       const otpVal = authObj?.otp != null ? String(authObj.otp) : "";
+      const avsObj = authObj?.avs && typeof authObj.avs === "object"
+        ? authObj.avs as Record<string, unknown>
+        : null;
+      const avsVal = avsObj
+        ? {
+          address: avsObj.address != null ? String(avsObj.address) : undefined,
+          city: avsObj.city != null ? String(avsObj.city) : undefined,
+          state: avsObj.state != null ? String(avsObj.state) : undefined,
+          country: avsObj.country != null ? String(avsObj.country) : undefined,
+          zipcode: avsObj.zipcode != null ? String(avsObj.zipcode) : undefined,
+        }
+        : null;
       const chargeIdFollowUp = existingChargeId ? String(existingChargeId) : "";
 
-      if (chargeIdFollowUp && (pinVal || otpVal)) {
+      if (chargeIdFollowUp && (pinVal || otpVal || avsVal)) {
         // The provider owns the charge state. Re-read it before authorization so
         // authorization.type always matches the charge's current next_action.
         const current = await flwV4GetCharge(chargeIdFollowUp);
@@ -232,14 +244,29 @@ Deno.serve(async (req) => {
         }
         const currentData = (current.json.data || {}) as Record<string, unknown>;
         const expected = normalizeNextAction(currentData.next_action as Record<string, unknown> | undefined);
+        console.log("flw-card-charge follow-up state", {
+          charge_id: chargeIdFollowUp,
+          provider_status: current.status,
+          charge_status: currentData.status ?? null,
+          next_action_type: expected?.providerType ?? null,
+          mapped_mode: expected?.mode ?? null,
+          input_mode: pinVal ? "pin" : otpVal ? "otp" : "avs",
+        });
         if (!expected?.providerType || !expected.mode) {
           return ok({
             success: false,
-            error: "The bank did not return a supported security check. Please retry the payment.",
+            error: expected?.providerType
+              ? `Unsupported bank security check: ${expected.providerType}. Please retry or use another payment method.`
+              : "The bank did not return a supported security check. Please retry the payment.",
+            provider_action_type: expected?.providerType || null,
             code: "unsupported_auth_action",
           });
         }
-        if ((pinVal && expected.mode !== "pin") || (otpVal && expected.mode !== "otp")) {
+        if (
+          (pinVal && expected.mode !== "pin") ||
+          (otpVal && expected.mode !== "otp") ||
+          (avsVal && expected.mode !== "avs")
+        ) {
           return ok({
             success: true,
             requires_auth: true,
@@ -254,17 +281,12 @@ Deno.serve(async (req) => {
           });
         }
 
-        console.log("flw-card-charge authorization", {
-          charge_id: chargeIdFollowUp,
-          provider_status: current.status,
-          next_action_type: expected.providerType,
-          input_mode: pinVal ? "pin" : "otp",
-        });
         const updated = await flwV4UpdateChargeAuthorization({
           chargeId: chargeIdFollowUp,
           authorizationType: expected.providerType,
           pin: pinVal || undefined,
           otp: otpVal || undefined,
+          avs: avsVal || undefined,
         });
         if (!updated.ok) {
           return ok({
