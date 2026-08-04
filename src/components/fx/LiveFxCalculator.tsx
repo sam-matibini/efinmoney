@@ -49,6 +49,8 @@ export type LiveFxCalculatorProps = {
   quoteSend?: (recvInTo: number) => number;
   displayRate?: number | null;
   feeLabel?: string;
+  /** Overrides the small fee line under the send input. */
+  feeNote?: string;
   walletBalance?: number | null;
   walletSymbol?: string;
   showComparison?: boolean;
@@ -97,6 +99,7 @@ const LiveFxCalculator = ({
   quoteSend: quoteSendOverride,
   displayRate,
   feeLabel,
+  feeNote,
   walletBalance,
   walletSymbol,
   showComparison = true,
@@ -401,9 +404,9 @@ const LiveFxCalculator = ({
             {walletBalance <= 0 && sendNumeric > 0 ? " · Top up to send" : ""}
           </p>
         )}
-        {appSurface && sendNumeric > 0 && transferFlatFee > 0 && (
+        {appSurface && sendNumeric > 0 && (feeNote || transferFlatFee > 0) && (
           <p className={`mt-0.5 px-1 text-[10px] ${shell.walletHint}`}>
-            {fmt(transferFlatFee)} {from} fee deducted · {fmt(Math.max(0, sendNumeric - transferFlatFee))} {from} converted at rate
+            {feeNote ?? `+${fmt(transferFlatFee)} ${from} fee added · total ${fmt(sendNumeric + transferFlatFee)} ${from}`}
           </p>
         )}
 
