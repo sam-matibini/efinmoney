@@ -2518,7 +2518,7 @@ const SendPage = () => {
                                       <motion.div custom={2} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
                                         <Label>Mobile Money Number</Label>
                                         <Input
-                                          placeholder="+254..."
+                                          placeholder={phonePlaceholder}
                                           value={recipientPhone}
                                           onChange={(e) => setRecipientPhone(e.target.value.replace(/[^\d+]/g, "").slice(0, 15))}
                                           maxLength={15}
