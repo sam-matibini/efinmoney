@@ -313,6 +313,15 @@ export default function FlutterwaveCardForm({
     redirect_url: `${window.location.origin}/payment-callback?type=flw_card`,
   });
 
+  const applyAuthResponse = (data: any) => {
+    const am = String(data?.auth?.mode || "otp");
+    const cid = data?.charge_id ? String(data.charge_id) : null;
+    if (cid) setPendingChargeId(cid);
+    if (am === "redirect" && data?.auth?.redirect) setAuthRedirect(String(data.auth.redirect));
+    setAuthMode(am);
+    setStage("auth");
+  };
+
   const verifyAndCredit = async () => {
     if (!lastPayload && !pendingChargeId) return;
     try {
