@@ -249,26 +249,29 @@ export default function FlutterwaveCardForm({
     if (!cardholderName && profile?.full_name) setCardholderName(profile.full_name.toUpperCase());
   }, [profile?.full_name, cardholderName]);
 
-  useEffect(() => {
-    if (authMode === "redirect" && authRedirect) {
-      const width = 500; const height = 620;
-      const left = (screen.width - width) / 2; const top = (screen.height - height) / 2;
-      const popup = window.open(authRedirect, "flw_auth", `width=${width},height=${height},left=${left},top=${top}`);
-      if (!popup) {
-        toast.error("Please allow pop-ups for 3D Secure verification");
-        setAuthMode(null);
-        setStage("idle");
-        return;
-      }
-      const interval = setInterval(() => {
-        if (popup.closed) {
-          clearInterval(interval);
-          setStage("verifying");
-          verifyAndCredit().finally(() => setStage("idle"));
-        }
-      }, 500);
+  const openRedirectPopup = () => {
+    if (!authRedirect) return;
+    const width = 500; const height = 620;
+    const left = (screen.width - width) / 2; const top = (screen.height - height) / 2;
+    const popup = window.open(authRedirect, "flw_auth", `width=${width},height=${height},left=${left},top=${top}`);
+    if (!popup) {
+      toast.error("Pop-up blocked — use the 'Open verification window' button to continue");
+      return;
     }
+    const interval = setInterval(() => {
+      if (popup.closed) {
+        clearInterval(interval);
+        setStage("verifying");
+        verifyAndCredit().finally(() => setStage("idle"));
+      }
+    }, 500);
+  };
+
+  useEffect(() => {
+    if (authMode === "redirect" && authRedirect) openRedirectPopup();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authMode, authRedirect]);
+
 
   const wallet = wallets?.find((w) => w.wallet_id === (selectedWalletId ?? defaultWalletId)) ?? wallets?.[0];
   const currency = wallet?.currency_code ?? "USD";
