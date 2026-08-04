@@ -287,17 +287,24 @@ Deno.serve(async (req) => {
           next_action_type: expected?.providerType ?? null,
           mapped_mode: expected?.mode ?? null,
           input_mode: pinVal ? "pin" : otpVal ? "otp" : "avs",
+          raw_next_action: JSON.stringify(currentData.next_action ?? null),
+          provider_message: currentData.next_action_message ?? currentData.message ?? null,
         });
-        if (!expected?.providerType || !expected.mode) {
+        if (!expected?.mode) {
+          const providerMessage = String(currentData.next_action_message || currentData.message || "");
           return ok({
             success: false,
-            error: expected?.providerType
-              ? `Unsupported bank security check: ${expected.providerType}. Please retry or use another payment method.`
-              : "The bank did not return a supported security check. Please retry the payment.",
-            provider_action_type: expected?.providerType || null,
+            error: providerMessage ||
+              (expected?.providerType
+                ? `Unsupported bank security check: ${expected.providerType}. Please retry or use another payment method.`
+                : "The bank did not return a supported security check. Please retry the payment."),
+            provider_action_type: expected?.providerType || expected?.rawType || null,
+            provider_message: providerMessage || null,
+            charge_id: chargeIdFollowUp,
             code: "unsupported_auth_action",
           });
         }
+
         if (
           (pinVal && expected.mode !== "pin") ||
           (otpVal && expected.mode !== "otp") ||
