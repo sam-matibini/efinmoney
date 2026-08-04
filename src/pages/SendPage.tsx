@@ -10,6 +10,7 @@ import ContactsPickerModal from "@/components/modals/ContactsPickerModal";
 import AddBeneficiaryModal from "@/components/modals/AddBeneficiaryModal";
 import ContactQuickField from "@/components/send/ContactQuickField";
 import AddCardModal from "@/components/modals/AddCardModal";
+import CreateWalletModal from "@/components/modals/CreateWalletModal";
 import TopUpModal from "@/components/modals/TopUpModal";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useBeneficiaries, recordTransferRecipient, type Beneficiary } from "@/hooks/useBeneficiaries";
