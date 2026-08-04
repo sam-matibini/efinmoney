@@ -1400,6 +1400,7 @@ const SendPage = () => {
       if (activeNetwork?.label) parts.push(activeNetwork.label);
       if (recipientPhone) parts.push(recipientPhone);
     }
+    if (parts.length === 0) return "Couldn't prefill payout details — please enter them below";
     return parts.join(" · ");
   }, [pickedBeneficiaryId, isNGNBank, isGhanaBank, ngnBanks, ngnBankCode, ngnAccountNumber, ghBanks, ghBankCode, ghAccountNumber, activeNetwork, recipientPhone]);
 
