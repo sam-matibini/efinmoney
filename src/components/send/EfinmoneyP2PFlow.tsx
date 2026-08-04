@@ -317,7 +317,7 @@ const EfinmoneyP2PFlow = () => {
       ...prev,
       {
         recipient,
-        currency: sender.currency_code,
+        currency: recipient.base_currency || sender.currency_code,
         note: "",
         status: "pending" as const,
       },
