@@ -392,25 +392,41 @@ export default function FlutterwaveCardForm({
   });
 
   const applyAuthResponse = (data: ChargeAuthResponse) => {
-    const am = typeof data?.auth?.mode === "string" ? data.auth.mode : "";
-    if (!["pin", "otp", "redirect", "avs"].includes(am)) {
+    const rawMode = typeof data?.auth?.mode === "string" ? data.auth.mode : "";
+    const fallbackRedirect = typeof data?.auth?.redirect === "string" && data.auth.redirect.trim()
+      ? data.auth.redirect.trim()
+      : null;
+    // Any hosted challenge URL can be completed in the redirect panel, whatever the bank calls it.
+    const am = ["pin", "otp", "redirect", "avs"].includes(rawMode)
+      ? rawMode
+      : fallbackRedirect
+        ? "redirect"
+        : "";
+
+    if (!am) {
       const providerType = data?.provider_action_type ? ` (${data.provider_action_type})` : "";
+      const providerMessage = data?.provider_message?.trim();
       toast.error(
-        data?.error ||
+        providerMessage ||
+          data?.error ||
           `Your bank returned a security check we can't complete here${providerType}. Please retry or use another payment method.`,
       );
+      // Keep the entered card details on screen so the user can retry without re-typing.
       setAuthMode(null);
+      setAuthRedirect(null);
+      setAuthMessage(null);
       setStage("idle");
       return;
     }
 
     const cid = data?.charge_id ? String(data.charge_id) : null;
     if (cid) setPendingChargeId(cid);
-    if (am === "redirect" && data?.auth?.redirect) setAuthRedirect(String(data.auth.redirect));
+    if (am === "redirect" && fallbackRedirect) setAuthRedirect(fallbackRedirect);
     setAuthMessage(typeof data?.auth?.message === "string" && data.auth.message.trim() ? data.auth.message : null);
     setAuthMode(am);
     setStage("auth");
   };
+
 
   const verifyAndCredit = async () => {
     if (!lastPayload && !pendingChargeId) return;
