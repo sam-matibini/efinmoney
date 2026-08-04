@@ -28,6 +28,7 @@ type Stage = "idle" | "charging" | "auth" | "verifying" | "crediting" | "success
 type ChargeAuthResponse = {
   error?: string;
   charge_id?: string | number | null;
+  provider_action_type?: string | null;
   auth?: {
     mode?: string;
     redirect?: string | null;
