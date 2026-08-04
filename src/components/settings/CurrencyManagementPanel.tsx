@@ -10,6 +10,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Search, Coins, Bitcoin } from "lucide-react";
 import { toast } from "sonner";
+import { CurrencyFlag } from "@/components/ui/FlagImage";
 
 interface Currency {
   code: string;
@@ -165,7 +166,7 @@ const CurrencyList = ({ currencies, isLoading, onToggle, isPending }: CurrencyLi
             className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
           >
             <div className="flex items-center gap-3">
-              <span className="text-2xl">{currency.flag_emoji || '💱'}</span>
+              <CurrencyFlag code={currency.code} size="md" />
               <div>
                 <div className="flex items-center gap-2">
                   <span className="font-medium">{currency.name}</span>

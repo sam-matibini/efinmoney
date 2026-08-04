@@ -20,6 +20,7 @@ import { productFeatures } from "@/lib/productFeatures";
 import SwychrAirtimePanel from "@/components/bills/SwychrAirtimePanel";
 import { useWallets } from "@/hooks/useWallets";
 import type { LucideIcon } from "lucide-react";
+import { CurrencyFlag } from "@/components/ui/FlagImage";
 
 interface BillCategory {
   id?: number;
@@ -448,7 +449,7 @@ const PayBillsPage = () => {
                     <SelectContent>
                       {matchingWallets.map((w) => (
                         <SelectItem key={w.wallet_id} value={w.wallet_id}>
-                          {w.flag_emoji} {w.currency_code} — {w.symbol}{Number(w.balance).toLocaleString()}
+                          <span className="inline-flex items-center gap-2"><CurrencyFlag code={w.currency_code} size="sm" />{w.currency_code} — {w.symbol}{Number(w.balance).toLocaleString()}</span>
                         </SelectItem>
                       ))}
                     </SelectContent>

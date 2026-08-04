@@ -14,6 +14,7 @@ import { useWallets } from "@/hooks/useWallets";
 import { getCpnQuote, initiateCpnPayout, listEnabledCorridors, type CpnQuote, type CpnCorridor } from "@/lib/circle";
 import { usePinGate } from "@/components/send/usePinGate";
 import { toast } from "sonner";
+import { CurrencyFlag } from "@/components/ui/FlagImage";
 
 const SendCpnPage = () => {
   const navigate = useNavigate();
@@ -174,7 +175,7 @@ const SendCpnPage = () => {
                     <SelectContent>
                       {matchingWallets.map((w) => (
                         <SelectItem key={w.wallet_id} value={w.wallet_id}>
-                          {w.flag_emoji} {w.currency_code} · {w.symbol}{Number(w.balance).toFixed(2)}
+                          <span className="inline-flex items-center gap-2"><CurrencyFlag code={w.currency_code} size="sm" />{w.currency_code} · {w.symbol}{Number(w.balance).toFixed(2)}</span>
                         </SelectItem>
                       ))}
                     </SelectContent>

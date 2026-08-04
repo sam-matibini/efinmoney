@@ -12,6 +12,7 @@ import { cardBrandClass, cardBrandLabel } from "@/lib/cardBrand";
 import { toast } from "sonner";
 import { CheckCircle2, CreditCard, Lock, ShieldCheck } from "lucide-react";
 import LoadingSpinner from "@/components/LoadingSpinner";
+import { CurrencyFlag } from "@/components/ui/FlagImage";
 
 interface Props {
   defaultWalletId?: string;
@@ -349,7 +350,7 @@ export default function FlutterwaveCardForm({
               <SelectContent>
                 {wallets.map((w) => (
                   <SelectItem key={w.wallet_id} value={w.wallet_id}>
-                    {w.flag_emoji} {w.currency_code} — {w.symbol}{Number(w.balance).toFixed(2)}
+                    <span className="inline-flex items-center gap-2"><CurrencyFlag code={w.currency_code} size="sm" />{w.currency_code} — {w.symbol}{Number(w.balance).toFixed(2)}</span>
                   </SelectItem>
                 ))}
               </SelectContent>
