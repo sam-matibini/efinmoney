@@ -26,7 +26,7 @@ export default function SendHeaderCountry({ value, onChange, filterIds }: Props)
           type="button"
           className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-2.5 h-9 text-sm font-semibold text-foreground transition-colors hover:bg-muted"
         >
-          <span className="text-base leading-none">{active?.flag}</span>
+          <CountryFlag country={active?.country} size="md" />
           <span className="max-w-[8rem] truncate">{active?.country ?? "Select"}</span>
           <ChevronDown className="w-3.5 h-3.5 opacity-70" />
         </button>
