@@ -24,22 +24,58 @@ const ok = (body: unknown) => jr(200, body);
 
 const VALID_CARD_CURRENCIES = ["NGN", "USD", "KES", "UGX", "GHS", "ZMW", "RWF", "TZS", "CAD", "GBP", "EUR"];
 
+/** Find a challenge URL anywhere in the next_action payload (string or object shapes). */
+function findActionUrl(node: unknown, depth = 0): string | null {
+  if (depth > 4 || node == null) return null;
+  if (typeof node === "string") return /^https?:\/\//i.test(node.trim()) ? node.trim() : null;
+  if (Array.isArray(node)) {
+    for (const item of node) {
+      const found = findActionUrl(item, depth + 1);
+      if (found) return found;
+    }
+    return null;
+  }
+  if (typeof node === "object") {
+    for (const value of Object.values(node as Record<string, unknown>)) {
+      const found = findActionUrl(value, depth + 1);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
 function normalizeNextAction(next: Record<string, unknown> | null | undefined) {
   if (!next) return null;
-  const providerType = String(next.type || "").trim();
-  const type = providerType.toLowerCase();
-  const redirect = (next.redirect_url as { url?: string } | undefined)?.url
-    || (next.redirect as { url?: string } | undefined)?.url
-    || (typeof next.url === "string" ? next.url : null);
+  const providerType = String(next.type || next.action || next.name || "").trim();
+  const type = providerType.toLowerCase().replace(/[\s-]+/g, "_");
+  // redirect_url may be a plain string, an object with .url, or nested deeper.
+  const redirect = findActionUrl(next.redirect_url)
+    || findActionUrl(next.redirect)
+    || (typeof next.url === "string" ? next.url : null)
+    || findActionUrl(next);
 
   let mode: "pin" | "otp" | "redirect" | "avs" | null = null;
-  if (type.includes("redirect") || type.includes("3ds") || redirect) mode = "redirect";
+  if (
+    redirect ||
+    type.includes("redirect") ||
+    type.includes("3ds") ||
+    type.includes("three_ds") ||
+    type.includes("threeds") ||
+    type.includes("secure_auth") ||
+    type.includes("challenge") ||
+    type.includes("payment_instruction") ||
+    type.includes("authoriz")
+  ) mode = "redirect";
   else if (type.includes("otp")) mode = "otp";
   else if (type.includes("pin")) mode = "pin";
-  else if (type.includes("avs") || type.includes("address")) mode = "avs";
+  else if (type.includes("avs") || type.includes("address") || type.includes("billing")) mode = "avs";
+
+  // A URL always wins — a hosted challenge page renders in the redirect panel.
+  if (redirect) mode = "redirect";
 
   return { mode, providerType, redirect, rawType: type };
 }
+
 
 async function creditWallet(params: {
   admin: ReturnType<typeof createClient>;
@@ -251,17 +287,24 @@ Deno.serve(async (req) => {
           next_action_type: expected?.providerType ?? null,
           mapped_mode: expected?.mode ?? null,
           input_mode: pinVal ? "pin" : otpVal ? "otp" : "avs",
+          raw_next_action: JSON.stringify(currentData.next_action ?? null),
+          provider_message: currentData.next_action_message ?? currentData.message ?? null,
         });
-        if (!expected?.providerType || !expected.mode) {
+        if (!expected?.mode) {
+          const providerMessage = String(currentData.next_action_message || currentData.message || "");
           return ok({
             success: false,
-            error: expected?.providerType
-              ? `Unsupported bank security check: ${expected.providerType}. Please retry or use another payment method.`
-              : "The bank did not return a supported security check. Please retry the payment.",
-            provider_action_type: expected?.providerType || null,
+            error: providerMessage ||
+              (expected?.providerType
+                ? `Unsupported bank security check: ${expected.providerType}. Please retry or use another payment method.`
+                : "The bank did not return a supported security check. Please retry the payment."),
+            provider_action_type: expected?.providerType || expected?.rawType || null,
+            provider_message: providerMessage || null,
+            charge_id: chargeIdFollowUp,
             code: "unsupported_auth_action",
           });
         }
+
         if (
           (pinVal && expected.mode !== "pin") ||
           (otpVal && expected.mode !== "otp") ||
@@ -318,13 +361,13 @@ Deno.serve(async (req) => {
           });
         }
         const next = normalizeNextAction(data.next_action as Record<string, unknown> | undefined);
-        if (next?.mode && next.providerType) {
+        if (next?.mode) {
           return ok({
             success: true,
             requires_auth: true,
             auth: {
               mode: next.mode,
-              provider_type: next.providerType,
+              provider_type: next.providerType || next.rawType || next.mode,
               redirect: next.redirect,
               message: String(data.next_action_message || data.message || ""),
             },
@@ -334,17 +377,24 @@ Deno.serve(async (req) => {
           });
         }
         if (data.next_action) {
+          const providerMessage = String(data.next_action_message || data.message || "");
           console.log("flw-card-charge unsupported follow-up action", {
             charge_id: chargeIdFollowUp,
             next_action_type: next?.providerType || null,
+            raw_next_action: JSON.stringify(data.next_action),
+            provider_message: providerMessage || null,
           });
           return ok({
             success: false,
-            error: `Unsupported bank security check: ${next?.providerType || "unknown"}. Please retry or use another payment method.`,
-            provider_action_type: next?.providerType || null,
+            error: providerMessage ||
+              `Unsupported bank security check: ${next?.providerType || "unknown"}. Please retry or use another payment method.`,
+            provider_action_type: next?.providerType || next?.rawType || null,
+            provider_message: providerMessage || null,
+            charge_id: chargeIdFollowUp,
             code: "unsupported_auth_action",
           });
         }
+
         return ok({
           success: true,
           pending_verification: true,
@@ -419,17 +469,22 @@ Deno.serve(async (req) => {
       const next = normalizeNextAction(charge.nextAction || (data.next_action as Record<string, unknown>) || null);
 
       if (next) {
-        if (!next.mode || !next.providerType) {
+        const providerMessage = String(data.next_action_message || data.message || "");
+        if (!next.mode) {
           console.log("flw-card-charge unsupported next action", {
             charge_id: charge.chargeId || data.id || null,
             provider_status: charge.status,
             next_action_type: next.providerType || null,
             raw_type: next.rawType || null,
+            raw_next_action: JSON.stringify(charge.nextAction || data.next_action || null),
+            provider_message: providerMessage || null,
           });
           return ok({
             success: false,
-            error: `Unsupported bank security check: ${next.providerType || "unknown"}. Please retry or use another payment method.`,
-            provider_action_type: next.providerType || null,
+            error: providerMessage ||
+              `Unsupported bank security check: ${next.providerType || "unknown"}. Please retry or use another payment method.`,
+            provider_action_type: next.providerType || next.rawType || null,
+            provider_message: providerMessage || null,
             charge_id: charge.chargeId || data.id || null,
             code: "unsupported_auth_action",
           });
@@ -440,6 +495,8 @@ Deno.serve(async (req) => {
           charge_id: charge.chargeId || data.id || null,
           provider_status: charge.status,
           next_action_type: next.providerType,
+          mapped_mode: next.mode,
+          raw_next_action: JSON.stringify(charge.nextAction || data.next_action || null),
         });
 
         return ok({
@@ -447,10 +504,11 @@ Deno.serve(async (req) => {
           requires_auth: true,
           auth: {
             mode: next.mode,
-            provider_type: next.providerType,
+            provider_type: next.providerType || next.rawType || next.mode,
             redirect: next.redirect,
-            message: String(data.next_action_message || data.message || ""),
+            message: providerMessage,
           },
+
           reference: txRef,
           tx_ref: txRef,
           charge_id: charge.chargeId || data.id || null,
