@@ -488,6 +488,13 @@ export async function flwV4UpdateChargeAuthorization(params: {
   authorizationType: string;
   pin?: string;
   otp?: string;
+  avs?: {
+    address?: string;
+    city?: string;
+    state?: string;
+    country?: string;
+    zipcode?: string;
+  };
 }): Promise<FlwV4Result> {
   const body: Record<string, unknown> = { authorization: {} };
   if (params.pin) {
@@ -501,8 +508,17 @@ export async function flwV4UpdateChargeAuthorization(params: {
     body.authorization = { type: params.authorizationType, pin: { nonce, encrypted_pin } };
   } else if (params.otp) {
     body.authorization = { type: params.authorizationType, otp: params.otp };
+  } else if (params.avs) {
+    const avs: Record<string, string> = {};
+    for (const [k, v] of Object.entries(params.avs)) {
+      if (v && String(v).trim()) avs[k] = String(v).trim();
+    }
+    if (Object.keys(avs).length === 0) {
+      return { ok: false, status: 0, json: { message: "billing address required" } };
+    }
+    body.authorization = { type: params.authorizationType, avs };
   } else {
-    return { ok: false, status: 0, json: { message: "pin or otp required" } };
+    return { ok: false, status: 0, json: { message: "pin, otp or avs required" } };
   }
 
   return flwV4Fetch(`/charges/${encodeURIComponent(params.chargeId)}`, {
