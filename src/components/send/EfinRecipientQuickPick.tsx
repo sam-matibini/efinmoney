@@ -89,7 +89,7 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
     return () => document.removeEventListener("mousedown", onClick);
   }, []);
 
-  const { data: recents = [] } = useQuery({
+  const { data: recents = [], isSuccess: recentsLoaded } = useQuery({
     queryKey: ["efin-recent-recipients", user?.id],
     enabled: !!user?.id,
     staleTime: 60_000,
@@ -100,10 +100,6 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
     },
   });
 
-  const { isSuccess: recentsLoaded } = useQuery({
-    queryKey: ["efin-recent-recipients", user?.id],
-    enabled: !!user?.id,
-  });
 
   // Open on Search when there are no recents to browse
   useEffect(() => {
