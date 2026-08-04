@@ -2,6 +2,7 @@ import { AlertCircle, CreditCard, Landmark, Lock, Plus, Wallet as WalletIcon } f
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { CurrencyFlag } from "@/components/ui/FlagImage";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export interface PanelWallet {
@@ -148,7 +149,7 @@ const MethodCheckoutPanel = ({
             return (
               <SelectItem key={w.wallet_id} value={w.wallet_id}>
                 <span className="flex items-center gap-2">
-                  {w.flag_emoji} {w.currency_code} — {w.symbol}{money(Number(w.balance))}
+                  <CurrencyFlag code={w.currency_code} /> {w.currency_code} — {w.symbol}{money(Number(w.balance))}
                   {cards > 0 && (
                     <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground ml-auto">
                       <CreditCard className="w-3 h-3" />{cards}

@@ -22,7 +22,7 @@ import AnimatedCheck from "@/components/ui/AnimatedCheck";
 import { usePinGate } from "@/components/send/usePinGate";
 import EfinRecipientQuickPick from "@/components/send/EfinRecipientQuickPick";
 import { sortByPriority } from "@/lib/currencyPriority";
-import { flagForCurrency } from "@/lib/flags";
+import { CurrencyFlag } from "@/components/ui/FlagImage";
 import { countryToCurrency } from "@/lib/currency";
 import { SYSTEM_DEFAULT_CURRENCY } from "@/lib/systemDefaults";
 
@@ -143,7 +143,7 @@ const RecipientCard: React.FC<RecipientCardProps> = ({
             <SelectTrigger className="h-9">
               <SelectValue>
                 <span className="flex items-center gap-1.5">
-                  <span aria-hidden>{flagForCurrency(currency)}</span> {currency}
+                  <CurrencyFlag code={currency} /> {currency}
                 </span>
               </SelectValue>
             </SelectTrigger>
@@ -151,7 +151,7 @@ const RecipientCard: React.FC<RecipientCardProps> = ({
               {currencies.map((c) => (
                 <SelectItem key={c} value={c}>
                   <span className="flex items-center gap-1.5">
-                    <span aria-hidden>{flagForCurrency(c)}</span> {c}
+                    <CurrencyFlag code={c} /> {c}
                   </span>
                 </SelectItem>
               ))}
@@ -162,7 +162,7 @@ const RecipientCard: React.FC<RecipientCardProps> = ({
           {amountPerUser > 0 && rateOk && (
             <>
               <span className="text-lg font-display font-bold text-foreground">
-                {fmt(targetDisplay)} <span aria-hidden>{flagForCurrency(currency)}</span> {currency}
+                <span className="inline-flex items-center gap-1.5">{fmt(targetDisplay)} <CurrencyFlag code={currency} /> {currency}</span>
               </span>
               {!isSameCurrency && (
                 <p className="text-xs text-muted-foreground">
@@ -479,7 +479,9 @@ const EfinmoneyP2PFlow = () => {
                     <SelectContent>
                       {wallets?.map((w) => (
                         <SelectItem key={w.wallet_id} value={w.wallet_id}>
-                          {w.flag_emoji} {w.currency_code} — {w.symbol}{fmt(Number(w.balance))}
+                          <span className="flex items-center gap-2">
+                            <CurrencyFlag code={w.currency_code} /> {w.currency_code} — {w.symbol}{fmt(Number(w.balance))}
+                          </span>
                         </SelectItem>
                       ))}
                     </SelectContent>
