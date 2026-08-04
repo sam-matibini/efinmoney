@@ -600,13 +600,13 @@ const SendPage = () => {
     if (fundingSource !== "card" || parsedAmount <= 0) return null;
     if (cardSendProvider !== "nomba") return null;
     if (sourceCurrency.toUpperCase() === "CAD" && fxRates?.length) {
-      return quoteCadNombaTopup(parsedAmount, fxRates);
+      return quoteCadNombaTopup(totalCharge, fxRates);
     }
     if (isNombaTopupCurrency(sourceCurrency) && sourceCurrency.toUpperCase() !== "CAD") {
-      return quoteDirectNombaTopup(parsedAmount, sourceCurrency);
+      return quoteDirectNombaTopup(totalCharge, sourceCurrency);
     }
     return null;
-  }, [fundingSource, parsedAmount, sourceCurrency, fxRates, cardSendProvider]);
+  }, [fundingSource, totalCharge, sourceCurrency, fxRates, cardSendProvider]);
 
   // Prefer a valid card-collect wallet + destination when paying by card
   useEffect(() => {
@@ -817,7 +817,7 @@ const SendPage = () => {
     setCreatingLink(true);
     try {
       const result = await createPaymentLink({
-        amount: parsedAmount,
+        amount: totalCharge,
         currency: targetCountry.code,
         sender_wallet_id: linkWallet.wallet_id,
         recipient_name: recipientName || null,
@@ -1044,11 +1044,11 @@ const SendPage = () => {
             `cardsend-fincra-${(user.id || "anon").slice(0, 8)}-${selectedWallet.wallet_id.slice(0, 8)}-${Date.now()}`;
           const { data, error } = await supabase.functions.invoke("fincra-initialize-checkout", {
             body: {
-              amount: parsedAmount,
+              amount: totalCharge,
               currency: selectedWallet.currency_code,
-              charge_amount: parsedAmount,
+              charge_amount: totalCharge,
               charge_currency: selectedWallet.currency_code,
-              credit_amount: parsedAmount,
+              credit_amount: totalCharge,
               credit_currency: selectedWallet.currency_code,
               redirectUrl,
               reference,
@@ -1079,8 +1079,8 @@ const SendPage = () => {
           }
           const returnUrl = `${window.location.origin}/send?cardSend=1&provider=nomba&walletId=${encodeURIComponent(selectedWallet.wallet_id)}`;
           const collection = await initiateNombaCollection({
-            credit_amount: parsedAmount,
-            amount: parsedAmount,
+            credit_amount: totalCharge,
+            amount: totalCharge,
             target_wallet_id: selectedWallet.wallet_id,
             email: user.email,
             corridor: "nigeria",
@@ -1114,8 +1114,8 @@ const SendPage = () => {
         if (provider === "paytota") {
           const returnUrl = `${window.location.origin}/send?cardSend=1&provider=paytota&walletId=${encodeURIComponent(selectedWallet.wallet_id)}`;
           const collection = await initiatePaytotaCollection({
-            amount: parsedAmount,
-            credit_amount: parsedAmount,
+            amount: totalCharge,
+            credit_amount: totalCharge,
             target_wallet_id: selectedWallet.wallet_id,
             email: user.email,
             phone: recipientPhone || undefined,
@@ -1146,7 +1146,7 @@ const SendPage = () => {
         if (provider === "swychr") {
           const returnUrl = `${window.location.origin}/send?cardSend=1&provider=swychr&walletId=${encodeURIComponent(selectedWallet.wallet_id)}`;
           const collection = await initiateSwychrCollection({
-            amount: parsedAmount,
+            amount: totalCharge,
             target_wallet_id: selectedWallet.wallet_id,
             email: user.email,
             name: recipientName || user.email.split("@")[0],
@@ -1172,7 +1172,7 @@ const SendPage = () => {
           const returnUrl =
             `${window.location.origin}/send?cardSend=1&provider=flutterwave&walletId=${encodeURIComponent(selectedWallet.wallet_id)}`;
           const collection = await initializeFlwPayment({
-            amount: parsedAmount,
+            amount: totalCharge,
             currency: selectedWallet.currency_code,
             paymentMethod: flutterwaveCardSendPaymentMethod(selectedWallet.currency_code),
             walletId: selectedWallet.wallet_id,
