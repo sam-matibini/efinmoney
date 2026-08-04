@@ -278,57 +278,31 @@ const EfinmoneyP2PFlow = () => {
     return sortByPriority(Array.from(codes));
   }, [wallets, sender]);
 
-  // ── Search ──────────────────────────────────────────────────────────────
-
-  const handleSearch = async () => {
-    const q = query.trim();
-    if (q.length < 3) {
-      toast.error("Enter an email or @tag (min 3 chars)");
-      return;
-    }
-    setSearching(true);
-    setNotFound(false);
-    setSearchRecipient(null);
-    try {
-      const { data, error } = await supabase.rpc("lookup_efin_recipient", { p_query: q });
-      if (error) throw error;
-      const rows = (data ?? []) as LookupRecipientResult[];
-      const row = rows[0];
-      if (!row) {
-        setNotFound(true);
-      } else if (row.user_id === user?.id) {
-        toast.error("That's you!");
-      } else {
-        setSearchRecipient(row as Recipient);
-      }
-    } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Lookup failed");
-    } finally {
-      setSearching(false);
-    }
-  };
+  // ── Add recipient (from quick-pick / search) ────────────────────────────
 
   const isAlreadyAdded = (userId: string) => recipients.some((r) => r.recipient.user_id === userId);
 
-  const addRecipient = () => {
-    if (!searchRecipient || !sender) return;
-    if (isAlreadyAdded(searchRecipient.user_id)) {
+  const addRecipient = (recipient: Recipient) => {
+    if (!sender) {
+      toast.error("Select a wallet to send from first");
+      return;
+    }
+    if (isAlreadyAdded(recipient.user_id)) {
       toast.info("Already in your list");
       return;
     }
     setRecipients((prev) => [
       ...prev,
       {
-        recipient: searchRecipient,
+        recipient,
         currency: sender.currency_code,
         note: "",
         status: "pending" as const,
       },
     ]);
-    setSearchRecipient(null);
-    setQuery("");
-    toast.success(`${searchRecipient.full_name || searchRecipient.email} added`);
+    toast.success(`${recipient.full_name || recipient.efin_tag || recipient.email} added`);
   };
+
 
   const removeRecipient = (userId: string) => {
     setRecipients((prev) => prev.filter((r) => r.recipient.user_id !== userId));
