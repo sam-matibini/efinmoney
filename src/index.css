@@ -38,6 +38,16 @@
 
     --radius: 1rem;
 
+    /* Payment method accents (light) */
+    --pay-card: 244 75% 57%;
+    --pay-card-foreground: 0 0% 100%;
+    --pay-bank: 199 85% 42%;
+    --pay-bank-foreground: 0 0% 100%;
+    --pay-wallet: 152 55% 34%;
+    --pay-wallet-foreground: 0 0% 100%;
+    --pay-mobile: 36 100% 45%;
+    --pay-mobile-foreground: 0 0% 100%;
+
     /* Custom tokens */
     --brand-900: 256 60% 12%;
     --brand-800: 256 55% 18%;
