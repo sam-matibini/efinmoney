@@ -7,7 +7,6 @@ import { useWalletCards } from "@/hooks/useWalletCards";
 import { Skeleton } from "@/components/ui/skeleton";
 import CreateWalletModal from "@/components/modals/CreateWalletModal";
 import AnimatedNumber from "@/components/ui/AnimatedNumber";
-import { flagForCurrency } from "@/lib/flags";
 import { CurrencyFlag } from "@/components/ui/FlagImage";
 
 const gradients: Record<string, string> = {

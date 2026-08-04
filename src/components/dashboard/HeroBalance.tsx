@@ -7,7 +7,6 @@ import { useWalletCards } from "@/hooks/useWalletCards";
 import { useDashboardTransfers } from "@/hooks/useDashboardTransfers";
 import { useFxRates } from "@/hooks/useFxRates";
 import { Skeleton } from "@/components/ui/skeleton";
-import { flagForCurrency } from "@/lib/flags";
 import AnimatedNumber from "@/components/ui/AnimatedNumber";
 import CountUp from "react-countup";
 import { useAuth } from "@/hooks/useAuth";
