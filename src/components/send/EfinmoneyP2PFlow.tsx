@@ -295,10 +295,11 @@ const EfinmoneyP2PFlow = () => {
   const currencyOptions = useMemo(() => {
     const codes = new Set<string>();
     wallets?.forEach((w) => codes.add(w.currency_code));
-    ["USD", "CAD", "EUR", "GBP", "NGN", "KES", "GHS", "ZAR", "ZMW", "UGX", "TZS", "RWF", "MWK", "XAF", "XOF"].forEach((c) => codes.add(c));
+    ["USD", "CAD", "EUR", "GBP", "NGN", "KES", "GHS", "ZAR", "ZMW", "UGX", "TZS", "RWF", "MWK", "BWP", "XAF", "XOF"].forEach((c) => codes.add(c));
     if (sender) codes.add(sender.currency_code);
+    recipients.forEach((r) => r.currency && codes.add(r.currency));
     return sortByPriority(Array.from(codes));
-  }, [wallets, sender]);
+  }, [wallets, sender, recipients]);
 
   // ── Add recipient (from quick-pick / search) ────────────────────────────
 
