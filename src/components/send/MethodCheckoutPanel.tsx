@@ -19,6 +19,14 @@ export interface PanelBankSource {
   last_four?: string | null;
 }
 
+export interface PanelSavedCard {
+  id: string;
+  card_brand?: string | null;
+  last_four?: string | null;
+  exp_month?: number | null;
+  exp_year?: number | null;
+}
+
 interface Props {
   method: "card" | "bank" | "wallet";
   /** Wallets valid for the active method. */
@@ -32,6 +40,13 @@ interface Props {
   onSourceChange: (id: string) => void;
   onLinkBank: () => void;
   linkingBank?: boolean;
+
+  /** Saved cards + quick-add hooks */
+  savedCards?: PanelSavedCard[];
+  selectedCardId?: string;
+  onCardChange?: (id: string) => void;
+  onAddCard?: () => void;
+  onAddWallet?: () => void;
 
   /** Money summary — fee is charged on top of the send amount. */
   amount: number;
@@ -48,6 +63,32 @@ interface Props {
   insufficientBalance?: boolean;
   onTopUp?: () => void;
 }
+
+type QuickTone = "card" | "bank" | "wallet";
+
+const quickToneClass: Record<QuickTone, string> = {
+  card: "border-pay-card/40 text-pay-card hover:bg-pay-card/10",
+  bank: "border-pay-bank/40 text-pay-bank hover:bg-pay-bank/10",
+  wallet: "border-pay-wallet/40 text-pay-wallet hover:bg-pay-wallet/10",
+};
+
+const QuickAddRow = ({
+  tone, label, onClick, disabled,
+}: { tone: QuickTone; label: string; onClick: () => void; disabled?: boolean }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    disabled={disabled}
+    className={cn(
+      "flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed px-3 py-2 text-xs font-semibold transition-colors disabled:opacity-50 disabled:pointer-events-none",
+      quickToneClass[tone],
+    )}
+  >
+    <Plus className="h-3.5 w-3.5" />
+    {label}
+  </button>
+);
+
 
 const money = (v: number) =>
   v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
