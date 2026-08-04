@@ -241,11 +241,8 @@ const EfinmoneyP2PFlow = () => {
   const { data: wallets } = useWallets();
   const { data: profile } = useProfile();
 
-  // Search state
-  const [query, setQuery] = useState("");
-  const [searching, setSearching] = useState(false);
-  const [searchRecipient, setSearchRecipient] = useState<Recipient | null>(null);
-  const [notFound, setNotFound] = useState(false);
+  // Multi-recipient state
+
 
   // Multi-recipient state
   const [recipients, setRecipients] = useState<RecipientEntry[]>([]);
