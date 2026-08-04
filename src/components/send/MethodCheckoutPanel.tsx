@@ -1,6 +1,7 @@
-import { AlertCircle, CreditCard, Landmark, Lock, Wallet as WalletIcon } from "lucide-react";
+import { AlertCircle, CreditCard, Landmark, Lock, Plus, Wallet as WalletIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export interface PanelWallet {
