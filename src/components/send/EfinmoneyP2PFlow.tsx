@@ -140,10 +140,20 @@ const RecipientCard: React.FC<RecipientCardProps> = ({
             onValueChange={(v) => onUpdate(recipient.user_id, { currency: v })}
             disabled={!canEdit}
           >
-            <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-9">
+              <SelectValue>
+                <span className="flex items-center gap-1.5">
+                  <span aria-hidden>{flagForCurrency(currency)}</span> {currency}
+                </span>
+              </SelectValue>
+            </SelectTrigger>
             <SelectContent>
               {currencies.map((c) => (
-                <SelectItem key={c} value={c}>{c}</SelectItem>
+                <SelectItem key={c} value={c}>
+                  <span className="flex items-center gap-1.5">
+                    <span aria-hidden>{flagForCurrency(c)}</span> {c}
+                  </span>
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -152,7 +162,7 @@ const RecipientCard: React.FC<RecipientCardProps> = ({
           {amountPerUser > 0 && rateOk && (
             <>
               <span className="text-lg font-display font-bold text-foreground">
-                {fmt(targetDisplay)} {currency}
+                {fmt(targetDisplay)} <span aria-hidden>{flagForCurrency(currency)}</span> {currency}
               </span>
               {!isSameCurrency && (
                 <p className="text-xs text-muted-foreground">
@@ -164,6 +174,7 @@ const RecipientCard: React.FC<RecipientCardProps> = ({
           {!rateOk && !isSameCurrency && (
             <p className="text-xs text-destructive">Rate unavailable</p>
           )}
+
         </div>
       </div>
 
