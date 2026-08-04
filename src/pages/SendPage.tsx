@@ -51,6 +51,8 @@ import EfinmoneyP2PFlow from "@/components/send/EfinmoneyP2PFlow";
 import MoneyFlowShell from "@/components/money/MoneyFlowShell";
 import PaymentMethodRow, { type PaymentMethodOption } from "@/components/money/PaymentMethodRow";
 import MethodCheckoutPanel from "@/components/send/MethodCheckoutPanel";
+import FlutterwaveCardForm from "@/components/payments/FlutterwaveCardForm";
+
 
 import { createPaymentLink, PaymentLinkSuccess, type PaymentLinkResult } from "@/components/send/PaymentLinkSuccess";
 import { isClaimCardCurrency } from "@/lib/stripeCorridors";
