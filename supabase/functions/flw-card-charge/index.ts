@@ -469,17 +469,22 @@ Deno.serve(async (req) => {
       const next = normalizeNextAction(charge.nextAction || (data.next_action as Record<string, unknown>) || null);
 
       if (next) {
-        if (!next.mode || !next.providerType) {
+        const providerMessage = String(data.next_action_message || data.message || "");
+        if (!next.mode) {
           console.log("flw-card-charge unsupported next action", {
             charge_id: charge.chargeId || data.id || null,
             provider_status: charge.status,
             next_action_type: next.providerType || null,
             raw_type: next.rawType || null,
+            raw_next_action: JSON.stringify(charge.nextAction || data.next_action || null),
+            provider_message: providerMessage || null,
           });
           return ok({
             success: false,
-            error: `Unsupported bank security check: ${next.providerType || "unknown"}. Please retry or use another payment method.`,
-            provider_action_type: next.providerType || null,
+            error: providerMessage ||
+              `Unsupported bank security check: ${next.providerType || "unknown"}. Please retry or use another payment method.`,
+            provider_action_type: next.providerType || next.rawType || null,
+            provider_message: providerMessage || null,
             charge_id: charge.chargeId || data.id || null,
             code: "unsupported_auth_action",
           });
@@ -490,6 +495,8 @@ Deno.serve(async (req) => {
           charge_id: charge.chargeId || data.id || null,
           provider_status: charge.status,
           next_action_type: next.providerType,
+          mapped_mode: next.mode,
+          raw_next_action: JSON.stringify(charge.nextAction || data.next_action || null),
         });
 
         return ok({
@@ -497,10 +504,11 @@ Deno.serve(async (req) => {
           requires_auth: true,
           auth: {
             mode: next.mode,
-            provider_type: next.providerType,
+            provider_type: next.providerType || next.rawType || next.mode,
             redirect: next.redirect,
-            message: String(data.next_action_message || data.message || ""),
+            message: providerMessage,
           },
+
           reference: txRef,
           tx_ref: txRef,
           charge_id: charge.chargeId || data.id || null,
