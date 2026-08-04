@@ -157,6 +157,14 @@ async function syncUn(): Promise<WatchRow[]> {
 const GAC_URL =
   "https://www.international.gc.ca/world-monde/assets/office_docs/international_relations-relations_internationales/sanctions/sema-lmes.xml";
 
+/** GAC publishes bilingual labels such as "Belarus / Bélarus". */
+const gacCountryLabels = (value: string) =>
+  [...new Set(value.split(/\s*\/\s*/).flatMap((label) => {
+    const trimmed = label.trim();
+    const withoutTranslation = trimmed.replace(/\s*\([^)]*\)\s*/g, " ").trim();
+    return [trimmed, withoutTranslation].filter(Boolean);
+  }))];
+
 async function syncGac(): Promise<WatchRow[]> {
   const res = await fetch(GAC_URL);
   if (!res.ok) throw new Error(`GAC SEMA fetch failed [${res.status}]`);
@@ -166,6 +174,7 @@ async function syncGac(): Promise<WatchRow[]> {
 
   for (const block of allTags(xml, "record")) {
     const country = tag(block, "Country") || tag(block, "Pays") || "";
+    const countryLabels = gacCountryLabels(country);
     const entity = tag(block, "Entity");
     const given = tag(block, "GivenName");
     const last = tag(block, "LastName");
@@ -183,8 +192,8 @@ async function syncGac(): Promise<WatchRow[]> {
       name_normalized: normalize(name),
       aliases,
       entity_type: entity ? "entity" : "individual",
-      programs: [`SEMA ${country}`.trim(), schedule].filter(Boolean) as string[],
-      countries: country ? [country] : [],
+      programs: [countryLabels[0] ? `SEMA ${countryLabels[0]}` : "", schedule].filter(Boolean) as string[],
+      countries: countryLabels,
       nationalities: [],
       remarks: tag(block, "DateOfBirth") ? `DOB: ${tag(block, "DateOfBirth")}` : null,
       source_url: GAC_URL,
