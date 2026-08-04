@@ -22,6 +22,9 @@ import AnimatedCheck from "@/components/ui/AnimatedCheck";
 import { usePinGate } from "@/components/send/usePinGate";
 import EfinRecipientQuickPick from "@/components/send/EfinRecipientQuickPick";
 import { sortByPriority } from "@/lib/currencyPriority";
+import { flagForCurrency } from "@/lib/flags";
+import { countryToCurrency } from "@/lib/currency";
+import { SYSTEM_DEFAULT_CURRENCY } from "@/lib/systemDefaults";
 
 interface Recipient {
   user_id: string;
@@ -30,6 +33,7 @@ interface Recipient {
   email: string | null;
   avatar_url: string | null;
   account_number?: string | null;
+  base_currency?: string | null;
 }
 
 interface RecipientEntry {
