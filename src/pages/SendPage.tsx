@@ -1302,6 +1302,8 @@ const SendPage = () => {
     const expectedCountry = b.country_code
       ? findCountryByCode(b.country_code)
       : null;
+    // Country stored but not resolvable yet — keep the pending record and retry.
+    if (b.country_code && !expectedCountry) return;
     if (expectedCountry && expectedCountry.id !== targetCountryId) return;
 
     let allApplied = true;
