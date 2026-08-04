@@ -180,7 +180,6 @@ const MethodCheckoutPanel = ({
           </div>
         ) : (
           <>
-            {walletSelect("Charge in", "Your card is billed in this currency, then the transfer is funded from it.")}
             <ChargeSummary
               amount={amount} fee={fee} total={total} currency={currency} symbol={symbol}
               debitLabel="Charged to your card"
