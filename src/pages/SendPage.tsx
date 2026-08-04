@@ -2208,7 +2208,7 @@ const SendPage = () => {
                                           placeholder="Select contact"
                                           valueLabel={pickedBeneficiaryId ? recipientName : null}
                                           onSelect={applyBeneficiary}
-                                          onClear={pickedBeneficiaryId ? () => { setPickedBeneficiaryId(null); setRecipientName(""); setRecipientPhone(""); } : undefined}
+                                          onClear={pickedBeneficiaryId ? clearSelectedContact : undefined}
                                         />
                                         <button
                                           type="button"
@@ -2221,9 +2221,11 @@ const SendPage = () => {
                                       {pickedBeneficiaryId && (
                                         <p className="inline-flex items-center gap-1.5 text-xs font-medium text-primary">
                                           <CheckCircle className="w-3.5 h-3.5" /> Contact selected — {recipientName}
+                                          {prefillSummary && <span className="text-muted-foreground">· {prefillSummary}</span>}
                                           <button
                                             type="button"
-                                            onClick={() => { setPickedBeneficiaryId(null); setRecipientName(""); setRecipientPhone(""); }}
+                                            onClick={clearSelectedContact}
+
                                             aria-label="Clear selected contact"
                                             className="opacity-70 hover:opacity-100"
                                           >
