@@ -841,6 +841,8 @@ const TopUpPage = () => {
 
   const activeMethodId =
     payMethods.some((m) => m.id === selectedMethodId) ? selectedMethodId : payMethods[0]?.id || "";
+  const activeCategory: PayTone =
+    toneForMethod(payMethods.find((m) => m.id === activeMethodId) ?? { id: "", label: "", content: null });
 
 
 
