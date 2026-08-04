@@ -394,15 +394,24 @@ export default function FlutterwaveCardForm({
     }
   };
 
-  const handlePinSubmit = (pin: string) => {
+  const handleChallengeSubmit = (code: string) => {
     if (!lastPayload) return;
-    const auth = { mode: "pin", pin };
+    const mode = authMode === "pin" ? "pin" : "otp";
+    const auth = mode === "pin" ? { mode: "pin", pin: code } : { mode: "otp", otp: code };
     handleCharge({
       ...lastPayload,
       authorization: auth,
       ...(pendingChargeId ? { charge_id: pendingChargeId } : {}),
     });
   };
+
+  const cancelChallenge = () => {
+    setAuthMode(null);
+    setAuthRedirect(null);
+    setPendingChargeId(null);
+    setStage("idle");
+  };
+
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
