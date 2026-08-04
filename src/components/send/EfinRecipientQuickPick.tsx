@@ -70,7 +70,9 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
   const [open, setOpen] = useState(false);
   const [finding, setFinding] = useState(false);
   const [notFound, setNotFound] = useState(false);
+  const [mode, setMode] = useState<"recents" | "search">("recents");
   const boxRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Debounce the type-ahead query
   useEffect(() => {
