@@ -2130,13 +2130,13 @@ const SendPage = () => {
                               >
                                 <MoneyFlowShell
                                   steps={[
-                                    { n: 1, label: "Amount" },
-                                    { n: 2, label: "Recipient" },
-                                    { n: 3, label: "Confirm" },
+                                    { n: 1, label: "Details" },
+                                    { n: 2, label: "Confirm" },
                                   ]}
                                   currentStep={1}
-                                  title="Amount"
-                                  subtitle="How much you send and what they get"
+                                  title={`Send money to ${targetCountry.country}`}
+                                  subtitle="Recipient, amount and how you pay"
+
                                   footer={
                                     <div className="space-y-3">
                                       <motion.div
