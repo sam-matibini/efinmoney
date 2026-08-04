@@ -2184,6 +2184,17 @@ const SendPage = () => {
                                         onSourceChange={setSelectedSourceId}
                                         onLinkBank={startPlaidLink}
                                         linkingBank={plaidLinking}
+                                        savedCards={savedCards.map((c) => ({
+                                          id: c.stripe_payment_method_id,
+                                          card_brand: c.card_brand,
+                                          last_four: c.last_four,
+                                          exp_month: c.exp_month,
+                                          exp_year: c.exp_year,
+                                        }))}
+                                        selectedCardId={activeSavedCard?.stripe_payment_method_id}
+                                        onCardChange={setSelectedSavedCardId}
+                                        onAddCard={() => setAddCardOpen(true)}
+                                        onAddWallet={() => createWalletTriggerRef.current?.click()}
                                         amount={parsedAmount}
                                         fee={fee}
                                         total={totalCharge}
