@@ -13,7 +13,6 @@ import { useProfile } from "@/hooks/useProfile";
 import { useStatement } from "@/hooks/useStatement";
 import { StatementTable } from "@/components/statement/StatementTable";
 import { StatementActions } from "@/components/statement/StatementActions";
-import { flagForCurrency } from "@/lib/flags";
 import PageHeroBanner from "@/components/common/PageHeroBanner";
 import AppPage from "@/components/layout/AppPage";
 import { TrendingUp } from "lucide-react";
@@ -63,7 +62,6 @@ const WalletStatementPage = () => {
     currency: wallet?.currency_code,
   };
 
-  const flag = wallet ? (flagForCurrency(wallet.currency_code) !== "🌍" ? flagForCurrency(wallet.currency_code) : wallet.flag_emoji || "💰") : "💰";
 
   return (
     <AppPage width="wide" innerClassName="space-y-6">
@@ -89,7 +87,7 @@ const WalletStatementPage = () => {
               label="Wallet statement"
               value={wallet ? `${fmt(Number(wallet.balance))} ${wallet.currency_code}` : "—"}
               meta={[
-                { text: `${flag} ${wallet?.currency_name || wallet?.currency_code || "Wallet"}` },
+                { text: wallet?.currency_name || wallet?.currency_code || "Wallet", flagCurrency: wallet?.currency_code },
                 { icon: TrendingUp, text: `Holder: ${accountHolder}` },
               ]}
               variant="primary"

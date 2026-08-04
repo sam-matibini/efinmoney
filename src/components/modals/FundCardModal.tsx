@@ -166,7 +166,6 @@ const FundCardModal = ({ open, onClose, card }: FundCardModalProps) => {
                   walletId={walletId}
                   currency={currency}
                   symbol={selectedWallet.symbol}
-                  flag={selectedWallet.flag_emoji ?? ""}
                   balance={walletBalance}
                   defaultAmount={parsedAmount > 0 ? parsedAmount : undefined}
                   onFunded={handleFunded}
