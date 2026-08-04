@@ -143,6 +143,7 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
     setDebounced("");
     setOpen(false);
     setNotFound(false);
+    setMode("recents");
   };
 
   // Exact lookup fallback (pasted email / @tag / account number)
