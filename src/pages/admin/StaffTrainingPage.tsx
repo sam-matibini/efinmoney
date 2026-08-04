@@ -21,7 +21,7 @@ export default function StaffTrainingPage() {
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({ course_name: "", category: "aml", frequency_months: "12", is_mandatory: false });
   const [showLog, setShowLog] = useState(false);
-  const [logForm, setLogForm] = useState({ course_id: "", course_name: "", score: "" });
+  const [logForm, setLogForm] = useState({ course_id: "", course_name: "", score: "", staff_id: "" });
 
   const { data: courses = [], isLoading: cLoading } = useQuery({
     queryKey: ["training-courses"],
