@@ -1248,7 +1248,21 @@ const SendPage = () => {
     navigate('/');
   };
 
+  const clearSelectedContact = useCallback(() => {
+    setPickedBeneficiaryId(null);
+    setPendingBeneficiary(null);
+    setRecipientName("");
+    setRecipientPhone("");
+    setRecipientEmail("");
+    setNgnAccountNumber("");
+    setNgnBankCode("");
+    setGhAccountNumber("");
+    setGhBankCode("");
+    setSelectedNetworkId(null);
+  }, []);
+
   const applyBeneficiary = useCallback((b: Beneficiary) => {
+
     setRecipientName(b.eft_account_holder || b.name);
     if (b.phone) setRecipientPhone(b.phone.replace(/[^\d+]/g, "").slice(0, 15));
     if (b.email || b.interac_email) setRecipientEmail(b.interac_email || b.email || "");
