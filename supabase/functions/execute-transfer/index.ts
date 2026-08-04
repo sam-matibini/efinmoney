@@ -636,7 +636,21 @@ Deno.serve(async (req) => {
           }
         };
 
-        // 1) Fincra
+        // 1) Fincra (primary partner for Zambia ZMW mobile money)
+        if (!fincraConfigured) {
+          console.error(
+            "fincra rail skipped: FINCRA_SECRET_KEY/FINCRA_BUSINESS_ID not configured",
+            { transfer_id, currency: targetCurrency, zambia: isZambia },
+          );
+          if (isZambia) {
+            payoutResult = {
+              success: false,
+              rail: "fincra",
+              error: "Zambia payout partner not configured (Fincra credentials missing).",
+              code: "partner_not_configured",
+            };
+          }
+        }
         if (fincraConfigured && Deno.env.get("FINCRA_PAYOUT_SMART") !== "false") {
           await tryNext("fincra", async () => {
             await supabase.from("transfers").update({
