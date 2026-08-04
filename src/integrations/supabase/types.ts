@@ -8989,6 +8989,18 @@ export type Database = {
       is_kyc_reviewer: { Args: { _uid: string }; Returns: boolean }
       is_pricing_manager: { Args: { _uid: string }; Returns: boolean }
       is_super_admin: { Args: { _uid: string }; Returns: boolean }
+      list_efin_recipients: {
+        Args: { p_limit?: number; p_offset?: number; p_query?: string }
+        Returns: {
+          account_number: string
+          avatar_url: string
+          base_currency: string
+          efin_tag: string
+          email_masked: string
+          full_name: string
+          user_id: string
+        }[]
+      }
       log_account_activity: {
         Args: {
           p_description: string
