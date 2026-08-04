@@ -265,10 +265,19 @@ const EfinmoneyP2PFlow = () => {
   const [selectedWalletId, setSelectedWalletId] = useState<string>("");
   const [sending, setSending] = useState(false);
 
+  // Sender's base currency comes from their domicile country, then stored preference.
+  const baseCurrency =
+    countryToCurrency(profile?.address_country || profile?.country_code)
+    || profile?.default_currency
+    || SYSTEM_DEFAULT_CURRENCY;
+
   const sender = wallets?.find((w) => w.wallet_id === selectedWalletId) || wallets?.[0];
   useEffect(() => {
-    if (!selectedWalletId && wallets?.length) setSelectedWalletId(wallets[0].wallet_id);
-  }, [wallets, selectedWalletId]);
+    if (selectedWalletId || !wallets?.length) return;
+    const preferred = wallets.find((w) => w.currency_code === baseCurrency) || wallets[0];
+    setSelectedWalletId(preferred.wallet_id);
+  }, [wallets, selectedWalletId, baseCurrency]);
+
 
   const fromCurrency = sender?.currency_code || "USD";
   const parsedAmount = parseFloat(amountPerUser) || 0;
