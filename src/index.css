@@ -48,6 +48,19 @@
     --pay-mobile: 36 100% 45%;
     --pay-mobile-foreground: 0 0% 100%;
 
+    /* Per-user avatar palette (light): tinted bg + readable ink */
+    --avatar-1: 244 70% 92%; --avatar-1-foreground: 244 60% 35%;
+    --avatar-2: 199 80% 90%; --avatar-2-foreground: 199 75% 28%;
+    --avatar-3: 152 50% 88%; --avatar-3-foreground: 152 55% 25%;
+    --avatar-4: 36 90% 88%;  --avatar-4-foreground: 30 80% 30%;
+    --avatar-5: 342 75% 92%; --avatar-5-foreground: 342 60% 38%;
+    --avatar-6: 271 70% 92%; --avatar-6-foreground: 271 55% 38%;
+    --avatar-7: 172 55% 87%; --avatar-7-foreground: 176 65% 24%;
+    --avatar-8: 12 80% 91%;  --avatar-8-foreground: 12 65% 38%;
+    --avatar-9: 88 55% 87%;  --avatar-9-foreground: 96 55% 24%;
+    --avatar-10: 220 30% 89%; --avatar-10-foreground: 220 35% 30%;
+
+
     /* Custom tokens */
     --brand-900: 256 60% 12%;
     --brand-800: 256 55% 18%;
