@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { CurrencyFlag } from "@/components/ui/FlagImage";
 
 export type PageHeroVariant =
   | "primary"
@@ -13,6 +14,8 @@ export type PageHeroVariant =
 
 export interface PageHeroMeta {
   icon?: LucideIcon;
+  /** Optional currency code — renders the matching country flag before the text. */
+  flagCurrency?: string | null;
   text: string;
 }
 
@@ -81,6 +84,7 @@ export default function PageHeroBanner({
                   key={`${item.text}-${i}`}
                   className={cn("flex items-center gap-2 text-sm", i === 0 ? metaClass : metaMutedClass)}
                 >
+                  {item.flagCurrency ? <CurrencyFlag code={item.flagCurrency} size="sm" /> : null}
                   {MetaIcon ? <MetaIcon className="w-4 h-4 shrink-0" /> : null}
                   <span>{item.text}</span>
                 </div>
