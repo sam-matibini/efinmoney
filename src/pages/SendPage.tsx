@@ -680,8 +680,12 @@ const SendPage = () => {
 
   const feeDisplayLabel =
     fee > 0
-      ? `${sourceSymbol}${fee.toFixed(2)} flat`
+      ? `+${sourceSymbol}${fee.toFixed(2)} fee`
       : `${sourceSymbol}0.00 fee`;
+
+  const feeNote = parsedAmount > 0 && fee > 0
+    ? `+${sourceSymbol}${fee.toFixed(2)} ${sourceCurrency} fee added · total ${sourceSymbol}${totalCharge.toFixed(2)} ${sourceCurrency}`
+    : undefined;
 
   const goToStep = useCallback((next: number) => {
     setDirection(next > step ? 1 : -1);
