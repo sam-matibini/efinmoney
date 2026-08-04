@@ -24,22 +24,58 @@ const ok = (body: unknown) => jr(200, body);
 
 const VALID_CARD_CURRENCIES = ["NGN", "USD", "KES", "UGX", "GHS", "ZMW", "RWF", "TZS", "CAD", "GBP", "EUR"];
 
+/** Find a challenge URL anywhere in the next_action payload (string or object shapes). */
+function findActionUrl(node: unknown, depth = 0): string | null {
+  if (depth > 4 || node == null) return null;
+  if (typeof node === "string") return /^https?:\/\//i.test(node.trim()) ? node.trim() : null;
+  if (Array.isArray(node)) {
+    for (const item of node) {
+      const found = findActionUrl(item, depth + 1);
+      if (found) return found;
+    }
+    return null;
+  }
+  if (typeof node === "object") {
+    for (const value of Object.values(node as Record<string, unknown>)) {
+      const found = findActionUrl(value, depth + 1);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
 function normalizeNextAction(next: Record<string, unknown> | null | undefined) {
   if (!next) return null;
-  const providerType = String(next.type || "").trim();
-  const type = providerType.toLowerCase();
-  const redirect = (next.redirect_url as { url?: string } | undefined)?.url
-    || (next.redirect as { url?: string } | undefined)?.url
-    || (typeof next.url === "string" ? next.url : null);
+  const providerType = String(next.type || next.action || next.name || "").trim();
+  const type = providerType.toLowerCase().replace(/[\s-]+/g, "_");
+  // redirect_url may be a plain string, an object with .url, or nested deeper.
+  const redirect = findActionUrl(next.redirect_url)
+    || findActionUrl(next.redirect)
+    || (typeof next.url === "string" ? next.url : null)
+    || findActionUrl(next);
 
   let mode: "pin" | "otp" | "redirect" | "avs" | null = null;
-  if (type.includes("redirect") || type.includes("3ds") || redirect) mode = "redirect";
+  if (
+    redirect ||
+    type.includes("redirect") ||
+    type.includes("3ds") ||
+    type.includes("three_ds") ||
+    type.includes("threeds") ||
+    type.includes("secure_auth") ||
+    type.includes("challenge") ||
+    type.includes("payment_instruction") ||
+    type.includes("authoriz")
+  ) mode = "redirect";
   else if (type.includes("otp")) mode = "otp";
   else if (type.includes("pin")) mode = "pin";
-  else if (type.includes("avs") || type.includes("address")) mode = "avs";
+  else if (type.includes("avs") || type.includes("address") || type.includes("billing")) mode = "avs";
+
+  // A URL always wins — a hosted challenge page renders in the redirect panel.
+  if (redirect) mode = "redirect";
 
   return { mode, providerType, redirect, rawType: type };
 }
+
 
 async function creditWallet(params: {
   admin: ReturnType<typeof createClient>;
