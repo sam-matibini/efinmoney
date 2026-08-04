@@ -25,6 +25,16 @@ interface Props {
 
 type Stage = "idle" | "charging" | "auth" | "verifying" | "crediting" | "success";
 
+type ChargeAuthResponse = {
+  error?: string;
+  charge_id?: string | number | null;
+  auth?: {
+    mode?: string;
+    redirect?: string | null;
+    message?: string | null;
+  };
+};
+
 const STAGE_COPY: Record<Exclude<Stage, "idle" | "success">, { title: string; sub: string }> = {
   charging: { title: "Charging your card…", sub: "Securely processing your payment" },
   auth: { title: "Verifying your identity…", sub: "Please complete the security check" },
@@ -316,7 +326,7 @@ export default function FlutterwaveCardForm({
     redirect_url: `${window.location.origin}/payment-callback?type=flw_card`,
   });
 
-  const applyAuthResponse = (data: any) => {
+  const applyAuthResponse = (data: ChargeAuthResponse) => {
     const am = typeof data?.auth?.mode === "string" ? data.auth.mode : "";
     if (!["pin", "otp", "redirect"].includes(am)) {
       toast.error(data?.error || "Your bank returned an unsupported security check. Please retry.");
