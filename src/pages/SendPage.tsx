@@ -190,6 +190,7 @@ const SendPage = () => {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [saveModalOpen, setSaveModalOpen] = useState(false);     // pre-filled Add modal
   const [addCardOpen, setAddCardOpen] = useState(false);
+  const createWalletTriggerRef = useRef<HTMLButtonElement>(null);
   const [topUpOpen, setTopUpOpen] = useState(false);
   const [pickedBeneficiaryId, setPickedBeneficiaryId] = useState<string | null>(null);
   const [pendingBeneficiary, setPendingBeneficiary] = useState<Beneficiary | null>(null);
