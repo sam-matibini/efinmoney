@@ -15,7 +15,7 @@ interface ReceiveMoneyModalProps {
     currency: string;
     balance: number;
     symbol: string;
-    flag: string;
+    flag?: string;
   } | null;
 }
 

@@ -20,7 +20,7 @@ interface EditWalletModalProps {
     currency: string;
     balance: number;
     symbol: string;
-    flag: string;
+    flag?: string;
   } | null;
   onSave: (walletId: string, data: { nickname?: string }) => Promise<void>;
 }

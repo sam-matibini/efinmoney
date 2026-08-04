@@ -20,7 +20,7 @@ interface DeleteWalletModalProps {
     currency: string;
     balance: number;
     symbol: string;
-    flag: string;
+    flag?: string;
   } | null;
   onDelete: (walletId: string) => Promise<void>;
 }

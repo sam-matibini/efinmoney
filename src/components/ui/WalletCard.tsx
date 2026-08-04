@@ -36,7 +36,7 @@ interface WalletCardProps {
   currency: string;
   balance: number;
   symbol: string;
-  flag: string;
+  flag?: string;
   change?: number;
   isMain?: boolean;
   isDefault?: boolean;
@@ -44,8 +44,8 @@ interface WalletCardProps {
   linkedCards?: WalletLinkedCard[];
   onSetDefault?: (walletId: string) => void;
   onToggleFreeze?: (walletId: string, freeze: boolean) => void;
-  onEdit?: (wallet: { walletId: string; currency: string; balance: number; symbol: string; flag: string }) => void;
-  onDelete?: (wallet: { walletId: string; currency: string; balance: number; symbol: string; flag: string }) => void;
+  onEdit?: (wallet: { walletId: string; currency: string; balance: number; symbol: string; flag?: string }) => void;
+  onDelete?: (wallet: { walletId: string; currency: string; balance: number; symbol: string; flag?: string }) => void;
   showStellarBadge?: boolean;
 }
 

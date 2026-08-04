@@ -23,7 +23,7 @@ type WalletModalData = {
   currency: string;
   balance: number;
   symbol: string;
-  flag: string;
+  flag?: string;
 } | null;
 
 const WalletsPage = () => {
