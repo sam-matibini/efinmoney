@@ -836,15 +836,17 @@ const SendPage = () => {
     }
   };
 
-  const handleConfirm = async () => {
+  const handleConfirm = async (fundingOverride?: "wallet" | "card" | "bank") => {
     if (confirming) return;
     setConfirming(true);
+    const funding = fundingOverride ?? fundingSource;
 
     // ── Wallet: create + execute payout immediately ──────────────────────
-    if (fundingSource === 'wallet') {
+    if (funding === 'wallet') {
       if (!selectedWallet) { setConfirming(false); return; }
       try {
-        const tid = await createTransferRecord();
+        const tid = await createTransferRecord({ funding_source: "wallet" });
+
         let data: any = null;
         let invokeErr: any = null;
         try {
