@@ -25,6 +25,16 @@ interface Props {
 
 type Stage = "idle" | "charging" | "auth" | "verifying" | "crediting" | "success";
 
+type ChargeAuthResponse = {
+  error?: string;
+  charge_id?: string | number | null;
+  auth?: {
+    mode?: string;
+    redirect?: string | null;
+    message?: string | null;
+  };
+};
+
 const STAGE_COPY: Record<Exclude<Stage, "idle" | "success">, { title: string; sub: string }> = {
   charging: { title: "Charging your card…", sub: "Securely processing your payment" },
   auth: { title: "Verifying your identity…", sub: "Please complete the security check" },
@@ -125,6 +135,7 @@ function ChallengePanel({
   mode,
   loading,
   redirectUrl,
+  providerMessage,
   onSubmitCode,
   onOpenRedirect,
   onCancel,
@@ -132,6 +143,7 @@ function ChallengePanel({
   mode: string;
   loading: boolean;
   redirectUrl?: string | null;
+  providerMessage?: string | null;
   onSubmitCode: (code: string) => void;
   onOpenRedirect: () => void;
   onCancel: () => void;
@@ -158,7 +170,7 @@ function ChallengePanel({
           <p className="text-xs text-muted-foreground">
             {isRedirect
               ? "Complete 3-D Secure verification in the window from your bank. If it didn't open, use the button below."
-              : copy.sub}
+              : providerMessage || copy.sub}
           </p>
         </div>
       </div>
@@ -233,6 +245,7 @@ export default function FlutterwaveCardForm({
   // Auth state
   const [authMode, setAuthMode] = useState<string | null>(null);
   const [authRedirect, setAuthRedirect] = useState<string | null>(null);
+  const [authMessage, setAuthMessage] = useState<string | null>(null);
   const [lastPayload, setLastPayload] = useState<Record<string, unknown> | null>(null);
   const [pendingChargeId, setPendingChargeId] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
@@ -313,11 +326,17 @@ export default function FlutterwaveCardForm({
     redirect_url: `${window.location.origin}/payment-callback?type=flw_card`,
   });
 
-  const applyAuthResponse = (data: any) => {
-    const am = String(data?.auth?.mode || "otp");
+  const applyAuthResponse = (data: ChargeAuthResponse) => {
+    const am = typeof data?.auth?.mode === "string" ? data.auth.mode : "";
+    if (!["pin", "otp", "redirect"].includes(am)) {
+      toast.error(data?.error || "Your bank returned an unsupported security check. Please retry.");
+      setStage("idle");
+      return;
+    }
     const cid = data?.charge_id ? String(data.charge_id) : null;
     if (cid) setPendingChargeId(cid);
     if (am === "redirect" && data?.auth?.redirect) setAuthRedirect(String(data.auth.redirect));
+    setAuthMessage(typeof data?.auth?.message === "string" && data.auth.message.trim() ? data.auth.message : null);
     setAuthMode(am);
     setStage("auth");
   };
@@ -408,6 +427,7 @@ export default function FlutterwaveCardForm({
   const cancelChallenge = () => {
     setAuthMode(null);
     setAuthRedirect(null);
+    setAuthMessage(null);
     setPendingChargeId(null);
     setStage("idle");
   };
@@ -563,6 +583,7 @@ export default function FlutterwaveCardForm({
             mode={authMode}
             loading={authLoading}
             redirectUrl={authRedirect}
+            providerMessage={authMessage}
             onSubmitCode={handleChallengeSubmit}
             onOpenRedirect={openRedirectPopup}
             onCancel={cancelChallenge}
