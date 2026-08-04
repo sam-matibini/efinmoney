@@ -187,37 +187,65 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
 
   return (
     <div className="space-y-3">
-      {/* Recent / frequent recipients */}
-      {recents.length > 0 && (
-        <div className="space-y-2">
-          <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-            <Clock className="w-3.5 h-3.5" aria-hidden /> Recent recipients
-          </p>
-          <div className="flex gap-3 overflow-x-auto pb-1">
-            {recents.map((r) => {
-              const added = isAlreadyAdded(r.user_id);
-              return (
-                <button
-                  key={r.user_id}
-                  type="button"
-                  onClick={() => pick(r)}
-                  disabled={added}
-                  className="flex w-16 shrink-0 flex-col items-center gap-1 rounded-lg p-1 text-center transition-colors hover:bg-muted disabled:opacity-50"
-                  title={r.full_name || r.efin_tag || r.email || ""}
-                >
-                  <Avatar url={r.avatar_url} label={initials(r)} size="sm" />
-                  <span className="w-full truncate text-[11px] text-muted-foreground">
-                    {added ? "Added" : (r.full_name?.split(" ")[0] || r.efin_tag || r.email)}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+      {/* Recents / Search toggle */}
+      <div className="flex justify-end">
+        <div className="inline-flex rounded-full border border-border bg-muted p-0.5" role="tablist">
+          {(["recents", "search"] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              role="tab"
+              aria-selected={mode === m}
+              onClick={() => switchMode(m)}
+              className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                mode === m
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {m === "recents" ? <Clock className="h-3.5 w-3.5" aria-hidden /> : <Search className="h-3.5 w-3.5" aria-hidden />}
+              {m === "recents" ? "Recents" : "Search"}
+            </button>
+          ))}
         </div>
+      </div>
+
+      {/* Recent / frequent recipients */}
+      {mode === "recents" && (
+        recents.length > 0 ? (
+          <div className="space-y-2">
+            <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+              <Clock className="w-3.5 h-3.5" aria-hidden /> Recent recipients
+            </p>
+            <div className="flex gap-3 overflow-x-auto pb-1">
+              {recents.map((r) => {
+                const added = isAlreadyAdded(r.user_id);
+                return (
+                  <button
+                    key={r.user_id}
+                    type="button"
+                    onClick={() => pick(r)}
+                    disabled={added}
+                    className="flex w-16 shrink-0 flex-col items-center gap-1 rounded-lg p-1 text-center transition-colors hover:bg-muted disabled:opacity-50"
+                    title={r.full_name || r.efin_tag || r.email || ""}
+                  >
+                    <Avatar url={r.avatar_url} label={initials(r)} size="sm" />
+                    <span className="w-full truncate text-[11px] text-muted-foreground">
+                      {added ? "Added" : (r.full_name?.split(" ")[0] || r.efin_tag || r.email)}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">No recent recipients yet — use Search to find someone.</p>
+        )
       )}
 
       {/* Search + type-ahead */}
-      <div ref={boxRef} className="relative">
+      <div ref={boxRef} className={`relative ${mode === "search" ? "" : "hidden"}`}>
+
         <div className="flex gap-2">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
