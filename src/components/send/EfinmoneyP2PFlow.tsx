@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import AnimatedCheck from "@/components/ui/AnimatedCheck";
 import { usePinGate } from "@/components/send/usePinGate";
+import EfinRecipientQuickPick from "@/components/send/EfinRecipientQuickPick";
 import { sortByPriority } from "@/lib/currencyPriority";
 
 interface Recipient {
@@ -240,11 +241,8 @@ const EfinmoneyP2PFlow = () => {
   const { data: wallets } = useWallets();
   const { data: profile } = useProfile();
 
-  // Search state
-  const [query, setQuery] = useState("");
-  const [searching, setSearching] = useState(false);
-  const [searchRecipient, setSearchRecipient] = useState<Recipient | null>(null);
-  const [notFound, setNotFound] = useState(false);
+  // Multi-recipient state
+
 
   // Multi-recipient state
   const [recipients, setRecipients] = useState<RecipientEntry[]>([]);
@@ -278,57 +276,31 @@ const EfinmoneyP2PFlow = () => {
     return sortByPriority(Array.from(codes));
   }, [wallets, sender]);
 
-  // ── Search ──────────────────────────────────────────────────────────────
-
-  const handleSearch = async () => {
-    const q = query.trim();
-    if (q.length < 3) {
-      toast.error("Enter an email or @tag (min 3 chars)");
-      return;
-    }
-    setSearching(true);
-    setNotFound(false);
-    setSearchRecipient(null);
-    try {
-      const { data, error } = await supabase.rpc("lookup_efin_recipient", { p_query: q });
-      if (error) throw error;
-      const rows = (data ?? []) as LookupRecipientResult[];
-      const row = rows[0];
-      if (!row) {
-        setNotFound(true);
-      } else if (row.user_id === user?.id) {
-        toast.error("That's you!");
-      } else {
-        setSearchRecipient(row as Recipient);
-      }
-    } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Lookup failed");
-    } finally {
-      setSearching(false);
-    }
-  };
+  // ── Add recipient (from quick-pick / search) ────────────────────────────
 
   const isAlreadyAdded = (userId: string) => recipients.some((r) => r.recipient.user_id === userId);
 
-  const addRecipient = () => {
-    if (!searchRecipient || !sender) return;
-    if (isAlreadyAdded(searchRecipient.user_id)) {
+  const addRecipient = (recipient: Recipient) => {
+    if (!sender) {
+      toast.error("Select a wallet to send from first");
+      return;
+    }
+    if (isAlreadyAdded(recipient.user_id)) {
       toast.info("Already in your list");
       return;
     }
     setRecipients((prev) => [
       ...prev,
       {
-        recipient: searchRecipient,
+        recipient,
         currency: sender.currency_code,
         note: "",
         status: "pending" as const,
       },
     ]);
-    setSearchRecipient(null);
-    setQuery("");
-    toast.success(`${searchRecipient.full_name || searchRecipient.email} added`);
+    toast.success(`${recipient.full_name || recipient.efin_tag || recipient.email} added`);
   };
+
 
   const removeRecipient = (userId: string) => {
     setRecipients((prev) => prev.filter((r) => r.recipient.user_id !== userId));
@@ -414,9 +386,6 @@ const EfinmoneyP2PFlow = () => {
   const reset = () => {
     setRecipients([]);
     setAmountPerUser("");
-    setQuery("");
-    setSearchRecipient(null);
-    setNotFound(false);
     qc.invalidateQueries({ queryKey: ["wallets", user?.id] });
     qc.invalidateQueries({ queryKey: ["wallets"] });
   };
@@ -435,59 +404,8 @@ const EfinmoneyP2PFlow = () => {
             </p>
           </div>
 
-          <div className="flex gap-2">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="email@example.com, @username, or 10-digit account #"
-                value={query}
-                onChange={(e) => { setQuery(e.target.value); setSearchRecipient(null); setNotFound(false); }}
-                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                className="pl-9"
-              />
-            </div>
-            <Button onClick={handleSearch} disabled={searching || query.trim().length < 3}>
-              {searching ? <LoadingSpinner size={16} /> : "Find"}
-            </Button>
-          </div>
+          <EfinRecipientQuickPick onSelect={addRecipient} isAlreadyAdded={isAlreadyAdded} />
 
-          {notFound && (
-            <Alert variant="destructive">
-              <AlertCircle className="w-4 h-4" />
-              <AlertDescription>No eFinMoney user found for "{query}".</AlertDescription>
-            </Alert>
-          )}
-
-          {searchRecipient && (
-            <motion.div
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="flex items-center gap-3 p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/30"
-            >
-              <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-                {searchRecipient.avatar_url
-                  ? <img src={searchRecipient.avatar_url} alt="" className="w-full h-full rounded-full object-cover" />
-                  : <User className="w-5 h-5 text-primary" />}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-foreground truncate">
-                  {searchRecipient.full_name || searchRecipient.email}
-                </p>
-                <div className="flex flex-wrap gap-x-3 text-xs text-muted-foreground">
-                  {searchRecipient.efin_tag && <span>@{searchRecipient.efin_tag}</span>}
-                  {searchRecipient.account_number && <span>Acct: {searchRecipient.account_number}</span>}
-                </div>
-              </div>
-              {isAlreadyAdded(searchRecipient.user_id) ? (
-                <Badge variant="secondary">Added</Badge>
-              ) : (
-                <Button size="sm" onClick={addRecipient}>
-                  <Plus className="w-4 h-4 mr-1" />
-                  Add to list
-                </Button>
-              )}
-            </motion.div>
-          )}
 
           {/* Badge row showing added recipients */}
           {recipients.length > 0 && (

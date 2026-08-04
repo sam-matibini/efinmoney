@@ -9073,6 +9073,18 @@ export type Database = {
           volume: number
         }[]
       }
+      recent_efin_recipients: {
+        Args: never
+        Returns: {
+          account_number: string
+          avatar_url: string
+          efin_tag: string
+          email: string
+          full_name: string
+          last_sent_at: string
+          user_id: string
+        }[]
+      }
       resolve_customer_price: {
         Args: {
           p_at?: string
@@ -9136,6 +9148,17 @@ export type Database = {
       run_compliance_checks: {
         Args: { p_transfer_id: string }
         Returns: number
+      }
+      search_efin_recipients: {
+        Args: { p_query: string }
+        Returns: {
+          account_number: string
+          avatar_url: string
+          efin_tag: string
+          email_masked: string
+          full_name: string
+          user_id: string
+        }[]
       }
       set_transaction_pin: { Args: { p_pin: string }; Returns: boolean }
       show_limit: { Args: never; Returns: number }
