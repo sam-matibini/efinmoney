@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import NavIconImage from "@/components/layout/NavIconImage";
-import { navShortLabel } from "@/components/layout/headerStyles";
+import { navShortLabel, navCellTone } from "@/components/layout/headerStyles";
 import { navIconImgClass } from "@/components/layout/navIconAssets";
 
 const spring = { type: "spring" as const, stiffness: 460, damping: 28, mass: 0.75 };
@@ -19,7 +19,10 @@ type HeaderNavItemProps = {
  * destination is self-identifying (no hover required). The active item gets a
  * raised pill + brighter label.
  */
-const HeaderNavItem = ({ label, href, isActive, onWarmRoute }: HeaderNavItemProps) => (
+const HeaderNavItem = ({ label, href, isActive, onWarmRoute }: HeaderNavItemProps) => {
+  const tone = navCellTone(label);
+
+  return (
   <motion.div
     className="flex-1 min-w-0"
     variants={{
@@ -39,12 +42,12 @@ const HeaderNavItem = ({ label, href, isActive, onWarmRoute }: HeaderNavItemProp
       {isActive ? (
         <motion.span
           layoutId="header-nav-active-pill"
-          className="absolute inset-0 rounded-lg bg-background shadow-md ring-1 ring-primary/30"
+          className={`absolute inset-0 rounded-lg ${tone.active}`}
           transition={spring}
           initial={false}
         />
       ) : (
-        <span className="absolute inset-0 rounded-lg bg-background/0 group-hover/nav:bg-background/60 transition-colors duration-300" />
+        <span className={`absolute inset-0 rounded-lg ${tone.idle} ${tone.hover} transition-colors duration-300`} />
       )}
 
       <motion.span
@@ -57,14 +60,15 @@ const HeaderNavItem = ({ label, href, isActive, onWarmRoute }: HeaderNavItemProp
       </motion.span>
 
       <span
-        className={`relative z-10 max-w-full truncate text-[10px] leading-none font-medium tracking-tight ${
-          isActive ? "text-foreground" : "text-muted-foreground group-hover/nav:text-foreground"
+        className={`relative z-10 max-w-full truncate text-[10px] leading-none font-semibold tracking-tight ${tone.label} ${
+          isActive ? "" : "opacity-90 group-hover/nav:opacity-100"
         }`}
       >
         {navShortLabel(label)}
       </span>
     </Link>
   </motion.div>
-);
+  );
+};
 
 export default HeaderNavItem;
