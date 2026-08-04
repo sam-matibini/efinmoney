@@ -49,6 +49,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import CanadaSendFlow from "@/components/send/CanadaSendFlow";
 import EfinmoneyP2PFlow from "@/components/send/EfinmoneyP2PFlow";
 import MoneyFlowShell from "@/components/money/MoneyFlowShell";
+import PaymentMethodRow, { type PaymentMethodOption } from "@/components/money/PaymentMethodRow";
 import { createPaymentLink, PaymentLinkSuccess, type PaymentLinkResult } from "@/components/send/PaymentLinkSuccess";
 import { isClaimCardCurrency } from "@/lib/stripeCorridors";
 import TransactionPinDialog from "@/components/send/TransactionPinDialog";
@@ -531,16 +532,18 @@ const SendPage = () => {
     ? rawRate * (1 - fxMarginBps / 10_000)
     : rawRate;
   const rateAvailable = isSameCurrency || effectiveRate > 0;
-  // Single receive formula: (send - fee) × rate (fee + margin from price-quote)
+  // Fee is charged on top: recipient gets the full send amount converted.
   const receivedAmount = parsedAmount > 0 && rateAvailable
-    ? Math.max(0, (parsedAmount - fee) * effectiveRate)
+    ? Math.max(0, parsedAmount * effectiveRate)
     : 0;
+  /** What the customer actually pays / is debited: amount + fee. */
+  const totalCharge = parsedAmount > 0 ? parsedAmount + fee : 0;
 
   const noLinkedSource = fundingSource === 'bank' && activeSources.length === 0;
   const insufficientFunds = fundingSource === 'wallet'
     && !!selectedWallet
     && parsedAmount > 0
-    && parsedAmount > Number(selectedWallet.balance);
+    && totalCharge > Number(selectedWallet.balance);
 
   const cardWallets = useMemo(
     () =>
@@ -598,13 +601,13 @@ const SendPage = () => {
     if (fundingSource !== "card" || parsedAmount <= 0) return null;
     if (cardSendProvider !== "nomba") return null;
     if (sourceCurrency.toUpperCase() === "CAD" && fxRates?.length) {
-      return quoteCadNombaTopup(parsedAmount, fxRates);
+      return quoteCadNombaTopup(totalCharge, fxRates);
     }
     if (isNombaTopupCurrency(sourceCurrency) && sourceCurrency.toUpperCase() !== "CAD") {
-      return quoteDirectNombaTopup(parsedAmount, sourceCurrency);
+      return quoteDirectNombaTopup(totalCharge, sourceCurrency);
     }
     return null;
-  }, [fundingSource, parsedAmount, sourceCurrency, fxRates, cardSendProvider]);
+  }, [fundingSource, totalCharge, sourceCurrency, fxRates, cardSendProvider]);
 
   // Prefer a valid card-collect wallet + destination when paying by card
   useEffect(() => {
@@ -649,16 +652,16 @@ const SendPage = () => {
   const calcQuoteRecipient = useCallback(
     (sendInFrom: number) => {
       if (!rateAvailable || effectiveRate <= 0) return 0;
-      return Math.max(0, (sendInFrom - baseFee - cardFee) * effectiveRate);
+      return Math.max(0, sendInFrom * effectiveRate);
     },
-    [rateAvailable, effectiveRate, baseFee, cardFee],
+    [rateAvailable, effectiveRate],
   );
   const calcQuoteSend = useCallback(
     (recvInTo: number) => {
       if (!rateAvailable || effectiveRate <= 0) return 0;
-      return recvInTo / effectiveRate + baseFee + cardFee;
+      return recvInTo / effectiveRate;
     },
-    [rateAvailable, effectiveRate, baseFee, cardFee],
+    [rateAvailable, effectiveRate],
   );
 
   const handleCalcFromChange = useCallback(
@@ -678,8 +681,12 @@ const SendPage = () => {
 
   const feeDisplayLabel =
     fee > 0
-      ? `${sourceSymbol}${fee.toFixed(2)} flat`
+      ? `+${sourceSymbol}${fee.toFixed(2)} fee`
       : `${sourceSymbol}0.00 fee`;
+
+  const feeNote = parsedAmount > 0 && fee > 0
+    ? `+${sourceSymbol}${fee.toFixed(2)} ${sourceCurrency} fee added · total ${sourceSymbol}${totalCharge.toFixed(2)} ${sourceCurrency}`
+    : undefined;
 
   const goToStep = useCallback((next: number) => {
     setDirection(next > step ? 1 : -1);
@@ -704,8 +711,8 @@ const SendPage = () => {
   }, [fundingSource, sourceCurrency, cardCurrency]);
 
   const cardChargeAmount = useMemo(
-    () => (usdRate ? Math.round(parsedAmount * usdRate * 100) / 100 : 0),
-    [parsedAmount, usdRate]
+    () => (usdRate ? Math.round(totalCharge * usdRate * 100) / 100 : 0),
+    [totalCharge, usdRate]
   );
 
   const txRef = useMemo(
@@ -1038,11 +1045,11 @@ const SendPage = () => {
             `cardsend-fincra-${(user.id || "anon").slice(0, 8)}-${selectedWallet.wallet_id.slice(0, 8)}-${Date.now()}`;
           const { data, error } = await supabase.functions.invoke("fincra-initialize-checkout", {
             body: {
-              amount: parsedAmount,
+              amount: totalCharge,
               currency: selectedWallet.currency_code,
-              charge_amount: parsedAmount,
+              charge_amount: totalCharge,
               charge_currency: selectedWallet.currency_code,
-              credit_amount: parsedAmount,
+              credit_amount: totalCharge,
               credit_currency: selectedWallet.currency_code,
               redirectUrl,
               reference,
@@ -1073,8 +1080,8 @@ const SendPage = () => {
           }
           const returnUrl = `${window.location.origin}/send?cardSend=1&provider=nomba&walletId=${encodeURIComponent(selectedWallet.wallet_id)}`;
           const collection = await initiateNombaCollection({
-            credit_amount: parsedAmount,
-            amount: parsedAmount,
+            credit_amount: totalCharge,
+            amount: totalCharge,
             target_wallet_id: selectedWallet.wallet_id,
             email: user.email,
             corridor: "nigeria",
@@ -1108,8 +1115,8 @@ const SendPage = () => {
         if (provider === "paytota") {
           const returnUrl = `${window.location.origin}/send?cardSend=1&provider=paytota&walletId=${encodeURIComponent(selectedWallet.wallet_id)}`;
           const collection = await initiatePaytotaCollection({
-            amount: parsedAmount,
-            credit_amount: parsedAmount,
+            amount: totalCharge,
+            credit_amount: totalCharge,
             target_wallet_id: selectedWallet.wallet_id,
             email: user.email,
             phone: recipientPhone || undefined,
@@ -1140,7 +1147,7 @@ const SendPage = () => {
         if (provider === "swychr") {
           const returnUrl = `${window.location.origin}/send?cardSend=1&provider=swychr&walletId=${encodeURIComponent(selectedWallet.wallet_id)}`;
           const collection = await initiateSwychrCollection({
-            amount: parsedAmount,
+            amount: totalCharge,
             target_wallet_id: selectedWallet.wallet_id,
             email: user.email,
             name: recipientName || user.email.split("@")[0],
@@ -1166,7 +1173,7 @@ const SendPage = () => {
           const returnUrl =
             `${window.location.origin}/send?cardSend=1&provider=flutterwave&walletId=${encodeURIComponent(selectedWallet.wallet_id)}`;
           const collection = await initializeFlwPayment({
-            amount: parsedAmount,
+            amount: totalCharge,
             currency: selectedWallet.currency_code,
             paymentMethod: flutterwaveCardSendPaymentMethod(selectedWallet.currency_code),
             walletId: selectedWallet.wallet_id,
@@ -1735,7 +1742,6 @@ const SendPage = () => {
 
   const isStep1Valid =
     parsedAmount > 0
-    && parsedAmount > fee
     && receivedAmount > 0
     && rateAvailable
     && !noLinkedSource
@@ -1761,6 +1767,19 @@ const SendPage = () => {
     modeParam === 'canada' ? 'canada'
     : modeParam === 'efinmoney' ? 'efinmoney'
     : 'international';
+  const cardFundingAvailable = productFeatures.nombaNigeria || productFeatures.lenhubFlutter
+    || productFeatures.paytota || productFeatures.swychr || productFeatures.flutterwave;
+
+  const fundingMethodOptions: PaymentMethodOption<"wallet" | "bank" | "card">[] = [
+    ...(cardFundingAvailable
+      ? [{ id: "card" as const, label: "Card", sublabel: "Debit or credit", icon: CreditCard, tone: "card" as const }]
+      : []),
+    ...(productFeatures.plaid
+      ? [{ id: "bank" as const, label: "Bank", sublabel: "Linked account", icon: Landmark, tone: "bank" as const }]
+      : []),
+    { id: "wallet" as const, label: "Wallet", sublabel: "eFinMoney balance", icon: Wallet, tone: "wallet" as const },
+  ];
+
   const fundingOptions = ([
     { v: "wallet" as const, icon: Wallet, label: "Wallet" },
     ...(productFeatures.plaid ? [{ v: "bank" as const, icon: Landmark, label: "Bank" }] : []),
@@ -2121,103 +2140,47 @@ const SendPage = () => {
                                 >
                                     <motion.div custom={0} variants={fieldVariants} initial="hidden" animate="show" className="space-y-3">
                                       <div className="space-y-2">
-                                        <Label>From wallet</Label>
-                                        <Select
-                                          value={selectedWalletId || selectedWallet?.wallet_id}
-                                          onValueChange={(id) => {
-                                            setSelectedWalletId(id);
-                                            setFundingSource("wallet");
-                                          }}
-                                          disabled={fundingSource !== "wallet"}
-                                        >
-                                          <SelectTrigger className={fundingSource !== "wallet" ? "opacity-60" : undefined}>
-                                            <SelectValue placeholder="Select wallet" />
-                                          </SelectTrigger>
-                                          <SelectContent>
-                                            {wallets?.map((w) => {
-                                              const cardCount = linkedCardCount[w.wallet_id] ?? 0;
-                                              return (
-                                                <SelectItem key={w.wallet_id} value={w.wallet_id}>
-                                                  <span className="flex items-center gap-2">
-                                                    {w.flag_emoji} {w.currency_code} — {w.symbol}{Number(w.balance).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                    {cardCount > 0 && (
-                                                      <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground ml-auto">
-                                                        <CreditCard className="w-3 h-3" />
-                                                        {cardCount}
-                                                      </span>
-                                                    )}
-                                                  </span>
-                                                </SelectItem>
-                                              );
-                                            })}
-                                          </SelectContent>
-                                        </Select>
-                                        {fundingSource !== "wallet" && (
-                                          <button
-                                            type="button"
-                                            className="text-xs text-primary hover:underline"
-                                            onClick={() => {
-                                              setFundingSource("wallet");
-                                              setShowOtherFunding(false);
-                                            }}
-                                          >
-                                            Use wallet instead
-                                          </button>
-                                        )}
+                                        <Label>Pay with</Label>
+                                        <PaymentMethodRow
+                                          options={fundingMethodOptions}
+                                          value={fundingSource}
+                                          onChange={(v) => setFundingSource(v)}
+                                        />
                                       </div>
 
-                                      {fundingOptions.filter((o) => o.v !== "wallet").length > 0 && (
-                                        <div className="space-y-2 pt-1">
-                                          <button
-                                            type="button"
-                                            aria-expanded={showOtherFunding}
-                                            className={cn(
-                                              "w-full flex items-center justify-between gap-3 rounded-xl border px-3.5 py-3 text-left transition-colors",
-                                              showOtherFunding || fundingSource !== "wallet"
-                                                ? "border-primary/40 bg-primary/5"
-                                                : "border-border bg-muted/40 hover:bg-muted/70 hover:border-border",
-                                            )}
-                                            onClick={() => setShowOtherFunding((v) => !v)}
+                                      {(fundingSource === "wallet" || fundingSource === "card") && (
+                                        <div className="space-y-2">
+                                          <Label>{fundingSource === "card" ? "Credit to wallet" : "From wallet"}</Label>
+                                          <Select
+                                            value={selectedWalletId || selectedWallet?.wallet_id}
+                                            onValueChange={(id) => setSelectedWalletId(id)}
                                           >
-                                            <span className="flex items-center gap-2.5 min-w-0">
-                                              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-background border border-border">
-                                                <CreditCard className="w-4 h-4 text-primary" />
-                                              </span>
-                                              <span className="min-w-0">
-                                                <span className="block text-sm font-medium text-foreground">
-                                                  Pay with card or bank
-                                                </span>
-                                                <span className="block text-xs text-muted-foreground">
-                                                  Debit card now, then we send — or link a bank
-                                                </span>
-                                              </span>
-                                            </span>
-                                            <ChevronDown
-                                              className={cn(
-                                                "w-5 h-5 shrink-0 text-muted-foreground transition-transform",
-                                                showOtherFunding && "rotate-180",
-                                              )}
-                                            />
-                                          </button>
-                                          {showOtherFunding && (
-                                            <div className="grid grid-cols-2 gap-2">
-                                              {fundingOptions.filter((o) => o.v !== "wallet").map(({ v, icon: Icon, label }) => (
-                                                <Button
-                                                  key={v}
-                                                  type="button"
-                                                  variant={fundingSource === v ? "default" : "outline"}
-                                                  className="flex items-center gap-2 h-11"
-                                                  onClick={() => setFundingSource(v)}
-                                                >
-                                                  <Icon className="w-4 h-4" />
-                                                  <span className="text-sm">{label}</span>
-                                                </Button>
-                                              ))}
-                                            </div>
-                                          )}
+                                            <SelectTrigger>
+                                              <SelectValue placeholder="Select wallet" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                              {wallets?.map((w) => {
+                                                const cardCount = linkedCardCount[w.wallet_id] ?? 0;
+                                                return (
+                                                  <SelectItem key={w.wallet_id} value={w.wallet_id}>
+                                                    <span className="flex items-center gap-2">
+                                                      {w.flag_emoji} {w.currency_code} — {w.symbol}{Number(w.balance).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                      {cardCount > 0 && (
+                                                        <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground ml-auto">
+                                                          <CreditCard className="w-3 h-3" />
+                                                          {cardCount}
+                                                        </span>
+                                                      )}
+                                                    </span>
+                                                  </SelectItem>
+                                                );
+                                              })}
+                                            </SelectContent>
+                                          </Select>
                                         </div>
                                       )}
                                     </motion.div>
+
 
                                     {fundingSource === 'bank' && (
                                       <motion.div custom={1} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
@@ -2284,7 +2247,8 @@ const SendPage = () => {
                                         quoteRecipient={rateAvailable ? calcQuoteRecipient : undefined}
                                         quoteSend={rateAvailable ? calcQuoteSend : undefined}
                                         displayRate={rateAvailable ? effectiveRate : null}
-                                        feeLabel={feeDisplayLabel}
+                                       feeLabel={feeDisplayLabel}
+                                       feeNote={feeNote}
                                         walletBalance={
                                           fundingSource === "wallet" && selectedWallet
                                             ? Number(selectedWallet.balance)
@@ -2718,7 +2682,8 @@ const SendPage = () => {
                                     </div>
                                     <div className="rounded-xl border border-border bg-card p-4 space-y-2 text-sm">
                                       <div className="flex justify-between"><span className="text-muted-foreground">You send</span><span className="font-medium">{sourceSymbol}{parsedAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {sourceCurrency}</span></div>
-                                      <div className="flex justify-between"><span className="text-muted-foreground">Fee</span><span className="font-medium">{sourceSymbol}{fee.toFixed(2)}</span></div>
+                                      <div className="flex justify-between"><span className="text-muted-foreground">Fee</span><span className="font-medium">+{sourceSymbol}{fee.toFixed(2)}</span></div>
+                                      <div className="flex justify-between"><span className="text-muted-foreground">Total to pay</span><span className="font-semibold">{sourceSymbol}{totalCharge.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {sourceCurrency}</span></div>
                                       <div className="flex justify-between"><span className="text-muted-foreground">Rate</span><span className="font-medium">1 {sourceCurrency} = {effectiveRate.toFixed(4)} {targetCountry.code}</span></div>
                                       <div className="flex justify-between text-base pt-2 border-t border-border"><span>They receive</span><span className="font-bold">{targetSymbol} {receivedAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
                                     </div>

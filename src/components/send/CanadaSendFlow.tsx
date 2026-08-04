@@ -630,8 +630,9 @@ const CanadaSendFlow = () => {
   const fallbackWallet = (wallets || [])[0];
 
   const totalFee = deliveryFee + cardFee;
-  const receivedAmount = Math.max(0, parsedAmount - deliveryFee);
-  const totalCharged = parsedAmount + cardFee;
+  // Fees are charged on top: the recipient always gets the full amount entered.
+  const receivedAmount = parsedAmount;
+  const totalCharged = parsedAmount + totalFee;
   const insufficient = funding === "wallet" && !!selectedWallet && parsedAmount > 0
     && (parsedAmount + totalFee) > Number(selectedWallet.balance);
 
@@ -1050,7 +1051,7 @@ const CanadaSendFlow = () => {
                 C${receivedAmount.toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
               <p className="text-sm text-muted-foreground mt-2">
-                Delivery fee C${deliveryFee.toFixed(2)} · {methodLabel}
+                +C${deliveryFee.toFixed(2)} delivery fee · total C${(parsedAmount + deliveryFee).toFixed(2)} · {methodLabel}
               </p>
             </div>
 
@@ -1243,7 +1244,7 @@ const CanadaSendFlow = () => {
               <ReviewRow label="Recipient" value={recipientName || (method === "paylink" ? "Anyone with link" : "—")} />
               <ReviewRow label="Delivery" value={methodLabel} />
               <ReviewRow label="They receive" value={`C$${receivedAmount.toFixed(2)}`} />
-              <ReviewRow label="Delivery fee" value={`C$${deliveryFee.toFixed(2)}`} />
+              <ReviewRow label="Delivery fee" value={`+C$${deliveryFee.toFixed(2)}`} />
               {method === "eft" && institutionNumber && (
                 <ReviewRow label="Bank" value={`${institutionNumber}-${transitNumber} ····${accountNumber.slice(-4)}`} />
               )}
