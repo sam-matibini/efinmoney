@@ -173,8 +173,9 @@ const MethodCheckoutPanel = ({
         </div>
 
         {wallets.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-border bg-muted/40 p-3 text-sm text-muted-foreground">
-            Create a supported wallet to pay by card.
+          <div className="space-y-2 rounded-lg border border-dashed border-border bg-muted/40 p-3">
+            <p className="text-sm text-muted-foreground">Create a supported wallet to pay by card.</p>
+            {onAddWallet && <QuickAddRow tone="wallet" label="Quick add wallet" onClick={onAddWallet} />}
           </div>
         ) : (
           <>
@@ -184,8 +185,53 @@ const MethodCheckoutPanel = ({
               debitLabel="Charged to your card"
             />
             {cardChargeNote && <p className="text-[11px] text-muted-foreground">{cardChargeNote}</p>}
-            <div className="rounded-lg border border-border bg-background/60 p-3 space-y-1.5">
+            <div className="rounded-lg border border-border bg-background/60 p-3 space-y-2">
               <p className="text-xs font-medium">Card details</p>
+
+              {savedCards.length > 0 && (
+                <div className="space-y-1.5">
+                  {savedCards.map((c) => {
+                    const selected = c.id === selectedCardId;
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => onCardChange?.(c.id)}
+                        aria-pressed={selected}
+                        className={cn(
+                          "flex w-full items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-colors",
+                          selected ? "border-pay-card bg-pay-card/10" : "border-border hover:bg-muted/50",
+                        )}
+                      >
+                        <span className={cn(
+                          "flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2",
+                          selected ? "border-pay-card" : "border-muted-foreground/40",
+                        )}>
+                          {selected && <span className="h-2 w-2 rounded-full bg-pay-card" />}
+                        </span>
+                        <CreditCard className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        <span className="min-w-0 flex-1 truncate text-xs font-medium capitalize">
+                          {c.card_brand || "Card"} •••• {c.last_four || "----"}
+                        </span>
+                        {c.exp_month && c.exp_year && (
+                          <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
+                            {String(c.exp_month).padStart(2, "0")}/{String(c.exp_year).slice(-2)}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {onAddCard && (
+                <QuickAddRow
+                  tone="card"
+                  label={savedCards.length > 0 ? "Quick add new card" : "Quick add card details"}
+                  onClick={onAddCard}
+                />
+              )}
+
               <p className="text-[11px] text-muted-foreground">
                 {inlineEntry
                   ? "You'll enter your cardholder name, card number, expiry date and CVV on the next step. We never store your full card number."
@@ -195,6 +241,7 @@ const MethodCheckoutPanel = ({
                 <Lock className="w-3 h-3" /> Visa · Mastercard · Amex · Verve
               </p>
             </div>
+
 
             {!cardProviderReady && amount > 0 && (
               <p className="flex items-start gap-1.5 text-[11px] text-destructive">
