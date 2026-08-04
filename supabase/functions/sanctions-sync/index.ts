@@ -235,6 +235,28 @@ const COUNTRY_ALIASES: Record<string, string[]> = {
   eg: ["egypt"],
 };
 
+/**
+ * Countries Canada sanctions under the *United Nations Act* regulations rather
+ * than SEMA. They never appear in the SEMA XML, so they are flagged statically.
+ */
+const CANADA_UN_ACT_COUNTRIES: Record<string, string> = {
+  kp: "North Korea",
+  ir: "Iran",
+  ly: "Libya",
+  so: "Somalia",
+  ss: "South Sudan",
+  sd: "Sudan",
+  ye: "Yemen",
+  cf: "Central African Republic",
+  cd: "Democratic Republic of the Congo",
+  ml: "Mali",
+  iq: "Iraq",
+  lb: "Lebanon",
+  gw: "Guinea-Bissau",
+  er: "Eritrea",
+};
+
+
 const canonCountry = (s: string) =>
   (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z ]/g, "").replace(/\s+/g, " ").trim();
