@@ -43,6 +43,7 @@ interface Props {
   cardProviderReady?: boolean;
   cardChargeNote?: string | null;
   cardMinNote?: string | null;
+  inlineEntry?: boolean;
   insufficientBalance?: boolean;
   onTopUp?: () => void;
 }
@@ -85,6 +86,7 @@ const MethodCheckoutPanel = ({
   cardProviderReady,
   cardChargeNote,
   cardMinNote,
+  inlineEntry,
   insufficientBalance,
   onTopUp,
 }: Props) => {
