@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Check, ChevronDown, Search } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { COUNTRIES, type CountryOption } from "@/lib/countries";
+import { COUNTRIES, type CountryInfo } from "@/lib/countries";
 
 type Props = {
   value: string;
@@ -14,7 +14,7 @@ type Props = {
 /** Sendwave-style inline destination-country picker for the send card header. */
 export default function SendHeaderCountry({ value, onChange, filterIds }: Props) {
   const [open, setOpen] = useState(false);
-  const options: CountryOption[] = filterIds?.length
+  const options: CountryInfo[] = filterIds?.length
     ? COUNTRIES.filter((c) => filterIds.includes(c.id))
     : COUNTRIES;
   const active = options.find((c) => c.id === value) || COUNTRIES.find((c) => c.id === value);
