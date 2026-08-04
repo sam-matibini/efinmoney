@@ -6,6 +6,7 @@ import {
   flwV4CreateCharge,
   flwV4CreateCustomer,
   flwV4ErrorMessage,
+  flwV4GetCharge,
   flwV4UpdateChargeAuthorization,
   isFlwV4Configured,
 } from "../_shared/flw-v4.ts";
@@ -22,6 +23,23 @@ function jr(status: number, body: unknown) {
 const ok = (body: unknown) => jr(200, body);
 
 const VALID_CARD_CURRENCIES = ["NGN", "USD", "KES", "UGX", "GHS", "ZMW", "RWF", "TZS", "CAD", "GBP", "EUR"];
+
+function normalizeNextAction(next: Record<string, unknown> | null | undefined) {
+  if (!next) return null;
+  const providerType = String(next.type || "").trim();
+  const type = providerType.toLowerCase();
+  const redirect = (next.redirect_url as { url?: string } | undefined)?.url
+    || (next.redirect as { url?: string } | undefined)?.url
+    || (typeof next.url === "string" ? next.url : null);
+
+  let mode: "pin" | "otp" | "redirect" | "avs" | null = null;
+  if (type.includes("redirect") || type.includes("3ds") || redirect) mode = "redirect";
+  else if (type.includes("otp")) mode = "otp";
+  else if (type.includes("pin")) mode = "pin";
+  else if (type.includes("avs") || type.includes("address")) mode = "avs";
+
+  return { mode, providerType, redirect, rawType: type };
+}
 
 async function creditWallet(params: {
   admin: ReturnType<typeof createClient>;
@@ -202,8 +220,49 @@ Deno.serve(async (req) => {
       const chargeIdFollowUp = existingChargeId ? String(existingChargeId) : "";
 
       if (chargeIdFollowUp && (pinVal || otpVal)) {
+        // The provider owns the charge state. Re-read it before authorization so
+        // authorization.type always matches the charge's current next_action.
+        const current = await flwV4GetCharge(chargeIdFollowUp);
+        if (!current.ok) {
+          return ok({
+            success: false,
+            error: flwV4ErrorMessage(current.json, "Could not retrieve the current security check"),
+            code: "charge_state_failed",
+          });
+        }
+        const currentData = (current.json.data || {}) as Record<string, unknown>;
+        const expected = normalizeNextAction(currentData.next_action as Record<string, unknown> | undefined);
+        if (!expected?.providerType || !expected.mode) {
+          return ok({
+            success: false,
+            error: "The bank did not return a supported security check. Please retry the payment.",
+            code: "unsupported_auth_action",
+          });
+        }
+        if ((pinVal && expected.mode !== "pin") || (otpVal && expected.mode !== "otp")) {
+          return ok({
+            success: true,
+            requires_auth: true,
+            auth: {
+              mode: expected.mode,
+              provider_type: expected.providerType,
+              redirect: expected.redirect,
+              message: String(currentData.next_action_message || currentData.message || ""),
+            },
+            charge_id: chargeIdFollowUp,
+            status: String(currentData.status || "pending"),
+          });
+        }
+
+        console.log("flw-card-charge authorization", {
+          charge_id: chargeIdFollowUp,
+          provider_status: current.status,
+          next_action_type: expected.providerType,
+          input_mode: pinVal ? "pin" : "otp",
+        });
         const updated = await flwV4UpdateChargeAuthorization({
           chargeId: chargeIdFollowUp,
+          authorizationType: expected.providerType,
           pin: pinVal || undefined,
           otp: otpVal || undefined,
         });
@@ -236,19 +295,27 @@ Deno.serve(async (req) => {
             currency: String(data.currency || currency),
           });
         }
-        const next = data.next_action as Record<string, unknown> | undefined;
-        if (next) {
-          const type = String(next.type || "").toLowerCase();
-          const redirect = (next.redirect_url as { url?: string } | undefined)?.url
-            || (next.redirect as { url?: string } | undefined)?.url
-            || null;
+        const next = normalizeNextAction(data.next_action as Record<string, unknown> | undefined);
+        if (next?.mode && next.providerType) {
           return ok({
             success: true,
             requires_auth: true,
-            auth: { mode: type.includes("redirect") ? "redirect" : type || "otp", redirect, fields: [] },
+            auth: {
+              mode: next.mode,
+              provider_type: next.providerType,
+              redirect: next.redirect,
+              message: String(data.next_action_message || data.message || ""),
+            },
             reference: String(data.reference || txRef),
             charge_id: String(data.id || chargeIdFollowUp),
             status: String(data.status || "pending"),
+          });
+        }
+        if (data.next_action) {
+          return ok({
+            success: false,
+            error: `Unsupported bank security check: ${next?.providerType || "unknown"}`,
+            code: "unsupported_auth_action",
           });
         }
         return ok({
@@ -322,28 +389,36 @@ Deno.serve(async (req) => {
 
       const data = (charge.json.data || {}) as Record<string, unknown>;
       const status = String(data.status || "").toLowerCase();
-      const next = charge.nextAction || (data.next_action as Record<string, unknown>) || null;
+      const next = normalizeNextAction(charge.nextAction || (data.next_action as Record<string, unknown>) || null);
 
       if (next) {
-        const type = String(next.type || "").toLowerCase();
-        const redirect = (next.redirect_url as { url?: string } | undefined)?.url
-          || (next.redirect as { url?: string } | undefined)?.url
-          || null;
-        let mode = "pin";
-        if (type.includes("redirect") || redirect) mode = "redirect";
-        else if (type.includes("otp")) mode = "otp";
-        else if (type.includes("pin")) mode = "pin";
-        else if (type.includes("avs")) mode = "avs_noauth";
-        else if (type) mode = type;
+        if (!next.mode || !next.providerType) {
+          return ok({
+            success: false,
+            error: `Unsupported bank security check: ${next.providerType || "unknown"}`,
+            code: "unsupported_auth_action",
+          });
+        }
+
+        console.log("flw-card-charge next action", {
+          charge_id: charge.chargeId || data.id || null,
+          provider_status: charge.status,
+          next_action_type: next.providerType,
+        });
 
         return ok({
           success: true,
           requires_auth: true,
-          auth: { mode, redirect, fields: [] },
+          auth: {
+            mode: next.mode,
+            provider_type: next.providerType,
+            redirect: next.redirect,
+            message: String(data.next_action_message || data.message || ""),
+          },
           reference: txRef,
           tx_ref: txRef,
           charge_id: charge.chargeId || data.id || null,
-          message: flwV4ErrorMessage(charge.json, `Complete ${mode}`),
+          message: flwV4ErrorMessage(charge.json, `Complete ${next.mode}`),
           status: status || "pending",
         });
       }

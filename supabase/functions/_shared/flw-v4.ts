@@ -485,6 +485,7 @@ export async function flwV4CreateCardMethod(params: {
 
 export async function flwV4UpdateChargeAuthorization(params: {
   chargeId: string;
+  authorizationType: string;
   pin?: string;
   otp?: string;
 }): Promise<FlwV4Result> {
@@ -497,9 +498,9 @@ export async function flwV4UpdateChargeAuthorization(params: {
     }
     const nonce = flwV4GenerateNonce(12);
     const encrypted_pin = await flwV4EncryptField(params.pin, encKey, nonce);
-    body.authorization = { type: "pin", pin: { nonce, encrypted_pin } };
+    body.authorization = { type: params.authorizationType, pin: { nonce, encrypted_pin } };
   } else if (params.otp) {
-    body.authorization = { type: "otp", otp: params.otp };
+    body.authorization = { type: params.authorizationType, otp: params.otp };
   } else {
     return { ok: false, status: 0, json: { message: "pin or otp required" } };
   }
@@ -508,5 +509,12 @@ export async function flwV4UpdateChargeAuthorization(params: {
     method: "PUT",
     json: body,
     timeoutMs: 30_000,
+  });
+}
+
+export async function flwV4GetCharge(chargeId: string): Promise<FlwV4Result> {
+  return flwV4Fetch(`/charges/${encodeURIComponent(chargeId)}`, {
+    method: "GET",
+    timeoutMs: 20_000,
   });
 }
