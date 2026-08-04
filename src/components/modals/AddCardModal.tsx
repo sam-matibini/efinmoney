@@ -323,7 +323,12 @@ const AddCardModal = ({ isOpen, onClose, defaultMode = "issue" }: AddCardModalPr
             </TabsContent>
 
             <TabsContent value="link" className="space-y-4 mt-4">
-              <SaveCardForm onSuccess={handleClose} onCancel={handleClose} />
+              {STRIPE_PAYMENTS_ENABLED ? (
+                <SaveCardForm onSuccess={handleClose} onCancel={handleClose} />
+              ) : (
+                <ManualCardForm onSuccess={handleClose} onCancel={handleClose} />
+              )}
+
             </TabsContent>
           </Tabs>
         )}
