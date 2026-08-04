@@ -18,6 +18,7 @@ export interface QuickPickRecipient {
   email: string | null;
   avatar_url: string | null;
   account_number?: string | null;
+  base_currency?: string | null;
 }
 
 interface SearchRow {
@@ -27,6 +28,7 @@ interface SearchRow {
   avatar_url: string | null;
   email_masked: string | null;
   account_number: string | null;
+  base_currency: string | null;
 }
 
 interface RecentRow {
@@ -37,6 +39,7 @@ interface RecentRow {
   email: string | null;
   account_number: string | null;
   last_sent_at: string;
+  base_currency: string | null;
 }
 
 interface Props {
@@ -301,6 +304,7 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
                             avatar_url: s.avatar_url,
                             email: null,
                             account_number: s.account_number,
+                            base_currency: s.base_currency,
                           })}
                           className="flex w-full items-center gap-3 p-3 text-left transition-colors hover:bg-muted disabled:opacity-60"
                         >

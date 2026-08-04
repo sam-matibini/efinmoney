@@ -22,6 +22,9 @@ import AnimatedCheck from "@/components/ui/AnimatedCheck";
 import { usePinGate } from "@/components/send/usePinGate";
 import EfinRecipientQuickPick from "@/components/send/EfinRecipientQuickPick";
 import { sortByPriority } from "@/lib/currencyPriority";
+import { flagForCurrency } from "@/lib/flags";
+import { countryToCurrency } from "@/lib/currency";
+import { SYSTEM_DEFAULT_CURRENCY } from "@/lib/systemDefaults";
 
 interface Recipient {
   user_id: string;
@@ -30,6 +33,7 @@ interface Recipient {
   email: string | null;
   avatar_url: string | null;
   account_number?: string | null;
+  base_currency?: string | null;
 }
 
 interface RecipientEntry {
@@ -136,10 +140,20 @@ const RecipientCard: React.FC<RecipientCardProps> = ({
             onValueChange={(v) => onUpdate(recipient.user_id, { currency: v })}
             disabled={!canEdit}
           >
-            <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-9">
+              <SelectValue>
+                <span className="flex items-center gap-1.5">
+                  <span aria-hidden>{flagForCurrency(currency)}</span> {currency}
+                </span>
+              </SelectValue>
+            </SelectTrigger>
             <SelectContent>
               {currencies.map((c) => (
-                <SelectItem key={c} value={c}>{c}</SelectItem>
+                <SelectItem key={c} value={c}>
+                  <span className="flex items-center gap-1.5">
+                    <span aria-hidden>{flagForCurrency(c)}</span> {c}
+                  </span>
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -148,7 +162,7 @@ const RecipientCard: React.FC<RecipientCardProps> = ({
           {amountPerUser > 0 && rateOk && (
             <>
               <span className="text-lg font-display font-bold text-foreground">
-                {fmt(targetDisplay)} {currency}
+                {fmt(targetDisplay)} <span aria-hidden>{flagForCurrency(currency)}</span> {currency}
               </span>
               {!isSameCurrency && (
                 <p className="text-xs text-muted-foreground">
@@ -160,6 +174,7 @@ const RecipientCard: React.FC<RecipientCardProps> = ({
           {!rateOk && !isSameCurrency && (
             <p className="text-xs text-destructive">Rate unavailable</p>
           )}
+
         </div>
       </div>
 
@@ -250,10 +265,19 @@ const EfinmoneyP2PFlow = () => {
   const [selectedWalletId, setSelectedWalletId] = useState<string>("");
   const [sending, setSending] = useState(false);
 
+  // Sender's base currency comes from their domicile country, then stored preference.
+  const baseCurrency =
+    countryToCurrency(profile?.address_country || profile?.country_code)
+    || profile?.default_currency
+    || SYSTEM_DEFAULT_CURRENCY;
+
   const sender = wallets?.find((w) => w.wallet_id === selectedWalletId) || wallets?.[0];
   useEffect(() => {
-    if (!selectedWalletId && wallets?.length) setSelectedWalletId(wallets[0].wallet_id);
-  }, [wallets, selectedWalletId]);
+    if (selectedWalletId || !wallets?.length) return;
+    const preferred = wallets.find((w) => w.currency_code === baseCurrency) || wallets[0];
+    setSelectedWalletId(preferred.wallet_id);
+  }, [wallets, selectedWalletId, baseCurrency]);
+
 
   const fromCurrency = sender?.currency_code || "USD";
   const parsedAmount = parseFloat(amountPerUser) || 0;
@@ -271,10 +295,11 @@ const EfinmoneyP2PFlow = () => {
   const currencyOptions = useMemo(() => {
     const codes = new Set<string>();
     wallets?.forEach((w) => codes.add(w.currency_code));
-    ["USD", "CAD", "EUR", "GBP", "NGN", "KES", "GHS", "ZAR", "ZMW", "UGX", "TZS", "RWF", "MWK", "XAF", "XOF"].forEach((c) => codes.add(c));
+    ["USD", "CAD", "EUR", "GBP", "NGN", "KES", "GHS", "ZAR", "ZMW", "UGX", "TZS", "RWF", "MWK", "BWP", "XAF", "XOF"].forEach((c) => codes.add(c));
     if (sender) codes.add(sender.currency_code);
+    recipients.forEach((r) => r.currency && codes.add(r.currency));
     return sortByPriority(Array.from(codes));
-  }, [wallets, sender]);
+  }, [wallets, sender, recipients]);
 
   // ── Add recipient (from quick-pick / search) ────────────────────────────
 
@@ -293,7 +318,7 @@ const EfinmoneyP2PFlow = () => {
       ...prev,
       {
         recipient,
-        currency: sender.currency_code,
+        currency: recipient.base_currency || sender.currency_code,
         note: "",
         status: "pending" as const,
       },
