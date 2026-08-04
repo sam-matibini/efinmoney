@@ -558,17 +558,30 @@ export default function FlutterwaveCardForm({
           </div>
         </div>
 
-        {authMode === "pin" && (
-          <PinAuthForm onPinSubmit={handlePinSubmit} loading={authLoading} />
+        {authMode && (
+          <ChallengePanel
+            mode={authMode}
+            loading={authLoading}
+            redirectUrl={authRedirect}
+            onSubmitCode={handleChallengeSubmit}
+            onOpenRedirect={openRedirectPopup}
+            onCancel={cancelChallenge}
+          />
         )}
 
-        <Button type="submit" size="lg" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white" disabled={stage !== "idle"}>
-          {stage === "charging" || stage === "auth" ? (
+        <Button
+          type="submit"
+          size="lg"
+          className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+          disabled={stage !== "idle" || !!authMode}
+        >
+          {stage === "charging" ? (
             <><LoadingSpinner size={16} className="mr-2" /> Processing…</>
           ) : (
             ctaLabel ?? `Pay ${symbol}${amountNum.toFixed(2)} ${currency}`
           )}
         </Button>
+
 
         <EfinmoneyBranding />
       </form>
