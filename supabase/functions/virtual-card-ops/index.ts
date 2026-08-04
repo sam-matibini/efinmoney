@@ -5,11 +5,14 @@ import { decryptSecret, encryptSecret, generateCvv, generatePan } from "../_shar
 type Sb = ReturnType<typeof createClient>;
 
 function formatDbError(err: unknown): string {
-  const msg = err instanceof Error ? err.message : String(err);
-  const details = typeof err === "object" && err && "details" in err
-    ? String((err as { details?: string }).details || "")
-    : "";
-  const full = `${msg} ${details}`.trim();
+  const obj = (typeof err === "object" && err ? err : {}) as Record<string, unknown>;
+  const msg = err instanceof Error
+    ? err.message
+    : (typeof obj.message === "string" ? obj.message : (typeof err === "string" ? err : JSON.stringify(err)));
+  const details = typeof obj.details === "string" ? obj.details : "";
+  const hint = typeof obj.hint === "string" ? obj.hint : "";
+  const full = `${msg} ${details} ${hint}`.trim();
+
 
   if (/permission denied for table card_secrets/i.test(full)) {
     return "Edge function cannot write to card_secrets. Run: GRANT ALL ON public.card_secrets TO service_role;";
