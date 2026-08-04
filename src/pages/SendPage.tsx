@@ -1247,7 +1247,7 @@ const SendPage = () => {
     }
     setCancelOpen(false);
     setLastTransferId(null);
-    navigate('/');
+    navigate('/dashboard');
   };
 
   const clearSelectedContact = useCallback(() => {
@@ -2239,7 +2239,7 @@ const SendPage = () => {
                                       </motion.div>
                                       <button
                                         type="button"
-                                        onClick={() => navigate('/')}
+                                        onClick={() => navigate('/dashboard')}
                                         className="block mx-auto text-sm text-muted-foreground hover:text-foreground transition-colors underline-offset-4 hover:underline"
                                       >
                                         Cancel

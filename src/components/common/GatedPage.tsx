@@ -21,7 +21,7 @@ const GatedPage = ({ feature, children, comingSoon }: GatedPageProps) => {
 
   if (!disabled) return <>{children}</>;
   if (comingSoon) return <ComingSoon />;
-  return <Navigate to="/" replace />;
+  return <Navigate to="/dashboard" replace />;
 };
 
 export default GatedPage;

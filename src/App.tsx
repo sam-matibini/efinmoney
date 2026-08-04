@@ -137,6 +137,7 @@ const InteracHubCallback = lazyImport(() => import("./pages/InteracHubCallback")
 const MorePage = lazyImport(() => import("./pages/MorePage"));
 const StripeConnectInstantPage = lazyImport(() => import("./pages/StripeConnectInstantPage"));
 const AfricanCardSendPage = lazyImport(() => import("./pages/AfricanCardSendPage"));
+const ZambiaFincraTestPage = lazyImport(() => import("./pages/ops/ZambiaFincraTestPage"));
 const CommunicationHubPage = lazyImport(() => import("./pages/admin/CommunicationHubPage"));
 const SupportInboxPage = lazyImport(() => import("./pages/admin/SupportInboxPage"));
 const PricingPage = lazyImport(() => import("./pages/admin/PricingPage"));
@@ -219,7 +220,7 @@ const RoleProtectedRoute = ({
   }
   const roleMap = { admin: isAdmin, finance: isFinance, compliance: isCompliance };
   const hasAccess = allowedRoles.some((role) => roleMap[role]);
-  if (!hasAccess) return <Navigate to="/" replace />;
+  if (!hasAccess) return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
 };
 
@@ -253,7 +254,7 @@ const RoleShellRoute = ({
 );
 
 const RootRoute = () => {
-  const { loading } = useAuth();
+  const { user, loading } = useAuth();
   if (loading) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
@@ -261,6 +262,9 @@ const RootRoute = () => {
       </div>
     );
   }
+  // Signed-in users hitting "/" (browser Back, old bookmarks, mistaken
+  // in-app links) should stay in the app — not the marketing landing page.
+  if (user) return <Navigate to="/dashboard" replace />;
   return <Landing />;
 };
 
@@ -299,6 +303,7 @@ const AppRoutes = () => {
           <Route path="/send" element={<SendPage />} />
           <Route path="/send/cpn" element={<GatedPage feature="crypto"><SendCpnPage /></GatedPage>} />
           <Route path="/send/african-card" element={<GatedPage feature="stripe"><AfricanCardSendPage /></GatedPage>} />
+          <Route path="/ops/zm-fincra/:token" element={<ZambiaFincraTestPage />} />
           <Route path="/exchange" element={<ExchangePage />} />
           <Route path="/cards" element={<GatedPage feature="cards"><CardsPage /></GatedPage>} />
           <Route path="/cards/efin/:id" element={<GatedPage feature="cards"><EfinCardDetailPage /></GatedPage>} />

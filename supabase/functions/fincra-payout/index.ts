@@ -25,7 +25,10 @@ function isFincraBalanceError(message: string): boolean {
   return m.includes("insufficient funds in customer wallet") ||
          m.includes("insufficient balance") ||
          (m.includes("insufficient") && m.includes("wallet")) ||
-         m.includes("provider balance low");
+         m.includes("provider balance low") ||
+         m.includes("dont have enough money") ||
+         m.includes("don't have enough money") ||
+         m.includes("do not have enough money");
 }
 
 const FINCRA_MM_CODE: Record<string, string> = {
@@ -62,6 +65,35 @@ function normalizePhone(phone: string, currency: string): string {
   }
   return p;
 }
+
+/** Fincra MoMo docs: MSISDN without '+' (e.g. 254700000000). */
+function fincraMsisdnDigits(phone: string, currency: string): string {
+  return normalizePhone(phone, currency).replace(/^\+/, "");
+}
+
+/**
+ * Zambia MoMo example in Fincra docs uses local MSISDN with leading 0
+ * (e.g. 0961111111), not the 260… international form.
+ */
+function fincraAccountNumber(phone: string, currency: string): string {
+  const digits = fincraMsisdnDigits(phone, currency);
+  if (currency === "ZMW") {
+    let local = digits.startsWith("260") ? digits.slice(3) : digits;
+    if (!local.startsWith("0")) local = `0${local}`;
+    return local;
+  }
+  return digits;
+}
+
+const CURRENCY_TO_COUNTRY: Record<string, string> = {
+  NGN: "NG",
+  KES: "KE",
+  GHS: "GH",
+  UGX: "UG",
+  TZS: "TZ",
+  ZMW: "ZM",
+  RWF: "RW",
+};
 
 async function reverseTransferLedger(supabase: ReturnType<typeof createClient>, transferId: string) {
   const { data: existing } = await supabase.from("ledger_entries").select("id")
@@ -175,11 +207,19 @@ Deno.serve(async (req) => {
         await supabase.from("transfers").update({ status: "failed", failure_reason: reason }).eq("id", transfer_id);
         return new Response(JSON.stringify({ success: false, error: reason, refunded: rev.reversed }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
+      const rawPhone = phone_number || transfer.recipient_phone || "";
+      const accountNumber = fincraAccountNumber(rawPhone, ccy);
+      const phoneDigits = fincraMsisdnDigits(rawPhone, ccy);
+      const holderName = (recipient_name || transfer.recipient_name || `${firstName} ${lastName}`).trim();
+      // AIRTEL corridors reject decimal amounts per Fincra docs.
+      const payoutAmount = mmCode === "AIRTEL"
+        ? String(Math.round(amount))
+        : String(Math.round(amount * 100) / 100);
       payload = {
         business: cfg.businessId,
         sourceCurrency: ccy,
         destinationCurrency: ccy,
-        amount: String(Math.round(amount * 100) / 100),
+        amount: payoutAmount,
         description: `eFinMoney transfer to ${recipient_name}`,
         paymentDestination: "mobile_money_wallet",
         customerReference,
@@ -187,7 +227,10 @@ Deno.serve(async (req) => {
           firstName,
           lastName,
           type: "individual",
-          phone: normalizePhone(phone_number || "", ccy),
+          accountHolderName: holderName,
+          accountNumber,
+          phone: phoneDigits,
+          country: CURRENCY_TO_COUNTRY[ccy] || "ZM",
           mobileMoneyCode: mmCode,
         },
       };

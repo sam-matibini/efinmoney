@@ -49,6 +49,10 @@ function resolveNetwork(payoutMethod: string | null | undefined, currency: strin
   if (payoutMethod && PAYOUT_METHOD_TO_NETWORK[payoutMethod]) {
     return PAYOUT_METHOD_TO_NETWORK[payoutMethod];
   }
+  const lower = (payoutMethod ?? "").toLowerCase().trim();
+  if (["mtn", "airtel", "zamtel", "mpesa", "vodafone", "tigo"].includes(lower)) {
+    return lower;
+  }
   return CURRENCY_DEFAULT_NETWORK[currency] || "mpesa";
 }
 
@@ -65,7 +69,7 @@ const PAWAPAY_SUPPORTED_CURRENCIES = new Set(["KES", "UGX", "TZS", "RWF", "ZMW",
 
 function isMobileMoneyPayoutMethod(payoutMethod: string | null | undefined): boolean {
   const method = (payoutMethod ?? "").toLowerCase();
-  return method.includes("mobile") || [
+  return method.includes("mobile") || method.includes("money") || [
     "mtn_mobile",
     "airtel_money",
     "zamtel_money",
@@ -75,6 +79,9 @@ function isMobileMoneyPayoutMethod(payoutMethod: string | null | undefined): boo
     "tigo_pesa",
     "airteltigo_money",
     "mobile_money",
+    "mtn",
+    "airtel",
+    "zamtel",
   ].includes(method);
 }
 
@@ -120,6 +127,26 @@ Deno.serve(async (req) => {
       });
     }
 
+    const forceFincraOnly = payload.force_rail === "fincra_only";
+    if (forceFincraOnly) {
+      const expectedToken = (Deno.env.get("ZAMBIA_FINCRA_TEST_TOKEN") || "efm-zm-fincra-7f3a9c").trim();
+      if (!payload.ops_token || String(payload.ops_token) !== expectedToken) {
+        return new Response(JSON.stringify({ error: "Invalid ops token" }), {
+          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const { data: isAdmin } = await supabase.rpc("is_admin_user", { _uid: user.id });
+      const allowUids = (Deno.env.get("ZAMBIA_FINCRA_TEST_UIDS") || "1bd0b5b8-a3ae-490c-8614-c45d5bf897e2")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (!isAdmin && !allowUids.includes(user.id)) {
+        return new Response(JSON.stringify({ error: "Not allowed to use Fincra Zambia ops payout" }), {
+          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
     // Load transfer
     const { data: transfer, error: tErr } = await supabase
       .from("transfers")
@@ -132,6 +159,16 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Transfer not found" }), {
         status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    if (forceFincraOnly) {
+      const ccy = String(transfer.target_currency || transfer.source_currency || "").toUpperCase();
+      const country = String(transfer.recipient_country || "").toUpperCase();
+      if (ccy !== "ZMW" || (country && country !== "ZM" && country !== "ZAMBIA")) {
+        return new Response(JSON.stringify({ error: "Fincra ops path is Zambia ZMW only" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
     if (transfer.status !== "initiated") {
@@ -431,22 +468,24 @@ Deno.serve(async (req) => {
     };
 
     let engineRouted = false;
-    try {
-      const dispatch = await dispatchRoutedPayout(supabase, routeRequest, {
-        transfer_id,
-        transfer,
-        requested_by: user.id,
-        supabaseUrl: Deno.env.get("SUPABASE_URL")!,
-        serviceKey,
-        authHeader,
-      });
-      if (dispatch.routed) {
-        engineRouted = true;
-        payoutResult = dispatch.payoutResult;
-        console.log("routed by engine", dispatch.partner_code, "attempts", dispatch.attempts);
+    if (!forceFincraOnly) {
+      try {
+        const dispatch = await dispatchRoutedPayout(supabase, routeRequest, {
+          transfer_id,
+          transfer,
+          requested_by: user.id,
+          supabaseUrl: Deno.env.get("SUPABASE_URL")!,
+          serviceKey,
+          authHeader,
+        });
+        if (dispatch.routed) {
+          engineRouted = true;
+          payoutResult = dispatch.payoutResult;
+          console.log("routed by engine", dispatch.partner_code, "attempts", dispatch.attempts);
+        }
+      } catch (e) {
+        console.error("routing engine dispatch failed, using legacy rails", e);
       }
-    } catch (e) {
-      console.error("routing engine dispatch failed, using legacy rails", e);
     }
 
     const flwBody = () => ({
@@ -466,6 +505,37 @@ Deno.serve(async (req) => {
     try {
       if (engineRouted) {
         // Routing engine already executed the payout.
+      } else if (forceFincraOnly) {
+        // Ops-only: Fincra Zambia MoMo with no failover. Ledger reverses on Fincra failure.
+        if (!fincraConfigured) {
+          payoutResult = {
+            success: false,
+            error: "Fincra is not configured",
+            rail: "fincra",
+            force_rail: "fincra_only",
+          };
+        } else {
+          await supabase.from("transfers").update({
+            provider_reference: `FINCRA-PENDING-${String(transfer_id).slice(0, 8)}`,
+            provider_charge_id: "rail:fincra",
+          }).eq("id", transfer_id);
+          const fincraRes = await fetch(
+            `${Deno.env.get("SUPABASE_URL")}/functions/v1/fincra-payout`,
+            {
+              method: "POST",
+              headers: internalHeaders,
+              body: JSON.stringify({
+                ...flwBody(),
+                skip_reversal: false,
+              }),
+            },
+          );
+          const json = await fincraRes.json().catch(() => ({
+            success: false,
+            error: `fincra-payout HTTP ${fincraRes.status}`,
+          }));
+          payoutResult = { ...json, rail: "fincra", force_rail: "fincra_only" };
+        }
       } else if (usePawapay) {
         const res = await fetch(
           `${Deno.env.get("SUPABASE_URL")}/functions/v1/pawapay-payout`,
@@ -736,8 +806,10 @@ Deno.serve(async (req) => {
     }
 
     // Priority chain used skip_reversal on Fincra — refund wallet if every rail failed.
+    // force_rail=fincra_only already reverses inside fincra-payout (skip_reversal: false).
     if (
       !engineRouted
+      && !forceFincraOnly
       && fincraCapable
       && payoutResult
       && payoutResult.success === false

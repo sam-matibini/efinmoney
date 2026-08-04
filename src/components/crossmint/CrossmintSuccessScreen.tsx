@@ -120,7 +120,7 @@ export default function CrossmintSuccessScreen({ transferId }: CrossmintSuccessS
 
           <Button
             variant="outline"
-            onClick={() => navigate("/")}
+            onClick={() => navigate("/dashboard")}
             className="rounded-xl px-6 py-5 text-sm font-semibold"
           >
             <Home className="w-4 h-4 mr-2" />
