@@ -2723,7 +2723,8 @@ const SendPage = () => {
                                     </div>
                                     <div className="rounded-xl border border-border bg-card p-4 space-y-2 text-sm">
                                       <div className="flex justify-between"><span className="text-muted-foreground">You send</span><span className="font-medium">{sourceSymbol}{parsedAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {sourceCurrency}</span></div>
-                                      <div className="flex justify-between"><span className="text-muted-foreground">Fee</span><span className="font-medium">{sourceSymbol}{fee.toFixed(2)}</span></div>
+                                      <div className="flex justify-between"><span className="text-muted-foreground">Fee</span><span className="font-medium">+{sourceSymbol}{fee.toFixed(2)}</span></div>
+                                      <div className="flex justify-between"><span className="text-muted-foreground">Total to pay</span><span className="font-semibold">{sourceSymbol}{totalCharge.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {sourceCurrency}</span></div>
                                       <div className="flex justify-between"><span className="text-muted-foreground">Rate</span><span className="font-medium">1 {sourceCurrency} = {effectiveRate.toFixed(4)} {targetCountry.code}</span></div>
                                       <div className="flex justify-between text-base pt-2 border-t border-border"><span>They receive</span><span className="font-bold">{targetSymbol} {receivedAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
                                     </div>
