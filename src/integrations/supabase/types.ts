@@ -9000,6 +9000,7 @@ export type Database = {
         Returns: {
           account_number: string
           avatar_url: string
+          base_currency: string
           efin_tag: string
           email: string
           full_name: string
