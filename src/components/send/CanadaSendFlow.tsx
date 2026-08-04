@@ -20,6 +20,7 @@ import {
 import PayeePicker from "@/components/PayeePicker";
 import ContactsPickerModal from "@/components/modals/ContactsPickerModal";
 import AddBeneficiaryModal from "@/components/modals/AddBeneficiaryModal";
+import ContactQuickField from "@/components/send/ContactQuickField";
 import {
   AlertDialog,
   AlertDialogAction,
