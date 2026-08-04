@@ -741,6 +741,39 @@ const TopUpPage = () => {
           </AlertDialogContent>
         </AlertDialog>
 
+        {topupStep === 2 && selectedWallet && liveTopup ? (
+          <CheckoutShell
+            payTo={`Add money to your ${currency} wallet`}
+            amount={`${currencySymbol(currency)}${(amountNum || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+            amountNote={`${selectedWallet.flag_emoji || ""} ${currency} wallet · ${selectedWallet.symbol}${Number(selectedWallet.balance).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} available`}
+            lines={[
+              { label: "Wallet top-up", sublabel: `${currency} balance credit`, value: `${currencySymbol(currency)}${(amountNum || 0).toFixed(2)}` },
+              { label: "Provider fees", sublabel: "Charged by the payment method", value: "At checkout", muted: true },
+            ]}
+            totals={[
+              { label: "Total to pay", value: `${currencySymbol(currency)}${(amountNum || 0).toFixed(2)}`, emphasis: true },
+            ]}
+            contactEmail={user?.email || null}
+            onBack={() => setTopupStep(1)}
+            backLabel="Edit amount"
+          >
+            {payMethods.length === 0 ? (
+              <Card>
+                <CardContent className="pt-6">
+                  <p className="text-sm text-muted-foreground">
+                    No payment method is available for <strong>{currency}</strong> right now. Please contact support.
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <CheckoutMethodList
+                methods={payMethods}
+                value={activeMethodId}
+                onChange={setSelectedMethodId}
+              />
+            )}
+          </CheckoutShell>
+        ) : (
         <MoneyFlowShell
           steps={flowSteps}
           currentStep={topupStep}
@@ -762,10 +795,6 @@ const TopUpPage = () => {
                 }
               >
                 {loading ? "Opening checkout." : "Continue"}
-              </Button>
-            ) : topupStep === 2 ? (
-              <Button type="button" variant="ghost" className="w-full text-muted-foreground" onClick={() => setTopupStep(1)}>
-                Back
               </Button>
             ) : null
           }
