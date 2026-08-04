@@ -651,16 +651,16 @@ const SendPage = () => {
   const calcQuoteRecipient = useCallback(
     (sendInFrom: number) => {
       if (!rateAvailable || effectiveRate <= 0) return 0;
-      return Math.max(0, (sendInFrom - baseFee - cardFee) * effectiveRate);
+      return Math.max(0, sendInFrom * effectiveRate);
     },
-    [rateAvailable, effectiveRate, baseFee, cardFee],
+    [rateAvailable, effectiveRate],
   );
   const calcQuoteSend = useCallback(
     (recvInTo: number) => {
       if (!rateAvailable || effectiveRate <= 0) return 0;
-      return recvInTo / effectiveRate + baseFee + cardFee;
+      return recvInTo / effectiveRate;
     },
-    [rateAvailable, effectiveRate, baseFee, cardFee],
+    [rateAvailable, effectiveRate],
   );
 
   const handleCalcFromChange = useCallback(
