@@ -314,19 +314,34 @@ export default function FlutterwaveCardForm({
   });
 
   const verifyAndCredit = async () => {
-    if (!lastPayload) return;
+    if (!lastPayload && !pendingChargeId) return;
     try {
-      const { data, error } = await supabase.functions.invoke("flw-card-charge", { body: lastPayload });
+      // Confirm the existing charge rather than re-posting card data (avoids a second charge).
+      const body: Record<string, unknown> = pendingChargeId
+        ? {
+            charge_id: pendingChargeId,
+            amount: amountNum,
+            currency,
+            wallet_id: wallet?.wallet_id ?? "",
+          }
+        : { ...(lastPayload as Record<string, unknown>) };
+      const { data, error } = await supabase.functions.invoke("flw-card-charge", { body });
       if (error) throw new Error(error.message);
       if (!data?.success) throw new Error(data?.error || "Payment failed");
+      if (data?.requires_auth) {
+        applyAuthResponse(data);
+        return;
+      }
       await queryClient.invalidateQueries({ queryKey: ["wallets"] });
       await queryClient.invalidateQueries({ queryKey: ["ledger-deposits"] });
+      setAuthMode(null);
       setSuccess({ amount: amountNum, currency, symbol });
       onSuccess?.({ amount: amountNum, currency, walletId: wallet?.wallet_id ?? "" });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Verification failed");
     }
   };
+
 
   const handleCharge = async (extraPayload?: Record<string, unknown>) => {
     const payload = extraPayload || buildChargePayload();
