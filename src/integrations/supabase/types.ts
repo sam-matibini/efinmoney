@@ -1260,6 +1260,35 @@ export type Database = {
           },
         ]
       }
+      card_secrets: {
+        Row: {
+          card_id: string
+          created_at: string
+          cvv_encrypted: string
+          pan_encrypted: string
+        }
+        Insert: {
+          card_id: string
+          created_at?: string
+          cvv_encrypted: string
+          pan_encrypted: string
+        }
+        Update: {
+          card_id?: string
+          created_at?: string
+          cvv_encrypted?: string
+          pan_encrypted?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_secrets_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: true
+            referencedRelation: "cards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       card_spending_controls: {
         Row: {
           allowed_categories: string[] | null
@@ -8596,6 +8625,50 @@ export type Database = {
             columns: ["wallet_id"]
             isOneToOne: false
             referencedRelation: "wallets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      virtual_card_transfers: {
+        Row: {
+          amount: number
+          card_id: string
+          created_at: string
+          currency_code: string
+          direction: string
+          id: string
+          journal_entry_id: string | null
+          user_id: string
+          wallet_id: string | null
+        }
+        Insert: {
+          amount: number
+          card_id: string
+          created_at?: string
+          currency_code?: string
+          direction: string
+          id?: string
+          journal_entry_id?: string | null
+          user_id: string
+          wallet_id?: string | null
+        }
+        Update: {
+          amount?: number
+          card_id?: string
+          created_at?: string
+          currency_code?: string
+          direction?: string
+          id?: string
+          journal_entry_id?: string | null
+          user_id?: string
+          wallet_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "virtual_card_transfers_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "cards"
             referencedColumns: ["id"]
           },
         ]
