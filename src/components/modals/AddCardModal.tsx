@@ -87,7 +87,7 @@ const AddCardModal = ({ isOpen, onClose, defaultMode = "issue" }: AddCardModalPr
 
   const handleIssue = async () => {
     if (!cardholderName.trim()) return toast.error("Cardholder name is required");
-    if (!isCredit && !walletId) return toast.error("Select a linked wallet");
+    if (isCredit && (!creditLimit || Number(creditLimit) <= 0))
     if (isCredit && (!creditLimit || Number(creditLimit) <= 0))
       return toast.error("Enter a valid credit limit");
 
