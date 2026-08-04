@@ -2259,15 +2259,8 @@ const SendPage = () => {
                                       /></SectionBoundary>
                                     </motion.div>
 
-                                    {fundingSource === "card" && cardSendProvider && (
-                                      <p className="text-xs text-muted-foreground text-center -mt-2">
-                                        {cardCheckoutQuote
-                                          ? `Card charge ≈ ${cardCheckoutQuote.checkoutCurrency} ${cardCheckoutQuote.checkoutAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} · `
-                                          : ""}
-                                        Min {cardSendMinAmount(cardSendProvider, sourceCurrency)} {sourceCurrency}
-                                        {cardSendProvider === "nomba" && sourceCurrency === "CAD" ? " · CAD charged in USD" : ""}
-                                      </p>
-                                    )}
+
+
 
                                     {fundingSource === "card" && cardSendProvider && parsedAmount > 0
                                       && parsedAmount < cardSendMinAmount(cardSendProvider, sourceCurrency) && (
