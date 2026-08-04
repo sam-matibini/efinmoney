@@ -18,6 +18,7 @@ export interface QuickPickRecipient {
   email: string | null;
   avatar_url: string | null;
   account_number?: string | null;
+  base_currency?: string | null;
 }
 
 interface SearchRow {
@@ -27,6 +28,7 @@ interface SearchRow {
   avatar_url: string | null;
   email_masked: string | null;
   account_number: string | null;
+  base_currency: string | null;
 }
 
 interface RecentRow {
@@ -37,6 +39,7 @@ interface RecentRow {
   email: string | null;
   account_number: string | null;
   last_sent_at: string;
+  base_currency: string | null;
 }
 
 interface Props {
