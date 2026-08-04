@@ -59,10 +59,10 @@ const initials = (r: { full_name: string | null; efin_tag: string | null; email:
     .join("");
 };
 
-const Avatar = ({ url, label, size = "md" }: { url: string | null; label: string; size?: "sm" | "md" }) => {
+const Avatar = ({ url, label, seed, size = "md" }: { url: string | null; label: string; seed?: string | null; size?: "sm" | "md" }) => {
   const cls = size === "sm" ? "w-9 h-9 text-xs" : "w-10 h-10 text-sm";
   return (
-    <div className={`${cls} rounded-full bg-primary/15 text-primary flex items-center justify-center shrink-0 font-medium overflow-hidden`}>
+    <div className={`${cls} ${avatarColorClasses(seed)} rounded-full flex items-center justify-center shrink-0 font-semibold overflow-hidden`}>
       {url ? <img src={url} alt="" className="w-full h-full object-cover" /> : label || <User className="w-4 h-4" />}
     </div>
   );
