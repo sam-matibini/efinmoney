@@ -224,7 +224,8 @@ const COUNTRY_ALIASES: Record<string, string[]> = {
   ua: ["ukraine"],
   gn: ["guinea"],
   cn: ["china", "peoples republic of china"],
-  sm: ["sri lanka"],
+  lk: ["sri lanka"],
+  gt: ["guatemala"],
   pk: ["pakistan"],
   ye: ["yemen"],
   so: ["somalia"],
@@ -234,6 +235,28 @@ const COUNTRY_ALIASES: Record<string, string[]> = {
   tn: ["tunisia"],
   eg: ["egypt"],
 };
+
+/**
+ * Countries Canada sanctions under the *United Nations Act* regulations rather
+ * than SEMA. They never appear in the SEMA XML, so they are flagged statically.
+ */
+const CANADA_UN_ACT_COUNTRIES: Record<string, string> = {
+  kp: "North Korea",
+  ir: "Iran",
+  ly: "Libya",
+  so: "Somalia",
+  ss: "South Sudan",
+  sd: "Sudan",
+  ye: "Yemen",
+  cf: "Central African Republic",
+  cd: "Democratic Republic of the Congo",
+  ml: "Mali",
+  iq: "Iraq",
+  lb: "Lebanon",
+  gw: "Guinea-Bissau",
+  er: "Eritrea",
+};
+
 
 const canonCountry = (s: string) =>
   (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
@@ -267,6 +290,13 @@ async function flagCanadaSanctionedCountries(
     }
   }
 
+  // Countries sanctioned under the UN Act are always in scope.
+  for (const [code, name] of Object.entries(CANADA_UN_ACT_COUNTRIES)) {
+    expanded.add(code);
+    expanded.add(canonCountry(name));
+    (COUNTRY_ALIASES[code] || []).forEach((a) => expanded.add(a));
+  }
+
   const { data } = await supabase
     .from("geographic_risk_ratings")
     .select("id, country_code, country_name, canada_sanctions");
@@ -275,9 +305,11 @@ async function flagCanadaSanctionedCountries(
   }[];
 
   let updated = 0;
+  const seenCodes = new Set<string>();
   for (const c of list) {
     const nm = canonCountry(c.country_name);
     const code = (c.country_code || "").toLowerCase();
+    if (code) seenCodes.add(code);
     const aliases = COUNTRY_ALIASES[code] || [];
     const hit = expanded.has(nm) ||
       (code.length === 2 && expanded.has(code)) ||
@@ -290,8 +322,32 @@ async function flagCanadaSanctionedCountries(
       updated++;
     }
   }
+
+  // Seed register rows for sanctioned countries that are not tracked yet, so
+  // the risk register is complete rather than silently missing regimes.
+  const missing: { country_code: string; country_name: string }[] = [];
+  for (const [code, names] of Object.entries(COUNTRY_ALIASES)) {
+    if (seenCodes.has(code)) continue;
+    const sanctioned = expanded.has(code) || names.some((n) => expanded.has(n));
+    if (!sanctioned) continue;
+    const label = CANADA_UN_ACT_COUNTRIES[code] ||
+      names[0].replace(/\b\w/g, (m) => m.toUpperCase());
+    missing.push({ country_code: code.toUpperCase(), country_name: label });
+  }
+  if (missing.length) {
+    const { error } = await supabase.from("geographic_risk_ratings").insert(
+      missing.map((m) => ({
+        ...m,
+        canada_sanctions: true,
+        risk_level: "high",
+      })),
+    );
+    if (!error) updated += missing.length;
+  }
+
   return updated;
 }
+
 
 
 async function upsertAll(supabase: ReturnType<typeof createClient>, rows: WatchRow[]) {
