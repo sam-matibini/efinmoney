@@ -29,12 +29,14 @@ type ChargeAuthResponse = {
   error?: string;
   charge_id?: string | number | null;
   provider_action_type?: string | null;
+  provider_message?: string | null;
   auth?: {
     mode?: string;
     redirect?: string | null;
     message?: string | null;
   };
 };
+
 
 const STAGE_COPY: Record<Exclude<Stage, "idle" | "success">, { title: string; sub: string }> = {
   charging: { title: "Charging your card…", sub: "Securely processing your payment" },
