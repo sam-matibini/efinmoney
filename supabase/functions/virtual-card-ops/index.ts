@@ -135,8 +135,9 @@ async function createCardInner(admin: Sb, userId: string, body: Record<string, u
     spending_limit: spendingLimit,
     credit_limit: isCredit ? creditLimit : null,
     funding_source: isCredit ? "credit_line" : "wallet",
-    wallet_id: isCredit ? null : walletId,
-    currency_code: currency,
+    wallet_id: isCredit || !walletId ? null : walletId,
+    currency_code: currency || "CAD",
+
   }).select("*").single();
   if (insertErr) throw insertErr;
 
