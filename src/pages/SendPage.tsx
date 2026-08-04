@@ -2209,14 +2209,26 @@ const SendPage = () => {
 
                                     <motion.div custom={1} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
                                       <Label>Recipient Name</Label>
-                                      <Input
-                                        placeholder="Full name as registered"
-                                        value={recipientName}
-                                        onChange={(e) => setRecipientName(e.target.value.replace(/[^\p{L}\p{M}'\-. ]/gu, "").slice(0, 100))}
-                                        maxLength={100}
-                                        className="transition-shadow focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:shadow-[0_0_0_4px_hsl(var(--primary)/0.12)]"
-                                      />
+                                      <div className="relative">
+                                        <Input
+                                          placeholder="Recipient name"
+                                          value={recipientName}
+                                          onChange={(e) => setRecipientName(e.target.value.replace(/[^\p{L}\p{M}'\-. ]/gu, "").slice(0, 100))}
+                                          maxLength={100}
+                                          className="pr-11 transition-shadow focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:shadow-[0_0_0_4px_hsl(var(--primary)/0.12)]"
+                                        />
+                                        <button
+                                          type="button"
+                                          onClick={() => setSaveModalOpen(true)}
+                                          aria-label="Quick add new recipient"
+                                          title="Quick add new recipient"
+                                          className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                        >
+                                          <UserPlus className="w-4 h-4" />
+                                        </button>
+                                      </div>
                                     </motion.div>
+
                                     {linkEligible && (
                                       <motion.div custom={1.1} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
                                         <Label>How should {targetCountry.country} receive it?</Label>
