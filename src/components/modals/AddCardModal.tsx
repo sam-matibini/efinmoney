@@ -25,6 +25,9 @@ import { useWallets } from "@/hooks/useWallets";
 import { Copy, Check, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import SaveCardForm from "@/components/cards/SaveCardForm";
+import ManualCardForm from "@/components/cards/ManualCardForm";
+import { STRIPE_PAYMENTS_ENABLED } from "@/lib/stripeDisabled";
+
 
 interface AddCardModalProps {
   isOpen: boolean;
