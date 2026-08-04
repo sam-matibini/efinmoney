@@ -2759,6 +2759,7 @@ const SendPage = () => {
       <AddBeneficiaryModal
         open={saveModalOpen}
         onOpenChange={setSaveModalOpen}
+        onSaved={(b) => { applyBeneficiary(b); setSaveModalOpen(false); }}
         editing={{
           id: "",
           user_id: "",
