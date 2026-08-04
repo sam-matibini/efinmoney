@@ -181,15 +181,16 @@ export function navDesktopClass(active: boolean, withLabel = false) {
   ].join(" ");
 }
 
-export function navMobileClass(active: boolean) {
+export function navMobileClass(active: boolean, label = "") {
+  const tone = navCellTone(label);
   return [
-    "flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium w-full",
+    "flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-semibold w-full",
     headerNavInteractive,
-    active
-      ? `bg-primary/10 text-primary ${headerNavActiveMotion}`
-      : "text-muted-foreground hover:bg-muted/80 hover:text-foreground",
+    tone.label,
+    active ? `${tone.active} ${headerNavActiveMotion}` : `${tone.idle} hover:brightness-105`,
   ].join(" ");
 }
+
 
 export const profileTriggerClass =
   "flex items-center gap-1.5 p-1 pr-2 rounded-lg border border-border/60 bg-background/80 hover:bg-muted/60 transition-all duration-300 header-hover-lift header-profile-btn";
