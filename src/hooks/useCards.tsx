@@ -97,9 +97,8 @@ export const useCardMutations = () => {
           throw new Error('Credit limit is required for credit cards');
         }
 
-        if (isCredit && !input.credit_limit) {
-          throw new Error('Credit limit is required for credit cards');
-        }
+
+
 
         const res = await invokeEdgeFunction<{
           card?: Card;
