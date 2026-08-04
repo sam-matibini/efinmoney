@@ -131,6 +131,8 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
     isFetchingNextPage,
     hasNextPage,
     fetchNextPage,
+    error: listError,
+    refetch: refetchList,
   } = useInfiniteQuery({
     queryKey: ["efin-list-recipients", debounced],
     enabled: open && mode === "search" && !!user?.id,
@@ -350,6 +352,15 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
               {isFetching && suggestions.length === 0 ? (
                 <div className="flex items-center gap-2 p-3 text-sm text-muted-foreground">
                   <LoadingSpinner size={14} /> Searching…
+                </div>
+              ) : listError ? (
+                <div className="flex items-center justify-between gap-2 p-3">
+                  <span className="text-sm text-destructive">
+                    {listError instanceof Error ? listError.message : "Couldn't load eFinMoney users"}
+                  </span>
+                  <Button size="sm" variant="ghost" onClick={() => refetchList()}>
+                    Retry
+                  </Button>
                 </div>
               ) : suggestions.length === 0 ? (
                 <div className="flex items-center justify-between gap-2 p-3">
