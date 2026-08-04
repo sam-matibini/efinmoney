@@ -132,6 +132,19 @@
     --pay-mobile: 41 100% 58%;
     --pay-mobile-foreground: 232 45% 7%;
 
+    /* Per-user avatar palette (dark) */
+    --avatar-1: 244 45% 26%; --avatar-1-foreground: 244 90% 86%;
+    --avatar-2: 199 55% 22%; --avatar-2-foreground: 199 90% 82%;
+    --avatar-3: 152 40% 20%; --avatar-3-foreground: 152 70% 78%;
+    --avatar-4: 33 55% 22%;  --avatar-4-foreground: 36 90% 78%;
+    --avatar-5: 342 45% 25%; --avatar-5-foreground: 342 85% 85%;
+    --avatar-6: 271 45% 26%; --avatar-6-foreground: 271 85% 86%;
+    --avatar-7: 176 45% 19%; --avatar-7-foreground: 172 70% 76%;
+    --avatar-8: 12 50% 24%;  --avatar-8-foreground: 12 85% 82%;
+    --avatar-9: 96 40% 19%;  --avatar-9-foreground: 88 65% 78%;
+    --avatar-10: 220 25% 26%; --avatar-10-foreground: 220 40% 85%;
+
+
     --gradient-card: linear-gradient(145deg, hsl(232 42% 11%) 0%, hsl(258 35% 16%) 100%);
     --shadow-card: 0 1px 3px hsl(0 0% 0% / 0.3), 0 1px 2px hsl(0 0% 0% / 0.2);
     --shadow-elevated: 0 10px 30px -10px hsl(0 0% 0% / 0.5), 0 4px 12px -4px hsl(0 0% 0% / 0.3);
