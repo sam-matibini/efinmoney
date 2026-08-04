@@ -195,7 +195,7 @@ const Header = () => {
                         onMouseEnter={() => warmRoute(item.href)}
                         onFocus={() => warmRoute(item.href)}
                         onTouchStart={() => warmRoute(item.href)}
-                        className={navMobileClass(isActive)}
+                        className={navMobileClass(isActive, item.label)}
                       >
                         <NavIconImage label={item.label} className={navIconImgClassMobile} />
                         {item.label}
