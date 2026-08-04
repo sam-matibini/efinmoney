@@ -44,7 +44,7 @@ import { resolveEffectiveRate } from "@/lib/fx";
 import { currencySymbol, countryToCurrency } from "@/lib/currency";
 import { useProfile } from "@/hooks/useProfile";
 import { toast } from "sonner";
-import { ArrowRight, CheckCircle, Wallet, Landmark, CreditCard, AlertCircle, X, Search, Globe2, Lock, Loader2, Check, Shield, Users, ChevronDown } from "lucide-react";
+import { ArrowRight, CheckCircle, Wallet, Landmark, CreditCard, AlertCircle, X, Search, Globe2, Lock, Loader2, Check, Shield, Users, UserPlus, ChevronDown } from "lucide-react";
 import { BrandFlag, CountryFlag } from "@/components/ui/FlagImage";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import CanadaSendFlow from "@/components/send/CanadaSendFlow";
@@ -318,8 +318,26 @@ const SendPage = () => {
     if (plaidLinkToken && plaidReady) openPlaid();
   }, [plaidLinkToken, plaidReady, openPlaid]);
 
-  const selectedWallet = wallets?.find(w => w.wallet_id === selectedWalletId) || wallets?.[0];
+  // Domicile country decides the base currency; stored preference is the fallback.
+  const profileCurrency = countryToCurrency(profile?.address_country || profile?.country_code)
+    || profile?.default_currency
+    || wallets?.find(w => w.is_default)?.currency_code
+    || null;
+  const baseCurrency = profileCurrency || SYSTEM_DEFAULT_CURRENCY;
+
+  const selectedWallet = wallets?.find(w => w.wallet_id === selectedWalletId)
+    || wallets?.find(w => w.currency_code === baseCurrency)
+    || wallets?.find(w => w.is_default)
+    || wallets?.[0];
   const targetCountry = findCountryById(targetCountryId) || COUNTRIES[0];
+
+  // On first load, start on the wallet in the sender's base currency.
+  useEffect(() => {
+    if (selectedWalletId || !wallets?.length) return;
+    const preferred = wallets.find(w => w.currency_code === baseCurrency)
+      || wallets.find(w => w.is_default);
+    if (preferred) setSelectedWalletId(preferred.wallet_id);
+  }, [wallets, baseCurrency, selectedWalletId]);
 
   const activeSources = fundingSource === 'bank' ? bankSources : fundingSource === 'card' ? cardSources : [];
   const selectedExternalSource = activeSources.find(s => s.id === selectedSourceId) || activeSources[0];
@@ -329,11 +347,6 @@ const SendPage = () => {
     || savedCards.find(c => c.is_default)
     || savedCards[0];
 
-  // Domicile country decides the base currency; stored preference is the fallback.
-  const profileCurrency = countryToCurrency(profile?.address_country || profile?.country_code)
-    || profile?.default_currency
-    || wallets?.find(w => w.is_default)?.currency_code
-    || null;
 
   const sourceCurrency = fundingSource === 'wallet'
     ? (selectedWallet?.currency_code || profileCurrency || SYSTEM_DEFAULT_CURRENCY)
@@ -1330,7 +1343,7 @@ const SendPage = () => {
       const b = beneficiaries.find((x) => x.id === bid);
       if (b) {
         applyBeneficiary(b);
-        goToStep(2);
+        goToStep(1);
         const next = new URLSearchParams(searchParams);
         next.delete("beneficiaryId");
         setSearchParams(next, { replace: true });
@@ -1391,7 +1404,7 @@ const SendPage = () => {
     }
 
     setFromQuickSend(true);
-    setTimeout(() => goToStep(2), 0);
+    setTimeout(() => goToStep(1), 0);
 
     const destCode = toCode;
     if (destCode && beneficiaries?.length) {
@@ -2117,30 +2130,30 @@ const SendPage = () => {
                               >
                                 <MoneyFlowShell
                                   steps={[
-                                    { n: 1, label: "Amount" },
-                                    { n: 2, label: "Recipient" },
-                                    { n: 3, label: "Confirm" },
+                                    { n: 1, label: "Details" },
+                                    { n: 2, label: "Confirm" },
                                   ]}
                                   currentStep={1}
-                                  title="Amount"
-                                  subtitle="How much you send and what they get"
+                                  title={`Send money to ${targetCountry.country}`}
+                                  subtitle="Recipient, amount and how you pay"
+
                                   footer={
                                     <div className="space-y-3">
                                       <motion.div
                                         whileTap={{ scale: 0.97 }}
-                                        animate={isStep1Valid ? { boxShadow: [
+                                        animate={isStep1Valid && isStep2Valid ? { boxShadow: [
                                           "0 0 0 0 hsl(var(--primary) / 0)",
                                           "0 0 0 6px hsl(var(--primary) / 0.15)",
                                           "0 0 0 0 hsl(var(--primary) / 0)",
                                         ] } : { boxShadow: "0 0 0 0 hsl(var(--primary) / 0)" }}
-                                        transition={isStep1Valid ? { duration: 1.8, repeat: Infinity, ease: "easeInOut" } : { duration: 0.2 }}
+                                        transition={isStep1Valid && isStep2Valid ? { duration: 1.8, repeat: Infinity, ease: "easeInOut" } : { duration: 0.2 }}
                                         className="rounded-md"
                                       >
                                         <Button
                                           className="w-full"
                                           size="lg"
-                                          onClick={() => goToStep(2)}
-                                          disabled={!isStep1Valid}
+                                          onClick={() => goToStep(3)}
+                                          disabled={!isStep1Valid || !isStep2Valid}
                                         >
                                           Continue
                                         </Button>
@@ -2155,195 +2168,6 @@ const SendPage = () => {
                                     </div>
                                   }
                                 >
-                                    <motion.div custom={0} variants={fieldVariants} initial="hidden" animate="show" className="space-y-3">
-                                      <div className="space-y-2">
-                                        <Label>Pay with</Label>
-                                        <PaymentMethodRow
-                                          options={fundingMethodOptions}
-                                          value={fundingSource}
-                                          onChange={(v) => setFundingSource(v)}
-                                        />
-                                      </div>
-
-                                    </motion.div>
-
-                                    <motion.div custom={1} variants={fieldVariants} initial="hidden" animate="show">
-                                      <MethodCheckoutPanel
-                                        method={fundingSource as "card" | "bank" | "wallet"}
-                                        wallets={(fundingSource === "card" ? cardWallets : (wallets ?? [])).map((w) => ({
-                                          wallet_id: w.wallet_id,
-                                          currency_code: w.currency_code,
-                                          symbol: w.symbol,
-                                          balance: w.balance,
-                                          flag_emoji: w.flag_emoji,
-                                        }))}
-                                        selectedWalletId={selectedWalletId || selectedWallet?.wallet_id}
-                                        onWalletChange={(id) => setSelectedWalletId(id)}
-                                        linkedCardCount={linkedCardCount}
-                                        bankSources={bankSources}
-                                        selectedSourceId={selectedSourceId || bankSources[0]?.id}
-                                        onSourceChange={setSelectedSourceId}
-                                        onLinkBank={startPlaidLink}
-                                        linkingBank={plaidLinking}
-                                        savedCards={savedCards.map((c) => ({
-                                          id: c.stripe_payment_method_id,
-                                          card_brand: c.card_brand,
-                                          last_four: c.last_four,
-                                          exp_month: c.exp_month,
-                                          exp_year: c.exp_year,
-                                        }))}
-                                        selectedCardId={activeSavedCard?.stripe_payment_method_id}
-                                        onCardChange={setSelectedSavedCardId}
-                                        onAddCard={() => setAddCardOpen(true)}
-                                        onAddWallet={() => createWalletTriggerRef.current?.click()}
-                                        amount={parsedAmount}
-                                        fee={fee}
-                                        total={totalCharge}
-                                        currency={sourceCurrency}
-                                        symbol={sourceSymbol}
-                                        cardProviderReady={!!cardSendProvider}
-                                        cardChargeNote={
-                                          cardCheckoutQuote
-                                            ? `Card charge ≈ ${cardCheckoutQuote.checkoutCurrency} ${cardCheckoutQuote.checkoutAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${cardSendProvider === "nomba" && sourceCurrency === "CAD" ? " · CAD charged in USD" : ""}`
-                                            : null
-                                        }
-                                        cardMinNote={
-                                          cardSendProvider
-                                            ? `Minimum card send is ${cardSendMinAmount(cardSendProvider, sourceCurrency)} ${sourceCurrency}.`
-                                            : null
-                                        }
-                                        inlineEntry={inlineCardEntry}
-                                        insufficientBalance={insufficientFunds}
-                                        onTopUp={() => navigate("/wallet/topup")}
-                                      />
-                                    </motion.div>
-
-
-                                    <motion.div custom={2} variants={fieldVariants} initial="hidden" animate="show" className="flex justify-center py-1">
-                                      <SectionBoundary name="LiveFxCalculator"><LiveFxCalculator
-                                        variant="app"
-                                        showDisclaimer={false}
-                                        className="max-w-none w-full"
-                                        from={sourceCurrency}
-                                        to={targetCountry.code}
-                                        sendAmount={amount}
-                                        onFromChange={handleCalcFromChange}
-                                        onToChange={handleCalcToChange}
-                                        onSendAmountChange={(v) => setAmount(v)}
-                                        fromCurrencyFilter={
-                                          fundingSource === "wallet" ? walletCurrencyCodes
-                                          : fundingSource === "card" ? cardWalletCodes
-                                          : undefined
-                                        }
-                                        toCurrencyFilter={
-                                          fundingSource === "card" ? cardPayoutCodes : payoutCurrencyCodes
-                                        }
-                                        priorityCodes={PRIORITY_SEND_CURRENCIES}
-                                        quoteRecipient={rateAvailable ? calcQuoteRecipient : undefined}
-                                        quoteSend={rateAvailable ? calcQuoteSend : undefined}
-                                        displayRate={rateAvailable ? effectiveRate : null}
-                                       feeLabel={feeDisplayLabel}
-                                       feeNote={feeNote}
-                                        walletBalance={
-                                          fundingSource === "wallet" && selectedWallet
-                                            ? Number(selectedWallet.balance)
-                                            : null
-                                        }
-                                        walletSymbol={selectedWallet?.symbol}
-                                        showActions={false}
-                                      /></SectionBoundary>
-                                    </motion.div>
-
-
-
-
-                                    {fundingSource === "card" && cardSendProvider && parsedAmount > 0
-                                      && parsedAmount < cardSendMinAmount(cardSendProvider, sourceCurrency) && (
-                                      <motion.p
-                                        initial={{ opacity: 0, x: -6 }}
-                                        animate={{ opacity: 1, x: 0 }}
-                                        className="text-sm font-medium text-destructive flex items-center justify-center gap-1"
-                                      >
-                                        <AlertCircle className="w-3.5 h-3.5" />
-                                        Card minimum is {cardSendMinAmount(cardSendProvider, sourceCurrency)} {sourceCurrency}
-                                      </motion.p>
-                                    )}
-
-                                    {insufficientFunds && (
-                                      <motion.p
-                                        initial={{ opacity: 0, x: -6 }}
-                                        animate={{ opacity: 1, x: 0 }}
-                                        className="text-sm font-medium text-destructive flex items-center justify-center gap-1"
-                                      >
-                                        <AlertCircle className="w-3.5 h-3.5" /> Insufficient wallet balance
-                                      </motion.p>
-                                    )}
-
-                                    {!rateAvailable && (
-                                      <p className="text-sm text-center text-muted-foreground">
-                                        No FX rate for {sourceCurrency} → {targetCountry.code}. Try another pair or funding source.
-                                      </p>
-                                    )}
-                                </MoneyFlowShell>
-                              </motion.div>
-                            )}
-
-                            {step === 2 && (
-                              <motion.div
-                                key="step2"
-                                custom={direction}
-                                variants={stepVariants}
-                                initial="enter"
-                                animate="center"
-                                exit="exit"
-                                transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-                              >
-                                <MoneyFlowShell
-                                  steps={[
-                                    { n: 1, label: "Amount" },
-                                    { n: 2, label: "Recipient" },
-                                    { n: 3, label: "Confirm" },
-                                  ]}
-                                  currentStep={2}
-                                  title="Recipient"
-                                  subtitle="Who should receive the money"
-                                >
-                                    {fromQuickSend && parsedAmount > 0 && receivedAmount > 0 && (
-                                      <motion.div
-                                        custom={0}
-                                        variants={fieldVariants}
-                                        initial="hidden"
-                                        animate="show"
-                                        className="rounded-xl border border-primary/25 bg-primary/5 p-4 space-y-2"
-                                      >
-                                        <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
-                                          Ready from calculator
-                                        </p>
-                                        <p className="text-base font-bold tabular-nums">
-                                          {sourceSymbol}
-                                          {parsedAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{" "}
-                                          {sourceCurrency}
-                                          <span className="mx-2 text-muted-foreground font-normal">→</span>
-                                          {targetSymbol}
-                                          {receivedAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{" "}
-                                          {targetCountry.code}
-                                        </p>
-                                        <p className="text-xs text-muted-foreground">
-                                          Wallet funded · pick a saved contact below or enter details
-                                        </p>
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            setFromQuickSend(false);
-                                            clearSendHandoff();
-                                            goToStep(1);
-                                          }}
-                                          className="text-xs font-medium text-primary hover:underline"
-                                        >
-                                          Edit amount or funding
-                                        </button>
-                                      </motion.div>
-                                    )}
 
                                     <motion.div custom={0} variants={fieldVariants} initial="hidden" animate="show" className="space-y-3">
                                       <ContactQuickField
@@ -2385,14 +2209,26 @@ const SendPage = () => {
 
                                     <motion.div custom={1} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
                                       <Label>Recipient Name</Label>
-                                      <Input
-                                        placeholder="Full name as registered"
-                                        value={recipientName}
-                                        onChange={(e) => setRecipientName(e.target.value.replace(/[^\p{L}\p{M}'\-. ]/gu, "").slice(0, 100))}
-                                        maxLength={100}
-                                        className="transition-shadow focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:shadow-[0_0_0_4px_hsl(var(--primary)/0.12)]"
-                                      />
+                                      <div className="relative">
+                                        <Input
+                                          placeholder="Recipient name"
+                                          value={recipientName}
+                                          onChange={(e) => setRecipientName(e.target.value.replace(/[^\p{L}\p{M}'\-. ]/gu, "").slice(0, 100))}
+                                          maxLength={100}
+                                          className="pr-11 transition-shadow focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:shadow-[0_0_0_4px_hsl(var(--primary)/0.12)]"
+                                        />
+                                        <button
+                                          type="button"
+                                          onClick={() => setSaveModalOpen(true)}
+                                          aria-label="Quick add new recipient"
+                                          title="Quick add new recipient"
+                                          className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                        >
+                                          <UserPlus className="w-4 h-4" />
+                                        </button>
+                                      </div>
                                     </motion.div>
+
                                     {linkEligible && (
                                       <motion.div custom={1.1} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
                                         <Label>How should {targetCountry.country} receive it?</Label>
@@ -2611,26 +2447,139 @@ const SendPage = () => {
                                     )}
 
 
-                                    <motion.div custom={3} variants={fieldVariants} initial="hidden" animate="show" className="flex gap-3">
-                                      <Button variant="outline" className="flex-1" onClick={() => goToStep(1)}>Back</Button>
-                                      <motion.div
-                                        whileTap={{ scale: 0.97 }}
-                                        animate={isStep2Valid && !createTransfer.isPending ? { boxShadow: [
-                                          "0 0 0 0 hsl(var(--primary) / 0)",
-                                          "0 0 0 6px hsl(var(--primary) / 0.15)",
-                                          "0 0 0 0 hsl(var(--primary) / 0)",
-                                        ] } : { boxShadow: "0 0 0 0 hsl(var(--primary) / 0)" }}
-                                        transition={isStep2Valid && !createTransfer.isPending ? { duration: 1.8, repeat: Infinity, ease: "easeInOut" } : { duration: 0.2 }}
-                                        className="flex-1 rounded-md"
-                                      >
-                                        <Button className="w-full" onClick={() => goToStep(3)} disabled={!isStep2Valid}>
-                                          Continue
-                                        </Button>
-                                      </motion.div>
+                                    <motion.div custom={0} variants={fieldVariants} initial="hidden" animate="show" className="space-y-3">
+                                      <div className="space-y-2">
+                                        <Label>Pay with</Label>
+                                        <PaymentMethodRow
+                                          options={fundingMethodOptions}
+                                          value={fundingSource}
+                                          onChange={(v) => setFundingSource(v)}
+                                        />
+                                      </div>
+
                                     </motion.div>
+
+                                    <motion.div custom={1} variants={fieldVariants} initial="hidden" animate="show">
+                                      <MethodCheckoutPanel
+                                        method={fundingSource as "card" | "bank" | "wallet"}
+                                        wallets={(fundingSource === "card" ? cardWallets : (wallets ?? [])).map((w) => ({
+                                          wallet_id: w.wallet_id,
+                                          currency_code: w.currency_code,
+                                          symbol: w.symbol,
+                                          balance: w.balance,
+                                          flag_emoji: w.flag_emoji,
+                                        }))}
+                                        selectedWalletId={selectedWalletId || selectedWallet?.wallet_id}
+                                        onWalletChange={(id) => setSelectedWalletId(id)}
+                                        linkedCardCount={linkedCardCount}
+                                        bankSources={bankSources}
+                                        selectedSourceId={selectedSourceId || bankSources[0]?.id}
+                                        onSourceChange={setSelectedSourceId}
+                                        onLinkBank={startPlaidLink}
+                                        linkingBank={plaidLinking}
+                                        savedCards={savedCards.map((c) => ({
+                                          id: c.stripe_payment_method_id,
+                                          card_brand: c.card_brand,
+                                          last_four: c.last_four,
+                                          exp_month: c.exp_month,
+                                          exp_year: c.exp_year,
+                                        }))}
+                                        selectedCardId={activeSavedCard?.stripe_payment_method_id}
+                                        onCardChange={setSelectedSavedCardId}
+                                        onAddCard={() => setAddCardOpen(true)}
+                                        onAddWallet={() => createWalletTriggerRef.current?.click()}
+                                        amount={parsedAmount}
+                                        fee={fee}
+                                        total={totalCharge}
+                                        currency={sourceCurrency}
+                                        symbol={sourceSymbol}
+                                        cardProviderReady={!!cardSendProvider}
+                                        cardChargeNote={
+                                          cardCheckoutQuote
+                                            ? `Card charge ≈ ${cardCheckoutQuote.checkoutCurrency} ${cardCheckoutQuote.checkoutAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${cardSendProvider === "nomba" && sourceCurrency === "CAD" ? " · CAD charged in USD" : ""}`
+                                            : null
+                                        }
+                                        cardMinNote={
+                                          cardSendProvider
+                                            ? `Minimum card send is ${cardSendMinAmount(cardSendProvider, sourceCurrency)} ${sourceCurrency}.`
+                                            : null
+                                        }
+                                        inlineEntry={inlineCardEntry}
+                                        insufficientBalance={insufficientFunds}
+                                        onTopUp={() => navigate("/wallet/topup")}
+                                      />
+                                    </motion.div>
+
+
+                                    <motion.div custom={2} variants={fieldVariants} initial="hidden" animate="show" className="flex justify-center py-1">
+                                      <SectionBoundary name="LiveFxCalculator"><LiveFxCalculator
+                                        variant="app"
+                                        showDisclaimer={false}
+                                        className="max-w-none w-full"
+                                        from={sourceCurrency}
+                                        to={targetCountry.code}
+                                        sendAmount={amount}
+                                        onFromChange={handleCalcFromChange}
+                                        onToChange={handleCalcToChange}
+                                        onSendAmountChange={(v) => setAmount(v)}
+                                        fromCurrencyFilter={
+                                          fundingSource === "wallet" ? walletCurrencyCodes
+                                          : fundingSource === "card" ? cardWalletCodes
+                                          : undefined
+                                        }
+                                        toCurrencyFilter={
+                                          fundingSource === "card" ? cardPayoutCodes : payoutCurrencyCodes
+                                        }
+                                        priorityCodes={PRIORITY_SEND_CURRENCIES}
+                                        quoteRecipient={rateAvailable ? calcQuoteRecipient : undefined}
+                                        quoteSend={rateAvailable ? calcQuoteSend : undefined}
+                                        displayRate={rateAvailable ? effectiveRate : null}
+                                       feeLabel={feeDisplayLabel}
+                                       feeNote={feeNote}
+                                        walletBalance={
+                                          fundingSource === "wallet" && selectedWallet
+                                            ? Number(selectedWallet.balance)
+                                            : null
+                                        }
+                                        walletSymbol={selectedWallet?.symbol}
+                                        showActions={false}
+                                      /></SectionBoundary>
+                                    </motion.div>
+
+
+
+
+                                    {fundingSource === "card" && cardSendProvider && parsedAmount > 0
+                                      && parsedAmount < cardSendMinAmount(cardSendProvider, sourceCurrency) && (
+                                      <motion.p
+                                        initial={{ opacity: 0, x: -6 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        className="text-sm font-medium text-destructive flex items-center justify-center gap-1"
+                                      >
+                                        <AlertCircle className="w-3.5 h-3.5" />
+                                        Card minimum is {cardSendMinAmount(cardSendProvider, sourceCurrency)} {sourceCurrency}
+                                      </motion.p>
+                                    )}
+
+                                    {insufficientFunds && (
+                                      <motion.p
+                                        initial={{ opacity: 0, x: -6 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        className="text-sm font-medium text-destructive flex items-center justify-center gap-1"
+                                      >
+                                        <AlertCircle className="w-3.5 h-3.5" /> Insufficient wallet balance
+                                      </motion.p>
+                                    )}
+
+                                    {!rateAvailable && (
+                                      <p className="text-sm text-center text-muted-foreground">
+                                        No FX rate for {sourceCurrency} → {targetCountry.code}. Try another pair or funding source.
+                                      </p>
+                                    )}
                                 </MoneyFlowShell>
                               </motion.div>
                             )}
+
 
                             {step === 3 && (
                               <motion.div
@@ -2644,11 +2593,10 @@ const SendPage = () => {
                               >
                                 <MoneyFlowShell
                                   steps={[
-                                    { n: 1, label: "Amount" },
-                                    { n: 2, label: "Recipient" },
-                                    { n: 3, label: "Confirm" },
+                                    { n: 1, label: "Details" },
+                                    { n: 2, label: "Confirm" },
                                   ]}
-                                  currentStep={3}
+                                  currentStep={2}
                                   title="Confirm"
                                   subtitle="Review the quote, then send"
                                 >
@@ -2698,7 +2646,7 @@ const SendPage = () => {
                                         <Button
                                           variant="outline"
                                           className="w-full"
-                                          onClick={() => goToStep(2)}
+                                          onClick={() => goToStep(1)}
                                           disabled={confirming}
                                         >
                                           Back
@@ -2706,7 +2654,7 @@ const SendPage = () => {
                                       </div>
                                     ) : (
                                     <div className="flex gap-3">
-                                      <Button variant="outline" className="flex-1" onClick={() => goToStep(2)} disabled={confirming || creatingLink}>Back</Button>
+                                      <Button variant="outline" className="flex-1" onClick={() => goToStep(1)} disabled={confirming || creatingLink}>Back</Button>
                                       <Button className="flex-1" onClick={useLink ? handleCreateLink : requestConfirm} disabled={confirming || creatingLink}>
                                         {(confirming || creatingLink) ? (
                                           <span className="inline-flex items-center gap-2">
@@ -2811,6 +2759,7 @@ const SendPage = () => {
       <AddBeneficiaryModal
         open={saveModalOpen}
         onOpenChange={setSaveModalOpen}
+        onSaved={(b) => { applyBeneficiary(b); setSaveModalOpen(false); }}
         editing={{
           id: "",
           user_id: "",
