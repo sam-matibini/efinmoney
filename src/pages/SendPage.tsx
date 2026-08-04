@@ -2126,103 +2126,47 @@ const SendPage = () => {
                                 >
                                     <motion.div custom={0} variants={fieldVariants} initial="hidden" animate="show" className="space-y-3">
                                       <div className="space-y-2">
-                                        <Label>From wallet</Label>
-                                        <Select
-                                          value={selectedWalletId || selectedWallet?.wallet_id}
-                                          onValueChange={(id) => {
-                                            setSelectedWalletId(id);
-                                            setFundingSource("wallet");
-                                          }}
-                                          disabled={fundingSource !== "wallet"}
-                                        >
-                                          <SelectTrigger className={fundingSource !== "wallet" ? "opacity-60" : undefined}>
-                                            <SelectValue placeholder="Select wallet" />
-                                          </SelectTrigger>
-                                          <SelectContent>
-                                            {wallets?.map((w) => {
-                                              const cardCount = linkedCardCount[w.wallet_id] ?? 0;
-                                              return (
-                                                <SelectItem key={w.wallet_id} value={w.wallet_id}>
-                                                  <span className="flex items-center gap-2">
-                                                    {w.flag_emoji} {w.currency_code} — {w.symbol}{Number(w.balance).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                    {cardCount > 0 && (
-                                                      <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground ml-auto">
-                                                        <CreditCard className="w-3 h-3" />
-                                                        {cardCount}
-                                                      </span>
-                                                    )}
-                                                  </span>
-                                                </SelectItem>
-                                              );
-                                            })}
-                                          </SelectContent>
-                                        </Select>
-                                        {fundingSource !== "wallet" && (
-                                          <button
-                                            type="button"
-                                            className="text-xs text-primary hover:underline"
-                                            onClick={() => {
-                                              setFundingSource("wallet");
-                                              setShowOtherFunding(false);
-                                            }}
-                                          >
-                                            Use wallet instead
-                                          </button>
-                                        )}
+                                        <Label>Pay with</Label>
+                                        <PaymentMethodRow
+                                          options={fundingMethodOptions}
+                                          value={fundingSource}
+                                          onChange={(v) => setFundingSource(v)}
+                                        />
                                       </div>
 
-                                      {fundingOptions.filter((o) => o.v !== "wallet").length > 0 && (
-                                        <div className="space-y-2 pt-1">
-                                          <button
-                                            type="button"
-                                            aria-expanded={showOtherFunding}
-                                            className={cn(
-                                              "w-full flex items-center justify-between gap-3 rounded-xl border px-3.5 py-3 text-left transition-colors",
-                                              showOtherFunding || fundingSource !== "wallet"
-                                                ? "border-primary/40 bg-primary/5"
-                                                : "border-border bg-muted/40 hover:bg-muted/70 hover:border-border",
-                                            )}
-                                            onClick={() => setShowOtherFunding((v) => !v)}
+                                      {(fundingSource === "wallet" || fundingSource === "card") && (
+                                        <div className="space-y-2">
+                                          <Label>{fundingSource === "card" ? "Credit to wallet" : "From wallet"}</Label>
+                                          <Select
+                                            value={selectedWalletId || selectedWallet?.wallet_id}
+                                            onValueChange={(id) => setSelectedWalletId(id)}
                                           >
-                                            <span className="flex items-center gap-2.5 min-w-0">
-                                              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-background border border-border">
-                                                <CreditCard className="w-4 h-4 text-primary" />
-                                              </span>
-                                              <span className="min-w-0">
-                                                <span className="block text-sm font-medium text-foreground">
-                                                  Pay with card or bank
-                                                </span>
-                                                <span className="block text-xs text-muted-foreground">
-                                                  Debit card now, then we send — or link a bank
-                                                </span>
-                                              </span>
-                                            </span>
-                                            <ChevronDown
-                                              className={cn(
-                                                "w-5 h-5 shrink-0 text-muted-foreground transition-transform",
-                                                showOtherFunding && "rotate-180",
-                                              )}
-                                            />
-                                          </button>
-                                          {showOtherFunding && (
-                                            <div className="grid grid-cols-2 gap-2">
-                                              {fundingOptions.filter((o) => o.v !== "wallet").map(({ v, icon: Icon, label }) => (
-                                                <Button
-                                                  key={v}
-                                                  type="button"
-                                                  variant={fundingSource === v ? "default" : "outline"}
-                                                  className="flex items-center gap-2 h-11"
-                                                  onClick={() => setFundingSource(v)}
-                                                >
-                                                  <Icon className="w-4 h-4" />
-                                                  <span className="text-sm">{label}</span>
-                                                </Button>
-                                              ))}
-                                            </div>
-                                          )}
+                                            <SelectTrigger>
+                                              <SelectValue placeholder="Select wallet" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                              {wallets?.map((w) => {
+                                                const cardCount = linkedCardCount[w.wallet_id] ?? 0;
+                                                return (
+                                                  <SelectItem key={w.wallet_id} value={w.wallet_id}>
+                                                    <span className="flex items-center gap-2">
+                                                      {w.flag_emoji} {w.currency_code} — {w.symbol}{Number(w.balance).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                      {cardCount > 0 && (
+                                                        <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground ml-auto">
+                                                          <CreditCard className="w-3 h-3" />
+                                                          {cardCount}
+                                                        </span>
+                                                      )}
+                                                    </span>
+                                                  </SelectItem>
+                                                );
+                                              })}
+                                            </SelectContent>
+                                          </Select>
                                         </div>
                                       )}
                                     </motion.div>
+
 
                                     {fundingSource === 'bank' && (
                                       <motion.div custom={1} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
