@@ -29,7 +29,7 @@ export async function getAttachmentUrl(path: string): Promise<string | null> {
   return data?.signedUrl ?? null;
 }
 
-export type SupportChannel = "app" | "contact" | "chat";
+export type SupportChannel = "app" | "contact" | "chat" | "reception";
 
 export interface SupportThread {
   id: string;
@@ -47,6 +47,8 @@ export interface SupportThread {
   unread_for_staff: boolean;
   unread_for_user: boolean;
   created_at: string;
+  external_source?: string | null;
+  external_ref?: string | null;
 }
 
 export interface SupportMessage {

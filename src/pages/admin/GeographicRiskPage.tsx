@@ -46,7 +46,7 @@ export default function GeographicRiskPage() {
 
   const prohibited = countries.filter((c: any) => c.risk_level === "prohibited").length;
   const high = countries.filter((c: any) => c.risk_level === "high").length;
-  const sanctioned = countries.filter((c: any) => c.un_sanctions || c.ofac_sanctions).length;
+  const sanctioned = countries.filter((c: any) => c.un_sanctions || c.ofac_sanctions || c.canada_sanctions).length;
 
   return (
     <AdminLayout>
@@ -67,7 +67,7 @@ export default function GeographicRiskPage() {
         <CardContent>
           {isLoading ? <div className="space-y-2">{[...Array(6)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div> : (
             <Table>
-              <TableHeader><TableRow><TableHead>Code</TableHead><TableHead>Country</TableHead><TableHead>Risk Level</TableHead><TableHead>FATF</TableHead><TableHead>UN Sanctions</TableHead><TableHead>OFAC</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Code</TableHead><TableHead>Country</TableHead><TableHead>Risk Level</TableHead><TableHead>FATF</TableHead><TableHead>UN Sanctions</TableHead><TableHead>OFAC</TableHead><TableHead>Canada (GAC)</TableHead></TableRow></TableHeader>
               <TableBody>
                 {countries.map((c: any) => (
                   <TableRow key={c.id}>
@@ -77,6 +77,7 @@ export default function GeographicRiskPage() {
                     <TableCell><Badge className={c.fatf_status === "blacklisted" ? "bg-red-500/10 text-red-600" : c.fatf_status === "monitored" ? "bg-amber-500/10 text-amber-600" : "bg-emerald-500/10 text-emerald-600"}>{c.fatf_status}</Badge></TableCell>
                     <TableCell>{c.un_sanctions ? <Badge className="bg-red-500/10 text-red-600">Yes</Badge> : <Badge className="bg-muted">No</Badge>}</TableCell>
                     <TableCell>{c.ofac_sanctions ? <Badge className="bg-red-500/10 text-red-600">Yes</Badge> : <Badge className="bg-muted">No</Badge>}</TableCell>
+                    <TableCell>{c.canada_sanctions ? <Badge className="bg-red-500/10 text-red-600">Yes</Badge> : <Badge className="bg-muted">No</Badge>}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
