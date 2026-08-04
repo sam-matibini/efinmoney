@@ -17,9 +17,9 @@ import {
   isCanadaBeneficiary,
   type Beneficiary,
 } from "@/hooks/useBeneficiaries";
-import PayeePicker from "@/components/PayeePicker";
 import ContactsPickerModal from "@/components/modals/ContactsPickerModal";
 import AddBeneficiaryModal from "@/components/modals/AddBeneficiaryModal";
+import ContactQuickField from "@/components/send/ContactQuickField";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,7 +34,7 @@ import { downloadTransferReceipt } from "@/lib/receipt";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { usePriceQuote } from "@/hooks/usePriceQuote";
-import { CheckCircle, Landmark, AlertCircle, Info, CreditCard, Wallet, Zap, Check, Building2, Link2, Copy, Share2, X, Users, UserPlus, ArrowRight, ChevronRight } from "lucide-react";
+import { CheckCircle, Landmark, AlertCircle, Info, CreditCard, Wallet, Zap, Check, Building2, Link2, Copy, Share2, X, Users, ArrowRight, ChevronRight } from "lucide-react";
 import { useStripeConnectedAccount, isConnectReady, getConnectReadiness } from "@/hooks/useStripeConnectedAccount";
 import { tokenizeDebitCard } from "@/lib/stripePayouts";
 import { usePinGate } from "@/components/send/usePinGate";
@@ -1072,18 +1072,15 @@ const CanadaSendFlow = () => {
           <CardContent className="space-y-6 pt-6">
             {method !== "stripe_connect" && method !== "paylink" && (
               <div className="space-y-3 p-4 rounded-xl border border-primary/20 bg-primary/[0.03]">
-                <div className="flex items-center justify-between gap-2">
-                  <Label className="text-sm font-semibold">Saved contacts</Label>
-                  <Button type="button" variant="ghost" size="sm" className="h-8 gap-1 text-xs" onClick={() => setAddContactOpen(true)}>
-                    <UserPlus className="w-3.5 h-3.5" /> Add new
-                  </Button>
-                </div>
-                <PayeePicker
+                <ContactQuickField
+                  label="To"
                   filterCanada
-                  placeholder="Search Canadian contacts…"
+                  placeholder="Select contact"
+                  valueLabel={pickedBeneficiaryId ? recipientName : null}
                   onSelect={applyCanadaBeneficiary}
-                  onAddNew={() => setAddContactOpen(true)}
+                  onClear={pickedBeneficiaryId ? clearSelectedContact : undefined}
                 />
+
                 <Button type="button" variant="outline" className="w-full gap-2" onClick={() => setPickerOpen(true)}>
                   <Users className="w-4 h-4" /> Browse all contacts
                 </Button>
