@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import AnimatedCheck from "@/components/ui/AnimatedCheck";
 import { usePinGate } from "@/components/send/usePinGate";
+import EfinRecipientQuickPick from "@/components/send/EfinRecipientQuickPick";
 import { sortByPriority } from "@/lib/currencyPriority";
 
 interface Recipient {
