@@ -250,6 +250,7 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
+              ref={inputRef}
               placeholder="email@example.com, @username, or 10-digit account #"
               value={query}
               onChange={(e) => { setQuery(e.target.value); setOpen(true); setNotFound(false); }}
