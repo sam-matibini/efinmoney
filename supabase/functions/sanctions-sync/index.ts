@@ -220,21 +220,26 @@ const COUNTRY_ALIASES: Record<string, string[]> = {
   ht: ["haiti"],
   ly: ["libya"],
   lb: ["lebanon"],
-  md: ["moldova", "republic of moldova"],
-  ua: ["ukraine"],
-  gn: ["guinea"],
-  cn: ["china", "peoples republic of china"],
-  lk: ["sri lanka"],
-  gt: ["guatemala"],
-  pk: ["pakistan"],
   ye: ["yemen"],
   so: ["somalia"],
   cf: ["central african republic"],
   cd: ["democratic republic of the congo", "congo democratic republic", "drc"],
   iq: ["iraq"],
-  tn: ["tunisia"],
-  eg: ["egypt"],
+  gw: ["guinea-bissau", "guinea bissau"],
+  er: ["eritrea"],
 };
+
+/**
+ * Country-level SEMA regimes (Special Economic Measures (Country) Regulations).
+ * Only these are treated as country-wide Canadian sanctions when they appear in
+ * the GAC feed. Entries listed under Magnitsky / corrupt-foreign-officials
+ * regimes (China, Ukraine, Sri Lanka, Guatemala, Moldova, Pakistan, Tunisia,
+ * Egypt, Guinea, …) target individuals or entities, NOT the country, so they
+ * must never flag the country in the risk register.
+ */
+const SEMA_COUNTRY_REGIMES = new Set([
+  "ru", "by", "ir", "mm", "sy", "ve", "zw", "ss", "sd", "ni", "ht",
+]);
 
 /**
  * Countries Canada sanctions under the *United Nations Act* regulations rather
@@ -262,40 +267,36 @@ const canonCountry = (s: string) =>
   (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z ]/g, "").replace(/\s+/g, " ").trim();
 
+/** Resolve a canonical country label/code to its ISO-2 code, if known. */
+function codeForLabel(label: string): string | null {
+  const v = canonCountry(label);
+  if (!v) return null;
+  if (v.length === 2 && COUNTRY_ALIASES[v]) return v;
+  for (const [code, names] of Object.entries(COUNTRY_ALIASES)) {
+    if (names.some((n) => canonCountry(n) === v)) return code;
+  }
+  return null;
+}
+
 async function flagCanadaSanctionedCountries(
   supabase: ReturnType<typeof createClient>,
   rows: WatchRow[],
 ) {
-  // Every country label mentioned by the GAC list, canonicalised.
-  const listed = new Set<string>();
+  // Country codes mentioned by the GAC list, restricted to country-level regimes.
+  const sanctioned = new Set<string>();
   for (const r of rows) {
-    for (const c of r.countries) {
-      const v = canonCountry(c);
-      if (v) listed.add(v);
-    }
-    // SEMA programs carry the regime country too ("SEMA Russia")
-    for (const p of r.programs || []) {
-      const v = canonCountry(String(p).replace(/^sema\s*/i, ""));
-      if (v) listed.add(v);
-    }
-  }
-  if (!listed.size) return 0;
-
-  // Expand with known aliases so either spelling matches.
-  const expanded = new Set(listed);
-  for (const [code, names] of Object.entries(COUNTRY_ALIASES)) {
-    if (names.some((n) => listed.has(n))) {
-      expanded.add(code);
-      names.forEach((n) => expanded.add(n));
+    const labels = [
+      ...r.countries,
+      ...(r.programs || []).map((p) => String(p).replace(/^sema\s*/i, "")),
+    ];
+    for (const label of labels) {
+      const code = codeForLabel(label);
+      if (code && SEMA_COUNTRY_REGIMES.has(code)) sanctioned.add(code);
     }
   }
 
   // Countries sanctioned under the UN Act are always in scope.
-  for (const [code, name] of Object.entries(CANADA_UN_ACT_COUNTRIES)) {
-    expanded.add(code);
-    expanded.add(canonCountry(name));
-    (COUNTRY_ALIASES[code] || []).forEach((a) => expanded.add(a));
-  }
+  for (const code of Object.keys(CANADA_UN_ACT_COUNTRIES)) sanctioned.add(code);
 
   const { data } = await supabase
     .from("geographic_risk_ratings")
@@ -307,13 +308,10 @@ async function flagCanadaSanctionedCountries(
   let updated = 0;
   const seenCodes = new Set<string>();
   for (const c of list) {
-    const nm = canonCountry(c.country_name);
-    const code = (c.country_code || "").toLowerCase();
+    const code = (c.country_code || "").toLowerCase() ||
+      codeForLabel(c.country_name) || "";
     if (code) seenCodes.add(code);
-    const aliases = COUNTRY_ALIASES[code] || [];
-    const hit = expanded.has(nm) ||
-      (code.length === 2 && expanded.has(code)) ||
-      aliases.some((a) => expanded.has(a));
+    const hit = Boolean(code) && sanctioned.has(code);
     if (hit !== Boolean(c.canada_sanctions)) {
       await supabase
         .from("geographic_risk_ratings")
@@ -325,28 +323,23 @@ async function flagCanadaSanctionedCountries(
 
   // Seed register rows for sanctioned countries that are not tracked yet, so
   // the risk register is complete rather than silently missing regimes.
-  const missing: { country_code: string; country_name: string }[] = [];
-  for (const [code, names] of Object.entries(COUNTRY_ALIASES)) {
-    if (seenCodes.has(code)) continue;
-    const sanctioned = expanded.has(code) || names.some((n) => expanded.has(n));
-    if (!sanctioned) continue;
-    const label = CANADA_UN_ACT_COUNTRIES[code] ||
-      names[0].replace(/\b\w/g, (m) => m.toUpperCase());
-    missing.push({ country_code: code.toUpperCase(), country_name: label });
-  }
+  const missing = [...sanctioned]
+    .filter((code) => !seenCodes.has(code))
+    .map((code) => ({
+      country_code: code.toUpperCase(),
+      country_name: CANADA_UN_ACT_COUNTRIES[code] ||
+        (COUNTRY_ALIASES[code]?.[0] || code).replace(/\b\w/g, (m) => m.toUpperCase()),
+      canada_sanctions: true,
+      risk_level: "high",
+    }));
   if (missing.length) {
-    const { error } = await supabase.from("geographic_risk_ratings").insert(
-      missing.map((m) => ({
-        ...m,
-        canada_sanctions: true,
-        risk_level: "high",
-      })),
-    );
+    const { error } = await supabase.from("geographic_risk_ratings").insert(missing);
     if (!error) updated += missing.length;
   }
 
   return updated;
 }
+
 
 
 
