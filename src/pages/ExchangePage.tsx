@@ -14,7 +14,6 @@ import { toast } from "sonner";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { RefreshCw, ArrowUpDown, TrendingUp, CheckCircle, Bitcoin, DollarSign, ExternalLink, Sparkles } from "lucide-react";
 import { CryptoTradingPanel } from "@/components/crypto/CryptoTradingPanel";
-import { flagForCurrency } from "@/lib/flags";
 import { resolveEffectiveRate } from "@/lib/fx";
 import { getNombaExchangeRate, isNgnPair } from "@/lib/nombaNigeria";
 import { CurrencyFlag } from "@/components/ui/FlagImage";
