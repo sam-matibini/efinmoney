@@ -1249,8 +1249,9 @@ const SendPage = () => {
   };
 
   const applyBeneficiary = useCallback((b: Beneficiary) => {
-    setRecipientName(b.name);
-    setRecipientPhone(b.phone || "");
+    setRecipientName(b.eft_account_holder || b.name);
+    if (b.phone) setRecipientPhone(b.phone.replace(/[^\d+]/g, "").slice(0, 15));
+    if (b.email || b.interac_email) setRecipientEmail(b.interac_email || b.email || "");
     setPickedBeneficiaryId(b.id);
     setPendingBeneficiary(b);
     // Prefill bank details immediately when present (effect below also reconciles
@@ -1275,7 +1276,9 @@ const SendPage = () => {
   }, []);
 
   // Apply saved network / bank details for a picked beneficiary once the
-  // destination country (and, for NGN, the banks list) is in place.
+  // destination country (and, for NGN/GHS, the banks list) is in place. The
+  // pending record is kept until everything it can fill has actually landed,
+  // so a slow bank/network list never drops the prefill.
   useEffect(() => {
     const b = pendingBeneficiary;
     if (!b) return;
@@ -1286,6 +1289,15 @@ const SendPage = () => {
     if (expectedCountry && expectedCountry.id !== targetCountryId) return;
 
     let allApplied = true;
+
+    // Contact details that apply to every corridor.
+    if (b.phone) {
+      const phone = b.phone.replace(/[^\d+]/g, "").slice(0, 15);
+      if (!recipientPhone) setRecipientPhone(phone);
+    }
+    if ((b.interac_email || b.email) && !recipientEmail) {
+      setRecipientEmail(b.interac_email || b.email || "");
+    }
 
     if (targetIsNGNBank) {
       if (b.bank_account) {
@@ -1325,19 +1337,29 @@ const SendPage = () => {
           else allApplied = false;
         }
       }
-    } else if (availableNetworks && b.network) {
-      const wanted = b.network;
-      const match =
-        availableNetworks.find((n) => n.id === wanted) ||
-        availableNetworks.find((n) => n.payout === wanted) ||
-        availableNetworks.find((n) => n.label?.toLowerCase() === wanted.toLowerCase());
-      if (match && selectedNetworkId !== match.id) {
-        setSelectedNetworkId(match.id);
+    } else if (b.network || b.payout_method) {
+      if (!availableNetworks || availableNetworks.length === 0) {
+        // No network picker for this corridor — nothing further to apply.
+      } else {
+        const wanted = String(b.network || "").toLowerCase();
+        const wantedPayout = String(b.payout_method || "").toLowerCase();
+        const match =
+          availableNetworks.find((n) => n.id.toLowerCase() === wanted) ||
+          availableNetworks.find((n) => n.payout.toLowerCase() === wanted) ||
+          availableNetworks.find((n) => n.label?.toLowerCase() === wanted) ||
+          availableNetworks.find((n) => !!wanted && n.label?.toLowerCase().includes(wanted)) ||
+          availableNetworks.find((n) => n.payout.toLowerCase() === wantedPayout) ||
+          availableNetworks.find((n) => n.id.toLowerCase() === wantedPayout);
+        if (match && selectedNetworkId !== match.id) {
+          setSelectedNetworkId(match.id);
+        }
       }
     }
 
     if (allApplied) setPendingBeneficiary(null);
-  }, [pendingBeneficiary, targetCountryId, ngnBanks, availableNetworks]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingBeneficiary, targetCountryId, ngnBanks, ghBanks, availableNetworks]);
+
 
   useEffect(() => {
     const bid = searchParams.get("beneficiaryId");
