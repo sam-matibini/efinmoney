@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { CheckCircle2, CreditCard, Lock, ShieldCheck } from "lucide-react";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { CurrencyFlag } from "@/components/ui/FlagImage";
+import { Logo, Wordmark } from "@/components/Logo";
 
 interface Props {
   defaultWalletId?: string;
