@@ -383,11 +383,17 @@ export default function FlutterwaveCardForm({
 
   const applyAuthResponse = (data: ChargeAuthResponse) => {
     const am = typeof data?.auth?.mode === "string" ? data.auth.mode : "";
-    if (!["pin", "otp", "redirect"].includes(am)) {
-      toast.error(data?.error || "Your bank returned an unsupported security check. Please retry.");
+    if (!["pin", "otp", "redirect", "avs"].includes(am)) {
+      const providerType = data?.provider_action_type ? ` (${data.provider_action_type})` : "";
+      toast.error(
+        data?.error ||
+          `Your bank returned a security check we can't complete here${providerType}. Please retry or use another payment method.`,
+      );
+      setAuthMode(null);
       setStage("idle");
       return;
     }
+
     const cid = data?.charge_id ? String(data.charge_id) : null;
     if (cid) setPendingChargeId(cid);
     if (am === "redirect" && data?.auth?.redirect) setAuthRedirect(String(data.auth.redirect));
