@@ -690,6 +690,15 @@ const SendPage = () => {
     ? `+${sourceSymbol}${fee.toFixed(2)} ${sourceCurrency} fee added · total ${sourceSymbol}${totalCharge.toFixed(2)} ${sourceCurrency}`
     : undefined;
 
+  /**
+   * The Flutterwave rail supports direct card charges, so we can collect
+   * cardholder name / number / expiry / CVV in-app. Every other card rail is
+   * a hosted redirect where the partner collects the details.
+   */
+  const inlineCardEntry =
+    fundingSource === "card" && cardSendProvider === "flutterwave" && !!selectedWallet;
+
+
   const goToStep = useCallback((next: number) => {
     setDirection(next > step ? 1 : -1);
     setStep(next);
