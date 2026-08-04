@@ -493,6 +493,16 @@ export default function FlutterwaveCardForm({
     });
   };
 
+  const handleAvsSubmit = (avs: AvsPayload) => {
+    if (!lastPayload) return;
+    handleCharge({
+      ...lastPayload,
+      authorization: { mode: "avs", avs },
+      ...(pendingChargeId ? { charge_id: pendingChargeId } : {}),
+    });
+  };
+
+
   const cancelChallenge = () => {
     setAuthMode(null);
     setAuthRedirect(null);
