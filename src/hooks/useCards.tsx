@@ -112,7 +112,7 @@ export const useCardMutations = () => {
           cardholder_name: input.cardholder_name.trim(),
           spending_limit: input.spending_limit ?? 5000,
           credit_limit: isCredit ? input.credit_limit : null,
-          wallet_id: isCredit ? null : input.wallet_id,
+          wallet_id: isCredit ? null : (input.wallet_id || null),
           currency_code: input.currency_code ?? null,
           initial_fund: !isCredit && Number(input.initial_fund) > 0 ? Number(input.initial_fund) : undefined,
         });
