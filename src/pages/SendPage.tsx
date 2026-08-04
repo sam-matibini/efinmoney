@@ -531,16 +531,18 @@ const SendPage = () => {
     ? rawRate * (1 - fxMarginBps / 10_000)
     : rawRate;
   const rateAvailable = isSameCurrency || effectiveRate > 0;
-  // Single receive formula: (send - fee) × rate (fee + margin from price-quote)
+  // Fee is charged on top: recipient gets the full send amount converted.
   const receivedAmount = parsedAmount > 0 && rateAvailable
-    ? Math.max(0, (parsedAmount - fee) * effectiveRate)
+    ? Math.max(0, parsedAmount * effectiveRate)
     : 0;
+  /** What the customer actually pays / is debited: amount + fee. */
+  const totalCharge = parsedAmount > 0 ? parsedAmount + fee : 0;
 
   const noLinkedSource = fundingSource === 'bank' && activeSources.length === 0;
   const insufficientFunds = fundingSource === 'wallet'
     && !!selectedWallet
     && parsedAmount > 0
-    && parsedAmount > Number(selectedWallet.balance);
+    && totalCharge > Number(selectedWallet.balance);
 
   const cardWallets = useMemo(
     () =>
