@@ -70,7 +70,9 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
   const [open, setOpen] = useState(false);
   const [finding, setFinding] = useState(false);
   const [notFound, setNotFound] = useState(false);
+  const [mode, setMode] = useState<"recents" | "search">("recents");
   const boxRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Debounce the type-ahead query
   useEffect(() => {
@@ -87,7 +89,7 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
     return () => document.removeEventListener("mousedown", onClick);
   }, []);
 
-  const { data: recents = [] } = useQuery({
+  const { data: recents = [], isSuccess: recentsLoaded } = useQuery({
     queryKey: ["efin-recent-recipients", user?.id],
     enabled: !!user?.id,
     staleTime: 60_000,
@@ -97,6 +99,24 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
       return (data ?? []) as RecentRow[];
     },
   });
+
+
+  // Open on Search when there are no recents to browse
+  useEffect(() => {
+    if (recentsLoaded && recents.length === 0) setMode("search");
+  }, [recentsLoaded, recents.length]);
+
+  const switchMode = (next: "recents" | "search") => {
+    setMode(next);
+    if (next === "recents") {
+      setQuery("");
+      setDebounced("");
+      setOpen(false);
+      setNotFound(false);
+    } else {
+      setTimeout(() => inputRef.current?.focus(), 0);
+    }
+  };
 
   const { data: suggestions = [], isFetching } = useQuery({
     queryKey: ["efin-search-recipients", debounced],
@@ -123,6 +143,7 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
     setDebounced("");
     setOpen(false);
     setNotFound(false);
+    setMode("recents");
   };
 
   // Exact lookup fallback (pasted email / @tag / account number)
@@ -167,41 +188,70 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
 
   return (
     <div className="space-y-3">
-      {/* Recent / frequent recipients */}
-      {recents.length > 0 && (
-        <div className="space-y-2">
-          <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-            <Clock className="w-3.5 h-3.5" aria-hidden /> Recent recipients
-          </p>
-          <div className="flex gap-3 overflow-x-auto pb-1">
-            {recents.map((r) => {
-              const added = isAlreadyAdded(r.user_id);
-              return (
-                <button
-                  key={r.user_id}
-                  type="button"
-                  onClick={() => pick(r)}
-                  disabled={added}
-                  className="flex w-16 shrink-0 flex-col items-center gap-1 rounded-lg p-1 text-center transition-colors hover:bg-muted disabled:opacity-50"
-                  title={r.full_name || r.efin_tag || r.email || ""}
-                >
-                  <Avatar url={r.avatar_url} label={initials(r)} size="sm" />
-                  <span className="w-full truncate text-[11px] text-muted-foreground">
-                    {added ? "Added" : (r.full_name?.split(" ")[0] || r.efin_tag || r.email)}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+      {/* Recents / Search toggle */}
+      <div className="flex justify-end">
+        <div className="inline-flex rounded-full border border-border bg-muted p-0.5" role="tablist">
+          {(["recents", "search"] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              role="tab"
+              aria-selected={mode === m}
+              onClick={() => switchMode(m)}
+              className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                mode === m
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {m === "recents" ? <Clock className="h-3.5 w-3.5" aria-hidden /> : <Search className="h-3.5 w-3.5" aria-hidden />}
+              {m === "recents" ? "Recents" : "Search"}
+            </button>
+          ))}
         </div>
+      </div>
+
+      {/* Recent / frequent recipients */}
+      {mode === "recents" && (
+        recents.length > 0 ? (
+          <div className="space-y-2">
+            <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+              <Clock className="w-3.5 h-3.5" aria-hidden /> Recent recipients
+            </p>
+            <div className="flex gap-3 overflow-x-auto pb-1">
+              {recents.map((r) => {
+                const added = isAlreadyAdded(r.user_id);
+                return (
+                  <button
+                    key={r.user_id}
+                    type="button"
+                    onClick={() => pick(r)}
+                    disabled={added}
+                    className="flex w-16 shrink-0 flex-col items-center gap-1 rounded-lg p-1 text-center transition-colors hover:bg-muted disabled:opacity-50"
+                    title={r.full_name || r.efin_tag || r.email || ""}
+                  >
+                    <Avatar url={r.avatar_url} label={initials(r)} size="sm" />
+                    <span className="w-full truncate text-[11px] text-muted-foreground">
+                      {added ? "Added" : (r.full_name?.split(" ")[0] || r.efin_tag || r.email)}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">No recent recipients yet — use Search to find someone.</p>
+        )
       )}
 
       {/* Search + type-ahead */}
-      <div ref={boxRef} className="relative">
+      <div ref={boxRef} className={`relative ${mode === "search" ? "" : "hidden"}`}>
+
         <div className="flex gap-2">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
+              ref={inputRef}
               placeholder="email@example.com, @username, or 10-digit account #"
               value={query}
               onChange={(e) => { setQuery(e.target.value); setOpen(true); setNotFound(false); }}
