@@ -51,6 +51,16 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        pay: {
+          card: "hsl(var(--pay-card))",
+          "card-foreground": "hsl(var(--pay-card-foreground))",
+          bank: "hsl(var(--pay-bank))",
+          "bank-foreground": "hsl(var(--pay-bank-foreground))",
+          wallet: "hsl(var(--pay-wallet))",
+          "wallet-foreground": "hsl(var(--pay-wallet-foreground))",
+          mobile: "hsl(var(--pay-mobile))",
+          "mobile-foreground": "hsl(var(--pay-mobile-foreground))",
+        },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",
