@@ -100,6 +100,28 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
     },
   });
 
+  const { isSuccess: recentsLoaded } = useQuery({
+    queryKey: ["efin-recent-recipients", user?.id],
+    enabled: !!user?.id,
+  });
+
+  // Open on Search when there are no recents to browse
+  useEffect(() => {
+    if (recentsLoaded && recents.length === 0) setMode("search");
+  }, [recentsLoaded, recents.length]);
+
+  const switchMode = (next: "recents" | "search") => {
+    setMode(next);
+    if (next === "recents") {
+      setQuery("");
+      setDebounced("");
+      setOpen(false);
+      setNotFound(false);
+    } else {
+      setTimeout(() => inputRef.current?.focus(), 0);
+    }
+  };
+
   const { data: suggestions = [], isFetching } = useQuery({
     queryKey: ["efin-search-recipients", debounced],
     enabled: debounced.replace(/^@/, "").length >= 3,
