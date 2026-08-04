@@ -55,6 +55,13 @@ const friendlyFailureReason = (reason: string): string => {
   if (r.includes("payouts_not_allowed") || r.includes("card payouts are not yet enabled") || r.includes("insufficient_capabilities") || r.includes("not allowed to make payouts")) {
     return "Card payouts are not yet enabled on our payments provider. Your funds have been returned to your wallet. Please try again later or contact support.";
   }
+  if (
+    r.includes("not configured") ||
+    r.includes("payout partner not configured") ||
+    r.includes("no payout partner")
+  ) {
+    return "This payout corridor is not currently connected to a payout partner. Your funds have been returned to your wallet — our team has been notified.";
+  }
   if (r.includes("card_declined") || r.includes("card was declined")) {
     return "The recipient's debit card was declined. Your funds have been returned to your wallet.";
   }
