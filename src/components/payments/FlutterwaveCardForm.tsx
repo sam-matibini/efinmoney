@@ -125,10 +125,17 @@ const CHALLENGE_COPY: Record<string, { title: string; sub: string; label: string
   },
   otp: {
     title: "Enter the one-time code",
-    sub: "We sent a one-time code to the phone number / email registered with your bank.",
+    sub: "Your bank is requesting a one-time code to authorise this payment.",
     label: "One-time code (OTP)",
     placeholder: "••••••",
     max: 8,
+  },
+  avs: {
+    title: "Confirm your billing address",
+    sub: "Your bank needs to verify the billing address registered to this card.",
+    label: "Billing address",
+    placeholder: "",
+    max: 100,
   },
 };
 
