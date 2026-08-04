@@ -115,7 +115,7 @@ async function createCardInner(admin: Sb, userId: string, body: Record<string, u
   const initialFund = Number(body.initial_fund) || 0;
 
   if (!cardholderName) return jsonResponse({ error: "Cardholder name is required" }, 400);
-  if (!isCredit && !walletId) return jsonResponse({ error: "Linked wallet is required" }, 400);
+
 
   const pan = generatePan(network);
   const cvv = generateCvv();
