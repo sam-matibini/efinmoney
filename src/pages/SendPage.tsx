@@ -2247,7 +2247,8 @@ const SendPage = () => {
                                         quoteRecipient={rateAvailable ? calcQuoteRecipient : undefined}
                                         quoteSend={rateAvailable ? calcQuoteSend : undefined}
                                         displayRate={rateAvailable ? effectiveRate : null}
-                                        feeLabel={feeDisplayLabel}
+                                       feeLabel={feeDisplayLabel}
+                                       feeNote={feeNote}
                                         walletBalance={
                                           fundingSource === "wallet" && selectedWallet
                                             ? Number(selectedWallet.balance)
