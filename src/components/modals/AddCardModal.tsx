@@ -25,6 +25,9 @@ import { useWallets } from "@/hooks/useWallets";
 import { Copy, Check, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import SaveCardForm from "@/components/cards/SaveCardForm";
+import ManualCardForm from "@/components/cards/ManualCardForm";
+import { STRIPE_PAYMENTS_ENABLED } from "@/lib/stripeDisabled";
+
 
 interface AddCardModalProps {
   isOpen: boolean;
@@ -320,7 +323,12 @@ const AddCardModal = ({ isOpen, onClose, defaultMode = "issue" }: AddCardModalPr
             </TabsContent>
 
             <TabsContent value="link" className="space-y-4 mt-4">
-              <SaveCardForm onSuccess={handleClose} onCancel={handleClose} />
+              {STRIPE_PAYMENTS_ENABLED ? (
+                <SaveCardForm onSuccess={handleClose} onCancel={handleClose} />
+              ) : (
+                <ManualCardForm onSuccess={handleClose} onCancel={handleClose} />
+              )}
+
             </TabsContent>
           </Tabs>
         )}
