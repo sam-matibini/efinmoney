@@ -49,6 +49,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import CanadaSendFlow from "@/components/send/CanadaSendFlow";
 import EfinmoneyP2PFlow from "@/components/send/EfinmoneyP2PFlow";
 import MoneyFlowShell from "@/components/money/MoneyFlowShell";
+import PaymentMethodRow, { type PaymentMethodOption } from "@/components/money/PaymentMethodRow";
 import { createPaymentLink, PaymentLinkSuccess, type PaymentLinkResult } from "@/components/send/PaymentLinkSuccess";
 import { isClaimCardCurrency } from "@/lib/stripeCorridors";
 import TransactionPinDialog from "@/components/send/TransactionPinDialog";
@@ -1766,6 +1767,19 @@ const SendPage = () => {
     modeParam === 'canada' ? 'canada'
     : modeParam === 'efinmoney' ? 'efinmoney'
     : 'international';
+  const cardFundingAvailable = productFeatures.nombaNigeria || productFeatures.lenhubFlutter
+    || productFeatures.paytota || productFeatures.swychr || productFeatures.flutterwave;
+
+  const fundingMethodOptions: PaymentMethodOption<"wallet" | "bank" | "card">[] = [
+    ...(cardFundingAvailable
+      ? [{ id: "card" as const, label: "Card", sublabel: "Debit or credit", icon: CreditCard, tone: "card" as const }]
+      : []),
+    ...(productFeatures.plaid
+      ? [{ id: "bank" as const, label: "Bank", sublabel: "Linked account", icon: Landmark, tone: "bank" as const }]
+      : []),
+    { id: "wallet" as const, label: "Wallet", sublabel: "eFinMoney balance", icon: Wallet, tone: "wallet" as const },
+  ];
+
   const fundingOptions = ([
     { v: "wallet" as const, icon: Wallet, label: "Wallet" },
     ...(productFeatures.plaid ? [{ v: "bank" as const, icon: Landmark, label: "Bank" }] : []),
