@@ -1302,6 +1302,8 @@ const SendPage = () => {
     const expectedCountry = b.country_code
       ? findCountryByCode(b.country_code)
       : null;
+    // Country stored but not resolvable yet — keep the pending record and retry.
+    if (b.country_code && !expectedCountry) return;
     if (expectedCountry && expectedCountry.id !== targetCountryId) return;
 
     let allApplied = true;
@@ -1359,18 +1361,24 @@ const SendPage = () => {
       } else {
         const wanted = String(b.network || "").toLowerCase();
         const wantedPayout = String(b.payout_method || "").toLowerCase();
+        // "mtn_mobile" / "airtel_money" -> "mtn" / "airtel"
+        const payoutStem = wantedPayout.split("_")[0];
         const match =
-          availableNetworks.find((n) => n.id.toLowerCase() === wanted) ||
-          availableNetworks.find((n) => n.payout.toLowerCase() === wanted) ||
-          availableNetworks.find((n) => n.label?.toLowerCase() === wanted) ||
+          availableNetworks.find((n) => !!wanted && n.id.toLowerCase() === wanted) ||
+          availableNetworks.find((n) => !!wanted && n.payout.toLowerCase() === wanted) ||
+          availableNetworks.find((n) => !!wanted && n.label?.toLowerCase() === wanted) ||
           availableNetworks.find((n) => !!wanted && n.label?.toLowerCase().includes(wanted)) ||
-          availableNetworks.find((n) => n.payout.toLowerCase() === wantedPayout) ||
-          availableNetworks.find((n) => n.id.toLowerCase() === wantedPayout);
+          availableNetworks.find((n) => !!wantedPayout && n.payout.toLowerCase() === wantedPayout) ||
+          availableNetworks.find((n) => !!wantedPayout && n.id.toLowerCase() === wantedPayout) ||
+          availableNetworks.find((n) => !!payoutStem && n.id.toLowerCase() === payoutStem) ||
+          availableNetworks.find((n) => !!payoutStem && n.payout.toLowerCase().startsWith(payoutStem));
         if (match && selectedNetworkId !== match.id) {
           setSelectedNetworkId(match.id);
         }
       }
     }
+
+
 
     if (allApplied) setPendingBeneficiary(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1392,6 +1400,7 @@ const SendPage = () => {
       if (activeNetwork?.label) parts.push(activeNetwork.label);
       if (recipientPhone) parts.push(recipientPhone);
     }
+    if (parts.length === 0) return "Couldn't prefill payout details — please enter them below";
     return parts.join(" · ");
   }, [pickedBeneficiaryId, isNGNBank, isGhanaBank, ngnBanks, ngnBankCode, ngnAccountNumber, ghBanks, ghBankCode, ghAccountNumber, activeNetwork, recipientPhone]);
 
