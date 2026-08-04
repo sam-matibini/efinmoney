@@ -373,20 +373,12 @@ export default function FlutterwaveCardForm({
       setLastPayload(payload);
 
       if (data?.requires_auth) {
-        const am = data?.auth?.mode;
-        const cid = data?.charge_id ? String(data.charge_id) : null;
-        if (cid) setPendingChargeId(cid);
-        setAuthMode(am);
-        if (am === "redirect" && data?.auth?.redirect) {
-          setAuthRedirect(data.auth.redirect);
-          setStage("auth");
-        } else if (am === "pin" || am === "avs_noauth") {
-          setStage("auth");
-        } else {
-          setStage("auth");
-        }
+        applyAuthResponse(data);
         return;
       }
+
+      setAuthMode(null);
+
 
       // Direct success
       setStage("crediting");
