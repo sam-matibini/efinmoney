@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
+import { avatarColorClasses } from "@/lib/avatarColor";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -110,10 +111,11 @@ const RecipientCard: React.FC<RecipientCardProps> = ({
     >
       {/* Header */}
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+        <div className={`w-10 h-10 rounded-full ${avatarColorClasses(recipient.user_id)} flex items-center justify-center shrink-0 text-sm font-semibold`}>
           {recipient.avatar_url
             ? <img src={recipient.avatar_url} alt="" className="w-full h-full rounded-full object-cover" />
-            : <User className="w-5 h-5 text-primary" />}
+            : (recipient.full_name || recipient.efin_tag || recipient.email || "?")
+                .split(/[\s._-]+/).filter(Boolean).slice(0, 2).map((s) => s[0]?.toUpperCase()).join("") || <User className="w-5 h-5" />}
         </div>
         <div className="flex-1 min-w-0">
           <p className="font-medium text-foreground truncate">

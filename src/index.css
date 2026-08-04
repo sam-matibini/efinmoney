@@ -48,6 +48,19 @@
     --pay-mobile: 36 100% 45%;
     --pay-mobile-foreground: 0 0% 100%;
 
+    /* Per-user avatar palette (light): tinted bg + readable ink */
+    --avatar-1: 244 70% 92%; --avatar-1-foreground: 244 60% 35%;
+    --avatar-2: 199 80% 90%; --avatar-2-foreground: 199 75% 28%;
+    --avatar-3: 152 50% 88%; --avatar-3-foreground: 152 55% 25%;
+    --avatar-4: 36 90% 88%;  --avatar-4-foreground: 30 80% 30%;
+    --avatar-5: 342 75% 92%; --avatar-5-foreground: 342 60% 38%;
+    --avatar-6: 271 70% 92%; --avatar-6-foreground: 271 55% 38%;
+    --avatar-7: 172 55% 87%; --avatar-7-foreground: 176 65% 24%;
+    --avatar-8: 12 80% 91%;  --avatar-8-foreground: 12 65% 38%;
+    --avatar-9: 88 55% 87%;  --avatar-9-foreground: 96 55% 24%;
+    --avatar-10: 220 30% 89%; --avatar-10-foreground: 220 35% 30%;
+
+
     /* Custom tokens */
     --brand-900: 256 60% 12%;
     --brand-800: 256 55% 18%;
@@ -118,6 +131,19 @@
     --pay-wallet-foreground: 232 45% 7%;
     --pay-mobile: 41 100% 58%;
     --pay-mobile-foreground: 232 45% 7%;
+
+    /* Per-user avatar palette (dark) */
+    --avatar-1: 244 45% 26%; --avatar-1-foreground: 244 90% 86%;
+    --avatar-2: 199 55% 22%; --avatar-2-foreground: 199 90% 82%;
+    --avatar-3: 152 40% 20%; --avatar-3-foreground: 152 70% 78%;
+    --avatar-4: 33 55% 22%;  --avatar-4-foreground: 36 90% 78%;
+    --avatar-5: 342 45% 25%; --avatar-5-foreground: 342 85% 85%;
+    --avatar-6: 271 45% 26%; --avatar-6-foreground: 271 85% 86%;
+    --avatar-7: 176 45% 19%; --avatar-7-foreground: 172 70% 76%;
+    --avatar-8: 12 50% 24%;  --avatar-8-foreground: 12 85% 82%;
+    --avatar-9: 96 40% 19%;  --avatar-9-foreground: 88 65% 78%;
+    --avatar-10: 220 25% 26%; --avatar-10-foreground: 220 40% 85%;
+
 
     --gradient-card: linear-gradient(145deg, hsl(232 42% 11%) 0%, hsl(258 35% 16%) 100%);
     --shadow-card: 0 1px 3px hsl(0 0% 0% / 0.3), 0 1px 2px hsl(0 0% 0% / 0.2);

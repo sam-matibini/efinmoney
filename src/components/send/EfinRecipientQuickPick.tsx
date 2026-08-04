@@ -10,6 +10,7 @@ import LoadingSpinner from "@/components/LoadingSpinner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import { avatarColorClasses } from "@/lib/avatarColor";
 
 export interface QuickPickRecipient {
   user_id: string;
@@ -59,10 +60,10 @@ const initials = (r: { full_name: string | null; efin_tag: string | null; email:
     .join("");
 };
 
-const Avatar = ({ url, label, size = "md" }: { url: string | null; label: string; size?: "sm" | "md" }) => {
+const Avatar = ({ url, label, seed, size = "md" }: { url: string | null; label: string; seed?: string | null; size?: "sm" | "md" }) => {
   const cls = size === "sm" ? "w-9 h-9 text-xs" : "w-10 h-10 text-sm";
   return (
-    <div className={`${cls} rounded-full bg-primary/15 text-primary flex items-center justify-center shrink-0 font-medium overflow-hidden`}>
+    <div className={`${cls} ${avatarColorClasses(seed)} rounded-full flex items-center justify-center shrink-0 font-semibold overflow-hidden`}>
       {url ? <img src={url} alt="" className="w-full h-full object-cover" /> : label || <User className="w-4 h-4" />}
     </div>
   );
@@ -301,7 +302,7 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
                     className="flex w-16 shrink-0 flex-col items-center gap-1 rounded-lg p-1 text-center transition-colors hover:bg-muted disabled:opacity-50"
                     title={r.full_name || r.efin_tag || r.email || ""}
                   >
-                    <Avatar url={r.avatar_url} label={initials(r)} size="sm" />
+                    <Avatar url={r.avatar_url} label={initials(r)} seed={r.user_id} size="sm" />
                     <span className="w-full truncate text-[11px] text-muted-foreground">
                       {added ? "Added" : (r.full_name?.split(" ")[0] || r.efin_tag || r.email)}
                     </span>
@@ -390,7 +391,7 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
                             i === highlight ? "bg-muted" : ""
                           }`}
                         >
-                          <Avatar url={s.avatar_url} label={initials({ ...s, email: s.email_masked })} />
+                          <Avatar url={s.avatar_url} label={initials({ ...s, email: s.email_masked })} seed={s.user_id} />
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-medium text-foreground">
                               {s.full_name || s.efin_tag || s.email_masked}
