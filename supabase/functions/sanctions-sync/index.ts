@@ -1,5 +1,5 @@
-// Sanctions list ingestion — pulls OFAC SDN and UN consolidated lists into
-// public.aml_watchlist (upsert on source+source_id). Fault-tolerant per source:
+// Sanctions list ingestion — pulls OFAC SDN, UN consolidated and Global Affairs
+// Canada (SEMA) lists into public.aml_watchlist (upsert on source+source_id).
 // if one provider is unreachable the others still apply. Invoked on demand from
 // the Sanctions Screening page and (optionally) on a schedule.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
@@ -12,7 +12,7 @@ const corsHeaders = {
 type EntityType = "individual" | "entity" | "vessel" | "aircraft" | "unknown";
 
 interface WatchRow {
-  source: "ofac" | "un";
+  source: "ofac" | "un" | "gac";
   source_id: string;
   name: string;
   name_normalized: string;
