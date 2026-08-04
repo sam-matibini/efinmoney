@@ -76,6 +76,8 @@ import AppPage from "@/components/layout/AppPage";
 import { SectionBoundary } from "@/components/common/SectionBoundary";
 import { currencySymbol } from "@/lib/currency";
 import MoneyFlowShell from "@/components/money/MoneyFlowShell";
+import CheckoutShell from "@/components/money/CheckoutShell";
+import CheckoutMethodList, { type CheckoutMethod } from "@/components/money/CheckoutMethodList";
 
 const MM_BY_CCY = Object.fromEntries(MM_COUNTRIES.map((c) => [c.currency, c]));
 
