@@ -278,6 +278,12 @@ const MethodCheckoutPanel = ({
                 </SelectContent>
               </Select>
             </div>
+            <QuickAddRow
+              tone="bank"
+              label={linkingBank ? "Starting…" : "Quick add bank account"}
+              onClick={onLinkBank}
+              disabled={linkingBank}
+            />
             <ChargeSummary
               amount={amount} fee={fee} total={total} currency={currency} symbol={symbol}
               debitLabel="Debited from your bank"
