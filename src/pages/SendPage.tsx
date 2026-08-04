@@ -1361,17 +1361,23 @@ const SendPage = () => {
       } else {
         const wanted = String(b.network || "").toLowerCase();
         const wantedPayout = String(b.payout_method || "").toLowerCase();
+        // "mtn_mobile" / "airtel_money" -> "mtn" / "airtel"
+        const payoutStem = wantedPayout.split("_")[0];
         const match =
-          availableNetworks.find((n) => n.id.toLowerCase() === wanted) ||
-          availableNetworks.find((n) => n.payout.toLowerCase() === wanted) ||
-          availableNetworks.find((n) => n.label?.toLowerCase() === wanted) ||
+          availableNetworks.find((n) => !!wanted && n.id.toLowerCase() === wanted) ||
+          availableNetworks.find((n) => !!wanted && n.payout.toLowerCase() === wanted) ||
+          availableNetworks.find((n) => !!wanted && n.label?.toLowerCase() === wanted) ||
           availableNetworks.find((n) => !!wanted && n.label?.toLowerCase().includes(wanted)) ||
-          availableNetworks.find((n) => n.payout.toLowerCase() === wantedPayout) ||
-          availableNetworks.find((n) => n.id.toLowerCase() === wantedPayout);
+          availableNetworks.find((n) => !!wantedPayout && n.payout.toLowerCase() === wantedPayout) ||
+          availableNetworks.find((n) => !!wantedPayout && n.id.toLowerCase() === wantedPayout) ||
+          availableNetworks.find((n) => !!payoutStem && n.id.toLowerCase() === payoutStem) ||
+          availableNetworks.find((n) => !!payoutStem && n.payout.toLowerCase().startsWith(payoutStem));
         if (match && selectedNetworkId !== match.id) {
           setSelectedNetworkId(match.id);
         }
       }
+    }
+
     }
 
     if (allApplied) setPendingBeneficiary(null);
