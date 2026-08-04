@@ -334,9 +334,14 @@ Deno.serve(async (req) => {
           });
         }
         if (data.next_action) {
+          console.log("flw-card-charge unsupported follow-up action", {
+            charge_id: chargeIdFollowUp,
+            next_action_type: next?.providerType || null,
+          });
           return ok({
             success: false,
-            error: `Unsupported bank security check: ${next?.providerType || "unknown"}`,
+            error: `Unsupported bank security check: ${next?.providerType || "unknown"}. Please retry or use another payment method.`,
+            provider_action_type: next?.providerType || null,
             code: "unsupported_auth_action",
           });
         }
