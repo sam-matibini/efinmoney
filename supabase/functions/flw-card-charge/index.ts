@@ -420,12 +420,21 @@ Deno.serve(async (req) => {
 
       if (next) {
         if (!next.mode || !next.providerType) {
+          console.log("flw-card-charge unsupported next action", {
+            charge_id: charge.chargeId || data.id || null,
+            provider_status: charge.status,
+            next_action_type: next.providerType || null,
+            raw_type: next.rawType || null,
+          });
           return ok({
             success: false,
-            error: `Unsupported bank security check: ${next.providerType || "unknown"}`,
+            error: `Unsupported bank security check: ${next.providerType || "unknown"}. Please retry or use another payment method.`,
+            provider_action_type: next.providerType || null,
+            charge_id: charge.chargeId || data.id || null,
             code: "unsupported_auth_action",
           });
         }
+
 
         console.log("flw-card-charge next action", {
           charge_id: charge.chargeId || data.id || null,
