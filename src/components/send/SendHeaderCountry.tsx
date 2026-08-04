@@ -3,6 +3,7 @@ import { Check, ChevronDown, Search } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { COUNTRIES, type CountryInfo } from "@/lib/countries";
+import { CountryFlag } from "@/components/ui/FlagImage";
 
 type Props = {
   value: string;
