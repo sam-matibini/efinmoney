@@ -254,6 +254,14 @@ export default function StaffTrainingPage() {
                 <SelectContent>{courses.map((c: any) => <SelectItem key={c.id} value={c.id}>{c.course_name}</SelectItem>)}</SelectContent>
               </Select>
             </div>
+            {staffRows.length > 0 && (
+              <div><Label>Staff member</Label>
+                <Select value={logForm.staff_id} onValueChange={(v) => setLogForm({ ...logForm, staff_id: v })}>
+                  <SelectTrigger><SelectValue placeholder="Myself" /></SelectTrigger>
+                  <SelectContent>{staffRows.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+            )}
             <div><Label>Score (%)</Label><Input value={logForm.score} onChange={(e) => setLogForm({ ...logForm, score: e.target.value })} type="number" placeholder="e.g., 85" /></div>
           </div>
           <DialogFooter>
