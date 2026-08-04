@@ -62,6 +62,8 @@ export type LiveFxCalculatorProps = {
   footer?: React.ReactNode;
   /** Tighter layout for dashboard modal — no outer blur bleed, no scrollbars. */
   embedded?: boolean;
+  /** Sendwave-style single row: You send | They receive + currency, rate/fee caption below. */
+  pairLayout?: boolean;
 };
 
 const Flag = ({ code, size = 20 }: { code: string; size?: number }) => {
