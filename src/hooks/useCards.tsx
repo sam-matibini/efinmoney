@@ -93,9 +93,10 @@ export const useCardMutations = () => {
       const isCredit = input.card_type === 'credit';
 
       if (!isExternal) {
-        if (!isCredit && !input.wallet_id) {
-          throw new Error('A linked wallet is required for debit cards');
+        if (isCredit && !input.credit_limit) {
+          throw new Error('Credit limit is required for credit cards');
         }
+
         if (isCredit && !input.credit_limit) {
           throw new Error('Credit limit is required for credit cards');
         }
