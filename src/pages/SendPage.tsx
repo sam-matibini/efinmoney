@@ -2199,6 +2199,7 @@ const SendPage = () => {
                                             ? `Minimum card send is ${cardSendMinAmount(cardSendProvider, sourceCurrency)} ${sourceCurrency}.`
                                             : null
                                         }
+                                        inlineEntry={inlineCardEntry}
                                         insufficientBalance={insufficientFunds}
                                         onTopUp={() => navigate("/wallet/topup")}
                                       />
