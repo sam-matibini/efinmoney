@@ -255,10 +255,14 @@ const AddCardModal = ({ isOpen, onClose, defaultMode = "issue" }: AddCardModalPr
               {!isCredit && (
                 <>
                   <div className="space-y-2">
-                    <Label>Linked Wallet</Label>
-                    <Select value={walletId} onValueChange={setWalletId}>
-                      <SelectTrigger><SelectValue placeholder="Select a wallet" /></SelectTrigger>
+                    <Label>Linked Wallet (optional)</Label>
+                    <Select
+                      value={walletId || "none"}
+                      onValueChange={(v) => setWalletId(v === "none" ? "" : v)}
+                    >
+                      <SelectTrigger><SelectValue placeholder="No wallet — fund later" /></SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="none">No wallet — fund later</SelectItem>
                         {wallets?.map((w) => (
                           <SelectItem key={w.wallet_id} value={w.wallet_id}>
                             {w.flag_emoji} {w.currency_code} — {w.symbol}{Number(w.balance).toFixed(2)}
@@ -267,26 +271,31 @@ const AddCardModal = ({ isOpen, onClose, defaultMode = "issue" }: AddCardModalPr
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-muted-foreground">
-                      Card spends from its own balance. Fund it from this wallet when creating or anytime after.
+                      {selectedWallet
+                        ? "Card spends from its own balance. Fund it from this wallet when creating or anytime after."
+                        : `Skip this and fund the card later from any wallet. The card will be issued in ${SYSTEM_DEFAULT_CURRENCY}.`}
                     </p>
                   </div>
-                  <div className="space-y-2">
-                    <Label>Initial fund (optional)</Label>
-                    <Input
-                      type="number"
-                      inputMode="decimal"
-                      min={0}
-                      step="0.01"
-                      placeholder="0.00"
-                      value={initialFund}
-                      onChange={(e) => setInitialFund(e.target.value)}
-                    />
-                    {selectedWallet && Number(initialFund) > 0 && (
-                      <p className="text-xs text-muted-foreground">
-                        {selectedWallet.currency_code} {Number(initialFund).toFixed(2)} will move from your wallet to this card.
-                      </p>
-                    )}
-                  </div>
+                  {selectedWallet && (
+                    <div className="space-y-2">
+                      <Label>Initial fund (optional)</Label>
+                      <Input
+                        type="number"
+                        inputMode="decimal"
+                        min={0}
+                        step="0.01"
+                        placeholder="0.00"
+                        value={initialFund}
+                        onChange={(e) => setInitialFund(e.target.value)}
+                      />
+                      {Number(initialFund) > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          {selectedWallet.currency_code} {Number(initialFund).toFixed(2)} will move from your wallet to this card.
+                        </p>
+                      )}
+                    </div>
+                  )}
+
                 </>
               )}
 
