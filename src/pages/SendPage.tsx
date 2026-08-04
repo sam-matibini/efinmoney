@@ -50,6 +50,10 @@ import CanadaSendFlow from "@/components/send/CanadaSendFlow";
 import EfinmoneyP2PFlow from "@/components/send/EfinmoneyP2PFlow";
 import MoneyFlowShell from "@/components/money/MoneyFlowShell";
 import PaymentMethodRow, { type PaymentMethodOption } from "@/components/money/PaymentMethodRow";
+import MethodCheckoutPanel from "@/components/send/MethodCheckoutPanel";
+import FlutterwaveCardForm from "@/components/payments/FlutterwaveCardForm";
+
+
 import { createPaymentLink, PaymentLinkSuccess, type PaymentLinkResult } from "@/components/send/PaymentLinkSuccess";
 import { isClaimCardCurrency } from "@/lib/stripeCorridors";
 import TransactionPinDialog from "@/components/send/TransactionPinDialog";
@@ -688,6 +692,15 @@ const SendPage = () => {
     ? `+${sourceSymbol}${fee.toFixed(2)} ${sourceCurrency} fee added · total ${sourceSymbol}${totalCharge.toFixed(2)} ${sourceCurrency}`
     : undefined;
 
+  /**
+   * The Flutterwave rail supports direct card charges, so we can collect
+   * cardholder name / number / expiry / CVV in-app. Every other card rail is
+   * a hosted redirect where the partner collects the details.
+   */
+  const inlineCardEntry =
+    fundingSource === "card" && cardSendProvider === "flutterwave" && !!selectedWallet;
+
+
   const goToStep = useCallback((next: number) => {
     setDirection(next > step ? 1 : -1);
     setStep(next);
@@ -834,15 +847,17 @@ const SendPage = () => {
     }
   };
 
-  const handleConfirm = async () => {
+  const handleConfirm = async (fundingOverride?: "wallet" | "card" | "bank") => {
     if (confirming) return;
     setConfirming(true);
+    const funding = fundingOverride ?? fundingSource;
 
     // ── Wallet: create + execute payout immediately ──────────────────────
-    if (fundingSource === 'wallet') {
+    if (funding === 'wallet') {
       if (!selectedWallet) { setConfirming(false); return; }
       try {
-        const tid = await createTransferRecord();
+        const tid = await createTransferRecord({ funding_source: "wallet" });
+
         let data: any = null;
         let invokeErr: any = null;
         try {
@@ -956,7 +971,7 @@ const SendPage = () => {
 
 
     // ── Bank: queue as pending; debit takes 1-2 business days ────────────
-    if (fundingSource === 'bank') {
+    if (funding === 'bank') {
       try {
         const tid = await createTransferRecord();
         await supabase.from('transfers').update({ status: 'processing' }).eq('id', tid);
@@ -973,7 +988,7 @@ const SendPage = () => {
     }
 
     // ── Card: Fincra → Flutterwave → Nomba… collect → credit → payout ─
-    if (fundingSource === "card") {
+    if (funding === "card") {
       try {
         if (!selectedWallet || !isCardSendCollectCurrency(selectedWallet.currency_code)) {
           toast.error("Pick a supported card currency wallet first.");
@@ -2148,81 +2163,48 @@ const SendPage = () => {
                                         />
                                       </div>
 
-                                      {(fundingSource === "wallet" || fundingSource === "card") && (
-                                        <div className="space-y-2">
-                                          <Label>{fundingSource === "card" ? "Credit to wallet" : "From wallet"}</Label>
-                                          <Select
-                                            value={selectedWalletId || selectedWallet?.wallet_id}
-                                            onValueChange={(id) => setSelectedWalletId(id)}
-                                          >
-                                            <SelectTrigger>
-                                              <SelectValue placeholder="Select wallet" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                              {wallets?.map((w) => {
-                                                const cardCount = linkedCardCount[w.wallet_id] ?? 0;
-                                                return (
-                                                  <SelectItem key={w.wallet_id} value={w.wallet_id}>
-                                                    <span className="flex items-center gap-2">
-                                                      {w.flag_emoji} {w.currency_code} — {w.symbol}{Number(w.balance).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                      {cardCount > 0 && (
-                                                        <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground ml-auto">
-                                                          <CreditCard className="w-3 h-3" />
-                                                          {cardCount}
-                                                        </span>
-                                                      )}
-                                                    </span>
-                                                  </SelectItem>
-                                                );
-                                              })}
-                                            </SelectContent>
-                                          </Select>
-                                        </div>
-                                      )}
                                     </motion.div>
 
+                                    <motion.div custom={1} variants={fieldVariants} initial="hidden" animate="show">
+                                      <MethodCheckoutPanel
+                                        method={fundingSource as "card" | "bank" | "wallet"}
+                                        wallets={(fundingSource === "card" ? cardWallets : (wallets ?? [])).map((w) => ({
+                                          wallet_id: w.wallet_id,
+                                          currency_code: w.currency_code,
+                                          symbol: w.symbol,
+                                          balance: w.balance,
+                                          flag_emoji: w.flag_emoji,
+                                        }))}
+                                        selectedWalletId={selectedWalletId || selectedWallet?.wallet_id}
+                                        onWalletChange={(id) => setSelectedWalletId(id)}
+                                        linkedCardCount={linkedCardCount}
+                                        bankSources={bankSources}
+                                        selectedSourceId={selectedSourceId || bankSources[0]?.id}
+                                        onSourceChange={setSelectedSourceId}
+                                        onLinkBank={startPlaidLink}
+                                        linkingBank={plaidLinking}
+                                        amount={parsedAmount}
+                                        fee={fee}
+                                        total={totalCharge}
+                                        currency={sourceCurrency}
+                                        symbol={sourceSymbol}
+                                        cardProviderReady={!!cardSendProvider}
+                                        cardChargeNote={
+                                          cardCheckoutQuote
+                                            ? `Card charge ≈ ${cardCheckoutQuote.checkoutCurrency} ${cardCheckoutQuote.checkoutAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${cardSendProvider === "nomba" && sourceCurrency === "CAD" ? " · CAD charged in USD" : ""}`
+                                            : null
+                                        }
+                                        cardMinNote={
+                                          cardSendProvider
+                                            ? `Minimum card send is ${cardSendMinAmount(cardSendProvider, sourceCurrency)} ${sourceCurrency}.`
+                                            : null
+                                        }
+                                        inlineEntry={inlineCardEntry}
+                                        insufficientBalance={insufficientFunds}
+                                        onTopUp={() => navigate("/wallet/topup")}
+                                      />
+                                    </motion.div>
 
-                                    {fundingSource === 'bank' && (
-                                      <motion.div custom={1} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
-                                        <Label>From Bank Account</Label>
-                                        {bankSources.length > 0 ? (
-                                          <>
-                                            <Select value={selectedSourceId || bankSources[0]?.id} onValueChange={setSelectedSourceId}>
-                                              <SelectTrigger><SelectValue placeholder="Select bank account" /></SelectTrigger>
-                                              <SelectContent>
-                                                {bankSources.map((s) => (
-                                                  <SelectItem key={s.id} value={s.id}>
-                                                    🏦 {s.institution ? `${s.institution} ` : ''}{s.display_name} ••••{s.last_four}
-                                                  </SelectItem>
-                                                ))}
-                                              </SelectContent>
-                                            </Select>
-                                            <p className="text-xs text-muted-foreground">Transfers from bank may take 1-2 business days</p>
-                                          </>
-                                        ) : (
-                                          <div className="space-y-2 p-3 rounded-lg border border-dashed border-border bg-muted/40">
-                                            <div className="flex items-start gap-2">
-                                              <AlertCircle className="w-4 h-4 mt-0.5 text-muted-foreground shrink-0" />
-                                              <p className="text-sm text-muted-foreground">
-                                                No bank accounts linked. Connect your bank to fund transfers via ACH/EFT.
-                                              </p>
-                                            </div>
-                                            <Button type="button" size="sm" className="w-full" onClick={startPlaidLink} disabled={plaidLinking}>
-                                              <Landmark className="w-4 h-4 mr-2" />
-                                              {plaidLinking ? "Starting…" : "Link bank account"}
-                                            </Button>
-                                          </div>
-                                        )}
-                                      </motion.div>
-                                    )}
-
-                                    {fundingSource === "card" && cardWallets.length === 0 && (
-                                      <motion.div custom={1} variants={fieldVariants} initial="hidden" animate="show">
-                                        <div className="rounded-lg border border-dashed border-border bg-muted/40 p-3 text-sm text-muted-foreground">
-                                          Create a supported wallet to pay by card.
-                                        </div>
-                                      </motion.div>
-                                    )}
 
                                     <motion.div custom={2} variants={fieldVariants} initial="hidden" animate="show" className="flex justify-center py-1">
                                       <SectionBoundary name="LiveFxCalculator"><LiveFxCalculator
@@ -2259,15 +2241,8 @@ const SendPage = () => {
                                       /></SectionBoundary>
                                     </motion.div>
 
-                                    {fundingSource === "card" && cardSendProvider && (
-                                      <p className="text-xs text-muted-foreground text-center -mt-2">
-                                        {cardCheckoutQuote
-                                          ? `Card charge ≈ ${cardCheckoutQuote.checkoutCurrency} ${cardCheckoutQuote.checkoutAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} · `
-                                          : ""}
-                                        Min {cardSendMinAmount(cardSendProvider, sourceCurrency)} {sourceCurrency}
-                                        {cardSendProvider === "nomba" && sourceCurrency === "CAD" ? " · CAD charged in USD" : ""}
-                                      </p>
-                                    )}
+
+
 
                                     {fundingSource === "card" && cardSendProvider && parsedAmount > 0
                                       && parsedAmount < cardSendMinAmount(cardSendProvider, sourceCurrency) && (
@@ -2690,11 +2665,33 @@ const SendPage = () => {
                                     {fundingSource === 'bank' && (
                                       <p className="text-xs text-muted-foreground text-center">Bank transfer — funds will be debited within 1-2 business days.</p>
                                     )}
-                                    {fundingSource === "card" && (
+                                    {fundingSource === "card" && !inlineCardEntry && (
                                       <p className="text-xs text-muted-foreground text-center">
                                         Next you’ll enter card details on our secure page. After payment, we automatically send to your recipient.
                                       </p>
                                     )}
+                                    {fundingSource === "card" && inlineCardEntry ? (
+                                      <div className="space-y-3">
+                                        <p className="text-sm font-semibold">Card details</p>
+                                        <SectionBoundary name="FlutterwaveCardForm">
+                                          <FlutterwaveCardForm
+                                            defaultWalletId={selectedWallet?.wallet_id}
+                                            defaultAmount={totalCharge}
+                                            lockAmount
+                                            ctaLabel={`Pay ${sourceSymbol}${totalCharge.toFixed(2)} & send`}
+                                            onSuccess={() => { void handleConfirm("wallet"); }}
+                                          />
+                                        </SectionBoundary>
+                                        <Button
+                                          variant="outline"
+                                          className="w-full"
+                                          onClick={() => goToStep(2)}
+                                          disabled={confirming}
+                                        >
+                                          Back
+                                        </Button>
+                                      </div>
+                                    ) : (
                                     <div className="flex gap-3">
                                       <Button variant="outline" className="flex-1" onClick={() => goToStep(2)} disabled={confirming || creatingLink}>Back</Button>
                                       <Button className="flex-1" onClick={useLink ? handleCreateLink : requestConfirm} disabled={confirming || creatingLink}>
@@ -2711,6 +2708,8 @@ const SendPage = () => {
                                         )}
                                       </Button>
                                     </div>
+                                    )}
+
                                     <Button
                                       variant="outline"
                                       className="w-full border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
