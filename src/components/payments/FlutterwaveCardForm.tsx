@@ -663,7 +663,9 @@ export default function FlutterwaveCardForm({
             loading={authLoading}
             redirectUrl={authRedirect}
             providerMessage={authMessage}
+            initialAvs={{ address: billingLine1, city: billingCity, zipcode: billingZip }}
             onSubmitCode={handleChallengeSubmit}
+            onSubmitAvs={handleAvsSubmit}
             onOpenRedirect={openRedirectPopup}
             onCancel={cancelChallenge}
           />
