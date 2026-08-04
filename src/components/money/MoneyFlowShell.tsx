@@ -36,6 +36,7 @@ export default function MoneyFlowShell({
   footer,
   className,
   above,
+  headerRight,
 }: Props) {
   const maxStep = steps[steps.length - 1]?.n ?? 1;
 
