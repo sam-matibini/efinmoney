@@ -710,8 +710,8 @@ const SendPage = () => {
   }, [fundingSource, sourceCurrency, cardCurrency]);
 
   const cardChargeAmount = useMemo(
-    () => (usdRate ? Math.round(parsedAmount * usdRate * 100) / 100 : 0),
-    [parsedAmount, usdRate]
+    () => (usdRate ? Math.round(totalCharge * usdRate * 100) / 100 : 0),
+    [totalCharge, usdRate]
   );
 
   const txRef = useMemo(
