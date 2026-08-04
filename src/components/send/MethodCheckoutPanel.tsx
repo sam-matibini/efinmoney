@@ -315,12 +315,14 @@ const MethodCheckoutPanel = ({
         <p className="text-sm font-semibold">Pay from wallet balance</p>
       </div>
       {wallets.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-border bg-muted/40 p-3 text-sm text-muted-foreground">
-          You have no wallets yet.
+        <div className="space-y-2 rounded-lg border border-dashed border-border bg-muted/40 p-3">
+          <p className="text-sm text-muted-foreground">You have no wallets yet.</p>
+          {onAddWallet && <QuickAddRow tone="wallet" label="Quick add wallet" onClick={onAddWallet} />}
         </div>
       ) : (
         <>
           {walletSelect("From wallet")}
+          {onAddWallet && <QuickAddRow tone="wallet" label="Quick add wallet" onClick={onAddWallet} />}
           <ChargeSummary
             amount={amount} fee={fee} total={total} currency={currency} symbol={symbol}
             debitLabel="Debited from wallet"
