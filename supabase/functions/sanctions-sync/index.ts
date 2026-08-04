@@ -159,7 +159,11 @@ const GAC_URL =
 
 /** GAC publishes bilingual labels such as "Belarus / Bélarus". */
 const gacCountryLabels = (value: string) =>
-  value.split(/\s*\/\s*/).map((label) => label.trim()).filter(Boolean);
+  [...new Set(value.split(/\s*\/\s*/).flatMap((label) => {
+    const trimmed = label.trim();
+    const withoutTranslation = trimmed.replace(/\s*\([^)]*\)\s*/g, " ").trim();
+    return [trimmed, withoutTranslation].filter(Boolean);
+  }))];
 
 async function syncGac(): Promise<WatchRow[]> {
   const res = await fetch(GAC_URL);
