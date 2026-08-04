@@ -131,6 +131,8 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
     isFetchingNextPage,
     hasNextPage,
     fetchNextPage,
+    error: listError,
+    refetch: refetchList,
   } = useInfiniteQuery({
     queryKey: ["efin-list-recipients", debounced],
     enabled: open && mode === "search" && !!user?.id,
