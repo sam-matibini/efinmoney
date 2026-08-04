@@ -304,6 +304,7 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
                             avatar_url: s.avatar_url,
                             email: null,
                             account_number: s.account_number,
+                            base_currency: s.base_currency,
                           })}
                           className="flex w-full items-center gap-3 p-3 text-left transition-colors hover:bg-muted disabled:opacity-60"
                         >
