@@ -19,6 +19,8 @@ type Props = {
   className?: string;
   /** Optional header slot above the stepper (e.g. quiet tabs) */
   above?: ReactNode;
+  /** Optional control rendered inline to the right of the title (e.g. country picker) */
+  headerRight?: ReactNode;
 };
 
 /**
@@ -34,6 +36,7 @@ export default function MoneyFlowShell({
   footer,
   className,
   above,
+  headerRight,
 }: Props) {
   const maxStep = steps[steps.length - 1]?.n ?? 1;
 
@@ -108,11 +111,14 @@ export default function MoneyFlowShell({
             })}
           </div>
 
-          <div className="text-center sm:text-left">
-            <h2 className="text-xl sm:text-2xl font-display font-bold tracking-tight">{title}</h2>
-            {subtitle ? (
-              <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
-            ) : null}
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0 text-left">
+              <h2 className="text-xl sm:text-2xl font-display font-bold tracking-tight truncate">{title}</h2>
+              {subtitle ? (
+                <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
+              ) : null}
+            </div>
+            {headerRight ? <div className="shrink-0">{headerRight}</div> : null}
           </div>
         </div>
 

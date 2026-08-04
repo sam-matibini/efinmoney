@@ -52,6 +52,8 @@ import EfinmoneyP2PFlow from "@/components/send/EfinmoneyP2PFlow";
 import MoneyFlowShell from "@/components/money/MoneyFlowShell";
 import PaymentMethodRow, { type PaymentMethodOption } from "@/components/money/PaymentMethodRow";
 import MethodCheckoutPanel from "@/components/send/MethodCheckoutPanel";
+import SendHeaderCountry from "@/components/send/SendHeaderCountry";
+import RecipientQuickBox from "@/components/send/RecipientQuickBox";
 import FlutterwaveCardForm from "@/components/payments/FlutterwaveCardForm";
 
 
@@ -2134,8 +2136,13 @@ const SendPage = () => {
                                     { n: 2, label: "Confirm" },
                                   ]}
                                   currentStep={1}
-                                  title={`Send money to ${targetCountry.country}`}
-                                  subtitle="Recipient, amount and how you pay"
+                                  title="Send money to"
+                                  headerRight={
+                                    <SendHeaderCountry
+                                      value={targetCountryId}
+                                      onChange={setTargetCountryId}
+                                    />
+                                  }
 
                                   footer={
                                     <div className="space-y-3">
@@ -2169,64 +2176,77 @@ const SendPage = () => {
                                   }
                                 >
 
-                                    <motion.div custom={0} variants={fieldVariants} initial="hidden" animate="show" className="space-y-3">
-                                      <ContactQuickField
-                                        label="To"
-                                        placeholder="Select contact"
-                                        valueLabel={pickedBeneficiaryId ? recipientName : null}
-                                        onSelect={applyBeneficiary}
-                                        onClear={pickedBeneficiaryId ? () => { setPickedBeneficiaryId(null); setRecipientName(""); setRecipientPhone(""); } : undefined}
+                                    <motion.div custom={0} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
+                                      <RecipientQuickBox
+                                        value={recipientName}
+                                        onChange={setRecipientName}
+                                        onQuickAdd={() => setSaveModalOpen(true)}
                                       />
-                                      <button
-                                        type="button"
-                                        onClick={() => setPickerOpen(true)}
-                                        className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
-                                      >
-                                        <Users className="w-3.5 h-3.5" /> Browse all contacts
-                                      </button>
-                                    </motion.div>
-
-
-                                    {pickedBeneficiaryId && (
-                                      <motion.div
-                                        initial={{ opacity: 0, y: -6 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        className="flex items-center justify-between gap-3 p-3 rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-primary dark:text-indigo-300"
-                                      >
-                                        <span className="inline-flex items-center gap-2 text-sm font-medium">
-                                          <CheckCircle className="w-4 h-4" /> Contact selected ✓ — {recipientName}
-                                        </span>
-                                        <button
-                                          type="button"
-                                          onClick={() => { setPickedBeneficiaryId(null); setRecipientName(""); setRecipientPhone(""); }}
-                                          className="text-primary/80 dark:text-indigo-300/80 hover:opacity-100 opacity-70"
-                                          aria-label="Clear selected contact"
-                                        >
-                                          <X className="w-4 h-4" />
-                                        </button>
-                                      </motion.div>
-                                    )}
-
-                                    <motion.div custom={1} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
-                                      <Label>Recipient Name</Label>
-                                      <div className="relative">
-                                        <Input
-                                          placeholder="Recipient name"
-                                          value={recipientName}
-                                          onChange={(e) => setRecipientName(e.target.value.replace(/[^\p{L}\p{M}'\-. ]/gu, "").slice(0, 100))}
-                                          maxLength={100}
-                                          className="pr-11 transition-shadow focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:shadow-[0_0_0_4px_hsl(var(--primary)/0.12)]"
+                                      <div className="flex items-center justify-between gap-3">
+                                        <ContactQuickField
+                                          label=""
+                                          placeholder="Select contact"
+                                          valueLabel={pickedBeneficiaryId ? recipientName : null}
+                                          onSelect={applyBeneficiary}
+                                          onClear={pickedBeneficiaryId ? () => { setPickedBeneficiaryId(null); setRecipientName(""); setRecipientPhone(""); } : undefined}
                                         />
                                         <button
                                           type="button"
-                                          onClick={() => setSaveModalOpen(true)}
-                                          aria-label="Quick add new recipient"
-                                          title="Quick add new recipient"
-                                          className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                          onClick={() => setPickerOpen(true)}
+                                          className="shrink-0 inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
                                         >
-                                          <UserPlus className="w-4 h-4" />
+                                          <Users className="w-3.5 h-3.5" /> All contacts
                                         </button>
                                       </div>
+                                      {pickedBeneficiaryId && (
+                                        <p className="inline-flex items-center gap-1.5 text-xs font-medium text-primary">
+                                          <CheckCircle className="w-3.5 h-3.5" /> Contact selected — {recipientName}
+                                          <button
+                                            type="button"
+                                            onClick={() => { setPickedBeneficiaryId(null); setRecipientName(""); setRecipientPhone(""); }}
+                                            aria-label="Clear selected contact"
+                                            className="opacity-70 hover:opacity-100"
+                                          >
+                                            <X className="w-3.5 h-3.5" />
+                                          </button>
+                                        </p>
+                                      )}
+                                    </motion.div>
+
+                                    <motion.div custom={1} variants={fieldVariants} initial="hidden" animate="show">
+                                      <SectionBoundary name="LiveFxCalculator"><LiveFxCalculator
+                                        variant="app"
+                                        pairLayout
+                                        showDisclaimer={false}
+                                        className="max-w-none w-full"
+                                        from={sourceCurrency}
+                                        to={targetCountry.code}
+                                        sendAmount={amount}
+                                        onFromChange={handleCalcFromChange}
+                                        onToChange={handleCalcToChange}
+                                        onSendAmountChange={(v) => setAmount(v)}
+                                        fromCurrencyFilter={
+                                          fundingSource === "wallet" ? walletCurrencyCodes
+                                          : fundingSource === "card" ? cardWalletCodes
+                                          : undefined
+                                        }
+                                        toCurrencyFilter={
+                                          fundingSource === "card" ? cardPayoutCodes : payoutCurrencyCodes
+                                        }
+                                        priorityCodes={PRIORITY_SEND_CURRENCIES}
+                                        quoteRecipient={rateAvailable ? calcQuoteRecipient : undefined}
+                                        quoteSend={rateAvailable ? calcQuoteSend : undefined}
+                                        displayRate={rateAvailable ? effectiveRate : null}
+                                        feeLabel={feeDisplayLabel}
+                                        feeNote={feeNote}
+                                        walletBalance={
+                                          fundingSource === "wallet" && selectedWallet
+                                            ? Number(selectedWallet.balance)
+                                            : null
+                                        }
+                                        walletSymbol={selectedWallet?.symbol}
+                                        showActions={false}
+                                      /></SectionBoundary>
                                     </motion.div>
 
                                     {linkEligible && (
@@ -2511,40 +2531,6 @@ const SendPage = () => {
                                     </motion.div>
 
 
-                                    <motion.div custom={2} variants={fieldVariants} initial="hidden" animate="show" className="flex justify-center py-1">
-                                      <SectionBoundary name="LiveFxCalculator"><LiveFxCalculator
-                                        variant="app"
-                                        showDisclaimer={false}
-                                        className="max-w-none w-full"
-                                        from={sourceCurrency}
-                                        to={targetCountry.code}
-                                        sendAmount={amount}
-                                        onFromChange={handleCalcFromChange}
-                                        onToChange={handleCalcToChange}
-                                        onSendAmountChange={(v) => setAmount(v)}
-                                        fromCurrencyFilter={
-                                          fundingSource === "wallet" ? walletCurrencyCodes
-                                          : fundingSource === "card" ? cardWalletCodes
-                                          : undefined
-                                        }
-                                        toCurrencyFilter={
-                                          fundingSource === "card" ? cardPayoutCodes : payoutCurrencyCodes
-                                        }
-                                        priorityCodes={PRIORITY_SEND_CURRENCIES}
-                                        quoteRecipient={rateAvailable ? calcQuoteRecipient : undefined}
-                                        quoteSend={rateAvailable ? calcQuoteSend : undefined}
-                                        displayRate={rateAvailable ? effectiveRate : null}
-                                       feeLabel={feeDisplayLabel}
-                                       feeNote={feeNote}
-                                        walletBalance={
-                                          fundingSource === "wallet" && selectedWallet
-                                            ? Number(selectedWallet.balance)
-                                            : null
-                                        }
-                                        walletSymbol={selectedWallet?.symbol}
-                                        showActions={false}
-                                      /></SectionBoundary>
-                                    </motion.div>
 
 
 
