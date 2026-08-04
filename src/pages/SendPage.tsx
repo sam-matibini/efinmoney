@@ -960,7 +960,7 @@ const SendPage = () => {
 
 
     // ── Bank: queue as pending; debit takes 1-2 business days ────────────
-    if (fundingSource === 'bank') {
+    if (funding === 'bank') {
       try {
         const tid = await createTransferRecord();
         await supabase.from('transfers').update({ status: 'processing' }).eq('id', tid);
@@ -977,7 +977,7 @@ const SendPage = () => {
     }
 
     // ── Card: Fincra → Flutterwave → Nomba… collect → credit → payout ─
-    if (fundingSource === "card") {
+    if (funding === "card") {
       try {
         if (!selectedWallet || !isCardSendCollectCurrency(selectedWallet.currency_code)) {
           toast.error("Pick a supported card currency wallet first.");
