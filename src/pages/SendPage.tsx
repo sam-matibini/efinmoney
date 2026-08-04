@@ -120,6 +120,8 @@ import { cn } from "@/lib/utils";
 import AppPage from "@/components/layout/AppPage";
 import TransferSuccess from "@/components/send/TransferSuccess";
 import { findCountryById, findCountryByCode, COUNTRIES } from "@/lib/countries";
+import { MM_COUNTRIES } from "@/lib/mobileMoneyNetworks";
+
 import { PRIORITY_SEND_CURRENCIES } from "@/lib/currencyPriority";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -1248,9 +1250,24 @@ const SendPage = () => {
     navigate('/');
   };
 
+  const clearSelectedContact = useCallback(() => {
+    setPickedBeneficiaryId(null);
+    setPendingBeneficiary(null);
+    setRecipientName("");
+    setRecipientPhone("");
+    setRecipientEmail("");
+    setNgnAccountNumber("");
+    setNgnBankCode("");
+    setGhAccountNumber("");
+    setGhBankCode("");
+    setSelectedNetworkId(null);
+  }, []);
+
   const applyBeneficiary = useCallback((b: Beneficiary) => {
-    setRecipientName(b.name);
-    setRecipientPhone(b.phone || "");
+
+    setRecipientName(b.eft_account_holder || b.name);
+    if (b.phone) setRecipientPhone(b.phone.replace(/[^\d+]/g, "").slice(0, 15));
+    if (b.email || b.interac_email) setRecipientEmail(b.interac_email || b.email || "");
     setPickedBeneficiaryId(b.id);
     setPendingBeneficiary(b);
     // Prefill bank details immediately when present (effect below also reconciles
@@ -1275,7 +1292,9 @@ const SendPage = () => {
   }, []);
 
   // Apply saved network / bank details for a picked beneficiary once the
-  // destination country (and, for NGN, the banks list) is in place.
+  // destination country (and, for NGN/GHS, the banks list) is in place. The
+  // pending record is kept until everything it can fill has actually landed,
+  // so a slow bank/network list never drops the prefill.
   useEffect(() => {
     const b = pendingBeneficiary;
     if (!b) return;
@@ -1286,6 +1305,15 @@ const SendPage = () => {
     if (expectedCountry && expectedCountry.id !== targetCountryId) return;
 
     let allApplied = true;
+
+    // Contact details that apply to every corridor.
+    if (b.phone) {
+      const phone = b.phone.replace(/[^\d+]/g, "").slice(0, 15);
+      if (!recipientPhone) setRecipientPhone(phone);
+    }
+    if ((b.interac_email || b.email) && !recipientEmail) {
+      setRecipientEmail(b.interac_email || b.email || "");
+    }
 
     if (targetIsNGNBank) {
       if (b.bank_account) {
@@ -1325,19 +1353,56 @@ const SendPage = () => {
           else allApplied = false;
         }
       }
-    } else if (availableNetworks && b.network) {
-      const wanted = b.network;
-      const match =
-        availableNetworks.find((n) => n.id === wanted) ||
-        availableNetworks.find((n) => n.payout === wanted) ||
-        availableNetworks.find((n) => n.label?.toLowerCase() === wanted.toLowerCase());
-      if (match && selectedNetworkId !== match.id) {
-        setSelectedNetworkId(match.id);
+    } else if (b.network || b.payout_method) {
+      if (!availableNetworks || availableNetworks.length === 0) {
+        // No network picker for this corridor — nothing further to apply.
+      } else {
+        const wanted = String(b.network || "").toLowerCase();
+        const wantedPayout = String(b.payout_method || "").toLowerCase();
+        const match =
+          availableNetworks.find((n) => n.id.toLowerCase() === wanted) ||
+          availableNetworks.find((n) => n.payout.toLowerCase() === wanted) ||
+          availableNetworks.find((n) => n.label?.toLowerCase() === wanted) ||
+          availableNetworks.find((n) => !!wanted && n.label?.toLowerCase().includes(wanted)) ||
+          availableNetworks.find((n) => n.payout.toLowerCase() === wantedPayout) ||
+          availableNetworks.find((n) => n.id.toLowerCase() === wantedPayout);
+        if (match && selectedNetworkId !== match.id) {
+          setSelectedNetworkId(match.id);
+        }
       }
     }
 
     if (allApplied) setPendingBeneficiary(null);
-  }, [pendingBeneficiary, targetCountryId, ngnBanks, availableNetworks]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingBeneficiary, targetCountryId, ngnBanks, ghBanks, availableNetworks]);
+
+  // Short summary of what got prefilled from the selected contact.
+  const prefillSummary = useMemo(() => {
+    if (!pickedBeneficiaryId) return "";
+    const parts: string[] = [];
+    if (isNGNBank) {
+      const bank = ngnBanks.find((x) => x.code === ngnBankCode)?.name;
+      if (bank) parts.push(bank);
+      if (ngnAccountNumber) parts.push(ngnAccountNumber);
+    } else if (isGhanaBank) {
+      const bank = ghBanks.find((x) => x.code === ghBankCode)?.name;
+      if (bank) parts.push(bank);
+      if (ghAccountNumber) parts.push(ghAccountNumber);
+    } else {
+      if (activeNetwork?.label) parts.push(activeNetwork.label);
+      if (recipientPhone) parts.push(recipientPhone);
+    }
+    return parts.join(" · ");
+  }, [pickedBeneficiaryId, isNGNBank, isGhanaBank, ngnBanks, ngnBankCode, ngnAccountNumber, ghBanks, ghBankCode, ghAccountNumber, activeNetwork, recipientPhone]);
+
+  const phonePlaceholder = useMemo(() => {
+    const mm = MM_COUNTRIES.find(
+      (c) => c.currency === targetCountry.code || c.name.toLowerCase() === targetCountry.id.toLowerCase(),
+    );
+    return `${mm?.dialCode ?? "+"}...`;
+  }, [targetCountry]);
+
+
 
   useEffect(() => {
     const bid = searchParams.get("beneficiaryId");
@@ -2186,7 +2251,7 @@ const SendPage = () => {
                                           placeholder="Select contact"
                                           valueLabel={pickedBeneficiaryId ? recipientName : null}
                                           onSelect={applyBeneficiary}
-                                          onClear={pickedBeneficiaryId ? () => { setPickedBeneficiaryId(null); setRecipientName(""); setRecipientPhone(""); } : undefined}
+                                          onClear={pickedBeneficiaryId ? clearSelectedContact : undefined}
                                         />
                                         <button
                                           type="button"
@@ -2199,9 +2264,11 @@ const SendPage = () => {
                                       {pickedBeneficiaryId && (
                                         <p className="inline-flex items-center gap-1.5 text-xs font-medium text-primary">
                                           <CheckCircle className="w-3.5 h-3.5" /> Contact selected — {recipientName}
+                                          {prefillSummary && <span className="text-muted-foreground">· {prefillSummary}</span>}
                                           <button
                                             type="button"
-                                            onClick={() => { setPickedBeneficiaryId(null); setRecipientName(""); setRecipientPhone(""); }}
+                                            onClick={clearSelectedContact}
+
                                             aria-label="Clear selected contact"
                                             className="opacity-70 hover:opacity-100"
                                           >
@@ -2451,7 +2518,7 @@ const SendPage = () => {
                                       <motion.div custom={2} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
                                         <Label>Mobile Money Number</Label>
                                         <Input
-                                          placeholder="+254..."
+                                          placeholder={phonePlaceholder}
                                           value={recipientPhone}
                                           onChange={(e) => setRecipientPhone(e.target.value.replace(/[^\d+]/g, "").slice(0, 15))}
                                           maxLength={15}
