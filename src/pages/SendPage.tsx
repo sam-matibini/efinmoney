@@ -318,8 +318,26 @@ const SendPage = () => {
     if (plaidLinkToken && plaidReady) openPlaid();
   }, [plaidLinkToken, plaidReady, openPlaid]);
 
-  const selectedWallet = wallets?.find(w => w.wallet_id === selectedWalletId) || wallets?.[0];
+  // Domicile country decides the base currency; stored preference is the fallback.
+  const profileCurrency = countryToCurrency(profile?.address_country || profile?.country_code)
+    || profile?.default_currency
+    || wallets?.find(w => w.is_default)?.currency_code
+    || null;
+  const baseCurrency = profileCurrency || SYSTEM_DEFAULT_CURRENCY;
+
+  const selectedWallet = wallets?.find(w => w.wallet_id === selectedWalletId)
+    || wallets?.find(w => w.currency_code === baseCurrency)
+    || wallets?.find(w => w.is_default)
+    || wallets?.[0];
   const targetCountry = findCountryById(targetCountryId) || COUNTRIES[0];
+
+  // On first load, start on the wallet in the sender's base currency.
+  useEffect(() => {
+    if (selectedWalletId || !wallets?.length) return;
+    const preferred = wallets.find(w => w.currency_code === baseCurrency)
+      || wallets.find(w => w.is_default);
+    if (preferred) setSelectedWalletId(preferred.wallet_id);
+  }, [wallets, baseCurrency, selectedWalletId]);
 
   const activeSources = fundingSource === 'bank' ? bankSources : fundingSource === 'card' ? cardSources : [];
   const selectedExternalSource = activeSources.find(s => s.id === selectedSourceId) || activeSources[0];
@@ -329,11 +347,6 @@ const SendPage = () => {
     || savedCards.find(c => c.is_default)
     || savedCards[0];
 
-  // Domicile country decides the base currency; stored preference is the fallback.
-  const profileCurrency = countryToCurrency(profile?.address_country || profile?.country_code)
-    || profile?.default_currency
-    || wallets?.find(w => w.is_default)?.currency_code
-    || null;
 
   const sourceCurrency = fundingSource === 'wallet'
     ? (selectedWallet?.currency_code || profileCurrency || SYSTEM_DEFAULT_CURRENCY)
