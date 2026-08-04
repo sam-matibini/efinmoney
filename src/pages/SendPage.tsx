@@ -2060,19 +2060,23 @@ const SendPage = () => {
                   }}
                   transition={{ type: "spring", stiffness: 380, damping: 30 }}
                 />
-                <TabsTrigger value="international" className="relative z-10 gap-1.5 px-2 sm:gap-2 sm:px-3 text-xs sm:text-sm data-[state=active]:bg-transparent data-[state=active]:shadow-none">
-                  <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/10 ring-1 ring-border">
-                    <Globe2 className="h-2.5 w-2.5 text-primary" aria-hidden />
+                <TabsTrigger value="international" className="relative z-10 gap-1.5 px-2 sm:gap-2 sm:px-3 text-xs sm:text-sm text-muted-foreground data-[state=active]:text-pay-bank data-[state=active]:bg-transparent data-[state=active]:shadow-none">
+                  <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-pay-bank/15 text-pay-bank ring-1 ring-pay-bank/25">
+                    <Globe2 className="h-2.5 w-2.5" aria-hidden />
                   </span>
                   Other
                 </TabsTrigger>
-                <TabsTrigger value="efinmoney" className="relative z-10 gap-1.5 px-2 sm:gap-2 sm:px-3 text-xs sm:text-sm data-[state=active]:bg-transparent data-[state=active]:shadow-none">
-                  <BrandFlag size="xs" />
+                <TabsTrigger value="efinmoney" className="relative z-10 gap-1.5 px-2 sm:gap-2 sm:px-3 text-xs sm:text-sm text-muted-foreground data-[state=active]:text-pay-wallet data-[state=active]:bg-transparent data-[state=active]:shadow-none">
+                  <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-pay-wallet/15 text-pay-wallet ring-1 ring-pay-wallet/25">
+                    <BrandFlag size="xs" />
+                  </span>
                   eFinMoney
                 </TabsTrigger>
                 {canadaLive && (
-                  <TabsTrigger value="canada" className="relative z-10 gap-1.5 px-2 sm:gap-2 sm:px-3 text-xs sm:text-sm data-[state=active]:bg-transparent data-[state=active]:shadow-none">
-                    <CountryFlag country="CA" size="xs" />
+                  <TabsTrigger value="canada" className="relative z-10 gap-1.5 px-2 sm:gap-2 sm:px-3 text-xs sm:text-sm text-muted-foreground data-[state=active]:text-pay-card data-[state=active]:bg-transparent data-[state=active]:shadow-none">
+                    <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-pay-card/15 text-pay-card ring-1 ring-pay-card/25">
+                      <CountryFlag country="CA" size="xs" />
+                    </span>
                     Domestic
                   </TabsTrigger>
                 )}
