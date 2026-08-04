@@ -98,6 +98,17 @@
     --border: 232 35% 20%;
     --input: 232 35% 20%;
     --ring: 250 85% 67%;
+
+    /* Payment method accents (dark) */
+    --pay-card: 250 85% 67%;
+    --pay-card-foreground: 232 45% 7%;
+    --pay-bank: 199 85% 55%;
+    --pay-bank-foreground: 232 45% 7%;
+    --pay-wallet: 152 55% 46%;
+    --pay-wallet-foreground: 232 45% 7%;
+    --pay-mobile: 41 100% 58%;
+    --pay-mobile-foreground: 232 45% 7%;
+
     --gradient-card: linear-gradient(145deg, hsl(232 42% 11%) 0%, hsl(258 35% 16%) 100%);
     --shadow-card: 0 1px 3px hsl(0 0% 0% / 0.3), 0 1px 2px hsl(0 0% 0% / 0.2);
     --shadow-elevated: 0 10px 30px -10px hsl(0 0% 0% / 0.5), 0 4px 12px -4px hsl(0 0% 0% / 0.3);
