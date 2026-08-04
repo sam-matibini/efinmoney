@@ -112,6 +112,7 @@ const LiveFxCalculator = ({
   continueDisabled,
   footer,
   embedded = false,
+  pairLayout = false,
 }: LiveFxCalculatorProps) => {
   const navigate = useNavigate();
   const { user } = useAuth();
