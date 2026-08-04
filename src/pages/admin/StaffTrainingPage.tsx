@@ -124,10 +124,11 @@ export default function StaffTrainingPage() {
         </div>
       </div>
 
-      <div className="grid sm:grid-cols-3 gap-3">
-        <Card><CardContent className="pt-4 pb-3"><div className="text-2xl font-bold">{courses.length}</div><div className="text-xs text-muted-foreground">Courses</div></CardContent></Card>
+      <div className="grid sm:grid-cols-4 gap-3">
+        <Card><CardContent className="pt-4 pb-3"><div className="text-2xl font-bold">{courses.length}</div><div className="text-xs text-muted-foreground">Courses ({mandatory.length} mandatory)</div></CardContent></Card>
         <Card><CardContent className="pt-4 pb-3"><div className="text-2xl font-bold">{records.length}</div><div className="text-xs text-muted-foreground">Completions</div></CardContent></Card>
         <Card><CardContent className="pt-4 pb-3"><div className="text-2xl font-bold text-red-500">{expired}</div><div className="text-xs text-muted-foreground">Expired certs</div></CardContent></Card>
+        <Card><CardContent className="pt-4 pb-3"><div className={`text-2xl font-bold ${gaps ? "text-amber-500" : "text-emerald-500"}`}>{gaps}</div><div className="text-xs text-muted-foreground">Mandatory gaps</div></CardContent></Card>
       </div>
 
       <Card>
@@ -135,13 +136,19 @@ export default function StaffTrainingPage() {
         <CardContent>
           {cLoading ? <Skeleton className="h-24 w-full" /> : (
             <Table>
-              <TableHeader><TableRow><TableHead>Course</TableHead><TableHead>Category</TableHead><TableHead>Mandatory</TableHead><TableHead>Frequency</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Course</TableHead><TableHead>Category</TableHead><TableHead>Mandatory</TableHead><TableHead>Pass mark</TableHead><TableHead>Frequency</TableHead></TableRow></TableHeader>
               <TableBody>
-                {courses.length === 0 ? <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground">No courses. Add your first course above.</TableCell></TableRow> : courses.map((c: any) => (
+                {courses.length === 0 ? <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">No courses. Add your first course above.</TableCell></TableRow> : courses.map((c: any) => (
                   <TableRow key={c.id}>
                     <TableCell className="font-medium">{c.course_name}</TableCell>
                     <TableCell className="capitalize">{c.category}</TableCell>
-                    <TableCell>{c.is_mandatory ? <Badge className="bg-red-500/10 text-red-600">Mandatory</Badge> : <Badge className="bg-muted">Optional</Badge>}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Switch checked={!!c.is_mandatory} onCheckedChange={(v) => setMandatory.mutate({ id: c.id, value: v })} />
+                        {c.is_mandatory ? <Badge className="bg-red-500/10 text-red-600">Mandatory</Badge> : <Badge className="bg-muted">Optional</Badge>}
+                      </div>
+                    </TableCell>
+                    <TableCell className="font-mono">{c.pass_mark ?? 70}%</TableCell>
                     <TableCell>Every {c.frequency_months} months</TableCell>
                   </TableRow>
                 ))}
@@ -150,6 +157,33 @@ export default function StaffTrainingPage() {
           )}
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader><CardTitle>Mandatory Training Compliance Matrix</CardTitle></CardHeader>
+        <CardContent className="overflow-x-auto">
+          {mandatory.length === 0 || staffRows.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Add mandatory courses and staff records to see the matrix.</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Staff</TableHead>
+                  {mandatory.map((c: any) => <TableHead key={c.id}>{c.course_name}</TableHead>)}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {staffRows.map((s) => (
+                  <TableRow key={s.id}>
+                    <TableCell className="font-medium">{s.name}</TableCell>
+                    {mandatory.map((c: any) => <TableCell key={c.id}>{statusBadge(cellStatus(s.id, c))}</TableCell>)}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
 
       <Card>
         <CardHeader><CardTitle>Completion Records</CardTitle></CardHeader>
