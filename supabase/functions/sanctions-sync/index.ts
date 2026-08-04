@@ -194,22 +194,85 @@ async function syncGac(): Promise<WatchRow[]> {
   return rows;
 }
 
-/** Flag countries named by the GAC list in the geographic risk register. */
+/** Canonical aliases so GAC country labels line up with the risk register. */
+const COUNTRY_ALIASES: Record<string, string[]> = {
+  ru: ["russia", "russian federation"],
+  by: ["belarus", "republic of belarus"],
+  kp: ["north korea", "democratic peoples republic of korea", "dprk", "korea north"],
+  mm: ["myanmar", "burma"],
+  ir: ["iran", "islamic republic of iran"],
+  sy: ["syria", "syrian arab republic"],
+  ve: ["venezuela", "bolivarian republic of venezuela"],
+  zw: ["zimbabwe"],
+  ss: ["south sudan"],
+  sd: ["sudan"],
+  ml: ["mali"],
+  ni: ["nicaragua"],
+  ht: ["haiti"],
+  ly: ["libya"],
+  lb: ["lebanon"],
+  md: ["moldova", "republic of moldova"],
+  ua: ["ukraine"],
+  gn: ["guinea"],
+  cn: ["china", "peoples republic of china"],
+  sm: ["sri lanka"],
+  pk: ["pakistan"],
+  ye: ["yemen"],
+  so: ["somalia"],
+  cf: ["central african republic"],
+  cd: ["democratic republic of the congo", "congo democratic republic", "drc"],
+  iq: ["iraq"],
+  tn: ["tunisia"],
+  eg: ["egypt"],
+};
+
+const canonCountry = (s: string) =>
+  (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z ]/g, "").replace(/\s+/g, " ").trim();
+
 async function flagCanadaSanctionedCountries(
   supabase: ReturnType<typeof createClient>,
   rows: WatchRow[],
 ) {
-  const names = new Set(
-    rows.flatMap((r) => r.countries).map((c) => c.toLowerCase().trim()).filter(Boolean),
-  );
-  if (!names.size) return 0;
+  // Every country label mentioned by the GAC list, canonicalised.
+  const listed = new Set<string>();
+  for (const r of rows) {
+    for (const c of r.countries) {
+      const v = canonCountry(c);
+      if (v) listed.add(v);
+    }
+    // SEMA programs carry the regime country too ("SEMA Russia")
+    for (const p of r.programs || []) {
+      const v = canonCountry(String(p).replace(/^sema\s*/i, ""));
+      if (v) listed.add(v);
+    }
+  }
+  if (!listed.size) return 0;
+
+  // Expand with known aliases so either spelling matches.
+  const expanded = new Set(listed);
+  for (const [code, names] of Object.entries(COUNTRY_ALIASES)) {
+    if (names.some((n) => listed.has(n))) {
+      expanded.add(code);
+      names.forEach((n) => expanded.add(n));
+    }
+  }
+
   const { data } = await supabase
     .from("geographic_risk_ratings")
-    .select("id, country_name, canada_sanctions");
-  const list = (data || []) as { id: string; country_name: string; canada_sanctions: boolean }[];
+    .select("id, country_code, country_name, canada_sanctions");
+  const list = (data || []) as {
+    id: string; country_code: string | null; country_name: string; canada_sanctions: boolean;
+  }[];
+
   let updated = 0;
   for (const c of list) {
-    const hit = names.has((c.country_name || "").toLowerCase().trim());
+    const nm = canonCountry(c.country_name);
+    const code = (c.country_code || "").toLowerCase();
+    const aliases = COUNTRY_ALIASES[code] || [];
+    const hit = expanded.has(nm) ||
+      (code.length === 2 && expanded.has(code)) ||
+      aliases.some((a) => expanded.has(a));
     if (hit !== Boolean(c.canada_sanctions)) {
       await supabase
         .from("geographic_risk_ratings")
@@ -220,6 +283,7 @@ async function flagCanadaSanctionedCountries(
   }
   return updated;
 }
+
 
 async function upsertAll(supabase: ReturnType<typeof createClient>, rows: WatchRow[]) {
   const CHUNK = 500;
