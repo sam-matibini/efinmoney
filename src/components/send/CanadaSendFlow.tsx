@@ -17,7 +17,6 @@ import {
   isCanadaBeneficiary,
   type Beneficiary,
 } from "@/hooks/useBeneficiaries";
-import PayeePicker from "@/components/PayeePicker";
 import ContactsPickerModal from "@/components/modals/ContactsPickerModal";
 import AddBeneficiaryModal from "@/components/modals/AddBeneficiaryModal";
 import ContactQuickField from "@/components/send/ContactQuickField";
@@ -35,7 +34,7 @@ import { downloadTransferReceipt } from "@/lib/receipt";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { usePriceQuote } from "@/hooks/usePriceQuote";
-import { CheckCircle, Landmark, AlertCircle, Info, CreditCard, Wallet, Zap, Check, Building2, Link2, Copy, Share2, X, Users, UserPlus, ArrowRight, ChevronRight } from "lucide-react";
+import { CheckCircle, Landmark, AlertCircle, Info, CreditCard, Wallet, Zap, Check, Building2, Link2, Copy, Share2, X, Users, ArrowRight, ChevronRight } from "lucide-react";
 import { useStripeConnectedAccount, isConnectReady, getConnectReadiness } from "@/hooks/useStripeConnectedAccount";
 import { tokenizeDebitCard } from "@/lib/stripePayouts";
 import { usePinGate } from "@/components/send/usePinGate";
