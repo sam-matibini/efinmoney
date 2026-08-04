@@ -8,6 +8,7 @@ import { usePlaidLink } from "react-plaid-link";
 // flw-initialize-payment edge function.
 import ContactsPickerModal from "@/components/modals/ContactsPickerModal";
 import AddBeneficiaryModal from "@/components/modals/AddBeneficiaryModal";
+import ContactQuickField from "@/components/send/ContactQuickField";
 import AddCardModal from "@/components/modals/AddCardModal";
 import TopUpModal from "@/components/modals/TopUpModal";
 import { Alert, AlertDescription } from "@/components/ui/alert";
