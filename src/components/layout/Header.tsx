@@ -41,9 +41,10 @@ import { useWallets } from "@/hooks/useWallets";
 import { useProfile } from "@/hooks/useProfile";
 import { prefetchRoute } from "@/lib/prefetchRoute";
 import { avatarInitials, resolveAvatarUrl } from "@/lib/avatar";
-import {
 import { CountryFlag, CurrencyFlag } from "@/components/ui/FlagImage";
+import {
   headerIconBase,
+
   headerIconInteractive,
   headerIconVariants,
   headerNavTrack,
