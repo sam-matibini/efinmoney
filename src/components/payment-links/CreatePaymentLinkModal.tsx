@@ -151,8 +151,7 @@ const CreatePaymentLinkModal = ({
                     <SelectContent>
                       {activeWallets.map((w) => (
                         <SelectItem key={w.wallet_id} value={w.wallet_id}>
-                          <span className="inline-flex items-center gap-2"><CurrencyFlag code={w.currency_code} size="sm" />{w.currency_code} — {w.symbol}
-                          {Number(w.balance).toLocaleString(undefined, { minimumFractionDigits: 2 })} available
+                          <span className="inline-flex items-center gap-2"><CurrencyFlag code={w.currency_code} size="sm" />{w.currency_code} — {w.symbol}{Number(w.balance).toLocaleString(undefined, { minimumFractionDigits: 2 })} available</span>
                         </SelectItem>
                       ))}
                     </SelectContent>
