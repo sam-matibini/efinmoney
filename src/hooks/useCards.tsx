@@ -93,12 +93,12 @@ export const useCardMutations = () => {
       const isCredit = input.card_type === 'credit';
 
       if (!isExternal) {
-        if (!isCredit && !input.wallet_id) {
-          throw new Error('A linked wallet is required for debit cards');
-        }
         if (isCredit && !input.credit_limit) {
           throw new Error('Credit limit is required for credit cards');
         }
+
+
+
 
         const res = await invokeEdgeFunction<{
           card?: Card;
@@ -112,7 +112,7 @@ export const useCardMutations = () => {
           cardholder_name: input.cardholder_name.trim(),
           spending_limit: input.spending_limit ?? 5000,
           credit_limit: isCredit ? input.credit_limit : null,
-          wallet_id: isCredit ? null : input.wallet_id,
+          wallet_id: isCredit ? null : (input.wallet_id || null),
           currency_code: input.currency_code ?? null,
           initial_fund: !isCredit && Number(input.initial_fund) > 0 ? Number(input.initial_fund) : undefined,
         });

@@ -115,7 +115,7 @@ async function createCardInner(admin: Sb, userId: string, body: Record<string, u
   const initialFund = Number(body.initial_fund) || 0;
 
   if (!cardholderName) return jsonResponse({ error: "Cardholder name is required" }, 400);
-  if (!isCredit && !walletId) return jsonResponse({ error: "Linked wallet is required" }, 400);
+
 
   const pan = generatePan(network);
   const cvv = generateCvv();
@@ -135,8 +135,9 @@ async function createCardInner(admin: Sb, userId: string, body: Record<string, u
     spending_limit: spendingLimit,
     credit_limit: isCredit ? creditLimit : null,
     funding_source: isCredit ? "credit_line" : "wallet",
-    wallet_id: isCredit ? null : walletId,
-    currency_code: currency,
+    wallet_id: isCredit || !walletId ? null : walletId,
+    currency_code: currency || "CAD",
+
   }).select("*").single();
   if (insertErr) throw insertErr;
 
