@@ -8,6 +8,8 @@ import { useWallets } from "@/hooks/useWallets";
 import { useAuth } from "@/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
+import { CurrencyFlag } from "@/components/ui/FlagImage";
+
 import CardPaymentForm from "./CardPaymentForm";
 import FlutterwaveCardForm from "@/components/payments/FlutterwaveCardForm";
 
@@ -82,7 +84,7 @@ const DepositModal = ({ children }: DepositModalProps) => {
                           : 'border-border hover:bg-muted/50'
                       }`}
                     >
-                      <p className="text-xs text-muted-foreground">{w.flag_emoji} {w.currency_code}</p>
+                      <p className="flex items-center gap-1.5 text-xs text-muted-foreground"><CurrencyFlag code={w.currency_code} size="xs" />{w.currency_code}</p>
                       <p className="text-sm font-medium truncate">{w.symbol}{Number(w.balance).toLocaleString()}</p>
                     </button>
                   ))}

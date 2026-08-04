@@ -8,6 +8,8 @@ import { usePricingConfig } from "@/hooks/usePricingConfig";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { WORLD_CURRENCIES, WORLD_CURRENCY_MAP } from "@/lib/worldCurrencies";
+import { CurrencyFlag } from "@/components/ui/FlagImage";
+
 import { getNombaExchangeRate, isNgnPair } from "@/lib/nombaNigeria";
 import {
   BENCHMARK_A_FLAT_FEE_USD,
@@ -66,20 +68,10 @@ export type LiveFxCalculatorProps = {
   pairLayout?: boolean;
 };
 
-const Flag = ({ code, size = 20 }: { code: string; size?: number }) => {
-  const cc = WORLD_CURRENCY_MAP[code]?.cc;
-  if (!cc) return <span className="inline-block rounded-[2px] bg-white/20" style={{ width: size, height: size * 0.75 }} />;
-  return (
-    <img
-      src={`https://flagcdn.com/${size * 2}x${size * 1.5}/${cc}.png`}
-      width={size}
-      height={size * 0.75}
-      alt={code}
-      loading="lazy"
-      className="inline-block rounded-[2px] ring-1 ring-white/15 object-cover"
-    />
-  );
-};
+const Flag = ({ code, size = 20 }: { code: string; size?: number }) => (
+  <CurrencyFlag code={code} size={size <= 16 ? "sm" : "md"} />
+);
+
 
 const LiveFxCalculator = ({
   variant = "landing",

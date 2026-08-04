@@ -9,6 +9,7 @@ import { useCreateWallet } from "@/hooks/useCreateWallet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Check, Search, Wallet } from "lucide-react";
 import { toast } from "sonner";
+import { CurrencyFlag } from "@/components/ui/FlagImage";
 
 const POPULAR_CODES = ["NGN", "USD", "CAD", "KES", "GBP", "EUR", "GHS", "UGX", "RWF", "TZS", "ZMW"];
 
@@ -77,7 +78,7 @@ const CreateWalletModal = ({ children }: CreateWalletModalProps) => {
       }`}
     >
       <div className="flex items-center gap-3">
-        <span className="text-2xl">{currency.flag_emoji || "💰"}</span>
+        <CurrencyFlag code={currency.code} size="md" />
         <div className="text-left">
           <p className="font-medium text-foreground">{currency.code}</p>
           <p className="text-sm text-muted-foreground">{currency.name}</p>

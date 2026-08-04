@@ -2187,6 +2187,7 @@ export type Database = {
       currencies: {
         Row: {
           code: string
+          country_code: string | null
           created_at: string
           currency_type: Database["public"]["Enums"]["currency_type"]
           decimal_places: number
@@ -2197,6 +2198,7 @@ export type Database = {
         }
         Insert: {
           code: string
+          country_code?: string | null
           created_at?: string
           currency_type?: Database["public"]["Enums"]["currency_type"]
           decimal_places?: number
@@ -2207,6 +2209,7 @@ export type Database = {
         }
         Update: {
           code?: string
+          country_code?: string | null
           created_at?: string
           currency_type?: Database["public"]["Enums"]["currency_type"]
           decimal_places?: number

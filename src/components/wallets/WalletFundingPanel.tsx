@@ -8,6 +8,8 @@ import ComingSoon from "@/components/common/ComingSoon";
 import { isLiveTopupCurrency, productFeatures } from "@/lib/productFeatures";
 import { routeWalletTopupGateway } from "@/lib/walletTopupGateway";
 import { cn } from "@/lib/utils";
+import { CurrencyFlag } from "@/components/ui/FlagImage";
+
 
 interface WalletFundingPanelProps {
   walletId: string;
@@ -55,9 +57,10 @@ const WalletFundingPanel = ({
       {balance !== undefined && (
         <div className="rounded-xl border bg-muted/30 px-4 py-3 text-sm">
           <span className="text-muted-foreground">Wallet balance: </span>
-          <span className="font-medium tabular-nums">
-            {flag} {symbol}{Number(balance).toFixed(2)} {currency}
+          <span className="inline-flex items-center gap-1.5 font-medium tabular-nums align-middle">
+            <CurrencyFlag code={currency} size="xs" />{symbol}{Number(balance).toFixed(2)} {currency}
           </span>
+
         </div>
       )}
 

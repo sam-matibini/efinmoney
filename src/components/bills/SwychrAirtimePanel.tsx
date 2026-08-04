@@ -15,6 +15,8 @@ import {
 } from "@/lib/swychrAirtime";
 import { useWallets } from "@/hooks/useWallets";
 import { getCountryIso2 } from "@/lib/countryIso";
+import { CurrencyFlag } from "@/components/ui/FlagImage";
+
 
 interface Props {
   countryId: string;
@@ -147,8 +149,9 @@ export default function SwychrAirtimePanel({ countryId, currency }: Props) {
                   <SelectContent>
                     {matchingWallets.map((w) => (
                       <SelectItem key={w.wallet_id} value={w.wallet_id}>
-                        {w.flag_emoji} {w.currency_code} — {w.symbol}{Number(w.balance).toLocaleString()}
+                        <span className="inline-flex items-center gap-2"><CurrencyFlag code={w.currency_code} size="sm" />{w.currency_code} — {w.symbol}{Number(w.balance).toLocaleString()}</span>
                       </SelectItem>
+
                     ))}
                   </SelectContent>
                 </Select>

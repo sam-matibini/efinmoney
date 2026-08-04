@@ -9,6 +9,8 @@ import { toast } from "sonner";
 import { issueSwychrCard, listSwychrCards, swychrCardOp, type SwychrCardRow } from "@/lib/swychrCards";
 import { useWallets } from "@/hooks/useWallets";
 import { useProfile } from "@/hooks/useProfile";
+import { CurrencyFlag } from "@/components/ui/FlagImage";
+
 
 function LiteCardFace({
   card,
@@ -227,8 +229,9 @@ export default function SwychrCardsPanel() {
                 <SelectContent>
                   {(wallets ?? []).map((w) => (
                     <SelectItem key={w.wallet_id} value={w.wallet_id}>
-                      {w.flag_emoji} {w.currency_code}
+                      <span className="inline-flex items-center gap-2"><CurrencyFlag code={w.currency_code} size="sm" />{w.currency_code}</span>
                     </SelectItem>
+
                   ))}
                 </SelectContent>
               </Select>

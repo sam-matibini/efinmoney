@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { CurrencyFlag } from "@/components/ui/FlagImage";
 
 interface EditWalletModalProps {
   isOpen: boolean;
@@ -50,7 +51,7 @@ const EditWalletModal = ({ isOpen, onClose, wallet, onSave }: EditWalletModalPro
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <span className="text-2xl">{wallet.flag}</span>
+            <CurrencyFlag code={wallet.currency} size="md" />
             Edit {wallet.currency} Wallet
           </DialogTitle>
         </DialogHeader>

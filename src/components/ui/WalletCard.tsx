@@ -1,6 +1,8 @@
 import { motion, useMotionValue, useSpring, useTransform, AnimatePresence } from "framer-motion";
 import { useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { CurrencyFlag } from "@/components/ui/FlagImage";
+
 import {
   ArrowUpRight,
   ArrowDownLeft,
@@ -197,7 +199,7 @@ const WalletCard = ({
         {/* Top row: currency + chip */}
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-2xl leading-none drop-shadow-sm">{flag}</span>
+            <CurrencyFlag code={currency} size="md" className="drop-shadow-sm" />
             <div className="flex flex-col leading-tight">
               <span className="font-display font-semibold text-base tracking-wide">{currency}</span>
               <span className="text-[10px] uppercase tracking-[0.18em] text-white/60">Wallet</span>

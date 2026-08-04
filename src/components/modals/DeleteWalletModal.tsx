@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useState } from "react";
 import { toast } from "sonner";
+import { CurrencyFlag } from "@/components/ui/FlagImage";
 
 interface DeleteWalletModalProps {
   isOpen: boolean;
@@ -54,7 +55,7 @@ const DeleteWalletModal = ({ isOpen, onClose, wallet, onDelete }: DeleteWalletMo
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2">
-            <span className="text-2xl">{wallet.flag}</span>
+            <CurrencyFlag code={wallet.currency} size="md" />
             Delete {wallet.currency} Wallet?
           </AlertDialogTitle>
           <AlertDialogDescription>

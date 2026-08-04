@@ -84,5 +84,8 @@ export const normalizeCountryCode = (value?: string | null): string | null => {
   const fuzzy = Object.entries(COUNTRY_NAME_TO_CODE).find(
     ([name]) => name.toLowerCase() === trimmed.toLowerCase(),
   );
-  return fuzzy ? fuzzy[1].toLowerCase() : null;
+  if (fuzzy) return fuzzy[1].toLowerCase();
+  const iso = ISO_COUNTRIES.find((i) => i.name.toLowerCase() === trimmed.toLowerCase());
+  return iso ? iso.code.toLowerCase() : null;
 };
+

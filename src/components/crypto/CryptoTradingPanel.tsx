@@ -20,6 +20,8 @@ import {
   Info,
 } from "lucide-react";
 import { motion } from "framer-motion";
+import { CurrencyFlag } from "@/components/ui/FlagImage";
+
 
 interface CryptoPair {
   id: string;
@@ -331,7 +333,7 @@ export const CryptoTradingPanel = () => {
                       const w = wallets?.find(x => x.currency_code === q);
                       return (
                         <SelectItem key={q} value={q}>
-                          {w ? `${w.flag_emoji ?? ""} ${q} - ${w.symbol}${Number(w.balance).toFixed(2)}` : q}
+                          {w ? <span className="inline-flex items-center gap-2"><CurrencyFlag code={q} size="sm" />{q} - {w.symbol}{Number(w.balance).toFixed(2)}</span> : q}
                         </SelectItem>
                       );
                     })}

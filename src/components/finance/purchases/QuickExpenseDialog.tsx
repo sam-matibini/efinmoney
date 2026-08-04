@@ -13,6 +13,8 @@ import { Plus, Receipt } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { AttachmentsPanel } from "./AttachmentsPanel";
+import { CurrencyFlag } from "@/components/ui/FlagImage";
+
 
 export const QuickExpenseDialog = () => {
   const { user } = useAuth();
@@ -211,8 +213,9 @@ export const QuickExpenseDialog = () => {
                   <SelectContent>
                     {wallets.map((w) => (
                       <SelectItem key={w.wallet_id} value={w.wallet_id}>
-                        {w.flag_emoji} {w.currency_code}
+                        <span className="inline-flex items-center gap-2"><CurrencyFlag code={w.currency_code} size="sm" />{w.currency_code}</span>
                       </SelectItem>
+
                     ))}
                   </SelectContent>
                 </Select>

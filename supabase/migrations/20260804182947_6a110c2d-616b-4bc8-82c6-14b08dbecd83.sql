@@ -1,0 +1,1 @@
+ALTER TABLE public.currencies ADD COLUMN IF NOT EXISTS country_code TEXT;

@@ -14,6 +14,8 @@ import { StatementActions } from "@/components/statement/StatementActions";
 import { StatementBalanceCards } from "@/components/statement/StatementBalanceCards";
 import { StatementNetHero } from "@/components/statement/StatementNetHero";
 import AppPage from "@/components/layout/AppPage";
+import { CurrencyFlag } from "@/components/ui/FlagImage";
+
 
 const TransfersListPage = () => {
   const { user } = useAuth();
@@ -116,8 +118,9 @@ const TransfersListPage = () => {
                   <SelectItem value="all">All wallets</SelectItem>
                   {wallets?.map((w) => (
                     <SelectItem key={w.wallet_id} value={w.wallet_id}>
-                      {w.flag_emoji ? `${w.flag_emoji} ` : ""}{w.currency_code} — {w.currency_name}
+                      <span className="inline-flex items-center gap-2"><CurrencyFlag code={w.currency_code} size="sm" />{w.currency_code} — {w.currency_name}</span>
                     </SelectItem>
+
                   ))}
                 </SelectContent>
               </Select>
