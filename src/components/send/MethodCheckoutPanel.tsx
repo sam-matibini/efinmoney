@@ -138,13 +138,15 @@ const MethodCheckoutPanel = ({
             <div className="rounded-lg border border-border bg-background/60 p-3 space-y-1.5">
               <p className="text-xs font-medium">Card details</p>
               <p className="text-[11px] text-muted-foreground">
-                Cardholder name, card number, expiry date and CVV are entered at the final step on our
-                PCI-secure checkout. We never store your full card number.
+                {inlineEntry
+                  ? "You'll enter your cardholder name, card number, expiry date and CVV on the next step. We never store your full card number."
+                  : "Cardholder name, card number, expiry date and CVV are entered at the final step on our PCI-secure checkout page."}
               </p>
               <p className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
                 <Lock className="w-3 h-3" /> Visa · Mastercard · Amex · Verve
               </p>
             </div>
+
             {!cardProviderReady && amount > 0 && (
               <p className="flex items-start gap-1.5 text-[11px] text-destructive">
                 <AlertCircle className="w-3.5 h-3.5 mt-px shrink-0" />
