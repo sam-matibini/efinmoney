@@ -104,42 +104,107 @@ function EfinmoneyBranding() {
   );
 }
 
-function PinAuthForm({ onPinSubmit, loading }: { onPinSubmit: (pin: string) => void; loading: boolean }) {
-  const [pin, setPin] = useState("");
+const CHALLENGE_COPY: Record<string, { title: string; sub: string; label: string; placeholder: string; max: number }> = {
+  pin: {
+    title: "Enter your card PIN",
+    sub: "Your bank requires your card PIN to authorise this payment.",
+    label: "Card PIN",
+    placeholder: "••••",
+    max: 6,
+  },
+  otp: {
+    title: "Enter the one-time code",
+    sub: "We sent a one-time code to the phone number / email registered with your bank.",
+    label: "One-time code (OTP)",
+    placeholder: "••••••",
+    max: 8,
+  },
+};
+
+function ChallengePanel({
+  mode,
+  loading,
+  redirectUrl,
+  onSubmitCode,
+  onOpenRedirect,
+  onCancel,
+}: {
+  mode: string;
+  loading: boolean;
+  redirectUrl?: string | null;
+  onSubmitCode: (code: string) => void;
+  onOpenRedirect: () => void;
+  onCancel: () => void;
+}) {
+  const [code, setCode] = useState("");
+  const ref = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    ref.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [mode]);
+
+  const copy = CHALLENGE_COPY[mode] ?? CHALLENGE_COPY.otp;
+  const isRedirect = mode === "redirect";
 
   return (
-    <div className="space-y-4 p-4 rounded-xl border border-border bg-muted/20">
-      <div className="flex items-center gap-2">
-        <ShieldCheck className="h-5 w-5 text-amber-500" />
+    <div
+      ref={ref}
+      className="space-y-4 p-4 rounded-xl border-2 border-amber-500/60 bg-amber-500/5 animate-fade-in"
+    >
+      <div className="flex items-start gap-2">
+        <ShieldCheck className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
         <div>
-          <p className="text-sm font-medium">Additional verification required</p>
-          <p className="text-xs text-muted-foreground">Enter the PIN sent by your bank to complete this payment.</p>
+          <p className="text-sm font-semibold">Action required — security check</p>
+          <p className="text-xs text-muted-foreground">
+            {isRedirect
+              ? "Complete 3-D Secure verification in the window from your bank. If it didn't open, use the button below."
+              : copy.sub}
+          </p>
         </div>
       </div>
-      <div className="space-y-2">
-        <Label className="text-xs">Enter PIN / OTP</Label>
-        <Input
-          type="text"
-          inputMode="numeric"
-          maxLength={6}
-          placeholder="******"
-          value={pin}
-          onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
-          className="h-12 text-center text-lg tracking-widest"
-          autoFocus
-        />
-      </div>
-      <Button
-        size="lg"
-        className="w-full"
-        disabled={pin.length < 4 || loading}
-        onClick={() => onPinSubmit(pin)}
+
+      {isRedirect ? (
+        <Button type="button" size="lg" className="w-full" onClick={onOpenRedirect} disabled={!redirectUrl}>
+          Open verification window
+        </Button>
+      ) : (
+        <>
+          <div className="space-y-2">
+            <Label className="text-xs">{copy.label}</Label>
+            <Input
+              type="text"
+              inputMode="numeric"
+              maxLength={copy.max}
+              placeholder={copy.placeholder}
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+              className="h-12 text-center text-lg tracking-widest"
+              autoFocus
+            />
+          </div>
+          <Button
+            type="button"
+            size="lg"
+            className="w-full"
+            disabled={code.length < 4 || loading}
+            onClick={() => onSubmitCode(code)}
+          >
+            {loading ? <><LoadingSpinner size={16} className="mr-2" /> Verifying…</> : "Verify & Pay"}
+          </Button>
+        </>
+      )}
+
+      <button
+        type="button"
+        onClick={onCancel}
+        className="w-full text-xs text-muted-foreground underline underline-offset-2"
       >
-        {loading ? <><LoadingSpinner size={16} className="mr-2" /> Verifying…</> : "Verify & Pay"}
-      </Button>
+        Cancel and edit payment details
+      </button>
     </div>
   );
 }
+
 
 export default function FlutterwaveCardForm({
   defaultWalletId,
