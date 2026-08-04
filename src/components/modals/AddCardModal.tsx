@@ -103,8 +103,9 @@ const AddCardModal = ({ isOpen, onClose, defaultMode = "issue" }: AddCardModalPr
         cardholder_name: cardholderName.trim(),
         spending_limit: Number(spendingLimit) || 5000,
         credit_limit: isCredit ? Number(creditLimit) : null,
-        wallet_id: isCredit ? null : walletId,
-        currency_code: selectedWallet?.currency_code ?? null,
+        wallet_id: isCredit || !walletId ? null : walletId,
+        currency_code: selectedWallet?.currency_code ?? SYSTEM_DEFAULT_CURRENCY,
+
         initial_fund: !isCredit && fundAmt > 0 ? fundAmt : undefined,
       });
       setCreatedCard(card);
