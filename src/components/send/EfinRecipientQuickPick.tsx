@@ -302,7 +302,7 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
                     className="flex w-16 shrink-0 flex-col items-center gap-1 rounded-lg p-1 text-center transition-colors hover:bg-muted disabled:opacity-50"
                     title={r.full_name || r.efin_tag || r.email || ""}
                   >
-                    <Avatar url={r.avatar_url} label={initials(r)} size="sm" />
+                    <Avatar url={r.avatar_url} label={initials(r)} seed={r.user_id} size="sm" />
                     <span className="w-full truncate text-[11px] text-muted-foreground">
                       {added ? "Added" : (r.full_name?.split(" ")[0] || r.efin_tag || r.email)}
                     </span>
