@@ -1072,18 +1072,15 @@ const CanadaSendFlow = () => {
           <CardContent className="space-y-6 pt-6">
             {method !== "stripe_connect" && method !== "paylink" && (
               <div className="space-y-3 p-4 rounded-xl border border-primary/20 bg-primary/[0.03]">
-                <div className="flex items-center justify-between gap-2">
-                  <Label className="text-sm font-semibold">Saved contacts</Label>
-                  <Button type="button" variant="ghost" size="sm" className="h-8 gap-1 text-xs" onClick={() => setAddContactOpen(true)}>
-                    <UserPlus className="w-3.5 h-3.5" /> Add new
-                  </Button>
-                </div>
-                <PayeePicker
+                <ContactQuickField
+                  label="To"
                   filterCanada
-                  placeholder="Search Canadian contacts…"
+                  placeholder="Select contact"
+                  valueLabel={pickedBeneficiaryId ? recipientName : null}
                   onSelect={applyCanadaBeneficiary}
-                  onAddNew={() => setAddContactOpen(true)}
+                  onClear={pickedBeneficiaryId ? clearSelectedContact : undefined}
                 />
+
                 <Button type="button" variant="outline" className="w-full gap-2" onClick={() => setPickerOpen(true)}>
                   <Users className="w-4 h-4" /> Browse all contacts
                 </Button>
