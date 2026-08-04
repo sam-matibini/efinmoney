@@ -2830,6 +2830,9 @@ const SendPage = () => {
         } as any}
       />
       <AddCardModal isOpen={addCardOpen} onClose={() => setAddCardOpen(false)} defaultMode="link" />
+      <CreateWalletModal>
+        <button type="button" ref={createWalletTriggerRef} className="hidden" aria-hidden="true" tabIndex={-1} />
+      </CreateWalletModal>
       <TopUpModal open={topUpOpen} onOpenChange={setTopUpOpen} defaultWalletId={selectedWallet?.wallet_id} title="Top up wallet" />
     </>
   );
