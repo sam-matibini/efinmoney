@@ -566,6 +566,7 @@ export default function FlutterwaveCardForm({
   return (
     <div className="relative">
       <form onSubmit={handleSubmit} className="space-y-4">
+        <CheckoutBrandHeader />
         {showWalletSelect && wallets && wallets.length > 0 && (
           <div className="space-y-2">
             <Label className="text-xs">Deposit into wallet</Label>
