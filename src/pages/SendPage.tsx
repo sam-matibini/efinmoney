@@ -2064,7 +2064,7 @@ const SendPage = () => {
                   <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/10 ring-1 ring-border">
                     <Globe2 className="h-2.5 w-2.5 text-primary" aria-hidden />
                   </span>
-                  International
+                  Other
                 </TabsTrigger>
                 <TabsTrigger value="efinmoney" className="relative z-10 gap-1.5 px-2 sm:gap-2 sm:px-3 text-xs sm:text-sm data-[state=active]:bg-transparent data-[state=active]:shadow-none">
                   <BrandFlag size="xs" />
