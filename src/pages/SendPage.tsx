@@ -2653,11 +2653,33 @@ const SendPage = () => {
                                     {fundingSource === 'bank' && (
                                       <p className="text-xs text-muted-foreground text-center">Bank transfer — funds will be debited within 1-2 business days.</p>
                                     )}
-                                    {fundingSource === "card" && (
+                                    {fundingSource === "card" && !inlineCardEntry && (
                                       <p className="text-xs text-muted-foreground text-center">
                                         Next you’ll enter card details on our secure page. After payment, we automatically send to your recipient.
                                       </p>
                                     )}
+                                    {fundingSource === "card" && inlineCardEntry ? (
+                                      <div className="space-y-3">
+                                        <p className="text-sm font-semibold">Card details</p>
+                                        <SectionBoundary name="FlutterwaveCardForm">
+                                          <FlutterwaveCardForm
+                                            defaultWalletId={selectedWallet?.wallet_id}
+                                            defaultAmount={totalCharge}
+                                            lockAmount
+                                            ctaLabel={`Pay ${sourceSymbol}${totalCharge.toFixed(2)} & send`}
+                                            onSuccess={() => { void handleConfirm("wallet"); }}
+                                          />
+                                        </SectionBoundary>
+                                        <Button
+                                          variant="outline"
+                                          className="w-full"
+                                          onClick={() => goToStep(2)}
+                                          disabled={confirming}
+                                        >
+                                          Back
+                                        </Button>
+                                      </div>
+                                    ) : (
                                     <div className="flex gap-3">
                                       <Button variant="outline" className="flex-1" onClick={() => goToStep(2)} disabled={confirming || creatingLink}>Back</Button>
                                       <Button className="flex-1" onClick={useLink ? handleCreateLink : requestConfirm} disabled={confirming || creatingLink}>
@@ -2674,6 +2696,8 @@ const SendPage = () => {
                                         )}
                                       </Button>
                                     </div>
+                                    )}
+
                                     <Button
                                       variant="outline"
                                       className="w-full border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
