@@ -19,6 +19,8 @@ type Props = {
   className?: string;
   /** Optional header slot above the stepper (e.g. quiet tabs) */
   above?: ReactNode;
+  /** Optional control rendered inline to the right of the title (e.g. country picker) */
+  headerRight?: ReactNode;
 };
 
 /**
