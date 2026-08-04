@@ -386,9 +386,6 @@ const EfinmoneyP2PFlow = () => {
   const reset = () => {
     setRecipients([]);
     setAmountPerUser("");
-    setQuery("");
-    setSearchRecipient(null);
-    setNotFound(false);
     qc.invalidateQueries({ queryKey: ["wallets", user?.id] });
     qc.invalidateQueries({ queryKey: ["wallets"] });
   };
