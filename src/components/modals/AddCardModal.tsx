@@ -18,6 +18,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { SYSTEM_DEFAULT_CURRENCY } from "@/lib/systemDefaults";
+
 import { useCardMutations, type CreatedCardResult, type CardType, type CardNetwork } from "@/hooks/useCards";
 import { useWallets } from "@/hooks/useWallets";
 import { Copy, Check, Eye, EyeOff } from "lucide-react";
@@ -85,8 +87,8 @@ const AddCardModal = ({ isOpen, onClose, defaultMode = "issue" }: AddCardModalPr
 
   const handleIssue = async () => {
     if (!cardholderName.trim()) return toast.error("Cardholder name is required");
-    if (!isCredit && !walletId) return toast.error("Select a linked wallet");
     if (isCredit && (!creditLimit || Number(creditLimit) <= 0))
+
       return toast.error("Enter a valid credit limit");
 
     const fundAmt = Number(initialFund);
@@ -101,8 +103,9 @@ const AddCardModal = ({ isOpen, onClose, defaultMode = "issue" }: AddCardModalPr
         cardholder_name: cardholderName.trim(),
         spending_limit: Number(spendingLimit) || 5000,
         credit_limit: isCredit ? Number(creditLimit) : null,
-        wallet_id: isCredit ? null : walletId,
-        currency_code: selectedWallet?.currency_code ?? null,
+        wallet_id: isCredit || !walletId ? null : walletId,
+        currency_code: selectedWallet?.currency_code ?? SYSTEM_DEFAULT_CURRENCY,
+
         initial_fund: !isCredit && fundAmt > 0 ? fundAmt : undefined,
       });
       setCreatedCard(card);
@@ -252,10 +255,14 @@ const AddCardModal = ({ isOpen, onClose, defaultMode = "issue" }: AddCardModalPr
               {!isCredit && (
                 <>
                   <div className="space-y-2">
-                    <Label>Linked Wallet</Label>
-                    <Select value={walletId} onValueChange={setWalletId}>
-                      <SelectTrigger><SelectValue placeholder="Select a wallet" /></SelectTrigger>
+                    <Label>Linked Wallet (optional)</Label>
+                    <Select
+                      value={walletId || "none"}
+                      onValueChange={(v) => setWalletId(v === "none" ? "" : v)}
+                    >
+                      <SelectTrigger><SelectValue placeholder="No wallet — fund later" /></SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="none">No wallet — fund later</SelectItem>
                         {wallets?.map((w) => (
                           <SelectItem key={w.wallet_id} value={w.wallet_id}>
                             {w.flag_emoji} {w.currency_code} — {w.symbol}{Number(w.balance).toFixed(2)}
@@ -264,26 +271,31 @@ const AddCardModal = ({ isOpen, onClose, defaultMode = "issue" }: AddCardModalPr
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-muted-foreground">
-                      Card spends from its own balance. Fund it from this wallet when creating or anytime after.
+                      {selectedWallet
+                        ? "Card spends from its own balance. Fund it from this wallet when creating or anytime after."
+                        : `Skip this and fund the card later from any wallet. The card will be issued in ${SYSTEM_DEFAULT_CURRENCY}.`}
                     </p>
                   </div>
-                  <div className="space-y-2">
-                    <Label>Initial fund (optional)</Label>
-                    <Input
-                      type="number"
-                      inputMode="decimal"
-                      min={0}
-                      step="0.01"
-                      placeholder="0.00"
-                      value={initialFund}
-                      onChange={(e) => setInitialFund(e.target.value)}
-                    />
-                    {selectedWallet && Number(initialFund) > 0 && (
-                      <p className="text-xs text-muted-foreground">
-                        {selectedWallet.currency_code} {Number(initialFund).toFixed(2)} will move from your wallet to this card.
-                      </p>
-                    )}
-                  </div>
+                  {selectedWallet && (
+                    <div className="space-y-2">
+                      <Label>Initial fund (optional)</Label>
+                      <Input
+                        type="number"
+                        inputMode="decimal"
+                        min={0}
+                        step="0.01"
+                        placeholder="0.00"
+                        value={initialFund}
+                        onChange={(e) => setInitialFund(e.target.value)}
+                      />
+                      {Number(initialFund) > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          {selectedWallet.currency_code} {Number(initialFund).toFixed(2)} will move from your wallet to this card.
+                        </p>
+                      )}
+                    </div>
+                  )}
+
                 </>
               )}
 
