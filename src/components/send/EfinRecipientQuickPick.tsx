@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useInfiniteQuery } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -47,6 +47,8 @@ interface Props {
   isAlreadyAdded: (userId: string) => boolean;
 }
 
+const PAGE_SIZE = 20;
+
 const initials = (r: { full_name: string | null; efin_tag: string | null; email: string | null }) => {
   const src = r.full_name || r.efin_tag || r.email || "?";
   return src
@@ -74,8 +76,10 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
   const [finding, setFinding] = useState(false);
   const [notFound, setNotFound] = useState(false);
   const [mode, setMode] = useState<"recents" | "search">("recents");
+  const [highlight, setHighlight] = useState(0);
   const boxRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
 
   // Debounce the type-ahead query
   useEffect(() => {
@@ -103,7 +107,6 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
     },
   });
 
-
   // Open on Search when there are no recents to browse
   useEffect(() => {
     if (recentsLoaded && recents.length === 0) setMode("search");
@@ -121,16 +124,34 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
     }
   };
 
-  const { data: suggestions = [], isFetching } = useQuery({
-    queryKey: ["efin-search-recipients", debounced],
-    enabled: debounced.replace(/^@/, "").length >= 3,
+  // Full browsable directory: opens with no query, filters as you type
+  const {
+    data,
+    isFetching,
+    isFetchingNextPage,
+    hasNextPage,
+    fetchNextPage,
+  } = useInfiniteQuery({
+    queryKey: ["efin-list-recipients", debounced],
+    enabled: open && mode === "search" && !!user?.id,
     staleTime: 30_000,
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("search_efin_recipients", { p_query: debounced });
+    initialPageParam: 0,
+    queryFn: async ({ pageParam }) => {
+      const { data, error } = await supabase.rpc("list_efin_recipients", {
+        p_query: debounced,
+        p_limit: PAGE_SIZE,
+        p_offset: pageParam as number,
+      });
       if (error) throw error;
       return (data ?? []) as SearchRow[];
     },
+    getNextPageParam: (lastPage, pages) =>
+      lastPage.length < PAGE_SIZE ? undefined : pages.length * PAGE_SIZE,
   });
+
+  const suggestions = useMemo(() => (data?.pages ?? []).flat() as SearchRow[], [data]);
+
+  useEffect(() => setHighlight(0), [debounced, open]);
 
   const pick = (r: QuickPickRecipient) => {
     if (r.user_id === user?.id) {
@@ -148,6 +169,17 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
     setNotFound(false);
     setMode("recents");
   };
+
+  const pickRow = (s: SearchRow) =>
+    pick({
+      user_id: s.user_id,
+      full_name: s.full_name,
+      efin_tag: s.efin_tag,
+      avatar_url: s.avatar_url,
+      email: null,
+      account_number: s.account_number,
+      base_currency: s.base_currency,
+    });
 
   // Exact lookup fallback (pasted email / @tag / account number)
   const handleFind = async () => {
@@ -171,6 +203,40 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
       toast.error(e instanceof Error ? e.message : "Lookup failed");
     } finally {
       setFinding(false);
+    }
+  };
+
+  const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      if (!open) {
+        setOpen(true);
+        return;
+      }
+      setHighlight((h) => {
+        const next = e.key === "ArrowDown" ? h + 1 : h - 1;
+        const clamped = Math.max(0, Math.min(next, suggestions.length - 1));
+        listRef.current?.children[clamped]?.scrollIntoView({ block: "nearest" });
+        return clamped;
+      });
+      return;
+    }
+    if (e.key === "Escape") {
+      setOpen(false);
+      return;
+    }
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const target = open ? suggestions[highlight] : undefined;
+      if (target) pickRow(target);
+      else handleFind();
+    }
+  };
+
+  const onListScroll = (e: React.UIEvent<HTMLUListElement>) => {
+    const el = e.currentTarget;
+    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 24 && hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
     }
   };
 
@@ -247,19 +313,23 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
         )
       )}
 
-      {/* Search + type-ahead */}
+      {/* Search + scrollable directory dropdown */}
       <div ref={boxRef} className={`relative ${mode === "search" ? "" : "hidden"}`}>
-
         <div className="flex gap-2">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               ref={inputRef}
-              placeholder="email@example.com, @username, or 10-digit account #"
+              role="combobox"
+              aria-expanded={open}
+              aria-autocomplete="list"
+              aria-controls="efin-recipient-listbox"
+              placeholder="Search eFinMoney users by name, @tag, email or account #"
               value={query}
               onChange={(e) => { setQuery(e.target.value); setOpen(true); setNotFound(false); }}
               onFocus={() => setOpen(true)}
-              onKeyDown={(e) => e.key === "Enter" && handleFind()}
+              onClick={() => setOpen(true)}
+              onKeyDown={onKeyDown}
               className="pl-9"
               autoComplete="off"
             />
@@ -270,7 +340,7 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
         </div>
 
         <AnimatePresence>
-          {open && debounced.replace(/^@/, "").length >= 3 && (
+          {open && (
             <motion.div
               initial={{ opacity: 0, y: -4 }}
               animate={{ opacity: 1, y: 0 }}
@@ -289,24 +359,25 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
                   </Button>
                 </div>
               ) : (
-                <ul className="max-h-72 overflow-y-auto">
-                  {suggestions.map((s) => {
+                <ul
+                  id="efin-recipient-listbox"
+                  role="listbox"
+                  ref={listRef}
+                  onScroll={onListScroll}
+                  className="max-h-72 overflow-y-auto"
+                >
+                  {suggestions.map((s, i) => {
                     const added = isAlreadyAdded(s.user_id);
                     return (
-                      <li key={s.user_id}>
+                      <li key={s.user_id} role="option" aria-selected={i === highlight}>
                         <button
                           type="button"
                           disabled={added}
-                          onClick={() => pick({
-                            user_id: s.user_id,
-                            full_name: s.full_name,
-                            efin_tag: s.efin_tag,
-                            avatar_url: s.avatar_url,
-                            email: null,
-                            account_number: s.account_number,
-                            base_currency: s.base_currency,
-                          })}
-                          className="flex w-full items-center gap-3 p-3 text-left transition-colors hover:bg-muted disabled:opacity-60"
+                          onMouseEnter={() => setHighlight(i)}
+                          onClick={() => pickRow(s)}
+                          className={`flex w-full items-center gap-3 p-3 text-left transition-colors hover:bg-muted disabled:opacity-60 ${
+                            i === highlight ? "bg-muted" : ""
+                          }`}
                         >
                           <Avatar url={s.avatar_url} label={initials({ ...s, email: s.email_masked })} />
                           <div className="min-w-0 flex-1">
@@ -323,6 +394,11 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
                       </li>
                     );
                   })}
+                  {isFetchingNextPage && (
+                    <li className="flex items-center justify-center gap-2 p-3 text-xs text-muted-foreground">
+                      <LoadingSpinner size={14} /> Loading more…
+                    </li>
+                  )}
                 </ul>
               )}
             </motion.div>
