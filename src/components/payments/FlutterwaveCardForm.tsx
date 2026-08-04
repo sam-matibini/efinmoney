@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -104,42 +104,107 @@ function EfinmoneyBranding() {
   );
 }
 
-function PinAuthForm({ onPinSubmit, loading }: { onPinSubmit: (pin: string) => void; loading: boolean }) {
-  const [pin, setPin] = useState("");
+const CHALLENGE_COPY: Record<string, { title: string; sub: string; label: string; placeholder: string; max: number }> = {
+  pin: {
+    title: "Enter your card PIN",
+    sub: "Your bank requires your card PIN to authorise this payment.",
+    label: "Card PIN",
+    placeholder: "••••",
+    max: 6,
+  },
+  otp: {
+    title: "Enter the one-time code",
+    sub: "We sent a one-time code to the phone number / email registered with your bank.",
+    label: "One-time code (OTP)",
+    placeholder: "••••••",
+    max: 8,
+  },
+};
+
+function ChallengePanel({
+  mode,
+  loading,
+  redirectUrl,
+  onSubmitCode,
+  onOpenRedirect,
+  onCancel,
+}: {
+  mode: string;
+  loading: boolean;
+  redirectUrl?: string | null;
+  onSubmitCode: (code: string) => void;
+  onOpenRedirect: () => void;
+  onCancel: () => void;
+}) {
+  const [code, setCode] = useState("");
+  const ref = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    ref.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [mode]);
+
+  const copy = CHALLENGE_COPY[mode] ?? CHALLENGE_COPY.otp;
+  const isRedirect = mode === "redirect";
 
   return (
-    <div className="space-y-4 p-4 rounded-xl border border-border bg-muted/20">
-      <div className="flex items-center gap-2">
-        <ShieldCheck className="h-5 w-5 text-amber-500" />
+    <div
+      ref={ref}
+      className="space-y-4 p-4 rounded-xl border-2 border-amber-500/60 bg-amber-500/5 animate-fade-in"
+    >
+      <div className="flex items-start gap-2">
+        <ShieldCheck className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
         <div>
-          <p className="text-sm font-medium">Additional verification required</p>
-          <p className="text-xs text-muted-foreground">Enter the PIN sent by your bank to complete this payment.</p>
+          <p className="text-sm font-semibold">Action required — security check</p>
+          <p className="text-xs text-muted-foreground">
+            {isRedirect
+              ? "Complete 3-D Secure verification in the window from your bank. If it didn't open, use the button below."
+              : copy.sub}
+          </p>
         </div>
       </div>
-      <div className="space-y-2">
-        <Label className="text-xs">Enter PIN / OTP</Label>
-        <Input
-          type="text"
-          inputMode="numeric"
-          maxLength={6}
-          placeholder="******"
-          value={pin}
-          onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
-          className="h-12 text-center text-lg tracking-widest"
-          autoFocus
-        />
-      </div>
-      <Button
-        size="lg"
-        className="w-full"
-        disabled={pin.length < 4 || loading}
-        onClick={() => onPinSubmit(pin)}
+
+      {isRedirect ? (
+        <Button type="button" size="lg" className="w-full" onClick={onOpenRedirect} disabled={!redirectUrl}>
+          Open verification window
+        </Button>
+      ) : (
+        <>
+          <div className="space-y-2">
+            <Label className="text-xs">{copy.label}</Label>
+            <Input
+              type="text"
+              inputMode="numeric"
+              maxLength={copy.max}
+              placeholder={copy.placeholder}
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+              className="h-12 text-center text-lg tracking-widest"
+              autoFocus
+            />
+          </div>
+          <Button
+            type="button"
+            size="lg"
+            className="w-full"
+            disabled={code.length < 4 || loading}
+            onClick={() => onSubmitCode(code)}
+          >
+            {loading ? <><LoadingSpinner size={16} className="mr-2" /> Verifying…</> : "Verify & Pay"}
+          </Button>
+        </>
+      )}
+
+      <button
+        type="button"
+        onClick={onCancel}
+        className="w-full text-xs text-muted-foreground underline underline-offset-2"
       >
-        {loading ? <><LoadingSpinner size={16} className="mr-2" /> Verifying…</> : "Verify & Pay"}
-      </Button>
+        Cancel and edit payment details
+      </button>
     </div>
   );
 }
+
 
 export default function FlutterwaveCardForm({
   defaultWalletId,
@@ -184,26 +249,29 @@ export default function FlutterwaveCardForm({
     if (!cardholderName && profile?.full_name) setCardholderName(profile.full_name.toUpperCase());
   }, [profile?.full_name, cardholderName]);
 
-  useEffect(() => {
-    if (authMode === "redirect" && authRedirect) {
-      const width = 500; const height = 620;
-      const left = (screen.width - width) / 2; const top = (screen.height - height) / 2;
-      const popup = window.open(authRedirect, "flw_auth", `width=${width},height=${height},left=${left},top=${top}`);
-      if (!popup) {
-        toast.error("Please allow pop-ups for 3D Secure verification");
-        setAuthMode(null);
-        setStage("idle");
-        return;
-      }
-      const interval = setInterval(() => {
-        if (popup.closed) {
-          clearInterval(interval);
-          setStage("verifying");
-          verifyAndCredit().finally(() => setStage("idle"));
-        }
-      }, 500);
+  const openRedirectPopup = () => {
+    if (!authRedirect) return;
+    const width = 500; const height = 620;
+    const left = (screen.width - width) / 2; const top = (screen.height - height) / 2;
+    const popup = window.open(authRedirect, "flw_auth", `width=${width},height=${height},left=${left},top=${top}`);
+    if (!popup) {
+      toast.error("Pop-up blocked — use the 'Open verification window' button to continue");
+      return;
     }
+    const interval = setInterval(() => {
+      if (popup.closed) {
+        clearInterval(interval);
+        setStage("verifying");
+        verifyAndCredit().finally(() => setStage("idle"));
+      }
+    }, 500);
+  };
+
+  useEffect(() => {
+    if (authMode === "redirect" && authRedirect) openRedirectPopup();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authMode, authRedirect]);
+
 
   const wallet = wallets?.find((w) => w.wallet_id === (selectedWalletId ?? defaultWalletId)) ?? wallets?.[0];
   const currency = wallet?.currency_code ?? "USD";
@@ -245,20 +313,44 @@ export default function FlutterwaveCardForm({
     redirect_url: `${window.location.origin}/payment-callback?type=flw_card`,
   });
 
+  const applyAuthResponse = (data: any) => {
+    const am = String(data?.auth?.mode || "otp");
+    const cid = data?.charge_id ? String(data.charge_id) : null;
+    if (cid) setPendingChargeId(cid);
+    if (am === "redirect" && data?.auth?.redirect) setAuthRedirect(String(data.auth.redirect));
+    setAuthMode(am);
+    setStage("auth");
+  };
+
   const verifyAndCredit = async () => {
-    if (!lastPayload) return;
+    if (!lastPayload && !pendingChargeId) return;
     try {
-      const { data, error } = await supabase.functions.invoke("flw-card-charge", { body: lastPayload });
+      // Confirm the existing charge rather than re-posting card data (avoids a second charge).
+      const body: Record<string, unknown> = pendingChargeId
+        ? {
+            charge_id: pendingChargeId,
+            amount: amountNum,
+            currency,
+            wallet_id: wallet?.wallet_id ?? "",
+          }
+        : { ...(lastPayload as Record<string, unknown>) };
+      const { data, error } = await supabase.functions.invoke("flw-card-charge", { body });
       if (error) throw new Error(error.message);
       if (!data?.success) throw new Error(data?.error || "Payment failed");
+      if (data?.requires_auth) {
+        applyAuthResponse(data);
+        return;
+      }
       await queryClient.invalidateQueries({ queryKey: ["wallets"] });
       await queryClient.invalidateQueries({ queryKey: ["ledger-deposits"] });
+      setAuthMode(null);
       setSuccess({ amount: amountNum, currency, symbol });
       onSuccess?.({ amount: amountNum, currency, walletId: wallet?.wallet_id ?? "" });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Verification failed");
     }
   };
+
 
   const handleCharge = async (extraPayload?: Record<string, unknown>) => {
     const payload = extraPayload || buildChargePayload();
@@ -281,20 +373,12 @@ export default function FlutterwaveCardForm({
       setLastPayload(payload);
 
       if (data?.requires_auth) {
-        const am = data?.auth?.mode;
-        const cid = data?.charge_id ? String(data.charge_id) : null;
-        if (cid) setPendingChargeId(cid);
-        setAuthMode(am);
-        if (am === "redirect" && data?.auth?.redirect) {
-          setAuthRedirect(data.auth.redirect);
-          setStage("auth");
-        } else if (am === "pin" || am === "avs_noauth") {
-          setStage("auth");
-        } else {
-          setStage("auth");
-        }
+        applyAuthResponse(data);
         return;
       }
+
+      setAuthMode(null);
+
 
       // Direct success
       setStage("crediting");
@@ -310,15 +394,24 @@ export default function FlutterwaveCardForm({
     }
   };
 
-  const handlePinSubmit = (pin: string) => {
+  const handleChallengeSubmit = (code: string) => {
     if (!lastPayload) return;
-    const auth = { mode: "pin", pin };
+    const mode = authMode === "pin" ? "pin" : "otp";
+    const auth = mode === "pin" ? { mode: "pin", pin: code } : { mode: "otp", otp: code };
     handleCharge({
       ...lastPayload,
       authorization: auth,
       ...(pendingChargeId ? { charge_id: pendingChargeId } : {}),
     });
   };
+
+  const cancelChallenge = () => {
+    setAuthMode(null);
+    setAuthRedirect(null);
+    setPendingChargeId(null);
+    setStage("idle");
+  };
+
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -465,22 +558,37 @@ export default function FlutterwaveCardForm({
           </div>
         </div>
 
-        {authMode === "pin" && (
-          <PinAuthForm onPinSubmit={handlePinSubmit} loading={authLoading} />
+        {authMode && (
+          <ChallengePanel
+            mode={authMode}
+            loading={authLoading}
+            redirectUrl={authRedirect}
+            onSubmitCode={handleChallengeSubmit}
+            onOpenRedirect={openRedirectPopup}
+            onCancel={cancelChallenge}
+          />
         )}
 
-        <Button type="submit" size="lg" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white" disabled={stage !== "idle"}>
-          {stage === "charging" || stage === "auth" ? (
+        <Button
+          type="submit"
+          size="lg"
+          className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+          disabled={stage !== "idle" || !!authMode}
+        >
+          {stage === "charging" ? (
             <><LoadingSpinner size={16} className="mr-2" /> Processing…</>
           ) : (
             ctaLabel ?? `Pay ${symbol}${amountNum.toFixed(2)} ${currency}`
           )}
         </Button>
 
+
         <EfinmoneyBranding />
       </form>
 
-      {stage !== "idle" && stage !== "success" && <ProcessingOverlay stage={stage as Exclude<Stage, "idle" | "success">} />}
+      {stage !== "idle" && stage !== "success" && stage !== "auth" && (
+        <ProcessingOverlay stage={stage as Exclude<Stage, "idle" | "success" | "auth">} />
+      )}
     </div>
   );
 }
