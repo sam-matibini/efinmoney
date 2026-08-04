@@ -78,6 +78,8 @@ import { currencySymbol } from "@/lib/currency";
 import MoneyFlowShell from "@/components/money/MoneyFlowShell";
 import CheckoutShell from "@/components/money/CheckoutShell";
 import CheckoutMethodList, { type CheckoutMethod } from "@/components/money/CheckoutMethodList";
+import PaymentMethodRow, { type PaymentMethodOption, type PayTone } from "@/components/money/PaymentMethodRow";
+import { CreditCard as PayCardIcon, Landmark as PayBankIcon, Smartphone as PayMobileIcon, Wallet as PayWalletIcon } from "lucide-react";
 
 const MM_BY_CCY = Object.fromEntries(MM_COUNTRIES.map((c) => [c.currency, c]));
 
@@ -184,6 +186,14 @@ function initialAfricanProvider(params: URLSearchParams): AfricanTopupProvider {
   if (import.meta.env.VITE_FINCRA_TOPUP === "true") return "fincra";
   return "flutterwave";
 }
+
+const toneForMethod = (m: CheckoutMethod): PayTone => {
+  const t = `${m.label} ${m.description ?? ""}`.toLowerCase();
+  if (t.includes("mobile money") || t.includes("momo")) return "mobile";
+  if (t.includes("card")) return "card";
+  if (t.includes("bank") || t.includes("interac") || t.includes("transfer")) return "bank";
+  return "wallet";
+};
 
 // Per-gateway available methods
 const FLW_METHODS_BY_CCY: Record<string, FlwMethod[]> = {
@@ -819,6 +829,16 @@ const TopUpPage = () => {
     }
   }
 
+  const payCategoryMeta: Record<PayTone, { label: string; sublabel: string; icon: typeof PayCardIcon }> = {
+    card: { label: "Card", sublabel: "Debit or credit", icon: PayCardIcon },
+    bank: { label: "Bank", sublabel: "Transfer or Interac", icon: PayBankIcon },
+    mobile: { label: "Mobile", sublabel: "Mobile money", icon: PayMobileIcon },
+    wallet: { label: "Wallet", sublabel: "Other methods", icon: PayWalletIcon },
+  };
+  const payCategories: PaymentMethodOption<PayTone>[] = (["card", "bank", "mobile", "wallet"] as PayTone[])
+    .filter((tone) => payMethods.some((m) => toneForMethod(m) === tone))
+    .map((tone) => ({ id: tone, tone, ...payCategoryMeta[tone] }));
+
   const activeMethodId =
     payMethods.some((m) => m.id === selectedMethodId) ? selectedMethodId : payMethods[0]?.id || "";
 
@@ -911,6 +931,17 @@ const TopUpPage = () => {
             onBack={() => setTopupStep(1)}
             backLabel="Edit amount"
           >
+            {payMethods.length > 1 && (
+              <PaymentMethodRow
+                className="mb-3"
+                options={payCategories}
+                value={activeCategory}
+                onChange={(tone) => {
+                  const first = payMethods.find((m) => toneForMethod(m) === tone);
+                  if (first) setSelectedMethodId(first.id);
+                }}
+              />
+            )}
             {payMethods.length === 0 ? (
               <Card>
                 <CardContent className="pt-6">
