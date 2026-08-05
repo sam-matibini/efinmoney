@@ -1408,6 +1408,8 @@ const SendPage = () => {
     const mm = MM_COUNTRIES.find(
       (c) => c.currency === targetCountry.code || c.name.toLowerCase() === targetCountry.id.toLowerCase(),
     );
+    if (targetCountry.code === "ZMW") return "26097XXXXXXX or 097XXXXXXX";
+    if (targetCountry.code === "KES") return "2547XXXXXXX or 07XXXXXXX";
     return `${mm?.dialCode ?? "+"}...`;
   }, [targetCountry]);
 
@@ -2529,12 +2531,15 @@ const SendPage = () => {
                                         <Input
                                           placeholder={phonePlaceholder}
                                           value={recipientPhone}
-                                          onChange={(e) => setRecipientPhone(e.target.value.replace(/[^\d+]/g, "").slice(0, 15))}
-                                          maxLength={15}
+                                          onChange={(e) => setRecipientPhone(e.target.value.replace(/[^\d+]/g, "").slice(0, 16))}
+                                          maxLength={16}
                                           className="transition-shadow focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:shadow-[0_0_0_4px_hsl(var(--primary)/0.12)]"
                                         />
                                         <p className="text-sm text-muted-foreground">
-                                          Funds will be sent via {effectiveMethodLabel} to this number.
+                                          {targetCountry.code === "ZMW"
+                                            ? "Use 260… or 07… (Airtel 77/97, MTN 76/96, Zamtel 75/95). Funds will be sent via "
+                                              + effectiveMethodLabel + "."
+                                            : `Funds will be sent via ${effectiveMethodLabel} to this number.`}
                                         </p>
                                       </motion.div>
                                       </>

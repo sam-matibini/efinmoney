@@ -15,6 +15,9 @@ interface PayoutRequest {
   currency: string;
   network: string;
   recipient_name: string;
+  /** Preferred Fincra wallet to debit (e.g. NGN). Falls back to FINCRA_PAYOUT_SOURCE_CURRENCY. */
+  source_currency?: string;
+  fincra_source_currency?: string;
   // When true (set by execute-transfer for fallback logic), on Fincra API failure
   // skip the ledger reversal and status update — execute-transfer will handle them.
   skip_reversal?: boolean;
@@ -48,6 +51,9 @@ const FINCRA_MM_CODE: Record<string, string> = {
   "RWF:airtel": "AIRTEL",
 };
 
+/** Currencies we will try as Fincra funding wallets (after preferred). */
+const DEFAULT_FUNDING_FALLBACKS = ["NGN", "USD", "GHS", "KES", "UGX", "ZMW", "TZS", "RWF"];
+
 function splitName(full: string): { firstName: string; lastName: string } {
   const parts = full.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return { firstName: "Recipient", lastName: "User" };
@@ -72,17 +78,31 @@ function fincraMsisdnDigits(phone: string, currency: string): string {
 }
 
 /**
- * Zambia MoMo example in Fincra docs uses local MSISDN with leading 0
- * (e.g. 0961111111), not the 260… international form.
+ * Fincra MoMo accountNumber: countryCallingCode + national number, no '+'.
+ * Zambia test accounts use 26097… / 26095… (not local 09…).
+ * Keep phone field in the same digit form.
  */
 function fincraAccountNumber(phone: string, currency: string): string {
-  const digits = fincraMsisdnDigits(phone, currency);
-  if (currency === "ZMW") {
-    let local = digits.startsWith("260") ? digits.slice(3) : digits;
-    if (!local.startsWith("0")) local = `0${local}`;
-    return local;
-  }
-  return digits;
+  return fincraMsisdnDigits(phone, currency);
+}
+
+/** Alternate MoMo MSISDN shapes Fincra may accept (esp. Zambia). */
+function fincraAccountNumberVariants(phone: string, currency: string): string[] {
+  const intl = fincraMsisdnDigits(phone, currency); // e.g. 260770069550
+  const dial = ({ NGN: "234", KES: "254", GHS: "233", UGX: "256", TZS: "255", ZMW: "260", RWF: "250" } as Record<string, string>)[currency] || "";
+  let national = intl;
+  if (dial && national.startsWith(dial)) national = national.slice(dial.length);
+  if (national.startsWith("0")) national = national.slice(1);
+  const local0 = national ? `0${national}` : "";
+  const out = [intl, local0, national].filter(Boolean);
+  return [...new Set(out)];
+}
+
+function isFincraAccountNumberError(message: string): boolean {
+  const m = message.toLowerCase();
+  return m.includes("account number") ||
+    m.includes("accountnumber") ||
+    (m.includes("valid") && m.includes("mobile money"));
 }
 
 const CURRENCY_TO_COUNTRY: Record<string, string> = {
@@ -94,6 +114,99 @@ const CURRENCY_TO_COUNTRY: Record<string, string> = {
   ZMW: "ZM",
   RWF: "RW",
 };
+
+function preferredFundingCurrency(body: PayoutRequest, dest: string): string {
+  const fromBody = (body.fincra_source_currency || body.source_currency || "").trim().toUpperCase();
+  if (fromBody) return fromBody;
+  const fromEnv = (Deno.env.get("FINCRA_PAYOUT_SOURCE_CURRENCY") || "NGN").trim().toUpperCase();
+  return fromEnv || dest;
+}
+
+function fundingCandidates(preferred: string, dest: string): string[] {
+  const extras = (Deno.env.get("FINCRA_PAYOUT_SOURCE_FALLBACKS") || "")
+    .split(",")
+    .map((s) => s.trim().toUpperCase())
+    .filter(Boolean);
+  const list = [preferred, dest, ...extras, ...DEFAULT_FUNDING_FALLBACKS];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const c of list) {
+    if (!c || seen.has(c)) continue;
+    seen.add(c);
+    out.push(c);
+  }
+  return out;
+}
+
+type QuoteResult = {
+  reference: string;
+  /** Debit from wallet incl. fees — for balance checks / logging only. */
+  amountToCharge: number;
+  /** Payout `amount` must equal this when quoteReference is set. */
+  sourceAmount: number;
+  amountToReceive: number;
+  rate?: number;
+  fee?: number;
+  raw: Record<string, unknown>;
+};
+
+async function generateDisbursementQuote(opts: {
+  businessId: string;
+  sourceCurrency: string;
+  destinationCurrency: string;
+  /** Amount the beneficiary should receive in destination currency. */
+  receiveAmount: number;
+  paymentDestination: "mobile_money_wallet" | "bank_account";
+}): Promise<{ ok: true; quote: QuoteResult } | { ok: false; error: string }> {
+  const amountStr = String(opts.receiveAmount);
+  const { ok, status, json } = await fincraFetch("/quotes/generate", {
+    method: "POST",
+    body: JSON.stringify({
+      sourceCurrency: opts.sourceCurrency,
+      destinationCurrency: opts.destinationCurrency,
+      amount: amountStr,
+      // receive → amount is what beneficiary gets; quote returns NGN (etc.) to charge.
+      action: "receive",
+      transactionType: "disbursement",
+      business: opts.businessId,
+      // Fee from our Fincra float so recipient gets the full destination amount.
+      feeBearer: "business",
+      paymentDestination: opts.paymentDestination,
+      beneficiaryType: "individual",
+    }),
+  });
+
+  if (!ok) {
+    return {
+      ok: false,
+      error: String(json?.error || json?.message || `Quote HTTP ${status}`),
+    };
+  }
+
+  const data = (json?.data ?? {}) as Record<string, unknown>;
+  const reference = String(data.reference || "");
+  const sourceAmount = Number(data.sourceAmount ?? data.quotedAmount ?? 0);
+  const amountToCharge = Number(data.amountToCharge ?? sourceAmount);
+  const amountToReceive = Number(data.amountToReceive ?? data.destinationAmount ?? opts.receiveAmount);
+  // Fincra rejects payouts when amount ≠ quoted sourceAmount (not amountToCharge).
+  const payoutAmount = sourceAmount > 0 ? sourceAmount : amountToCharge;
+  if (!reference || !(payoutAmount > 0)) {
+    return { ok: false, error: "Fincra quote missing reference or source amount" };
+  }
+
+  return {
+    ok: true,
+    quote: {
+      reference,
+      amountToCharge: amountToCharge > 0 ? amountToCharge : payoutAmount,
+      sourceAmount: payoutAmount,
+      amountToReceive,
+      rate: data.rate != null ? Number(data.rate) : undefined,
+      fee: data.fee != null ? Number(data.fee) : undefined,
+      raw: data,
+    },
+  };
+}
 
 async function reverseTransferLedger(supabase: ReturnType<typeof createClient>, transferId: string) {
   const { data: existing } = await supabase.from("ledger_entries").select("id")
@@ -179,28 +292,25 @@ Deno.serve(async (req) => {
     const { firstName, lastName } = splitName(recipient_name || transfer.recipient_name || "Recipient");
     const customerReference = transfer_id;
     const ccy = currency.toUpperCase();
+    const paymentDestination = hasBankRail ? "bank_account" as const : "mobile_money_wallet" as const;
 
-    let payload: Record<string, unknown>;
+    let mmCode: string | null = null;
+    let beneficiaryBase: Record<string, unknown>;
+    let accountVariants: string[] = [];
+
     if (hasBankRail) {
-      payload = {
-        business: cfg.businessId,
-        sourceCurrency: ccy,
-        destinationCurrency: ccy,
-        amount: String(Math.round(amount * 100) / 100),
-        description: `eFinMoney transfer to ${recipient_name}`,
-        paymentDestination: "bank_account",
-        customerReference,
-        beneficiary: {
-          firstName,
-          lastName,
-          type: "individual",
-          accountHolderName: recipient_name,
-          accountNumber: String(account_number).replace(/\D/g, ""),
-          bankCode: String(bank_code),
-        },
+      beneficiaryBase = {
+        firstName,
+        lastName,
+        type: "individual",
+        accountHolderName: recipient_name || transfer.recipient_name,
+        accountNumber: String(account_number).replace(/\D/g, ""),
+        bankCode: String(bank_code),
+        country: CURRENCY_TO_COUNTRY[ccy] || undefined,
       };
+      accountVariants = [String(account_number).replace(/\D/g, "")];
     } else {
-      const mmCode = FINCRA_MM_CODE[`${ccy}:${network.toLowerCase()}`];
+      mmCode = FINCRA_MM_CODE[`${ccy}:${network.toLowerCase()}`] || null;
       if (!mmCode) {
         const reason = `Unsupported network ${network} for ${ccy} on Fincra`;
         const rev = await reverseTransferLedger(supabase, transfer_id);
@@ -208,80 +318,213 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ success: false, error: reason, refunded: rev.reversed }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
       const rawPhone = phone_number || transfer.recipient_phone || "";
-      const accountNumber = fincraAccountNumber(rawPhone, ccy);
-      const phoneDigits = fincraMsisdnDigits(rawPhone, ccy);
       const holderName = (recipient_name || transfer.recipient_name || `${firstName} ${lastName}`).trim();
-      // AIRTEL corridors reject decimal amounts per Fincra docs.
-      const payoutAmount = mmCode === "AIRTEL"
-        ? String(Math.round(amount))
-        : String(Math.round(amount * 100) / 100);
-      payload = {
-        business: cfg.businessId,
-        sourceCurrency: ccy,
-        destinationCurrency: ccy,
-        amount: payoutAmount,
-        description: `eFinMoney transfer to ${recipient_name}`,
-        paymentDestination: "mobile_money_wallet",
-        customerReference,
-        beneficiary: {
-          firstName,
-          lastName,
-          type: "individual",
-          accountHolderName: holderName,
-          accountNumber,
-          phone: phoneDigits,
-          country: CURRENCY_TO_COUNTRY[ccy] || "ZM",
-          mobileMoneyCode: mmCode,
-        },
+      accountVariants = fincraAccountNumberVariants(rawPhone, ccy);
+      beneficiaryBase = {
+        firstName,
+        lastName,
+        type: "individual",
+        accountHolderName: holderName,
+        phone: fincraMsisdnDigits(rawPhone, ccy),
+        country: CURRENCY_TO_COUNTRY[ccy] || "ZM",
+        mobileMoneyCode: mmCode,
       };
     }
 
-    const { ok, status, json } = await fincraFetch("/disbursements/payouts", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
+    // For Zambia, if the selected network is rejected, also try the other MoMo operators.
+    const networkVariants: string[] = mmCode
+      ? (ccy === "ZMW"
+        ? [...new Set([mmCode, "AIRTEL", "MTN", "ZAMTEL"])]
+        : [mmCode])
+      : [];
 
-    if (!ok) {
-      const reason = String(json?.error || json?.message || `HTTP ${status}`);
+    // Destination amount the recipient should get.
+    let destAmountNum = Number(amount);
+    // AIRTEL requires whole amounts — use whole for all ZMW attempts for safety when probing networks.
+    if (ccy === "UGX" || ccy === "ZMW" || mmCode === "AIRTEL") {
+      destAmountNum = Math.round(destAmountNum);
+    } else {
+      destAmountNum = Math.round(destAmountNum * 100) / 100;
+    }
+
+    const preferred = preferredFundingCurrency(body, ccy);
+    const candidates = fundingCandidates(preferred, ccy);
+    const attemptErrors: string[] = [];
+    let lastReason = "Fincra payout failed";
+    let usedSource = ccy;
+    let usedQuote: QuoteResult | null = null;
+    let usedAccountNumber: string | null = null;
+    let usedNetwork: string | null = mmCode;
+    let successJson: Record<string, unknown> | null = null;
+
+    for (const sourceCurrency of candidates) {
+      if (successJson) break;
+      const cross = sourceCurrency !== ccy;
+
+      for (const netCode of (networkVariants.length ? networkVariants : [null])) {
+        if (successJson) break;
+
+        for (const accountNumber of accountVariants) {
+          const beneficiary = hasBankRail
+            ? { ...beneficiaryBase, accountNumber }
+            : {
+              ...beneficiaryBase,
+              accountNumber,
+              phone: (beneficiaryBase.phone as string) || accountNumber,
+              ...(netCode ? { mobileMoneyCode: netCode } : {}),
+            };
+
+          let quoted: QuoteResult | null = null;
+          if (cross) {
+            const q = await generateDisbursementQuote({
+              businessId: cfg.businessId!,
+              sourceCurrency,
+              destinationCurrency: ccy,
+              receiveAmount: destAmountNum,
+              paymentDestination,
+            });
+            if (!q.ok) {
+              attemptErrors.push(`${sourceCurrency}->${ccy} quote: ${q.error}`);
+              lastReason = q.error;
+              break;
+            }
+            quoted = q.quote;
+          }
+
+          const payload: Record<string, unknown> = {
+            business: cfg.businessId,
+            sourceCurrency,
+            destinationCurrency: ccy,
+            description: `eFinMoney transfer to ${recipient_name || transfer.recipient_name}`,
+            paymentDestination,
+            customerReference,
+            beneficiary,
+            amount: cross && quoted
+              ? String(Math.round(quoted.sourceAmount * 100) / 100)
+              : String(destAmountNum),
+          };
+          if (cross && quoted) payload.quoteReference = quoted.reference;
+
+          console.log("fincra-payout attempt", {
+            transfer_id,
+            sourceCurrency,
+            destinationCurrency: ccy,
+            cross,
+            accountNumber,
+            mobileMoneyCode: netCode || mmCode,
+            amount: payload.amount,
+            quoteReference: quoted?.reference ?? null,
+          });
+
+          const { ok, status, json } = await fincraFetch("/disbursements/payouts", {
+            method: "POST",
+            body: JSON.stringify(payload),
+          });
+
+          if (ok) {
+            usedSource = sourceCurrency;
+            usedQuote = quoted;
+            usedAccountNumber = accountNumber;
+            usedNetwork = netCode || mmCode;
+            successJson = json;
+            break;
+          }
+
+          const reason = String(json?.error || json?.message || `HTTP ${status}`);
+          attemptErrors.push(`${sourceCurrency}->${ccy} net=${netCode || mmCode} acct=${accountNumber}: ${reason}`);
+          lastReason = reason;
+
+          const lower = reason.toLowerCase();
+          if (isFincraAccountNumberError(reason)) {
+            continue;
+          }
+          if (
+            lower.includes("maintenance") ||
+            lower.includes("not supported") ||
+            lower.includes("unsupported")
+          ) {
+            accountVariants.length = 0;
+            break;
+          }
+          if (isFincraBalanceError(reason)) {
+            break;
+          }
+          // Other errors — try next network, else stop funding wallet.
+          break;
+        }
+        if (isFincraBalanceError(lastReason)) break;
+      }
+    }
+
+    if (!successJson) {
+      const reason = lastReason;
       const isBalanceError = isFincraBalanceError(reason);
+      const detail = attemptErrors.length > 1
+        ? `${reason} (tried: ${attemptErrors.join(" | ")})`
+        : reason;
 
-      // Always alert admins when Fincra's wallet is depleted.
       if (isBalanceError) {
         await supabase.from("admin_notifications").insert({
           title: "Fincra wallet balance low",
-          message: `Payout for transfer ${transfer_id} failed: ${reason}. Top up the Fincra ${currency} wallet immediately.`,
+          message: `Payout for transfer ${transfer_id} failed across funding wallets: ${detail}. Preferred source=${preferred}, dest=${ccy}.`,
           type: "treasury",
         }).catch(() => {/* non-blocking */});
       }
 
-      // When called from execute-transfer with skip_reversal, don't touch the ledger
-      // or transfer status — execute-transfer will attempt a fallback rail first.
       if (skip_reversal) {
-        return new Response(JSON.stringify({ success: false, error: reason, refunded: false }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return new Response(JSON.stringify({
+          success: false,
+          error: reason,
+          refunded: false,
+          attempts: attemptErrors,
+        }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
       const rev = await reverseTransferLedger(supabase, transfer_id);
-      await supabase.from("transfers").update({ status: "failed", failure_reason: reason.slice(0, 500) }).eq("id", transfer_id);
+      await supabase.from("transfers").update({ status: "failed", failure_reason: detail.slice(0, 500) }).eq("id", transfer_id);
       await supabase.from("notifications").insert({
         user_id: senderId,
         title: "Transfer failed — refunded",
         message: rev.reversed ? `${reason}. Funds returned to your wallet.` : reason,
         type: "error",
       });
-      return new Response(JSON.stringify({ success: false, error: reason, refunded: rev.reversed }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({
+        success: false,
+        error: reason,
+        refunded: rev.reversed,
+        attempts: attemptErrors,
+      }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const pdata = (json?.data ?? {}) as Record<string, unknown>;
+    const pdata = (successJson?.data ?? {}) as Record<string, unknown>;
     const providerRef = String(pdata.reference || pdata.id || customerReference);
-    await supabase.from("transfers").update({ status: "processing", provider_reference: providerRef }).eq("id", transfer_id);
+    await supabase.from("transfers").update({
+      status: "processing",
+      provider_reference: providerRef,
+      provider_charge_id: usedQuote
+        ? `rail:fincra|src:${usedSource}|dst:${ccy}|net:${usedNetwork || "?"}|acct:${usedAccountNumber || "?"}|q:${usedQuote.reference}`
+        : `rail:fincra|src:${usedSource}|dst:${ccy}|net:${usedNetwork || "?"}|acct:${usedAccountNumber || "?"}`,
+    }).eq("id", transfer_id);
     await supabase.from("notifications").insert({
       user_id: senderId,
       title: "Transfer initiated",
-      message: `Your ${ccy} ${amount} transfer to ${recipient_name} is being processed via Fincra.`,
+      message: usedSource === ccy
+        ? `Your ${ccy} ${destAmountNum} transfer to ${recipient_name || transfer.recipient_name} is being processed via Fincra.`
+        : `Your ${ccy} ${destAmountNum} transfer (funded from Fincra ${usedSource}) to ${recipient_name || transfer.recipient_name} is being processed via Fincra.`,
       type: "info",
     });
 
-    return new Response(JSON.stringify({ success: true, reference: providerRef, status: pdata.status }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({
+      success: true,
+      reference: providerRef,
+      status: pdata.status,
+      source_currency: usedSource,
+      destination_currency: ccy,
+      quote_reference: usedQuote?.reference ?? null,
+      amount_charged: usedQuote?.amountToCharge ?? destAmountNum,
+      amount_to_receive: usedQuote?.amountToReceive ?? destAmountNum,
+      attempts: attemptErrors,
+    }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
     console.error("fincra-payout error", msg);
