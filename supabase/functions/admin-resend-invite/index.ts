@@ -73,9 +73,11 @@ Deno.serve(async (req) => {
       );
     }
 
+    const appUrl = (Deno.env.get("APP_URL") || Deno.env.get("PUBLIC_APP_URL") || "https://www.efin.money").replace(/\/+$/, "");
     const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
       type: "recovery",
       email: body.email,
+      options: { redirectTo: `${appUrl}/auth/reset-password` },
     });
     if (linkErr) {
       return new Response(

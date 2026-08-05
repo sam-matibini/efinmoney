@@ -158,9 +158,11 @@ Deno.serve(async (req) => {
     }
 
     // Send password recovery email so user can set their own password
+    const appUrl = (Deno.env.get("APP_URL") || Deno.env.get("PUBLIC_APP_URL") || "https://www.efin.money").replace(/\/+$/, "");
     const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
       type: "recovery",
       email: body.email,
+      options: { redirectTo: `${appUrl}/auth/reset-password` },
     });
     if (linkErr) {
       // Recovery link is required for the user to set their password.

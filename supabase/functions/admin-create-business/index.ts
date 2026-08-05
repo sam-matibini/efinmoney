@@ -266,9 +266,11 @@ Deno.serve(async (req) => {
     }
 
     // --- Send recovery email to the owner ---
+    const appUrl = (Deno.env.get("APP_URL") || Deno.env.get("PUBLIC_APP_URL") || "https://www.efin.money").replace(/\/+$/, "");
     const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
       type: "recovery",
       email: body.ownerEmail,
+      options: { redirectTo: `${appUrl}/auth/reset-password` },
     });
     if (linkErr) {
       // Roll back everything we created
