@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { ChevronLeft, ChevronRight, UserPlus, Check } from "lucide-react";
+import { ISO_COUNTRIES } from "@/lib/isoCountries";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -155,13 +156,18 @@ const OnboardUserPage = () => {
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="countryCode">Country</Label>
-                    <Input
-                      id="countryCode"
-                      value={form.countryCode}
-                      onChange={(e) => set("countryCode", e.target.value)}
-                      placeholder="US"
-                      maxLength={2}
-                    />
+                    <Select value={form.countryCode} onValueChange={(v) => set("countryCode", v)}>
+                      <SelectTrigger id="countryCode">
+                        <SelectValue placeholder="Select country" />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-72">
+                        {ISO_COUNTRIES.map((c) => (
+                          <SelectItem key={c.code} value={c.code}>
+                            <span className="mr-2">{c.flag}</span>{c.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="dob">Date of birth</Label>
@@ -199,13 +205,18 @@ const OnboardUserPage = () => {
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="addressCountry">Country *</Label>
-                    <Input
-                      id="addressCountry"
-                      value={form.addressCountry}
-                      onChange={(e) => set("addressCountry", e.target.value)}
-                      placeholder="US"
-                      maxLength={2}
-                    />
+                    <Select value={form.addressCountry} onValueChange={(v) => set("addressCountry", v)}>
+                      <SelectTrigger id="addressCountry">
+                        <SelectValue placeholder="Select country" />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-72">
+                        {ISO_COUNTRIES.map((c) => (
+                          <SelectItem key={c.code} value={c.code}>
+                            <span className="mr-2">{c.flag}</span>{c.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
               </>

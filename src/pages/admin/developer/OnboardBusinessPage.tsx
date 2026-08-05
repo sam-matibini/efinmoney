@@ -12,6 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { ChevronLeft, ChevronRight, Briefcase, Check, Plus, X, AlertCircle } from "lucide-react";
+import { ISO_COUNTRIES } from "@/lib/isoCountries";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -292,7 +293,18 @@ const OnboardBusinessPage = () => {
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="ownerCountryCode">Country</Label>
-                    <Input id="ownerCountryCode" value={form.ownerCountryCode} onChange={(e) => set("ownerCountryCode", e.target.value)} maxLength={2} placeholder="US" />
+                    <Select value={form.ownerCountryCode} onValueChange={(v) => set("ownerCountryCode", v)}>
+                      <SelectTrigger id="ownerCountryCode">
+                        <SelectValue placeholder="Select country" />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-72">
+                        {ISO_COUNTRIES.map((c) => (
+                          <SelectItem key={c.code} value={c.code}>
+                            <span className="mr-2">{c.flag}</span>{c.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
               </>
@@ -335,7 +347,18 @@ const OnboardBusinessPage = () => {
                           </div>
                           <div className="space-y-1">
                             <Label className="text-xs">Nationality</Label>
-                            <Input value={u.nationality} onChange={(e) => updateUbo(u.id, { nationality: e.target.value })} maxLength={2} placeholder="US" />
+                            <Select value={u.nationality} onValueChange={(v) => updateUbo(u.id, { nationality: v })}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select" />
+                              </SelectTrigger>
+                              <SelectContent className="max-h-72">
+                                {ISO_COUNTRIES.map((c) => (
+                                  <SelectItem key={c.code} value={c.code}>
+                                    <span className="mr-2">{c.flag}</span>{c.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           </div>
                         </div>
                         <div className="grid sm:grid-cols-3 gap-3">
