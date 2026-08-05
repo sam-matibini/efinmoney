@@ -163,6 +163,8 @@ export default function StaffTrainingPage() {
   const expired = records.filter((r: Any) => r.expiry_date && isPast(new Date(r.expiry_date))).length;
 
   const mandatory = courses.filter((c: Any) => c.is_mandatory);
+  const hasContent = (c: Any) => Array.isArray(c.quiz) && c.quiz.length > 0;
+  const learnable = mandatory.filter(hasContent); // courses a learner can actually take
   const staffRows = staff.length
     ? staff.map((s: Any) => ({ id: s.user_id || s.id, name: s.full_name || s.email || s.user_id || s.id }))
     : Array.from(new Set(records.map((r: Any) => r.staff_id).filter(Boolean))).map((id: Any) => ({ id, name: id as string }));
@@ -197,7 +199,7 @@ export default function StaffTrainingPage() {
   const myAssignmentFor = (courseId: string) => assignments.find((a: Any) => a.staff_id === myId && a.course_id === courseId);
   const myStatus = (course: Any): "current" | "expired" | "missing" => (myId ? cellStatus(myId, course) : "missing") as Any;
   const myRecords = records.filter((r: Any) => r.staff_id === myId);
-  const myCompleted = mandatory.filter((c: Any) => myStatus(c) === "current").length;
+  const myCompleted = learnable.filter((c: Any) => myStatus(c) === "current").length;
 
   const answeredAll = learn && Array.isArray(learn.quiz) && learn.quiz.length > 0
     ? learn.quiz.every((_: Any, i: number) => answers[i] != null)
@@ -223,21 +225,21 @@ export default function StaffTrainingPage() {
         {/* ------------------------------- LEARNER ------------------------------- */}
         <TabsContent value="learn" className="space-y-6">
           <div className="grid sm:grid-cols-3 gap-3">
-            <Card><CardContent className="pt-4 pb-3"><div className="text-2xl font-bold">{mandatory.length}</div><div className="text-xs text-muted-foreground">Assigned courses</div></CardContent></Card>
+            <Card><CardContent className="pt-4 pb-3"><div className="text-2xl font-bold">{learnable.length}</div><div className="text-xs text-muted-foreground">Assigned courses</div></CardContent></Card>
             <Card><CardContent className="pt-4 pb-3"><div className="text-2xl font-bold text-emerald-500">{myCompleted}</div><div className="text-xs text-muted-foreground">Completed</div></CardContent></Card>
-            <Card><CardContent className="pt-4 pb-3"><div className="text-2xl font-bold text-amber-500">{mandatory.length - myCompleted}</div><div className="text-xs text-muted-foreground">Outstanding</div></CardContent></Card>
+            <Card><CardContent className="pt-4 pb-3"><div className="text-2xl font-bold text-amber-500">{learnable.length - myCompleted}</div><div className="text-xs text-muted-foreground">Outstanding</div></CardContent></Card>
           </div>
 
           <Card>
             <CardHeader><CardTitle>My Courses</CardTitle></CardHeader>
             <CardContent>
-              {cLoading ? <Skeleton className="h-24 w-full" /> : mandatory.length === 0 ? (
+              {cLoading ? <Skeleton className="h-24 w-full" /> : learnable.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No training assigned yet.</p>
               ) : (
                 <Table>
                   <TableHeader><TableRow><TableHead>Course</TableHead><TableHead>Program area</TableHead><TableHead>Duration</TableHead><TableHead>Pass mark</TableHead><TableHead>Due by</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
                   <TableBody>
-                    {mandatory.map((c: Any) => {
+                    {learnable.map((c: Any) => {
                       const st = myStatus(c);
                       const a = myAssignmentFor(c.id);
                       return (
