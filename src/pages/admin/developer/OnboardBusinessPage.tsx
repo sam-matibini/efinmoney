@@ -12,7 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { ChevronLeft, ChevronRight, Briefcase, Check, Plus, X, AlertCircle } from "lucide-react";
-import { ISO_COUNTRIES } from "@/lib/isoCountries";
+import CountrySelect from "@/components/inputs/CountrySelect";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -160,7 +160,12 @@ const OnboardBusinessPage = () => {
       return data as { user_id: string; customer_id: string };
     },
     onSuccess: () => {
-      toast.success(`Business created. Invite sent to ${form.ownerEmail}`);
+      const invitedEmail = form.ownerEmail;
+      const businessName = form.businessName;
+      // Reset form so the wizard is clean if the admin returns to onboard another
+      setForm({ ...initial, ubos: initialUbos() });
+      setStep(0);
+      toast.success(`Business created. Invite sent to ${invitedEmail}`);
       navigate("/admin/developer");
     },
     onError: (e) => {
@@ -293,18 +298,11 @@ const OnboardBusinessPage = () => {
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="ownerCountryCode">Country</Label>
-                    <Select value={form.ownerCountryCode} onValueChange={(v) => set("ownerCountryCode", v)}>
-                      <SelectTrigger id="ownerCountryCode">
-                        <SelectValue placeholder="Select country" />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-72">
-                        {ISO_COUNTRIES.map((c) => (
-                          <SelectItem key={c.code} value={c.code}>
-                            <span className="mr-2">{c.flag}</span>{c.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <CountrySelect
+                      id="ownerCountryCode"
+                      value={form.ownerCountryCode}
+                      onValueChange={(v) => set("ownerCountryCode", v)}
+                    />
                   </div>
                 </div>
               </>
@@ -347,18 +345,10 @@ const OnboardBusinessPage = () => {
                           </div>
                           <div className="space-y-1">
                             <Label className="text-xs">Nationality</Label>
-                            <Select value={u.nationality} onValueChange={(v) => updateUbo(u.id, { nationality: v })}>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select" />
-                              </SelectTrigger>
-                              <SelectContent className="max-h-72">
-                                {ISO_COUNTRIES.map((c) => (
-                                  <SelectItem key={c.code} value={c.code}>
-                                    <span className="mr-2">{c.flag}</span>{c.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                            <CountrySelect
+                              value={u.nationality}
+                              onValueChange={(v) => updateUbo(u.id, { nationality: v })}
+                            />
                           </div>
                         </div>
                         <div className="grid sm:grid-cols-3 gap-3">
