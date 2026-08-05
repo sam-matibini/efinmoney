@@ -368,7 +368,12 @@ const OnboardBusinessPage = () => {
                         <div className="grid sm:grid-cols-2 gap-3">
                           <div className="space-y-1">
                             <Label className="text-xs">DOB</Label>
-                            <Input type="date" value={u.dob} onChange={(e) => updateUbo(u.id, { dob: e.target.value })} />
+                            <Input
+                              type="date"
+                              value={u.dob}
+                              max={new Date().toISOString().split("T")[0]}
+                              onChange={(e) => updateUbo(u.id, { dob: e.target.value })}
+                            />
                           </div>
                           <div className="space-y-1">
                             <Label className="text-xs">PEP status</Label>

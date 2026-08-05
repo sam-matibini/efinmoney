@@ -294,7 +294,7 @@ Deno.serve(async (req) => {
     }
 
     // Send the admin_invitation email
-    await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
+    const emailRes = await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -310,6 +310,21 @@ Deno.serve(async (req) => {
         },
       }),
     });
+    if (!emailRes.ok) {
+      const emailErr = await emailRes.text();
+      // Business + owner + UBOs are created, but the email failed.
+      // Surface it so the admin can use admin-resend-invite later.
+      return new Response(
+        JSON.stringify({
+          success: true,
+          user_id: ownerUserId,
+          customer_id: customerId,
+          ubo_ids: ubos.map((u) => u.id),
+          email_warning: `Business created but invite email failed (${emailRes.status}): ${emailErr}`,
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     return new Response(
       JSON.stringify({
