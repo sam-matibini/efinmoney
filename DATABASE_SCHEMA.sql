@@ -817,6 +817,9 @@ CREATE TABLE IF NOT EXISTS public.customers (
   industry character varying(100),
   website character varying(255),
   risk_level character varying(50) DEFAULT 'medium'::character varying,
+  onboarded_by_admin_id uuid,
+  onboarded_via text CHECK (onboarded_via IN ('self','admin','developer_api')),
+  onboarded_at timestamp with time zone,
   CONSTRAINT customers_pkey PRIMARY KEY (id)
 );
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.customers TO authenticated;
@@ -1354,6 +1357,9 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   kyc_framework_version smallint DEFAULT 2 NOT NULL,
   aml_status aml_profile_status DEFAULT 'unscreened'::aml_profile_status NOT NULL,
   aml_last_screened_at timestamp with time zone,
+  onboarded_by_admin_id uuid,
+  onboarded_via text CHECK (onboarded_via IN ('self','admin','developer_api')),
+  onboarded_at timestamp with time zone,
   CONSTRAINT profiles_account_number_key UNIQUE (account_number),
   CONSTRAINT profiles_stripe_customer_id_key UNIQUE (stripe_customer_id),
   CONSTRAINT profiles_user_id_key UNIQUE (user_id),

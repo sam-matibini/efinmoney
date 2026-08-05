@@ -15,6 +15,12 @@ interface Payload {
   kycTier?: string;
   riskScore?: number;
   roles?: string[];
+  // When present, the user is created via the Developer tab flow:
+  // kyc_tier is forced to tier_0, kyc_status to pending, and the profile is
+  // tagged with onboarded_by_admin_id / onboarded_via='admin' / onboarded_at.
+  // The handle_new_user trigger uses user_metadata.onboarded_by_admin to
+  // switch the welcome email template.
+  onboardedByAdminId?: string;
 }
 
 Deno.serve(async (req) => {
@@ -69,6 +75,29 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Developer-tab flow: caller must have developer_onboarding permission.
+    // Mirrors the frontend hasPermission("developer_onboarding") check in
+    // AdminAuthContext — that one is role-based (only super_admin for now,
+    // pending boss confirmation). When the frontend migrates to also honor
+    // the admin_users.permissions jsonb, this check should match that logic.
+    // Falls through silently for legacy callers that don't pass onboardedByAdminId.
+    if (body.onboardedByAdminId) {
+      const { data: callerAdmin } = await admin
+        .from("admin_users")
+        .select("role")
+        .eq("id", userData.user.id)
+        .maybeSingle();
+      if (!callerAdmin || callerAdmin.role !== "super_admin") {
+        return new Response(
+          JSON.stringify({ error: "developer_onboarding permission required (super_admin role)" }),
+          {
+            status: 403,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+    }
+
     // Create real auth user (no password — they'll use magic link / reset)
     const tempPassword = crypto.randomUUID() + "Aa1!";
     const { data: created, error: createErr } =
@@ -76,7 +105,12 @@ Deno.serve(async (req) => {
         email: body.email,
         password: tempPassword,
         email_confirm: false,
-        user_metadata: { full_name: body.fullName },
+        // The handle_new_user trigger reads this to switch the email template
+        // between 'welcome' (self-signup) and 'admin_invitation' (Developer tab).
+        user_metadata: {
+          full_name: body.fullName,
+          onboarded_by_admin: body.onboardedByAdminId ? "true" : null,
+        },
       });
     if (createErr || !created.user) {
       return new Response(
@@ -92,17 +126,25 @@ Deno.serve(async (req) => {
 
     // The handle_new_user trigger has already created profile + default user role + wallets.
     // Update profile with admin-supplied fields.
-    await admin
-      .from("profiles")
-      .update({
-        full_name: body.fullName ?? null,
-        phone_number: body.phoneNumber ?? null,
-        country_code: body.countryCode ?? null,
-        kyc_status: body.kycStatus ?? "pending",
-        kyc_tier: body.kycTier ?? "tier_0",
-        risk_score: body.riskScore ?? 0,
-      })
-      .eq("user_id", newUserId);
+    // When the caller is using the Developer tab flow, force kyc_tier=tier_0
+    // and kyc_status=pending regardless of what was passed in the payload;
+    // the customer always completes their own KYC through the standard flow.
+    const isDeveloperTabFlow = !!body.onboardedByAdminId;
+    const profileUpdate: Record<string, unknown> = {
+      full_name: body.fullName ?? null,
+      phone_number: body.phoneNumber ?? null,
+      country_code: body.countryCode ?? null,
+      kyc_status: isDeveloperTabFlow ? "pending" : (body.kycStatus ?? "pending"),
+      kyc_tier: isDeveloperTabFlow ? "tier_0" : (body.kycTier ?? "tier_0"),
+      risk_score: body.riskScore ?? 0,
+    };
+    if (isDeveloperTabFlow && body.onboardedByAdminId) {
+      profileUpdate.onboarded_by_admin_id = body.onboardedByAdminId;
+      profileUpdate.onboarded_via = "admin";
+      profileUpdate.onboarded_at = new Date().toISOString();
+    }
+
+    await admin.from("profiles").update(profileUpdate).eq("user_id", newUserId);
 
     // Add extra roles (skip 'user' since trigger already inserted it)
     const extraRoles = (body.roles || []).filter((r) => r !== "user");

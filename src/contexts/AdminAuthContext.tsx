@@ -35,13 +35,14 @@ type AdminAction =
   | "manage_admins"
   | "manage_staff"
   | "manage_finance"
-  | "edit_settings";
+  | "edit_settings"
+  | "developer_onboarding";
 
 const ROLE_PERMISSIONS: Record<AdminRole, AdminAction[]> = {
   super_admin: [
     "view", "approve_kyc", "reject_kyc", "request_info", "escalate",
     "edit_internal_notes", "edit_users", "edit_tiers", "manage_admins",
-    "manage_staff", "manage_finance", "edit_settings",
+    "manage_staff", "manage_finance", "edit_settings", "developer_onboarding",
   ],
   compliance_officer: [
     "view", "approve_kyc", "reject_kyc", "request_info", "escalate",
