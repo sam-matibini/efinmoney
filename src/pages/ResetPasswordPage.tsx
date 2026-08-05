@@ -27,14 +27,29 @@ const ResetPasswordPage = () => {
   }, []);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
+    // If the URL has a recovery token, clear any existing session first so the
+    // new session (from the recovery link) takes over. Without this, a user
+    // who is already signed in (e.g. an admin) would have their own session
+    // returned by getSession() and could overwrite the wrong account's password.
+    const hasRecoveryToken = window.location.hash.includes("type=recovery")
+      || window.location.hash.includes("access_token=");
+
+    const init = async () => {
+      if (hasRecoveryToken) {
+        await supabase.auth.signOut();
+        // Give Supabase a moment to process the URL hash and establish the
+        // new session from the recovery token.
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      const { data } = await supabase.auth.getSession();
       if (!data.session) {
         toast.error("This reset link is invalid or has expired.");
         navigate(loginPath, { replace: true });
         return;
       }
       setChecking(false);
-    });
+    };
+    init();
   }, [loginPath, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
