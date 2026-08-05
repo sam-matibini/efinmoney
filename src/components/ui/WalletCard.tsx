@@ -13,7 +13,6 @@ import {
   Play,
   Pencil,
   Trash2,
-  Sparkles,
   FileText,
   CreditCard,
   ChevronDown,
@@ -21,7 +20,6 @@ import {
 import type { WalletLinkedCard } from "@/hooks/useWalletCards";
 import SendMoneyModal from "@/components/modals/SendMoneyModal";
 import ReceiveMoneyModal from "@/components/modals/ReceiveMoneyModal";
-import StellarWalletModal from "@/components/modals/StellarWalletModal";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -46,7 +44,6 @@ interface WalletCardProps {
   onToggleFreeze?: (walletId: string, freeze: boolean) => void;
   onEdit?: (wallet: { walletId: string; currency: string; balance: number; symbol: string; flag?: string }) => void;
   onDelete?: (wallet: { walletId: string; currency: string; balance: number; symbol: string; flag?: string }) => void;
-  showStellarBadge?: boolean;
 }
 
 // SVG noise filter shared across cards
@@ -104,10 +101,8 @@ const WalletCard = ({
   onToggleFreeze,
   onEdit,
   onDelete,
-  showStellarBadge = false,
 }: WalletCardProps) => {
   const [receiveOpen, setReceiveOpen] = useState(false);
-  const [stellarOpen, setStellarOpen] = useState(false);
   const [showLinkedCards, setShowLinkedCards] = useState(false);
   const navigate = useNavigate();
 
@@ -213,21 +208,6 @@ const WalletCard = ({
           </div>
 
           <div className="flex items-center gap-2">
-            {showStellarBadge && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setStellarOpen(true);
-                }}
-                className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-white/15 text-white border border-white/15 hover:bg-white/25 transition"
-                title="View Stellar blockchain wallet"
-              >
-                <Sparkles className="w-3 h-3" />
-                Chain
-              </button>
-            )}
-
             {/* EMV chip */}
             <div className="relative h-8 w-11 rounded-md overflow-hidden shadow-[0_4px_14px_rgba(255,200,80,0.35)] ring-1 ring-yellow-200/40">
               <div
@@ -428,8 +408,6 @@ const WalletCard = ({
           wallet={{ walletId, currency, balance, symbol, flag }}
         />
       )}
-
-      {showStellarBadge && <StellarWalletModal open={stellarOpen} onOpenChange={setStellarOpen} />}
     </motion.div>
   );
 };

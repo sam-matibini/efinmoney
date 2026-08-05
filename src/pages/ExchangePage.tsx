@@ -8,11 +8,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useWallets } from "@/hooks/useWallets";
 import { useFxRates, useFxRatesLastUpdated } from "@/hooks/useFxRates";
-import { useStellarWallet } from "@/hooks/useStellarWallet";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
-import { RefreshCw, ArrowUpDown, TrendingUp, CheckCircle, Bitcoin, DollarSign, ExternalLink, Sparkles } from "lucide-react";
+import { RefreshCw, ArrowUpDown, TrendingUp, CheckCircle, Bitcoin, DollarSign, Sparkles } from "lucide-react";
 import { CryptoTradingPanel } from "@/components/crypto/CryptoTradingPanel";
 import { resolveEffectiveRate } from "@/lib/fx";
 import { getNombaExchangeRate, isNgnPair } from "@/lib/nombaNigeria";
@@ -22,8 +21,6 @@ import PageHeroBanner from "@/components/common/PageHeroBanner";
 import AppPage from "@/components/layout/AppPage";
 import { productFeatures } from "@/lib/productFeatures";
 
-// Synthetic wallet id used to represent the on-chain USDC option.
-const STELLAR_USDC_ID = "stellar-usdc";
 const FEE_RATE = 0.005;
 const MIN_AMOUNT = 0.01;
 const MAX_AMOUNT = 1_000_000;
@@ -58,7 +55,6 @@ const FxTradingPanel = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [swapRotation, setSwapRotation] = useState(0);
-  const [lastTxHash, setLastTxHash] = useState<string | null>(null);
   const successTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -69,55 +65,31 @@ const FxTradingPanel = () => {
 
   const { data: wallets } = useWallets();
   const { data: fxRates } = useFxRates();
-  const stellar = useStellarWallet();
   const queryClient = useQueryClient();
 
   const fiatWallets = wallets?.filter(w => !['BTC', 'USDT', 'USDC'].includes(w.currency_code)) ?? [];
 
-  // Stellar USDC appears as a virtual destination wallet driven by the live
-  // on-chain balance from useStellarWallet.
-  const stellarUsdcOption = stellar.publicKey
-    ? {
-        wallet_id: STELLAR_USDC_ID,
-        currency_code: "USDC",
-        symbol: "$",
-        flag_emoji: "⭐",
-        balance: Number(stellar.usdcBalance ?? 0),
-        isStellar: true as const,
-      }
-    : null;
-
-  const destinationOptions = [
-    ...fiatWallets.map(w => ({ ...w, isStellar: false as const })),
-    ...(stellarUsdcOption ? [stellarUsdcOption] : []),
-  ];
-
   const fromWallet = fiatWallets.find(w => w.wallet_id === fromWalletId) ?? fiatWallets[0];
-  const toWallet = destinationOptions.find(w => w.wallet_id === toWalletId) ?? destinationOptions[1];
-  const isCryptoSwap = toWallet && "isStellar" in toWallet && toWallet.isStellar;
+  const toWallet = fiatWallets.find(w => w.wallet_id === toWalletId) ?? fiatWallets.find(w => w.wallet_id !== fromWallet?.wallet_id) ?? fiatWallets[1];
 
   const fromCode = fromWallet?.currency_code ?? "";
   const toCode = toWallet?.currency_code ?? "";
   const { data: nombaQuote } = useQuery({
     queryKey: ["exchange-page-nomba", fromCode, toCode],
     queryFn: () => getNombaExchangeRate(fromCode, toCode),
-    enabled: !!fromCode && !!toCode && fromCode !== toCode && !isCryptoSwap && isNgnPair(fromCode, toCode),
+    enabled: !!fromCode && !!toCode && fromCode !== toCode && isNgnPair(fromCode, toCode),
     staleTime: 60_000,
   });
 
   const effectiveRate = useMemo(() => {
     if (!fromCode || !toCode) return null;
-    if (isCryptoSwap) {
-      if (fromCode === "USD") return 1;
-      return resolveEffectiveRate(fromCode, "USD", fxRates ?? []);
-    }
     if (nombaQuote?.effective_rate && nombaQuote.effective_rate > 0) {
       return nombaQuote.effective_rate;
     }
     return resolveEffectiveRate(fromCode, toCode, fxRates ?? []);
-  }, [fromCode, toCode, isCryptoSwap, fxRates, nombaQuote?.effective_rate]);
+  }, [fromCode, toCode, fxRates, nombaQuote?.effective_rate]);
   const rateFromNomba = !!nombaQuote?.effective_rate;
-  const recvDecimals = isCryptoSwap ? 4 : 2;
+  const recvDecimals = 2;
 
   const quoteReceive = useCallback(
     (send: number) => {
@@ -180,7 +152,6 @@ const FxTradingPanel = () => {
   };
 
   const handleSwap = () => {
-    if (toWallet && "isStellar" in toWallet && toWallet.isStellar) return;
     const temp = fromWalletId;
     setFromWalletId(toWalletId);
     setToWalletId(temp);
@@ -199,27 +170,18 @@ const FxTradingPanel = () => {
     }
 
     setIsLoading(true);
-    setLastTxHash(null);
 
     try {
-      const response = isCryptoSwap
-        ? await supabase.functions.invoke('execute-crypto-swap', {
-            body: {
-              from_wallet_id: fromWallet.wallet_id,
-              from_amount: parsedSend,
-              to_currency: 'USDC',
-            },
-          })
-        : await supabase.functions.invoke('fx-engine', {
-            body: {
-              action: 'execute',
-              from_wallet_id: fromWallet.wallet_id,
-              to_wallet_id: toWallet.wallet_id,
-              from_currency: fromWallet.currency_code,
-              to_currency: toWallet.currency_code,
-              from_amount: parsedSend,
-            },
-          });
+      const response = await supabase.functions.invoke('fx-engine', {
+        body: {
+          action: 'execute',
+          from_wallet_id: fromWallet.wallet_id,
+          to_wallet_id: toWallet.wallet_id,
+          from_currency: fromWallet.currency_code,
+          to_currency: toWallet.currency_code,
+          from_amount: parsedSend,
+        },
+      });
 
       const serverError = (response.data as any)?.error;
       if (response.error || serverError) {
@@ -227,15 +189,11 @@ const FxTradingPanel = () => {
         throw new Error(msg);
       }
 
-      const txHash = (response.data as any)?.stellar_tx_hash ?? null;
-      setLastTxHash(txHash);
       setSuccess(true);
       queryClient.invalidateQueries({ queryKey: ['wallets'] });
       queryClient.invalidateQueries({ queryKey: ['fx_rates'] });
       queryClient.invalidateQueries({ queryKey: ['ledger-fx'] });
-      queryClient.invalidateQueries({ queryKey: ['stellar-balance', stellar.publicKey] });
-      stellar.refetchBalance?.();
-      toast.success(isCryptoSwap ? 'USDC delivered to your Stellar wallet!' : 'Exchange completed successfully!');
+      toast.success('Exchange completed successfully!');
 
       successTimer.current = setTimeout(() => {
         setSuccess(false);
@@ -286,15 +244,6 @@ const FxTradingPanel = () => {
           <p className="text-muted-foreground">
             Converted {fromWallet?.symbol}{sendAmount} to {toWallet?.symbol}{receivedAmount.toFixed(recvDecimals)} {toWallet?.currency_code}
           </p>
-          {lastTxHash && (
-            <a
-              href={`https://stellar.expert/explorer/testnet/tx/${lastTxHash}`}
-              target="_blank" rel="noreferrer"
-              className="mt-4 inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
-            >
-              View on StellarExpert <ExternalLink className="w-3.5 h-3.5" />
-            </a>
-          )}
         </CardContent>
       </Card>
     );
@@ -380,16 +329,12 @@ const FxTradingPanel = () => {
                 <SelectValue placeholder="Select wallet" />
               </SelectTrigger>
               <SelectContent>
-                {destinationOptions.filter(w => w.wallet_id !== fromWalletId).map((w) => (
+                {fiatWallets.filter(w => w.wallet_id !== fromWalletId).map((w) => (
                   <SelectItem key={w.wallet_id} value={w.wallet_id}>
                       <span className="inline-flex items-center gap-2">
-                        {w.isStellar ? (
-                          <CurrencyFlag code={w.currency_code} size="sm" />
-                        ) : (
-                          <CurrencyFlag code={w.currency_code} size="sm" />
-                        )}
+                        <CurrencyFlag code={w.currency_code} size="sm" />
                       {w.currency_code}
-                        {w.isStellar ? " (Stellar)" : ""} · {w.symbol}{Number(w.balance).toFixed(w.isStellar ? 4 : 2)}
+                        · {w.symbol}{Number(w.balance).toFixed(2)}
                     </span>
                   </SelectItem>
                 ))}
@@ -408,9 +353,6 @@ const FxTradingPanel = () => {
                   className="h-14 border-border/60 bg-background/90 pl-10 font-display text-2xl font-bold tabular-nums focus-visible:ring-primary/30"
                 />
               </div>
-              {isCryptoSwap && (
-                <p className="text-xs text-muted-foreground">Delivered on-chain to your Stellar wallet</p>
-              )}
           </div>
 
             {parsedSend > 0 && (
@@ -545,7 +487,7 @@ const ExchangePage = () => {
             value="Live FX rates"
             meta={[
               { icon: TrendingUp, text: "0.5% spread on wallet swaps" },
-              { icon: Sparkles, text: productFeatures.crypto ? "Fiat & on-chain USDC" : "Live rates for NGN pairs" },
+              { icon: Sparkles, text: "Live rates for supported pairs" },
             ]}
             variant="cta"
           />

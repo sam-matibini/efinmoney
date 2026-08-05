@@ -14,7 +14,6 @@ import CreateWalletModal from "@/components/modals/CreateWalletModal";
 import WalletTransferModal from "@/components/modals/WalletTransferModal";
 import EditWalletModal from "@/components/modals/EditWalletModal";
 import DeleteWalletModal from "@/components/modals/DeleteWalletModal";
-import StellarNetworkCard from "@/components/wallets/StellarNetworkCard";
 import PageHeroBanner from "@/components/common/PageHeroBanner";
 import AppPage from "@/components/layout/AppPage";
 
@@ -128,9 +127,6 @@ const WalletsPage = () => {
             variant="primary"
           />
 
-          {/* Stellar Network (Testnet) */}
-          <StellarNetworkCard />
-
           {/* Wallets Grid */}
           {isLoading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -160,7 +156,6 @@ const WalletsPage = () => {
                     onToggleFreeze={(id, freeze) => toggleFreeze({ walletId: id, freeze })}
                     onEdit={(w) => setEditWallet(w)}
                     onDelete={(w) => setDeleteWallet(w)}
-                    showStellarBadge={wallet.currency_code === 'USD'}
                   />
                 </motion.div>
               ))}
