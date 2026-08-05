@@ -12,7 +12,7 @@ import { Logo, Wordmark } from "@/components/Logo";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { PhotonAddressInput } from "@/components/PhotonAddressInput";
 import { verifyEmail } from "@/lib/emailValidation";
-import { ISO_COUNTRIES } from "@/lib/isoCountries";
+import CountrySelect from "@/components/inputs/CountrySelect";
 import { useLoginLockout } from "@/hooks/useLoginLockout";
 import { LoginLockoutBanners } from "@/components/auth/LoginLockoutBanners";
 import { BrandedScreen, BrandIconBadge, BrandPrimaryButton } from "@/components/brand/BrandedScreen";
@@ -555,18 +555,11 @@ const Auth = () => {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="country" className="text-neutral-700 font-medium">Country</Label>
-                    <Select value={country} onValueChange={setCountry} required>
-                      <SelectTrigger id="country" className="h-12 bg-white border-neutral-200 focus:ring-2 focus:ring-primary/20">
-                        <SelectValue placeholder="Select country" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {ISO_COUNTRIES.map((c) => (
-                          <SelectItem key={c.code} value={c.code}>
-                            <span className="mr-2">{c.flag}</span>{c.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <CountrySelect
+                      id="country"
+                      value={country}
+                      onValueChange={setCountry}
+                    />
                   </div>
                 </div>
 
@@ -610,18 +603,12 @@ const Auth = () => {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="nationality" className="text-neutral-700 font-medium">Nationality</Label>
-                    <Select value={nationality} onValueChange={setNationality} required>
-                      <SelectTrigger id="nationality" className="h-12 bg-white border-neutral-200 focus:ring-2 focus:ring-primary/20">
-                        <SelectValue placeholder="Select nationality" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {ISO_COUNTRIES.map((c) => (
-                          <SelectItem key={c.code} value={c.code}>
-                            <span className="mr-2">{c.flag}</span>{c.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <CountrySelect
+                      id="nationality"
+                      value={nationality}
+                      onValueChange={setNationality}
+                      placeholder="Select nationality"
+                    />
                   </div>
                 </div>
               </div>
