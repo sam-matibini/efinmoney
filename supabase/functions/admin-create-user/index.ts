@@ -181,7 +181,7 @@ Deno.serve(async (req) => {
     }
 
     // Send the admin_invitation email (the trigger skipped it for admin-onboarded users)
-    await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
+    const emailRes = await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -197,6 +197,20 @@ Deno.serve(async (req) => {
         },
       }),
     });
+    if (!emailRes.ok) {
+      const emailErr = await emailRes.text();
+      // User is created, but the email failed. Surface the error in the
+      // response so the admin knows. They can use admin-resend-invite to
+      // retry once the underlying issue is fixed (e.g., Resend rate limit).
+      return new Response(
+        JSON.stringify({
+          success: true,
+          user_id: newUserId,
+          email_warning: `User created but invite email failed (${emailRes.status}): ${emailErr}`,
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     return new Response(
       JSON.stringify({ success: true, user_id: newUserId }),
