@@ -5,10 +5,11 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Search, User, AlertCircle, Clock, Share2 } from "lucide-react";
+import { Search, User, AlertCircle, Clock, Share2, Plus, Check } from "lucide-react";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useProfile } from "@/hooks/useProfile";
 import { toast } from "sonner";
 import { avatarColorClasses } from "@/lib/avatarColor";
 
@@ -71,11 +72,13 @@ const Avatar = ({ url, label, seed, size = "md" }: { url: string | null; label: 
 
 const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
   const { user } = useAuth();
+  const { data: profile } = useProfile();
   const [query, setQuery] = useState("");
   const [debounced, setDebounced] = useState("");
   const [open, setOpen] = useState(false);
   const [finding, setFinding] = useState(false);
   const [notFound, setNotFound] = useState(false);
+  const [self, setSelf] = useState(false);
   const [mode, setMode] = useState<"recents" | "search">("recents");
   const [highlight, setHighlight] = useState(0);
   const boxRef = useRef<HTMLDivElement>(null);
@@ -113,6 +116,22 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
     if (recentsLoaded && recents.length === 0) setMode("search");
   }, [recentsLoaded, recents.length]);
 
+  // Does the query resolve to the caller's own account? Lookups exclude self,
+  // so without this the field misleadingly reports "no user found".
+  const isSelfQuery = (raw: string) => {
+    const q = raw.trim().toLowerCase().replace(/^@/, "");
+    if (!q) return false;
+    const digits = q.replace(/\D/g, "");
+    const tag = (profile?.efin_tag ?? "").toLowerCase();
+    const email = (profile?.email ?? user?.email ?? "").toLowerCase();
+    const acct = profile?.account_number ?? "";
+    return (
+      (tag !== "" && tag === q) ||
+      (email !== "" && email === q) ||
+      (acct !== "" && digits.length >= 6 && acct === digits)
+    );
+  };
+
   const switchMode = (next: "recents" | "search") => {
     setMode(next);
     if (next === "recents") {
@@ -120,6 +139,7 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
       setDebounced("");
       setOpen(false);
       setNotFound(false);
+      setSelf(false);
     } else {
       setTimeout(() => inputRef.current?.focus(), 0);
     }
@@ -170,6 +190,7 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
     setDebounced("");
     setOpen(false);
     setNotFound(false);
+    setSelf(false);
     setMode("recents");
   };
 
@@ -191,8 +212,15 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
       toast.error("Enter an email, @tag, or account number (min 3 chars)");
       return;
     }
+    if (isSelfQuery(q)) {
+      setSelf(true);
+      setNotFound(false);
+      setOpen(false);
+      return;
+    }
     setFinding(true);
     setNotFound(false);
+    setSelf(false);
     try {
       const { data, error } = await supabase.rpc("lookup_efin_recipient", { p_query: q });
       if (error) throw error;
@@ -329,7 +357,7 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
               aria-controls="efin-recipient-listbox"
               placeholder="Search eFinMoney users by name, @tag, email or account #"
               value={query}
-              onChange={(e) => { setQuery(e.target.value); setOpen(true); setNotFound(false); }}
+              onChange={(e) => { setQuery(e.target.value); setOpen(true); setNotFound(false); setSelf(false); }}
               onFocus={() => setOpen(true)}
               onClick={() => setOpen(true)}
               onKeyDown={onKeyDown}
@@ -356,7 +384,8 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
                 </div>
               ) : listError ? (
                 <div className="flex items-center justify-between gap-2 p-3">
-                  <span className="text-sm text-destructive">
+                  <span className="flex items-center gap-2 text-sm text-destructive">
+                    <AlertCircle className="h-4 w-4 shrink-0" aria-hidden />
                     {listError instanceof Error ? listError.message : "Couldn't load eFinMoney users"}
                   </span>
                   <Button size="sm" variant="ghost" onClick={() => refetchList()}>
@@ -364,12 +393,18 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
                   </Button>
                 </div>
               ) : suggestions.length === 0 ? (
-                <div className="flex items-center justify-between gap-2 p-3">
-                  <span className="text-sm text-muted-foreground">No eFinMoney user found</span>
-                  <Button size="sm" variant="ghost" onClick={invite}>
-                    <Share2 className="mr-1 h-3.5 w-3.5" /> Invite
-                  </Button>
-                </div>
+                isSelfQuery(debounced) ? (
+                  <div className="flex items-center gap-2 p-3 text-sm text-muted-foreground">
+                    <User className="h-4 w-4 shrink-0" aria-hidden /> This is your account
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between gap-2 p-3">
+                    <span className="text-sm text-muted-foreground">No eFinMoney user found</span>
+                    <Button size="sm" variant="ghost" onClick={invite}>
+                      <Share2 className="mr-1 h-3.5 w-3.5" /> Invite
+                    </Button>
+                  </div>
+                )
               ) : (
                 <ul
                   id="efin-recipient-listbox"
@@ -396,12 +431,28 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
                             <p className="truncate text-sm font-medium text-foreground">
                               {s.full_name || s.efin_tag || s.email_masked}
                             </p>
-                            <div className="flex flex-wrap gap-x-3 text-xs text-muted-foreground">
-                              {s.efin_tag && <span>@{s.efin_tag}</span>}
-                              {s.email_masked && <span>{s.email_masked}</span>}
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+                              {s.efin_tag && <span className="font-medium text-foreground/70">@{s.efin_tag}</span>}
+                              {s.email_masked && <span className="truncate">{s.email_masked}</span>}
+                              {s.account_number && (
+                                <span className="font-mono tracking-tight">·&nbsp;{s.account_number}</span>
+                              )}
                             </div>
                           </div>
-                          {added && <Badge variant="secondary">Added</Badge>}
+                          {added ? (
+                            <Badge variant="secondary" className="shrink-0 gap-1">
+                              <Check className="h-3 w-3" aria-hidden /> Added
+                            </Badge>
+                          ) : (
+                            <span
+                              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors ${
+                                i === highlight ? "bg-primary/10 text-primary" : ""
+                              }`}
+                              aria-hidden
+                            >
+                              <Plus className="h-4 w-4" />
+                            </span>
+                          )}
                         </button>
                       </li>
                     );
@@ -418,7 +469,16 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
         </AnimatePresence>
       </div>
 
-      {notFound && (
+      {self && (
+        <Alert>
+          <User className="h-4 w-4" />
+          <AlertDescription>
+            That's your own account — you can't send money to yourself.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {notFound && !self && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription className="flex items-center justify-between gap-2">
