@@ -266,9 +266,47 @@ Deno.serve(async (req) => {
     }
 
     // --- Send recovery email to the owner ---
-    await admin.auth.admin.generateLink({
+    const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
       type: "recovery",
       email: body.ownerEmail,
+    });
+    if (linkErr) {
+      // Roll back everything we created
+      await admin.from("customer_portal_access").delete().eq("customer_id", customerId);
+      await admin.from("customers").delete().eq("id", customerId);
+      await admin.auth.admin.deleteUser(ownerUserId);
+      return new Response(
+        JSON.stringify({ error: `Failed to generate recovery link: ${linkErr.message}` }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    const actionLink = (linkData?.properties as { action_link?: string } | undefined)?.action_link;
+    if (!actionLink) {
+      await admin.from("customer_portal_access").delete().eq("customer_id", customerId);
+      await admin.from("customers").delete().eq("id", customerId);
+      await admin.auth.admin.deleteUser(ownerUserId);
+      return new Response(
+        JSON.stringify({ error: "Recovery link missing action_link property" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Send the admin_invitation email
+    await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${ANON_KEY}`,
+      },
+      body: JSON.stringify({
+        type: "admin_invitation",
+        to: body.ownerEmail,
+        data: {
+          name: body.ownerFullName,
+          action_link: actionLink,
+          expires_in_minutes: 60,
+        },
+      }),
     });
 
     return new Response(

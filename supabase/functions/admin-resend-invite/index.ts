@@ -63,7 +63,7 @@ Deno.serve(async (req) => {
     // recovery emails for arbitrary addresses — that would be a phishing vector).
     const { data: target } = await admin
       .from("profiles")
-      .select("user_id, onboarded_via")
+      .select("user_id, onboarded_via, full_name")
       .eq("email", body.email)
       .maybeSingle();
     if (!target || target.onboarded_via !== "admin") {
@@ -73,7 +73,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { error: linkErr } = await admin.auth.admin.generateLink({
+    const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
       type: "recovery",
       email: body.email,
     });
@@ -83,6 +83,31 @@ Deno.serve(async (req) => {
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+    const actionLink = (linkData?.properties as { action_link?: string } | undefined)?.action_link;
+    if (!actionLink) {
+      return new Response(
+        JSON.stringify({ error: "Recovery link missing action_link property" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Send the admin_invitation email
+    await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${ANON_KEY}`,
+      },
+      body: JSON.stringify({
+        type: "admin_invitation",
+        to: body.email,
+        data: {
+          name: target.full_name || "",
+          action_link: actionLink,
+          expires_in_minutes: 60,
+        },
+      }),
+    });
 
     // Push out the orphan deadline by re-stamping onboarded_at. This gives the
     // user another 14 days from now to claim before cleanup kicks in.

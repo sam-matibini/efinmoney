@@ -158,9 +158,44 @@ Deno.serve(async (req) => {
     }
 
     // Send password recovery email so user can set their own password
-    await admin.auth.admin.generateLink({
+    const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
       type: "recovery",
       email: body.email,
+    });
+    if (linkErr) {
+      // Recovery link is required for the user to set their password.
+      // Don't leave them in limbo — roll back the auth user.
+      await admin.auth.admin.deleteUser(newUserId);
+      return new Response(
+        JSON.stringify({ error: `Failed to generate recovery link: ${linkErr.message}` }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    const actionLink = (linkData?.properties as { action_link?: string } | undefined)?.action_link;
+    if (!actionLink) {
+      await admin.auth.admin.deleteUser(newUserId);
+      return new Response(
+        JSON.stringify({ error: "Recovery link missing action_link property" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Send the admin_invitation email (the trigger skipped it for admin-onboarded users)
+    await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${ANON_KEY}`,
+      },
+      body: JSON.stringify({
+        type: "admin_invitation",
+        to: body.email,
+        data: {
+          name: body.fullName,
+          action_link: actionLink,
+          expires_in_minutes: 60,
+        },
+      }),
     });
 
     return new Response(
