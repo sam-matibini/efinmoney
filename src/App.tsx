@@ -132,6 +132,10 @@ const RegulatoryChangesPage = lazyImport(() => import("./pages/admin/RegulatoryC
 const SettlementReconciliationPage = lazyImport(() => import("./pages/admin/SettlementReconciliationPage"));
 const PeriodEndControlsPage = lazyImport(() => import("./pages/admin/PeriodEndControlsPage"));
 const EvidenceRepositoryPage = lazyImport(() => import("./pages/admin/EvidenceRepositoryPage"));
+const DeveloperDashboardPage = lazyImport(() => import("./pages/admin/developer/DeveloperDashboardPage"));
+const OnboardUserPage = lazyImport(() => import("./pages/admin/developer/OnboardUserPage"));
+const OnboardBusinessPage = lazyImport(() => import("./pages/admin/developer/OnboardBusinessPage"));
+const OnboardedByMePage = lazyImport(() => import("./pages/admin/developer/OnboardedByMePage"));
 const InteracCallback = lazyImport(() => import("./pages/InteracCallback"));
 const InteracHubCallback = lazyImport(() => import("./pages/InteracHubCallback"));
 const MorePage = lazyImport(() => import("./pages/MorePage"));
@@ -399,6 +403,10 @@ const AppRoutes = () => {
           <Route path="/admin/evidence-repository" element={<EvidenceRepositoryPage />} />
           <Route path="/admin/payments/adyen" element={<AdminAdyenLinksPage />} />
           <Route path="/admin/payments/adyen/transactions" element={<AdminAdyenTransactionsPage />} />
+          <Route path="/admin/developer" element={<DeveloperDashboardPage />} />
+          <Route path="/admin/developer/onboard-user" element={<OnboardUserPage />} />
+          <Route path="/admin/developer/onboard-business" element={<OnboardBusinessPage />} />
+          <Route path="/admin/developer/onboarded" element={<OnboardedByMePage />} />
         </Route>
 
         <Route path="/auth" element={<PublicRoute><Auth /></PublicRoute>} />

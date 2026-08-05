@@ -1,6 +1,6 @@
 import { ReactNode, Suspense, useEffect, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
-import { ChevronDown, LayoutDashboard, ShieldCheck, Users, Layers, ScrollText, Settings, Bell, Search, LogOut, ChevronLeft, ChevronRight, Sun, Moon, Activity, ExternalLink, SlidersHorizontal, UserCog, Gauge, AlertCircle, FileText, Eye, ShieldAlert, Shield, ClipboardList, Ban, UserX, Building2, FileWarning, GraduationCap, Landmark, Globe, ArrowLeftRight, Banknote, RefreshCw, TrendingUp, Zap, BookOpen, BarChart2, Scale, CalendarCheck, Archive, PanelLeft, Wallet, Cog, Megaphone, Headphones, Tags } from "lucide-react";
+import { ChevronDown, LayoutDashboard, ShieldCheck, Users, Layers, ScrollText, Settings, Bell, Search, LogOut, ChevronLeft, ChevronRight, Sun, Moon, Activity, ExternalLink, SlidersHorizontal, UserCog, Gauge, AlertCircle, FileText, Eye, ShieldAlert, Shield, ClipboardList, Ban, UserX, Building2, FileWarning, GraduationCap, Landmark, Globe, ArrowLeftRight, Banknote, RefreshCw, TrendingUp, Zap, BookOpen, BarChart2, Scale, CalendarCheck, Archive, PanelLeft, Wallet, Cog, Megaphone, Headphones, Tags, Code2, UserPlus, Briefcase, ListChecks } from "lucide-react";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,7 @@ type NavItem = {
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   requiresStaffMgmt?: boolean;
+  requiresDeveloperOnboarding?: boolean;
 };
 
 type NavGroup = {
@@ -114,6 +115,14 @@ const NAV_GROUPS: NavGroup[] = [
       { to: "/admin/settings", label: "Settings", icon: Cog },
       { to: "/admin/diagnostics", label: "Diagnostics", icon: Activity },
       { to: "/admin/api", label: "API Management", icon: Settings },
+    ],
+  },
+  {
+    label: "Developer", icon: Code2, items: [
+      { to: "/admin/developer", label: "Dashboard", icon: Code2, requiresDeveloperOnboarding: true },
+      { to: "/admin/developer/onboard-user", label: "Onboard User", icon: UserPlus, requiresDeveloperOnboarding: true },
+      { to: "/admin/developer/onboard-business", label: "Onboard Business", icon: Briefcase, requiresDeveloperOnboarding: true },
+      { to: "/admin/developer/onboarded", label: "Onboarded by Me", icon: ListChecks, requiresDeveloperOnboarding: true },
     ],
   },
 ];
@@ -288,6 +297,10 @@ const AdminLayout = ({ children }: { children: ReactNode }) => {
     const Icon = item.icon;
     const active = location.pathname === item.to || location.pathname.startsWith(item.to + "/");
     const badge = item.to === "/admin/kyc" && pendingKycCount > 0 ? pendingKycCount : null;
+    const visible =
+      (!item.requiresStaffMgmt || hasPermission("manage_staff")) &&
+      (!item.requiresDeveloperOnboarding || hasPermission("developer_onboarding"));
+    if (!visible) return null;
     return (
       <NavLink
         key={item.to}
@@ -332,7 +345,9 @@ const AdminLayout = ({ children }: { children: ReactNode }) => {
     const kycBadge = group.label === "Queue" && pendingKycCount > 0 ? pendingKycCount : null;
 
     const visibleItems = filteredItems.filter(
-      (item) => !item.requiresStaffMgmt || hasPermission("manage_staff")
+      (item) =>
+        (!item.requiresStaffMgmt || hasPermission("manage_staff")) &&
+        (!item.requiresDeveloperOnboarding || hasPermission("developer_onboarding"))
     );
     if (visibleItems.length === 0) return null;
 
@@ -399,7 +414,13 @@ const AdminLayout = ({ children }: { children: ReactNode }) => {
       {/* Nav */}
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
         {collapsed
-          ? allNavItems.filter((item) => !item.requiresStaffMgmt || hasPermission("manage_staff")).map(renderNavItem)
+          ? allNavItems
+              .filter(
+                (item) =>
+                  (!item.requiresStaffMgmt || hasPermission("manage_staff")) &&
+                  (!item.requiresDeveloperOnboarding || hasPermission("developer_onboarding"))
+              )
+              .map(renderNavItem)
           : (
             <>
               <div className="relative mb-2">
@@ -411,7 +432,11 @@ const AdminLayout = ({ children }: { children: ReactNode }) => {
                   className="pl-8 h-8 text-xs bg-muted/50 border-transparent focus-visible:bg-background"
                 />
               </div>
-              {TOP_NAV.filter((item) => !item.requiresStaffMgmt || hasPermission("manage_staff")).map(renderNavItem)}
+              {TOP_NAV.filter(
+                (item) =>
+                  (!item.requiresStaffMgmt || hasPermission("manage_staff")) &&
+                  (!item.requiresDeveloperOnboarding || hasPermission("developer_onboarding"))
+              ).map(renderNavItem)}
               <div className="my-2 border-t border-sidebar-border" />
               {NAV_GROUPS.map(renderNavGroup)}
             </>
