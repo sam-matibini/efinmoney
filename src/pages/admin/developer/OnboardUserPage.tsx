@@ -171,7 +171,13 @@ const OnboardUserPage = () => {
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="dob">Date of birth</Label>
-                    <Input id="dob" type="date" value={form.dateOfBirth} onChange={(e) => set("dateOfBirth", e.target.value)} />
+                    <Input
+                      id="dob"
+                      type="date"
+                      value={form.dateOfBirth}
+                      max={new Date().toISOString().split("T")[0]}
+                      onChange={(e) => set("dateOfBirth", e.target.value)}
+                    />
                   </div>
                 </div>
               </>
