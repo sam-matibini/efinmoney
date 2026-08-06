@@ -27,6 +27,7 @@ function networkFromPhone(raw: string): string | null {
 }
 
 interface Props {
+  initialAmount?: string;
   walletId: string;
   walletCurrency: string;
 }
@@ -37,11 +38,14 @@ const NETWORKS = [
   { value: "ZAMTEL", label: "Zamtel Kwacha" },
 ];
 
-export default function ElicateTopUpCard({ walletId, walletCurrency }: Props) {
+export default function ElicateTopUpCard({ walletId, walletCurrency, initialAmount }: Props) {
   const queryClient = useQueryClient();
   const { data: profile } = useProfile();
   const [, setParams] = useSearchParams();
-  const [amount, setAmount] = useState("");
+  const [amount, setAmount] = useState(initialAmount ?? "");
+  useEffect(() => {
+    if (initialAmount != null && initialAmount !== "") setAmount(initialAmount);
+  }, [initialAmount]);
   const [network, setNetwork] = useState("MTN");
   const [phone, setPhone] = useState("");
   const [phoneTouched, setPhoneTouched] = useState(false);

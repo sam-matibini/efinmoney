@@ -21,6 +21,7 @@ import { quoteDirectNombaTopup } from "@/lib/nombaTopupQuote";
 import { currencySymbol } from "@/lib/currency";
 
 interface Props {
+  initialAmount?: string;
   walletId: string;
   walletCurrency: string;
   onComplete?: () => void;
@@ -61,11 +62,14 @@ function phoneLooksValidForCurrency(phone: string, currency: string): boolean {
   return false;
 }
 
-export default function PaytotaTopUpCard({ walletId, walletCurrency, onComplete }: Props) {
+export default function PaytotaTopUpCard({ walletId, walletCurrency, onComplete, initialAmount }: Props) {
   const { user } = useAuth();
   const currency = walletCurrency.toUpperCase();
   const africa = isPaytotaAfricaTopupCurrency(currency);
-  const [amount, setAmount] = useState("");
+  const [amount, setAmount] = useState(initialAmount ?? "");
+  useEffect(() => {
+    if (initialAmount != null && initialAmount !== "") setAmount(initialAmount);
+  }, [initialAmount]);
   const [email, setEmail] = useState(user?.email ?? "");
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);

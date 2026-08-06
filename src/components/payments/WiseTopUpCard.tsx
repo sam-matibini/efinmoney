@@ -8,6 +8,7 @@ import { CheckCircle2, Copy, Landmark, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 interface Props {
+  initialAmount?: string;
   walletId: string;
   walletCurrency: string;
   onComplete?: () => void;
@@ -32,9 +33,12 @@ const fnHeaders = async () => {
   };
 };
 
-export default function WiseTopUpCard({ walletId, walletCurrency, onComplete }: Props) {
+export default function WiseTopUpCard({ walletId, walletCurrency, onComplete, initialAmount }: Props) {
   const currency = walletCurrency.toUpperCase();
-  const [amount, setAmount] = useState("");
+  const [amount, setAmount] = useState(initialAmount ?? "");
+  useEffect(() => {
+    if (initialAmount != null && initialAmount !== "") setAmount(initialAmount);
+  }, [initialAmount]);
   const [loading, setLoading] = useState(false);
   const [intent, setIntent] = useState<Intent | null>(null);
   const [details, setDetails] = useState<DetailField[]>([]);

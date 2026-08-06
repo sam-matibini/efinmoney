@@ -15,15 +15,19 @@ import {
 } from "@/lib/swychrPay";
 
 interface Props {
+  initialAmount?: string;
   walletId: string;
   walletCurrency: string;
   onComplete?: () => void;
 }
 
-export default function SwychrTopUpCard({ walletId, walletCurrency, onComplete }: Props) {
+export default function SwychrTopUpCard({ walletId, walletCurrency, onComplete, initialAmount }: Props) {
   const { user } = useAuth();
   const currency = walletCurrency.toUpperCase();
-  const [amount, setAmount] = useState("");
+  const [amount, setAmount] = useState(initialAmount ?? "");
+  useEffect(() => {
+    if (initialAmount != null && initialAmount !== "") setAmount(initialAmount);
+  }, [initialAmount]);
   const [email, setEmail] = useState(user?.email ?? "");
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,15 +13,19 @@ import { useQueryClient } from "@tanstack/react-query";
 import { productFeatures } from "@/lib/productFeatures";
 
 interface Props {
+  initialAmount?: string;
   walletId: string;
   walletCurrency: string;
 }
 
-export default function AdyenTopUpCard({ walletId, walletCurrency }: Props) {
+export default function AdyenTopUpCard({ walletId, walletCurrency, initialAmount }: Props) {
   if (!productFeatures.adyen) return null;
 
   const queryClient = useQueryClient();
-  const [amount, setAmount] = useState("");
+  const [amount, setAmount] = useState(initialAmount ?? "");
+  useEffect(() => {
+    if (initialAmount != null && initialAmount !== "") setAmount(initialAmount);
+  }, [initialAmount]);
   const [loading, setLoading] = useState(false);
   const [session, setSession] = useState<AdyenSessionResult | null>(null);
   const [open, setOpen] = useState(false);

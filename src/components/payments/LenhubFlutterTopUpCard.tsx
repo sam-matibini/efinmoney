@@ -15,6 +15,7 @@ const looseDb = supabase as unknown as { from: (t: string) => any };
 type Step = "details" | "pin" | "otp" | "avs" | "done";
 
 interface Props {
+  initialAmount?: string;
   walletId: string;
   walletCurrency: string;
   onComplete?: () => void;

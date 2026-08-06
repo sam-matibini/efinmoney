@@ -22,15 +22,19 @@ const NETWORKS = [
 ];
 
 interface Props {
+  initialAmount?: string;
   walletId: string;
   walletCurrency: string;
 }
 
-export default function GhanaTopUpCard({ walletId, walletCurrency }: Props) {
+export default function GhanaTopUpCard({ walletId, walletCurrency, initialAmount }: Props) {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { data: profile } = useProfile();
-  const [amount, setAmount] = useState("");
+  const [amount, setAmount] = useState(initialAmount ?? "");
+  useEffect(() => {
+    if (initialAmount != null && initialAmount !== "") setAmount(initialAmount);
+  }, [initialAmount]);
   const [network, setNetwork] = useState("MTN");
   const [phone, setPhone] = useState("");
   const [phoneTouched, setPhoneTouched] = useState(false);
