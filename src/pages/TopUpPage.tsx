@@ -217,7 +217,7 @@ const TopUpPage = () => {
   const [network, setNetwork] = useState<string>("");
   const [phone, setPhone] = useState<string>("");
   const [loading, setLoading] = useState(false);
-  const [topupStep, setTopupStep] = useState(1);
+  
   const [westernProvider, setWesternProvider] = useState<WesternTopupProvider>(() => initialWesternProvider(params));
   const [africanProvider, setAfricanProvider] = useState<AfricanTopupProvider>(() => initialAfricanProvider(params));
   const [verifyState, setVerifyState] = useState<{ status: "verifying" | "success" | "failed"; message: string } | null>(null);
