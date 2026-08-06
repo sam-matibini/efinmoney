@@ -226,6 +226,20 @@ verify_jwt = false
 [functions.dodo-reconcile]
 verify_jwt = false
 
+# Square Checkout (hosted Payment Link) + optional Web Payments CreatePayment.
+# Secrets: SQUARE_ACCESS_TOKEN, SQUARE_APPLICATION_ID, SQUARE_LOCATION_ID, SQUARE_ENVIRONMENT
+[functions.square-public-config]
+verify_jwt = false
+
+[functions.square-create-payment]
+verify_jwt = false
+
+[functions.square-create-checkout]
+verify_jwt = false
+
+[functions.square-verify-checkout]
+verify_jwt = false
+
 [functions.fincra-cad-interac]
 verify_jwt = true
 

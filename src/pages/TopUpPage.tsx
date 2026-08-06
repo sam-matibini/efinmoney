@@ -33,6 +33,7 @@ import NombaTopUpCard from "@/components/payments/NombaTopUpCard";
 import LenhubFlutterTopUpCard from "@/components/payments/LenhubFlutterTopUpCard";
 import PaytotaTopUpCard from "@/components/payments/PaytotaTopUpCard";
 import DodoTopUpCard from "@/components/payments/DodoTopUpCard";
+import SquareTopUpCard, { verifySquareCheckout } from "@/components/payments/SquareTopUpCard";
 import SwychrTopUpCard from "@/components/payments/SwychrTopUpCard";
 import { validateMinAmount, minAmount, type FlwMethod } from "@/lib/flutterwave";
 import LoadingSpinner from "@/components/LoadingSpinner";
@@ -99,6 +100,7 @@ function availableIntlMethods(currency: string): IntlTopupMethod[] {
     if (productFeatures.fincra && ["EUR", "GBP"].includes(c)) methods.push("fincra");
     if (productFeatures.paytota) methods.push("paytota");
     if (productFeatures.dodo) methods.push("dodo");
+    if (productFeatures.square) methods.push("square");
     if (c === "CAD" && productFeatures.fincraInterac) methods.push("interac");
     if (productFeatures.wise) methods.push("wise");
     if (productFeatures.flutterwave && FLW_WESTERN_TOPUP_CURRENCIES.includes(c)) {
@@ -148,6 +150,7 @@ function initialIntlMethod(params: URLSearchParams, currency: string): IntlTopup
   if ((fromQuery === "fincra" || fromQuery === "bank") && methods.includes("fincra")) return "fincra";
   if ((fromQuery === "paytota" || fromQuery === "invoice") && methods.includes("paytota")) return "paytota";
   if ((fromQuery === "dodo" || fromQuery === "global") && methods.includes("dodo")) return "dodo";
+  if ((fromQuery === "square" || fromQuery === "sq") && methods.includes("square")) return "square";
   if ((fromQuery === "nomba" || fromQuery === "card" || fromQuery === "express") && methods.includes("nomba")) return "nomba";
   if (
     (fromQuery === "flutterwave" || fromQuery === "flw" || fromQuery === "company") &&
@@ -318,6 +321,7 @@ const TopUpPage = () => {
   const preferFincra = intlMethod === "fincra" || africaMomoMethod === "fincra";
   const preferLenhubFlutter = intlMethod === "lenhub" || africaMomoMethod === "lenhub";
   const preferDodo = intlMethod === "dodo";
+  const preferSquare = intlMethod === "square";
   const preferSwychrResolved =
     africaMomoMethod === "swychr"
     || (
@@ -351,6 +355,7 @@ const TopUpPage = () => {
     preferLenhubFlutter,
     preferDodo,
     preferWise,
+    preferSquare,
   );
   const liveTopup = isLiveTopupCurrency(currency);
   const availableFlwMethods = FLW_METHODS_BY_CCY[currency] || ["card"];
@@ -447,6 +452,55 @@ const TopUpPage = () => {
     const dodoRef = params.get("ref") || readPendingDodoRef();
     const dodoPaymentId = params.get("payment_id") || undefined;
     const dodoStatus = params.get("status");
+
+    const squareFlag = params.get("square");
+    const squareOrderId =
+      params.get("orderId") ||
+      params.get("order_id") ||
+      (() => {
+        try { return sessionStorage.getItem("efm_square_pending_order"); } catch { return null; }
+      })();
+    if (squareFlag === "1") {
+      if (squareOrderId) {
+        setVerifyState({ status: "verifying", message: "Confirming your Square payment…" });
+        (async () => {
+          try {
+            const result = await verifySquareCheckout(squareOrderId);
+            if (result.success) {
+              try {
+                sessionStorage.removeItem("efm_square_pending_order");
+                sessionStorage.removeItem("efm_square_pending_intent");
+              } catch { /* ignore */ }
+              setVerifyState({
+                status: "success",
+                message: result.already
+                  ? "Payment already credited."
+                  : "Payment received — your wallet has been updated.",
+              });
+              toast.success("Top-up complete");
+              void queryClient.invalidateQueries({ queryKey: ["wallets"] });
+            } else {
+              setVerifyState({
+                status: "verifying",
+                message: result.message || "Waiting for Square confirmation…",
+              });
+            }
+          } catch (e) {
+            setVerifyState({
+              status: "failed",
+              message: e instanceof Error ? e.message : "Could not confirm Square payment",
+            });
+          }
+        })();
+        return;
+      }
+      setVerifyState({
+        status: "failed",
+        message: "Missing Square order reference — if you paid, contact support with your receipt.",
+      });
+      return;
+    }
+
     if (dodoFlag === "1" || dodoRef || dodoPaymentId) {
       setVerifyState({ status: "verifying", message: "Confirming your payment…" });
       (async () => {
@@ -673,7 +727,19 @@ const TopUpPage = () => {
       ),
     });
 
-
+    if (productFeatures.square && rails.has("square")) {
+      payMethods.push({
+        id: "square",
+        tone: "card",
+        label: "Card",
+        description: "Visa, Mastercard, Amex — powered by Square",
+        content: (
+          <SectionBoundary name="SquareTopUp">
+            <SquareTopUpCard walletId={walletId} walletCurrency={currency} initialAmount={amount} embedded onComplete={invalidateWallets} />
+          </SectionBoundary>
+        ),
+      });
+    }
 
     if (productFeatures.flutterwave && rails.has("flutterwave")) {
       const hosted = availableFlwMethods.filter((m) => ["card", "banktransfer", "ussd"].includes(m));
@@ -895,6 +961,7 @@ const TopUpPage = () => {
     swychr_pay: "swychr",
     paytota_pay: "paytota",
     dodo_pay: "dodo",
+    square_pay: "square",
     nomba_pay: "nomba",
     lenhub_flutter: "lenhub",
     fincra_interac: "interac",
