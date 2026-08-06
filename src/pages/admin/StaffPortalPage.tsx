@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -22,6 +22,7 @@ import { format } from "date-fns";
 import {
   DollarSign, Banknote, CheckCircle2, Clock, Plus, Trash2,
   ShieldCheck, AlertCircle, Phone, Mail, User, Home, Users, Receipt,
+  FileText, Eye, Upload, XCircle,
 } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -75,6 +76,29 @@ type OwnBankAccount = {
   verified: boolean;
   created_at: string;
 };
+
+type StaffDocument = {
+  id: string;
+  doc_type: string;
+  storage_path: string;
+  file_name: string;
+  file_size: number | null;
+  status: "pending" | "verified" | "expired";
+  created_at: string;
+};
+
+const DOC_TYPES = [
+  { value: "id_front",      label: "ID – front" },
+  { value: "id_back",       label: "ID – back" },
+  { value: "offer_letter",  label: "Offer letter" },
+  { value: "contract",      label: "Employment contract" },
+  { value: "nda",           label: "NDA" },
+  { value: "tax_form",      label: "Tax form" },
+  { value: "certification", label: "Certification" },
+  { value: "bank_letter",   label: "Bank letter" },
+  { value: "other",         label: "Other" },
+];
+const DOC_TYPE_LABEL = Object.fromEntries(DOC_TYPES.map((d) => [d.value, d.label]));
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -728,6 +752,219 @@ const PayslipsTab = ({ staffId, currency }: { staffId: string; currency: string 
   );
 };
 
+// ─── DocumentsTab ────────────────────────────────────────────────────────────
+
+const DocumentsTab = ({ staffId }: { staffId: string }) => {
+  const qc = useQueryClient();
+  const fileRef = useRef<HTMLInputElement | null>(null);
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [uploadForm, setUploadForm] = useState({ doc_type: "id_front", file: null as File | null });
+  const [deleteTarget, setDeleteTarget] = useState<StaffDocument | null>(null);
+
+  const { data: docs = [], isLoading } = useQuery({
+    queryKey: ["own-documents", staffId],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("staff_documents")
+        .select("id, doc_type, storage_path, file_name, file_size, status, created_at")
+        .eq("staff_id", staffId)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data || []) as StaffDocument[];
+    },
+  });
+
+  const viewDoc = async (doc: StaffDocument) => {
+    const { data, error } = await supabase.storage
+      .from("staff-documents")
+      .createSignedUrl(doc.storage_path, 3600);
+    if (error || !data?.signedUrl) { toast.error("Could not generate link"); return; }
+    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+  };
+
+  const uploadMutation = useMutation({
+    mutationFn: async () => {
+      const file = uploadForm.file;
+      if (!file) throw new Error("No file selected");
+      if (file.size > 10 * 1024 * 1024) throw new Error("File must be under 10 MB");
+      const ext = file.name.split(".").pop();
+      const path = `staff/${staffId}/${Date.now()}-${uploadForm.doc_type}.${ext}`;
+      const { error: storageErr } = await supabase.storage
+        .from("staff-documents")
+        .upload(path, file, { contentType: file.type });
+      if (storageErr) throw storageErr;
+      const { error: dbErr } = await (supabase as any).from("staff_documents").insert({
+        staff_id: staffId,
+        doc_type: uploadForm.doc_type,
+        storage_path: path,
+        file_name: file.name,
+        file_size: file.size,
+        mime_type: file.type,
+        uploaded_by: staffId,
+        status: "pending",
+      });
+      if (dbErr) {
+        await supabase.storage.from("staff-documents").remove([path]);
+        throw dbErr;
+      }
+    },
+    onSuccess: () => {
+      toast.success("Document uploaded — your admin team will review it shortly");
+      qc.invalidateQueries({ queryKey: ["own-documents", staffId] });
+      setUploadOpen(false);
+      setUploadForm({ doc_type: "id_front", file: null });
+      if (fileRef.current) fileRef.current.value = "";
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Upload failed"),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (doc: StaffDocument) => {
+      await supabase.storage.from("staff-documents").remove([doc.storage_path]);
+      const { error } = await (supabase as any)
+        .from("staff_documents").delete().eq("id", doc.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Document removed");
+      qc.invalidateQueries({ queryKey: ["own-documents", staffId] });
+      setDeleteTarget(null);
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
+  });
+
+  const DocStatusBadge = ({ status }: { status: string }) => {
+    if (status === "verified")
+      return <Badge className="gap-1 text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"><CheckCircle2 className="w-3 h-3" />Verified</Badge>;
+    if (status === "expired")
+      return <Badge variant="destructive" className="gap-1 text-xs"><XCircle className="w-3 h-3" />Expired</Badge>;
+    return <Badge variant="secondary" className="gap-1 text-xs"><Clock className="w-3 h-3" />Pending review</Badge>;
+  };
+
+  return (
+    <>
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-sm text-muted-foreground">
+          Upload your ID, contracts, and other required documents. Your admin team will verify them.
+        </p>
+        <Button onClick={() => setUploadOpen(true)} className="gap-2">
+          <Plus className="w-4 h-4" /> Upload document
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-3">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}</div>
+      ) : docs.length === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center text-muted-foreground">
+            <FileText className="w-8 h-8 mx-auto mb-2 opacity-30" />
+            <p className="text-sm">No documents uploaded yet.</p>
+            <p className="text-xs mt-1">Upload your ID and any required documents to complete your profile.</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {docs.map((doc) => (
+            <Card key={doc.id}>
+              <CardContent className="p-4 flex items-center gap-4">
+                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                  <FileText className="w-5 h-5 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-medium text-sm">{DOC_TYPE_LABEL[doc.doc_type] ?? doc.doc_type}</span>
+                    <DocStatusBadge status={doc.status} />
+                  </div>
+                  <div className="text-xs text-muted-foreground truncate mt-0.5">{doc.file_name}</div>
+                  <div className="text-xs text-muted-foreground">
+                    Uploaded {format(new Date(doc.created_at), "MMM d, yyyy")}
+                  </div>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <Button size="icon" variant="ghost" className="h-8 w-8" title="View"
+                    onClick={() => viewDoc(doc)}>
+                    <Eye className="w-3.5 h-3.5" />
+                  </Button>
+                  {doc.status === "pending" && (
+                    <Button size="icon" variant="ghost"
+                      className="h-8 w-8 text-destructive hover:text-destructive"
+                      title="Remove" onClick={() => setDeleteTarget(doc)}>
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+          <p className="text-xs text-muted-foreground px-1">
+            Verified documents cannot be removed. Contact your admin if you need to update one.
+          </p>
+        </div>
+      )}
+
+      {/* Upload dialog */}
+      <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Upload document</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label>Document type</Label>
+              <Select value={uploadForm.doc_type}
+                onValueChange={(v) => setUploadForm({ ...uploadForm, doc_type: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {DOC_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>File (PDF, JPG, PNG — max 10 MB)</Label>
+              <Input
+                type="file"
+                ref={fileRef}
+                accept=".pdf,.jpg,.jpeg,.png,.webp"
+                onChange={(e) => setUploadForm({ ...uploadForm, file: e.target.files?.[0] ?? null })}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUploadOpen(false)}>Cancel</Button>
+            <Button onClick={() => uploadMutation.mutate()}
+              disabled={!uploadForm.file || uploadMutation.isPending}
+              className="gap-2">
+              {uploadMutation.isPending
+                ? "Uploading…"
+                : <><Upload className="w-4 h-4" /> Upload</>}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirm */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove document?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Remove <strong>{deleteTarget?.file_name}</strong>? You can re-upload it any time.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget)}
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? "Removing…" : "Remove"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+};
+
 // ─── StaffPortalPage ─────────────────────────────────────────────────────────
 
 const StaffPortalPage = () => {
@@ -818,6 +1055,7 @@ const StaffPortalPage = () => {
             <TabsTrigger value="profile">Profile</TabsTrigger>
             <TabsTrigger value="bank-accounts">Bank accounts</TabsTrigger>
             <TabsTrigger value="payslips">Payslips</TabsTrigger>
+            <TabsTrigger value="documents">Documents</TabsTrigger>
           </TabsList>
 
           <div className="mt-4">
@@ -844,6 +1082,10 @@ const StaffPortalPage = () => {
 
             <TabsContent value="payslips">
               <PayslipsTab staffId={profile.id} currency={salary?.currency || "NGN"} />
+            </TabsContent>
+
+            <TabsContent value="documents">
+              <DocumentsTab staffId={profile.id} />
             </TabsContent>
           </div>
         </Tabs>

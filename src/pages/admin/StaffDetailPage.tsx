@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,7 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RoleBadge, StaffStatusBadge } from "@/components/admin-portal/Badges";
@@ -17,12 +19,45 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, FileText, CheckCircle2, XCircle, ShieldOff, ShieldCheck, Mail } from "lucide-react";
+import {
+  ArrowLeft, FileText, CheckCircle2, XCircle, ShieldOff, ShieldCheck, Mail,
+  Clock, Eye, Trash2, Upload, Plus,
+} from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import type { AdminRole } from "@/contexts/AdminAuthContext";
+import { useAdminAuth } from "@/contexts/AdminAuthContext";
 
 const ROLE_OPTIONS: AdminRole[] = ["super_admin", "compliance_officer", "finance_officer", "support_agent", "viewer"];
+
+const DOC_TYPES = [
+  { value: "id_front",      label: "ID – front" },
+  { value: "id_back",       label: "ID – back" },
+  { value: "offer_letter",  label: "Offer letter" },
+  { value: "contract",      label: "Employment contract" },
+  { value: "nda",           label: "NDA" },
+  { value: "tax_form",      label: "Tax form" },
+  { value: "certification", label: "Certification" },
+  { value: "bank_letter",   label: "Bank letter" },
+  { value: "other",         label: "Other" },
+];
+const DOC_TYPE_LABEL = Object.fromEntries(DOC_TYPES.map((d) => [d.value, d.label]));
+
+interface StaffDocument {
+  id: string;
+  staff_id: string;
+  doc_type: string;
+  storage_path: string;
+  file_name: string;
+  file_size: number | null;
+  mime_type: string | null;
+  status: "pending" | "verified" | "expired";
+  expires_at: string | null;
+  notes: string | null;
+  uploaded_by: string | null;
+  verified_at: string | null;
+  created_at: string;
+}
 
 interface StaffDetail {
   id: string;
@@ -41,6 +76,258 @@ interface StaffDetail {
   reviewed_at: string | null;
   created_at: string;
 }
+
+// ─── StaffDocumentsCard ───────────────────────────────────────────────────────
+
+const StaffDocumentsCard = ({ staffId }: { staffId: string }) => {
+  const { admin } = useAdminAuth();
+  const qc = useQueryClient();
+  const canModify = admin?.role === "super_admin" || admin?.role === "compliance_officer";
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [uploadForm, setUploadForm] = useState({ doc_type: "id_front", file: null as File | null });
+  const [deleteTarget, setDeleteTarget] = useState<StaffDocument | null>(null);
+
+  const { data: docs = [], isLoading } = useQuery({
+    queryKey: ["staff-documents", staffId],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("staff_documents")
+        .select("*")
+        .eq("staff_id", staffId)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data || []) as StaffDocument[];
+    },
+  });
+
+  const viewDoc = async (doc: StaffDocument) => {
+    const { data, error } = await supabase.storage
+      .from("staff-documents")
+      .createSignedUrl(doc.storage_path, 3600);
+    if (error || !data?.signedUrl) { toast.error("Could not generate link"); return; }
+    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+  };
+
+  const uploadMutation = useMutation({
+    mutationFn: async () => {
+      const file = uploadForm.file;
+      if (!file) throw new Error("No file selected");
+      const ext = file.name.split(".").pop();
+      const path = `staff/${staffId}/${Date.now()}-${uploadForm.doc_type}.${ext}`;
+      const { error: storageErr } = await supabase.storage
+        .from("staff-documents")
+        .upload(path, file, { contentType: file.type });
+      if (storageErr) throw storageErr;
+      const { error: dbErr } = await (supabase as any).from("staff_documents").insert({
+        staff_id: staffId,
+        doc_type: uploadForm.doc_type,
+        storage_path: path,
+        file_name: file.name,
+        file_size: file.size,
+        mime_type: file.type,
+        uploaded_by: admin!.id,
+        status: "pending",
+      });
+      if (dbErr) {
+        await supabase.storage.from("staff-documents").remove([path]);
+        throw dbErr;
+      }
+    },
+    onSuccess: () => {
+      toast.success("Document uploaded");
+      qc.invalidateQueries({ queryKey: ["staff-documents", staffId] });
+      setUploadOpen(false);
+      setUploadForm({ doc_type: "id_front", file: null });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Upload failed"),
+  });
+
+  const verifyMutation = useMutation({
+    mutationFn: async (doc: StaffDocument) => {
+      const { error } = await (supabase as any)
+        .from("staff_documents")
+        .update({ status: "verified", verified_by: admin!.id, verified_at: new Date().toISOString() })
+        .eq("id", doc.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Document verified");
+      qc.invalidateQueries({ queryKey: ["staff-documents", staffId] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
+  });
+
+  const expireMutation = useMutation({
+    mutationFn: async (doc: StaffDocument) => {
+      const { error } = await (supabase as any)
+        .from("staff_documents")
+        .update({ status: "expired" })
+        .eq("id", doc.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Document marked expired");
+      qc.invalidateQueries({ queryKey: ["staff-documents", staffId] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (doc: StaffDocument) => {
+      await supabase.storage.from("staff-documents").remove([doc.storage_path]);
+      const { error } = await (supabase as any)
+        .from("staff_documents").delete().eq("id", doc.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Document deleted");
+      qc.invalidateQueries({ queryKey: ["staff-documents", staffId] });
+      setDeleteTarget(null);
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
+  });
+
+  const StatusBadge = ({ status }: { status: string }) => {
+    if (status === "verified")
+      return <Badge className="gap-1 text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"><CheckCircle2 className="w-3 h-3" />Verified</Badge>;
+    if (status === "expired")
+      return <Badge variant="destructive" className="gap-1 text-xs"><XCircle className="w-3 h-3" />Expired</Badge>;
+    return <Badge variant="secondary" className="gap-1 text-xs"><Clock className="w-3 h-3" />Pending</Badge>;
+  };
+
+  return (
+    <>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <FileText className="w-4 h-4 text-primary" /> Document vault
+          </CardTitle>
+          {canModify && (
+            <Button size="sm" variant="outline" className="gap-2" onClick={() => setUploadOpen(true)}>
+              <Plus className="w-3.5 h-3.5" /> Upload
+            </Button>
+          )}
+        </CardHeader>
+        <CardContent className="p-0">
+          {isLoading ? (
+            <div className="p-6 space-y-3">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}</div>
+          ) : docs.length === 0 ? (
+            <div className="py-10 text-center text-muted-foreground">
+              <FileText className="w-7 h-7 mx-auto mb-2 opacity-30" />
+              <p className="text-sm">No documents uploaded yet.</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-border">
+              {docs.map((doc) => (
+                <div key={doc.id} className="flex items-center gap-3 px-6 py-3">
+                  <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium">{DOC_TYPE_LABEL[doc.doc_type] ?? doc.doc_type}</div>
+                    <div className="text-xs text-muted-foreground truncate">{doc.file_name}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {format(new Date(doc.created_at), "MMM d, yyyy")}
+                    </div>
+                  </div>
+                  <StatusBadge status={doc.status} />
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button size="icon" variant="ghost" className="h-8 w-8" title="View"
+                      onClick={() => viewDoc(doc)}>
+                      <Eye className="w-3.5 h-3.5" />
+                    </Button>
+                    {canModify && doc.status === "pending" && (
+                      <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600 hover:text-green-700"
+                        title="Verify" onClick={() => verifyMutation.mutate(doc)}
+                        disabled={verifyMutation.isPending}>
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                      </Button>
+                    )}
+                    {canModify && doc.status === "verified" && (
+                      <Button size="icon" variant="ghost" className="h-8 w-8 text-amber-600 hover:text-amber-700"
+                        title="Mark expired" onClick={() => expireMutation.mutate(doc)}
+                        disabled={expireMutation.isPending}>
+                        <XCircle className="w-3.5 h-3.5" />
+                      </Button>
+                    )}
+                    {canModify && (
+                      <Button size="icon" variant="ghost"
+                        className="h-8 w-8 text-destructive hover:text-destructive"
+                        title="Delete" onClick={() => setDeleteTarget(doc)}>
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Upload dialog */}
+      <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Upload document</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label>Document type</Label>
+              <Select value={uploadForm.doc_type}
+                onValueChange={(v) => setUploadForm({ ...uploadForm, doc_type: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {DOC_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>File (PDF, JPG, PNG — max 10 MB)</Label>
+              <Input
+                type="file"
+                ref={fileRef}
+                accept=".pdf,.jpg,.jpeg,.png,.webp"
+                onChange={(e) => setUploadForm({ ...uploadForm, file: e.target.files?.[0] ?? null })}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUploadOpen(false)}>Cancel</Button>
+            <Button onClick={() => uploadMutation.mutate()}
+              disabled={!uploadForm.file || uploadMutation.isPending}
+              className="gap-2">
+              {uploadMutation.isPending
+                ? <><LoadingSpinner size={14} /> Uploading…</>
+                : <><Upload className="w-4 h-4" /> Upload</>}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirm */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete document?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Permanently delete <strong>{deleteTarget?.file_name}</strong>? This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget)}
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? "Deleting…" : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+};
+
+// ─── StaffDetailPage ──────────────────────────────────────────────────────────
 
 const StaffDetailPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -169,6 +456,9 @@ const StaffDetailPage = () => {
             )}
           </CardContent>
         </Card>
+
+        {/* Document vault */}
+        <StaffDocumentsCard staffId={staff.id} />
 
         {/* Actions */}
         <Card>
