@@ -21,6 +21,7 @@ import { quoteDirectNombaTopup } from "@/lib/nombaTopupQuote";
 import { currencySymbol } from "@/lib/currency";
 
 interface Props {
+  initialAmount?: string;
   walletId: string;
   walletCurrency: string;
   onComplete?: () => void;
@@ -61,11 +62,14 @@ function phoneLooksValidForCurrency(phone: string, currency: string): boolean {
   return false;
 }
 
-export default function PaytotaTopUpCard({ walletId, walletCurrency, onComplete }: Props) {
+export default function PaytotaTopUpCard({ walletId, walletCurrency, onComplete, initialAmount }: Props) {
   const { user } = useAuth();
   const currency = walletCurrency.toUpperCase();
   const africa = isPaytotaAfricaTopupCurrency(currency);
-  const [amount, setAmount] = useState("");
+  const [amount, setAmount] = useState(initialAmount ?? "");
+  useEffect(() => {
+    if (initialAmount != null && initialAmount !== "") setAmount(initialAmount);
+  }, [initialAmount]);
   const [email, setEmail] = useState(user?.email ?? "");
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
@@ -213,20 +217,22 @@ export default function PaytotaTopUpCard({ walletId, walletCurrency, onComplete 
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <Label>Amount to credit ({currency})</Label>
-          <Input
-            type="number"
-            min={min}
-            step={currency === "UGX" || currency === "RWF" ? "1" : "0.01"}
-            placeholder="e.g. 25"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-          />
-          <p className="text-xs text-muted-foreground">
-            Minimum {formatCredited(min, currency)} · Includes processing fee (1.9% + fixed)
-          </p>
-        </div>
+        {!initialAmount && (
+          <div className="space-y-2">
+            <Label>Amount to credit ({currency})</Label>
+            <Input
+              type="number"
+              min={min}
+              step={currency === "UGX" || currency === "RWF" ? "1" : "0.01"}
+              placeholder="e.g. 25"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Minimum {formatCredited(min, currency)} · Includes processing fee (1.9% + fixed)
+            </p>
+          </div>
+        )}
 
         {quote && (
           <div className="rounded-lg border bg-muted/40 p-3 text-sm space-y-1.5">

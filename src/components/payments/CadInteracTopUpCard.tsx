@@ -8,6 +8,7 @@ import { CheckCircle2, Copy, Landmark, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 interface Props {
+  initialAmount?: string;
   walletId: string;
   walletCurrency: string;
   onComplete?: () => void;
@@ -22,9 +23,12 @@ type Intent = {
   expires_at?: string;
 };
 
-export default function CadInteracTopUpCard({ walletId, walletCurrency, onComplete }: Props) {
+export default function CadInteracTopUpCard({ walletId, walletCurrency, onComplete, initialAmount }: Props) {
   const currency = walletCurrency.toUpperCase();
-  const [amount, setAmount] = useState("");
+  const [amount, setAmount] = useState(initialAmount ?? "");
+  useEffect(() => {
+    if (initialAmount != null && initialAmount !== "") setAmount(initialAmount);
+  }, [initialAmount]);
   const [loading, setLoading] = useState(false);
   const [alias, setAlias] = useState<string | null>(null);
   const [intent, setIntent] = useState<Intent | null>(null);
@@ -156,18 +160,20 @@ export default function CadInteracTopUpCard({ walletId, walletCurrency, onComple
 
         {!intent && (
           <>
-            <div className="space-y-2">
-              <Label>Amount (CAD)</Label>
-              <Input
-                type="number"
-                min={1}
-                step="0.01"
-                placeholder="e.g. 25"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">Minimum CAD 1.00 · Send this exact amount</p>
-            </div>
+            {!initialAmount && (
+              <div className="space-y-2">
+                <Label>Amount (CAD)</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  step="0.01"
+                  placeholder="e.g. 25"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">Minimum CAD 1.00 · Send this exact amount</p>
+              </div>
+            )}
             <Button className="w-full" onClick={handleCreate} disabled={loading || !configured}>
               {loading ? (
                 <>

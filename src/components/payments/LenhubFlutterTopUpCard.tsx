@@ -15,6 +15,7 @@ const looseDb = supabase as unknown as { from: (t: string) => any };
 type Step = "details" | "pin" | "otp" | "avs" | "done";
 
 interface Props {
+  initialAmount?: string;
   walletId: string;
   walletCurrency: string;
   onComplete?: () => void;
@@ -60,6 +61,7 @@ export default function LenhubFlutterTopUpCard({
   walletId,
   walletCurrency,
   onComplete,
+  initialAmount,
   fixedAmount,
   amountReadOnly,
   onCredited,
@@ -73,8 +75,11 @@ export default function LenhubFlutterTopUpCard({
   const [step, setStep] = useState<Step>("details");
   const [busy, setBusy] = useState(false);
   const [amount, setAmount] = useState(
-    fixedAmount != null && fixedAmount > 0 ? String(fixedAmount) : "",
+    fixedAmount != null && fixedAmount > 0 ? String(fixedAmount) : (initialAmount ?? ""),
   );
+  useEffect(() => {
+    if (initialAmount != null && initialAmount !== "") setAmount(initialAmount);
+  }, [initialAmount]);
   const [email, setEmail] = useState(user?.email ?? "");
   const [localId, setLocalId] = useState<string | null>(null);
   const [chargeId, setChargeId] = useState<string | null>(null);
@@ -586,8 +591,10 @@ export default function LenhubFlutterTopUpCard({
       ? "Pay with your Nigerian card or transfer from any bank app. Wallet updates when payment confirms."
       : `Pay in ${currency}. Enter the amount to add to your wallet, then your card details.`;
 
+  const hideAmountField = Boolean(initialAmount);
   const amountEmailFields = (
-    <div className="grid gap-4 sm:grid-cols-2">
+    <div className={hideAmountField ? "grid gap-4" : "grid gap-4 sm:grid-cols-2"}>
+      {!hideAmountField && (
       <div className="space-y-2">
         <Label htmlFor="lf-amount">Amount ({currency})</Label>
         <div className="relative">
@@ -609,6 +616,7 @@ export default function LenhubFlutterTopUpCard({
         </div>
         {minHint && <p className="text-xs text-muted-foreground">{minHint}</p>}
       </div>
+      )}
       <div className="space-y-2">
         <Label htmlFor="lf-email">Email</Label>
         <Input

@@ -8,6 +8,7 @@ import { CheckCircle2, Copy, Landmark, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 interface Props {
+  initialAmount?: string;
   walletId: string;
   walletCurrency: string;
   onComplete?: () => void;
@@ -32,9 +33,12 @@ const fnHeaders = async () => {
   };
 };
 
-export default function WiseTopUpCard({ walletId, walletCurrency, onComplete }: Props) {
+export default function WiseTopUpCard({ walletId, walletCurrency, onComplete, initialAmount }: Props) {
   const currency = walletCurrency.toUpperCase();
-  const [amount, setAmount] = useState("");
+  const [amount, setAmount] = useState(initialAmount ?? "");
+  useEffect(() => {
+    if (initialAmount != null && initialAmount !== "") setAmount(initialAmount);
+  }, [initialAmount]);
   const [loading, setLoading] = useState(false);
   const [intent, setIntent] = useState<Intent | null>(null);
   const [details, setDetails] = useState<DetailField[]>([]);
@@ -172,20 +176,22 @@ export default function WiseTopUpCard({ walletId, walletCurrency, onComplete }: 
 
         {!intent && (
           <>
-            <div className="space-y-2">
-              <Label>Amount ({currency})</Label>
-              <Input
-                type="number"
-                min={1}
-                step="0.01"
-                placeholder="e.g. 25"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">
-                Minimum 1.00 · Send this exact amount with the payment reference
-              </p>
-            </div>
+            {!initialAmount && (
+              <div className="space-y-2">
+                <Label>Amount ({currency})</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  step="0.01"
+                  placeholder="e.g. 25"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Minimum 1.00 · Send this exact amount with the payment reference
+                </p>
+              </div>
+            )}
             <Button className="w-full" onClick={handleCreate} disabled={loading || !configured}>
               {loading ? (
                 <>

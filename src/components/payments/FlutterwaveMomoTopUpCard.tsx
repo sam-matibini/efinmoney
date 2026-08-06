@@ -11,6 +11,7 @@ import { MM_COUNTRIES } from "@/lib/mobileMoneyNetworks";
 import { currencySymbol } from "@/lib/currency";
 
 interface Props {
+  initialAmount?: string;
   walletId: string;
   walletCurrency: string;
   onComplete?: () => void;
@@ -26,10 +27,13 @@ function formatAmt(amount: number, currency: string): string {
   })} ${c}`;
 }
 
-export default function FlutterwaveMomoTopUpCard({ walletId, walletCurrency, onComplete }: Props) {
+export default function FlutterwaveMomoTopUpCard({ walletId, walletCurrency, onComplete, initialAmount }: Props) {
   const currency = walletCurrency.toUpperCase();
   const mm = useMemo(() => MM_COUNTRIES.find((c) => c.currency === currency), [currency]);
-  const [amount, setAmount] = useState("");
+  const [amount, setAmount] = useState(initialAmount ?? "");
+  useEffect(() => {
+    if (initialAmount != null && initialAmount !== "") setAmount(initialAmount);
+  }, [initialAmount]);
   const [phone, setPhone] = useState("");
   const [network, setNetwork] = useState(mm?.networks[0]?.value || "");
   const [loading, setLoading] = useState(false);
@@ -125,18 +129,20 @@ export default function FlutterwaveMomoTopUpCard({ walletId, walletCurrency, onC
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <Label>Amount ({currency})</Label>
-          <Input
-            type="number"
-            min={min}
-            step={currency === "UGX" || currency === "RWF" || currency === "TZS" ? "1" : "0.01"}
-            placeholder={`e.g. ${min}`}
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-          />
-          <p className="text-xs text-muted-foreground">Minimum {formatAmt(min, currency)}</p>
-        </div>
+        {!initialAmount && (
+          <div className="space-y-2">
+            <Label>Amount ({currency})</Label>
+            <Input
+              type="number"
+              min={min}
+              step={currency === "UGX" || currency === "RWF" || currency === "TZS" ? "1" : "0.01"}
+              placeholder={`e.g. ${min}`}
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">Minimum {formatAmt(min, currency)}</p>
+          </div>
+        )}
 
         <div className="space-y-2">
           <Label>Network</Label>
