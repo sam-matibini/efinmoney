@@ -1119,13 +1119,12 @@ const TopUpPage = () => {
                   </CardContent>
                 </Card>
               ) : (
-                <div className={amountValid ? undefined : "opacity-60 pointer-events-none"}>
-                  <CheckoutMethodList
-                    methods={visibleMethods}
-                    value={activeMethodId}
-                    onChange={setSelectedMethodId}
-                  />
-                </div>
+                <CheckoutMethodList
+                  methods={visibleMethods}
+                  value={activeMethodId}
+                  onChange={setSelectedMethodId}
+                />
+
               )}
             </div>
           </CheckoutShell>
