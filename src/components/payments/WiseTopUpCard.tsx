@@ -167,18 +167,12 @@ export default function WiseTopUpCard({ walletId, walletCurrency, onComplete, in
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
-        {!configured && !intent && (
-          <p className="text-sm text-amber-700 dark:text-amber-400">
-            Bank transfer top-up is not available yet. Try card checkout instead.
-          </p>
-        )}
-
-        {!intent && configured && (
+        {!intent && (
           <>
             <div className="flex items-center justify-between rounded-lg border bg-muted/40 px-3 py-2 text-sm">
               <span className="text-muted-foreground">Paying</span>
               <span className="font-semibold tabular-nums">
-                {Number(amount) > 0 ? `${currency} ${Number(amount).toFixed(2)}` : `Enter an amount above`}
+                {Number(amount) > 0 ? `${currency} ${Number(amount).toFixed(2)}` : "Enter an amount above"}
               </span>
             </div>
             <p className="text-sm text-muted-foreground">
@@ -188,13 +182,23 @@ export default function WiseTopUpCard({ walletId, walletCurrency, onComplete, in
             <BankDetailsForm
               walletCurrency={currency}
               alwaysOpen
-              submitLabel={loading ? "Preparing…" : "Get bank details"}
+              submitLabel={
+                loading ? "Preparing…" : configured ? "Get bank details" : "Save bank account"
+              }
               submitting={loading}
-              submitDisabled={!(Number(amount) > 0)}
-              onSubmit={() => handleCreate()}
+              submitDisabled={configured && !(Number(amount) > 0)}
+              onSubmit={() => (configured ? handleCreate() : undefined)}
             />
+            {!configured && (
+              <p className="text-sm text-amber-700 dark:text-amber-400">
+                Bank transfers aren't live for {currency} yet — your account is saved for reuse, and
+                we'll show the deposit instructions as soon as the rail is enabled. For an instant
+                top-up, use card checkout.
+              </p>
+            )}
           </>
         )}
+
 
         {intent && intent.status === "pending" && (
           <div className="space-y-3">
