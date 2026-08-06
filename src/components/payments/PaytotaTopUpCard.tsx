@@ -308,7 +308,7 @@ export default function PaytotaTopUpCard({ walletId, walletCurrency, onComplete,
           </div>
         )}
 
-        <Button className="w-full" onClick={handleConfirm} disabled={loading || !quote || awaitingPhone}>
+        <Button className="w-full" onClick={handleConfirm} disabled={loading || !quote || awaitingPhone || !(Number(amount) > 0)}>
           {loading ? (
             <>
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />

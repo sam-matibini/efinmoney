@@ -259,7 +259,7 @@ export default function ElicateTopUpCard({ walletId, walletCurrency, initialAmou
             </p>
           </div>
 
-          <Button className="w-full" size="lg" onClick={validateAndConfirm} disabled={busy}>
+          <Button className="w-full" size="lg" onClick={validateAndConfirm} disabled={busy || !(Number(amount) > 0)}>
             {busy ? "Starting…" : `Top up ${amount ? `ZMW ${amount}` : "with Mobile Money"}`}
           </Button>
         </CardContent>

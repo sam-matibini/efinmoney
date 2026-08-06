@@ -174,7 +174,7 @@ export default function CadInteracTopUpCard({ walletId, walletCurrency, onComple
                 <p className="text-xs text-muted-foreground">Minimum CAD 1.00 · Send this exact amount</p>
               </div>
             )}
-            <Button className="w-full" onClick={handleCreate} disabled={loading || !configured}>
+            <Button className="w-full" onClick={handleCreate} disabled={loading || !configured || !(Number(amount) > 0)}>
               {loading ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />

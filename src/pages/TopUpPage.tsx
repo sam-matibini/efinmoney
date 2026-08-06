@@ -1094,9 +1094,10 @@ const TopUpPage = () => {
 
               {!amountValid && (
                 <p className="text-xs text-muted-foreground">
-                  Enter an amount to enable the payment methods below.
+                  You can set up a payment method now — enter an amount above to complete the payment.
                 </p>
               )}
+
 
               {payMethods.length > 1 && payCategories.length > 1 && (
                 <PaymentMethodRow
@@ -1118,13 +1119,12 @@ const TopUpPage = () => {
                   </CardContent>
                 </Card>
               ) : (
-                <div className={amountValid ? undefined : "opacity-60 pointer-events-none"}>
-                  <CheckoutMethodList
-                    methods={visibleMethods}
-                    value={activeMethodId}
-                    onChange={setSelectedMethodId}
-                  />
-                </div>
+                <CheckoutMethodList
+                  methods={visibleMethods}
+                  value={activeMethodId}
+                  onChange={setSelectedMethodId}
+                />
+
               )}
             </div>
           </CheckoutShell>
