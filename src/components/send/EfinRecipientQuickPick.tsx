@@ -87,7 +87,7 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
 
   // Debounce the type-ahead query
   useEffect(() => {
-    const t = setTimeout(() => setDebounced(query.trim()), 100);
+    const t = setTimeout(() => setDebounced(query.trim()), 200);
     return () => clearTimeout(t);
   }, [query]);
 
@@ -157,11 +157,17 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
   } = useInfiniteQuery({
     queryKey: ["efin-list-recipients", debounced],
     enabled: open && mode === "search" && !!user?.id && !isSelfQuery(debounced),
-    staleTime: 30_000,
+    staleTime: 15_000,
     initialPageParam: 0,
     queryFn: async ({ pageParam }) => {
+      // Fast prefix search when user is typing; full browsable directory when idle
+      if (debounced.length >= 3) {
+        const { data, error } = await supabase.rpc("search_efin_recipients", { p_query: debounced });
+        if (error) throw error;
+        return (data ?? []) as SearchRow[];
+      }
       const { data, error } = await supabase.rpc("list_efin_recipients", {
-        p_query: debounced,
+        p_query: "",
         p_limit: PAGE_SIZE,
         p_offset: pageParam as number,
       });
@@ -169,7 +175,8 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
       return (data ?? []) as SearchRow[];
     },
     getNextPageParam: (lastPage, pages) =>
-      lastPage.length < PAGE_SIZE ? undefined : pages.length * PAGE_SIZE,
+      // search_efin_recipients always returns ≤5, so next-page is naturally disabled when typing
+      debounced.length >= 3 || lastPage.length < PAGE_SIZE ? undefined : pages.length * PAGE_SIZE,
   });
 
   const suggestions = useMemo(() => (data?.pages ?? []).flat() as SearchRow[], [data]);
@@ -190,15 +197,18 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
     ) return;
     autoLookupRef.current = debounced;
     let cancelled = false;
+    setFinding(true);
     supabase.rpc("lookup_efin_recipient", { p_query: debounced }).then(({ data, error }) => {
-      if (cancelled || error || !data?.length) return;
+      if (cancelled) return;
+      setFinding(false);
+      if (error || !data?.length) return;
       const row = data[0] as QuickPickRecipient;
       if (row.user_id === user?.id) return;
       if (isAlreadyAdded(row.user_id)) return;
       onSelect(row);
       setQuery(""); setDebounced(""); setOpen(false); setSelf(false); setMode("recents");
     });
-    return () => { cancelled = true; };
+    return () => { cancelled = true; setFinding(false); };
   }, [debounced, suggestions.length, isFetching, isFetchingNextPage, open, mode]);
 
   const pick = (r: QuickPickRecipient) => {
@@ -409,7 +419,7 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
                 <div className="flex items-center gap-2 p-3 text-sm text-muted-foreground">
                   <User className="h-4 w-4 shrink-0" aria-hidden /> This is your account
                 </div>
-              ) : isFetching && suggestions.length === 0 ? (
+              ) : (isFetching || finding) && suggestions.length === 0 ? (
                 <div className="flex items-center gap-2 p-3 text-sm text-muted-foreground">
                   <LoadingSpinner size={14} /> Searching…
                 </div>
