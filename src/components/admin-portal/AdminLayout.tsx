@@ -54,6 +54,7 @@ const NAV_GROUPS: NavGroup[] = [
       { to: "/admin/finance", label: "Finance", icon: Wallet },
       { to: "/admin/revenue", label: "Revenue", icon: TrendingUp },
       { to: "/admin/pricing", label: "Pricing", icon: Tags },
+      { to: "/admin/payroll", label: "Payroll", icon: Banknote },
       { to: "/admin/settlement-reconciliation", label: "Settlement Rec.", icon: Scale },
       { to: "/admin/period-end-controls", label: "Period-End", icon: CalendarCheck },
       { to: "/admin/evidence-repository", label: "Evidence Repo", icon: Archive },
