@@ -87,7 +87,7 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
 
   // Debounce the type-ahead query
   useEffect(() => {
-    const t = setTimeout(() => setDebounced(query.trim()), 250);
+    const t = setTimeout(() => setDebounced(query.trim()), 100);
     return () => clearTimeout(t);
   }, [query]);
 
@@ -156,7 +156,7 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
     refetch: refetchList,
   } = useInfiniteQuery({
     queryKey: ["efin-list-recipients", debounced],
-    enabled: open && mode === "search" && !!user?.id,
+    enabled: open && mode === "search" && !!user?.id && !isSelfQuery(debounced),
     staleTime: 30_000,
     initialPageParam: 0,
     queryFn: async ({ pageParam }) => {
@@ -368,7 +368,8 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
 
       {/* Search + scrollable directory dropdown */}
       <div ref={boxRef} className={`relative ${mode === "search" ? "" : "hidden"}`}>
-        <div className="relative">
+        <div className="flex gap-2">
+          <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
             <Input
               ref={inputRef}
@@ -382,7 +383,7 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
               onFocus={() => setOpen(true)}
               onClick={() => setOpen(true)}
               onKeyDown={onKeyDown}
-              className={`pl-9 ${query !== debounced ? "pr-9" : ""}`}
+              className={`pl-9 ${query !== debounced || finding ? "pr-9" : ""}`}
               autoComplete="off"
             />
             {(query !== debounced || finding) && (
@@ -391,6 +392,10 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
               </div>
             )}
           </div>
+          <Button onClick={handleFind} disabled={finding || query.trim().length < 3}>
+            {finding ? <LoadingSpinner size={16} /> : "Find"}
+          </Button>
+        </div>
 
         <AnimatePresence>
           {open && (
@@ -400,7 +405,11 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
               exit={{ opacity: 0, y: -4 }}
               className="absolute z-30 mt-1 w-full overflow-hidden rounded-xl border border-border bg-popover shadow-lg"
             >
-              {isFetching && suggestions.length === 0 ? (
+              {isSelfQuery(debounced) ? (
+                <div className="flex items-center gap-2 p-3 text-sm text-muted-foreground">
+                  <User className="h-4 w-4 shrink-0" aria-hidden /> This is your account
+                </div>
+              ) : isFetching && suggestions.length === 0 ? (
                 <div className="flex items-center gap-2 p-3 text-sm text-muted-foreground">
                   <LoadingSpinner size={14} /> Searching…
                 </div>
@@ -415,18 +424,12 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
                   </Button>
                 </div>
               ) : suggestions.length === 0 ? (
-                isSelfQuery(debounced) ? (
-                  <div className="flex items-center gap-2 p-3 text-sm text-muted-foreground">
-                    <User className="h-4 w-4 shrink-0" aria-hidden /> This is your account
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-between gap-2 p-3">
-                    <span className="text-sm text-muted-foreground">No eFinMoney user found</span>
-                    <Button size="sm" variant="ghost" onClick={invite}>
-                      <Share2 className="mr-1 h-3.5 w-3.5" /> Invite
-                    </Button>
-                  </div>
-                )
+                <div className="flex items-center justify-between gap-2 p-3">
+                  <span className="text-sm text-muted-foreground">No eFinMoney user found</span>
+                  <Button size="sm" variant="ghost" onClick={invite}>
+                    <Share2 className="mr-1 h-3.5 w-3.5" /> Invite
+                  </Button>
+                </div>
               ) : (
                 <ul
                   id="efin-recipient-listbox"
@@ -491,7 +494,7 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
         </AnimatePresence>
       </div>
 
-      {self && (
+      {(self || (mode === "search" && debounced.length >= 1 && isSelfQuery(debounced))) && (
         <Alert>
           <User className="h-4 w-4" />
           <AlertDescription>
