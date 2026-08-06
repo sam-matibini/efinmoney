@@ -1,22 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { usePlaidLink } from "react-plaid-link";
 import { toast } from "sonner";
-import { Building2, Check, Landmark, Loader2, Plus } from "lucide-react";
+import { Building2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { useFundingSources } from "@/hooks/useFundingSources";
-import {
-  accountIdentifier,
-  bankSchemaForCountry,
-  countryForCurrency,
-  PLAID_COUNTRIES,
-  validateBankFields,
-} from "@/lib/bankFieldSchemas";
+import BankDetailsForm from "@/components/payments/BankDetailsForm";
+import { countryForCurrency, PLAID_COUNTRIES } from "@/lib/bankFieldSchemas";
 
 interface Props {
   walletCurrency: string;
@@ -24,51 +15,19 @@ interface Props {
   countryCode?: string | null;
 }
 
-const COUNTRY_OPTIONS = [
-  { code: "CA", label: "Canada" },
-  { code: "US", label: "United States" },
-  { code: "NG", label: "Nigeria" },
-  { code: "ZM", label: "Zambia" },
-  { code: "KE", label: "Kenya" },
-  { code: "GH", label: "Ghana" },
-  { code: "GB", label: "United Kingdom" },
-  { code: "EU", label: "Eurozone" },
-  { code: "DEFAULT", label: "Other country" },
-];
-
 export default function LinkBankPanel({ walletCurrency, countryCode }: Props) {
   const currency = walletCurrency.toUpperCase();
   const { user } = useAuth();
   const qc = useQueryClient();
 
-  const [country, setCountry] = useState(() => (countryCode || countryForCurrency(currency)).toUpperCase());
-  const [values, setValues] = useState<Record<string, string>>({});
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [showForm, setShowForm] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [selectedId, setSelectedId] = useState<string>("");
-  const [linkToken, setLinkToken] = useState<string | null>(null);
-  const [linking, setLinking] = useState(false);
-
-  const schema = useMemo(() => bankSchemaForCountry(country), [country]);
+  const country = useMemo(
+    () => (countryCode || countryForCurrency(currency)).toUpperCase(),
+    [countryCode, currency],
+  );
   const plaidSupported = PLAID_COUNTRIES.has(country);
 
-  const { data: savedBanks = [] } = useFundingSources("bank");
-
-  const { data: plaidAccounts = [] } = useQuery({
-    queryKey: ["plaid_accounts", user?.id],
-    queryFn: async () => {
-      if (!user) return [];
-      const { data, error } = await supabase
-        .from("plaid_accounts")
-        .select("id,name,mask,subtype,item_id, plaid_items(institution_name)")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data ?? [];
-    },
-    enabled: !!user,
-  });
+  const [linkToken, setLinkToken] = useState<string | null>(null);
+  const [linking, setLinking] = useState(false);
 
   const startPlaid = useCallback(async () => {
     setLinking(true);
@@ -92,7 +51,7 @@ export default function LinkBankPanel({ walletCurrency, countryCode }: Props) {
         });
         if (error) throw error;
         if (data?.error) throw new Error(data.error);
-        toast.success(`Linked ${metadata.institution?.name || "bank"}`);
+        toast.success("Bank linked");
         void qc.invalidateQueries({ queryKey: ["plaid_accounts", user?.id] });
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Could not link bank");
@@ -109,81 +68,6 @@ export default function LinkBankPanel({ walletCurrency, countryCode }: Props) {
     if (linkToken && ready) open();
   }, [linkToken, ready, open]);
 
-  const setField = (key: string, raw: string) => {
-    const field = schema.fields.find((f) => f.key === key);
-    let v = raw;
-    if (field?.numeric) v = v.replace(/\D/g, "");
-    if (field?.uppercase) v = v.toUpperCase();
-    if (field?.maxLength) v = v.slice(0, field.maxLength);
-    setValues((prev) => ({ ...prev, [key]: v }));
-    setErrors((prev) => ({ ...prev, [key]: "" }));
-  };
-
-  const handleSave = async () => {
-    if (!user) return;
-    const found = validateBankFields(schema, values);
-    setErrors(found);
-    if (Object.values(found).some(Boolean)) return;
-    setSaving(true);
-    try {
-      const trimmed: Record<string, string> = {};
-      for (const f of schema.fields) {
-        const v = (values[f.key] ?? "").trim();
-        if (v) trimmed[f.key] = v;
-      }
-      const lastFour = accountIdentifier(trimmed);
-      const { data, error } = await supabase
-        .from("linked_funding_sources")
-        .insert({
-          user_id: user.id,
-          source_type: "bank",
-          display_name: `${trimmed.bank_name || "Bank"} ····${lastFour}`,
-          institution: trimmed.bank_name || null,
-          last_four: lastFour,
-          currency_code: currency,
-          country_code: country,
-          details: trimmed,
-        })
-        .select("id")
-        .single();
-      if (error) throw error;
-      toast.success("Bank account saved");
-      setValues({});
-      setShowForm(false);
-      setSelectedId(data.id);
-      void qc.invalidateQueries({ queryKey: ["linked_funding_sources"] });
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not save bank account");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const accountRows = useMemo(() => {
-    const rows: { id: string; institution: string; detail: string; plaid: boolean }[] = [];
-    const seen = new Set<string>();
-    const push = (row: { id: string; institution: string; detail: string; plaid: boolean }, key: string) => {
-      if (seen.has(key)) return;
-      seen.add(key);
-      rows.push(row);
-    };
-    for (const a of plaidAccounts) {
-      const inst = (a.plaid_items as { institution_name?: string } | null)?.institution_name || "Bank";
-      push(
-        { id: `plaid:${a.id}`, institution: inst, detail: `${a.name} ····${a.mask}`, plaid: true },
-        `${inst.toLowerCase()}|${a.mask ?? ""}`,
-      );
-    }
-    for (const b of savedBanks) {
-      const inst = b.institution || "Bank";
-      push(
-        { id: b.id, institution: inst, detail: `····${b.last_four} · ${b.currency_code}`, plaid: false },
-        `${inst.toLowerCase()}|${b.last_four ?? ""}`,
-      );
-    }
-    return rows;
-  }, [plaidAccounts, savedBanks]);
-
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
@@ -191,117 +75,29 @@ export default function LinkBankPanel({ walletCurrency, countryCode }: Props) {
         country's banking system requires.
       </p>
 
-      {accountRows.length > 0 && (
-        <div className="space-y-2">
-          <Label className="text-xs uppercase tracking-wide text-muted-foreground">Your accounts</Label>
-          <div className="space-y-2">
-            {accountRows.map((row) => (
-              <button
-                key={row.id}
-                type="button"
-                onClick={() => setSelectedId(row.id)}
-                className={`flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors ${
-                  selectedId === row.id ? "border-primary bg-primary/5" : "hover:bg-muted/50"
-                }`}
-              >
-                {row.plaid ? (
-                  <Building2 className="h-4 w-4 text-muted-foreground" />
-                ) : (
-                  <Landmark className="h-4 w-4 text-muted-foreground" />
-                )}
-                <span className="flex-1 text-sm">
-                  <span className="font-medium">{row.institution}</span>
-                  <span className="text-muted-foreground"> — {row.detail}</span>
-                </span>
-                {selectedId === row.id && <Check className="h-4 w-4 text-primary" />}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-
-      {plaidSupported && (
-        <Button
-          type="button"
-          variant="outline"
-          className="w-full border-dashed"
-          onClick={() => void startPlaid()}
-          disabled={linking}
-        >
-          {linking ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Building2 className="mr-2 h-4 w-4" />}
-          Link your bank instantly
-        </Button>
-      )}
-
-      {!showForm ? (
-        <Button
-          type="button"
-          variant="outline"
-          className="w-full border-dashed"
-          onClick={() => setShowForm(true)}
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          Quick add bank account
-        </Button>
-      ) : (
-        <div className="space-y-3 rounded-lg border p-3">
-          <div className="space-y-2">
-            <Label>Bank country</Label>
-            <Select
-              value={country}
-              onValueChange={(v) => {
-                setCountry(v);
-                setValues({});
-                setErrors({});
-              }}
+      <BankDetailsForm
+        walletCurrency={currency}
+        countryCode={country}
+        submitLabel="Save account"
+        headerSlot={
+          plaidSupported ? (
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full border-dashed"
+              onClick={() => void startPlaid()}
+              disabled={linking}
             >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {COUNTRY_OPTIONS.map((c) => (
-                  <SelectItem key={c.code} value={c.code}>
-                    {c.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {schema.fields.map((f) => (
-            <div key={f.key} className="space-y-1.5">
-              <Label htmlFor={`bank-${f.key}`}>
-                {f.label}
-                {!f.required && <span className="text-muted-foreground"> (optional)</span>}
-              </Label>
-              <Input
-                id={`bank-${f.key}`}
-                value={values[f.key] ?? ""}
-                inputMode={f.numeric ? "numeric" : "text"}
-                placeholder={f.placeholder}
-                maxLength={f.maxLength}
-                onChange={(e) => setField(f.key, e.target.value)}
-              />
-              {errors[f.key] ? (
-                <p className="text-xs text-destructive">{errors[f.key]}</p>
-              ) : f.helper ? (
-                <p className="text-xs text-muted-foreground">{f.helper}</p>
-              ) : null}
-            </div>
-          ))}
-
-          <div className="flex gap-2">
-            <Button type="button" variant="ghost" className="flex-1" onClick={() => setShowForm(false)}>
-              Cancel
+              {linking ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Building2 className="mr-2 h-4 w-4" />
+              )}
+              Link your bank instantly
             </Button>
-            <Button type="button" className="flex-1" onClick={() => void handleSave()} disabled={saving}>
-              {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Save account
-            </Button>
-          </div>
-        </div>
-      )}
+          ) : null
+        }
+      />
     </div>
   );
 }

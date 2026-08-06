@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import BankDetailsForm from "@/components/payments/BankDetailsForm";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { CheckCircle2, Copy, Landmark, Loader2 } from "lucide-react";
@@ -174,34 +173,26 @@ export default function WiseTopUpCard({ walletId, walletCurrency, onComplete, in
           </p>
         )}
 
-        {!intent && (
+        {!intent && configured && (
           <>
-            {!initialAmount && (
-              <div className="space-y-2">
-                <Label>Amount ({currency})</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  step="0.01"
-                  placeholder="e.g. 25"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Minimum 1.00 · Send this exact amount with the payment reference
-                </p>
-              </div>
-            )}
-            <Button className="w-full" onClick={handleCreate} disabled={loading || !configured || !(Number(amount) > 0)}>
-              {loading ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Preparing…
-                </>
-              ) : (
-                "Get bank details"
-              )}
-            </Button>
+            <div className="flex items-center justify-between rounded-lg border bg-muted/40 px-3 py-2 text-sm">
+              <span className="text-muted-foreground">Paying</span>
+              <span className="font-semibold tabular-nums">
+                {Number(amount) > 0 ? `${currency} ${Number(amount).toFixed(2)}` : `Enter an amount above`}
+              </span>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Add the account you will transfer from — we ask only for what your country's banking
+              system requires (EFT for Canada, ACH for the US, bank &amp; account number for Nigeria).
+            </p>
+            <BankDetailsForm
+              walletCurrency={currency}
+              alwaysOpen
+              submitLabel={loading ? "Preparing…" : "Get bank details"}
+              submitting={loading}
+              submitDisabled={!(Number(amount) > 0)}
+              onSubmit={() => handleCreate()}
+            />
           </>
         )}
 
