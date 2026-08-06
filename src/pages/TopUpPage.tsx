@@ -57,6 +57,8 @@ import {
   pickBestIntlTopupMethod,
   pickBestAfricaTopupMethod,
   isFincraTopupCurrency,
+  isNombaTopupLive,
+
 } from "@/lib/walletTopupGateway";
 import { clearPendingSwychrTxn } from "@/lib/swychrPay";
 import FlutterwaveWesternTopUpHints from "@/components/wallets/FlutterwaveWesternTopUpHints";
@@ -188,13 +190,6 @@ function initialAfricanProvider(params: URLSearchParams): AfricanTopupProvider {
   return "flutterwave";
 }
 
-const toneForMethod = (m: CheckoutMethod): PayTone => {
-  const t = `${m.label} ${m.description ?? ""}`.toLowerCase();
-  if (t.includes("mobile money") || t.includes("momo")) return "mobile";
-  if (t.includes("card")) return "card";
-  if (t.includes("bank") || t.includes("interac") || t.includes("transfer")) return "bank";
-  return "wallet";
-};
 
 // Per-gateway available methods
 const FLW_METHODS_BY_CCY: Record<string, FlwMethod[]> = {
@@ -222,7 +217,7 @@ const TopUpPage = () => {
   const [network, setNetwork] = useState<string>("");
   const [phone, setPhone] = useState<string>("");
   const [loading, setLoading] = useState(false);
-  const [topupStep, setTopupStep] = useState(1);
+  
   const [westernProvider, setWesternProvider] = useState<WesternTopupProvider>(() => initialWesternProvider(params));
   const [africanProvider, setAfricanProvider] = useState<AfricanTopupProvider>(() => initialAfricanProvider(params));
   const [verifyState, setVerifyState] = useState<{ status: "verifying" | "success" | "failed"; message: string } | null>(null);
@@ -646,38 +641,11 @@ const TopUpPage = () => {
     }
   };
 
-  useEffect(() => {
-    setTopupStep(1);
-  }, [selectedWalletId, gateway, currency]);
-
-  const needsPayStep = Boolean(
-    liveTopup &&
-      selectedWallet &&
-      gateway !== "unsupported" &&
-      gateway !== "fincra",
-  );
-
-  const flowSteps = needsPayStep
-    ? [
-        { n: 1, label: "Amount" },
-        { n: 2, label: "Pay" },
-      ]
-    : [{ n: 1, label: "Amount" }];
-
   const amountNum = Number(amount);
   const amountValid =
     Number.isFinite(amountNum) &&
     amountNum > 0 &&
     !validateMinAmount(currency, amountNum);
-
-  const handleAmountContinue = () => {
-    if (!selectedWallet || !amountValid) return;
-    if (gateway === "fincra") {
-      void handleFincraTopUp();
-      return;
-    }
-    if (needsPayStep) setTopupStep(2);
-  };
 
   const invalidateWallets = () => {
     void queryClient.invalidateQueries({ queryKey: ["wallets"] });
@@ -685,28 +653,21 @@ const TopUpPage = () => {
 
   const [selectedMethodId, setSelectedMethodId] = useState<string>("");
 
-  const payMethods: CheckoutMethod[] = [];
+  type PayMethod = CheckoutMethod & { tone: PayTone };
+  const payMethods: PayMethod[] = [];
+
   if (selectedWallet && liveTopup) {
     const walletId = selectedWallet.wallet_id;
-    if (productFeatures.flutterwave && gateway === "flutterwave") {
-      if (availableFlwMethods.includes("mobilemoney") || currency === "TZS") {
-        payMethods.push({
-          id: "flw_momo",
-          label: "Mobile money",
-          description: "Pay from your mobile wallet",
-          content: (
-            <SectionBoundary name="FlutterwaveMomoTopUp">
-              <FlutterwaveMomoTopUpCard walletId={walletId} walletCurrency={currency} onComplete={invalidateWallets} />
-            </SectionBoundary>
-          ),
-        });
-      }
+    const rails = new Set<string>([...intlMethods, ...africaMomoMethods]);
+
+    if (productFeatures.flutterwave && rails.has("flutterwave")) {
       const hosted = availableFlwMethods.filter((m) => ["card", "banktransfer", "ussd"].includes(m));
       if (hosted.length > 0) {
         payMethods.push({
           id: "flw_hosted",
-          label: "Card, bank transfer or USSD",
-          description: "Secure hosted checkout",
+          tone: hosted.includes("card") ? "card" : "bank",
+          label: hosted.includes("card") ? "Card" : "Bank transfer",
+          description: "Powered by Flutterwave",
           content: (
             <SectionBoundary name="FlutterwaveHostedTopUp">
               <FlutterwaveHostedTopUpCard
@@ -721,10 +682,25 @@ const TopUpPage = () => {
           ),
         });
       }
+      if (availableFlwMethods.includes("mobilemoney") || currency === "TZS") {
+        payMethods.push({
+          id: "flw_momo",
+          tone: "mobile",
+          label: "Mobile money",
+          description: "Powered by Flutterwave",
+          content: (
+            <SectionBoundary name="FlutterwaveMomoTopUp">
+              <FlutterwaveMomoTopUpCard walletId={walletId} walletCurrency={currency} onComplete={invalidateWallets} />
+            </SectionBoundary>
+          ),
+        });
+      }
     }
-    if (gateway === "swychr_pay") {
+
+    if (productFeatures.swychr && rails.has("swychr")) {
       payMethods.push({
         id: "swychr",
+        tone: "mobile",
         label: "Mobile money & card",
         description: "Powered by Swychr",
         content: (
@@ -734,10 +710,13 @@ const TopUpPage = () => {
         ),
       });
     }
-    if (gateway === "paytota_pay") {
+
+    if (productFeatures.paytota && rails.has("paytota")) {
+      const africaMomo = PAYTOTA_AFRICA_TOPUP_CURRENCIES.includes(currency.toUpperCase());
       payMethods.push({
         id: "paytota",
-        label: "Mobile money",
+        tone: africaMomo ? "mobile" : "card",
+        label: africaMomo ? "Mobile money" : "Card or hosted invoice",
         description: "Powered by Paytota",
         content: (
           <SectionBoundary name="PaytotaTopUp">
@@ -746,11 +725,13 @@ const TopUpPage = () => {
         ),
       });
     }
-    if (gateway === "dodo_pay") {
+
+    if (productFeatures.dodo && rails.has("dodo")) {
       payMethods.push({
         id: "dodo",
+        tone: "card",
         label: "Card",
-        description: "Visa, Mastercard, Amex",
+        description: "Visa, Mastercard, Amex — powered by Dodo",
         content: (
           <SectionBoundary name="DodoTopUp">
             <DodoTopUpCard walletId={walletId} walletCurrency={currency} initialAmount={amount} embedded onComplete={invalidateWallets} />
@@ -758,9 +739,11 @@ const TopUpPage = () => {
         ),
       });
     }
-    if (gateway === "nomba_pay") {
+
+    if (productFeatures.nombaNigeria && rails.has("nomba") && isNombaTopupLive(currency)) {
       payMethods.push({
         id: "nomba",
+        tone: "card",
         label: "Card or bank transfer",
         description: "Powered by Nomba",
         content: (
@@ -770,10 +753,13 @@ const TopUpPage = () => {
         ),
       });
     }
-    if (gateway === "lenhub_flutter") {
+
+    if (rails.has("lenhub")) {
       payMethods.push({
         id: "lenhub",
+        tone: "card",
         label: "Card or bank transfer",
+        description: "Powered by Lenhub",
         content: (
           <SectionBoundary name="LenhubTopUp">
             <LenhubFlutterTopUpCard walletId={walletId} walletCurrency={currency} onComplete={invalidateWallets} />
@@ -781,9 +767,11 @@ const TopUpPage = () => {
         ),
       });
     }
-    if (productFeatures.fincraInterac && gateway === "fincra_interac") {
+
+    if (productFeatures.fincraInterac && rails.has("interac")) {
       payMethods.push({
         id: "interac",
+        tone: "bank",
         label: "Interac e-Transfer",
         description: "Send from your Canadian bank",
         content: (
@@ -793,9 +781,60 @@ const TopUpPage = () => {
         ),
       });
     }
-    if (productFeatures.wise && gateway === "wise_pay") {
+
+    if (productFeatures.fincra && rails.has("fincra")) {
+      const isCadViaUsd = currency.toUpperCase() === "CAD";
+      const cadQuote = isCadViaUsd ? quoteCadNombaTopup(amountNum || 0, fxRates) : null;
+      payMethods.push({
+        id: "fincra",
+        tone: "bank",
+        label: "Bank transfer or card checkout",
+        description: "Powered by Fincra",
+        content: (
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              You will be redirected to Fincra's secure checkout to complete this payment.
+            </p>
+            {isCadViaUsd && amountNum > 0 && (
+              cadQuote ? (
+                <div className="rounded-lg border bg-muted/40 p-3 text-sm space-y-1.5">
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted-foreground">Wallet credit</span>
+                    <span className="font-medium tabular-nums">{"C$"}{cadQuote.creditAmount.toFixed(2)} CAD</span>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted-foreground">You pay (approx.)</span>
+                    <span className="font-semibold tabular-nums">{"$"}{cadQuote.checkoutAmount.toFixed(2)} USD</span>
+                  </div>
+                  {cadQuote.fxRate && (
+                    <p className="text-[11px] text-muted-foreground pt-1">
+                      Rate: 1 CAD ≈ {cadQuote.fxRate.toFixed(4)} USD · fee included
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-xs text-amber-700 dark:text-amber-400">
+                  CAD/USD rate loading — try again in a moment.
+                </p>
+              )
+            )}
+            <Button
+              className="w-full"
+              size="lg"
+              onClick={() => void handleFincraTopUp()}
+              disabled={loading || !amountValid || (isCadViaUsd && !cadQuote)}
+            >
+              {loading ? "Opening checkout…" : "Continue to checkout"}
+            </Button>
+          </div>
+        ),
+      });
+    }
+
+    if (productFeatures.wise && rails.has("wise")) {
       payMethods.push({
         id: "wise",
+        tone: "bank",
         label: "Bank transfer",
         description: "Powered by Wise",
         content: (
@@ -805,9 +844,11 @@ const TopUpPage = () => {
         ),
       });
     }
-    if (gateway === "ghana_pay") {
+
+    if (productFeatures.ghanaPay && rails.has("ghana")) {
       payMethods.push({
         id: "ghana",
+        tone: "mobile",
         label: "Mobile money",
         description: "MTN, Telecel, AirtelTigo",
         content: (
@@ -817,10 +858,13 @@ const TopUpPage = () => {
         ),
       });
     }
-    if (productFeatures.elicate && gateway === "elicate") {
+
+    if (productFeatures.elicate && rails.has("elicate")) {
       payMethods.push({
         id: "elicate",
+        tone: "card",
         label: "Card",
+        description: "Powered by Elicate",
         content: (
           <SectionBoundary name="ElicateTopUp">
             <ElicateTopUpCard walletId={walletId} walletCurrency={currency} />
@@ -830,6 +874,23 @@ const TopUpPage = () => {
     }
   }
 
+  /** The auto-routed gateway is only the default selection now. */
+  const GATEWAY_DEFAULT_METHOD: Partial<Record<Gateway, string>> = {
+    flutterwave: availableFlwMethods.includes("mobilemoney") ? "flw_momo" : "flw_hosted",
+    swychr_pay: "swychr",
+    paytota_pay: "paytota",
+    dodo_pay: "dodo",
+    nomba_pay: "nomba",
+    lenhub_flutter: "lenhub",
+    fincra_interac: "interac",
+    fincra: "fincra",
+    wise_pay: "wise",
+    ghana_pay: "ghana",
+    elicate: "elicate",
+  };
+  const defaultMethodId =
+    payMethods.find((m) => m.id === GATEWAY_DEFAULT_METHOD[gateway])?.id || payMethods[0]?.id || "";
+
   const payCategoryMeta: Record<PayTone, { label: string; sublabel: string; icon: typeof PayCardIcon }> = {
     card: { label: "Card", sublabel: "Debit or credit", icon: PayCardIcon },
     bank: { label: "Bank", sublabel: "Transfer or Interac", icon: PayBankIcon },
@@ -837,13 +898,17 @@ const TopUpPage = () => {
     wallet: { label: "Wallet", sublabel: "Other methods", icon: PayWalletIcon },
   };
   const payCategories: PaymentMethodOption<PayTone>[] = (["card", "bank", "mobile", "wallet"] as PayTone[])
-    .filter((tone) => payMethods.some((m) => toneForMethod(m) === tone))
+    .filter((tone) => payMethods.some((m) => m.tone === tone))
     .map((tone) => ({ id: tone, tone, ...payCategoryMeta[tone] }));
 
   const activeMethodId =
-    payMethods.some((m) => m.id === selectedMethodId) ? selectedMethodId : payMethods[0]?.id || "";
+    payMethods.some((m) => m.id === selectedMethodId) ? selectedMethodId : defaultMethodId;
   const activeCategory: PayTone =
-    toneForMethod(payMethods.find((m) => m.id === activeMethodId) ?? { id: "", label: "", content: null });
+    payMethods.find((m) => m.id === activeMethodId)?.tone ?? "card";
+  const visibleMethods = payCategories.length > 1
+    ? payMethods.filter((m) => m.tone === activeCategory)
+    : payMethods;
+
 
 
 
@@ -918,75 +983,13 @@ const TopUpPage = () => {
           </AlertDialogContent>
         </AlertDialog>
 
-        {topupStep === 2 && selectedWallet && liveTopup ? (
-          <CheckoutShell
-            payTo={`Add money to your ${currency} wallet`}
-            amount={`${currencySymbol(currency)}${(amountNum || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-            amountNote={`${currency} wallet · ${selectedWallet.symbol}${Number(selectedWallet.balance).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} available`}
-            lines={[
-              { label: "Wallet top-up", sublabel: `${currency} balance credit`, value: `${currencySymbol(currency)}${(amountNum || 0).toFixed(2)}` },
-              { label: "Provider fees", sublabel: "Charged by the payment method", value: "At checkout", muted: true },
-            ]}
-            totals={[
-              { label: "Total to pay", value: `${currencySymbol(currency)}${(amountNum || 0).toFixed(2)}`, emphasis: true },
-            ]}
-            contactEmail={user?.email || null}
-            onBack={() => setTopupStep(1)}
-            backLabel="Edit amount"
+        {!selectedWallet || !liveTopup ? (
+          <MoneyFlowShell
+            steps={[{ n: 1, label: "Amount" }]}
+            currentStep={1}
+            title="Add Money"
+            subtitle="Pick a wallet, then enter the amount to fund it."
           >
-            {payMethods.length > 1 && (
-              <PaymentMethodRow
-                className="mb-3"
-                options={payCategories}
-                value={activeCategory}
-                onChange={(tone) => {
-                  const first = payMethods.find((m) => toneForMethod(m) === tone);
-                  if (first) setSelectedMethodId(first.id);
-                }}
-              />
-            )}
-            {payMethods.length === 0 ? (
-              <Card>
-                <CardContent className="pt-6">
-                  <p className="text-sm text-muted-foreground">
-                    No payment method is available for <strong>{currency}</strong> right now. Please contact support.
-                  </p>
-                </CardContent>
-              </Card>
-            ) : (
-              <CheckoutMethodList
-                methods={payMethods}
-                value={activeMethodId}
-                onChange={setSelectedMethodId}
-              />
-            )}
-          </CheckoutShell>
-        ) : (
-        <MoneyFlowShell
-          steps={flowSteps}
-          currentStep={topupStep}
-          title="Add Money"
-          subtitle="Pick a wallet, then enter the amount to fund it."
-          footer={
-            topupStep === 1 && liveTopup && gateway !== "unsupported" ? (
-              <Button
-                className="w-full"
-                size="lg"
-                onClick={handleAmountContinue}
-                disabled={
-                  loading ||
-                  !amountValid ||
-                  !selectedWallet ||
-                  (gateway === "fincra" &&
-                    currency.toUpperCase() === "CAD" &&
-                    !quoteCadNombaTopup(amountNum || 0, fxRates))
-                }
-              >
-                {loading ? "Opening checkout." : "Continue"}
-              </Button>
-            ) : null
-          }
-        >          {topupStep === 1 && (
             <div className="space-y-5">
               <div className="space-y-2">
                 <Label>Wallet</Label>
@@ -1008,19 +1011,56 @@ const TopUpPage = () => {
                     </SelectContent>
                   </Select>
                 )}
-                {selectedWallet && (
-                  <p className="text-xs text-muted-foreground tabular-nums">
-                    Balance: {currencySymbol(currency)}
-                    {Number(selectedWallet.balance).toLocaleString("en-US", {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}{" "}
-                    {currency}
-                  </p>
-                )}
               </div>
 
-              {liveTopup && gateway !== "unsupported" && selectedWallet && (
+              {!liveTopup && selectedWallet && (
+                <ComingSoon
+                  title="Top-up not available for this currency"
+                  description={
+                    currency +
+                    " wallet funding is not available. Try NGN, GHS, ZMW, KES, UGX, RWF, TZS, ZAR, XAF, XOF, MWK, USD, EUR, GBP, or CAD."
+                  }
+                  backHref="/wallets"
+                  backLabel="View wallets"
+                />
+              )}
+            </div>
+          </MoneyFlowShell>
+        ) : (
+          <CheckoutShell
+            payTo={`Add money to your ${currency} wallet`}
+            amount={`${currencySymbol(currency)}${(amountNum || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+            amountNote={`${currency} wallet · ${selectedWallet.symbol}${Number(selectedWallet.balance).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} available`}
+            lines={[
+              { label: "Wallet top-up", sublabel: `${currency} balance credit`, value: `${currencySymbol(currency)}${(amountNum || 0).toFixed(2)}` },
+              { label: "Provider fees", sublabel: "Charged by the payment method", value: "At checkout", muted: true },
+            ]}
+            totals={[
+              { label: "Total to pay", value: `${currencySymbol(currency)}${(amountNum || 0).toFixed(2)}`, emphasis: true },
+            ]}
+            contactEmail={user?.email || null}
+          >
+            <div className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Wallet</Label>
+                  {walletsLoading ? (
+                    <Skeleton className="h-12 w-full" />
+                  ) : (
+                    <Select value={selectedWalletId} onValueChange={setSelectedWalletId}>
+                      <SelectTrigger className="h-12">
+                        <SelectValue placeholder="Select wallet" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(wallets ?? []).map((w) => (
+                          <SelectItem key={w.wallet_id} value={w.wallet_id}>
+                            <span className="inline-flex items-center gap-2"><CurrencyFlag code={w.currency_code} size="sm" />{w.currency_code} - {w.symbol}{Number(w.balance).toLocaleString()}</span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
                 <div className="space-y-2">
                   <Label>Amount ({currency})</Label>
                   <Input
@@ -1035,70 +1075,46 @@ const TopUpPage = () => {
                     Minimum: {minAmount(currency)} {currency}
                   </p>
                 </div>
+              </div>
+
+              {!amountValid && (
+                <p className="text-xs text-muted-foreground">
+                  Enter an amount to enable the payment methods below.
+                </p>
               )}
 
-              {gateway === "fincra" &&
-                currency.toUpperCase() === "CAD" &&
-                amountNum > 0 &&
-                (() => {
-                  const quote = quoteCadNombaTopup(amountNum, fxRates);
-                  if (!quote) {
-                    return (
-                      <p className="text-xs text-amber-700 dark:text-amber-400">
-                        CAD/USD rate loading. try again in a moment.
-                      </p>
-                    );
-                  }
-                  return (
-                    <div className="rounded-lg border bg-muted/40 p-3 text-sm space-y-1.5">
-                      <div className="flex justify-between gap-2">
-                        <span className="text-muted-foreground">Wallet credit</span>
-                        <span className="font-medium tabular-nums">
-                          {"C$"}
-                          {quote.creditAmount.toFixed(2)} CAD
-                        </span>
-                      </div>
-                      <div className="flex justify-between gap-2">
-                        <span className="text-muted-foreground">You pay (approx.)</span>
-                        <span className="font-semibold tabular-nums">
-                          {"$"}
-                          {quote.checkoutAmount.toFixed(2)} USD
-                        </span>
-                      </div>
-                      {quote.fxRate && (
-                        <p className="text-[11px] text-muted-foreground pt-1">
-                          Rate: 1 CAD ≈ {quote.fxRate.toFixed(4)} USD · fee included
-                        </p>
-                      )}
-                    </div>
-                  );
-                })()}
-
-              {!liveTopup && selectedWallet && (
-                <ComingSoon
-                  title="Top-up not available for this currency"
-                  description={
-                    currency +
-                    " wallet funding is not available. Try NGN, GHS, ZMW, KES, UGX, RWF, TZS, ZAR, XAF, XOF, MWK, USD, EUR, GBP, or CAD."
-                  }
-                  backHref="/wallets"
-                  backLabel="View wallets"
+              {payMethods.length > 1 && payCategories.length > 1 && (
+                <PaymentMethodRow
+                  options={payCategories}
+                  value={activeCategory}
+                  onChange={(tone) => {
+                    const first = payMethods.find((m) => m.tone === tone);
+                    if (first) setSelectedMethodId(first.id);
+                  }}
                 />
               )}
 
-              {liveTopup && gateway === "unsupported" && selectedWallet && (
+              {payMethods.length === 0 ? (
                 <Card>
                   <CardContent className="pt-6">
                     <p className="text-sm text-muted-foreground">
-                      Top-up for <strong>{currency}</strong> is not yet available. Please contact support.
+                      No payment method is available for <strong>{currency}</strong> right now. Please contact support.
                     </p>
                   </CardContent>
                 </Card>
+              ) : (
+                <div className={amountValid ? undefined : "opacity-60 pointer-events-none"}>
+                  <CheckoutMethodList
+                    methods={visibleMethods}
+                    value={activeMethodId}
+                    onChange={setSelectedMethodId}
+                  />
+                </div>
               )}
             </div>
-          )}
-        </MoneyFlowShell>
+          </CheckoutShell>
         )}
+
       </motion.div>
     </AppPage>
   );
