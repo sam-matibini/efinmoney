@@ -190,13 +190,6 @@ function initialAfricanProvider(params: URLSearchParams): AfricanTopupProvider {
   return "flutterwave";
 }
 
-const toneForMethod = (m: CheckoutMethod): PayTone => {
-  const t = `${m.label} ${m.description ?? ""}`.toLowerCase();
-  if (t.includes("mobile money") || t.includes("momo")) return "mobile";
-  if (t.includes("card")) return "card";
-  if (t.includes("bank") || t.includes("interac") || t.includes("transfer")) return "bank";
-  return "wallet";
-};
 
 // Per-gateway available methods
 const FLW_METHODS_BY_CCY: Record<string, FlwMethod[]> = {
