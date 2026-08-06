@@ -106,17 +106,19 @@ export default function SwychrTopUpCard({ walletId, walletCurrency, onComplete, 
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <Label>Amount ({currency})</Label>
-          <Input
-            type="number"
-            min={min}
-            step={currency === "NGN" ? "1" : "0.01"}
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            placeholder={currency === "NGN" ? "5000" : "50"}
-          />
-        </div>
+        {!initialAmount && (
+          <div className="space-y-2">
+            <Label>Amount ({currency})</Label>
+            <Input
+              type="number"
+              min={min}
+              step={currency === "NGN" ? "1" : "0.01"}
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder={currency === "NGN" ? "5000" : "50"}
+            />
+          </div>
+        )}
         <div className="space-y-2">
           <Label>Name</Label>
           <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" />

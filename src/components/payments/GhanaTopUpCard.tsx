@@ -127,17 +127,19 @@ export default function GhanaTopUpCard({ walletId, walletCurrency, initialAmount
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <Label>Amount (GHS)</Label>
-          <Input
-            type="number"
-            min={1}
-            step="0.01"
-            placeholder="e.g. 100"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-          />
-        </div>
+        {!initialAmount && (
+          <div className="space-y-2">
+            <Label>Amount (GHS)</Label>
+            <Input
+              type="number"
+              min={1}
+              step="0.01"
+              placeholder="e.g. 100"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+            />
+          </div>
+        )}
         <div className="space-y-2">
           <Label>Network</Label>
           <Select value={network} onValueChange={(v) => { setNetworkTouched(true); setNetwork(v); }}>

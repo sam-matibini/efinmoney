@@ -160,18 +160,20 @@ export default function CadInteracTopUpCard({ walletId, walletCurrency, onComple
 
         {!intent && (
           <>
-            <div className="space-y-2">
-              <Label>Amount (CAD)</Label>
-              <Input
-                type="number"
-                min={1}
-                step="0.01"
-                placeholder="e.g. 25"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">Minimum CAD 1.00 · Send this exact amount</p>
-            </div>
+            {!initialAmount && (
+              <div className="space-y-2">
+                <Label>Amount (CAD)</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  step="0.01"
+                  placeholder="e.g. 25"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">Minimum CAD 1.00 · Send this exact amount</p>
+              </div>
+            )}
             <Button className="w-full" onClick={handleCreate} disabled={loading || !configured}>
               {loading ? (
                 <>

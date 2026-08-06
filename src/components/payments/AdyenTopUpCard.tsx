@@ -69,17 +69,19 @@ export default function AdyenTopUpCard({ walletId, walletCurrency, initialAmount
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div>
-            <Label>Amount ({walletCurrency})</Label>
-            <Input
-              type="number"
-              inputMode="decimal"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="0.00"
-              className="h-12 text-lg"
-            />
-          </div>
+          {!initialAmount && (
+            <div>
+              <Label>Amount ({walletCurrency})</Label>
+              <Input
+                type="number"
+                inputMode="decimal"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="0.00"
+                className="h-12 text-lg"
+              />
+            </div>
+          )}
           <div className="p-3 rounded-lg bg-accent/10 border border-accent/20">
             <p className="text-xs text-foreground">
               Embedded card checkout — enter your Visa, Mastercard, or Amex card details. Powered by Adyen (test mode).

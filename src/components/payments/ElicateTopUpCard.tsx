@@ -201,17 +201,19 @@ export default function ElicateTopUpCard({ walletId, walletCurrency, initialAmou
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div>
-            <Label>Amount (ZMW)</Label>
-            <Input
-              type="number"
-              inputMode="decimal"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="0.00"
-              className="h-12 text-lg"
-            />
-          </div>
+          {!initialAmount && (
+            <div>
+              <Label>Amount (ZMW)</Label>
+              <Input
+                type="number"
+                inputMode="decimal"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="0.00"
+                className="h-12 text-lg"
+              />
+            </div>
+          )}
 
           <div>
             <Label>Mobile Money Network</Label>

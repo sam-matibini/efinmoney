@@ -129,18 +129,20 @@ export default function FlutterwaveMomoTopUpCard({ walletId, walletCurrency, onC
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <Label>Amount ({currency})</Label>
-          <Input
-            type="number"
-            min={min}
-            step={currency === "UGX" || currency === "RWF" || currency === "TZS" ? "1" : "0.01"}
-            placeholder={`e.g. ${min}`}
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-          />
-          <p className="text-xs text-muted-foreground">Minimum {formatAmt(min, currency)}</p>
-        </div>
+        {!initialAmount && (
+          <div className="space-y-2">
+            <Label>Amount ({currency})</Label>
+            <Input
+              type="number"
+              min={min}
+              step={currency === "UGX" || currency === "RWF" || currency === "TZS" ? "1" : "0.01"}
+              placeholder={`e.g. ${min}`}
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">Minimum {formatAmt(min, currency)}</p>
+          </div>
+        )}
 
         <div className="space-y-2">
           <Label>Network</Label>
