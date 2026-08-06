@@ -159,6 +159,31 @@ export default function LinkBankPanel({ walletCurrency, countryCode }: Props) {
     }
   };
 
+  const accountRows = useMemo(() => {
+    const rows: { id: string; institution: string; detail: string; plaid: boolean }[] = [];
+    const seen = new Set<string>();
+    const push = (row: { id: string; institution: string; detail: string; plaid: boolean }, key: string) => {
+      if (seen.has(key)) return;
+      seen.add(key);
+      rows.push(row);
+    };
+    for (const a of plaidAccounts) {
+      const inst = (a.plaid_items as { institution_name?: string } | null)?.institution_name || "Bank";
+      push(
+        { id: `plaid:${a.id}`, institution: inst, detail: `${a.name} ····${a.mask}`, plaid: true },
+        `${inst.toLowerCase()}|${a.mask ?? ""}`,
+      );
+    }
+    for (const b of savedBanks) {
+      const inst = b.institution || "Bank";
+      push(
+        { id: b.id, institution: inst, detail: `····${b.last_four} · ${b.currency_code}`, plaid: false },
+        `${inst.toLowerCase()}|${b.last_four ?? ""}`,
+      );
+    }
+    return rows;
+  }, [plaidAccounts, savedBanks]);
+
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
@@ -166,51 +191,35 @@ export default function LinkBankPanel({ walletCurrency, countryCode }: Props) {
         country's banking system requires.
       </p>
 
-      {(plaidAccounts.length > 0 || savedBanks.length > 0) && (
+      {accountRows.length > 0 && (
         <div className="space-y-2">
           <Label className="text-xs uppercase tracking-wide text-muted-foreground">Your accounts</Label>
           <div className="space-y-2">
-            {plaidAccounts.map((a) => {
-              const id = `plaid:${a.id}`;
-              const inst = (a.plaid_items as { institution_name?: string } | null)?.institution_name;
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => setSelectedId(id)}
-                  className={`flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors ${
-                    selectedId === id ? "border-primary bg-primary/5" : "hover:bg-muted/50"
-                  }`}
-                >
-                  <Building2 className="h-4 w-4 text-muted-foreground" />
-                  <span className="flex-1 text-sm">
-                    <span className="font-medium">{inst || "Bank"}</span>
-                    <span className="text-muted-foreground"> — {a.name} ····{a.mask}</span>
-                  </span>
-                  {selectedId === id && <Check className="h-4 w-4 text-primary" />}
-                </button>
-              );
-            })}
-            {savedBanks.map((b) => (
+            {accountRows.map((row) => (
               <button
-                key={b.id}
+                key={row.id}
                 type="button"
-                onClick={() => setSelectedId(b.id)}
+                onClick={() => setSelectedId(row.id)}
                 className={`flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors ${
-                  selectedId === b.id ? "border-primary bg-primary/5" : "hover:bg-muted/50"
+                  selectedId === row.id ? "border-primary bg-primary/5" : "hover:bg-muted/50"
                 }`}
               >
-                <Landmark className="h-4 w-4 text-muted-foreground" />
+                {row.plaid ? (
+                  <Building2 className="h-4 w-4 text-muted-foreground" />
+                ) : (
+                  <Landmark className="h-4 w-4 text-muted-foreground" />
+                )}
                 <span className="flex-1 text-sm">
-                  <span className="font-medium">{b.institution || "Bank"}</span>
-                  <span className="text-muted-foreground"> ····{b.last_four} · {b.currency_code}</span>
+                  <span className="font-medium">{row.institution}</span>
+                  <span className="text-muted-foreground"> — {row.detail}</span>
                 </span>
-                {selectedId === b.id && <Check className="h-4 w-4 text-primary" />}
+                {selectedId === row.id && <Check className="h-4 w-4 text-primary" />}
               </button>
             ))}
           </div>
         </div>
       )}
+
 
       {plaidSupported && (
         <Button
