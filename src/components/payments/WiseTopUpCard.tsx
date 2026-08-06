@@ -169,12 +169,6 @@ export default function WiseTopUpCard({ walletId, walletCurrency, onComplete, in
       <CardContent className="space-y-4">
         {!intent && (
           <>
-            <div className="flex items-center justify-between rounded-lg border bg-muted/40 px-3 py-2 text-sm">
-              <span className="text-muted-foreground">Paying</span>
-              <span className="font-semibold tabular-nums">
-                {Number(amount) > 0 ? `${currency} ${Number(amount).toFixed(2)}` : "Enter an amount above"}
-              </span>
-            </div>
             <p className="text-sm text-muted-foreground">
               Add the account you will transfer from — we ask only for what your country's banking
               system requires (EFT for Canada, ACH for the US, bank &amp; account number for Nigeria).
@@ -189,13 +183,6 @@ export default function WiseTopUpCard({ walletId, walletCurrency, onComplete, in
               submitDisabled={configured && !(Number(amount) > 0)}
               onSubmit={() => (configured ? handleCreate() : undefined)}
             />
-            {!configured && (
-              <p className="text-sm text-amber-700 dark:text-amber-400">
-                Bank transfers aren't live for {currency} yet — your account is saved for reuse, and
-                we'll show the deposit instructions as soon as the rail is enabled. For an instant
-                top-up, use card checkout.
-              </p>
-            )}
           </>
         )}
 
