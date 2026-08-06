@@ -3749,8 +3749,10 @@ export type Database = {
       }
       linked_funding_sources: {
         Row: {
+          country_code: string | null
           created_at: string
           currency_code: string
+          details: Json
           display_name: string
           id: string
           institution: string | null
@@ -3760,8 +3762,10 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          country_code?: string | null
           created_at?: string
           currency_code?: string
+          details?: Json
           display_name: string
           id?: string
           institution?: string | null
@@ -3771,8 +3775,10 @@ export type Database = {
           user_id: string
         }
         Update: {
+          country_code?: string | null
           created_at?: string
           currency_code?: string
+          details?: Json
           display_name?: string
           id?: string
           institution?: string | null
