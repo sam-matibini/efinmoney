@@ -660,6 +660,20 @@ const TopUpPage = () => {
     const walletId = selectedWallet.wallet_id;
     const rails = new Set<string>([...intlMethods, ...africaMomoMethods]);
 
+    payMethods.push({
+      id: "link_bank",
+      tone: "bank",
+      label: "Link or add a bank account",
+      description: "Instant linking or manual account details",
+      content: (
+        <SectionBoundary name="LinkBankPanel">
+          <LinkBankPanel walletCurrency={currency} />
+        </SectionBoundary>
+      ),
+    });
+
+
+
     if (productFeatures.flutterwave && rails.has("flutterwave")) {
       const hosted = availableFlwMethods.filter((m) => ["card", "banktransfer", "ussd"].includes(m));
       if (hosted.length > 0) {
