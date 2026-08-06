@@ -77,13 +77,13 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
   const [debounced, setDebounced] = useState("");
   const [open, setOpen] = useState(false);
   const [finding, setFinding] = useState(false);
-  const [notFound, setNotFound] = useState(false);
   const [self, setSelf] = useState(false);
   const [mode, setMode] = useState<"recents" | "search">("recents");
   const [highlight, setHighlight] = useState(0);
   const boxRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
+  const autoLookupRef = useRef("");
 
   // Debounce the type-ahead query
   useEffect(() => {
@@ -138,9 +138,9 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
       setQuery("");
       setDebounced("");
       setOpen(false);
-      setNotFound(false);
       setSelf(false);
     } else {
+      setOpen(true);
       setTimeout(() => inputRef.current?.focus(), 0);
     }
   };
@@ -176,6 +176,31 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
 
   useEffect(() => setHighlight(0), [debounced, open]);
 
+  // Auto exact-lookup when fuzzy list returns nothing
+  useEffect(() => {
+    if (debounced.length < 3) { autoLookupRef.current = ""; return; }
+    if (
+      !open ||
+      mode !== "search" ||
+      isFetching ||
+      isFetchingNextPage ||
+      suggestions.length > 0 ||
+      isSelfQuery(debounced) ||
+      autoLookupRef.current === debounced
+    ) return;
+    autoLookupRef.current = debounced;
+    let cancelled = false;
+    supabase.rpc("lookup_efin_recipient", { p_query: debounced }).then(({ data, error }) => {
+      if (cancelled || error || !data?.length) return;
+      const row = data[0] as QuickPickRecipient;
+      if (row.user_id === user?.id) return;
+      if (isAlreadyAdded(row.user_id)) return;
+      onSelect(row);
+      setQuery(""); setDebounced(""); setOpen(false); setSelf(false); setMode("recents");
+    });
+    return () => { cancelled = true; };
+  }, [debounced, suggestions.length, isFetching, isFetchingNextPage, open, mode]);
+
   const pick = (r: QuickPickRecipient) => {
     if (r.user_id === user?.id) {
       toast.error("That's you!");
@@ -189,7 +214,6 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
     setQuery("");
     setDebounced("");
     setOpen(false);
-    setNotFound(false);
     setSelf(false);
     setMode("recents");
   };
@@ -214,19 +238,17 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
     }
     if (isSelfQuery(q)) {
       setSelf(true);
-      setNotFound(false);
       setOpen(false);
       return;
     }
     setFinding(true);
-    setNotFound(false);
     setSelf(false);
     try {
       const { data, error } = await supabase.rpc("lookup_efin_recipient", { p_query: q });
       if (error) throw error;
       const row = (data ?? [])[0] as QuickPickRecipient | undefined;
       if (!row) {
-        setNotFound(true);
+        toast.error(`No eFinMoney user found for "${q}"`);
         return;
       }
       pick(row);
@@ -346,29 +368,29 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
 
       {/* Search + scrollable directory dropdown */}
       <div ref={boxRef} className={`relative ${mode === "search" ? "" : "hidden"}`}>
-        <div className="flex gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
             <Input
               ref={inputRef}
               role="combobox"
               aria-expanded={open}
               aria-autocomplete="list"
               aria-controls="efin-recipient-listbox"
-              placeholder="Search eFinMoney users by name, @tag, email or account #"
+              placeholder="Search by name, @tag, email or account #"
               value={query}
-              onChange={(e) => { setQuery(e.target.value); setOpen(true); setNotFound(false); setSelf(false); }}
+              onChange={(e) => { setQuery(e.target.value); setOpen(true); setSelf(false); }}
               onFocus={() => setOpen(true)}
               onClick={() => setOpen(true)}
               onKeyDown={onKeyDown}
-              className="pl-9"
+              className={`pl-9 ${query !== debounced ? "pr-9" : ""}`}
               autoComplete="off"
             />
+            {(query !== debounced || finding) && (
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                <LoadingSpinner size={14} />
+              </div>
+            )}
           </div>
-          <Button onClick={handleFind} disabled={finding || query.trim().length < 3}>
-            {finding ? <LoadingSpinner size={16} /> : "Find"}
-          </Button>
-        </div>
 
         <AnimatePresence>
           {open && (
@@ -411,7 +433,7 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
                   role="listbox"
                   ref={listRef}
                   onScroll={onListScroll}
-                  className="max-h-72 overflow-y-auto"
+                  className="max-h-96 overflow-y-auto pb-2"
                 >
                   {suggestions.map((s, i) => {
                     const added = isAlreadyAdded(s.user_id);
@@ -478,17 +500,6 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
         </Alert>
       )}
 
-      {notFound && !self && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription className="flex items-center justify-between gap-2">
-            <span>No eFinMoney user found for "{query}".</span>
-            <Button size="sm" variant="ghost" onClick={invite}>
-              <Share2 className="mr-1 h-3.5 w-3.5" /> Invite them
-            </Button>
-          </AlertDescription>
-        </Alert>
-      )}
     </div>
   );
 };
