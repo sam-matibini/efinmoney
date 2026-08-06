@@ -690,7 +690,7 @@ const TopUpPage = () => {
           description: "Powered by Flutterwave",
           content: (
             <SectionBoundary name="FlutterwaveMomoTopUp">
-              <FlutterwaveMomoTopUpCard walletId={walletId} walletCurrency={currency} onComplete={invalidateWallets} />
+              <FlutterwaveMomoTopUpCard walletId={walletId} walletCurrency={currency} initialAmount={amount} onComplete={invalidateWallets} />
             </SectionBoundary>
           ),
         });
@@ -705,7 +705,7 @@ const TopUpPage = () => {
         description: "Powered by Swychr",
         content: (
           <SectionBoundary name="SwychrTopUp">
-            <SwychrTopUpCard walletId={walletId} walletCurrency={currency} onComplete={invalidateWallets} />
+            <SwychrTopUpCard walletId={walletId} walletCurrency={currency} initialAmount={amount} onComplete={invalidateWallets} />
           </SectionBoundary>
         ),
       });
@@ -720,7 +720,7 @@ const TopUpPage = () => {
         description: "Powered by Paytota",
         content: (
           <SectionBoundary name="PaytotaTopUp">
-            <PaytotaTopUpCard walletId={walletId} walletCurrency={currency} onComplete={invalidateWallets} />
+            <PaytotaTopUpCard walletId={walletId} walletCurrency={currency} initialAmount={amount} onComplete={invalidateWallets} />
           </SectionBoundary>
         ),
       });
@@ -762,7 +762,7 @@ const TopUpPage = () => {
         description: "Powered by Lenhub",
         content: (
           <SectionBoundary name="LenhubTopUp">
-            <LenhubFlutterTopUpCard walletId={walletId} walletCurrency={currency} onComplete={invalidateWallets} />
+            <LenhubFlutterTopUpCard walletId={walletId} walletCurrency={currency} initialAmount={amount} onComplete={invalidateWallets} />
           </SectionBoundary>
         ),
       });
@@ -776,7 +776,7 @@ const TopUpPage = () => {
         description: "Send from your Canadian bank",
         content: (
           <SectionBoundary name="CadInteracTopUp">
-            <CadInteracTopUpCard walletId={walletId} walletCurrency={currency} onComplete={invalidateWallets} />
+            <CadInteracTopUpCard walletId={walletId} walletCurrency={currency} initialAmount={amount} onComplete={invalidateWallets} />
           </SectionBoundary>
         ),
       });
@@ -839,7 +839,7 @@ const TopUpPage = () => {
         description: "Powered by Wise",
         content: (
           <SectionBoundary name="WiseTopUp">
-            <WiseTopUpCard walletId={walletId} walletCurrency={currency} onComplete={invalidateWallets} />
+            <WiseTopUpCard walletId={walletId} walletCurrency={currency} initialAmount={amount} onComplete={invalidateWallets} />
           </SectionBoundary>
         ),
       });
@@ -853,7 +853,7 @@ const TopUpPage = () => {
         description: "MTN, Telecel, AirtelTigo",
         content: (
           <SectionBoundary name="GhanaTopUp">
-            <GhanaTopUpCard walletId={walletId} walletCurrency={currency} />
+            <GhanaTopUpCard walletId={walletId} walletCurrency={currency} initialAmount={amount} />
           </SectionBoundary>
         ),
       });
@@ -867,7 +867,7 @@ const TopUpPage = () => {
         description: "Powered by Elicate",
         content: (
           <SectionBoundary name="ElicateTopUp">
-            <ElicateTopUpCard walletId={walletId} walletCurrency={currency} />
+            <ElicateTopUpCard walletId={walletId} walletCurrency={currency} initialAmount={amount} />
           </SectionBoundary>
         ),
       });
