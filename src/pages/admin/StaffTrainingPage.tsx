@@ -91,6 +91,14 @@ export default function StaffTrainingPage() {
     },
   });
 
+  const { data: templates = [] } = useQuery({
+    queryKey: ["document-templates"],
+    queryFn: async () => {
+      const { data } = await (supabase as Any).from("document_templates").select("*").order("sort_order");
+      return data || [];
+    },
+  });
+
   const addCourse = useMutation({
     mutationFn: async () => {
       const { error } = await (supabase as Any).from("training_courses").insert({ ...form, frequency_months: Number(form.frequency_months) });
@@ -255,6 +263,24 @@ export default function StaffTrainingPage() {
     }
   };
 
+  const downloadTemplate = (tpl: Any) => {
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${tpl.name}</title>
+<style>
+body{font-family:Arial,Helvetica,sans-serif;max-width:900px;margin:40px auto;padding:0 24px;color:#111;font-size:14px;line-height:1.5}
+h1{font-size:22px;margin-bottom:4px}h2{font-size:16px;margin-top:24px;border-bottom:2px solid #ccc;padding-bottom:4px}h3{font-size:14px;margin-top:16px}
+table{border-collapse:collapse;width:100%;margin-bottom:8px}th,td{border:1px solid #ccc;padding:7px 10px;text-align:left;vertical-align:top}
+th{background:#f0f0f0;font-weight:600}tr:nth-child(even){background:#fafafa}
+p{margin:6px 0}@media print{body{margin:20px}}
+</style></head><body>
+${tpl.content_html}
+</body></html>`;
+    const blob = new Blob([html], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `${tpl.name.replace(/\s+/g, "_")}.html`; a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const openCourse = (course: Any) => {
     setLearn(course); setAnswers({}); setResult(null);
     if (me?.id) {
@@ -334,6 +360,7 @@ export default function StaffTrainingPage() {
         <TabsList>
           <TabsTrigger value="learn"><BookOpen className="w-4 h-4 mr-1" />My Training</TabsTrigger>
           <TabsTrigger value="manage"><GraduationCap className="w-4 h-4 mr-1" />Manage</TabsTrigger>
+          <TabsTrigger value="templates"><FileText className="w-4 h-4 mr-1" />Templates</TabsTrigger>
         </TabsList>
 
         {/* ------------------------------- LEARNER ------------------------------- */}
@@ -524,6 +551,46 @@ export default function StaffTrainingPage() {
                         </TableRow>
                       );
                     })}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ------------------------------- TEMPLATES ------------------------------- */}
+        <TabsContent value="templates" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><FileText className="w-5 h-5" />Compliance Document Templates</CardTitle>
+              <p className="text-sm text-muted-foreground">Download fillable HTML templates for FINTRAC MSB and BoC RPAA compliance documents. Each file opens in any browser and can be printed.</p>
+            </CardHeader>
+            <CardContent>
+              {templates.length === 0 ? (
+                <p className="text-muted-foreground text-sm">No templates available.</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Document</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead className="w-24">Version</TableHead>
+                      <TableHead className="w-24 text-right">Download</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {templates.map((tpl: Any) => (
+                      <TableRow key={tpl.id}>
+                        <TableCell className="font-medium">{tpl.name}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{tpl.description}</TableCell>
+                        <TableCell className="text-sm">{tpl.version}</TableCell>
+                        <TableCell className="text-right">
+                          <Button size="sm" variant="outline" onClick={() => downloadTemplate(tpl)}>
+                            <Download className="w-3 h-3 mr-1" />HTML
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
                   </TableBody>
                 </Table>
               )}
