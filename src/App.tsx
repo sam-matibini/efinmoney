@@ -122,6 +122,7 @@ const StrFilingPage = lazyImport(() => import("./pages/admin/StrFilingPage"));
 const IncidentManagementPage = lazyImport(() => import("./pages/admin/IncidentManagementPage"));
 const StaffTrainingPage = lazyImport(() => import("./pages/admin/StaffTrainingPage"));
 const PayrollPage = lazyImport(() => import("./pages/admin/PayrollPage"));
+const StaffPortalPage = lazyImport(() => import("./pages/admin/StaffPortalPage"));
 const CorrespondentBankingPage = lazyImport(() => import("./pages/admin/CorrespondentBankingPage"));
 const GeographicRiskPage = lazyImport(() => import("./pages/admin/GeographicRiskPage"));
 const TravelRulePage = lazyImport(() => import("./pages/admin/TravelRulePage"));
@@ -392,6 +393,7 @@ const AppRoutes = () => {
           <Route path="/admin/incidents" element={<IncidentManagementPage />} />
           <Route path="/admin/training" element={<StaffTrainingPage />} />
           <Route path="/admin/payroll" element={<PayrollPage />} />
+          <Route path="/admin/portal" element={<StaffPortalPage />} />
           <Route path="/admin/correspondent-banking" element={<CorrespondentBankingPage />} />
           <Route path="/admin/geographic-risk" element={<GeographicRiskPage />} />
           <Route path="/admin/travel-rule" element={<TravelRulePage />} />
