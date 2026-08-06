@@ -192,7 +192,7 @@ export default function WiseTopUpCard({ walletId, walletCurrency, onComplete, in
                 </p>
               </div>
             )}
-            <Button className="w-full" onClick={handleCreate} disabled={loading || !configured}>
+            <Button className="w-full" onClick={handleCreate} disabled={loading || !configured || !(Number(amount) > 0)}>
               {loading ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />

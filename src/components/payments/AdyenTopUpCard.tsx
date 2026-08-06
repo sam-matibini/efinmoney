@@ -87,7 +87,7 @@ export default function AdyenTopUpCard({ walletId, walletCurrency, initialAmount
               Embedded card checkout — enter your Visa, Mastercard, or Amex card details. Powered by Adyen (test mode).
             </p>
           </div>
-          <Button className="w-full" size="lg" onClick={start} disabled={loading}>
+          <Button className="w-full" size="lg" onClick={start} disabled={loading || !(Number(amount) > 0)}>
             {loading ? "Preparing checkout…" : "Continue to Adyen"}
           </Button>
         </CardContent>

@@ -127,7 +127,7 @@ export default function SwychrTopUpCard({ walletId, walletCurrency, onComplete, 
           <Label>Email for receipt</Label>
           <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
         </div>
-        <Button className="w-full" onClick={handleSubmit} disabled={loading}>
+        <Button className="w-full" onClick={handleSubmit} disabled={loading || !(Number(amount) > 0)}>
           {loading ? (
             <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Opening checkout…</>
           ) : (

@@ -160,7 +160,7 @@ export default function GhanaTopUpCard({ walletId, walletCurrency, initialAmount
             onChange={(e) => { setPhoneTouched(true); setPhone(e.target.value); }}
           />
         </div>
-        <Button className="w-full" onClick={handleSubmit} disabled={loading}>
+        <Button className="w-full" onClick={handleSubmit} disabled={loading || !(Number(amount) > 0)}>
           {loading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Waiting for approval…</> : "Send MoMo prompt"}
         </Button>
       </CardContent>
