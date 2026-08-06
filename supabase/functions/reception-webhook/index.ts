@@ -3,8 +3,10 @@
 // Configure this URL as the webhook target in Reception AI, and set the
 // RECEPTION_WEBHOOK_SECRET secret to the same value you put in the
 // "x-reception-secret" header there.
-import { createClient } from "npm:@supabase/supabase-js@2";
-import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+//
+// Webhook URL: https://hgmskcvaeadnyovbroup.supabase.co/functions/v1/reception-webhook
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { corsHeaders } from "../_shared/cors.ts";
 
 type Json = Record<string, unknown>;
 
@@ -84,34 +86,40 @@ Deno.serve(async (req) => {
     userId = (p as { user_id?: string } | null)?.user_id ?? null;
   }
 
+  // channel_ref is the idempotency key: "reception:<externalRef>"
+  const channelRef = `reception:${externalRef}`;
+
   // One thread per Reception AI call, updated as follow-up events arrive.
   const { data: existing } = await supabase
     .from("support_threads")
     .select("id")
-    .eq("external_source", "reception")
-    .eq("external_ref", externalRef)
+    .eq("channel_ref", channelRef)
     .maybeSingle();
 
   const preview = (summary || transcript || subject).slice(0, 300);
   let threadId = (existing as { id?: string } | null)?.id ?? null;
 
   if (!threadId) {
+    const threadInsert: Record<string, unknown> = {
+      guest_name: name,
+      subject,
+      channel: "reception",
+      channel_ref: channelRef,
+      status: "open",
+      priority: callbackRequested ? "high" : "normal",
+      unread_for_staff: true,
+      last_message_preview: preview,
+      last_message_at: new Date().toISOString(),
+    };
+    if (userId) {
+      threadInsert.user_id = userId;
+    } else {
+      if (email) threadInsert.guest_email = email;
+    }
+
     const { data: thread, error } = await supabase
       .from("support_threads")
-      .insert({
-        user_id: userId,
-        guest_email: userId ? null : email,
-        guest_name: userId ? null : name,
-        subject,
-        channel: "reception",
-        status: "open",
-        priority: callbackRequested ? "high" : "normal",
-        unread_for_staff: true,
-        last_message_preview: preview,
-        last_message_at: new Date().toISOString(),
-        external_source: "reception",
-        external_ref: externalRef,
-      })
+      .insert(threadInsert)
       .select("id")
       .single();
     if (error) return json({ error: error.message }, 500);
