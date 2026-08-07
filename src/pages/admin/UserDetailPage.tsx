@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import AdminLayout from "@/components/admin-portal/AdminLayout";
+import TopScrollSync from "@/components/admin-portal/TopScrollSync";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -778,7 +779,7 @@ const UserDetailPage = () => {
                 ) : transfers.length === 0 ? (
                   <EmptyState icon={ArrowRightLeft} title="No transfers yet" description="This user hasn't sent or received any transfers." size="sm" />
                 ) : (
-                  <div className="overflow-x-auto">
+                  <TopScrollSync>
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -815,7 +816,7 @@ const UserDetailPage = () => {
                         ))}
                       </TableBody>
                     </Table>
-                  </div>
+                  </TopScrollSync>
                 )}
               </CardContent>
             </Card>

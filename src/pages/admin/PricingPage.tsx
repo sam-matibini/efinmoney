@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Tags, Plus, Trash2, Loader2, Save, X, AlertTriangle, RefreshCw } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import TopScrollSync from "@/components/admin-portal/TopScrollSync";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
@@ -133,7 +134,7 @@ export default function PricingPage() {
       </div>
 
       <div className="rounded-2xl border border-border overflow-hidden">
-        <div className="overflow-x-auto">
+        <TopScrollSync>
           <table className="w-full text-sm">
             <thead className="bg-muted/50 text-xs uppercase text-muted-foreground">
               <tr>
@@ -156,7 +157,7 @@ export default function PricingPage() {
               )}
             </tbody>
           </table>
-        </div>
+        </TopScrollSync>
       </div>
       <p className="text-xs text-muted-foreground mt-3">
         Live corridors are active — fees and FX markup apply immediately to user transfer quotes. Toggle Live off to revert a corridor to global defaults.

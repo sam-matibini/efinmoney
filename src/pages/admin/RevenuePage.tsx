@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import TopScrollSync from "@/components/admin-portal/TopScrollSync";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TrendingUp, DollarSign, Calendar, Clock } from "lucide-react";
@@ -270,7 +271,7 @@ export default function RevenuePage() {
             {recent.length === 0 ? (
               <p className="text-sm text-muted-foreground py-8 text-center">No fee transactions yet</p>
             ) : (
-              <div className="rounded-md border overflow-x-auto">
+              <TopScrollSync className="rounded-md border">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -303,7 +304,7 @@ export default function RevenuePage() {
                     ))}
                   </TableBody>
                 </Table>
-              </div>
+              </TopScrollSync>
             )}
           </CardContent>
         </Card>
