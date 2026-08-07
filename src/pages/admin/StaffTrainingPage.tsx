@@ -533,17 +533,31 @@ ${tpl.content_html}
               </div>
               {cLoading ? <Skeleton className="h-24 w-full" /> : (
                 <Table>
-                  <TableHeader><TableRow><TableHead>Course</TableHead><TableHead>Program area</TableHead><TableHead>Mandatory</TableHead><TableHead>Pass mark</TableHead><TableHead>Content</TableHead><TableHead>Frequency</TableHead><TableHead className="text-right">Edit</TableHead></TableRow></TableHeader>
+                  <TableHeader><TableRow><TableHead>Course</TableHead><TableHead>Program area</TableHead><TableHead>Requirement</TableHead><TableHead>Pass mark</TableHead><TableHead>Content</TableHead><TableHead>Frequency</TableHead><TableHead className="text-right">Edit</TableHead></TableRow></TableHeader>
                   <TableBody>
                     {catalogueFiltered.length === 0 ? <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">No courses in this program area.</TableCell></TableRow> : catalogueFiltered.map((c: Any) => (
                       <TableRow key={c.id}>
                         <TableCell className="font-medium">{c.course_name}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">{programLabel(c.program_area) || c.category}</TableCell>
                         <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Switch checked={!!c.is_mandatory} onCheckedChange={(v) => setMandatory.mutate({ id: c.id, value: v })} />
-                            {c.is_mandatory ? <Badge className="bg-red-500/10 text-red-600">Mandatory</Badge> : <Badge className="bg-muted">Optional</Badge>}
-                          </div>
+                          {(() => {
+                            const rt = requirementOf(c);
+                            return (
+                              <div className="space-y-1">
+                                <Badge className={rt === "all_staff" ? "bg-red-500/10 text-red-600" : rt === "role_based" ? "bg-amber-500/10 text-amber-600" : "bg-muted"}>
+                                  {requirementLabel(rt)}
+                                </Badge>
+                                {rt === "role_based" && (
+                                  <div className="text-xs text-muted-foreground">
+                                    {(Array.isArray(c.applies_to_roles) && c.applies_to_roles.length ? c.applies_to_roles.map(roleLabel).join(", ") : "No roles selected")}
+                                  </div>
+                                )}
+                                {rt !== "elective" && c.onboarding_due_days ? (
+                                  <div className="text-xs text-muted-foreground">Onboarding: {c.onboarding_due_days} days</div>
+                                ) : null}
+                              </div>
+                            );
+                          })()}
                         </TableCell>
                         <TableCell className="font-mono">{c.pass_mark ?? 70}%</TableCell>
                         <TableCell className="text-xs text-muted-foreground">{(Array.isArray(c.study_materials) ? c.study_materials.length : 0)} lessons · {(Array.isArray(c.quiz) ? c.quiz.length : 0)} questions</TableCell>
