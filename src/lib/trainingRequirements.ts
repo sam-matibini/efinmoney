@@ -22,8 +22,8 @@ export const REQUIREMENT_OPTIONS: Array<{ value: RequirementType; label: string;
   { value: "elective", label: "Elective", hint: "Optional — tracked but never overdue." },
 ];
 
-export const roleLabel = (role: string) =>
-  role.replace(/_/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
+export const roleLabel = (role: string | null | undefined) =>
+  (role || "unassigned").replace(/_/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
 
 export const requirementLabel = (t: string | undefined | null) =>
   t === "all_staff" ? "All staff" : t === "role_based" ? "By role" : "Elective";
