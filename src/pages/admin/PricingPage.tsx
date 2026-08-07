@@ -3,6 +3,9 @@ import { Tags, Plus, Trash2, Loader2, Save, X, AlertTriangle, RefreshCw } from "
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import TopScrollSync from "@/components/admin-portal/TopScrollSync";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import SectionBoundary from "@/components/common/SectionBoundary";
+import PartnerNetworkPanel from "@/components/settings/PartnerNetworkPanel";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
@@ -65,6 +68,27 @@ const EMPTY: NewPricingRule = {
 };
 
 export default function PricingPage() {
+  return (
+    <div className="max-w-[1400px] mx-auto space-y-4">
+      <Tabs defaultValue="rate-card" className="space-y-4">
+        <div className="overflow-x-auto pb-2">
+          <TabsList className="inline-flex w-auto">
+            <TabsTrigger value="rate-card">Rate card</TabsTrigger>
+            <TabsTrigger value="partners">Partners & Routing</TabsTrigger>
+          </TabsList>
+        </div>
+        <TabsContent value="rate-card">
+          <RateCardPanel />
+        </TabsContent>
+        <TabsContent value="partners">
+          <SectionBoundary name="PartnerNetworkPanel"><PartnerNetworkPanel /></SectionBoundary>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+function RateCardPanel() {
   const qc = useQueryClient();
   const { data: rules = [], isLoading, isFetching } = usePricingRules();
   const create = useCreatePricingRule();
