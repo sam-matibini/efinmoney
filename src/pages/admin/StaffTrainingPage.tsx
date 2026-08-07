@@ -19,6 +19,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { format, isPast } from "date-fns";
 import { toast } from "sonner";
 import AdminLayout from "@/components/admin-portal/AdminLayout";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  STAFF_ROLES, REQUIREMENT_OPTIONS, roleLabel, requirementLabel, requirementOf,
+  isRequiredFor, courseState, STATE_LABEL, STATE_CLASS, type CellState,
+} from "@/lib/trainingRequirements";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Any = any;
@@ -46,7 +51,8 @@ export default function StaffTrainingPage() {
   const [showEdit, setShowEdit] = useState(false);
   const [editCourse, setEditCourse] = useState<Any | null>(null);
   const [editTab, setEditTab] = useState("meta");
-  const [editMeta, setEditMeta] = useState({ course_name: "", program_area: "fintrac_mandatory", role_requirement: "", estimated_minutes: "30", pass_mark: "70", frequency_months: "12", is_mandatory: false });
+  const [editMeta, setEditMeta] = useState({ course_name: "", program_area: "fintrac_mandatory", role_requirement: "", estimated_minutes: "30", pass_mark: "70", frequency_months: "12", requirement_type: "elective", onboarding_due_days: "" });
+  const [editRoles, setEditRoles] = useState<string[]>([]);
   const [editLessons, setEditLessons] = useState<Array<{ title: string; body: string }>>([]);
   const [editQuiz, setEditQuiz] = useState<Array<{ question: string; options: string[]; answer: number }>>([]);
   const [editLinks, setEditLinks] = useState<Array<{ label: string; url: string; type: string }>>([]);
@@ -108,14 +114,6 @@ export default function StaffTrainingPage() {
     onError: () => toast.error("Failed to add course"),
   });
 
-  const setMandatory = useMutation({
-    mutationFn: async ({ id, value }: { id: string; value: boolean }) => {
-      const { error } = await (supabase as Any).from("training_courses").update({ is_mandatory: value }).eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["training-courses"] }); toast.success("Course updated"); },
-    onError: () => toast.error("Failed to update course"),
-  });
 
   const logCompletion = useMutation({
     mutationFn: async () => {
@@ -184,8 +182,10 @@ export default function StaffTrainingPage() {
       estimated_minutes: String(course.estimated_minutes ?? 30),
       pass_mark: String(course.pass_mark ?? 70),
       frequency_months: String(course.frequency_months ?? 12),
-      is_mandatory: !!course.is_mandatory,
+      requirement_type: requirementOf(course),
+      onboarding_due_days: course.onboarding_due_days != null ? String(course.onboarding_due_days) : "",
     });
+    setEditRoles(Array.isArray(course.applies_to_roles) ? [...course.applies_to_roles] : []);
     setEditLessons(Array.isArray(course.study_materials) ? JSON.parse(JSON.stringify(course.study_materials)) : []);
     setEditQuiz(Array.isArray(course.quiz) ? JSON.parse(JSON.stringify(course.quiz)) : []);
     setEditLinks(Array.isArray(course.resources) ? JSON.parse(JSON.stringify(course.resources)) : []);
@@ -293,7 +293,8 @@ ${tpl.content_html}
 
   const expired = records.filter((r: Any) => r.expiry_date && isPast(new Date(r.expiry_date))).length;
 
-  const mandatory = courses.filter((c: Any) => c.is_mandatory);
+  // Courses that are required for at least one role (Tier 1 + Tier 2).
+  const mandatory = courses.filter((c: Any) => requirementOf(c) !== "elective");
   const hasContent = (c: Any) => Array.isArray(c.quiz) && c.quiz.length > 0;
   const learnable = courses.filter(hasContent); // all courses with content (mandatory + elective)
 
@@ -305,41 +306,71 @@ ${tpl.content_html}
   };
   const learnableFiltered = learnable.filter(matchesProgram);
   const catalogueFiltered = courses.filter(matchesProgram);
-  const staffRows = staff.length
-    ? staff.map((s: Any) => ({ id: s.user_id || s.id, name: s.full_name || s.email || s.user_id || s.id }))
-    : Array.from(new Set(records.map((r: Any) => r.staff_id).filter(Boolean))).map((id: Any) => ({ id, name: id as string }));
+  const staffRows: Array<{ id: string; name: string; role: string | null; activatedAt: string | null }> = staff.length
+    ? staff.map((s: Any) => ({
+        id: s.user_id || s.id,
+        name: s.full_name || s.email || s.user_id || s.id,
+        role: s.role ?? null,
+        activatedAt: s.activated_at || s.updated_at || s.created_at || null,
+      }))
+    : Array.from(new Set(records.map((r: Any) => r.staff_id).filter(Boolean))).map((id: Any) => ({ id: id as string, name: id as string, role: null, activatedAt: null }));
 
-  const cellStatus = (staffId: string, course: Any) => {
+  const staffById = (id: string) => staffRows.find((s) => s.id === id);
+
+  const newestPass = (staffId: string, course: Any) => {
     const hits = records.filter((r: Any) => r.staff_id === staffId && (r.course_id === course.id || r.course_name === course.course_name) && r.passed);
-    if (!hits.length) return "missing";
-    const newest = hits.reduce((a: Any, b: Any) => (new Date(a.completed_at) > new Date(b.completed_at) ? a : b));
-    if (newest.expiry_date && isPast(new Date(newest.expiry_date))) return "expired";
-    return "current";
+    if (!hits.length) return null;
+    return hits.reduce((a: Any, b: Any) => (new Date(a.completed_at) > new Date(b.completed_at) ? a : b));
   };
 
-  const statusBadge = (s: string) =>
-    s === "current" ? <Badge className="bg-emerald-500/10 text-emerald-600">Current</Badge>
-      : s === "expired" ? <Badge className="bg-amber-500/10 text-amber-600">Expired</Badge>
-      : <Badge className="bg-red-500/10 text-red-600">Missing</Badge>;
+  const cellStatus = (staffId: string, course: Any): CellState => {
+    const rec = newestPass(staffId, course);
+    return courseState({
+      completedAt: rec?.completed_at ?? null,
+      expiryDate: rec?.expiry_date ?? null,
+      onboardingDueDays: course.onboarding_due_days ?? null,
+      activatedAt: staffById(staffId)?.activatedAt ?? null,
+    });
+  };
 
-  const gaps = staffRows.reduce((n, s) => n + mandatory.filter((c: Any) => cellStatus(s.id, c) !== "current").length, 0);
+  const statusBadge = (s: CellState) => <Badge className={STATE_CLASS[s]}>{STATE_LABEL[s]}</Badge>;
 
-  // Per-course completion rate across all staff (passing, non-expired record).
+  // Courses required for a given staff member, based on their role.
+  const requiredFor = (s: { role: string | null }) => mandatory.filter((c: Any) => isRequiredFor(c, s.role));
+
+  const gaps = staffRows.reduce((n, s) => n + requiredFor(s).filter((c: Any) => cellStatus(s.id, c) !== "current").length, 0);
+
+  // Per-course completion rate across the staff the course actually applies to.
   const completionRate = (course: Any) => {
-    if (!staffRows.length) return 0;
-    const done = staffRows.filter((s) => cellStatus(s.id, course) === "current").length;
-    return Math.round((done / staffRows.length) * 100);
+    const applicable = staffRows.filter((s) => isRequiredFor(course, s.role));
+    if (!applicable.length) return 0;
+    const done = applicable.filter((s) => cellStatus(s.id, course) === "current").length;
+    return Math.round((done / applicable.length) * 100);
   };
   const overallRate = mandatory.length && staffRows.length
     ? Math.round(mandatory.reduce((sum: number, c: Any) => sum + completionRate(c), 0) / mandatory.length)
     : 0;
 
+  const fullyCompliant = staffRows.filter((s) => requiredFor(s).every((c: Any) => cellStatus(s.id, c) === "current")).length;
+  const staffOverdue = staffRows.filter((s) => requiredFor(s).some((c: Any) => ["expired", "onboarding_overdue"].includes(cellStatus(s.id, c)))).length;
+  const expiringSoon = staffRows.reduce((n, s) => n + requiredFor(s).filter((c: Any) => cellStatus(s.id, c) === "due_soon").length, 0);
+
   // ---- Learner view helpers (current user) ----
   const myId = me?.id;
+  const myRow = myId ? staffById(myId) : undefined;
+  const myRole = myRow?.role ?? null;
   const myAssignmentFor = (courseId: string) => assignments.find((a: Any) => a.staff_id === myId && a.course_id === courseId);
-  const myStatus = (course: Any): "current" | "expired" | "missing" => (myId ? cellStatus(myId, course) : "missing") as Any;
+  const myStatus = (course: Any): CellState => (myId ? cellStatus(myId, course) : "missing");
   const myRecords = records.filter((r: Any) => r.staff_id === myId);
-  const myCompleted = learnable.filter((c: Any) => myStatus(c) === "current").length;
+  const myRequired = learnableFiltered.filter((c: Any) => isRequiredFor(c, myRole));
+  const myOptional = learnableFiltered.filter((c: Any) => !isRequiredFor(c, myRole));
+  const myCompleted = myRequired.filter((c: Any) => myStatus(c) === "current").length;
+  const myOnboardingDue = (course: Any) => {
+    if (!course.onboarding_due_days || !myRow?.activatedAt) return null;
+    const d = new Date(myRow.activatedAt);
+    d.setDate(d.getDate() + Number(course.onboarding_due_days));
+    return d;
+  };
 
   const answeredAll = learn && Array.isArray(learn.quiz) && learn.quiz.length > 0
     ? learn.quiz.every((_: Any, i: number) => answers[i] != null)
@@ -366,14 +397,14 @@ ${tpl.content_html}
         {/* ------------------------------- LEARNER ------------------------------- */}
         <TabsContent value="learn" className="space-y-6">
           <div className="grid sm:grid-cols-3 gap-3">
-            <Card><CardContent className="pt-4 pb-3"><div className="text-2xl font-bold">{learnable.length}</div><div className="text-xs text-muted-foreground">Assigned courses</div></CardContent></Card>
+            <Card><CardContent className="pt-4 pb-3"><div className="text-2xl font-bold">{myRequired.length}</div><div className="text-xs text-muted-foreground">Required for {roleLabel(myRole)}</div></CardContent></Card>
             <Card><CardContent className="pt-4 pb-3"><div className="text-2xl font-bold text-emerald-500">{myCompleted}</div><div className="text-xs text-muted-foreground">Completed</div></CardContent></Card>
-            <Card><CardContent className="pt-4 pb-3"><div className="text-2xl font-bold text-amber-500">{learnable.length - myCompleted}</div><div className="text-xs text-muted-foreground">Outstanding</div></CardContent></Card>
+            <Card><CardContent className="pt-4 pb-3"><div className="text-2xl font-bold text-amber-500">{myRequired.length - myCompleted}</div><div className="text-xs text-muted-foreground">Outstanding</div></CardContent></Card>
           </div>
 
           <Card>
             <CardHeader><CardTitle>My Courses</CardTitle></CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-6">
               <div className="flex gap-2 flex-wrap">
                 {(["all","fintrac","boc_rpaa","consulting"] as const).map((key) => (
                   <Button key={key} size="sm" variant={programFilter === key ? "default" : "outline"} onClick={() => setProgramFilter(key)}>
@@ -384,30 +415,46 @@ ${tpl.content_html}
               {cLoading ? <Skeleton className="h-24 w-full" /> : learnableFiltered.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No courses in this program area yet.</p>
               ) : (
-                <Table>
-                  <TableHeader><TableRow><TableHead>Course</TableHead><TableHead>Program area</TableHead><TableHead>Duration</TableHead><TableHead>Pass mark</TableHead><TableHead>Due by</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
-                  <TableBody>
-                    {learnableFiltered.map((c: Any) => {
-                      const st = myStatus(c);
-                      const a = myAssignmentFor(c.id);
-                      return (
-                        <TableRow key={c.id}>
-                          <TableCell className="font-medium">{c.course_name}</TableCell>
-                          <TableCell className="text-xs text-muted-foreground">{programLabel(c.program_area) || c.category}</TableCell>
-                          <TableCell className="text-xs"><Clock className="w-3 h-3 inline mr-1" />{c.estimated_minutes ?? 30} min</TableCell>
-                          <TableCell className="font-mono">{c.pass_mark ?? 70}%</TableCell>
-                          <TableCell className="text-xs">{a?.expected_completion_date ? format(new Date(a.expected_completion_date), "MMM d, yyyy") : "—"}</TableCell>
-                          <TableCell>{st === "current" ? <Badge className="bg-emerald-500/10 text-emerald-600">Completed</Badge> : st === "expired" ? <Badge className="bg-amber-500/10 text-amber-600">Renewal due</Badge> : <Badge className="bg-muted">Not started</Badge>}</TableCell>
-                          <TableCell className="text-right">
-                            <Button size="sm" variant={st === "current" ? "outline" : "default"} onClick={() => openCourse(c)}>
-                              <PlayCircle className="w-4 h-4 mr-1" />{st === "current" ? "Retake" : "Start training"}
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
+                ([
+                  { key: "required", title: "Mandatory", desc: "Must be completed and kept current for your role.", rows: myRequired },
+                  { key: "optional", title: "Elective", desc: "Optional professional development.", rows: myOptional },
+                ] as const).filter((g) => g.rows.length > 0).map((g) => (
+                  <div key={g.key} className="space-y-2">
+                    <div>
+                      <h3 className="text-sm font-semibold">{g.title} <span className="text-muted-foreground font-normal">({g.rows.length})</span></h3>
+                      <p className="text-xs text-muted-foreground">{g.desc}</p>
+                    </div>
+                    <Table>
+                      <TableHeader><TableRow><TableHead>Course</TableHead><TableHead>Requirement</TableHead><TableHead>Duration</TableHead><TableHead>Pass mark</TableHead><TableHead>Due by</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
+                      <TableBody>
+                        {g.rows.map((c: Any) => {
+                          const st = myStatus(c);
+                          const a = myAssignmentFor(c.id);
+                          const onboardDue = myOnboardingDue(c);
+                          const due = a?.expected_completion_date ? new Date(a.expected_completion_date) : onboardDue;
+                          return (
+                            <TableRow key={c.id}>
+                              <TableCell className="font-medium">
+                                {c.course_name}
+                                <div className="text-xs text-muted-foreground">{programLabel(c.program_area) || c.category}</div>
+                              </TableCell>
+                              <TableCell className="text-xs">{requirementLabel(requirementOf(c))}</TableCell>
+                              <TableCell className="text-xs"><Clock className="w-3 h-3 inline mr-1" />{c.estimated_minutes ?? 30} min</TableCell>
+                              <TableCell className="font-mono">{c.pass_mark ?? 70}%</TableCell>
+                              <TableCell className="text-xs">{due ? format(due, "MMM d, yyyy") : "—"}</TableCell>
+                              <TableCell>{statusBadge(st)}</TableCell>
+                              <TableCell className="text-right">
+                                <Button size="sm" variant={st === "current" ? "outline" : "default"} onClick={() => openCourse(c)}>
+                                  <PlayCircle className="w-4 h-4 mr-1" />{st === "current" ? "Retake" : "Start training"}
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                ))
               )}
             </CardContent>
           </Card>
@@ -440,10 +487,10 @@ ${tpl.content_html}
         {/* ------------------------------- ADMIN ------------------------------- */}
         <TabsContent value="manage" className="space-y-6">
           <div className="grid sm:grid-cols-4 gap-3">
-            <Card><CardContent className="pt-4 pb-3"><div className="text-2xl font-bold">{courses.length}</div><div className="text-xs text-muted-foreground">Courses ({mandatory.length} mandatory)</div></CardContent></Card>
-            <Card><CardContent className="pt-4 pb-3"><div className="text-2xl font-bold">{records.length}</div><div className="text-xs text-muted-foreground">Completions</div></CardContent></Card>
-            <Card><CardContent className="pt-4 pb-3"><div className="text-2xl font-bold text-red-500">{expired}</div><div className="text-xs text-muted-foreground">Expired certs</div></CardContent></Card>
-            <Card><CardContent className="pt-4 pb-3"><div className={`text-2xl font-bold ${overallRate >= 100 ? "text-emerald-500" : "text-amber-500"}`}>{overallRate}%</div><div className="text-xs text-muted-foreground">Overall completion</div></CardContent></Card>
+            <Card><CardContent className="pt-4 pb-3"><div className="text-2xl font-bold text-emerald-500">{fullyCompliant}<span className="text-sm text-muted-foreground">/{staffRows.length}</span></div><div className="text-xs text-muted-foreground">Staff fully compliant</div></CardContent></Card>
+            <Card><CardContent className="pt-4 pb-3"><div className="text-2xl font-bold text-red-500">{staffOverdue}</div><div className="text-xs text-muted-foreground">Staff overdue</div></CardContent></Card>
+            <Card><CardContent className="pt-4 pb-3"><div className="text-2xl font-bold text-amber-500">{expiringSoon}</div><div className="text-xs text-muted-foreground">Expiring in 30 days</div></CardContent></Card>
+            <Card><CardContent className="pt-4 pb-3"><div className={`text-2xl font-bold ${overallRate >= 100 ? "text-emerald-500" : "text-amber-500"}`}>{overallRate}%</div><div className="text-xs text-muted-foreground">Overall completion · {mandatory.length} required of {courses.length}</div></CardContent></Card>
           </div>
 
           <Card>
@@ -478,17 +525,31 @@ ${tpl.content_html}
               </div>
               {cLoading ? <Skeleton className="h-24 w-full" /> : (
                 <Table>
-                  <TableHeader><TableRow><TableHead>Course</TableHead><TableHead>Program area</TableHead><TableHead>Mandatory</TableHead><TableHead>Pass mark</TableHead><TableHead>Content</TableHead><TableHead>Frequency</TableHead><TableHead className="text-right">Edit</TableHead></TableRow></TableHeader>
+                  <TableHeader><TableRow><TableHead>Course</TableHead><TableHead>Program area</TableHead><TableHead>Requirement</TableHead><TableHead>Pass mark</TableHead><TableHead>Content</TableHead><TableHead>Frequency</TableHead><TableHead className="text-right">Edit</TableHead></TableRow></TableHeader>
                   <TableBody>
                     {catalogueFiltered.length === 0 ? <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">No courses in this program area.</TableCell></TableRow> : catalogueFiltered.map((c: Any) => (
                       <TableRow key={c.id}>
                         <TableCell className="font-medium">{c.course_name}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">{programLabel(c.program_area) || c.category}</TableCell>
                         <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Switch checked={!!c.is_mandatory} onCheckedChange={(v) => setMandatory.mutate({ id: c.id, value: v })} />
-                            {c.is_mandatory ? <Badge className="bg-red-500/10 text-red-600">Mandatory</Badge> : <Badge className="bg-muted">Optional</Badge>}
-                          </div>
+                          {(() => {
+                            const rt = requirementOf(c);
+                            return (
+                              <div className="space-y-1">
+                                <Badge className={rt === "all_staff" ? "bg-red-500/10 text-red-600" : rt === "role_based" ? "bg-amber-500/10 text-amber-600" : "bg-muted"}>
+                                  {requirementLabel(rt)}
+                                </Badge>
+                                {rt === "role_based" && (
+                                  <div className="text-xs text-muted-foreground">
+                                    {(Array.isArray(c.applies_to_roles) && c.applies_to_roles.length ? c.applies_to_roles.map(roleLabel).join(", ") : "No roles selected")}
+                                  </div>
+                                )}
+                                {rt !== "elective" && c.onboarding_due_days ? (
+                                  <div className="text-xs text-muted-foreground">Onboarding: {c.onboarding_due_days} days</div>
+                                ) : null}
+                              </div>
+                            );
+                          })()}
                         </TableCell>
                         <TableCell className="font-mono">{c.pass_mark ?? 70}%</TableCell>
                         <TableCell className="text-xs text-muted-foreground">{(Array.isArray(c.study_materials) ? c.study_materials.length : 0)} lessons · {(Array.isArray(c.quiz) ? c.quiz.length : 0)} questions</TableCell>
@@ -507,7 +568,10 @@ ${tpl.content_html}
           </Card>
 
           <Card>
-            <CardHeader><CardTitle>Mandatory Training Compliance Matrix</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle>Mandatory Training Compliance Matrix</CardTitle>
+              <p className="text-xs text-muted-foreground">Role-based courses only count for the roles they apply to; “n/a” means the course is not required for that staff member.</p>
+            </CardHeader>
             <CardContent className="overflow-x-auto">
               {mandatory.length === 0 || staffRows.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Add mandatory courses and staff records to see the matrix.</p>
@@ -516,14 +580,25 @@ ${tpl.content_html}
                   <TableHeader>
                     <TableRow>
                       <TableHead>Staff</TableHead>
-                      {mandatory.map((c: Any) => <TableHead key={c.id}>{c.course_name}</TableHead>)}
+                      <TableHead>Role</TableHead>
+                      {mandatory.map((c: Any) => (
+                        <TableHead key={c.id}>
+                          {c.course_name}
+                          <div className="text-[10px] font-normal text-muted-foreground">{requirementLabel(requirementOf(c))}</div>
+                        </TableHead>
+                      ))}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {staffRows.map((s) => (
                       <TableRow key={s.id}>
                         <TableCell className="font-medium">{s.name}</TableCell>
-                        {mandatory.map((c: Any) => <TableCell key={c.id}>{statusBadge(cellStatus(s.id, c))}</TableCell>)}
+                        <TableCell className="text-xs text-muted-foreground">{roleLabel(s.role)}</TableCell>
+                        {mandatory.map((c: Any) => (
+                          <TableCell key={c.id}>
+                            {isRequiredFor(c, s.role) ? statusBadge(cellStatus(s.id, c)) : <span className="text-xs text-muted-foreground">n/a</span>}
+                          </TableCell>
+                        ))}
                       </TableRow>
                     ))}
                   </TableBody>
@@ -796,11 +871,50 @@ ${tpl.content_html}
                   <div><Label>Pass mark (%)</Label><Input type="number" value={editMeta.pass_mark} onChange={(e) => setEditMeta({ ...editMeta, pass_mark: e.target.value })} /></div>
                   <div><Label>Frequency (months)</Label><Input type="number" value={editMeta.frequency_months} onChange={(e) => setEditMeta({ ...editMeta, frequency_months: e.target.value })} /></div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <Switch id="edit-mandatory" checked={editMeta.is_mandatory} onCheckedChange={(v) => setEditMeta({ ...editMeta, is_mandatory: v })} />
-                  <Label htmlFor="edit-mandatory" className="cursor-pointer">Mandatory for all staff</Label>
+                <div className="rounded-lg border p-3 space-y-3">
+                  <Label>Requirement</Label>
+                  <Select value={editMeta.requirement_type} onValueChange={(v) => setEditMeta({ ...editMeta, requirement_type: v, onboarding_due_days: v === "elective" ? "" : (editMeta.onboarding_due_days || (v === "all_staff" ? "30" : "60")) })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {REQUIREMENT_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">{REQUIREMENT_OPTIONS.find((o) => o.value === editMeta.requirement_type)?.hint}</p>
+
+                  {editMeta.requirement_type === "role_based" && (
+                    <div className="grid grid-cols-2 gap-2 pt-1">
+                      {STAFF_ROLES.map((r) => (
+                        <label key={r} className="flex items-center gap-2 text-sm cursor-pointer">
+                          <Checkbox
+                            checked={editRoles.includes(r)}
+                            onCheckedChange={(v) => setEditRoles(v ? [...editRoles, r] : editRoles.filter((x) => x !== r))}
+                          />
+                          {roleLabel(r)}
+                        </label>
+                      ))}
+                    </div>
+                  )}
+
+                  {editMeta.requirement_type !== "elective" && (
+                    <div>
+                      <Label>Onboarding deadline (days from activation)</Label>
+                      <Input type="number" className="w-32" value={editMeta.onboarding_due_days}
+                        onChange={(e) => setEditMeta({ ...editMeta, onboarding_due_days: e.target.value })} />
+                    </div>
+                  )}
                 </div>
-                <Button onClick={() => patchCourse.mutate({ course_name: editMeta.course_name, program_area: editMeta.program_area, role_requirement: editMeta.role_requirement || null, estimated_minutes: Number(editMeta.estimated_minutes), pass_mark: Number(editMeta.pass_mark), frequency_months: Number(editMeta.frequency_months), is_mandatory: editMeta.is_mandatory })} disabled={patchCourse.isPending || !editMeta.course_name}>
+                <Button onClick={() => patchCourse.mutate({
+                  course_name: editMeta.course_name,
+                  program_area: editMeta.program_area,
+                  role_requirement: editMeta.role_requirement || null,
+                  estimated_minutes: Number(editMeta.estimated_minutes),
+                  pass_mark: Number(editMeta.pass_mark),
+                  frequency_months: Number(editMeta.frequency_months),
+                  requirement_type: editMeta.requirement_type,
+                  applies_to_roles: editMeta.requirement_type === "role_based" ? editRoles : [],
+                  onboarding_due_days: editMeta.requirement_type === "elective" || !editMeta.onboarding_due_days ? null : Number(editMeta.onboarding_due_days),
+                  is_mandatory: editMeta.requirement_type !== "elective",
+                })} disabled={patchCourse.isPending || !editMeta.course_name}>
                   {patchCourse.isPending ? "Saving…" : "Save metadata"}
                 </Button>
               </TabsContent>
