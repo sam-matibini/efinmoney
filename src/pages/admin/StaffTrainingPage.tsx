@@ -576,7 +576,10 @@ ${tpl.content_html}
           </Card>
 
           <Card>
-            <CardHeader><CardTitle>Mandatory Training Compliance Matrix</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle>Mandatory Training Compliance Matrix</CardTitle>
+              <p className="text-xs text-muted-foreground">Role-based courses only count for the roles they apply to; “n/a” means the course is not required for that staff member.</p>
+            </CardHeader>
             <CardContent className="overflow-x-auto">
               {mandatory.length === 0 || staffRows.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Add mandatory courses and staff records to see the matrix.</p>
@@ -585,14 +588,25 @@ ${tpl.content_html}
                   <TableHeader>
                     <TableRow>
                       <TableHead>Staff</TableHead>
-                      {mandatory.map((c: Any) => <TableHead key={c.id}>{c.course_name}</TableHead>)}
+                      <TableHead>Role</TableHead>
+                      {mandatory.map((c: Any) => (
+                        <TableHead key={c.id}>
+                          {c.course_name}
+                          <div className="text-[10px] font-normal text-muted-foreground">{requirementLabel(requirementOf(c))}</div>
+                        </TableHead>
+                      ))}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {staffRows.map((s) => (
                       <TableRow key={s.id}>
                         <TableCell className="font-medium">{s.name}</TableCell>
-                        {mandatory.map((c: Any) => <TableCell key={c.id}>{statusBadge(cellStatus(s.id, c))}</TableCell>)}
+                        <TableCell className="text-xs text-muted-foreground">{roleLabel(s.role)}</TableCell>
+                        {mandatory.map((c: Any) => (
+                          <TableCell key={c.id}>
+                            {isRequiredFor(c, s.role) ? statusBadge(cellStatus(s.id, c)) : <span className="text-xs text-muted-foreground">n/a</span>}
+                          </TableCell>
+                        ))}
                       </TableRow>
                     ))}
                   </TableBody>
