@@ -495,10 +495,10 @@ ${tpl.content_html}
         {/* ------------------------------- ADMIN ------------------------------- */}
         <TabsContent value="manage" className="space-y-6">
           <div className="grid sm:grid-cols-4 gap-3">
-            <Card><CardContent className="pt-4 pb-3"><div className="text-2xl font-bold">{courses.length}</div><div className="text-xs text-muted-foreground">Courses ({mandatory.length} mandatory)</div></CardContent></Card>
-            <Card><CardContent className="pt-4 pb-3"><div className="text-2xl font-bold">{records.length}</div><div className="text-xs text-muted-foreground">Completions</div></CardContent></Card>
-            <Card><CardContent className="pt-4 pb-3"><div className="text-2xl font-bold text-red-500">{expired}</div><div className="text-xs text-muted-foreground">Expired certs</div></CardContent></Card>
-            <Card><CardContent className="pt-4 pb-3"><div className={`text-2xl font-bold ${overallRate >= 100 ? "text-emerald-500" : "text-amber-500"}`}>{overallRate}%</div><div className="text-xs text-muted-foreground">Overall completion</div></CardContent></Card>
+            <Card><CardContent className="pt-4 pb-3"><div className="text-2xl font-bold text-emerald-500">{fullyCompliant}<span className="text-sm text-muted-foreground">/{staffRows.length}</span></div><div className="text-xs text-muted-foreground">Staff fully compliant</div></CardContent></Card>
+            <Card><CardContent className="pt-4 pb-3"><div className="text-2xl font-bold text-red-500">{staffOverdue}</div><div className="text-xs text-muted-foreground">Staff overdue</div></CardContent></Card>
+            <Card><CardContent className="pt-4 pb-3"><div className="text-2xl font-bold text-amber-500">{expiringSoon}</div><div className="text-xs text-muted-foreground">Expiring in 30 days</div></CardContent></Card>
+            <Card><CardContent className="pt-4 pb-3"><div className={`text-2xl font-bold ${overallRate >= 100 ? "text-emerald-500" : "text-amber-500"}`}>{overallRate}%</div><div className="text-xs text-muted-foreground">Overall completion · {mandatory.length} required of {courses.length}</div></CardContent></Card>
           </div>
 
           <Card>
