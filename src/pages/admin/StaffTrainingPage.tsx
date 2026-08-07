@@ -804,11 +804,50 @@ ${tpl.content_html}
                   <div><Label>Pass mark (%)</Label><Input type="number" value={editMeta.pass_mark} onChange={(e) => setEditMeta({ ...editMeta, pass_mark: e.target.value })} /></div>
                   <div><Label>Frequency (months)</Label><Input type="number" value={editMeta.frequency_months} onChange={(e) => setEditMeta({ ...editMeta, frequency_months: e.target.value })} /></div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <Switch id="edit-mandatory" checked={editMeta.is_mandatory} onCheckedChange={(v) => setEditMeta({ ...editMeta, is_mandatory: v })} />
-                  <Label htmlFor="edit-mandatory" className="cursor-pointer">Mandatory for all staff</Label>
+                <div className="rounded-lg border p-3 space-y-3">
+                  <Label>Requirement</Label>
+                  <Select value={editMeta.requirement_type} onValueChange={(v) => setEditMeta({ ...editMeta, requirement_type: v, onboarding_due_days: v === "elective" ? "" : (editMeta.onboarding_due_days || (v === "all_staff" ? "30" : "60")) })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {REQUIREMENT_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">{REQUIREMENT_OPTIONS.find((o) => o.value === editMeta.requirement_type)?.hint}</p>
+
+                  {editMeta.requirement_type === "role_based" && (
+                    <div className="grid grid-cols-2 gap-2 pt-1">
+                      {STAFF_ROLES.map((r) => (
+                        <label key={r} className="flex items-center gap-2 text-sm cursor-pointer">
+                          <Checkbox
+                            checked={editRoles.includes(r)}
+                            onCheckedChange={(v) => setEditRoles(v ? [...editRoles, r] : editRoles.filter((x) => x !== r))}
+                          />
+                          {roleLabel(r)}
+                        </label>
+                      ))}
+                    </div>
+                  )}
+
+                  {editMeta.requirement_type !== "elective" && (
+                    <div>
+                      <Label>Onboarding deadline (days from activation)</Label>
+                      <Input type="number" className="w-32" value={editMeta.onboarding_due_days}
+                        onChange={(e) => setEditMeta({ ...editMeta, onboarding_due_days: e.target.value })} />
+                    </div>
+                  )}
                 </div>
-                <Button onClick={() => patchCourse.mutate({ course_name: editMeta.course_name, program_area: editMeta.program_area, role_requirement: editMeta.role_requirement || null, estimated_minutes: Number(editMeta.estimated_minutes), pass_mark: Number(editMeta.pass_mark), frequency_months: Number(editMeta.frequency_months), is_mandatory: editMeta.is_mandatory })} disabled={patchCourse.isPending || !editMeta.course_name}>
+                <Button onClick={() => patchCourse.mutate({
+                  course_name: editMeta.course_name,
+                  program_area: editMeta.program_area,
+                  role_requirement: editMeta.role_requirement || null,
+                  estimated_minutes: Number(editMeta.estimated_minutes),
+                  pass_mark: Number(editMeta.pass_mark),
+                  frequency_months: Number(editMeta.frequency_months),
+                  requirement_type: editMeta.requirement_type,
+                  applies_to_roles: editMeta.requirement_type === "role_based" ? editRoles : [],
+                  onboarding_due_days: editMeta.requirement_type === "elective" || !editMeta.onboarding_due_days ? null : Number(editMeta.onboarding_due_days),
+                  is_mandatory: editMeta.requirement_type !== "elective",
+                })} disabled={patchCourse.isPending || !editMeta.course_name}>
                   {patchCourse.isPending ? "Saving…" : "Save metadata"}
                 </Button>
               </TabsContent>
