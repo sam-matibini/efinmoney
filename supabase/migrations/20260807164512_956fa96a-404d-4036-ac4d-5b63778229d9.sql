@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS idx_profiles_country_code ON public.profiles (country_code);
