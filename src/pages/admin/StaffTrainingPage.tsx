@@ -51,7 +51,8 @@ export default function StaffTrainingPage() {
   const [showEdit, setShowEdit] = useState(false);
   const [editCourse, setEditCourse] = useState<Any | null>(null);
   const [editTab, setEditTab] = useState("meta");
-  const [editMeta, setEditMeta] = useState({ course_name: "", program_area: "fintrac_mandatory", role_requirement: "", estimated_minutes: "30", pass_mark: "70", frequency_months: "12", is_mandatory: false });
+  const [editMeta, setEditMeta] = useState({ course_name: "", program_area: "fintrac_mandatory", role_requirement: "", estimated_minutes: "30", pass_mark: "70", frequency_months: "12", requirement_type: "elective", onboarding_due_days: "" });
+  const [editRoles, setEditRoles] = useState<string[]>([]);
   const [editLessons, setEditLessons] = useState<Array<{ title: string; body: string }>>([]);
   const [editQuiz, setEditQuiz] = useState<Array<{ question: string; options: string[]; answer: number }>>([]);
   const [editLinks, setEditLinks] = useState<Array<{ label: string; url: string; type: string }>>([]);
