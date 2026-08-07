@@ -301,7 +301,8 @@ ${tpl.content_html}
 
   const expired = records.filter((r: Any) => r.expiry_date && isPast(new Date(r.expiry_date))).length;
 
-  const mandatory = courses.filter((c: Any) => c.is_mandatory);
+  // Courses that are required for at least one role (Tier 1 + Tier 2).
+  const mandatory = courses.filter((c: Any) => requirementOf(c) !== "elective");
   const hasContent = (c: Any) => Array.isArray(c.quiz) && c.quiz.length > 0;
   const learnable = courses.filter(hasContent); // all courses with content (mandatory + elective)
 
@@ -313,41 +314,71 @@ ${tpl.content_html}
   };
   const learnableFiltered = learnable.filter(matchesProgram);
   const catalogueFiltered = courses.filter(matchesProgram);
-  const staffRows = staff.length
-    ? staff.map((s: Any) => ({ id: s.user_id || s.id, name: s.full_name || s.email || s.user_id || s.id }))
-    : Array.from(new Set(records.map((r: Any) => r.staff_id).filter(Boolean))).map((id: Any) => ({ id, name: id as string }));
+  const staffRows: Array<{ id: string; name: string; role: string | null; activatedAt: string | null }> = staff.length
+    ? staff.map((s: Any) => ({
+        id: s.user_id || s.id,
+        name: s.full_name || s.email || s.user_id || s.id,
+        role: s.role ?? null,
+        activatedAt: s.activated_at || s.updated_at || s.created_at || null,
+      }))
+    : Array.from(new Set(records.map((r: Any) => r.staff_id).filter(Boolean))).map((id: Any) => ({ id: id as string, name: id as string, role: null, activatedAt: null }));
 
-  const cellStatus = (staffId: string, course: Any) => {
+  const staffById = (id: string) => staffRows.find((s) => s.id === id);
+
+  const newestPass = (staffId: string, course: Any) => {
     const hits = records.filter((r: Any) => r.staff_id === staffId && (r.course_id === course.id || r.course_name === course.course_name) && r.passed);
-    if (!hits.length) return "missing";
-    const newest = hits.reduce((a: Any, b: Any) => (new Date(a.completed_at) > new Date(b.completed_at) ? a : b));
-    if (newest.expiry_date && isPast(new Date(newest.expiry_date))) return "expired";
-    return "current";
+    if (!hits.length) return null;
+    return hits.reduce((a: Any, b: Any) => (new Date(a.completed_at) > new Date(b.completed_at) ? a : b));
   };
 
-  const statusBadge = (s: string) =>
-    s === "current" ? <Badge className="bg-emerald-500/10 text-emerald-600">Current</Badge>
-      : s === "expired" ? <Badge className="bg-amber-500/10 text-amber-600">Expired</Badge>
-      : <Badge className="bg-red-500/10 text-red-600">Missing</Badge>;
+  const cellStatus = (staffId: string, course: Any): CellState => {
+    const rec = newestPass(staffId, course);
+    return courseState({
+      completedAt: rec?.completed_at ?? null,
+      expiryDate: rec?.expiry_date ?? null,
+      onboardingDueDays: course.onboarding_due_days ?? null,
+      activatedAt: staffById(staffId)?.activatedAt ?? null,
+    });
+  };
 
-  const gaps = staffRows.reduce((n, s) => n + mandatory.filter((c: Any) => cellStatus(s.id, c) !== "current").length, 0);
+  const statusBadge = (s: CellState) => <Badge className={STATE_CLASS[s]}>{STATE_LABEL[s]}</Badge>;
 
-  // Per-course completion rate across all staff (passing, non-expired record).
+  // Courses required for a given staff member, based on their role.
+  const requiredFor = (s: { role: string | null }) => mandatory.filter((c: Any) => isRequiredFor(c, s.role));
+
+  const gaps = staffRows.reduce((n, s) => n + requiredFor(s).filter((c: Any) => cellStatus(s.id, c) !== "current").length, 0);
+
+  // Per-course completion rate across the staff the course actually applies to.
   const completionRate = (course: Any) => {
-    if (!staffRows.length) return 0;
-    const done = staffRows.filter((s) => cellStatus(s.id, course) === "current").length;
-    return Math.round((done / staffRows.length) * 100);
+    const applicable = staffRows.filter((s) => isRequiredFor(course, s.role));
+    if (!applicable.length) return 0;
+    const done = applicable.filter((s) => cellStatus(s.id, course) === "current").length;
+    return Math.round((done / applicable.length) * 100);
   };
   const overallRate = mandatory.length && staffRows.length
     ? Math.round(mandatory.reduce((sum: number, c: Any) => sum + completionRate(c), 0) / mandatory.length)
     : 0;
 
+  const fullyCompliant = staffRows.filter((s) => requiredFor(s).every((c: Any) => cellStatus(s.id, c) === "current")).length;
+  const staffOverdue = staffRows.filter((s) => requiredFor(s).some((c: Any) => ["expired", "onboarding_overdue"].includes(cellStatus(s.id, c)))).length;
+  const expiringSoon = staffRows.reduce((n, s) => n + requiredFor(s).filter((c: Any) => cellStatus(s.id, c) === "due_soon").length, 0);
+
   // ---- Learner view helpers (current user) ----
   const myId = me?.id;
+  const myRow = myId ? staffById(myId) : undefined;
+  const myRole = myRow?.role ?? null;
   const myAssignmentFor = (courseId: string) => assignments.find((a: Any) => a.staff_id === myId && a.course_id === courseId);
-  const myStatus = (course: Any): "current" | "expired" | "missing" => (myId ? cellStatus(myId, course) : "missing") as Any;
+  const myStatus = (course: Any): CellState => (myId ? cellStatus(myId, course) : "missing");
   const myRecords = records.filter((r: Any) => r.staff_id === myId);
-  const myCompleted = learnable.filter((c: Any) => myStatus(c) === "current").length;
+  const myRequired = learnableFiltered.filter((c: Any) => isRequiredFor(c, myRole));
+  const myOptional = learnableFiltered.filter((c: Any) => !isRequiredFor(c, myRole));
+  const myCompleted = myRequired.filter((c: Any) => myStatus(c) === "current").length;
+  const myOnboardingDue = (course: Any) => {
+    if (!course.onboarding_due_days || !myRow?.activatedAt) return null;
+    const d = new Date(myRow.activatedAt);
+    d.setDate(d.getDate() + Number(course.onboarding_due_days));
+    return d;
+  };
 
   const answeredAll = learn && Array.isArray(learn.quiz) && learn.quiz.length > 0
     ? learn.quiz.every((_: Any, i: number) => answers[i] != null)
