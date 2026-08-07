@@ -519,7 +519,7 @@ const UsersPage = () => {
                     ))}
                   </TableBody>
                 </Table>
-              </div>
+              </TopScrollSync>
             )}
           </CardContent>
         </Card>
