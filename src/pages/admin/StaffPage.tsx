@@ -222,11 +222,17 @@ const StaffPage = () => {
             </h1>
             <p className="text-sm text-muted-foreground">Invite team members and manage roles &amp; access</p>
           </div>
-          {canManage && (
-            <Button onClick={() => setInviteOpen(true)} className="gap-2">
-              <UserPlus className="w-4 h-4" /> Invite staff
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={exportCsv} disabled={filtered.length === 0}>
+              <Download className="w-4 h-4" /> Export CSV
             </Button>
-          )}
+            {canManage && (
+              <Button onClick={() => setInviteOpen(true)} className="gap-2">
+                <UserPlus className="w-4 h-4" /> Invite staff
+              </Button>
+            )}
+          </div>
+
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -251,30 +257,63 @@ const StaffPage = () => {
         </div>
 
         <Card>
-          <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <CardTitle className="text-base">All staff ({filtered.length})</CardTitle>
-            <div className="flex items-center gap-2">
+          <CardHeader className="gap-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <CardTitle className="text-base">All staff ({filtered.length})</CardTitle>
+              <div className="relative w-full sm:w-72">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search name, email, role, position or department"
+                  className="pl-9"
+                />
+              </div>
+            </div>
+
+            {/* Filters */}
+            <div className="flex flex-wrap gap-2">
               <Select value={deptFilter} onValueChange={setDeptFilter}>
-                <SelectTrigger className="w-40">
-                  <SelectValue placeholder="All depts" />
-                </SelectTrigger>
+                <SelectTrigger className="w-[180px] h-9"><SelectValue placeholder="Department" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="_all_">All departments</SelectItem>
+                  <SelectItem value={ANY}>All departments</SelectItem>
                   {departments.map((d) => (
                     <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              <div className="relative w-full sm:w-64">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search name, email, role, department"
-                  className="pl-9"
-                />
-              </div>
+
+              <Select value={roleFilter} onValueChange={setRoleFilter}>
+                <SelectTrigger className="w-[180px] h-9"><SelectValue placeholder="Role" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ANY}>All roles</SelectItem>
+                  {roleOptions.map((r) => (
+                    <SelectItem key={r} value={r} className="capitalize">{prettify(r)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-[170px] h-9"><SelectValue placeholder="Status" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ANY}>All statuses</SelectItem>
+                  {statusOptions.map((s) => (
+                    <SelectItem key={s} value={s} className="capitalize">{prettify(s)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={joined} onValueChange={setJoined}>
+                <SelectTrigger className="w-[150px] h-9"><SelectValue placeholder="Joined" /></SelectTrigger>
+                <SelectContent>
+                  {Object.keys(DATE_RANGES).map((k) => (
+                    <SelectItem key={k} value={k}>{DATE_LABEL[k]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
+
+            <FilterChips chips={chips} onClearAll={clearAll} />
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -286,19 +325,22 @@ const StaffPage = () => {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Member</TableHead>
-                      <TableHead>Role</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Department</TableHead>
-                      <TableHead>Joined</TableHead>
+                      <SortHead label="Member" sortKey="name" />
+                      <SortHead label="Role" sortKey="role" />
+                      <SortHead label="Status" sortKey="status" />
+                      <SortHead label="Department" sortKey="department" />
+                      <SortHead label="Position" sortKey="position" />
+                      <SortHead label="Joined" sortKey="created_at" />
                       {canManage && <TableHead className="w-24 text-right">Actions</TableHead>}
                     </TableRow>
                   </TableHeader>
+
                   <TableBody>
                     {filtered.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={canManage ? 6 : 5} className="text-center py-10 text-muted-foreground">
-                          {query ? "No staff match your search" : "No staff yet"}
+                        <TableCell colSpan={canManage ? 7 : 6} className="text-center py-10 text-muted-foreground">
+                          {chips.length > 0 ? "No staff match your filters" : "No staff yet"}
+
                         </TableCell>
                       </TableRow>
                     ) : filtered.map((s) => (
@@ -321,6 +363,8 @@ const StaffPage = () => {
                         <TableCell><RoleBadge role={s.role ?? "viewer"} /></TableCell>
                         <TableCell><StaffStatusBadge status={s.status} /></TableCell>
                         <TableCell className="text-sm text-muted-foreground">{s.department || "—"}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{s.position || "—"}</TableCell>
+
                         <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                           {s.created_at ? format(new Date(s.created_at), "MMM d, yyyy") : "—"}
                         </TableCell>
