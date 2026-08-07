@@ -1,9 +1,13 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import AdminLayout from "@/components/admin-portal/AdminLayout";
 import TopScrollSync from "@/components/admin-portal/TopScrollSync";
+import {
+  ANY, DATE_LABEL, DATE_RANGES, FilterChips, compareBy, downloadCsv, prettify,
+  useSortState, useUrlFilterSync, type FilterChip,
+} from "@/components/admin-portal/TableControls";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -17,9 +21,10 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { RoleBadge, StaffStatusBadge } from "@/components/admin-portal/Badges";
 import InviteStaffModal from "@/components/admin-portal/InviteStaffModal";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
-import { Search, UserPlus, Users as UsersIcon, UserCheck, Clock, ShieldX, Pencil, Trash2, Building2, ChevronDown, ChevronRight } from "lucide-react";
+import { Search, UserPlus, Users as UsersIcon, UserCheck, Clock, ShieldX, Pencil, Trash2, Building2, ChevronDown, ChevronRight, Download } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
+
 
 const ROLES = ["super_admin", "compliance_officer", "finance_officer", "support_agent", "viewer"];
 const STATUSES = ["active", "invited", "pending_review", "suspended", "rejected"];
