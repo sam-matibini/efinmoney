@@ -40,6 +40,8 @@ export const productFeatures = {
   wise: envFlag("VITE_FEATURE_WISE", true),
   /** Square Checkout — card top-up for USD/CAD/EUR/GBP. */
   square: envFlag("VITE_FEATURE_SQUARE", true),
+  /** PayPal Orders API — wallet top-up for USD/CAD/EUR/GBP. */
+  paypal: envFlag("VITE_FEATURE_PAYPAL", true),
   /** Lenhub Flutter wrapper — card collect (USD/CAD/…) + FX bank/MoMo payouts. */
   lenhubFlutter: envFlag("VITE_FEATURE_LENHUB_FLUTTER", true),
   adyen: envFlag("VITE_FEATURE_ADYEN", false),
@@ -55,7 +57,7 @@ export function isFeatureEnabled(key: ProductFeatureKey): boolean {
 export function isLiveTopupCurrency(currency: string): boolean {
   const c = currency.toUpperCase();
   if (productFeatures.nombaNigeria && c === "NGN") return true;
-  if ((productFeatures.paytota || productFeatures.nombaNigeria || productFeatures.fincra || productFeatures.lenhubFlutter || productFeatures.dodo || productFeatures.square) && ["USD", "EUR", "GBP", "CAD"].includes(c)) {
+  if ((productFeatures.paytota || productFeatures.nombaNigeria || productFeatures.fincra || productFeatures.lenhubFlutter || productFeatures.dodo || productFeatures.square || productFeatures.paypal) && ["USD", "EUR", "GBP", "CAD"].includes(c)) {
     return true;
   }
   if (productFeatures.lenhubFlutter && ["NGN", "GHS", "KES", "UGX", "RWF", "TZS"].includes(c)) return true;

@@ -44,6 +44,8 @@ export const PAYTOTA_TOPUP_CURRENCIES = [
 export const DODO_TOPUP_CURRENCIES = ["USD", "CAD", "EUR", "GBP"];
 /** Square Checkout (hosted Payment Link) — western wallet top-up. */
 export const SQUARE_TOPUP_CURRENCIES = ["USD", "CAD", "EUR", "GBP"];
+/** PayPal Orders API — western wallet top-up. */
+export const PAYPAL_TOPUP_CURRENCIES = ["USD", "CAD", "EUR", "GBP"];
 /** Fincra western hosted checkout. CAD uses USD charge → credit CAD wallet. */
 export const FINCRA_WESTERN_CHECKOUT_CURRENCIES = ["USD", "EUR", "GBP", "CAD"];
 /**
@@ -110,6 +112,7 @@ export type WalletTopupGateway =
   | "paytota_pay"
   | "dodo_pay"
   | "square_pay"
+  | "paypal_pay"
   | "lenhub_flutter"
   | "wise_pay"
   | "unsupported";
@@ -117,7 +120,7 @@ export type WalletTopupGateway =
 export type WesternTopupProvider = "flutterwave" | "fincra";
 export type AfricanTopupProvider = "flutterwave" | "fincra";
 /** User-facing intl/CAD method pick (internal keys; UI uses white-label labels). */
-export type IntlTopupMethod = "nomba" | "paytota" | "fincra" | "interac" | "lenhub" | "flutterwave" | "dodo" | "square" | "wise";
+export type IntlTopupMethod = "nomba" | "paytota" | "fincra" | "interac" | "lenhub" | "flutterwave" | "dodo" | "square" | "paypal" | "wise";
 /** African multi-rail method pick. */
 export type AfricaMomoTopupMethod =
   | "swychr"
@@ -163,12 +166,15 @@ export function routeWalletTopupGateway(
   preferDodo = false,
   preferWise = false,
   preferSquare = false,
+  preferPaypal = false,
 ): WalletTopupGateway {
   const c = currency.toUpperCase();
   // Explicit Wise bank-deposit rail
   if (preferWise) return "wise_pay";
   // Explicit Square hosted checkout
   if (preferSquare && SQUARE_TOPUP_CURRENCIES.includes(c)) return "square_pay";
+  // Explicit PayPal
+  if (preferPaypal && PAYPAL_TOPUP_CURRENCIES.includes(c)) return "paypal_pay";
   // Explicit Lenhub Flutter card rail
   if (preferLenhubFlutter && LENHUB_FLUTTER_TOPUP_CURRENCIES.includes(c)) return "lenhub_flutter";
   // Explicit Dodo MoR checkout (western)
@@ -264,6 +270,7 @@ export function intlMethodBenefit(method: IntlTopupMethod): string {
   if (method === "paytota") return "Invoice";
   if (method === "dodo") return "Global";
   if (method === "square") return "Card";
+  if (method === "paypal") return "PayPal";
   if (method === "interac") return "Bank send";
   if (method === "wise") return "Bank send";
   if (method === "fincra") return "Flexible";
@@ -288,6 +295,7 @@ export function intlMethodProvider(method: IntlTopupMethod): string {
   if (method === "paytota") return "Paytota";
   if (method === "dodo") return "Dodo";
   if (method === "square") return "Square";
+  if (method === "paypal") return "PayPal";
   if (method === "interac") return "Interac";
   if (method === "wise") return "Wise";
   if (method === "fincra") return "Fincra";
@@ -319,6 +327,7 @@ export function gatewayProviderLabel(gateway: WalletTopupGateway): string | null
   if (gateway === "fincra") return "Fincra";
   if (gateway === "dodo_pay") return "Dodo";
   if (gateway === "square_pay") return "Square";
+  if (gateway === "paypal_pay") return "PayPal";
   if (gateway === "flutterwave") return "Flutterwave";
   return null;
 }
@@ -339,12 +348,12 @@ export function pickBestIntlTopupMethod(
 
   let priority: IntlTopupMethod[];
   if (c === "USD" || c === "CAD" || c === "GBP" || c === "EUR") {
-    // Square card first for western; Wise bank next; then other rails
-    priority = ["square", "wise", "paytota", "dodo", "interac", "nomba", "flutterwave", "fincra"];
+    // Square / Dodo card first; PayPal after (do not displace Dodo)
+    priority = ["square", "wise", "paytota", "dodo", "paypal", "interac", "nomba", "flutterwave", "fincra"];
   } else if (c === "NGN") {
     priority = ["fincra", "flutterwave", "nomba", "wise"];
   } else {
-    priority = ["fincra", "flutterwave", "nomba", "paytota", "square", "dodo", "interac", "wise"];
+    priority = ["fincra", "flutterwave", "nomba", "paytota", "square", "dodo", "paypal", "interac", "wise"];
   }
 
   for (const p of priority) {
@@ -383,6 +392,7 @@ export function intlMethodLabel(method: IntlTopupMethod, currency?: string): str
   if (method === "fincra") return fincraGatewayLabel(currency || "");
   if (method === "dodo") return "Global card checkout";
   if (method === "square") return "Card";
+  if (method === "paypal") return "PayPal";
   if (method === "lenhub") {
     return currency?.toUpperCase() === "NGN" ? "NGN card or bank" : "Card (direct)";
   }
@@ -403,6 +413,9 @@ export function intlMethodDescription(method: IntlTopupMethod, currency: string)
   }
   if (method === "square") {
     return `Pay with card on Square’s secure page — your ${c} wallet credits after payment.`;
+  }
+  if (method === "paypal") {
+    return `Pay with PayPal — your ${c} wallet credits after you approve.`;
   }
   if (method === "interac") {
     return "Send CAD from your Canadian bank with Interac e-Transfer.";

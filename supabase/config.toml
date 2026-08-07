@@ -240,6 +240,18 @@ verify_jwt = false
 [functions.square-verify-checkout]
 verify_jwt = false
 
+# PayPal Orders API (Client ID + Secret — no Braintree required for now).
+# Secrets: PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET, PAYPAL_ENVIRONMENT=sandbox|live
+# Braintree helpers remain in _shared/braintree.ts for a later upgrade.
+[functions.paypal-public-config]
+verify_jwt = false
+
+[functions.paypal-create-order]
+verify_jwt = false
+
+[functions.paypal-capture-order]
+verify_jwt = false
+
 [functions.fincra-cad-interac]
 verify_jwt = true
 

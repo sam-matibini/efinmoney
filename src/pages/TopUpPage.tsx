@@ -34,6 +34,7 @@ import LenhubFlutterTopUpCard from "@/components/payments/LenhubFlutterTopUpCard
 import PaytotaTopUpCard from "@/components/payments/PaytotaTopUpCard";
 import DodoTopUpCard from "@/components/payments/DodoTopUpCard";
 import SquareTopUpCard, { verifySquareCheckout } from "@/components/payments/SquareTopUpCard";
+import PayPalTopUpCard from "@/components/payments/PayPalTopUpCard";
 import SwychrTopUpCard from "@/components/payments/SwychrTopUpCard";
 import { validateMinAmount, minAmount, type FlwMethod } from "@/lib/flutterwave";
 import LoadingSpinner from "@/components/LoadingSpinner";
@@ -101,6 +102,7 @@ function availableIntlMethods(currency: string): IntlTopupMethod[] {
     if (productFeatures.paytota) methods.push("paytota");
     if (productFeatures.dodo) methods.push("dodo");
     if (productFeatures.square) methods.push("square");
+    if (productFeatures.paypal) methods.push("paypal");
     if (c === "CAD" && productFeatures.fincraInterac) methods.push("interac");
     if (productFeatures.wise) methods.push("wise");
     if (productFeatures.flutterwave && FLW_WESTERN_TOPUP_CURRENCIES.includes(c)) {
@@ -151,6 +153,7 @@ function initialIntlMethod(params: URLSearchParams, currency: string): IntlTopup
   if ((fromQuery === "paytota" || fromQuery === "invoice") && methods.includes("paytota")) return "paytota";
   if ((fromQuery === "dodo" || fromQuery === "global") && methods.includes("dodo")) return "dodo";
   if ((fromQuery === "square" || fromQuery === "sq") && methods.includes("square")) return "square";
+  if ((fromQuery === "paypal" || fromQuery === "pp") && methods.includes("paypal")) return "paypal";
   if ((fromQuery === "nomba" || fromQuery === "card" || fromQuery === "express") && methods.includes("nomba")) return "nomba";
   if (
     (fromQuery === "flutterwave" || fromQuery === "flw" || fromQuery === "company") &&
@@ -322,6 +325,7 @@ const TopUpPage = () => {
   const preferLenhubFlutter = intlMethod === "lenhub" || africaMomoMethod === "lenhub";
   const preferDodo = intlMethod === "dodo";
   const preferSquare = intlMethod === "square";
+  const preferPaypal = intlMethod === "paypal";
   const preferSwychrResolved =
     africaMomoMethod === "swychr"
     || (
@@ -356,6 +360,7 @@ const TopUpPage = () => {
     preferDodo,
     preferWise,
     preferSquare,
+    preferPaypal,
   );
   const liveTopup = isLiveTopupCurrency(currency);
   const availableFlwMethods = FLW_METHODS_BY_CCY[currency] || ["card"];
@@ -741,6 +746,20 @@ const TopUpPage = () => {
       });
     }
 
+    if (productFeatures.paypal && rails.has("paypal")) {
+      payMethods.push({
+        id: "paypal",
+        tone: "card",
+        label: "PayPal",
+        description: "Pay with PayPal",
+        content: (
+          <SectionBoundary name="PayPalTopUp">
+            <PayPalTopUpCard walletId={walletId} walletCurrency={currency} initialAmount={amount} embedded onComplete={invalidateWallets} />
+          </SectionBoundary>
+        ),
+      });
+    }
+
     if (productFeatures.flutterwave && rails.has("flutterwave")) {
       const hosted = availableFlwMethods.filter((m) => ["card", "banktransfer", "ussd"].includes(m));
       if (hosted.length > 0) {
@@ -962,6 +981,7 @@ const TopUpPage = () => {
     paytota_pay: "paytota",
     dodo_pay: "dodo",
     square_pay: "square",
+    paypal_pay: "paypal",
     nomba_pay: "nomba",
     lenhub_flutter: "lenhub",
     fincra_interac: "interac",
