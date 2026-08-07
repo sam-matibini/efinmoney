@@ -1,9 +1,13 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import AdminLayout from "@/components/admin-portal/AdminLayout";
 import TopScrollSync from "@/components/admin-portal/TopScrollSync";
+import {
+  ANY, DATE_LABEL, DATE_RANGES, FilterChips, compareBy, downloadCsv, prettify,
+  useSortState, useUrlFilterSync, type FilterChip,
+} from "@/components/admin-portal/TableControls";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -17,9 +21,10 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { RoleBadge, StaffStatusBadge } from "@/components/admin-portal/Badges";
 import InviteStaffModal from "@/components/admin-portal/InviteStaffModal";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
-import { Search, UserPlus, Users as UsersIcon, UserCheck, Clock, ShieldX, Pencil, Trash2, Building2, ChevronDown, ChevronRight } from "lucide-react";
+import { Search, UserPlus, Users as UsersIcon, UserCheck, Clock, ShieldX, Pencil, Trash2, Building2, ChevronDown, ChevronRight, Download } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
+
 
 const ROLES = ["super_admin", "compliance_officer", "finance_officer", "support_agent", "viewer"];
 const STATUSES = ["active", "invited", "pending_review", "suspended", "rejected"];
@@ -36,16 +41,20 @@ interface StaffRow {
   invited_at: string | null;
 }
 
+type SortKey = "name" | "role" | "status" | "department" | "position" | "created_at";
+
 const StaffPage = () => {
   const navigate = useNavigate();
   const { hasPermission } = useAdminAuth();
   const qc = useQueryClient();
-  const [query, setQuery] = useState("");
+  const [params] = useSearchParams();
+  const [query, setQuery] = useState(params.get("q") || "");
   const [inviteOpen, setInviteOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<StaffRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<StaffRow | null>(null);
   const [editForm, setEditForm] = useState({ full_name: "", role: "", status: "", department: "", position: "" });
   const canManage = hasPermission("manage_staff");
+
 
   const updateMutation = useMutation({
     mutationFn: async (fields: typeof editForm) => {
@@ -111,19 +120,90 @@ const StaffPage = () => {
     retry: false,
   });
 
-  const [deptFilter, setDeptFilter] = useState("_all_");
+  const [deptFilter, setDeptFilter] = useState(params.get("dept") || ANY);
+  const [roleFilter, setRoleFilter] = useState(params.get("role") || ANY);
+  const [statusFilter, setStatusFilter] = useState(params.get("status") || ANY);
+  const [joined, setJoined] = useState(params.get("joined") || "all");
   const [expandedDept, setExpandedDept] = useState<string | null>(null);
+  const { sortKey, sortDir, SortHead } = useSortState<SortKey>("created_at", "desc");
 
-  const filtered = staff.filter((s) => {
-    const matchQuery = !query || (
-      s.full_name?.toLowerCase().includes(query.toLowerCase()) ||
-      s.email?.toLowerCase().includes(query.toLowerCase()) ||
-      s.role?.toLowerCase().includes(query.toLowerCase()) ||
-      s.department?.toLowerCase().includes(query.toLowerCase())
-    );
-    const matchDept = deptFilter === "_all_" || s.department === deptFilter;
-    return matchQuery && matchDept;
+  useUrlFilterSync({
+    q: query,
+    dept: deptFilter !== ANY ? deptFilter : null,
+    role: roleFilter !== ANY ? roleFilter : null,
+    status: statusFilter !== ANY ? statusFilter : null,
+    joined: joined !== "all" ? joined : null,
+    sort: sortKey !== "created_at" ? sortKey : null,
+    dir: sortDir !== "desc" ? sortDir : null,
   });
+
+  const roleOptions = useMemo(
+    () => [...new Set(staff.map((s) => s.role).filter(Boolean))].sort(),
+    [staff],
+  );
+  const statusOptions = useMemo(
+    () => [...new Set(staff.map((s) => s.status).filter(Boolean))].sort(),
+    [staff],
+  );
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const days = DATE_RANGES[joined] ?? null;
+    const cutoff = days ? Date.now() - days * 86_400_000 : null;
+
+    const matched = staff.filter((s) => {
+      if (q) {
+        const hit =
+          s.full_name?.toLowerCase().includes(q) ||
+          s.email?.toLowerCase().includes(q) ||
+          s.role?.toLowerCase().includes(q) ||
+          s.position?.toLowerCase().includes(q) ||
+          s.department?.toLowerCase().includes(q);
+        if (!hit) return false;
+      }
+      if (deptFilter !== ANY && s.department !== deptFilter) return false;
+      if (roleFilter !== ANY && s.role !== roleFilter) return false;
+      if (statusFilter !== ANY && s.status !== statusFilter) return false;
+      if (cutoff && new Date(s.created_at).getTime() < cutoff) return false;
+      return true;
+    });
+
+    const value = (s: StaffRow): string | number => {
+      switch (sortKey) {
+        case "name": return (s.full_name || s.email || "").toLowerCase();
+        case "role": return s.role || "";
+        case "status": return s.status || "";
+        case "department": return (s.department || "zzz").toLowerCase();
+        case "position": return (s.position || "zzz").toLowerCase();
+        default: return s.created_at ? new Date(s.created_at).getTime() : 0;
+      }
+    };
+
+    return [...matched].sort(compareBy<StaffRow>(value, sortDir));
+  }, [staff, query, deptFilter, roleFilter, statusFilter, joined, sortKey, sortDir]);
+
+  const chips = [
+    deptFilter !== ANY && { label: `Dept: ${deptFilter}`, clear: () => setDeptFilter(ANY) },
+    roleFilter !== ANY && { label: `Role: ${prettify(roleFilter)}`, clear: () => setRoleFilter(ANY) },
+    statusFilter !== ANY && { label: `Status: ${prettify(statusFilter)}`, clear: () => setStatusFilter(ANY) },
+    joined !== "all" && { label: `Joined: ${DATE_LABEL[joined]}`, clear: () => setJoined("all") },
+    !!query && { label: `Search: "${query}"`, clear: () => setQuery("") },
+  ].filter(Boolean) as FilterChip[];
+
+  const clearAll = () => {
+    setQuery(""); setDeptFilter(ANY); setRoleFilter(ANY); setStatusFilter(ANY); setJoined("all");
+  };
+
+  const exportCsv = () =>
+    downloadCsv(
+      "efinmoney-staff",
+      ["Name", "Email", "Role", "Status", "Department", "Position", "Joined"],
+      filtered.map((s) => [
+        s.full_name, s.email, prettify(s.role), prettify(s.status), s.department, s.position,
+        s.created_at ? format(new Date(s.created_at), "yyyy-MM-dd") : "",
+      ]),
+    );
+
 
   const stats = {
     total: staff.length,
@@ -142,11 +222,17 @@ const StaffPage = () => {
             </h1>
             <p className="text-sm text-muted-foreground">Invite team members and manage roles &amp; access</p>
           </div>
-          {canManage && (
-            <Button onClick={() => setInviteOpen(true)} className="gap-2">
-              <UserPlus className="w-4 h-4" /> Invite staff
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={exportCsv} disabled={filtered.length === 0}>
+              <Download className="w-4 h-4" /> Export CSV
             </Button>
-          )}
+            {canManage && (
+              <Button onClick={() => setInviteOpen(true)} className="gap-2">
+                <UserPlus className="w-4 h-4" /> Invite staff
+              </Button>
+            )}
+          </div>
+
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -171,30 +257,63 @@ const StaffPage = () => {
         </div>
 
         <Card>
-          <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <CardTitle className="text-base">All staff ({filtered.length})</CardTitle>
-            <div className="flex items-center gap-2">
+          <CardHeader className="gap-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <CardTitle className="text-base">All staff ({filtered.length})</CardTitle>
+              <div className="relative w-full sm:w-72">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search name, email, role, position or department"
+                  className="pl-9"
+                />
+              </div>
+            </div>
+
+            {/* Filters */}
+            <div className="flex flex-wrap gap-2">
               <Select value={deptFilter} onValueChange={setDeptFilter}>
-                <SelectTrigger className="w-40">
-                  <SelectValue placeholder="All depts" />
-                </SelectTrigger>
+                <SelectTrigger className="w-[180px] h-9"><SelectValue placeholder="Department" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="_all_">All departments</SelectItem>
+                  <SelectItem value={ANY}>All departments</SelectItem>
                   {departments.map((d) => (
                     <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              <div className="relative w-full sm:w-64">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search name, email, role, department"
-                  className="pl-9"
-                />
-              </div>
+
+              <Select value={roleFilter} onValueChange={setRoleFilter}>
+                <SelectTrigger className="w-[180px] h-9"><SelectValue placeholder="Role" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ANY}>All roles</SelectItem>
+                  {roleOptions.map((r) => (
+                    <SelectItem key={r} value={r} className="capitalize">{prettify(r)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-[170px] h-9"><SelectValue placeholder="Status" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ANY}>All statuses</SelectItem>
+                  {statusOptions.map((s) => (
+                    <SelectItem key={s} value={s} className="capitalize">{prettify(s)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={joined} onValueChange={setJoined}>
+                <SelectTrigger className="w-[150px] h-9"><SelectValue placeholder="Joined" /></SelectTrigger>
+                <SelectContent>
+                  {Object.keys(DATE_RANGES).map((k) => (
+                    <SelectItem key={k} value={k}>{DATE_LABEL[k]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
+
+            <FilterChips chips={chips} onClearAll={clearAll} />
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -206,19 +325,22 @@ const StaffPage = () => {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Member</TableHead>
-                      <TableHead>Role</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Department</TableHead>
-                      <TableHead>Joined</TableHead>
+                      <SortHead label="Member" sortKey="name" />
+                      <SortHead label="Role" sortKey="role" />
+                      <SortHead label="Status" sortKey="status" />
+                      <SortHead label="Department" sortKey="department" />
+                      <SortHead label="Position" sortKey="position" />
+                      <SortHead label="Joined" sortKey="created_at" />
                       {canManage && <TableHead className="w-24 text-right">Actions</TableHead>}
                     </TableRow>
                   </TableHeader>
+
                   <TableBody>
                     {filtered.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={canManage ? 6 : 5} className="text-center py-10 text-muted-foreground">
-                          {query ? "No staff match your search" : "No staff yet"}
+                        <TableCell colSpan={canManage ? 7 : 6} className="text-center py-10 text-muted-foreground">
+                          {chips.length > 0 ? "No staff match your filters" : "No staff yet"}
+
                         </TableCell>
                       </TableRow>
                     ) : filtered.map((s) => (
@@ -241,6 +363,8 @@ const StaffPage = () => {
                         <TableCell><RoleBadge role={s.role ?? "viewer"} /></TableCell>
                         <TableCell><StaffStatusBadge status={s.status} /></TableCell>
                         <TableCell className="text-sm text-muted-foreground">{s.department || "—"}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{s.position || "—"}</TableCell>
+
                         <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                           {s.created_at ? format(new Date(s.created_at), "MMM d, yyyy") : "—"}
                         </TableCell>
