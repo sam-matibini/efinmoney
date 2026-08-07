@@ -74,6 +74,15 @@ Deno.serve(async (req) => {
     }
 
     const customerRef = transferId;
+    // Attempts may use `${transferId}__N` — try base id first, then recent attempt suffixes.
+    const customerRefCandidates = [
+      customerRef,
+      `${customerRef}__2`,
+      `${customerRef}__3`,
+      `${customerRef}__4`,
+      `${customerRef}__5`,
+      `${customerRef}__6`,
+    ];
     const providerRef = String(transfer.provider_reference || "");
     const isPendingStub =
       !providerRef ||
@@ -82,13 +91,20 @@ Deno.serve(async (req) => {
 
     let payout: Record<string, unknown> | null = null;
 
-    const byCustomer = await fincraFetch(
-      `/disbursements/payouts/customer-reference/${encodeURIComponent(customerRef)}`,
-      { method: "GET", withBusinessId: true },
-    );
-    if (byCustomer.ok && byCustomer.json?.data) {
-      payout = (byCustomer.json.data as Record<string, unknown>) || null;
-    } else if (providerRef && !isPendingStub) {
+    for (const cref of customerRefCandidates) {
+      const byCustomer = await fincraFetch(
+        `/disbursements/payouts/customer-reference/${encodeURIComponent(cref)}`,
+        { method: "GET", withBusinessId: true },
+      );
+      if (byCustomer.ok && byCustomer.json?.data) {
+        payout = (byCustomer.json.data as Record<string, unknown>) || null;
+        break;
+      }
+      if (!byCustomer.ok && byCustomer.status !== 404) {
+        // keep going — try next candidate / provider ref
+      }
+    }
+    if (!payout && providerRef && !isPendingStub) {
       const byRef = await fincraFetch(
         `/disbursements/payouts/reference/${encodeURIComponent(providerRef)}`,
         { method: "GET", withBusinessId: true },
@@ -96,15 +112,7 @@ Deno.serve(async (req) => {
       if (byRef.ok && byRef.json?.data) {
         payout = (byRef.json.data as Record<string, unknown>) || null;
       }
-    } else if (!byCustomer.ok && byCustomer.status !== 404) {
-      return json({
-        changed: false,
-        status: transfer.status,
-        note: "fincra_lookup_unavailable",
-        error: String(byCustomer.json?.message || byCustomer.json?.error || `HTTP ${byCustomer.status}`),
-      });
     }
-
     if (!payout) {
       return json({
         changed: false,

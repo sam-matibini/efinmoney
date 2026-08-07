@@ -32,19 +32,19 @@ export const COUNTRIES: CountryInfo[] = [
   // AFRICA
   { id: "Kenya", country: "Kenya", code: "KES", flag: "🇰🇪", method: "M-Pesa", payout: "mpesa", region: "Africa", symbol: "KSh" },
   { id: "Nigeria", country: "Nigeria", code: "NGN", flag: "🇳🇬", method: "Bank/Mobile", payout: "bank", region: "Africa", symbol: "₦" },
-  { id: "Ghana", country: "Ghana", code: "GHS", flag: "🇬🇭", method: "Mobile Money", payout: "mtn_mobile", region: "Africa", symbol: "GH₵", networks: [
-    { id: "mtn", label: "MTN Mobile Money", payout: "mtn_mobile" },
-    { id: "vodafone", label: "Vodafone Cash", payout: "vodafone_money" },
-    { id: "airteltigo", label: "AirtelTigo Money", payout: "airteltigo_money" },
+  { id: "Ghana", country: "Ghana", code: "GHS", flag: "🇬🇭", method: "MoMo", payout: "mtn_mobile", region: "Africa", symbol: "GH₵", networks: [
+    { id: "mtn", label: "MTN", payout: "mtn_mobile" },
+    { id: "vodafone", label: "Vodafone", payout: "vodafone_money" },
+    { id: "airteltigo", label: "AirtelTigo", payout: "airteltigo_money" },
   ]},
-  { id: "Uganda", country: "Uganda", code: "UGX", flag: "🇺🇬", method: "Mobile Money", payout: "airtel_money", region: "Africa", symbol: "USh" },
+  { id: "Uganda", country: "Uganda", code: "UGX", flag: "🇺🇬", method: "MoMo", payout: "airtel_money", region: "Africa", symbol: "USh" },
   { id: "Tanzania", country: "Tanzania", code: "TZS", flag: "🇹🇿", method: "M-Pesa", payout: "mpesa", region: "Africa", symbol: "TSh" },
-  { id: "Zambia", country: "Zambia", code: "ZMW", flag: "🇿🇲", method: "Mobile Money", payout: "mtn_mobile", region: "Africa", symbol: "ZK", networks: [
-    { id: "mtn", label: "MTN Mobile Money", payout: "mtn_mobile" },
-    { id: "airtel", label: "Airtel Money", payout: "airtel_money" },
-    { id: "zamtel", label: "Zamtel Kwacha", payout: "zamtel_money" },
+  { id: "Zambia", country: "Zambia", code: "ZMW", flag: "🇿🇲", method: "MoMo", payout: "mtn_mobile", region: "Africa", symbol: "ZK", networks: [
+    { id: "mtn", label: "MTN", payout: "mtn_mobile" },
+    { id: "airtel", label: "Airtel", payout: "airtel_money" },
+    { id: "zamtel", label: "Zamtel", payout: "zamtel_money" },
   ] },
-  { id: "Rwanda", country: "Rwanda", code: "RWF", flag: "🇷🇼", method: "Mobile Money", payout: "mtn_mobile", region: "Africa", symbol: "RF" },
+  { id: "Rwanda", country: "Rwanda", code: "RWF", flag: "🇷🇼", method: "MoMo", payout: "mtn_mobile", region: "Africa", symbol: "RF" },
   { id: "Ethiopia", country: "Ethiopia", code: "ETB", flag: "🇪🇹", method: "Bank Transfer", payout: "bank", region: "Africa" },
   { id: "Senegal", country: "Senegal", code: "XOF", flag: "🇸🇳", method: "Wave/Orange", payout: "mobile_money", region: "Africa" },
   { id: "Ivory Coast", country: "Ivory Coast", code: "XOF", flag: "🇨🇮", method: "Wave/Orange", payout: "mobile_money", region: "Africa" },
@@ -142,8 +142,30 @@ export const COUNTRIES: CountryInfo[] = [
 ];
 
 export const POPULAR_COUNTRY_IDS = [
-  "Canada", "United States", "United Kingdom", "Nigeria", "Kenya", "Ghana", "India",
+  "Canada", "United States", "Nigeria", "Ghana", "Kenya", "Zambia", "Uganda",
 ];
+
+/**
+ * Destinations shown on Send / Add Contact.
+ * Keep the full COUNTRIES catalog for admin/legacy lookups — UI pickers use this allowlist.
+ */
+export const LIVE_SEND_COUNTRY_IDS = [
+  "Canada",
+  "United States",
+  "Nigeria",
+  "Ghana",
+  "Kenya",
+  "Zambia",
+  "Uganda",
+  "Tanzania",
+  "Rwanda",
+  "Ethiopia",
+  "Senegal",
+] as const;
+
+export const LIVE_SEND_COUNTRIES: CountryInfo[] = LIVE_SEND_COUNTRY_IDS
+  .map((id) => COUNTRIES.find((c) => c.id === id))
+  .filter((c): c is CountryInfo => !!c);
 
 export const REGION_ORDER: Exclude<CountryRegion, "Popular">[] = [
   "Africa", "North America", "Europe", "Asia / Middle East", "South America / Oceania",
@@ -156,13 +178,16 @@ export const findCountryById = (id?: string | null): CountryInfo | undefined =>
 export const findCountryByCode = (code?: string | null): CountryInfo | undefined =>
   code ? COUNTRIES.find((c) => c.code === code) : undefined;
 
-export const filterCountries = (q: string): CountryInfo[] => {
+export const filterCountries = (q: string, pool: CountryInfo[] = COUNTRIES): CountryInfo[] => {
   const s = q.trim().toLowerCase();
-  if (!s) return COUNTRIES;
-  return COUNTRIES.filter(
+  if (!s) return pool;
+  return pool.filter(
     (c) =>
       c.country.toLowerCase().includes(s) ||
       c.code.toLowerCase().includes(s) ||
       c.method.toLowerCase().includes(s)
   );
 };
+
+export const isLiveSendCountryId = (id?: string | null): boolean =>
+  !!id && (LIVE_SEND_COUNTRY_IDS as readonly string[]).includes(id);

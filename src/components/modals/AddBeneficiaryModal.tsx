@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useCreateBeneficiary, useUpdateBeneficiary, type Beneficiary, type BeneficiaryCategory } from "@/hooks/useBeneficiaries";
 import { toast } from "sonner";
 import CountryPicker from "@/components/ui/CountryPicker";
-import { COUNTRIES, findCountryById, findCountryByCode } from "@/lib/countries";
+import { COUNTRIES, findCountryById, findCountryByCode, LIVE_SEND_COUNTRIES, isLiveSendCountryId } from "@/lib/countries";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { getNigeriaBanks, resolveNigeriaAccount } from "@/lib/nombaNigeria";
 
@@ -40,7 +40,7 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
   const [email, setEmail] = useState("");
   const [address, setAddress] = useState("");
   const [tel, setTel] = useState("");
-  const [countryId, setCountryId] = useState<string>("Canada");
+  const [countryId, setCountryId] = useState<string>("Nigeria");
   const [method, setMethod] = useState<"mobile" | "bank" | "eft" | "interac" | "none">("none");
   const [phone, setPhone] = useState("");
   const [bankName, setBankName] = useState("");
@@ -73,7 +73,8 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
     setAddress(editing?.address || "");
     setTel(editing?.tel || "");
     const fromCode = editing?.country_code ? findCountryByCode(editing.country_code) : undefined;
-    setCountryId(fromCode?.id || "Canada");
+    const resolvedId = fromCode?.id || "Nigeria";
+    setCountryId(isLiveSendCountryId(resolvedId) ? resolvedId : (fromCode?.id || "Nigeria"));
     setMethod(
       editing?.eft_account ? "eft" :
       editing?.interac_email ? "interac" :
@@ -101,7 +102,12 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
     setShowAdvanced(!!editing?.notes || !!editing?.tags?.length);
   }, [open, editing, defaultCategory, defaultMethod]);
 
-  const country = findCountryById(countryId) || COUNTRIES[0];
+  const country = findCountryById(countryId) || LIVE_SEND_COUNTRIES[0] || COUNTRIES[0];
+  const pickerCountries = useMemo(() => {
+    const base = [...LIVE_SEND_COUNTRIES];
+    if (country && !base.some((c) => c.id === country.id)) base.push(country);
+    return base;
+  }, [country]);
   const isNigeriaBank = method === "bank" && country.code === "NGN";
 
   useEffect(() => {
@@ -234,7 +240,11 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
             </div>
             <div className="space-y-2">
               <Label>Country</Label>
-              <CountryPicker value={countryId} onChange={(c) => setCountryId(c.id)} />
+              <CountryPicker
+                value={countryId}
+                onChange={(c) => setCountryId(c.id)}
+                countries={pickerCountries}
+              />
             </div>
           </div>
 

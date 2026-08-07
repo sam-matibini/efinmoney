@@ -90,6 +90,16 @@ export async function creditWalletViaFincra(
   desc = "Top-up via Fincra",
 ): Promise<{ wallet_id: string; already: boolean }> {
   const ccy = currency.toUpperCase();
+  const ref = String(idempotencyRef || "").trim();
+  if (!ref) throw new Error("Missing Fincra top-up reference");
+  if (!Number.isFinite(amount) || !(amount > 0)) {
+    throw new Error(`Invalid Fincra credit amount: ${amount}`);
+  }
+  // Hard cap against absurd provider payloads (e.g. unit mistakes). Legitimate top-ups stay well under this.
+  if (amount > 50_000_000) {
+    throw new Error(`Fincra credit amount rejected as unsafe: ${amount} ${ccy}`);
+  }
+
   let walletId = walletIdFromMeta || "";
   if (walletId) {
     const { data: w } = await admin.from("wallets").select("id, user_id, currency_code")
@@ -109,9 +119,20 @@ export async function creditWalletViaFincra(
     walletId = nw.id as string;
   }
 
-  const { data: existing } = await admin.from("ledger_entries").select("id")
-    .eq("reference_type", "fincra_topup").eq("external_reference", idempotencyRef).limit(1);
-  if (existing && existing.length > 0) return { wallet_id: walletId, already: true };
+  // Idempotency: exact merchant ref, plus legacy rows that may have used provider ids
+  // while still embedding the merchant ref in the description.
+  const { data: existingExact } = await admin.from("ledger_entries").select("id")
+    .eq("reference_type", "fincra_topup").eq("external_reference", ref).limit(1);
+  if (existingExact && existingExact.length > 0) return { wallet_id: walletId, already: true };
+
+  if (ref.startsWith("topup-fincra-") || ref.startsWith("efm_fincra_")) {
+    const { data: existingDesc } = await admin.from("ledger_entries").select("id")
+      .eq("reference_type", "fincra_topup")
+      .eq("wallet_id", walletId)
+      .ilike("description", `%${ref}%`)
+      .limit(1);
+    if (existingDesc && existingDesc.length > 0) return { wallet_id: walletId, already: true };
+  }
 
   const asset = await resolveFincraSettlementAccount(admin, ccy);
   const liab = await resolveLiabilityAccount(admin, ccy);
@@ -128,15 +149,22 @@ export async function creditWalletViaFincra(
     {
       journal_id: journalId, account_id: asset.id, wallet_id: null, currency_code: ccy,
       debit_amount: amount, credit_amount: 0, description: desc,
-      reference_type: "fincra_topup", external_reference: idempotencyRef,
+      reference_type: "fincra_topup", external_reference: ref,
     },
     {
       journal_id: journalId, account_id: liab.id, wallet_id: walletId, currency_code: ccy,
       debit_amount: 0, credit_amount: amount, description: desc,
-      reference_type: "fincra_topup", external_reference: idempotencyRef,
+      reference_type: "fincra_topup", external_reference: ref,
     },
   ]);
-  if (error) throw new Error(error.message ?? "Ledger insert failed");
+  if (error) {
+    // Unique violation → already credited concurrently
+    if (String(error.message || "").toLowerCase().includes("duplicate")
+      || String((error as { code?: string }).code || "") === "23505") {
+      return { wallet_id: walletId, already: true };
+    }
+    throw new Error(error.message ?? "Ledger insert failed");
+  }
 
   try {
     await admin.from("notifications").insert({
@@ -147,7 +175,7 @@ export async function creditWalletViaFincra(
     });
   } catch { /* best-effort */ }
 
-  sendTopupEmail(admin, userId, ccy, amount, idempotencyRef).catch(() => {});
+  sendTopupEmail(admin, userId, ccy, amount, ref).catch(() => {});
 
   return { wallet_id: walletId, already: false };
 }

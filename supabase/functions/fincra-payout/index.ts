@@ -52,7 +52,17 @@ const FINCRA_MM_CODE: Record<string, string> = {
 };
 
 /** Currencies we will try as Fincra funding wallets (after preferred). */
-const DEFAULT_FUNDING_FALLBACKS = ["NGN", "USD", "GHS", "KES", "UGX", "ZMW", "TZS", "RWF"];
+const DEFAULT_FUNDING_FALLBACKS = ["NGN", "USD", "GHS", "KES", "ZMW"];
+
+const DIAL_BY_CURRENCY: Record<string, string> = {
+  NGN: "234",
+  KES: "254",
+  GHS: "233",
+  UGX: "256",
+  TZS: "255",
+  ZMW: "260",
+  RWF: "250",
+};
 
 function splitName(full: string): { firstName: string; lastName: string } {
   const parts = full.trim().split(/\s+/).filter(Boolean);
@@ -63,13 +73,31 @@ function splitName(full: string): { firstName: string; lastName: string } {
 
 function normalizePhone(phone: string, currency: string): string {
   let p = phone.replace(/[^\d+]/g, "");
-  if (!p.startsWith("+")) {
-    const cc: Record<string, string> = { NGN: "+234", KES: "+254", GHS: "+233", UGX: "+256", TZS: "+255", ZMW: "+260", RWF: "+250" };
-    const prefix = cc[currency] || "+";
-    if (p.startsWith("0")) p = p.slice(1);
-    p = `${prefix}${p}`;
+  const dial = DIAL_BY_CURRENCY[currency] || "";
+
+  if (p.startsWith("+")) {
+    const digits = p.slice(1).replace(/\D/g, "");
+    // Collapse accidental double country code: +26026077… → +26077…
+    if (dial && digits.startsWith(dial + dial)) {
+      return `+${dial}${digits.slice(dial.length * 2)}`;
+    }
+    return `+${digits}`;
   }
-  return p;
+
+  let digits = p.replace(/\D/g, "");
+  // National format 07… → strip trunk 0
+  if (digits.startsWith("0") && !(dial && digits.startsWith(dial))) {
+    digits = digits.slice(1);
+  }
+  // Already includes country code (26077… / 2547…) — do NOT prepend again
+  if (dial && digits.startsWith(dial)) {
+    if (digits.startsWith(dial + dial)) {
+      digits = dial + digits.slice(dial.length * 2);
+    }
+    return `+${digits}`;
+  }
+  if (dial) return `+${dial}${digits}`;
+  return `+${digits}`;
 }
 
 /** Fincra MoMo docs: MSISDN without '+' (e.g. 254700000000). */
@@ -79,23 +107,37 @@ function fincraMsisdnDigits(phone: string, currency: string): string {
 
 /**
  * Fincra MoMo accountNumber: countryCallingCode + national number, no '+'.
- * Zambia test accounts use 26097… / 26095… (not local 09…).
- * Keep phone field in the same digit form.
+ * Zambia: Fincra confirmed 260… is correct.
  */
 function fincraAccountNumber(phone: string, currency: string): string {
   return fincraMsisdnDigits(phone, currency);
 }
 
-/** Alternate MoMo MSISDN shapes Fincra may accept (esp. Zambia). */
+/** MoMo MSISDN shapes to try. Zambia prefers intl 260… only (+ optional 0… fallback). */
 function fincraAccountNumberVariants(phone: string, currency: string): string[] {
   const intl = fincraMsisdnDigits(phone, currency); // e.g. 260770069550
-  const dial = ({ NGN: "234", KES: "254", GHS: "233", UGX: "256", TZS: "255", ZMW: "260", RWF: "250" } as Record<string, string>)[currency] || "";
+  const dial = DIAL_BY_CURRENCY[currency] || "";
   let national = intl;
   if (dial && national.startsWith(dial)) national = national.slice(dial.length);
   if (national.startsWith("0")) national = national.slice(1);
   const local0 = national ? `0${national}` : "";
-  const out = [intl, local0, national].filter(Boolean);
-  return [...new Set(out)];
+
+  // Reject garbage like 260260… if anything slipped through
+  const cleanIntl = (dial && intl.startsWith(dial + dial))
+    ? dial + intl.slice(dial.length * 2)
+    : intl;
+
+  if (currency === "ZMW") {
+    // Fincra: 260 is correct. Keep one local fallback only.
+    return [...new Set([cleanIntl, local0].filter((v) => {
+      if (!v) return false;
+      if (dial && v.startsWith(dial + dial)) return false;
+      if (v.startsWith("0") && dial && v.slice(1).startsWith(dial)) return false; // 0260…
+      return true;
+    }))];
+  }
+
+  return [...new Set([cleanIntl, local0, national].filter(Boolean))];
 }
 
 function isFincraAccountNumberError(message: string): boolean {
@@ -103,6 +145,39 @@ function isFincraAccountNumberError(message: string): boolean {
   return m.includes("account number") ||
     m.includes("accountnumber") ||
     (m.includes("valid") && m.includes("mobile money"));
+}
+
+/** HTTP 200 can still mean the payout was created as failed. */
+function fincraPayoutAccepted(json: Record<string, unknown> | null | undefined): {
+  accepted: boolean;
+  status: string;
+  message: string;
+  data: Record<string, unknown>;
+} {
+  const data = (json?.data ?? {}) as Record<string, unknown>;
+  const status = String(data.status || json?.status || "").toLowerCase();
+  const message = String(
+    data.message || data.reason || data.failureReason || json?.error || json?.message || "",
+  );
+  const failed = ["failed", "cancelled", "canceled", "rejected"].includes(status)
+    || /transaction failed|contact support|re-try after/i.test(message);
+  const softOk = !status || ["processing", "pending", "successful", "success", "completed"].includes(status);
+  return {
+    accepted: !failed && softOk,
+    status,
+    message: message || (failed ? `Fincra payout ${status || "failed"}` : ""),
+    data,
+  };
+}
+
+/** True when Fincra's generic outage copy — worth retrying another network/format. */
+function isFincraTransientPayoutError(message: string): boolean {
+  const m = message.toLowerCase();
+  return m.includes("contact support")
+    || m.includes("re-try after")
+    || m.includes("retry after")
+    || m.includes("technical issue")
+    || m.includes("try again");
 }
 
 const CURRENCY_TO_COUNTRY: Record<string, string> = {
@@ -127,7 +202,11 @@ function fundingCandidates(preferred: string, dest: string): string[] {
     .split(",")
     .map((s) => s.trim().toUpperCase())
     .filter(Boolean);
-  const list = [preferred, dest, ...extras, ...DEFAULT_FUNDING_FALLBACKS];
+  // MoMo corridors: don't wander into random wallets (RWF/UGX/…) that can't fund the quote.
+  const defaults = ["ZMW", "KES", "GHS"].includes(dest)
+    ? ["NGN", "USD", dest]
+    : DEFAULT_FUNDING_FALLBACKS;
+  const list = [preferred, dest, ...extras, ...defaults];
   const seen = new Set<string>();
   const out: string[] = [];
   for (const c of list) {
@@ -136,6 +215,13 @@ function fundingCandidates(preferred: string, dest: string): string[] {
     out.push(c);
   }
   return out;
+}
+
+function isUnsupportedFundingError(message: string): boolean {
+  const m = message.toLowerCase();
+  return m.includes("no currency supported")
+    || m.includes("currency not supported")
+    || m.includes("unsupported currency");
 }
 
 type QuoteResult = {
@@ -290,7 +376,6 @@ Deno.serve(async (req) => {
     }
 
     const { firstName, lastName } = splitName(recipient_name || transfer.recipient_name || "Recipient");
-    const customerReference = transfer_id;
     const ccy = currency.toUpperCase();
     const paymentDestination = hasBankRail ? "bank_account" as const : "mobile_money_wallet" as const;
 
@@ -355,8 +440,10 @@ Deno.serve(async (req) => {
     let usedQuote: QuoteResult | null = null;
     let usedAccountNumber: string | null = null;
     let usedNetwork: string | null = mmCode;
+    let usedCustomerReference = transfer_id;
     let successJson: Record<string, unknown> | null = null;
 
+    let attemptNo = 0;
     for (const sourceCurrency of candidates) {
       if (successJson) break;
       const cross = sourceCurrency !== ccy;
@@ -365,12 +452,17 @@ Deno.serve(async (req) => {
         if (successJson) break;
 
         for (const accountNumber of accountVariants) {
+          attemptNo += 1;
+          // Unique per attempt — Fincra rejects reuse of the same customerReference after a failed create.
+          const customerReference = attemptNo === 1 ? transfer_id : `${transfer_id}__${attemptNo}`;
           const beneficiary = hasBankRail
             ? { ...beneficiaryBase, accountNumber }
             : {
               ...beneficiaryBase,
               accountNumber,
-              phone: (beneficiaryBase.phone as string) || accountNumber,
+              phone: accountNumber.startsWith("260") || accountNumber.startsWith("254") || accountNumber.startsWith("233")
+                ? accountNumber
+                : ((beneficiaryBase.phone as string) || accountNumber),
               ...(netCode ? { mobileMoneyCode: netCode } : {}),
             };
 
@@ -385,7 +477,11 @@ Deno.serve(async (req) => {
             });
             if (!q.ok) {
               attemptErrors.push(`${sourceCurrency}->${ccy} quote: ${q.error}`);
-              lastReason = q.error;
+              // Don't bury a real NGN payout failure under later "RWF not supported".
+              if (!isUnsupportedFundingError(q.error)) {
+                lastReason = q.error;
+              }
+              // Skip this funding currency entirely.
               break;
             }
             quoted = q.quote;
@@ -407,6 +503,7 @@ Deno.serve(async (req) => {
 
           console.log("fincra-payout attempt", {
             transfer_id,
+            customerReference,
             sourceCurrency,
             destinationCurrency: ccy,
             cross,
@@ -421,35 +518,53 @@ Deno.serve(async (req) => {
             body: JSON.stringify(payload),
           });
 
-          if (ok) {
+          const outcome = fincraPayoutAccepted(json as Record<string, unknown>);
+          if (ok && outcome.accepted) {
             usedSource = sourceCurrency;
             usedQuote = quoted;
             usedAccountNumber = accountNumber;
             usedNetwork = netCode || mmCode;
-            successJson = json;
+            usedCustomerReference = customerReference;
+            successJson = json as Record<string, unknown>;
             break;
           }
 
-          const reason = String(json?.error || json?.message || `HTTP ${status}`);
+          let reason = outcome.message
+            || String((json as any)?.error || (json as any)?.message || `HTTP ${status}`);
+          // Pull richer failure text when create returns status=failed.
+          if (ok && !outcome.accepted) {
+            const detail = await fincraFetch(
+              `/disbursements/payouts/customer-reference/${encodeURIComponent(customerReference)}`,
+              { method: "GET", withBusinessId: true },
+            );
+            const d = (detail.json?.data ?? {}) as Record<string, unknown>;
+            const richer = String(d.message || d.reason || d.failureReason || "");
+            if (richer) reason = richer;
+            reason = `${reason} [fincra:${outcome.status || "failed"} ref=${d.reference || outcome.data.reference || "?"}]`;
+          }
+
           attemptErrors.push(`${sourceCurrency}->${ccy} net=${netCode || mmCode} acct=${accountNumber}: ${reason}`);
           lastReason = reason;
 
-          const lower = reason.toLowerCase();
           if (isFincraAccountNumberError(reason)) {
-            continue;
+            continue; // try next MSISDN shape
+          }
+          if (isFincraTransientPayoutError(reason)) {
+            // Format was accepted by Fincra then failed downstream — try next network with same good MSISDNs.
+            break;
           }
           if (
-            lower.includes("maintenance") ||
-            lower.includes("not supported") ||
-            lower.includes("unsupported")
+            reason.toLowerCase().includes("maintenance") ||
+            (reason.toLowerCase().includes("not supported") && !isUnsupportedFundingError(reason)) ||
+            reason.toLowerCase().includes("unsupported")
           ) {
             accountVariants.length = 0;
             break;
           }
-          if (isFincraBalanceError(reason)) {
+          if (isFincraBalanceError(reason) || isUnsupportedFundingError(reason)) {
             break;
           }
-          // Other errors — try next network, else stop funding wallet.
+          // Other hard errors — try next network once, else stop this funding wallet.
           break;
         }
         if (isFincraBalanceError(lastReason)) break;
@@ -457,7 +572,13 @@ Deno.serve(async (req) => {
     }
 
     if (!successJson) {
-      const reason = lastReason;
+      // Prefer the most useful attempt line over a later "RWF not supported" quote error.
+      const bestAttempt = [...attemptErrors].reverse().find((a) =>
+        a.includes("fincra:failed") || isFincraTransientPayoutError(a) || isFincraAccountNumberError(a)
+      ) || attemptErrors[attemptErrors.length - 1] || lastReason;
+      const reason = bestAttempt.includes(": ")
+        ? bestAttempt.slice(bestAttempt.indexOf(": ") + 2)
+        : lastReason;
       const isBalanceError = isFincraBalanceError(reason);
       const detail = attemptErrors.length > 1
         ? `${reason} (tried: ${attemptErrors.join(" | ")})`
@@ -497,13 +618,13 @@ Deno.serve(async (req) => {
     }
 
     const pdata = (successJson?.data ?? {}) as Record<string, unknown>;
-    const providerRef = String(pdata.reference || pdata.id || customerReference);
+    const providerRef = String(pdata.reference || pdata.id || usedCustomerReference);
     await supabase.from("transfers").update({
       status: "processing",
       provider_reference: providerRef,
       provider_charge_id: usedQuote
-        ? `rail:fincra|src:${usedSource}|dst:${ccy}|net:${usedNetwork || "?"}|acct:${usedAccountNumber || "?"}|q:${usedQuote.reference}`
-        : `rail:fincra|src:${usedSource}|dst:${ccy}|net:${usedNetwork || "?"}|acct:${usedAccountNumber || "?"}`,
+        ? `rail:fincra|src:${usedSource}|dst:${ccy}|net:${usedNetwork || "?"}|acct:${usedAccountNumber || "?"}|cref:${usedCustomerReference}|q:${usedQuote.reference}`
+        : `rail:fincra|src:${usedSource}|dst:${ccy}|net:${usedNetwork || "?"}|acct:${usedAccountNumber || "?"}|cref:${usedCustomerReference}`,
     }).eq("id", transfer_id);
     await supabase.from("notifications").insert({
       user_id: senderId,

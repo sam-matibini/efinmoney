@@ -10,8 +10,10 @@ const corsHeaders = {
 
 function isSuccessPayload(payload: Record<string, unknown>, data: Record<string, unknown>): boolean {
   const code = String(data.response_code ?? payload.response_code ?? "");
+  // 202 / "successfully received" = collection accepted, NOT settled — do not credit yet.
+  if (code === "202") return false;
   const msg = String(data.response_message ?? payload.response_message ?? data.status ?? payload.status ?? "").toLowerCase();
-  if (code === "202" || msg.includes("successfully received")) return true;
+  if (msg.includes("successfully received") && !isSuccessStatus(data.status ?? payload.status)) return false;
   return isSuccessStatus(data.status ?? payload.status);
 }
 
@@ -124,13 +126,39 @@ Deno.serve(async (req) => {
         });
       }
 
-      const idempotencyRef = transactionId || reference;
+      // Atomic claim — only one callback may transition pending → completed.
+      const { data: claimed, error: claimErr } = await supabase
+        .from("ghana_pay_transactions")
+        .update({
+          status: "completed",
+          provider_reference: transactionId || reference || txn.provider_reference || null,
+          last_event: payload,
+        })
+        .eq("id", txn.id)
+        .neq("status", "completed")
+        .select("id, amount, user_id, target_wallet_id, reference")
+        .maybeSingle();
+
+      if (claimErr) {
+        console.error("ghana-payment-callback claim failed", claimErr);
+        return new Response(JSON.stringify({ error: "Could not claim transaction" }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (!claimed) {
+        return new Response(JSON.stringify({ received: true, duplicate: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Stable merchant reference — never alternate provider transaction ids.
+      const idempotencyRef = String(claimed.reference || txn.reference || reference || txn.id);
       const { data: existing } = await supabase.from("ledger_entries").select("id")
         .eq("reference_type", "ghana_pay_topup")
         .eq("external_reference", idempotencyRef)
         .limit(1);
       if (existing?.length) {
-        await supabase.from("ghana_pay_transactions").update({ status: "completed" }).eq("id", txn.id);
         return new Response(JSON.stringify({ received: true, duplicate: true }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -139,13 +167,23 @@ Deno.serve(async (req) => {
       const { data: asset } = await supabase.from("ledger_accounts").select("id").eq("code", "1254").maybeSingle();
       const { data: liab } = await supabase.from("ledger_accounts").select("id").eq("code", "2106").maybeSingle();
       if (!asset || !liab) {
+        // Roll claim back so a later correct callback can retry.
+        await supabase.from("ghana_pay_transactions").update({ status: "pending" }).eq("id", txn.id);
         return new Response(JSON.stringify({ error: "Missing GHS ledger accounts (1254/2106)" }), {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      const amount = Number(txn.amount);
+      const amount = Number(claimed.amount);
+      if (!Number.isFinite(amount) || !(amount > 0)) {
+        await supabase.from("ghana_pay_transactions").update({ status: "pending" }).eq("id", txn.id);
+        return new Response(JSON.stringify({ error: "Invalid collection amount" }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       const journalId = crypto.randomUUID();
       const desc = `Ghana Pay top-up (${idempotencyRef})`;
 
@@ -161,12 +199,12 @@ Deno.serve(async (req) => {
           reference_type: "ghana_pay_topup",
           reference_id: txn.id,
           external_reference: idempotencyRef,
-          created_by: txn.user_id,
+          created_by: claimed.user_id,
         },
         {
           journal_id: journalId,
           account_id: liab.id,
-          wallet_id: txn.target_wallet_id,
+          wallet_id: claimed.target_wallet_id,
           currency_code: "GHS",
           debit_amount: 0,
           credit_amount: amount,
@@ -174,30 +212,26 @@ Deno.serve(async (req) => {
           reference_type: "ghana_pay_topup",
           reference_id: txn.id,
           external_reference: idempotencyRef,
-          created_by: txn.user_id,
+          created_by: claimed.user_id,
         },
       ]);
 
       if (leErr) {
+        await supabase.from("ghana_pay_transactions").update({ status: "pending" }).eq("id", txn.id);
         return new Response(JSON.stringify({ error: "Ledger post failed" }), {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      await supabase.from("ghana_pay_transactions").update({
-        status: "completed",
-        provider_reference: idempotencyRef,
-      }).eq("id", txn.id);
-
       await supabase.from("notifications").insert({
-        user_id: txn.user_id,
+        user_id: claimed.user_id,
         title: "Wallet topped up",
         message: `Your GHS wallet has been credited GH₵${amount.toLocaleString()}.`,
         type: "wallet",
       }).then(() => null, () => null);
 
-      sendTopupEmail(supabase, txn.user_id, "GHS", amount, idempotencyRef).catch(() => {});
+      sendTopupEmail(supabase, claimed.user_id, "GHS", amount, idempotencyRef).catch(() => {});
 
       return new Response(JSON.stringify({ received: true, outcome: "collection_completed" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },

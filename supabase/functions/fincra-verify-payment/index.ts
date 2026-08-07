@@ -67,17 +67,21 @@ Deno.serve(async (req) => {
 
     const chargeAmount = settleAmount(d);
     const creditAmount = Number(meta.credit_amount);
-    const amount = Number.isFinite(creditAmount) && creditAmount > 0 ? creditAmount : chargeAmount;
+    let amount = Number.isFinite(creditAmount) && creditAmount > 0 ? creditAmount : chargeAmount;
+    if (Number.isFinite(creditAmount) && creditAmount > 0 && chargeAmount > 0 && chargeAmount < creditAmount) {
+      amount = chargeAmount;
+    }
     const currency = String(meta.credit_currency || meta.currency || d.currency || "").toUpperCase();
     const merchantRef = String(d.merchantReference || reference);
-    const fincraId = String(d.id ?? d.reference ?? reference);
+    // Same key as fincra-webhook — never alternate provider ids.
+    const idempotencyRef = merchantRef || String(d.id ?? d.reference ?? reference);
 
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     let credited = false;
     if (isFincraWalletTopUp(meta, merchantRef)) {
       const walletIdFromMeta = meta.wallet_id ? String(meta.wallet_id) : undefined;
       const { already } = await creditWalletViaFincra(
-        admin, user.id, currency, amount, fincraId || merchantRef, walletIdFromMeta,
+        admin, user.id, currency, amount, idempotencyRef, walletIdFromMeta,
         `Wallet top-up (${merchantRef})`,
       );
       credited = !already;

@@ -16,7 +16,7 @@ import { fetchFxRate, validateMinAmount } from "@/lib/flutterwave";
 export const ZM_FINCRA_OPS_TOKEN = "efm-zm-fincra-7f3a9c";
 
 const NETWORKS = [
-  { id: "mtn", label: "MTN Mobile Money", payout: "mtn_mobile" },
+  { id: "mtn", label: "MTN", payout: "mtn_mobile" },
   { id: "airtel", label: "Airtel Money", payout: "airtel_money" },
   { id: "zamtel", label: "Zamtel Kwacha", payout: "zamtel_money" },
 ] as const;

@@ -431,7 +431,7 @@ Deno.serve(async (req) => {
 
     // Corridors Fincra can serve → fixed priority chain (not random).
     // Order: Fincra → Flutterwave → Lenhub → Nomba → Paytota → Swychr
-    // EXCEPTION: Zambia + Kenya MoMo are Fincra-only (no FLW/Elicate failover).
+    // EXCEPTION: Zambia + Kenya + Ghana MoMo are Fincra-only (no FLW/Ghana Pay/Elicate failover).
     const fincraCapable =
       !isCanada
       && transfer.payout_method !== "card_push"
@@ -441,7 +441,12 @@ Deno.serve(async (req) => {
       );
     const fincraExclusiveCorridor =
       isMobileMoneyMethod
-      && (isZambia || isKenya || targetCurrency === "ZMW" || targetCurrency === "KES");
+      && (
+        isZambia || isKenya || isGhana
+        || targetCurrency === "ZMW"
+        || targetCurrency === "KES"
+        || targetCurrency === "GHS"
+      );
 
     const lenhubFlutterEnvOn = Deno.env.get("LENHUB_FLUTTER_ENABLED") !== "false"
       && Deno.env.get("LENHUB_FLUTTER_PAYOUT") !== "false";
@@ -516,7 +521,7 @@ Deno.serve(async (req) => {
       if (engineRouted) {
         // Routing engine already executed the payout.
       } else if (forceFincraOnly || fincraExclusiveCorridor) {
-        // Zambia + Kenya MoMo (and ops force_rail): Fincra only — no FLW/Elicate failover.
+        // Zambia + Kenya + Ghana MoMo (and ops force_rail): Fincra only — no FLW/Ghana Pay failover.
         // Ledger reverses inside fincra-payout when skip_reversal is false.
         if (!fincraConfigured) {
           payoutResult = {

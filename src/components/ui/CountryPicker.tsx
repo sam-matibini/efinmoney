@@ -36,11 +36,13 @@ const CountryPicker = ({
   const selected = findCountryById(value || undefined);
 
   const grouped = useMemo(() => {
-    const base = query.trim() ? filterCountries(query).filter((c) => countries.some((x) => x.id === c.id)) : countries;
+    const base = query.trim()
+      ? filterCountries(query, countries)
+      : countries;
     const items = base;
     const popular = POPULAR_COUNTRY_IDS
       .map((id) => countries.find((c) => c.id === id))
-      .filter((c): c is CountryInfo => !!c && items.includes(c));
+      .filter((c): c is CountryInfo => !!c && items.some((x) => x.id === c.id));
 
     const byRegion = REGION_ORDER.map((region) => ({
       region,

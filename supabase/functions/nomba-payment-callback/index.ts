@@ -107,7 +107,13 @@ async function completeNombaCollection(
   const checkoutCurrency = String(txn.checkout_currency ?? txn.currency).toUpperCase();
   const checkoutAmount = txn.checkout_amount != null ? Number(txn.checkout_amount) : Number(txn.amount);
 
-  const idempotencyRef = orderId || String(txn.reference);
+  if (!Number.isFinite(creditAmount) || !(creditAmount > 0)) {
+    return { ok: false, error: `Invalid Nomba credit amount: ${creditAmount}` };
+  }
+
+  // Prefer stable merchant reference so browser return + webhook cannot double-post.
+  const idempotencyRef = String(txn.reference || orderId || "").trim();
+  if (!idempotencyRef) return { ok: false, error: "Missing Nomba top-up reference" };
 
   const { data: existing } = await supabase.from("ledger_entries").select("id")
     .eq("reference_type", "nomba_pay_topup")
@@ -116,6 +122,17 @@ async function completeNombaCollection(
   if (existing?.length) {
     await supabase.from("nomba_pay_transactions").update({ status: "completed" }).eq("id", txn.id);
     return { ok: true, duplicate: true };
+  }
+  // Legacy: prior credits may have keyed on orderId instead of merchant reference
+  if (orderId && orderId !== idempotencyRef) {
+    const { data: byOrder } = await supabase.from("ledger_entries").select("id")
+      .eq("reference_type", "nomba_pay_topup")
+      .eq("external_reference", orderId)
+      .limit(1);
+    if (byOrder?.length) {
+      await supabase.from("nomba_pay_transactions").update({ status: "completed" }).eq("id", txn.id);
+      return { ok: true, duplicate: true };
+    }
   }
 
   const settlementByCurrency: Record<string, string> = {

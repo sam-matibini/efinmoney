@@ -119,7 +119,7 @@ import LenhubFlutterTopUpCard from "@/components/payments/LenhubFlutterTopUpCard
 import { cn } from "@/lib/utils";
 import AppPage from "@/components/layout/AppPage";
 import TransferSuccess from "@/components/send/TransferSuccess";
-import { findCountryById, findCountryByCode, COUNTRIES } from "@/lib/countries";
+import { findCountryById, findCountryByCode, COUNTRIES, LIVE_SEND_COUNTRY_IDS, isLiveSendCountryId } from "@/lib/countries";
 import { MM_COUNTRIES } from "@/lib/mobileMoneyNetworks";
 
 import { PRIORITY_SEND_CURRENCIES } from "@/lib/currencyPriority";
@@ -188,6 +188,13 @@ const SendPage = () => {
   const [amount, setAmount] = useState("");
   const [selectedWalletId, setSelectedWalletId] = useState("");
   const [targetCountryId, setTargetCountryId] = useState<string>("Kenya");
+
+  // Drop destinations that are no longer live (e.g. deep-link / stale state).
+  useEffect(() => {
+    if (!isLiveSendCountryId(targetCountryId)) {
+      setTargetCountryId(LIVE_SEND_COUNTRY_IDS[0]);
+    }
+  }, [targetCountryId]);
   const [recipientName, setRecipientName] = useState("");
   const [recipientPhone, setRecipientPhone] = useState("");
   const [selectedSourceId, setSelectedSourceId] = useState<string>("");
@@ -2215,6 +2222,7 @@ const SendPage = () => {
                                     <SendHeaderCountry
                                       value={targetCountryId}
                                       onChange={setTargetCountryId}
+                                      filterIds={[...LIVE_SEND_COUNTRY_IDS]}
                                     />
                                   }
 
@@ -2361,8 +2369,8 @@ const SendPage = () => {
                                         <Label>Payout Method</Label>
                                         <div className="grid grid-cols-2 gap-2">
                                           {([
-                                            { v: 'mobile', label: 'Mobile Money' },
-                                            { v: 'bank',   label: 'Bank Transfer' },
+                                            { v: 'mobile', label: 'Phone' },
+                                            { v: 'bank',   label: 'Bank' },
                                           ] as const).map(({ v, label }) => {
                                             const active = ghPayoutMode === v;
                                             return (
@@ -2385,7 +2393,7 @@ const SendPage = () => {
                                     )}
                                     {!useLink && availableNetworks && availableNetworks.length > 1 && !isGhanaBank && !isNGNBank && (
                                       <motion.div custom={1.5} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
-                                        <Label>Mobile Money Network</Label>
+                                        <Label>Network</Label>
                                         <div className="grid grid-cols-3 gap-2">
                                           {availableNetworks.map((n) => {
                                             const active = (activeNetwork?.id === n.id);
@@ -2527,7 +2535,7 @@ const SendPage = () => {
                                     ) : (
                                       <>
                                       <motion.div custom={2} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
-                                        <Label>Mobile Money Number</Label>
+                                        <Label>Phone number</Label>
                                         <Input
                                           placeholder={phonePlaceholder}
                                           value={recipientPhone}
@@ -2537,9 +2545,8 @@ const SendPage = () => {
                                         />
                                         <p className="text-sm text-muted-foreground">
                                           {targetCountry.code === "ZMW"
-                                            ? "Use 260… or 07… (Airtel 77/97, MTN 76/96, Zamtel 75/95). Funds will be sent via "
-                                              + effectiveMethodLabel + "."
-                                            : `Funds will be sent via ${effectiveMethodLabel} to this number.`}
+                                            ? `Use 260… or 07… (Airtel 77/97, MTN 76/96, Zamtel 75/95). Sent via ${effectiveMethodLabel}.`
+                                            : `Sent via ${effectiveMethodLabel} to this number.`}
                                         </p>
                                       </motion.div>
                                       </>

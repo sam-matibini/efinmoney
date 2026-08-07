@@ -164,14 +164,27 @@ Deno.serve(async (req) => {
             }
           }
 
-          // Idempotency keyed on FLW transaction_id (falls back to tx_ref)
-          const idempotencyRef = flwId || String(reference);
-          const credited = await creditWallet(
-            supabase, userIdMeta, walletId, currency, amount,
-            idempotencyRef, `Top-up via Flutterwave (txn ${flwId}, ref ${reference})`,
-          );
-          if (credited) {
-            sendTopupEmail(supabase, userIdMeta, currency, amount, idempotencyRef).catch(() => {});
+          // Idempotency keyed on merchant tx_ref (same as flw-verify-payment)
+          const idempotencyRef = String(reference || flwId || "").trim();
+          if (!idempotencyRef || !(amount > 0)) {
+            console.warn("flutterwave-webhook: skipping credit — missing ref or amount", { reference, flwId, amount });
+          } else {
+            // Skip if already credited under either tx_ref or FLW id
+            const { data: existingAny } = await supabase.from("ledger_entries").select("id")
+              .eq("reference_type", "flw_topup")
+              .in("external_reference", [idempotencyRef, flwId].filter(Boolean))
+              .limit(1);
+            if (existingAny?.length) {
+              console.log("flutterwave-webhook: already posted", idempotencyRef);
+            } else {
+              const credited = await creditWallet(
+                supabase, userIdMeta, walletId, currency, amount,
+                idempotencyRef, `Top-up via Flutterwave (txn ${flwId}, ref ${reference})`,
+              );
+              if (credited) {
+                sendTopupEmail(supabase, userIdMeta, currency, amount, idempotencyRef).catch(() => {});
+              }
+            }
           }
         }
         // Virtual account credit

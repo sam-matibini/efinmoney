@@ -23,11 +23,11 @@ export const LENHUB_LIABILITY_BY_CURRENCY: Record<string, string> = {
   CAD: "2101",
   EUR: "2104",
   GBP: "2105",
-  GHS: "2102",
-  KES: "2102",
-  UGX: "2102",
-  RWF: "2102",
-  TZS: "2102",
+  GHS: "2106",
+  KES: "2110",
+  UGX: "2111",
+  RWF: "2112",
+  TZS: "2107",
 };
 
 export async function creditLenhubFlutterTopup(
@@ -48,6 +48,10 @@ export async function creditLenhubFlutterTopup(
     .eq("reference_id", params.chargeRowId)
     .limit(1);
   if (already?.length) return { credited: false, reason: "already_credited" };
+
+  if (!Number.isFinite(params.amount) || !(params.amount > 0)) {
+    return { credited: false, reason: "invalid_amount" };
+  }
 
   let walletId = params.walletId;
   if (!walletId) {

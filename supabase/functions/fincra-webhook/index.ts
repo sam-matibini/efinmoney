@@ -92,14 +92,24 @@ Deno.serve(async (req) => {
       if (userId && isFincraWalletTopUp(meta, merchantRef)) {
         const creditAmount = Number(meta.credit_amount);
         const settle = settleAmount(data);
-        const amount = Number.isFinite(creditAmount) && creditAmount > 0 ? creditAmount : settle;
+        // Prefer intentional credit_amount from checkout metadata — never over-credit from settle fields.
+        let amount = Number.isFinite(creditAmount) && creditAmount > 0 ? creditAmount : settle;
+        if (Number.isFinite(creditAmount) && creditAmount > 0 && settle > 0 && settle < creditAmount) {
+          // Provider settled less than requested — credit the lower settled amount only.
+          amount = settle;
+        }
         const currency = String(meta.credit_currency || meta.currency || data.currency || "").toUpperCase();
-        const idempotencyRef = String(data.chargeReference || data.id || merchantRef);
+        // ALWAYS key on merchant reference so webhook + verify cannot double-post.
+        const idempotencyRef = merchantRef || String(data.chargeReference || data.id || "");
         const walletId = meta.wallet_id ? String(meta.wallet_id) : undefined;
-        await creditWalletViaFincra(
-          supabase, userId, currency, amount, idempotencyRef, walletId,
-          `Wallet top-up (${merchantRef})`,
-        );
+        if (!idempotencyRef) {
+          console.warn("fincra-webhook: charge.successful missing merchant reference — skipping credit");
+        } else {
+          await creditWalletViaFincra(
+            supabase, userId, currency, amount, idempotencyRef, walletId,
+            `Wallet top-up (${merchantRef || idempotencyRef})`,
+          );
+        }
       }
     }
 
@@ -164,14 +174,20 @@ Deno.serve(async (req) => {
 
     if (payoutSuccess || payoutFailed) {
       const customerRef = String(data.customerReference || data.merchantReference || "");
-      const transferId = customerRef.startsWith("EFM-") ? null : customerRef;
-      let tid = transferId;
+      let tid: string | undefined;
+      const baseId = customerRef.includes("__")
+        ? customerRef.split("__")[0]
+        : (customerRef.startsWith("EFM-") ? "" : customerRef);
+      if (baseId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(baseId)) {
+        const { data: tr2 } = await supabase.from("transfers").select("id").eq("id", baseId).maybeSingle();
+        tid = tr2?.id as string | undefined;
+      }
       if (!tid && customerRef) {
         const { data: tr } = await supabase.from("transfers").select("id")
           .eq("provider_reference", String(data.reference || data.id || "")).maybeSingle();
         tid = tr?.id as string | undefined;
       }
-      if (!tid && customerRef) {
+      if (!tid && customerRef && !customerRef.includes("__")) {
         const { data: tr2 } = await supabase.from("transfers").select("id").eq("id", customerRef).maybeSingle();
         tid = tr2?.id as string | undefined;
       }

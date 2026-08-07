@@ -20,17 +20,16 @@ function json(body: unknown, status = 200) {
 
 function variants(raw: string): string[] {
   let d = raw.replace(/\D/g, "");
+  // Already international 260… — don't prepend again
+  if (d.startsWith("260260")) d = d.slice(3);
   if (d.startsWith("0") && !d.startsWith("260")) d = "260" + d.slice(1);
   if (!d.startsWith("260") && d.length === 9) d = "260" + d;
+  if (d.startsWith("260260")) d = "260" + d.slice(6);
   const national = d.startsWith("260") ? d.slice(3) : d;
   const nationalNo0 = national.startsWith("0") ? national.slice(1) : national;
   const with0 = nationalNo0.startsWith("0") ? nationalNo0 : `0${nationalNo0}`;
-  const out = [
-    d, // 260770069550
-    with0, // 0770069550
-    nationalNo0, // 770069550
-    `+${d}`,
-  ];
+  // Prefer Fincra-confirmed 260… ; skip garbage 0260… / 260260…
+  const out = [d, with0].filter((v) => v && !v.startsWith("0260") && !v.startsWith("260260"));
   return [...new Set(out.filter(Boolean))];
 }
 

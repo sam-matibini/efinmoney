@@ -54,11 +54,21 @@ async function creditWalletViaLedger(
     walletId = nw.id;
   }
 
-  // Idempotency — use external_reference (text), same as flutterwave-webhook
-  const idempotencyRef = flwId || txRef;
+  // Idempotency — always merchant tx_ref so webhook + verify share one key
+  const idempotencyRef = String(txRef || flwId || "").trim();
+  if (!idempotencyRef) throw new Error("Missing Flutterwave top-up reference");
+  if (!Number.isFinite(amount) || !(amount > 0)) throw new Error(`Invalid Flutterwave credit amount: ${amount}`);
+
   const { data: existing } = await admin.from("ledger_entries").select("id")
     .eq("reference_type", "flw_topup").eq("external_reference", idempotencyRef).limit(1);
   if (existing && existing.length > 0) return { wallet_id: walletId, already: true };
+
+  // Also treat a prior credit under the FLW transaction id as already done
+  if (flwId && flwId !== idempotencyRef) {
+    const { data: byFlwId } = await admin.from("ledger_entries").select("id")
+      .eq("reference_type", "flw_topup").eq("external_reference", flwId).limit(1);
+    if (byFlwId && byFlwId.length > 0) return { wallet_id: walletId, already: true };
+  }
 
   // Match flutterwave-webhook account lookup (proven working)
   const { data: asset } = await admin.from("ledger_accounts")
