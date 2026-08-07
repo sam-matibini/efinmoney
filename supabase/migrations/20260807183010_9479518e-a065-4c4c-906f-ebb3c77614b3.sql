@@ -1,0 +1,41 @@
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE
+  public.payment_partners,
+  public.partner_corridors,
+  public.partner_limits,
+  public.partner_pricing,
+  public.partner_fx_rates,
+  public.partner_liquidity,
+  public.partner_performance,
+  public.partner_alerts,
+  public.partner_settlements,
+  public.partner_scorecards,
+  public.partner_score_weights,
+  public.partner_suspensions,
+  public.partner_invoices,
+  public.partner_invoice_lines,
+  public.efinmoney_pricing,
+  public.routing_rules,
+  public.routing_attempts,
+  public.api_partners
+TO authenticated;
+
+GRANT ALL ON TABLE
+  public.payment_partners,
+  public.partner_corridors,
+  public.partner_limits,
+  public.partner_pricing,
+  public.partner_fx_rates,
+  public.partner_liquidity,
+  public.partner_performance,
+  public.partner_alerts,
+  public.partner_settlements,
+  public.partner_scorecards,
+  public.partner_score_weights,
+  public.partner_suspensions,
+  public.partner_invoices,
+  public.partner_invoice_lines,
+  public.efinmoney_pricing,
+  public.routing_rules,
+  public.routing_attempts,
+  public.api_partners
+TO service_role;
