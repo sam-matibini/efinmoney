@@ -428,7 +428,7 @@ const UsersPage = () => {
                 {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}
               </div>
             ) : (
-              <div className="overflow-x-auto">
+              <TopScrollSync>
                 <Table>
                   <TableHeader>
                     <TableRow>
