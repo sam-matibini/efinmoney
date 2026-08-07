@@ -19,6 +19,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { format, isPast } from "date-fns";
 import { toast } from "sonner";
 import AdminLayout from "@/components/admin-portal/AdminLayout";
+import TopScrollSync from "@/components/admin-portal/TopScrollSync";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   STAFF_ROLES, REQUIREMENT_OPTIONS, roleLabel, requirementLabel, requirementOf,
@@ -572,10 +573,11 @@ ${tpl.content_html}
               <CardTitle>Mandatory Training Compliance Matrix</CardTitle>
               <p className="text-xs text-muted-foreground">Role-based courses only count for the roles they apply to; “n/a” means the course is not required for that staff member.</p>
             </CardHeader>
-            <CardContent className="overflow-x-auto">
+            <CardContent>
               {mandatory.length === 0 || staffRows.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Add mandatory courses and staff records to see the matrix.</p>
               ) : (
+                <TopScrollSync>
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -603,6 +605,7 @@ ${tpl.content_html}
                     ))}
                   </TableBody>
                 </Table>
+                </TopScrollSync>
               )}
             </CardContent>
           </Card>

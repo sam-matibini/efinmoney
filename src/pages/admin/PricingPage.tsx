@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Tags, Plus, Trash2, Loader2, Save, X, AlertTriangle, RefreshCw } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import TopScrollSync from "@/components/admin-portal/TopScrollSync";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
