@@ -8,25 +8,45 @@ import { ReactNode, useEffect, useRef, useState } from "react";
 const TopScrollSync = ({ children, className }: { children: ReactNode; className?: string }) => {
   const topRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
+  const scrollTargetRef = useRef<HTMLElement | null>(null);
   const syncing = useRef(false);
   const [width, setWidth] = useState(0);
   const [overflowing, setOverflowing] = useState(false);
 
   useEffect(() => {
-    const el = bodyRef.current;
-    if (!el) return;
-    const measure = () => {
-      setWidth(el.scrollWidth);
-      setOverflowing(el.scrollWidth > el.clientWidth + 1);
+    const body = bodyRef.current;
+    if (!body) return;
+
+    const findScrollTarget = () => {
+      const candidates = [body, ...Array.from(body.querySelectorAll<HTMLElement>("*"))];
+      return candidates.reduce<HTMLElement>((widest, candidate) =>
+        candidate.scrollWidth > widest.scrollWidth ? candidate : widest, body);
     };
+
+    let target = findScrollTarget();
+    scrollTargetRef.current = target;
+    const measure = () => {
+      target = findScrollTarget();
+      scrollTargetRef.current = target;
+      setWidth(target.scrollWidth);
+      setOverflowing(target.scrollWidth > target.clientWidth + 1);
+    };
+    const syncFromTable = () => mirror(scrollTargetRef.current, topRef.current);
+
     measure();
     const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    if (el.firstElementChild) ro.observe(el.firstElementChild);
-    return () => ro.disconnect();
+    ro.observe(body);
+    body.querySelectorAll<HTMLElement>("*").forEach((element) => ro.observe(element));
+    target.addEventListener("scroll", syncFromTable, { passive: true });
+
+    return () => {
+      ro.disconnect();
+      target.removeEventListener("scroll", syncFromTable);
+      scrollTargetRef.current = null;
+    };
   }, [children]);
 
-  const mirror = (from: HTMLDivElement | null, to: HTMLDivElement | null) => {
+  const mirror = (from: HTMLElement | null, to: HTMLElement | null) => {
     if (!from || !to || syncing.current) return;
     syncing.current = true;
     to.scrollLeft = from.scrollLeft;
@@ -37,17 +57,16 @@ const TopScrollSync = ({ children, className }: { children: ReactNode; className
     <div className={className}>
       <div
         ref={topRef}
-        onScroll={() => mirror(topRef.current, bodyRef.current)}
-        className="overflow-x-auto overflow-y-hidden"
-        style={{ height: overflowing ? 12 : 0 }}
-        aria-hidden
+        onScroll={() => mirror(topRef.current, scrollTargetRef.current)}
+        className="top-scrollbar overflow-x-scroll overflow-y-hidden mb-2"
+        style={{ height: overflowing ? 18 : 0 }}
+        aria-label="Scroll table horizontally"
       >
         <div style={{ width, height: 1 }} />
       </div>
       <div
         ref={bodyRef}
-        onScroll={() => mirror(bodyRef.current, topRef.current)}
-        className="overflow-x-auto"
+        className="min-w-0 [&_table]:min-w-max"
       >
         {children}
       </div>
