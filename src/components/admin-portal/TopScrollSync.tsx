@@ -46,7 +46,7 @@ const TopScrollSync = ({ children, className }: { children: ReactNode; className
     };
   }, [children]);
 
-  const mirror = (from: HTMLDivElement | null, to: HTMLDivElement | null) => {
+  const mirror = (from: HTMLElement | null, to: HTMLElement | null) => {
     if (!from || !to || syncing.current) return;
     syncing.current = true;
     to.scrollLeft = from.scrollLeft;
