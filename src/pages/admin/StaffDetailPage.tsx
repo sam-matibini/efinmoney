@@ -27,6 +27,7 @@ import { format } from "date-fns";
 import { toast } from "sonner";
 import type { AdminRole } from "@/contexts/AdminAuthContext";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
+import StaffTrainingCard from "@/components/admin-portal/StaffTrainingCard";
 
 const ROLE_OPTIONS: AdminRole[] = ["super_admin", "compliance_officer", "finance_officer", "support_agent", "viewer"];
 
@@ -459,6 +460,14 @@ const StaffDetailPage = () => {
 
         {/* Document vault */}
         <StaffDocumentsCard staffId={staff.id} />
+
+        {/* Training & certifications */}
+        <StaffTrainingCard
+          staffId={staff.id}
+          role={staff.role}
+          activatedAt={staff.reviewed_at || staff.created_at}
+          canModify={admin?.role === "super_admin" || admin?.role === "compliance_officer"}
+        />
 
         {/* Actions */}
         <Card>
