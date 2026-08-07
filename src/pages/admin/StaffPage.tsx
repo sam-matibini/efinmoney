@@ -120,19 +120,90 @@ const StaffPage = () => {
     retry: false,
   });
 
-  const [deptFilter, setDeptFilter] = useState("_all_");
+  const [deptFilter, setDeptFilter] = useState(params.get("dept") || ANY);
+  const [roleFilter, setRoleFilter] = useState(params.get("role") || ANY);
+  const [statusFilter, setStatusFilter] = useState(params.get("status") || ANY);
+  const [joined, setJoined] = useState(params.get("joined") || "all");
   const [expandedDept, setExpandedDept] = useState<string | null>(null);
+  const { sortKey, sortDir, SortHead } = useSortState<SortKey>("created_at", "desc");
 
-  const filtered = staff.filter((s) => {
-    const matchQuery = !query || (
-      s.full_name?.toLowerCase().includes(query.toLowerCase()) ||
-      s.email?.toLowerCase().includes(query.toLowerCase()) ||
-      s.role?.toLowerCase().includes(query.toLowerCase()) ||
-      s.department?.toLowerCase().includes(query.toLowerCase())
-    );
-    const matchDept = deptFilter === "_all_" || s.department === deptFilter;
-    return matchQuery && matchDept;
+  useUrlFilterSync({
+    q: query,
+    dept: deptFilter !== ANY ? deptFilter : null,
+    role: roleFilter !== ANY ? roleFilter : null,
+    status: statusFilter !== ANY ? statusFilter : null,
+    joined: joined !== "all" ? joined : null,
+    sort: sortKey !== "created_at" ? sortKey : null,
+    dir: sortDir !== "desc" ? sortDir : null,
   });
+
+  const roleOptions = useMemo(
+    () => [...new Set(staff.map((s) => s.role).filter(Boolean))].sort(),
+    [staff],
+  );
+  const statusOptions = useMemo(
+    () => [...new Set(staff.map((s) => s.status).filter(Boolean))].sort(),
+    [staff],
+  );
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const days = DATE_RANGES[joined] ?? null;
+    const cutoff = days ? Date.now() - days * 86_400_000 : null;
+
+    const matched = staff.filter((s) => {
+      if (q) {
+        const hit =
+          s.full_name?.toLowerCase().includes(q) ||
+          s.email?.toLowerCase().includes(q) ||
+          s.role?.toLowerCase().includes(q) ||
+          s.position?.toLowerCase().includes(q) ||
+          s.department?.toLowerCase().includes(q);
+        if (!hit) return false;
+      }
+      if (deptFilter !== ANY && s.department !== deptFilter) return false;
+      if (roleFilter !== ANY && s.role !== roleFilter) return false;
+      if (statusFilter !== ANY && s.status !== statusFilter) return false;
+      if (cutoff && new Date(s.created_at).getTime() < cutoff) return false;
+      return true;
+    });
+
+    const value = (s: StaffRow): string | number => {
+      switch (sortKey) {
+        case "name": return (s.full_name || s.email || "").toLowerCase();
+        case "role": return s.role || "";
+        case "status": return s.status || "";
+        case "department": return (s.department || "zzz").toLowerCase();
+        case "position": return (s.position || "zzz").toLowerCase();
+        default: return s.created_at ? new Date(s.created_at).getTime() : 0;
+      }
+    };
+
+    return [...matched].sort(compareBy<StaffRow>(value, sortDir));
+  }, [staff, query, deptFilter, roleFilter, statusFilter, joined, sortKey, sortDir]);
+
+  const chips = [
+    deptFilter !== ANY && { label: `Dept: ${deptFilter}`, clear: () => setDeptFilter(ANY) },
+    roleFilter !== ANY && { label: `Role: ${prettify(roleFilter)}`, clear: () => setRoleFilter(ANY) },
+    statusFilter !== ANY && { label: `Status: ${prettify(statusFilter)}`, clear: () => setStatusFilter(ANY) },
+    joined !== "all" && { label: `Joined: ${DATE_LABEL[joined]}`, clear: () => setJoined("all") },
+    !!query && { label: `Search: "${query}"`, clear: () => setQuery("") },
+  ].filter(Boolean) as FilterChip[];
+
+  const clearAll = () => {
+    setQuery(""); setDeptFilter(ANY); setRoleFilter(ANY); setStatusFilter(ANY); setJoined("all");
+  };
+
+  const exportCsv = () =>
+    downloadCsv(
+      "efinmoney-staff",
+      ["Name", "Email", "Role", "Status", "Department", "Position", "Joined"],
+      filtered.map((s) => [
+        s.full_name, s.email, prettify(s.role), prettify(s.status), s.department, s.position,
+        s.created_at ? format(new Date(s.created_at), "yyyy-MM-dd") : "",
+      ]),
+    );
+
 
   const stats = {
     total: staff.length,
