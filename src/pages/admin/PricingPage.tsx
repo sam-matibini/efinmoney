@@ -3,6 +3,9 @@ import { Tags, Plus, Trash2, Loader2, Save, X, AlertTriangle, RefreshCw } from "
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import TopScrollSync from "@/components/admin-portal/TopScrollSync";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import SectionBoundary from "@/components/common/SectionBoundary";
+import PartnerNetworkPanel from "@/components/settings/PartnerNetworkPanel";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
