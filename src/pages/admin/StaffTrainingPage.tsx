@@ -190,8 +190,10 @@ export default function StaffTrainingPage() {
       estimated_minutes: String(course.estimated_minutes ?? 30),
       pass_mark: String(course.pass_mark ?? 70),
       frequency_months: String(course.frequency_months ?? 12),
-      is_mandatory: !!course.is_mandatory,
+      requirement_type: requirementOf(course),
+      onboarding_due_days: course.onboarding_due_days != null ? String(course.onboarding_due_days) : "",
     });
+    setEditRoles(Array.isArray(course.applies_to_roles) ? [...course.applies_to_roles] : []);
     setEditLessons(Array.isArray(course.study_materials) ? JSON.parse(JSON.stringify(course.study_materials)) : []);
     setEditQuiz(Array.isArray(course.quiz) ? JSON.parse(JSON.stringify(course.quiz)) : []);
     setEditLinks(Array.isArray(course.resources) ? JSON.parse(JSON.stringify(course.resources)) : []);
