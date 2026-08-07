@@ -4,9 +4,9 @@ import path from "path";
 import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
-// Committed public backend defaults so builds outside Lovable (e.g. Vercel, where
-// .env is gitignored and never reaches the repo) still target the correct project.
-// These are publishable values — the anon key is protected by Row Level Security.
+// Committed public backend configuration for production builds. Vercel still has
+// legacy VITE_SUPABASE_* values configured, so production must not inherit them.
+// These are publishable values — access remains protected by Row Level Security.
 const FALLBACK_SUPABASE_PROJECT_ID = "hgmskcvaeadnyovbroup";
 const FALLBACK_SUPABASE_URL = "https://hgmskcvaeadnyovbroup.supabase.co";
 const FALLBACK_SUPABASE_PUBLISHABLE_KEY =
@@ -14,9 +14,16 @@ const FALLBACK_SUPABASE_PUBLISHABLE_KEY =
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
-  const supabaseUrl = env.VITE_SUPABASE_URL || FALLBACK_SUPABASE_URL;
-  const supabaseKey = env.VITE_SUPABASE_PUBLISHABLE_KEY || FALLBACK_SUPABASE_PUBLISHABLE_KEY;
-  const supabaseProjectId = env.VITE_SUPABASE_PROJECT_ID || FALLBACK_SUPABASE_PROJECT_ID;
+  const isProduction = mode === "production";
+  const supabaseUrl = isProduction
+    ? FALLBACK_SUPABASE_URL
+    : env.VITE_SUPABASE_URL || FALLBACK_SUPABASE_URL;
+  const supabaseKey = isProduction
+    ? FALLBACK_SUPABASE_PUBLISHABLE_KEY
+    : env.VITE_SUPABASE_PUBLISHABLE_KEY || FALLBACK_SUPABASE_PUBLISHABLE_KEY;
+  const supabaseProjectId = isProduction
+    ? FALLBACK_SUPABASE_PROJECT_ID
+    : env.VITE_SUPABASE_PROJECT_ID || FALLBACK_SUPABASE_PROJECT_ID;
 
   return {
   server: {
