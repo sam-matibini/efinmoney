@@ -66,7 +66,7 @@ const TopScrollSync = ({ children, className }: { children: ReactNode; className
       </div>
       <div
         ref={bodyRef}
-        className="min-w-0"
+        className="min-w-0 [&_table]:min-w-max"
       >
         {children}
       </div>
