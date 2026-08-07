@@ -19,6 +19,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { format, isPast } from "date-fns";
 import { toast } from "sonner";
 import AdminLayout from "@/components/admin-portal/AdminLayout";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  STAFF_ROLES, REQUIREMENT_OPTIONS, roleLabel, requirementLabel, requirementOf,
+  isRequiredFor, courseState, STATE_LABEL, STATE_CLASS, type CellState,
+} from "@/lib/trainingRequirements";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Any = any;
