@@ -405,14 +405,14 @@ ${tpl.content_html}
         {/* ------------------------------- LEARNER ------------------------------- */}
         <TabsContent value="learn" className="space-y-6">
           <div className="grid sm:grid-cols-3 gap-3">
-            <Card><CardContent className="pt-4 pb-3"><div className="text-2xl font-bold">{learnable.length}</div><div className="text-xs text-muted-foreground">Assigned courses</div></CardContent></Card>
+            <Card><CardContent className="pt-4 pb-3"><div className="text-2xl font-bold">{myRequired.length}</div><div className="text-xs text-muted-foreground">Required for {roleLabel(myRole)}</div></CardContent></Card>
             <Card><CardContent className="pt-4 pb-3"><div className="text-2xl font-bold text-emerald-500">{myCompleted}</div><div className="text-xs text-muted-foreground">Completed</div></CardContent></Card>
-            <Card><CardContent className="pt-4 pb-3"><div className="text-2xl font-bold text-amber-500">{learnable.length - myCompleted}</div><div className="text-xs text-muted-foreground">Outstanding</div></CardContent></Card>
+            <Card><CardContent className="pt-4 pb-3"><div className="text-2xl font-bold text-amber-500">{myRequired.length - myCompleted}</div><div className="text-xs text-muted-foreground">Outstanding</div></CardContent></Card>
           </div>
 
           <Card>
             <CardHeader><CardTitle>My Courses</CardTitle></CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-6">
               <div className="flex gap-2 flex-wrap">
                 {(["all","fintrac","boc_rpaa","consulting"] as const).map((key) => (
                   <Button key={key} size="sm" variant={programFilter === key ? "default" : "outline"} onClick={() => setProgramFilter(key)}>
@@ -423,30 +423,46 @@ ${tpl.content_html}
               {cLoading ? <Skeleton className="h-24 w-full" /> : learnableFiltered.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No courses in this program area yet.</p>
               ) : (
-                <Table>
-                  <TableHeader><TableRow><TableHead>Course</TableHead><TableHead>Program area</TableHead><TableHead>Duration</TableHead><TableHead>Pass mark</TableHead><TableHead>Due by</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
-                  <TableBody>
-                    {learnableFiltered.map((c: Any) => {
-                      const st = myStatus(c);
-                      const a = myAssignmentFor(c.id);
-                      return (
-                        <TableRow key={c.id}>
-                          <TableCell className="font-medium">{c.course_name}</TableCell>
-                          <TableCell className="text-xs text-muted-foreground">{programLabel(c.program_area) || c.category}</TableCell>
-                          <TableCell className="text-xs"><Clock className="w-3 h-3 inline mr-1" />{c.estimated_minutes ?? 30} min</TableCell>
-                          <TableCell className="font-mono">{c.pass_mark ?? 70}%</TableCell>
-                          <TableCell className="text-xs">{a?.expected_completion_date ? format(new Date(a.expected_completion_date), "MMM d, yyyy") : "—"}</TableCell>
-                          <TableCell>{st === "current" ? <Badge className="bg-emerald-500/10 text-emerald-600">Completed</Badge> : st === "expired" ? <Badge className="bg-amber-500/10 text-amber-600">Renewal due</Badge> : <Badge className="bg-muted">Not started</Badge>}</TableCell>
-                          <TableCell className="text-right">
-                            <Button size="sm" variant={st === "current" ? "outline" : "default"} onClick={() => openCourse(c)}>
-                              <PlayCircle className="w-4 h-4 mr-1" />{st === "current" ? "Retake" : "Start training"}
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
+                ([
+                  { key: "required", title: "Mandatory", desc: "Must be completed and kept current for your role.", rows: myRequired },
+                  { key: "optional", title: "Elective", desc: "Optional professional development.", rows: myOptional },
+                ] as const).filter((g) => g.rows.length > 0).map((g) => (
+                  <div key={g.key} className="space-y-2">
+                    <div>
+                      <h3 className="text-sm font-semibold">{g.title} <span className="text-muted-foreground font-normal">({g.rows.length})</span></h3>
+                      <p className="text-xs text-muted-foreground">{g.desc}</p>
+                    </div>
+                    <Table>
+                      <TableHeader><TableRow><TableHead>Course</TableHead><TableHead>Requirement</TableHead><TableHead>Duration</TableHead><TableHead>Pass mark</TableHead><TableHead>Due by</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
+                      <TableBody>
+                        {g.rows.map((c: Any) => {
+                          const st = myStatus(c);
+                          const a = myAssignmentFor(c.id);
+                          const onboardDue = myOnboardingDue(c);
+                          const due = a?.expected_completion_date ? new Date(a.expected_completion_date) : onboardDue;
+                          return (
+                            <TableRow key={c.id}>
+                              <TableCell className="font-medium">
+                                {c.course_name}
+                                <div className="text-xs text-muted-foreground">{programLabel(c.program_area) || c.category}</div>
+                              </TableCell>
+                              <TableCell className="text-xs">{requirementLabel(requirementOf(c))}</TableCell>
+                              <TableCell className="text-xs"><Clock className="w-3 h-3 inline mr-1" />{c.estimated_minutes ?? 30} min</TableCell>
+                              <TableCell className="font-mono">{c.pass_mark ?? 70}%</TableCell>
+                              <TableCell className="text-xs">{due ? format(due, "MMM d, yyyy") : "—"}</TableCell>
+                              <TableCell>{statusBadge(st)}</TableCell>
+                              <TableCell className="text-right">
+                                <Button size="sm" variant={st === "current" ? "outline" : "default"} onClick={() => openCourse(c)}>
+                                  <PlayCircle className="w-4 h-4 mr-1" />{st === "current" ? "Retake" : "Start training"}
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                ))
               )}
             </CardContent>
           </Card>
