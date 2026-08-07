@@ -16,7 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Pencil, Trash2, Network } from "lucide-react";
+import { Plus, Pencil, Trash2, Network, AlertCircle, RefreshCw } from "lucide-react";
 
 const csv = (v: string) => v.split(",").map((s) => s.trim()).filter(Boolean);
 
@@ -38,7 +38,7 @@ const emptyPartner: Partial<PaymentPartner> = {
 };
 
 export const PartnersPanel = () => {
-  const { data: partners, isLoading } = usePaymentPartners();
+  const { data: partners, isLoading, isError, error, refetch, isFetching } = usePaymentPartners();
   const create = useCreatePartner();
   const update = useUpdatePartner();
   const remove = useDeletePartner();
@@ -83,6 +83,20 @@ export const PartnersPanel = () => {
             {[0, 1, 2].map((i) => (
               <Skeleton key={i} className="h-10 w-full" />
             ))}
+          </div>
+        ) : isError ? (
+          <div className="flex flex-col items-center gap-3 py-6 text-center" role="alert">
+            <AlertCircle className="h-5 w-5 text-destructive" />
+            <div>
+              <p className="text-sm font-medium">Unable to load payment partners</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {error instanceof Error ? error.message : "The partner data request failed."}
+              </p>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
+              <RefreshCw className={`mr-1.5 h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
+              Retry
+            </Button>
           </div>
         ) : !partners?.length ? (
           <p className="text-sm text-muted-foreground py-6 text-center">
