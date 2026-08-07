@@ -12,6 +12,7 @@ import { Shield, Plus, AlertTriangle } from "lucide-react";
 import { useOperationalRisks, useCreateOperationalRisk, useUpdateOperationalRisk } from "@/hooks/useOperationalRisks";
 import { toast } from "sonner";
 import AdminLayout from "@/components/admin-portal/AdminLayout";
+import TopScrollSync from "@/components/admin-portal/TopScrollSync";
 
 const categoryLabel = (c: string) => c.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
 
@@ -53,7 +54,7 @@ export default function OperationalRiskPage() {
       <Card>
         <CardHeader><CardTitle className="text-lg">Risk Heatmap (Likelihood × Impact)</CardTitle></CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
+          <TopScrollSync>
             <table className="w-full text-xs">
               <thead>
                 <tr>
@@ -74,7 +75,7 @@ export default function OperationalRiskPage() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </TopScrollSync>
         </CardContent>
       </Card>
 

@@ -18,6 +18,7 @@ import { Link } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
 import AdminLayout from "@/components/admin-portal/AdminLayout";
+import TopScrollSync from "@/components/admin-portal/TopScrollSync";
 
 type IntegrationKey = string;
 
@@ -601,7 +602,7 @@ export default function ApiManagementPage() {
               <CardDescription>Deployed serverless functions powering eFinMoney</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="rounded-md border overflow-x-auto">
+              <TopScrollSync className="rounded-md border">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -647,7 +648,7 @@ export default function ApiManagementPage() {
                     })()}
                   </TableBody>
                 </Table>
-              </div>
+              </TopScrollSync>
             </CardContent>
           </Card>
         </TabsContent>

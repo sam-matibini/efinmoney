@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import AdminLayout from "@/components/admin-portal/AdminLayout";
+import TopScrollSync from "@/components/admin-portal/TopScrollSync";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -329,7 +330,7 @@ function UserTierOverrides({ tierDefaults }: { tierDefaults: Record<TierKey, Tie
           />
         </div>
 
-        <div className="overflow-x-auto rounded-lg border">
+        <TopScrollSync className="rounded-lg border">
           <Table>
             <TableHeader>
               <TableRow>
@@ -396,7 +397,7 @@ function UserTierOverrides({ tierDefaults }: { tierDefaults: Record<TierKey, Tie
               )}
             </TableBody>
           </Table>
-        </div>
+        </TopScrollSync>
         <p className="text-xs text-muted-foreground">
           <Label className="text-xs">Note:</Label> Lowering a user's tier reduces their limits immediately. The user
           portal reflects the new tier within ~1 second.

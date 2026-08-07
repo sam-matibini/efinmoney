@@ -270,7 +270,7 @@ export default function RevenuePage() {
             {recent.length === 0 ? (
               <p className="text-sm text-muted-foreground py-8 text-center">No fee transactions yet</p>
             ) : (
-              <div className="rounded-md border overflow-x-auto">
+              <TopScrollSync className="rounded-md border">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -303,7 +303,7 @@ export default function RevenuePage() {
                     ))}
                   </TableBody>
                 </Table>
-              </div>
+              </TopScrollSync>
             )}
           </CardContent>
         </Card>
