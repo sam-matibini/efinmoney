@@ -6,7 +6,6 @@ import { SystemSettingsPanel } from "@/components/settings/SystemSettingsPanel";
 import { IntegrationsPanel } from "@/components/settings/IntegrationsPanel";
 import { CurrencyManagementPanel } from "@/components/settings/CurrencyManagementPanel";
 import { CircleCpnConfigPanel } from "@/components/settings/CircleCpnConfigPanel";
-import { PartnerNetworkPanel } from "@/components/settings/PartnerNetworkPanel";
 import PageHeroBanner from "@/components/common/PageHeroBanner";
 import AppPage from "@/components/layout/AppPage";
 import SectionBoundary from "@/components/common/SectionBoundary";
@@ -41,7 +40,6 @@ const SettingsDashboard = () => {
               <TabsList className="inline-flex w-auto min-w-full lg:min-w-0">
                 <TabsTrigger value="pricing">Pricing & Fees</TabsTrigger>
                 <TabsTrigger value="currencies">Currencies</TabsTrigger>
-                <TabsTrigger value="partners">Partners & Routing</TabsTrigger>
                 <TabsTrigger value="modules">Module Access</TabsTrigger>
                 <TabsTrigger value="integrations">Integrations</TabsTrigger>
                 <TabsTrigger value="circle_cpn">Circle CPN</TabsTrigger>
@@ -55,10 +53,6 @@ const SettingsDashboard = () => {
 
             <TabsContent value="currencies" className="space-y-4">
               <SectionBoundary name="CurrencyManagementPanel"><CurrencyManagementPanel /></SectionBoundary>
-            </TabsContent>
-
-            <TabsContent value="partners" className="space-y-4">
-              <SectionBoundary name="PartnerNetworkPanel"><PartnerNetworkPanel /></SectionBoundary>
             </TabsContent>
 
             <TabsContent value="modules" className="space-y-4">
