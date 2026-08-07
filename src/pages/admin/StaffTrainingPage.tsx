@@ -114,14 +114,6 @@ export default function StaffTrainingPage() {
     onError: () => toast.error("Failed to add course"),
   });
 
-  const setMandatory = useMutation({
-    mutationFn: async ({ id, value }: { id: string; value: boolean }) => {
-      const { error } = await (supabase as Any).from("training_courses").update({ is_mandatory: value }).eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["training-courses"] }); toast.success("Course updated"); },
-    onError: () => toast.error("Failed to update course"),
-  });
 
   const logCompletion = useMutation({
     mutationFn: async () => {
