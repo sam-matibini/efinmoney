@@ -70,7 +70,7 @@ const EMPTY: NewPricingRule = {
 export default function PricingPage() {
   return (
     <div className="max-w-[1400px] mx-auto space-y-4">
-      <Tabs defaultValue="rate-card" className="space-y-4">
+      <Tabs defaultValue="partners" className="space-y-4">
         <div className="overflow-x-auto pb-2">
           <TabsList className="inline-flex w-auto">
             <TabsTrigger value="rate-card">Rate card</TabsTrigger>
