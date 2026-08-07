@@ -95,3 +95,33 @@ export const STATE_CLASS: Record<CellState, string> = {
   onboarding_overdue: "bg-red-500/10 text-red-600",
   missing: "bg-muted text-muted-foreground",
 };
+
+/** Plain-English reason a course applies (or doesn't) to a staff member. */
+export const linkReason = (
+  course: { requirement_type?: string | null; is_mandatory?: boolean | null; applies_to_roles?: string[] | null },
+  role: string | null | undefined,
+  isAssigned = false,
+): { required: boolean; source: "all_staff" | "role" | "assigned" | "none"; reason: string } => {
+  const t = requirementOf(course);
+  if (t === "all_staff") {
+    return { required: true, source: "all_staff", reason: "Auto-linked — mandatory for all staff" };
+  }
+  if (t === "role_based") {
+    const roles = Array.isArray(course.applies_to_roles) ? course.applies_to_roles : [];
+    if (role && roles.includes(role)) {
+      return { required: true, source: "role", reason: `Auto-linked — mandatory for ${roleLabel(role)}` };
+    }
+    if (isAssigned) {
+      return { required: true, source: "assigned", reason: "Manually linked to this staff member" };
+    }
+    return {
+      required: false,
+      source: "none",
+      reason: roles.length
+        ? `Not required — applies to ${roles.map(roleLabel).join(", ")}`
+        : "Role-based course with no roles configured",
+    };
+  }
+  if (isAssigned) return { required: true, source: "assigned", reason: "Manually linked to this staff member" };
+  return { required: false, source: "none", reason: "Elective — optional for every role" };
+};
