@@ -1,0 +1,1 @@
+ALTER VIEW public.t4a_ytd_totals SET (security_invoker = true);
