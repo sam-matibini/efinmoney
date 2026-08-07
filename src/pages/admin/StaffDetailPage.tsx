@@ -333,6 +333,7 @@ const StaffDocumentsCard = ({ staffId }: { staffId: string }) => {
 const StaffDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { admin } = useAdminAuth();
   const queryClient = useQueryClient();
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
