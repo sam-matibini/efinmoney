@@ -41,16 +41,20 @@ interface StaffRow {
   invited_at: string | null;
 }
 
+type SortKey = "name" | "role" | "status" | "department" | "position" | "created_at";
+
 const StaffPage = () => {
   const navigate = useNavigate();
   const { hasPermission } = useAdminAuth();
   const qc = useQueryClient();
-  const [query, setQuery] = useState("");
+  const [params] = useSearchParams();
+  const [query, setQuery] = useState(params.get("q") || "");
   const [inviteOpen, setInviteOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<StaffRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<StaffRow | null>(null);
   const [editForm, setEditForm] = useState({ full_name: "", role: "", status: "", department: "", position: "" });
   const canManage = hasPermission("manage_staff");
+
 
   const updateMutation = useMutation({
     mutationFn: async (fields: typeof editForm) => {
