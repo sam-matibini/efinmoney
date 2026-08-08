@@ -615,15 +615,17 @@ Deno.serve(async (req) => {
           attemptErrors.push(`${sourceCurrency}->${ccy} net=${netCode || mmCode} acct=${accountNumber}: ${reason}`);
           lastReason = reason;
 
+          const cls = classifyFincraError(reason);
+          if (cls === "corridor_down" || cls === "transient") {
+            // Upstream problem — every network returns the same thing. Stop probing
+            // and let the caller fail over to another rail.
+            outageClass = cls;
+            break;
+          }
           if (isFincraAccountNumberError(reason)) {
             continue; // try next MSISDN shape
           }
-          if (isFincraTransientPayoutError(reason)) {
-            // Format was accepted by Fincra then failed downstream — try next network with same good MSISDNs.
-            break;
-          }
           if (
-            reason.toLowerCase().includes("maintenance") ||
             (reason.toLowerCase().includes("not supported") && !isUnsupportedFundingError(reason)) ||
             reason.toLowerCase().includes("unsupported")
           ) {
@@ -635,6 +637,7 @@ Deno.serve(async (req) => {
           }
           // Other hard errors — try next network once, else stop this funding wallet.
           break;
+
         }
         if (isFincraBalanceError(lastReason)) break;
       }
