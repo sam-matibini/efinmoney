@@ -486,8 +486,10 @@ Deno.serve(async (req) => {
     };
 
     let engineRouted = false;
-    // Zambia/Kenya MoMo and ops force_rail skip the routing engine — Fincra only.
-    if (!forceFincraOnly && !fincraExclusiveCorridor) {
+    // Zambia/Kenya MoMo and ops force_rail skip the routing engine — the hardcoded
+    // Fincra-first priority chain below owns those corridors.
+    if (!forceFincraOnly && !fincraExclusiveCorridor && !zambiaMomo) {
+
       try {
         const dispatch = await dispatchRoutedPayout(supabase, routeRequest, {
           transfer_id,
