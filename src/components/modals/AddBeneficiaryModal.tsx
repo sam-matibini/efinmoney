@@ -182,8 +182,11 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
     if (method === "interac" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(interacEmail)) {
       toast.error("Interac requires a valid email"); return;
     }
-    if (method === "mobile" && !phone.trim()) {
+    if (method === "mobile" && !tel.trim()) {
       toast.error("Mobile payout requires a phone number"); return;
+    }
+    if (method === "mobile" && countryNetworks.length > 0 && !networkId) {
+      toast.error("Select a mobile money operator"); return;
     }
 
     const payload: any = {
@@ -194,8 +197,10 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
       tel: tel.trim() || null,
       country_code: country.code,
       currency_code: country.code,
-      payout_method: method === "mobile" ? country.payout : method === "bank" ? "bank" : method === "eft" ? "eft" : method === "interac" ? "interac" : null,
-      phone: phone.trim() || null,
+      payout_method: method === "mobile" ? (activeNetwork?.payout || country.payout) : method === "bank" ? "bank" : method === "eft" ? "eft" : method === "interac" ? "interac" : null,
+      network: method === "mobile" ? (activeNetwork?.id || null) : null,
+      phone: tel.trim() || null,
+
       bank_name: method === "bank" ? selectedBankName.trim() : null,
       bank_account: method === "bank" ? bankAccount.trim() : null,
       bank_code: method === "bank" && isNigeriaBank ? bankCode.trim() || null : null,
