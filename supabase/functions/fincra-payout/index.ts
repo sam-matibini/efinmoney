@@ -508,14 +508,17 @@ Deno.serve(async (req) => {
     let usedNetwork: string | null = mmCode;
     let usedCustomerReference = transfer_id;
     let successJson: Record<string, unknown> | null = null;
+    // Set when the provider itself is down / erroring: stop probing, fail over instead.
+    let outageClass: FincraErrorClass | null = null;
 
     let attemptNo = 0;
     for (const sourceCurrency of candidates) {
-      if (successJson) break;
+      if (successJson || outageClass) break;
       const cross = sourceCurrency !== ccy;
 
       for (const netCode of (networkVariants.length ? networkVariants : [null])) {
-        if (successJson) break;
+        if (successJson || outageClass) break;
+
 
         for (const accountNumber of accountVariants) {
           attemptNo += 1;
