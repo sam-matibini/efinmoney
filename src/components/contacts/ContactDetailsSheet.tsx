@@ -53,7 +53,7 @@ export default function ContactDetailsSheet({
                   <SheetTitle className="truncate">{c.nickname || c.name}</SheetTitle>
                   <SheetDescription className="truncate">
                     <span aria-hidden className="mr-1">{country?.flag || "🌍"}</span>
-                    {country?.name || c.country_code || "Unknown country"}
+                    {country?.country || c.country_code || "Unknown country"}
                   </SheetDescription>
                 </div>
               </div>
