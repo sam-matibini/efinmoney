@@ -833,18 +833,20 @@ Deno.serve(async (req) => {
 
         console.log("priority payout chain", attempts, "final", payoutResult?.rail, payoutResult?.success);
       } else if (isZambia) {
+        // Zambia is a Fincra-only corridor.
         const res = await fetch(
-          `${Deno.env.get("SUPABASE_URL")}/functions/v1/elicate-payout`,
+          `${Deno.env.get("SUPABASE_URL")}/functions/v1/fincra-payout`,
           {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-internal-secret": Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "",
-            },
-            body: JSON.stringify({ transfer_id }),
+            headers: internalHeaders,
+            body: JSON.stringify({ ...flwBody(), skip_reversal: false }),
           },
         );
-        payoutResult = await res.json();
+        payoutResult = await res.json().catch(() => ({
+          success: false,
+          error: `fincra-payout HTTP ${res.status}`,
+          rail: "fincra",
+        }));
       } else if (ghanaPayConfigured && isGhana && isMobileMoneyMethod) {
         const res = await fetch(
           `${Deno.env.get("SUPABASE_URL")}/functions/v1/ghana-payout`,
