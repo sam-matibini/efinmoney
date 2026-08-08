@@ -1855,6 +1855,9 @@ const SendPage = () => {
     clearSendHandoff();
     clearCardSendIntent();
   };
+  /** Card details captured once, in the step-1 checkout panel. */
+  const [cardFields, setCardFields] = useState<CardFieldsValue>(emptyCardFields);
+
 
   const isStep1Valid =
     parsedAmount > 0
