@@ -2616,6 +2616,8 @@ const SendPage = () => {
                                             : null
                                         }
                                         inlineEntry={inlineCardEntry}
+                                        cardFields={cardFields}
+                                        onCardFieldsChange={setCardFields}
                                         insufficientBalance={insufficientFunds}
                                         onTopUp={() => navigate("/wallet/topup")}
                                       />
