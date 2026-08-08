@@ -280,7 +280,8 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
             <Label>Full Name / Business Name</Label>
             <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Jane Doe or Acme Inc." />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+
             <div className="space-y-2">
               <Label>Nickname (optional)</Label>
               <Input value={nickname} onChange={(e) => setNickname(e.target.value)} placeholder="e.g. Landlord" />
