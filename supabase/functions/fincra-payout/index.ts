@@ -451,17 +451,36 @@ Deno.serve(async (req) => {
       }
       const rawPhone = phone_number || transfer.recipient_phone || "";
       const holderName = (recipient_name || transfer.recipient_name || `${firstName} ${lastName}`).trim();
+      // Reject malformed Zambian numbers before spending Fincra attempts on them.
+      if (ccy === "ZMW") {
+        const z = zmwMsisdn(rawPhone);
+        if (!z.ok) {
+          if (!skip_reversal) {
+            const rev = await reverseTransferLedger(supabase, transfer_id);
+            await supabase.from("transfers").update({ status: "failed", failure_reason: z.error }).eq("id", transfer_id);
+            return new Response(
+              JSON.stringify({ success: false, error: z.error, error_class: "hard", refunded: rev.reversed }),
+              { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+            );
+          }
+          return new Response(
+            JSON.stringify({ success: false, error: z.error, error_class: "hard", refunded: false }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+      }
       accountVariants = fincraAccountNumberVariants(rawPhone, ccy);
       beneficiaryBase = {
         firstName,
         lastName,
         type: "individual",
         accountHolderName: holderName,
-        phone: fincraMsisdnDigits(rawPhone, ccy),
+        phone: ccy === "ZMW" ? accountVariants[0] : fincraMsisdnDigits(rawPhone, ccy),
         country: CURRENCY_TO_COUNTRY[ccy] || "ZM",
         mobileMoneyCode: mmCode,
       };
     }
+
 
     // For Zambia, if the selected network is rejected, also try the other MoMo operators.
     const networkVariants: string[] = mmCode
