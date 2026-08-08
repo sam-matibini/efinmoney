@@ -25,10 +25,9 @@ const Index = () => {
       <SectionBoundary name="TierProgressCard"><TierProgressCard /></SectionBoundary>
       <SectionBoundary name="RecentTransactions"><RecentTransactions /></SectionBoundary>
       <SectionBoundary name="ExchangeRates"><div className="mt-6"><ExchangeRates /></div></SectionBoundary>
-      </AppPage>
-      </div>
-    </>
+    </AppPage>
   );
+
 };
 
 export default Index;
