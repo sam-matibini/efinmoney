@@ -10,17 +10,11 @@ import MiniStats from "@/components/dashboard/MiniStats";
 import TierProgressCard from "@/components/dashboard/TierProgressCard";
 import AppPage from "@/components/layout/AppPage";
 import { SectionBoundary } from "@/components/common/SectionBoundary";
-import { useDashboardReady } from "@/hooks/useDashboardReady";
-import DashboardSkeleton from "@/components/dashboard/DashboardSkeleton";
 
 const Index = () => {
-  const ready = useDashboardReady();
-
   return (
-    <>
-      {!ready && <DashboardSkeleton />}
-      <div className={ready ? "" : "hidden"}>
-      <AppPage width="wide" className="py-4 sm:py-6">
+    <AppPage width="wide" className="py-4 sm:py-6">
+
       <SectionBoundary name="KycPromptBanner"><KycPromptBanner /></SectionBoundary>
       <SectionBoundary name="BusinessPromptCard"><BusinessPromptCard /></SectionBoundary>
       <SectionBoundary name="WealthPulseBanner"><WealthPulseBanner /></SectionBoundary>
