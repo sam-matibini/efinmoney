@@ -643,15 +643,46 @@ Deno.serve(async (req) => {
         );
         payoutResult = await res.json();
       } else if (fincraCapable) {
-        // Fixed priority: Fincra → Flutterwave → Lenhub → Nomba → Paytota → Swychr
+        // Fixed priority: Fincra → Elicate (ZMW) → Flutterwave → Lenhub → Nomba → Paytota → Swychr
         const attempts: string[] = [];
+        // Set when a rail returns a hard decline (bad recipient/number/limits) — never
+        // re-attempt that on another provider.
+        let hardDecline = false;
+        const logAttempt = async (
+          rail: string,
+          attemptNumber: number,
+          r: any,
+          ok: boolean,
+          latency: number,
+        ) => {
+          try {
+            await supabase.from("routing_attempts").insert({
+              transfer_id,
+              partner_code: rail,
+              function_slug: `${rail.replace(/_/g, "-")}-payout`,
+              attempt_number: attemptNumber,
+              outcome: ok ? "success" : "failed",
+              retryable: !ok && r?.error_class !== "hard" && r?.retryable !== false,
+              provider_reference: r?.reference ?? r?.provider_reference ?? null,
+              error_message: ok ? null : String(r?.error || r?.provider_message || "").slice(0, 500),
+              latency_ms: latency,
+            });
+          } catch (e) {
+            console.error("routing_attempts insert failed", e);
+          }
+        };
         const tryNext = async (rail: string, fn: () => Promise<any>) => {
-          if (payoutOk(payoutResult)) return;
+          if (payoutOk(payoutResult) || hardDecline) return;
           attempts.push(rail);
+          const started = Date.now();
           const r = await fn();
-          if (payoutOk(r)) {
+          const ok = payoutOk(r);
+          await logAttempt(rail, attempts.length, r, ok, Date.now() - started);
+          if (ok) {
             payoutResult = { ...r, rail: r?.rail || rail, priority_chain: attempts };
           } else {
+            // A hard decline is the recipient's fault, not the rail's — stop the chain.
+            if (r?.error_class === "hard") hardDecline = true;
             payoutResult = {
               ...(r || {}),
               success: false,
@@ -661,6 +692,7 @@ Deno.serve(async (req) => {
             };
           }
         };
+
 
         // 1) Fincra (primary partner for Zambia ZMW mobile money)
         if (!fincraConfigured) {
