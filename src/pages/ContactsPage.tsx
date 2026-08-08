@@ -42,6 +42,8 @@ const ContactsPage = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Beneficiary | null>(null);
   const [deleting, setDeleting] = useState<Beneficiary | null>(null);
+  const [viewing, setViewing] = useState<Beneficiary | null>(null);
+
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     if (typeof window === "undefined") return "grid";
     return (localStorage.getItem(VIEW_KEY) as ViewMode) || "grid";
@@ -157,7 +159,12 @@ const ContactsPage = () => {
                     {flagFor(c.country_code)}
                   </span>
                   <CardContent className="p-5 space-y-4">
-                    <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setViewing(c)}
+                      className="flex w-full items-center gap-3 text-left rounded-lg -m-1 p-1 hover:bg-muted/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      aria-label={`View details for ${c.nickname || c.name}`}
+                    >
                       <div className="w-12 h-12 rounded-full gradient-primary flex items-center justify-center text-primary-foreground font-display font-bold">
                         {c.avatar_initials || c.name.slice(0, 2).toUpperCase()}
                       </div>
@@ -170,7 +177,7 @@ const ContactsPage = () => {
                           {methodLabel(c)}
                         </p>
                       </div>
-                    </div>
+                    </button>
                     <div className="text-xs text-muted-foreground">
                       <p>{c.transfer_count} transfer{c.transfer_count === 1 ? "" : "s"}</p>
                       <p>
@@ -183,15 +190,19 @@ const ContactsPage = () => {
                       <Button size="sm" className="flex-1 gap-1" onClick={() => handleSendTo(c)}>
                         <Send className="w-3.5 h-3.5" /> Send Money →
                       </Button>
-                      <Button size="sm" variant="outline" onClick={() => { setEditing(c); setModalOpen(true); }}>
+                      <Button size="sm" variant="outline" aria-label="View contact" onClick={() => setViewing(c)}>
+                        <Eye className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button size="sm" variant="outline" aria-label="Edit contact" onClick={() => { setEditing(c); setModalOpen(true); }}>
                         <Pencil className="w-3.5 h-3.5" />
                       </Button>
-                      <Button size="sm" variant="outline" onClick={() => setDeleting(c)}>
+                      <Button size="sm" variant="outline" aria-label="Delete contact" onClick={() => setDeleting(c)}>
                         <Trash2 className="w-3.5 h-3.5 text-destructive" />
                       </Button>
                     </div>
                   </CardContent>
                 </Card>
+
               </motion.div>
             ))}
           </div>
