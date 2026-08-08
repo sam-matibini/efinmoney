@@ -323,21 +323,45 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
           <div className="space-y-2">
             <Label>Default payout method</Label>
             <Tabs value={method} onValueChange={(v) => setMethod(v as any)}>
-              <TabsList className="grid grid-cols-5 w-full">
-                <TabsTrigger value="none">None</TabsTrigger>
-                <TabsTrigger value="eft">EFT 🇨🇦</TabsTrigger>
-                <TabsTrigger value="interac">Interac</TabsTrigger>
-                <TabsTrigger value="mobile">Mobile</TabsTrigger>
-                <TabsTrigger value="bank">Bank</TabsTrigger>
+              <TabsList className="flex w-full flex-wrap h-auto gap-1 justify-start">
+                <TabsTrigger className="flex-1 min-w-[72px]" value="none">None</TabsTrigger>
+                <TabsTrigger className="flex-1 min-w-[72px]" value="eft">EFT 🇨🇦</TabsTrigger>
+                <TabsTrigger className="flex-1 min-w-[72px]" value="interac">Interac</TabsTrigger>
+                <TabsTrigger className="flex-1 min-w-[72px]" value="mobile">Mobile</TabsTrigger>
+                <TabsTrigger className="flex-1 min-w-[72px]" value="bank">Bank</TabsTrigger>
               </TabsList>
             </Tabs>
           </div>
 
-          {method === "mobile" && !phone.trim() && (
+          {method === "mobile" && (
+            countryNetworks.length > 0 ? (
+              <div className="space-y-2">
+                <Label>Mobile money operator</Label>
+                <Select value={networkId} onValueChange={setNetworkId}>
+                  <SelectTrigger><SelectValue placeholder="Select operator" /></SelectTrigger>
+                  <SelectContent>
+                    {countryNetworks.map((n) => (
+                      <SelectItem key={n.id} value={n.id}>{n.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Used to route {country.country} mobile money payouts for this payee.
+                </p>
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                {country.country} payouts use {country.method} — no operator choice needed.
+              </p>
+            )
+          )}
+
+          {method === "mobile" && !tel.trim() && (
             <p className="text-xs text-amber-700 dark:text-amber-400">
               Enter a phone number above for mobile money payouts.
             </p>
           )}
+
           {method === "bank" && (
             <>
               {isNigeriaBank ? (
