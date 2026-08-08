@@ -60,16 +60,17 @@ const CountryPicker = ({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className={cn("w-full justify-between font-normal", className)}
+          className={cn("w-full justify-between font-normal gap-2", className)}
         >
           {selected ? (
-            <span className="inline-flex items-center gap-2 truncate">
-              <span className="text-lg leading-none">{selected.flag}</span>
+            <span className="inline-flex min-w-0 flex-1 items-center gap-2">
+              <span className="text-lg leading-none shrink-0">{selected.flag}</span>
               <span className="truncate">{selected.country}</span>
               {showMethod && (
-                <span className="text-xs text-muted-foreground truncate">· {selected.method}</span>
+                <span className="hidden sm:inline text-xs text-muted-foreground truncate">· {selected.method}</span>
               )}
             </span>
+
           ) : (
             <span className="text-muted-foreground">{placeholder}</span>
           )}
