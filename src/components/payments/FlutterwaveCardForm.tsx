@@ -22,6 +22,12 @@ interface Props {
   showWalletSelect?: boolean;
   onSuccess?: (info: { amount: number; currency: string; walletId: string }) => void;
   ctaLabel?: string;
+  /** Card details captured elsewhere (single-capture flows) — hides the fields here. */
+  externalCard?: CardFieldsValue;
+  hideAmountField?: boolean;
+  hideBrandHeader?: boolean;
+  /** Rendered above the pay button, e.g. a masked card summary. */
+  summary?: React.ReactNode;
 }
 
 type Stage = "idle" | "charging" | "auth" | "verifying" | "crediting" | "success";
