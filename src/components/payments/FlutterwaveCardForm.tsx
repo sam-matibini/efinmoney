@@ -311,6 +311,10 @@ export default function FlutterwaveCardForm({
   showWalletSelect,
   onSuccess,
   ctaLabel,
+  externalCard,
+  hideAmountField,
+  hideBrandHeader,
+  summary,
 }: Props) {
   const queryClient = useQueryClient();
   const { data: wallets } = useWallets();
@@ -318,13 +322,13 @@ export default function FlutterwaveCardForm({
 
   const [selectedWalletId, setSelectedWalletId] = useState<string | undefined>(defaultWalletId);
   const [amount, setAmount] = useState(defaultAmount ? String(defaultAmount) : "");
-  const [cardNumber, setCardNumber] = useState("");
-  const [expiry, setExpiry] = useState("");
-  const [cvc, setCvc] = useState("");
-  const [cardholderName, setCardholderName] = useState("");
-  const [billingLine1, setBillingLine1] = useState("");
-  const [billingCity, setBillingCity] = useState("");
-  const [billingZip, setBillingZip] = useState("");
+  const [cardNumber, setCardNumber] = useState(externalCard?.cardNumber ?? "");
+  const [expiry, setExpiry] = useState(externalCard?.expiry ?? "");
+  const [cvc, setCvc] = useState(externalCard?.cvc ?? "");
+  const [cardholderName, setCardholderName] = useState(externalCard?.cardholderName ?? "");
+  const [billingLine1, setBillingLine1] = useState(externalCard?.billingLine1 ?? "");
+  const [billingCity, setBillingCity] = useState(externalCard?.billingCity ?? "");
+  const [billingZip, setBillingZip] = useState(externalCard?.billingZip ?? "");
   const [stage, setStage] = useState<Stage>("idle");
   const [success, setSuccess] = useState<{ amount: number; currency: string; symbol: string } | null>(null);
 
@@ -335,6 +339,18 @@ export default function FlutterwaveCardForm({
   const [lastPayload, setLastPayload] = useState<Record<string, unknown> | null>(null);
   const [pendingChargeId, setPendingChargeId] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
+
+  /** Single-capture flows own the card values — mirror them in. */
+  useEffect(() => {
+    if (!externalCard) return;
+    setCardNumber(externalCard.cardNumber);
+    setExpiry(externalCard.expiry);
+    setCvc(externalCard.cvc);
+    setCardholderName(externalCard.cardholderName);
+    setBillingLine1(externalCard.billingLine1);
+    setBillingCity(externalCard.billingCity);
+    setBillingZip(externalCard.billingZip);
+  }, [externalCard]);
 
   useEffect(() => {
     if (defaultAmount !== undefined) setAmount(String(defaultAmount));
