@@ -1868,6 +1868,7 @@ const SendPage = () => {
       && availableCardProviders.length > 0
       && !!cardSendProvider
       && parsedAmount >= cardSendMinAmount(cardSendProvider, sourceCurrency)
+      && (!inlineCardEntry || isCardFieldsValid(cardFields))
     ));
   const isStep2Valid = useLink
     ? (recipientName.trim().length > 2 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail) && parsedAmount > 0)
