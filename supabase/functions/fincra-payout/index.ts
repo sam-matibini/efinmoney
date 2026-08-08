@@ -197,6 +197,25 @@ function isFincraTransientPayoutError(message: string): boolean {
     || m.includes("try again");
 }
 
+/** Whole corridor is down at the provider — no network/format retry can help. */
+function isFincraCorridorDownError(message: string): boolean {
+  const m = message.toLowerCase();
+  return m.includes("maintenance")
+    || m.includes("temporarily unavailable")
+    || m.includes("currently unavailable")
+    || m.includes("service unavailable");
+}
+
+export type FincraErrorClass = "corridor_down" | "transient" | "hard";
+
+/** Classify a Fincra failure so callers know whether to fail over to another rail. */
+export function classifyFincraError(message: string): FincraErrorClass {
+  if (isFincraCorridorDownError(message)) return "corridor_down";
+  if (isFincraTransientPayoutError(message)) return "transient";
+  return "hard";
+}
+
+
 const CURRENCY_TO_COUNTRY: Record<string, string> = {
   NGN: "NG",
   KES: "KE",
