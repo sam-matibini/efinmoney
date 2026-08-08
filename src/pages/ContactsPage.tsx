@@ -218,20 +218,27 @@ const ContactsPage = () => {
                     transition={{ delay: i * 0.02 }}
                     className="flex items-center gap-3 px-4 py-3 hover:bg-muted/40 transition-colors"
                   >
-                    <div className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center text-primary-foreground text-sm font-bold shrink-0">
-                      {c.avatar_initials || c.name.slice(0, 2).toUpperCase()}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <p className="font-medium truncate">{c.nickname || c.name}</p>
-                        <span className="text-base leading-none" aria-hidden>{flagFor(c.country_code)}</span>
+                    <button
+                      type="button"
+                      onClick={() => setViewing(c)}
+                      className="flex min-w-0 flex-1 items-center gap-3 text-left rounded-lg p-1 -m-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      aria-label={`View details for ${c.nickname || c.name}`}
+                    >
+                      <div className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center text-primary-foreground text-sm font-bold shrink-0">
+                        {c.avatar_initials || c.name.slice(0, 2).toUpperCase()}
                       </div>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {methodLabel(c)}
-                        {c.phone ? ` · ${c.phone}` : c.bank_account ? ` · ${c.bank_account}` : ""}
-                        {c.mailing_city ? ` · ${c.mailing_city}` : ""}
-                      </p>
-                    </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <p className="font-medium truncate">{c.nickname || c.name}</p>
+                          <span className="text-base leading-none" aria-hidden>{flagFor(c.country_code)}</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {methodLabel(c)}
+                          {c.phone ? ` · ${c.phone}` : c.bank_account ? ` · ${c.bank_account}` : ""}
+                          {c.mailing_city ? ` · ${c.mailing_city}` : ""}
+                        </p>
+                      </div>
+                    </button>
                     <div className="hidden sm:block text-right text-xs text-muted-foreground shrink-0 min-w-[120px]">
                       <p>{c.transfer_count} transfer{c.transfer_count === 1 ? "" : "s"}</p>
                       <p>
@@ -245,13 +252,17 @@ const ContactsPage = () => {
                         <Send className="w-3.5 h-3.5" />
                         <span className="hidden sm:inline">Send</span>
                       </Button>
-                      <Button size="sm" variant="outline" onClick={() => { setEditing(c); setModalOpen(true); }}>
+                      <Button size="sm" variant="outline" aria-label="View contact" onClick={() => setViewing(c)}>
+                        <Eye className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button size="sm" variant="outline" aria-label="Edit contact" onClick={() => { setEditing(c); setModalOpen(true); }}>
                         <Pencil className="w-3.5 h-3.5" />
                       </Button>
-                      <Button size="sm" variant="outline" onClick={() => setDeleting(c)}>
+                      <Button size="sm" variant="outline" aria-label="Delete contact" onClick={() => setDeleting(c)}>
                         <Trash2 className="w-3.5 h-3.5 text-destructive" />
                       </Button>
                     </div>
+
                   </motion.li>
                 ))}
               </ul>
