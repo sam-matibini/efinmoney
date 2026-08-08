@@ -361,8 +361,9 @@ export default function FlutterwaveCardForm({
   }, [defaultWalletId]);
 
   useEffect(() => {
+    if (externalCard) return;
     if (!cardholderName && profile?.full_name) setCardholderName(profile.full_name.toUpperCase());
-  }, [profile?.full_name, cardholderName]);
+  }, [profile?.full_name, cardholderName, externalCard]);
 
   const openRedirectPopup = () => {
     if (!authRedirect) return;
