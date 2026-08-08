@@ -116,6 +116,20 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
     return base;
   }, [country]);
   const isNigeriaBank = method === "bank" && country.code === "NGN";
+  const countryNetworks = country.networks || [];
+  const activeNetwork = countryNetworks.find((n) => n.id === networkId) || null;
+
+  // Keep the operator valid for the selected country.
+  useEffect(() => {
+    if (countryNetworks.length === 0) {
+      if (networkId) setNetworkId("");
+      return;
+    }
+    if (!countryNetworks.some((n) => n.id === networkId)) {
+      setNetworkId(countryNetworks[0].id);
+    }
+  }, [countryId, method]); // eslint-disable-line react-hooks/exhaustive-deps
+
 
   useEffect(() => {
     if (!open || !isNigeriaBank || ngnBanks.length > 0) return;
