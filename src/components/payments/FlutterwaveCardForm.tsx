@@ -715,6 +715,10 @@ export default function FlutterwaveCardForm({
             />
           </div>
         </div>
+        </>)}
+
+        {summary}
+
 
         {authMode && (
           <ChallengePanel
