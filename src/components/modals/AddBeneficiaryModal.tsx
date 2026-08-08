@@ -42,7 +42,8 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
   const [tel, setTel] = useState("");
   const [countryId, setCountryId] = useState<string>("Nigeria");
   const [method, setMethod] = useState<"mobile" | "bank" | "eft" | "interac" | "none">("none");
-  const [phone, setPhone] = useState("");
+  const [networkId, setNetworkId] = useState<string>("");
+
   const [bankName, setBankName] = useState("");
   const [bankCode, setBankCode] = useState("");
   const [bankAccount, setBankAccount] = useState("");
@@ -71,7 +72,7 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
     setNickname(editing?.nickname || "");
     setEmail(editing?.email || "");
     setAddress(editing?.address || "");
-    setTel(editing?.tel || "");
+    setTel(editing?.tel || editing?.phone || "");
     const fromCode = editing?.country_code ? findCountryByCode(editing.country_code) : undefined;
     const resolvedId = fromCode?.id || "Nigeria";
     setCountryId(isLiveSendCountryId(resolvedId) ? resolvedId : (fromCode?.id || "Nigeria"));
@@ -83,7 +84,13 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
         ? "mobile"
         : (defaultMethod || "none")
     );
-    setPhone(editing?.phone || "");
+    const editCountry = fromCode;
+    const savedNetwork = String(editing?.network || "").toLowerCase();
+    const matched = editCountry?.networks?.find(
+      (n) => n.id.toLowerCase() === savedNetwork || n.payout === editing?.payout_method,
+    );
+    setNetworkId(matched?.id || "");
+
     setBankName(editing?.bank_name || "");
     setBankCode(editing?.bank_code || "");
     setBankAccount(editing?.bank_account || "");
@@ -109,6 +116,20 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
     return base;
   }, [country]);
   const isNigeriaBank = method === "bank" && country.code === "NGN";
+  const countryNetworks = country.networks || [];
+  const activeNetwork = countryNetworks.find((n) => n.id === networkId) || null;
+
+  // Keep the operator valid for the selected country.
+  useEffect(() => {
+    if (countryNetworks.length === 0) {
+      if (networkId) setNetworkId("");
+      return;
+    }
+    if (!countryNetworks.some((n) => n.id === networkId)) {
+      setNetworkId(countryNetworks[0].id);
+    }
+  }, [countryId, method]); // eslint-disable-line react-hooks/exhaustive-deps
+
 
   useEffect(() => {
     if (!open || !isNigeriaBank || ngnBanks.length > 0) return;
@@ -175,8 +196,11 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
     if (method === "interac" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(interacEmail)) {
       toast.error("Interac requires a valid email"); return;
     }
-    if (method === "mobile" && !phone.trim()) {
+    if (method === "mobile" && !tel.trim()) {
       toast.error("Mobile payout requires a phone number"); return;
+    }
+    if (method === "mobile" && countryNetworks.length > 0 && !networkId) {
+      toast.error("Select a mobile money operator"); return;
     }
 
     const payload: any = {
@@ -187,8 +211,10 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
       tel: tel.trim() || null,
       country_code: country.code,
       currency_code: country.code,
-      payout_method: method === "mobile" ? country.payout : method === "bank" ? "bank" : method === "eft" ? "eft" : method === "interac" ? "interac" : null,
-      phone: phone.trim() || null,
+      payout_method: method === "mobile" ? (activeNetwork?.payout || country.payout) : method === "bank" ? "bank" : method === "eft" ? "eft" : method === "interac" ? "interac" : null,
+      network: method === "mobile" ? (activeNetwork?.id || null) : null,
+      phone: tel.trim() || null,
+
       bank_name: method === "bank" ? selectedBankName.trim() : null,
       bank_account: method === "bank" ? bankAccount.trim() : null,
       bank_code: method === "bank" && isNigeriaBank ? bankCode.trim() || null : null,
@@ -228,7 +254,9 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
           <DialogTitle>{editing?.id ? "Edit Payee" : "Add Payee"}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Who</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+
             <div className="space-y-2">
               <Label>Category</Label>
               <Select value={category} onValueChange={(v) => setCategory(v as BeneficiaryCategory)}>
@@ -252,7 +280,8 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
             <Label>Full Name / Business Name</Label>
             <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Jane Doe or Acme Inc." />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+
             <div className="space-y-2">
               <Label>Nickname (optional)</Label>
               <Input value={nickname} onChange={(e) => setNickname(e.target.value)} placeholder="e.g. Landlord" />
@@ -263,10 +292,19 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label>Phone</Label>
-              <Input value={tel} onChange={(e) => setTel(e.target.value)} placeholder="+1 (555) 000-0000" required />
+              <Input
+                type="tel"
+                value={tel}
+                onChange={(e) => setTel(e.target.value)}
+                placeholder={method === "mobile" ? "+260 977 000 000" : "+1 (555) 000-0000"}
+                required
+              />
+              {method === "mobile" && (
+                <p className="text-xs text-muted-foreground">Also used as the mobile money payout number.</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label>Address</Label>
@@ -274,27 +312,14 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label>Phone (optional)</Label>
-            <Input
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder={method === "mobile" ? "+260..." : "+1..."}
-            />
-            {method === "mobile" && (
-              <p className="text-xs text-muted-foreground">Used as the mobile money payout number.</p>
-            )}
-          </div>
-
-          <div className="space-y-2">
+          <div className="space-y-2 pt-2 border-t">
             <Label>Mailing address (optional)</Label>
             <Input
               value={mailingAddress}
               onChange={(e) => setMailingAddress(e.target.value)}
               placeholder="Street address"
             />
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Input
                 value={mailingCity}
                 onChange={(e) => setMailingCity(e.target.value)}
@@ -313,24 +338,50 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
             />
           </div>
 
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground pt-2 border-t">Payout details</p>
           <div className="space-y-2">
             <Label>Default payout method</Label>
+
             <Tabs value={method} onValueChange={(v) => setMethod(v as any)}>
-              <TabsList className="grid grid-cols-5 w-full">
-                <TabsTrigger value="none">None</TabsTrigger>
-                <TabsTrigger value="eft">EFT 🇨🇦</TabsTrigger>
-                <TabsTrigger value="interac">Interac</TabsTrigger>
-                <TabsTrigger value="mobile">Mobile</TabsTrigger>
-                <TabsTrigger value="bank">Bank</TabsTrigger>
+              <TabsList className="flex w-full flex-wrap h-auto gap-1 justify-start">
+                <TabsTrigger className="flex-1 min-w-[72px]" value="none">None</TabsTrigger>
+                <TabsTrigger className="flex-1 min-w-[72px]" value="eft">EFT 🇨🇦</TabsTrigger>
+                <TabsTrigger className="flex-1 min-w-[72px]" value="interac">Interac</TabsTrigger>
+                <TabsTrigger className="flex-1 min-w-[72px]" value="mobile">Mobile</TabsTrigger>
+                <TabsTrigger className="flex-1 min-w-[72px]" value="bank">Bank</TabsTrigger>
               </TabsList>
             </Tabs>
           </div>
 
-          {method === "mobile" && !phone.trim() && (
+          {method === "mobile" && (
+            countryNetworks.length > 0 ? (
+              <div className="space-y-2">
+                <Label>Mobile money operator</Label>
+                <Select value={networkId} onValueChange={setNetworkId}>
+                  <SelectTrigger><SelectValue placeholder="Select operator" /></SelectTrigger>
+                  <SelectContent>
+                    {countryNetworks.map((n) => (
+                      <SelectItem key={n.id} value={n.id}>{n.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Used to route {country.country} mobile money payouts for this payee.
+                </p>
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                {country.country} payouts use {country.method} — no operator choice needed.
+              </p>
+            )
+          )}
+
+          {method === "mobile" && !tel.trim() && (
             <p className="text-xs text-amber-700 dark:text-amber-400">
               Enter a phone number above for mobile money payouts.
             </p>
           )}
+
           {method === "bank" && (
             <>
               {isNigeriaBank ? (
@@ -377,7 +428,7 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
           )}
           {method === "eft" && (
             <>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-2"><Label>Institution # (3)</Label>
                   <Input inputMode="numeric" maxLength={3} value={eftInst} onChange={(e) => setEftInst(e.target.value.replace(/\D/g, ""))} placeholder="001" /></div>
                 <div className="space-y-2"><Label>Transit # (5)</Label>
