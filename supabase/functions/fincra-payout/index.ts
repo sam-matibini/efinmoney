@@ -113,7 +113,27 @@ function fincraAccountNumber(phone: string, currency: string): string {
   return fincraMsisdnDigits(phone, currency);
 }
 
-/** MoMo MSISDN shapes to try. Zambia prefers intl 260… only (+ optional 0… fallback). */
+/** Zambia MSISDN must be 260 + 9 national digits (26097…, 26077…, 26095…). */
+export function zmwMsisdn(phone: string): { ok: true; msisdn: string } | { ok: false; error: string } {
+  let digits = String(phone).replace(/\D/g, "");
+  // Collapse any number of leading 260 repeats and trunk zeros: 0260…, 260260…
+  for (let i = 0; i < 4; i++) {
+    if (digits.startsWith("0")) { digits = digits.slice(1); continue; }
+    if (digits.startsWith("260260")) { digits = digits.slice(3); continue; }
+    break;
+  }
+  if (digits.startsWith("260")) digits = digits.slice(3);
+  if (digits.startsWith("0")) digits = digits.slice(1);
+  if (digits.length !== 9) {
+    return {
+      ok: false,
+      error: "Zambian mobile money number must be 9 digits after the 260 country code (e.g. 260 97 1234567).",
+    };
+  }
+  return { ok: true, msisdn: `260${digits}` };
+}
+
+/** MoMo MSISDN shapes to try. Zambia sends exactly one canonical 260… form. */
 function fincraAccountNumberVariants(phone: string, currency: string): string[] {
   const intl = fincraMsisdnDigits(phone, currency); // e.g. 260770069550
   const dial = DIAL_BY_CURRENCY[currency] || "";
@@ -128,17 +148,14 @@ function fincraAccountNumberVariants(phone: string, currency: string): string[] 
     : intl;
 
   if (currency === "ZMW") {
-    // Fincra: 260 is correct. Keep one local fallback only.
-    return [...new Set([cleanIntl, local0].filter((v) => {
-      if (!v) return false;
-      if (dial && v.startsWith(dial + dial)) return false;
-      if (v.startsWith("0") && dial && v.slice(1).startsWith(dial)) return false; // 0260…
-      return true;
-    }))];
+    // Fincra only accepts 260 + 9 digits. Never waste attempts on 0260…/260260…/local.
+    const z = zmwMsisdn(phone);
+    return z.ok ? [z.msisdn] : [];
   }
 
   return [...new Set([cleanIntl, local0, national].filter(Boolean))];
 }
+
 
 function isFincraAccountNumberError(message: string): boolean {
   const m = message.toLowerCase();
@@ -180,6 +197,25 @@ function isFincraTransientPayoutError(message: string): boolean {
     || m.includes("try again");
 }
 
+/** Whole corridor is down at the provider — no network/format retry can help. */
+function isFincraCorridorDownError(message: string): boolean {
+  const m = message.toLowerCase();
+  return m.includes("maintenance")
+    || m.includes("temporarily unavailable")
+    || m.includes("currently unavailable")
+    || m.includes("service unavailable");
+}
+
+export type FincraErrorClass = "corridor_down" | "transient" | "hard";
+
+/** Classify a Fincra failure so callers know whether to fail over to another rail. */
+export function classifyFincraError(message: string): FincraErrorClass {
+  if (isFincraCorridorDownError(message)) return "corridor_down";
+  if (isFincraTransientPayoutError(message)) return "transient";
+  return "hard";
+}
+
+
 const CURRENCY_TO_COUNTRY: Record<string, string> = {
   NGN: "NG",
   KES: "KE",
@@ -202,11 +238,22 @@ function fundingCandidates(preferred: string, dest: string): string[] {
     .split(",")
     .map((s) => s.trim().toUpperCase())
     .filter(Boolean);
-  // MoMo corridors: don't wander into random wallets (RWF/UGX/…) that can't fund the quote.
-  const defaults = ["ZMW", "KES", "GHS"].includes(dest)
+  // Zambia is strictly NGN -> USD -> ZMW. Never let env fallbacks pull in a wallet
+  // (RWF/UGX/…) that Fincra cannot quote from — that produced the
+  // "No currency supported to make payout to, from RWF" failures.
+  if (dest === "ZMW") {
+    const allowed = ["NGN", "USD", "ZMW"];
+    const list = allowed.includes(preferred)
+      ? [preferred, ...allowed.filter((c) => c !== preferred)]
+      : allowed;
+    return list;
+  }
+  // MoMo corridors: don't wander into random wallets that can't fund the quote.
+  const defaults = ["KES", "GHS"].includes(dest)
     ? ["NGN", "USD", dest]
     : DEFAULT_FUNDING_FALLBACKS;
   const list = [preferred, dest, ...extras, ...defaults];
+
   const seen = new Set<string>();
   const out: string[] = [];
   for (const c of list) {
@@ -404,17 +451,36 @@ Deno.serve(async (req) => {
       }
       const rawPhone = phone_number || transfer.recipient_phone || "";
       const holderName = (recipient_name || transfer.recipient_name || `${firstName} ${lastName}`).trim();
+      // Reject malformed Zambian numbers before spending Fincra attempts on them.
+      if (ccy === "ZMW") {
+        const z = zmwMsisdn(rawPhone);
+        if (!z.ok) {
+          if (!skip_reversal) {
+            const rev = await reverseTransferLedger(supabase, transfer_id);
+            await supabase.from("transfers").update({ status: "failed", failure_reason: z.error }).eq("id", transfer_id);
+            return new Response(
+              JSON.stringify({ success: false, error: z.error, error_class: "hard", refunded: rev.reversed }),
+              { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+            );
+          }
+          return new Response(
+            JSON.stringify({ success: false, error: z.error, error_class: "hard", refunded: false }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+      }
       accountVariants = fincraAccountNumberVariants(rawPhone, ccy);
       beneficiaryBase = {
         firstName,
         lastName,
         type: "individual",
         accountHolderName: holderName,
-        phone: fincraMsisdnDigits(rawPhone, ccy),
+        phone: ccy === "ZMW" ? accountVariants[0] : fincraMsisdnDigits(rawPhone, ccy),
         country: CURRENCY_TO_COUNTRY[ccy] || "ZM",
         mobileMoneyCode: mmCode,
       };
     }
+
 
     // For Zambia, if the selected network is rejected, also try the other MoMo operators.
     const networkVariants: string[] = mmCode
@@ -442,14 +508,17 @@ Deno.serve(async (req) => {
     let usedNetwork: string | null = mmCode;
     let usedCustomerReference = transfer_id;
     let successJson: Record<string, unknown> | null = null;
+    // Set when the provider itself is down / erroring: stop probing, fail over instead.
+    let outageClass: FincraErrorClass | null = null;
 
     let attemptNo = 0;
     for (const sourceCurrency of candidates) {
-      if (successJson) break;
+      if (successJson || outageClass) break;
       const cross = sourceCurrency !== ccy;
 
       for (const netCode of (networkVariants.length ? networkVariants : [null])) {
-        if (successJson) break;
+        if (successJson || outageClass) break;
+
 
         for (const accountNumber of accountVariants) {
           attemptNo += 1;
@@ -546,15 +615,17 @@ Deno.serve(async (req) => {
           attemptErrors.push(`${sourceCurrency}->${ccy} net=${netCode || mmCode} acct=${accountNumber}: ${reason}`);
           lastReason = reason;
 
+          const cls = classifyFincraError(reason);
+          if (cls === "corridor_down" || cls === "transient") {
+            // Upstream problem — every network returns the same thing. Stop probing
+            // and let the caller fail over to another rail.
+            outageClass = cls;
+            break;
+          }
           if (isFincraAccountNumberError(reason)) {
             continue; // try next MSISDN shape
           }
-          if (isFincraTransientPayoutError(reason)) {
-            // Format was accepted by Fincra then failed downstream — try next network with same good MSISDNs.
-            break;
-          }
           if (
-            reason.toLowerCase().includes("maintenance") ||
             (reason.toLowerCase().includes("not supported") && !isUnsupportedFundingError(reason)) ||
             reason.toLowerCase().includes("unsupported")
           ) {
@@ -566,6 +637,7 @@ Deno.serve(async (req) => {
           }
           // Other hard errors — try next network once, else stop this funding wallet.
           break;
+
         }
         if (isFincraBalanceError(lastReason)) break;
       }
@@ -580,9 +652,14 @@ Deno.serve(async (req) => {
         ? bestAttempt.slice(bestAttempt.indexOf(": ") + 2)
         : lastReason;
       const isBalanceError = isFincraBalanceError(reason);
+      const errorClass: FincraErrorClass = outageClass ?? classifyFincraError(reason);
       const detail = attemptErrors.length > 1
         ? `${reason} (tried: ${attemptErrors.join(" | ")})`
         : reason;
+      // Lead with a customer-safe sentence, keep the provider text behind it.
+      const customerMessage = errorClass === "hard"
+        ? reason
+        : `${ccy === "ZMW" ? "Zambia mobile money" : `${ccy} payouts`} is temporarily unavailable — your funds have not left your wallet. ${reason}`;
 
       if (isBalanceError) {
         await supabase.from("admin_notifications").insert({
@@ -596,25 +673,33 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({
           success: false,
           error: reason,
+          error_class: errorClass,
+          retryable: errorClass !== "hard",
           refunded: false,
           attempts: attemptErrors,
         }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
       const rev = await reverseTransferLedger(supabase, transfer_id);
-      await supabase.from("transfers").update({ status: "failed", failure_reason: detail.slice(0, 500) }).eq("id", transfer_id);
+      await supabase.from("transfers").update({
+        status: "failed",
+        failure_reason: `${customerMessage} (tried: ${attemptErrors.join(" | ")})`.slice(0, 500),
+      }).eq("id", transfer_id);
       await supabase.from("notifications").insert({
         user_id: senderId,
         title: "Transfer failed — refunded",
-        message: rev.reversed ? `${reason}. Funds returned to your wallet.` : reason,
+        message: rev.reversed ? `${customerMessage} Funds returned to your wallet.` : customerMessage,
         type: "error",
       });
       return new Response(JSON.stringify({
         success: false,
-        error: reason,
+        error: customerMessage,
+        error_class: errorClass,
+        retryable: errorClass !== "hard",
         refunded: rev.reversed,
         attempts: attemptErrors,
       }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
     }
 
     const pdata = (successJson?.data ?? {}) as Record<string, unknown>;

@@ -439,14 +439,18 @@ Deno.serve(async (req) => {
         (isMobileMoneyMethod && FINCRA_MOMO.has(targetCurrency))
         || isNigeriaBank
       );
+    // Zambia MoMo is no longer Fincra-exclusive: when Fincra reports an outage or a
+    // transient error we fail over to Elicate, then Flutterwave (see priority chain).
+    const zambiaMomo = isMobileMoneyMethod && (isZambia || targetCurrency === "ZMW");
     const fincraExclusiveCorridor =
       isMobileMoneyMethod
+      && !zambiaMomo
       && (
-        isZambia || isKenya || isGhana
-        || targetCurrency === "ZMW"
+        isKenya || isGhana
         || targetCurrency === "KES"
         || targetCurrency === "GHS"
       );
+
 
     const lenhubFlutterEnvOn = Deno.env.get("LENHUB_FLUTTER_ENABLED") !== "false"
       && Deno.env.get("LENHUB_FLUTTER_PAYOUT") !== "false";
@@ -482,8 +486,10 @@ Deno.serve(async (req) => {
     };
 
     let engineRouted = false;
-    // Zambia/Kenya MoMo and ops force_rail skip the routing engine — Fincra only.
-    if (!forceFincraOnly && !fincraExclusiveCorridor) {
+    // Zambia/Kenya MoMo and ops force_rail skip the routing engine — the hardcoded
+    // Fincra-first priority chain below owns those corridors.
+    if (!forceFincraOnly && !fincraExclusiveCorridor && !zambiaMomo) {
+
       try {
         const dispatch = await dispatchRoutedPayout(supabase, routeRequest, {
           transfer_id,
@@ -637,15 +643,46 @@ Deno.serve(async (req) => {
         );
         payoutResult = await res.json();
       } else if (fincraCapable) {
-        // Fixed priority: Fincra → Flutterwave → Lenhub → Nomba → Paytota → Swychr
+        // Fixed priority: Fincra → Elicate (ZMW) → Flutterwave → Lenhub → Nomba → Paytota → Swychr
         const attempts: string[] = [];
+        // Set when a rail returns a hard decline (bad recipient/number/limits) — never
+        // re-attempt that on another provider.
+        let hardDecline = false;
+        const logAttempt = async (
+          rail: string,
+          attemptNumber: number,
+          r: any,
+          ok: boolean,
+          latency: number,
+        ) => {
+          try {
+            await supabase.from("routing_attempts").insert({
+              transfer_id,
+              partner_code: rail,
+              function_slug: `${rail.replace(/_/g, "-")}-payout`,
+              attempt_number: attemptNumber,
+              outcome: ok ? "success" : "failed",
+              retryable: !ok && r?.error_class !== "hard" && r?.retryable !== false,
+              provider_reference: r?.reference ?? r?.provider_reference ?? null,
+              error_message: ok ? null : String(r?.error || r?.provider_message || "").slice(0, 500),
+              latency_ms: latency,
+            });
+          } catch (e) {
+            console.error("routing_attempts insert failed", e);
+          }
+        };
         const tryNext = async (rail: string, fn: () => Promise<any>) => {
-          if (payoutOk(payoutResult)) return;
+          if (payoutOk(payoutResult) || hardDecline) return;
           attempts.push(rail);
+          const started = Date.now();
           const r = await fn();
-          if (payoutOk(r)) {
+          const ok = payoutOk(r);
+          await logAttempt(rail, attempts.length, r, ok, Date.now() - started);
+          if (ok) {
             payoutResult = { ...r, rail: r?.rail || rail, priority_chain: attempts };
           } else {
+            // A hard decline is the recipient's fault, not the rail's — stop the chain.
+            if (r?.error_class === "hard") hardDecline = true;
             payoutResult = {
               ...(r || {}),
               success: false,
@@ -655,6 +692,7 @@ Deno.serve(async (req) => {
             };
           }
         };
+
 
         // 1) Fincra (primary partner for Zambia ZMW mobile money)
         if (!fincraConfigured) {
@@ -702,6 +740,23 @@ Deno.serve(async (req) => {
             }).eq("id", transfer_id);
           }
         }
+
+        // 1b) Elicate — Zambia MoMo failover when Fincra is down or erroring transiently.
+        if (zambiaMomo) {
+          await tryNext("elicate", async () => {
+            const elRes = await fetch(
+              `${Deno.env.get("SUPABASE_URL")}/functions/v1/elicate-payout`,
+              { method: "POST", headers: internalHeaders, body: JSON.stringify({ transfer_id }) },
+            );
+            return elRes.json().catch(() => ({
+              success: false,
+              error: `elicate-payout HTTP ${elRes.status}`,
+              rail: "elicate",
+            }));
+          });
+        }
+
+
 
         // 2) Flutterwave
         await tryNext("flutterwave", async () => {
