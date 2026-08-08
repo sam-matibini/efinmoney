@@ -72,7 +72,7 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
     setNickname(editing?.nickname || "");
     setEmail(editing?.email || "");
     setAddress(editing?.address || "");
-    setTel(editing?.tel || "");
+    setTel(editing?.tel || editing?.phone || "");
     const fromCode = editing?.country_code ? findCountryByCode(editing.country_code) : undefined;
     const resolvedId = fromCode?.id || "Nigeria";
     setCountryId(isLiveSendCountryId(resolvedId) ? resolvedId : (fromCode?.id || "Nigeria"));
@@ -84,7 +84,13 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
         ? "mobile"
         : (defaultMethod || "none")
     );
-    setPhone(editing?.phone || "");
+    const editCountry = fromCode;
+    const savedNetwork = String(editing?.network || "").toLowerCase();
+    const matched = editCountry?.networks?.find(
+      (n) => n.id.toLowerCase() === savedNetwork || n.payout === editing?.payout_method,
+    );
+    setNetworkId(matched?.id || "");
+
     setBankName(editing?.bank_name || "");
     setBankCode(editing?.bank_code || "");
     setBankAccount(editing?.bank_account || "");
