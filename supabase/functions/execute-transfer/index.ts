@@ -741,6 +741,23 @@ Deno.serve(async (req) => {
           }
         }
 
+        // 1b) Elicate — Zambia MoMo failover when Fincra is down or erroring transiently.
+        if (zambiaMomo) {
+          await tryNext("elicate", async () => {
+            const elRes = await fetch(
+              `${Deno.env.get("SUPABASE_URL")}/functions/v1/elicate-payout`,
+              { method: "POST", headers: internalHeaders, body: JSON.stringify({ transfer_id }) },
+            );
+            return elRes.json().catch(() => ({
+              success: false,
+              error: `elicate-payout HTTP ${elRes.status}`,
+              rail: "elicate",
+            }));
+          });
+        }
+
+
+
         // 2) Flutterwave
         await tryNext("flutterwave", async () => {
           const flwRes = await fetch(
