@@ -439,14 +439,18 @@ Deno.serve(async (req) => {
         (isMobileMoneyMethod && FINCRA_MOMO.has(targetCurrency))
         || isNigeriaBank
       );
+    // Zambia MoMo is no longer Fincra-exclusive: when Fincra reports an outage or a
+    // transient error we fail over to Elicate, then Flutterwave (see priority chain).
+    const zambiaMomo = isMobileMoneyMethod && (isZambia || targetCurrency === "ZMW");
     const fincraExclusiveCorridor =
       isMobileMoneyMethod
+      && !zambiaMomo
       && (
-        isZambia || isKenya || isGhana
-        || targetCurrency === "ZMW"
+        isKenya || isGhana
         || targetCurrency === "KES"
         || targetCurrency === "GHS"
       );
+
 
     const lenhubFlutterEnvOn = Deno.env.get("LENHUB_FLUTTER_ENABLED") !== "false"
       && Deno.env.get("LENHUB_FLUTTER_PAYOUT") !== "false";
