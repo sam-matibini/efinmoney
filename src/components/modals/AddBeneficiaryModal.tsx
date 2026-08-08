@@ -42,7 +42,8 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
   const [tel, setTel] = useState("");
   const [countryId, setCountryId] = useState<string>("Nigeria");
   const [method, setMethod] = useState<"mobile" | "bank" | "eft" | "interac" | "none">("none");
-  const [phone, setPhone] = useState("");
+  const [networkId, setNetworkId] = useState<string>("");
+
   const [bankName, setBankName] = useState("");
   const [bankCode, setBankCode] = useState("");
   const [bankAccount, setBankAccount] = useState("");
