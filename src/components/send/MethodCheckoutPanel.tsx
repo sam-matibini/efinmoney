@@ -232,9 +232,15 @@ const MethodCheckoutPanel = ({
                 />
               )}
 
+              {inlineEntry && cardFields && onCardFieldsChange && (
+                <div className="pt-1">
+                  <CardFieldsInputs value={cardFields} onChange={onCardFieldsChange} />
+                </div>
+              )}
+
               <p className="text-[11px] text-muted-foreground">
                 {inlineEntry
-                  ? "You'll enter your cardholder name, card number, expiry date and CVV on the next step. We never store your full card number."
+                  ? "We never store your full card number. Your bank may ask for an extra security check at the confirm step."
                   : "Cardholder name, card number, expiry date and CVV are entered at the final step on our PCI-secure checkout page."}
               </p>
               <p className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
