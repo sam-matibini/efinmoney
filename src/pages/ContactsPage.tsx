@@ -15,7 +15,9 @@ import AddBeneficiaryModal, { BENEFICIARY_COUNTRIES } from "@/components/modals/
 import {
   useBeneficiaries, useDeleteBeneficiary, isCanadaBeneficiary, type Beneficiary,
 } from "@/hooks/useBeneficiaries";
-import { Search, Plus, Send, Pencil, Trash2, Users, LayoutGrid, List as ListIcon } from "lucide-react";
+import ContactDetailsSheet from "@/components/contacts/ContactDetailsSheet";
+import { Search, Plus, Send, Pencil, Trash2, Users, LayoutGrid, List as ListIcon, Eye } from "lucide-react";
+
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import { productFeatures } from "@/lib/productFeatures";
