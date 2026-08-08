@@ -652,9 +652,14 @@ Deno.serve(async (req) => {
         ? bestAttempt.slice(bestAttempt.indexOf(": ") + 2)
         : lastReason;
       const isBalanceError = isFincraBalanceError(reason);
+      const errorClass: FincraErrorClass = outageClass ?? classifyFincraError(reason);
       const detail = attemptErrors.length > 1
         ? `${reason} (tried: ${attemptErrors.join(" | ")})`
         : reason;
+      // Lead with a customer-safe sentence, keep the provider text behind it.
+      const customerMessage = errorClass === "hard"
+        ? reason
+        : `${ccy === "ZMW" ? "Zambia mobile money" : `${ccy} payouts`} is temporarily unavailable — your funds have not left your wallet. ${reason}`;
 
       if (isBalanceError) {
         await supabase.from("admin_notifications").insert({
@@ -668,25 +673,33 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({
           success: false,
           error: reason,
+          error_class: errorClass,
+          retryable: errorClass !== "hard",
           refunded: false,
           attempts: attemptErrors,
         }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
       const rev = await reverseTransferLedger(supabase, transfer_id);
-      await supabase.from("transfers").update({ status: "failed", failure_reason: detail.slice(0, 500) }).eq("id", transfer_id);
+      await supabase.from("transfers").update({
+        status: "failed",
+        failure_reason: `${customerMessage} (tried: ${attemptErrors.join(" | ")})`.slice(0, 500),
+      }).eq("id", transfer_id);
       await supabase.from("notifications").insert({
         user_id: senderId,
         title: "Transfer failed — refunded",
-        message: rev.reversed ? `${reason}. Funds returned to your wallet.` : reason,
+        message: rev.reversed ? `${customerMessage} Funds returned to your wallet.` : customerMessage,
         type: "error",
       });
       return new Response(JSON.stringify({
         success: false,
-        error: reason,
+        error: customerMessage,
+        error_class: errorClass,
+        retryable: errorClass !== "hard",
         refunded: rev.reversed,
         attempts: attemptErrors,
       }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
     }
 
     const pdata = (successJson?.data ?? {}) as Record<string, unknown>;
