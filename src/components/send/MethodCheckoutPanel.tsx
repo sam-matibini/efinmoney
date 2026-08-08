@@ -4,6 +4,7 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { CurrencyFlag } from "@/components/ui/FlagImage";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { CardFieldsInputs, type CardFieldsValue } from "@/components/payments/cardFields";
 
 export interface PanelWallet {
   wallet_id: string;
