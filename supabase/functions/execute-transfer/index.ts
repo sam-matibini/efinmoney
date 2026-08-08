@@ -439,14 +439,14 @@ Deno.serve(async (req) => {
         (isMobileMoneyMethod && FINCRA_MOMO.has(targetCurrency))
         || isNigeriaBank
       );
-    // Zambia MoMo is no longer Fincra-exclusive: when Fincra reports an outage or a
-    // transient error we fail over to Elicate, then Flutterwave (see priority chain).
+    // Zambia MoMo is Fincra-exclusive: Fincra is the only payout rail for ZMW.
+    // No Elicate / Flutterwave failover.
     const zambiaMomo = isMobileMoneyMethod && (isZambia || targetCurrency === "ZMW");
     const fincraExclusiveCorridor =
       isMobileMoneyMethod
-      && !zambiaMomo
       && (
-        isKenya || isGhana
+        zambiaMomo
+        || isKenya || isGhana
         || targetCurrency === "KES"
         || targetCurrency === "GHS"
       );
