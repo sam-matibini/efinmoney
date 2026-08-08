@@ -428,7 +428,7 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
           )}
           {method === "eft" && (
             <>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-2"><Label>Institution # (3)</Label>
                   <Input inputMode="numeric" maxLength={3} value={eftInst} onChange={(e) => setEftInst(e.target.value.replace(/\D/g, ""))} placeholder="001" /></div>
                 <div className="space-y-2"><Label>Transit # (5)</Label>
