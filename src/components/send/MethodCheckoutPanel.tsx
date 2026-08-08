@@ -62,6 +62,9 @@ interface Props {
   cardChargeNote?: string | null;
   cardMinNote?: string | null;
   inlineEntry?: boolean;
+  /** Inline card capture (single-capture flows). */
+  cardFields?: CardFieldsValue;
+  onCardFieldsChange?: (next: CardFieldsValue) => void;
   insufficientBalance?: boolean;
   onTopUp?: () => void;
 }
