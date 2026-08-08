@@ -4,6 +4,7 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { CurrencyFlag } from "@/components/ui/FlagImage";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { CardFieldsInputs, type CardFieldsValue } from "@/components/payments/cardFields";
 
 export interface PanelWallet {
   wallet_id: string;
@@ -61,6 +62,9 @@ interface Props {
   cardChargeNote?: string | null;
   cardMinNote?: string | null;
   inlineEntry?: boolean;
+  /** Inline card capture (single-capture flows). */
+  cardFields?: CardFieldsValue;
+  onCardFieldsChange?: (next: CardFieldsValue) => void;
   insufficientBalance?: boolean;
   onTopUp?: () => void;
 }
@@ -135,6 +139,8 @@ const MethodCheckoutPanel = ({
   cardChargeNote,
   cardMinNote,
   inlineEntry,
+  cardFields,
+  onCardFieldsChange,
   insufficientBalance,
   onTopUp,
 }: Props) => {
@@ -232,9 +238,15 @@ const MethodCheckoutPanel = ({
                 />
               )}
 
+              {inlineEntry && cardFields && onCardFieldsChange && (
+                <div className="pt-1">
+                  <CardFieldsInputs value={cardFields} onChange={onCardFieldsChange} />
+                </div>
+              )}
+
               <p className="text-[11px] text-muted-foreground">
                 {inlineEntry
-                  ? "You'll enter your cardholder name, card number, expiry date and CVV on the next step. We never store your full card number."
+                  ? "We never store your full card number. Your bank may ask for an extra security check at the confirm step."
                   : "Cardholder name, card number, expiry date and CVV are entered at the final step on our PCI-secure checkout page."}
               </p>
               <p className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">

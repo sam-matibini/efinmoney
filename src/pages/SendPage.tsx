@@ -55,6 +55,7 @@ import MethodCheckoutPanel from "@/components/send/MethodCheckoutPanel";
 import SendHeaderCountry from "@/components/send/SendHeaderCountry";
 import RecipientQuickBox from "@/components/send/RecipientQuickBox";
 import FlutterwaveCardForm from "@/components/payments/FlutterwaveCardForm";
+import { emptyCardFields, isCardFieldsValid, maskedCardLabel, type CardFieldsValue } from "@/components/payments/cardFields";
 
 
 import { createPaymentLink, PaymentLinkSuccess, type PaymentLinkResult } from "@/components/send/PaymentLinkSuccess";
@@ -1854,6 +1855,9 @@ const SendPage = () => {
     clearSendHandoff();
     clearCardSendIntent();
   };
+  /** Card details captured once, in the step-1 checkout panel. */
+  const [cardFields, setCardFields] = useState<CardFieldsValue>(emptyCardFields);
+
 
   const isStep1Valid =
     parsedAmount > 0
@@ -1867,6 +1871,7 @@ const SendPage = () => {
       && availableCardProviders.length > 0
       && !!cardSendProvider
       && parsedAmount >= cardSendMinAmount(cardSendProvider, sourceCurrency)
+      && (!inlineCardEntry || isCardFieldsValid(cardFields))
     ));
   const isStep2Valid = useLink
     ? (recipientName.trim().length > 2 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail) && parsedAmount > 0)
@@ -2611,6 +2616,8 @@ const SendPage = () => {
                                             : null
                                         }
                                         inlineEntry={inlineCardEntry}
+                                        cardFields={cardFields}
+                                        onCardFieldsChange={setCardFields}
                                         insufficientBalance={insufficientFunds}
                                         onTopUp={() => navigate("/wallet/topup")}
                                       />
@@ -2705,12 +2712,19 @@ const SendPage = () => {
                                     )}
                                     {fundingSource === "card" && inlineCardEntry ? (
                                       <div className="space-y-3">
-                                        <p className="text-sm font-semibold">Card details</p>
                                         <SectionBoundary name="FlutterwaveCardForm">
                                           <FlutterwaveCardForm
                                             defaultWalletId={selectedWallet?.wallet_id}
                                             defaultAmount={totalCharge}
                                             lockAmount
+                                            hideAmountField
+                                            hideBrandHeader
+                                            externalCard={cardFields}
+                                            summary={
+                                              <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm">
+                                                Paying with {maskedCardLabel(cardFields)}
+                                              </div>
+                                            }
                                             ctaLabel={`Pay ${sourceSymbol}${totalCharge.toFixed(2)} & send`}
                                             onSuccess={() => { void handleConfirm("wallet"); }}
                                           />

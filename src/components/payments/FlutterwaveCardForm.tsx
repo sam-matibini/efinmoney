@@ -14,6 +14,7 @@ import { CheckCircle2, CreditCard, Lock, ShieldCheck } from "lucide-react";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { CurrencyFlag } from "@/components/ui/FlagImage";
 import { Logo, Wordmark } from "@/components/Logo";
+import type { CardFieldsValue } from "@/components/payments/cardFields";
 
 interface Props {
   defaultWalletId?: string;
@@ -22,6 +23,12 @@ interface Props {
   showWalletSelect?: boolean;
   onSuccess?: (info: { amount: number; currency: string; walletId: string }) => void;
   ctaLabel?: string;
+  /** Card details captured elsewhere (single-capture flows) — hides the fields here. */
+  externalCard?: CardFieldsValue;
+  hideAmountField?: boolean;
+  hideBrandHeader?: boolean;
+  /** Rendered above the pay button, e.g. a masked card summary. */
+  summary?: React.ReactNode;
 }
 
 type Stage = "idle" | "charging" | "auth" | "verifying" | "crediting" | "success";
@@ -304,6 +311,10 @@ export default function FlutterwaveCardForm({
   showWalletSelect,
   onSuccess,
   ctaLabel,
+  externalCard,
+  hideAmountField,
+  hideBrandHeader,
+  summary,
 }: Props) {
   const queryClient = useQueryClient();
   const { data: wallets } = useWallets();
@@ -311,13 +322,13 @@ export default function FlutterwaveCardForm({
 
   const [selectedWalletId, setSelectedWalletId] = useState<string | undefined>(defaultWalletId);
   const [amount, setAmount] = useState(defaultAmount ? String(defaultAmount) : "");
-  const [cardNumber, setCardNumber] = useState("");
-  const [expiry, setExpiry] = useState("");
-  const [cvc, setCvc] = useState("");
-  const [cardholderName, setCardholderName] = useState("");
-  const [billingLine1, setBillingLine1] = useState("");
-  const [billingCity, setBillingCity] = useState("");
-  const [billingZip, setBillingZip] = useState("");
+  const [cardNumber, setCardNumber] = useState(externalCard?.cardNumber ?? "");
+  const [expiry, setExpiry] = useState(externalCard?.expiry ?? "");
+  const [cvc, setCvc] = useState(externalCard?.cvc ?? "");
+  const [cardholderName, setCardholderName] = useState(externalCard?.cardholderName ?? "");
+  const [billingLine1, setBillingLine1] = useState(externalCard?.billingLine1 ?? "");
+  const [billingCity, setBillingCity] = useState(externalCard?.billingCity ?? "");
+  const [billingZip, setBillingZip] = useState(externalCard?.billingZip ?? "");
   const [stage, setStage] = useState<Stage>("idle");
   const [success, setSuccess] = useState<{ amount: number; currency: string; symbol: string } | null>(null);
 
@@ -329,6 +340,18 @@ export default function FlutterwaveCardForm({
   const [pendingChargeId, setPendingChargeId] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
 
+  /** Single-capture flows own the card values — mirror them in. */
+  useEffect(() => {
+    if (!externalCard) return;
+    setCardNumber(externalCard.cardNumber);
+    setExpiry(externalCard.expiry);
+    setCvc(externalCard.cvc);
+    setCardholderName(externalCard.cardholderName);
+    setBillingLine1(externalCard.billingLine1);
+    setBillingCity(externalCard.billingCity);
+    setBillingZip(externalCard.billingZip);
+  }, [externalCard]);
+
   useEffect(() => {
     if (defaultAmount !== undefined) setAmount(String(defaultAmount));
   }, [defaultAmount]);
@@ -338,8 +361,9 @@ export default function FlutterwaveCardForm({
   }, [defaultWalletId]);
 
   useEffect(() => {
+    if (externalCard) return;
     if (!cardholderName && profile?.full_name) setCardholderName(profile.full_name.toUpperCase());
-  }, [profile?.full_name, cardholderName]);
+  }, [profile?.full_name, cardholderName, externalCard]);
 
   const openRedirectPopup = () => {
     if (!authRedirect) return;
@@ -566,7 +590,7 @@ export default function FlutterwaveCardForm({
   return (
     <div className="relative">
       <form onSubmit={handleSubmit} className="space-y-4">
-        <CheckoutBrandHeader />
+        {!hideBrandHeader && <CheckoutBrandHeader />}
         {showWalletSelect && wallets && wallets.length > 0 && (
           <div className="space-y-2">
             <Label className="text-xs">Deposit into wallet</Label>
@@ -583,6 +607,7 @@ export default function FlutterwaveCardForm({
           </div>
         )}
 
+        {!hideAmountField && (
         <div className="space-y-2">
           <Label className="text-xs">Amount ({currency})</Label>
           <Input
@@ -596,7 +621,9 @@ export default function FlutterwaveCardForm({
           />
           <p className="text-xs text-muted-foreground">Minimum: {minAmount(currency)} {currency}</p>
         </div>
+        )}
 
+        {!externalCard && (<>
         <div className="space-y-2">
           <Label className="text-xs">Cardholder name</Label>
           <Input
@@ -689,6 +716,10 @@ export default function FlutterwaveCardForm({
             />
           </div>
         </div>
+        </>)}
+
+        {summary}
+
 
         {authMode && (
           <ChallengePanel
