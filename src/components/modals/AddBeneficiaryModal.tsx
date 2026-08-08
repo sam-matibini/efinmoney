@@ -254,7 +254,9 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
           <DialogTitle>{editing?.id ? "Edit Payee" : "Add Payee"}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Who</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+
             <div className="space-y-2">
               <Label>Category</Label>
               <Select value={category} onValueChange={(v) => setCategory(v as BeneficiaryCategory)}>
