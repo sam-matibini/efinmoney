@@ -606,6 +606,7 @@ export default function FlutterwaveCardForm({
           </div>
         )}
 
+        {!hideAmountField && (
         <div className="space-y-2">
           <Label className="text-xs">Amount ({currency})</Label>
           <Input
@@ -619,6 +620,7 @@ export default function FlutterwaveCardForm({
           />
           <p className="text-xs text-muted-foreground">Minimum: {minAmount(currency)} {currency}</p>
         </div>
+        )}
 
         <div className="space-y-2">
           <Label className="text-xs">Cardholder name</Label>
