@@ -741,35 +741,20 @@ Deno.serve(async (req) => {
           }
         }
 
-        // 1b) Elicate — Zambia MoMo failover when Fincra is down or erroring transiently.
-        if (zambiaMomo) {
-          await tryNext("elicate", async () => {
-            const elRes = await fetch(
-              `${Deno.env.get("SUPABASE_URL")}/functions/v1/elicate-payout`,
-              { method: "POST", headers: internalHeaders, body: JSON.stringify({ transfer_id }) },
+        // 2) Flutterwave — never for Zambia ZMW (Fincra-only corridor).
+        if (!zambiaMomo && targetCurrency !== "ZMW") {
+          await tryNext("flutterwave", async () => {
+            const flwRes = await fetch(
+              `${Deno.env.get("SUPABASE_URL")}/functions/v1/flutterwave-payout`,
+              { method: "POST", headers: internalHeaders, body: JSON.stringify(flwBody()) },
             );
-            return elRes.json().catch(() => ({
+            return flwRes.json().catch(() => ({
               success: false,
-              error: `elicate-payout HTTP ${elRes.status}`,
-              rail: "elicate",
+              error: `flutterwave-payout HTTP ${flwRes.status}`,
+              rail: "flutterwave",
             }));
           });
         }
-
-
-
-        // 2) Flutterwave
-        await tryNext("flutterwave", async () => {
-          const flwRes = await fetch(
-            `${Deno.env.get("SUPABASE_URL")}/functions/v1/flutterwave-payout`,
-            { method: "POST", headers: internalHeaders, body: JSON.stringify(flwBody()) },
-          );
-          return flwRes.json().catch(() => ({
-            success: false,
-            error: `flutterwave-payout HTTP ${flwRes.status}`,
-            rail: "flutterwave",
-          }));
-        });
 
         // 3) Lenhub (NGN bank or GHS/KES/UGX MoMo)
         if (lenhubFlutterEnvOn && (hasLenhubBankRail || hasLenhubMomoRail)) {
