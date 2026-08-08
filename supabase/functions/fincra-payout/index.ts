@@ -238,11 +238,22 @@ function fundingCandidates(preferred: string, dest: string): string[] {
     .split(",")
     .map((s) => s.trim().toUpperCase())
     .filter(Boolean);
-  // MoMo corridors: don't wander into random wallets (RWF/UGX/…) that can't fund the quote.
-  const defaults = ["ZMW", "KES", "GHS"].includes(dest)
+  // Zambia is strictly NGN -> USD -> ZMW. Never let env fallbacks pull in a wallet
+  // (RWF/UGX/…) that Fincra cannot quote from — that produced the
+  // "No currency supported to make payout to, from RWF" failures.
+  if (dest === "ZMW") {
+    const allowed = ["NGN", "USD", "ZMW"];
+    const list = allowed.includes(preferred)
+      ? [preferred, ...allowed.filter((c) => c !== preferred)]
+      : allowed;
+    return list;
+  }
+  // MoMo corridors: don't wander into random wallets that can't fund the quote.
+  const defaults = ["KES", "GHS"].includes(dest)
     ? ["NGN", "USD", dest]
     : DEFAULT_FUNDING_FALLBACKS;
   const list = [preferred, dest, ...extras, ...defaults];
+
   const seen = new Set<string>();
   const out: string[] = [];
   for (const c of list) {
