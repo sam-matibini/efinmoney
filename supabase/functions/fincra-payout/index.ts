@@ -113,7 +113,27 @@ function fincraAccountNumber(phone: string, currency: string): string {
   return fincraMsisdnDigits(phone, currency);
 }
 
-/** MoMo MSISDN shapes to try. Zambia prefers intl 260… only (+ optional 0… fallback). */
+/** Zambia MSISDN must be 260 + 9 national digits (26097…, 26077…, 26095…). */
+export function zmwMsisdn(phone: string): { ok: true; msisdn: string } | { ok: false; error: string } {
+  let digits = String(phone).replace(/\D/g, "");
+  // Collapse any number of leading 260 repeats and trunk zeros: 0260…, 260260…
+  for (let i = 0; i < 4; i++) {
+    if (digits.startsWith("0")) { digits = digits.slice(1); continue; }
+    if (digits.startsWith("260260")) { digits = digits.slice(3); continue; }
+    break;
+  }
+  if (digits.startsWith("260")) digits = digits.slice(3);
+  if (digits.startsWith("0")) digits = digits.slice(1);
+  if (digits.length !== 9) {
+    return {
+      ok: false,
+      error: "Zambian mobile money number must be 9 digits after the 260 country code (e.g. 260 97 1234567).",
+    };
+  }
+  return { ok: true, msisdn: `260${digits}` };
+}
+
+/** MoMo MSISDN shapes to try. Zambia sends exactly one canonical 260… form. */
 function fincraAccountNumberVariants(phone: string, currency: string): string[] {
   const intl = fincraMsisdnDigits(phone, currency); // e.g. 260770069550
   const dial = DIAL_BY_CURRENCY[currency] || "";
@@ -128,17 +148,14 @@ function fincraAccountNumberVariants(phone: string, currency: string): string[] 
     : intl;
 
   if (currency === "ZMW") {
-    // Fincra: 260 is correct. Keep one local fallback only.
-    return [...new Set([cleanIntl, local0].filter((v) => {
-      if (!v) return false;
-      if (dial && v.startsWith(dial + dial)) return false;
-      if (v.startsWith("0") && dial && v.slice(1).startsWith(dial)) return false; // 0260…
-      return true;
-    }))];
+    // Fincra only accepts 260 + 9 digits. Never waste attempts on 0260…/260260…/local.
+    const z = zmwMsisdn(phone);
+    return z.ok ? [z.msisdn] : [];
   }
 
   return [...new Set([cleanIntl, local0, national].filter(Boolean))];
 }
+
 
 function isFincraAccountNumberError(message: string): boolean {
   const m = message.toLowerCase();
