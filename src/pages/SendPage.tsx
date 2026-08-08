@@ -2712,12 +2712,19 @@ const SendPage = () => {
                                     )}
                                     {fundingSource === "card" && inlineCardEntry ? (
                                       <div className="space-y-3">
-                                        <p className="text-sm font-semibold">Card details</p>
                                         <SectionBoundary name="FlutterwaveCardForm">
                                           <FlutterwaveCardForm
                                             defaultWalletId={selectedWallet?.wallet_id}
                                             defaultAmount={totalCharge}
                                             lockAmount
+                                            hideAmountField
+                                            hideBrandHeader
+                                            externalCard={cardFields}
+                                            summary={
+                                              <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm">
+                                                Paying with {maskedCardLabel(cardFields)}
+                                              </div>
+                                            }
                                             ctaLabel={`Pay ${sourceSymbol}${totalCharge.toFixed(2)} & send`}
                                             onSuccess={() => { void handleConfirm("wallet"); }}
                                           />
