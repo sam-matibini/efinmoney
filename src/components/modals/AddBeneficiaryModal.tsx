@@ -270,10 +270,19 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label>Phone</Label>
-              <Input value={tel} onChange={(e) => setTel(e.target.value)} placeholder="+1 (555) 000-0000" required />
+              <Input
+                type="tel"
+                value={tel}
+                onChange={(e) => setTel(e.target.value)}
+                placeholder={method === "mobile" ? "+260 977 000 000" : "+1 (555) 000-0000"}
+                required
+              />
+              {method === "mobile" && (
+                <p className="text-xs text-muted-foreground">Also used as the mobile money payout number.</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label>Address</Label>
@@ -281,18 +290,6 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label>Phone (optional)</Label>
-            <Input
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder={method === "mobile" ? "+260..." : "+1..."}
-            />
-            {method === "mobile" && (
-              <p className="text-xs text-muted-foreground">Used as the mobile money payout number.</p>
-            )}
-          </div>
 
           <div className="space-y-2">
             <Label>Mailing address (optional)</Label>
