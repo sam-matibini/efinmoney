@@ -439,14 +439,14 @@ Deno.serve(async (req) => {
         (isMobileMoneyMethod && FINCRA_MOMO.has(targetCurrency))
         || isNigeriaBank
       );
-    // Zambia MoMo is no longer Fincra-exclusive: when Fincra reports an outage or a
-    // transient error we fail over to Elicate, then Flutterwave (see priority chain).
+    // Zambia MoMo is Fincra-exclusive: Fincra is the only payout rail for ZMW.
+    // No Elicate / Flutterwave failover.
     const zambiaMomo = isMobileMoneyMethod && (isZambia || targetCurrency === "ZMW");
     const fincraExclusiveCorridor =
       isMobileMoneyMethod
-      && !zambiaMomo
       && (
-        isKenya || isGhana
+        zambiaMomo
+        || isKenya || isGhana
         || targetCurrency === "KES"
         || targetCurrency === "GHS"
       );
@@ -741,35 +741,20 @@ Deno.serve(async (req) => {
           }
         }
 
-        // 1b) Elicate — Zambia MoMo failover when Fincra is down or erroring transiently.
-        if (zambiaMomo) {
-          await tryNext("elicate", async () => {
-            const elRes = await fetch(
-              `${Deno.env.get("SUPABASE_URL")}/functions/v1/elicate-payout`,
-              { method: "POST", headers: internalHeaders, body: JSON.stringify({ transfer_id }) },
+        // 2) Flutterwave — never for Zambia ZMW (Fincra-only corridor).
+        if (!zambiaMomo && targetCurrency !== "ZMW") {
+          await tryNext("flutterwave", async () => {
+            const flwRes = await fetch(
+              `${Deno.env.get("SUPABASE_URL")}/functions/v1/flutterwave-payout`,
+              { method: "POST", headers: internalHeaders, body: JSON.stringify(flwBody()) },
             );
-            return elRes.json().catch(() => ({
+            return flwRes.json().catch(() => ({
               success: false,
-              error: `elicate-payout HTTP ${elRes.status}`,
-              rail: "elicate",
+              error: `flutterwave-payout HTTP ${flwRes.status}`,
+              rail: "flutterwave",
             }));
           });
         }
-
-
-
-        // 2) Flutterwave
-        await tryNext("flutterwave", async () => {
-          const flwRes = await fetch(
-            `${Deno.env.get("SUPABASE_URL")}/functions/v1/flutterwave-payout`,
-            { method: "POST", headers: internalHeaders, body: JSON.stringify(flwBody()) },
-          );
-          return flwRes.json().catch(() => ({
-            success: false,
-            error: `flutterwave-payout HTTP ${flwRes.status}`,
-            rail: "flutterwave",
-          }));
-        });
 
         // 3) Lenhub (NGN bank or GHS/KES/UGX MoMo)
         if (lenhubFlutterEnvOn && (hasLenhubBankRail || hasLenhubMomoRail)) {
@@ -848,18 +833,20 @@ Deno.serve(async (req) => {
 
         console.log("priority payout chain", attempts, "final", payoutResult?.rail, payoutResult?.success);
       } else if (isZambia) {
+        // Zambia is a Fincra-only corridor.
         const res = await fetch(
-          `${Deno.env.get("SUPABASE_URL")}/functions/v1/elicate-payout`,
+          `${Deno.env.get("SUPABASE_URL")}/functions/v1/fincra-payout`,
           {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-internal-secret": Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "",
-            },
-            body: JSON.stringify({ transfer_id }),
+            headers: internalHeaders,
+            body: JSON.stringify({ ...flwBody(), skip_reversal: false }),
           },
         );
-        payoutResult = await res.json();
+        payoutResult = await res.json().catch(() => ({
+          success: false,
+          error: `fincra-payout HTTP ${res.status}`,
+          rail: "fincra",
+        }));
       } else if (ghanaPayConfigured && isGhana && isMobileMoneyMethod) {
         const res = await fetch(
           `${Deno.env.get("SUPABASE_URL")}/functions/v1/ghana-payout`,
