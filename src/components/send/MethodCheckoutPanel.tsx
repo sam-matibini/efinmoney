@@ -139,6 +139,8 @@ const MethodCheckoutPanel = ({
   cardChargeNote,
   cardMinNote,
   inlineEntry,
+  cardFields,
+  onCardFieldsChange,
   insufficientBalance,
   onTopUp,
 }: Props) => {
