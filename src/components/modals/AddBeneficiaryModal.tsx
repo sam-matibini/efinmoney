@@ -312,15 +312,14 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
             </div>
           </div>
 
-
-          <div className="space-y-2">
+          <div className="space-y-2 pt-2 border-t">
             <Label>Mailing address (optional)</Label>
             <Input
               value={mailingAddress}
               onChange={(e) => setMailingAddress(e.target.value)}
               placeholder="Street address"
             />
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Input
                 value={mailingCity}
                 onChange={(e) => setMailingCity(e.target.value)}
@@ -339,8 +338,10 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
             />
           </div>
 
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground pt-2 border-t">Payout details</p>
           <div className="space-y-2">
             <Label>Default payout method</Label>
+
             <Tabs value={method} onValueChange={(v) => setMethod(v as any)}>
               <TabsList className="flex w-full flex-wrap h-auto gap-1 justify-start">
                 <TabsTrigger className="flex-1 min-w-[72px]" value="none">None</TabsTrigger>
