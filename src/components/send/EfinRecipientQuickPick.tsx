@@ -108,9 +108,13 @@ const EfinRecipientQuickPick = ({ onSelect, isAlreadyAdded }: Props) => {
     enabled: !!user?.id,
     staleTime: 60_000,
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("recent_efin_recipients");
+      // Not present in generated types — optional convenience RPC.
+      const { data, error } = await (supabase.rpc as unknown as (
+        fn: string,
+      ) => Promise<{ data: unknown; error: unknown }>)("recent_efin_recipients");
       if (error) throw error;
-      return (data ?? []) as RecentRow[];
+      return ((data ?? []) as RecentRow[]);
+
     },
   });
 
