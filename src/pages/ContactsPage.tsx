@@ -271,7 +271,16 @@ const ContactsPage = () => {
         )}
       </AppPage>
 
+      <ContactDetailsSheet
+        contact={viewing}
+        onOpenChange={(o) => !o && setViewing(null)}
+        onSend={(c) => { setViewing(null); handleSendTo(c); }}
+        onEdit={(c) => { setViewing(null); setEditing(c); setModalOpen(true); }}
+        onDelete={(c) => { setViewing(null); setDeleting(c); }}
+      />
+
       <AddBeneficiaryModal open={modalOpen} onOpenChange={setModalOpen} editing={editing} />
+
 
       <AlertDialog open={!!deleting} onOpenChange={(o) => !o && setDeleting(null)}>
         <AlertDialogContent>
