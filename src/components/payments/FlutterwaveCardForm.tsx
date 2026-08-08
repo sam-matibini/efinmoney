@@ -622,6 +622,7 @@ export default function FlutterwaveCardForm({
         </div>
         )}
 
+        {!externalCard && (<>
         <div className="space-y-2">
           <Label className="text-xs">Cardholder name</Label>
           <Input
