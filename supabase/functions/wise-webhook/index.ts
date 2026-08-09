@@ -342,11 +342,25 @@ Deno.serve(async (req) => {
               ? `Interac e-Transfer top-up (${intent.reference})`
               : `Wise top-up (${intent.reference})`,
           );
-          await supabase.from(intentTable).update({
-            status: "completed",
-            provider_reference: transferReference || balanceId || idempotencyKey,
-            credited_at: nowIso,
-          }).eq("id", intent.id).eq("status", "pending");
+          await supabase.from(intentTable).update(
+            isInterac
+              ? {
+                status: "settled",
+                provider_reference: transferReference || balanceId || idempotencyKey,
+                credited_at: nowIso,
+                received_at: nowIso,
+                matched_at: nowIso,
+                confirmed_at: nowIso,
+                match_tier: matchTier,
+                wise_transaction_id: idempotencyKey,
+              }
+              : {
+                status: "completed",
+                provider_reference: transferReference || balanceId || idempotencyKey,
+                credited_at: nowIso,
+              },
+          ).eq("id", intent.id).in("status", ["pending", "awaiting_payment"]);
+
           console.log("wise-webhook: credited intent", intentTable, intent.id, result);
 
           // Interac-funded sends: release the linked payout now that funds arrived
