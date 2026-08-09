@@ -303,6 +303,15 @@ export default function CadInteracTopUpCard({ walletId, walletCurrency, onComple
                 <span className="text-muted-foreground">Send exactly</span>
                 <span className="font-semibold tabular-nums">CAD {Number(intent.amount).toFixed(2)}</span>
               </div>
+              {(intent.sender_name || intent.sender_email) && (
+                <div className="flex justify-between gap-2 text-xs text-muted-foreground">
+                  <span>Sending from</span>
+                  <span className="text-right break-all">
+                    {[intent.sender_name, intent.sender_email, intent.sender_bank].filter(Boolean).join(" · ")}
+                  </span>
+                </div>
+              )}
+
               {alias && (
                 <div className="space-y-1">
                   <p className="text-xs text-muted-foreground">Interac recipient</p>
