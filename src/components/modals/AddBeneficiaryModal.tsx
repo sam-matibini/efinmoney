@@ -11,6 +11,7 @@ import { useCreateBeneficiary, useUpdateBeneficiary, type Beneficiary, type Bene
 import { toast } from "sonner";
 import CountryPicker from "@/components/ui/CountryPicker";
 import { COUNTRIES, findCountryById, findCountryByCode, LIVE_SEND_COUNTRIES, isLiveSendCountryId } from "@/lib/countries";
+import { ISO_COUNTRIES, findIsoCountry } from "@/lib/isoCountries";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { getNigeriaBanks, resolveNigeriaAccount } from "@/lib/nombaNigeria";
 
@@ -58,10 +59,15 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
   const [eftHolder, setEftHolder] = useState("");
   // Interac
   const [interacEmail, setInteracEmail] = useState("");
+  const [addressCity, setAddressCity] = useState("");
+  const [addressRegion, setAddressRegion] = useState("");
+  const [addressPostal, setAddressPostal] = useState("");
+  const [addressCountry, setAddressCountry] = useState("");
   const [mailingAddress, setMailingAddress] = useState("");
   const [mailingCity, setMailingCity] = useState("");
   const [mailingRegion, setMailingRegion] = useState("");
   const [mailingPostal, setMailingPostal] = useState("");
+  const [mailingCountry, setMailingCountry] = useState("");
   const [sameAsAddress, setSameAsAddress] = useState(false);
   const [notes, setNotes] = useState("");
   const [tags, setTags] = useState("");
@@ -102,12 +108,25 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
     setEftAcct(editing?.eft_account || "");
     setEftHolder(editing?.eft_account_holder || "");
     setInteracEmail(editing?.interac_email || "");
+    const e: any = editing || {};
+    setAddressCity(e.address_city || "");
+    setAddressRegion(e.address_region || "");
+    setAddressPostal(e.address_postal_code || "");
+    setAddressCountry(e.address_country_code || "");
     setMailingAddress(editing?.mailing_address || "");
     setMailingCity(editing?.mailing_city || "");
     setMailingRegion(editing?.mailing_region || "");
     setMailingPostal(editing?.mailing_postal_code || "");
+    setMailingCountry(e.mailing_country_code || "");
     const norm = (s?: string | null) => (s || "").trim().toLowerCase();
-    setSameAsAddress(!!norm(editing?.address) && norm(editing?.mailing_address) === norm(editing?.address));
+    const parts: [string, string][] = [
+      [e.address, e.mailing_address],
+      [e.address_city, e.mailing_city],
+      [e.address_region, e.mailing_region],
+      [e.address_postal_code, e.mailing_postal_code],
+      [e.address_country_code, e.mailing_country_code],
+    ];
+    setSameAsAddress(!!norm(e.address) && parts.every(([a, m]) => norm(a) === norm(m)));
     setNotes(editing?.notes || "");
     setTags((editing?.tags || []).join(", "));
     setShowAdvanced(!!editing?.notes || !!editing?.tags?.length);
@@ -227,10 +246,15 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
       eft_account: method === "eft" ? eftAcct : null,
       eft_account_holder: method === "eft" ? (eftHolder.trim() || name.trim()) : null,
       interac_email: method === "interac" ? interacEmail.trim() : null,
+      address_city: addressCity.trim() || null,
+      address_region: addressRegion.trim() || null,
+      address_postal_code: addressPostal.trim() || null,
+      address_country_code: addressCountry || null,
       mailing_address: (sameAsAddress ? address.trim() : mailingAddress.trim()) || null,
-      mailing_city: mailingCity.trim() || null,
-      mailing_region: mailingRegion.trim() || null,
-      mailing_postal_code: mailingPostal.trim() || null,
+      mailing_city: (sameAsAddress ? addressCity.trim() : mailingCity.trim()) || null,
+      mailing_region: (sameAsAddress ? addressRegion.trim() : mailingRegion.trim()) || null,
+      mailing_postal_code: (sameAsAddress ? addressPostal.trim() : mailingPostal.trim()) || null,
+      mailing_country_code: (sameAsAddress ? addressCountry : mailingCountry) || null,
       category,
       notes: notes.trim() || null,
       tags: tags.split(",").map(t => t.trim()).filter(Boolean),
@@ -310,14 +334,30 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
                 <p className="text-xs text-muted-foreground">Also used as the mobile money payout number.</p>
               )}
             </div>
-            <div className="space-y-2">
-              <Label>Address</Label>
-              <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="123 Main St, City" required />
+          </div>
+
+          <div className="space-y-2 pt-2 border-t">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Address</p>
+            <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Street address" required />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Input value={addressCity} onChange={(e) => setAddressCity(e.target.value)} placeholder="City / Town" />
+              <Input value={addressRegion} onChange={(e) => setAddressRegion(e.target.value)} placeholder="State / Province" />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Select value={addressCountry} onValueChange={setAddressCountry}>
+                <SelectTrigger><SelectValue placeholder="Country" /></SelectTrigger>
+                <SelectContent>
+                  {ISO_COUNTRIES.map((c) => (
+                    <SelectItem key={c.code} value={c.code}>{c.flag} {c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Input value={addressPostal} onChange={(e) => setAddressPostal(e.target.value)} placeholder="Postal / ZIP code" />
             </div>
           </div>
 
           <div className="space-y-2 pt-2 border-t">
-            <Label>Mailing address (optional)</Label>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Mailing address (optional)</p>
             <div className="flex items-center gap-2">
               <Checkbox
                 id="same-as-address"
@@ -335,25 +375,50 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
               readOnly={sameAsAddress}
               className={sameAsAddress ? "bg-muted/40" : undefined}
             />
-
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Input
-                value={mailingCity}
+                value={sameAsAddress ? addressCity : mailingCity}
                 onChange={(e) => setMailingCity(e.target.value)}
-                placeholder="City"
+                placeholder="City / Town"
+                readOnly={sameAsAddress}
+                className={sameAsAddress ? "bg-muted/40" : undefined}
               />
               <Input
-                value={mailingRegion}
+                value={sameAsAddress ? addressRegion : mailingRegion}
                 onChange={(e) => setMailingRegion(e.target.value)}
                 placeholder="State / Province"
+                readOnly={sameAsAddress}
+                className={sameAsAddress ? "bg-muted/40" : undefined}
               />
             </div>
-            <Input
-              value={mailingPostal}
-              onChange={(e) => setMailingPostal(e.target.value)}
-              placeholder="Postal / ZIP code"
-            />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {sameAsAddress ? (
+                <Input
+                  value={findIsoCountry(addressCountry)?.name || ""}
+                  readOnly
+                  placeholder="Country"
+                  className="bg-muted/40"
+                />
+              ) : (
+                <Select value={mailingCountry} onValueChange={setMailingCountry}>
+                  <SelectTrigger><SelectValue placeholder="Country" /></SelectTrigger>
+                  <SelectContent>
+                    {ISO_COUNTRIES.map((c) => (
+                      <SelectItem key={c.code} value={c.code}>{c.flag} {c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              <Input
+                value={sameAsAddress ? addressPostal : mailingPostal}
+                onChange={(e) => setMailingPostal(e.target.value)}
+                placeholder="Postal / ZIP code"
+                readOnly={sameAsAddress}
+                className={sameAsAddress ? "bg-muted/40" : undefined}
+              />
+            </div>
           </div>
+
 
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground pt-2 border-t">Payout details</p>
           <div className="space-y-2">

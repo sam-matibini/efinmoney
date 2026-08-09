@@ -89,15 +89,20 @@ export default function ContactDetailsSheet({
                 </Section>
               )}
 
-              {(c.address || c.mailing_address || c.mailing_city || c.mailing_region || c.mailing_postal_code) && (
-                <Section title="Address">
-                  <Row label="Address" value={c.address} />
-                  <Row label="Mailing address" value={c.mailing_address} />
-                  <Row label="City" value={c.mailing_city} />
-                  <Row label="Region" value={c.mailing_region} />
-                  <Row label="Postal code" value={c.mailing_postal_code} />
-                </Section>
-              )}
+              {(() => {
+                const a: any = c;
+                const compose = (street?: string | null, city?: string | null, region?: string | null, postal?: string | null, cc?: string | null) =>
+                  [street, [city, region].filter(Boolean).join(", "), postal, cc].filter(Boolean).join(" · ") || null;
+                const main = compose(a.address, a.address_city, a.address_region, a.address_postal_code, a.address_country_code);
+                const mailing = compose(a.mailing_address, a.mailing_city, a.mailing_region, a.mailing_postal_code, a.mailing_country_code);
+                if (!main && !mailing) return null;
+                return (
+                  <Section title="Address">
+                    <Row label="Address" value={main} />
+                    <Row label="Mailing address" value={mailing === main ? "Same as address" : mailing} />
+                  </Section>
+                );
+              })()}
 
               <Section title="Activity">
                 <Row
