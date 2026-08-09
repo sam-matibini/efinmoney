@@ -28,6 +28,8 @@ import ElicateTopUpCard from "@/components/payments/ElicateTopUpCard";
 import CadInteracTopUpCard from "@/components/payments/CadInteracTopUpCard";
 import LinkBankPanel from "@/components/payments/LinkBankPanel";
 import WiseTopUpCard from "@/components/payments/WiseTopUpCard";
+import CadCollectionPanel from "@/components/topup/CadCollectionPanel";
+
 import GhanaTopUpCard from "@/components/payments/GhanaTopUpCard";
 import NombaTopUpCard from "@/components/payments/NombaTopUpCard";
 import LenhubFlutterTopUpCard from "@/components/payments/LenhubFlutterTopUpCard";
@@ -868,7 +870,21 @@ const TopUpPage = () => {
       });
     }
 
-    if (productFeatures.fincraInterac && rails.has("interac")) {
+    const isCadWallet = currency.toUpperCase() === "CAD";
+
+    if (isCadWallet && (rails.has("interac") || rails.has("wise"))) {
+      payMethods.push({
+        id: rails.has("interac") ? "interac" : "wise",
+        tone: "bank",
+        label: "Interac e-Transfer or bank EFT",
+        description: "Send CAD from your Canadian bank",
+        content: (
+          <SectionBoundary name="CadCollection">
+            <CadCollectionPanel walletId={walletId} walletCurrency={currency} initialAmount={amount} onComplete={invalidateWallets} />
+          </SectionBoundary>
+        ),
+      });
+    } else if (productFeatures.fincraInterac && rails.has("interac")) {
       payMethods.push({
         id: "interac",
         tone: "bank",
@@ -881,6 +897,7 @@ const TopUpPage = () => {
         ),
       });
     }
+
 
     if (productFeatures.fincra && rails.has("fincra")) {
       const isCadViaUsd = currency.toUpperCase() === "CAD";
@@ -931,7 +948,7 @@ const TopUpPage = () => {
       });
     }
 
-    if (productFeatures.wise && rails.has("wise")) {
+    if (productFeatures.wise && rails.has("wise") && !isCadWallet) {
       payMethods.push({
         id: "wise",
         tone: "bank",
