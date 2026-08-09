@@ -43,8 +43,11 @@ const LIABILITY_BY_CURRENCY: Record<string, string> = {
 
 export function isFincraWalletTopUp(meta: Record<string, unknown> | null | undefined, ref: string): boolean {
   if (meta?.type === "wallet_topup") return true;
+  // Card-funded sends prepaid into wallet then execute-transfer (Zambia/etc.).
+  if (meta?.type === "card_send" || meta?.purpose === "card_send") return true;
   if (ref.startsWith("efm_fincra_")) return true;
   if (ref.startsWith("topup-fincra-")) return true;
+  if (ref.startsWith("cardsend-fincra-")) return true;
   return false;
 }
 

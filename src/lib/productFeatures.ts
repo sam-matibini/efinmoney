@@ -35,7 +35,7 @@ export const productFeatures = {
   /** Fincra hosted checkout — western + Africa collect (NGN/GHS/KES/…). */
   fincra: envFlag("VITE_FEATURE_FINCRA", true),
   /** Fincra CAD Interac e-Transfer collections (platform alias + intent matching). */
-  fincraInterac: envFlag("VITE_FEATURE_FINCRA_INTERAC", false),
+  fincraInterac: envFlag("VITE_FEATURE_FINCRA_INTERAC", true),
   /** Wise bank-deposit top-up (shared receive account + unique payment reference). */
   wise: envFlag("VITE_FEATURE_WISE", true),
   /** Square Checkout — card top-up for USD/CAD/EUR/GBP. */

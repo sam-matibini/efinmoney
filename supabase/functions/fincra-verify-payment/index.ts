@@ -78,13 +78,17 @@ Deno.serve(async (req) => {
 
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     let credited = false;
+    let already = false;
+    let walletFunded = false;
     if (isFincraWalletTopUp(meta, merchantRef)) {
       const walletIdFromMeta = meta.wallet_id ? String(meta.wallet_id) : undefined;
-      const { already } = await creditWalletViaFincra(
+      const result = await creditWalletViaFincra(
         admin, user.id, currency, amount, idempotencyRef, walletIdFromMeta,
         `Wallet top-up (${merchantRef})`,
       );
+      already = !!result.already;
       credited = !already;
+      walletFunded = true;
     }
 
     return new Response(JSON.stringify({
@@ -94,6 +98,8 @@ Deno.serve(async (req) => {
       currency,
       reference: merchantRef,
       credited,
+      already,
+      wallet_funded: walletFunded,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (err) {
     console.error("fincra-verify-payment error", err);

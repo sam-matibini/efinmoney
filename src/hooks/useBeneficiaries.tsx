@@ -38,6 +38,11 @@ export interface Beneficiary {
   mailing_city: string | null;
   mailing_region: string | null;
   mailing_postal_code: string | null;
+  mailing_country_code: string | null;
+  address_city: string | null;
+  address_region: string | null;
+  address_postal_code: string | null;
+  address_country_code: string | null;
 }
 
 export const initialsOf = (name: string) =>
@@ -99,6 +104,11 @@ export const useCreateBeneficiary = () => {
         mailing_city: input.mailing_city ?? null,
         mailing_region: input.mailing_region ?? null,
         mailing_postal_code: input.mailing_postal_code ?? null,
+        mailing_country_code: input.mailing_country_code ?? null,
+        address_city: input.address_city ?? null,
+        address_region: input.address_region ?? null,
+        address_postal_code: input.address_postal_code ?? null,
+        address_country_code: input.address_country_code ?? null,
       };
       const { data, error } = await supabase
         .from("beneficiaries" as any)

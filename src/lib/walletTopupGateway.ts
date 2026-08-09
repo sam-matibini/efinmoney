@@ -348,11 +348,11 @@ export function pickBestIntlTopupMethod(
 
   let priority: IntlTopupMethod[];
   if (c === "CAD") {
-    // Card (Square) first so debit/credit is the default; cheaper push rails follow
-    priority = ["square", "interac", "wise", "paytota", "dodo", "paypal", "nomba", "flutterwave", "fincra"];
+    // Zero-cost Interac/Wise pay-ins first; card rails after (Square/PayPal charge both sides)
+    priority = ["interac", "wise", "square", "paytota", "dodo", "paypal", "nomba", "flutterwave", "fincra"];
   } else if (c === "USD" || c === "GBP" || c === "EUR") {
-    // Square / Dodo card first; PayPal after (do not displace Dodo)
-    priority = ["square", "wise", "paytota", "dodo", "paypal", "interac", "nomba", "flutterwave", "fincra"];
+    // Wise bank deposit before paid card rails
+    priority = ["wise", "square", "paytota", "dodo", "paypal", "interac", "nomba", "flutterwave", "fincra"];
 
   } else if (c === "NGN") {
     priority = ["fincra", "flutterwave", "nomba", "wise"];

@@ -1801,8 +1801,15 @@ const SendPage = () => {
               tx_ref: txRef,
               transaction_id: txnId,
             });
-            if (verified?.verified) {
+            // Pay-in must fund the wallet before we create/execute the send.
+            if (verified?.verified && (verified?.wallet_funded === true || verified?.credited === true || verified?.already === true)) {
               paid = true;
+              break;
+            }
+            if (verified?.verified && verified?.wallet_funded === false) {
+              // Provider success without ledger credit — keep polling.
+            } else if (verified?.verified && verified?.wallet_funded == null && verified?.credited == null) {
+              paid = true; // legacy responses
               break;
             }
             if (verified?.status === "failed" || verified?.status === "cancelled") {
@@ -1822,7 +1829,13 @@ const SendPage = () => {
               headers: { Authorization: `Bearer ${session?.access_token || ""}` },
             });
             const json = await res.json().catch(() => ({}));
-            if (json?.verified) {
+            if (json?.verified && (json?.wallet_funded === true || json?.credited === true || json?.already === true)) {
+              paid = true;
+              break;
+            }
+            if (json?.verified && json?.wallet_funded === false) {
+              // verified at Fincra but wallet not credited — retry
+            } else if (json?.verified && json?.wallet_funded == null && json?.credited == null) {
               paid = true;
               break;
             }

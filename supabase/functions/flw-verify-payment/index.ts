@@ -19,8 +19,10 @@ function errMsg(err: unknown): string {
 
 function isWalletTopUp(meta: Record<string, unknown>, ref: string): boolean {
   if (meta?.type === "wallet_topup") return true;
+  if (meta?.type === "card_send" || meta?.purpose === "card_send") return true;
   if (ref.startsWith("efm_topup_")) return true;
   if (ref.startsWith("topup-")) return true;
+  if (ref.startsWith("cardsend-")) return true;
   return false;
 }
 
@@ -172,10 +174,14 @@ Deno.serve(async (req) => {
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
     let credited = false;
+    let already = false;
+    let walletFunded = false;
     if (isWalletTopUp(meta, ref)) {
       const walletIdFromMeta = meta.wallet_id ? String(meta.wallet_id) : undefined;
-      const { already } = await creditWalletViaLedger(admin, userId, currency, amount, flwId, ref, walletIdFromMeta);
+      const result = await creditWalletViaLedger(admin, userId, currency, amount, flwId, ref, walletIdFromMeta);
+      already = !!result.already;
       credited = !already;
+      walletFunded = true;
       if (credited) {
         sendTopupEmail(admin, userId, currency, amount, flwId || ref).catch(() => {});
       }
@@ -188,6 +194,8 @@ Deno.serve(async (req) => {
       currency,
       charge_id: d.id,
       credited,
+      already,
+      wallet_funded: walletFunded,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (err) {
     console.error("flw-verify-payment V3 error", err);
