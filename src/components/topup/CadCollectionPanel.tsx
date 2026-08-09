@@ -19,7 +19,7 @@ interface Props {
  * Both rails create a referenced intent and credit automatically when the deposit arrives.
  */
 export default function CadCollectionPanel({ walletId, walletCurrency, initialAmount, onComplete }: Props) {
-  const [tab, setTab] = useState<"interac" | "eft">("interac");
+  const [tab, setTab] = useState<CheckoutMethod>("interac");
   const [eftAvailable, setEftAvailable] = useState<boolean | null>(null);
 
   useEffect(() => {
