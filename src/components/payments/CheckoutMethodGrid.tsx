@@ -58,6 +58,7 @@ export default function CheckoutMethodGrid({
   value,
   onChange,
   interacAvailable = true,
+  cardAvailable = true,
   lang = "en",
 }: Props) {
   const t = CHECKOUT_STRINGS[lang];
@@ -70,6 +71,15 @@ export default function CheckoutMethodGrid({
       </div>
 
       <div className="overflow-hidden rounded-xl border">
+        {cardAvailable && (
+          <MethodRow
+            title={t.card}
+            description={t.cardDesc}
+            icon={<CreditCard className="h-5 w-5" />}
+            selected={value === "card"}
+            onSelect={() => onChange("card")}
+          />
+        )}
         {interacAvailable && (
           <MethodRow
             title={t.interac}
@@ -79,6 +89,7 @@ export default function CheckoutMethodGrid({
             onSelect={() => onChange("interac")}
           />
         )}
+
         <MethodRow
           title={t.wise}
           description={t.wiseDesc}
