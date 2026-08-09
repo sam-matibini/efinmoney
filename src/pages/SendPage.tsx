@@ -1109,7 +1109,34 @@ const SendPage = () => {
           recipientCountryHint: targetCountry.country,
         };
 
+        if (provider === "square") {
+          const returnUrl =
+            `${window.location.origin}/send?cardSend=1&provider=square&walletId=${encodeURIComponent(selectedWallet.wallet_id)}`;
+          const { data, error } = await supabase.functions.invoke("square-create-checkout", {
+            body: {
+              walletId: selectedWallet.wallet_id,
+              amount: totalCharge,
+              currency: selectedWallet.currency_code,
+              redirectUrl: returnUrl,
+            },
+          });
+          const sqErr = (data as { error?: string } | null)?.error || error?.message;
+          const checkoutUrl = String((data as { checkout_url?: string } | null)?.checkout_url || "");
+          if (sqErr || !checkoutUrl) {
+            throw new Error(sqErr || "Could not start card checkout");
+          }
+          saveCardSendIntent({
+            ...intentBase,
+            provider: "square",
+            squareOrderId: String((data as { order_id?: string }).order_id || ""),
+          });
+          toast.message("Opening secure card checkout…");
+          window.location.href = checkoutUrl;
+          return;
+        }
+
         if (provider === "fincra") {
+
           if (!isFincraCheckoutCurrency(selectedWallet.currency_code)) {
             toast.error(`Secure checkout does not support ${selectedWallet.currency_code}. Try another payment method.`);
             setConfirming(false);
