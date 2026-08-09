@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import CountryPicker from "@/components/ui/CountryPicker";
 import { COUNTRIES, findCountryById, findCountryByCode, LIVE_SEND_COUNTRIES, isLiveSendCountryId } from "@/lib/countries";
 import { ISO_COUNTRIES, findIsoCountry } from "@/lib/isoCountries";
+import { COUNTRY_ISO2 } from "@/lib/countryIso";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { getNigeriaBanks, resolveNigeriaAccount } from "@/lib/nombaNigeria";
 
@@ -63,6 +64,7 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
   const [addressRegion, setAddressRegion] = useState("");
   const [addressPostal, setAddressPostal] = useState("");
   const [addressCountry, setAddressCountry] = useState("");
+  const [addressCountryTouched, setAddressCountryTouched] = useState(false);
   const [mailingAddress, setMailingAddress] = useState("");
   const [mailingCity, setMailingCity] = useState("");
   const [mailingRegion, setMailingRegion] = useState("");
@@ -113,6 +115,7 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
     setAddressRegion(e.address_region || "");
     setAddressPostal(e.address_postal_code || "");
     setAddressCountry(e.address_country_code || "");
+    setAddressCountryTouched(!!editing);
     setMailingAddress(editing?.mailing_address || "");
     setMailingCity(editing?.mailing_city || "");
     setMailingRegion(editing?.mailing_region || "");
@@ -141,6 +144,15 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
   const isNigeriaBank = method === "bank" && country.code === "NGN";
   const countryNetworks = country.networks || [];
   const activeNetwork = countryNetworks.find((n) => n.id === networkId) || null;
+
+  // Prefill the address country from the selected contact country until the user picks one.
+  useEffect(() => {
+    if (!open || addressCountryTouched) return;
+    const iso = COUNTRY_ISO2[country.country] || COUNTRY_ISO2[country.id];
+    if (iso && iso !== addressCountry) setAddressCountry(iso);
+  }, [open, countryId, addressCountryTouched]); // eslint-disable-line react-hooks/exhaustive-deps
+
+
 
   // Keep the operator valid for the selected country.
   useEffect(() => {
@@ -344,7 +356,13 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
               <Input value={addressRegion} onChange={(e) => setAddressRegion(e.target.value)} placeholder="State / Province" />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Select value={addressCountry} onValueChange={setAddressCountry}>
+              <Select
+                value={addressCountry}
+                onValueChange={(v) => {
+                  setAddressCountryTouched(true);
+                  setAddressCountry(v);
+                }}
+              >
                 <SelectTrigger><SelectValue placeholder="Country" /></SelectTrigger>
                 <SelectContent>
                   {ISO_COUNTRIES.map((c) => (
