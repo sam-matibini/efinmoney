@@ -145,6 +145,9 @@ const MethodCheckoutPanel = ({
   inlineEntry,
   cardFields,
   onCardFieldsChange,
+  showCardForm = true,
+  onCancelCardForm,
+
   insufficientBalance,
   onTopUp,
 }: Props) => {
