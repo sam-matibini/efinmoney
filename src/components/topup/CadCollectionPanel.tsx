@@ -62,38 +62,37 @@ export default function CadCollectionPanel({ walletId, walletCurrency, initialAm
           deposit arrives with your reference.
         </p>
       </CardHeader>
-      <CardContent>
-        <Tabs value={tab} onValueChange={(v) => setTab(v as "interac" | "eft")}>
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="interac">Interac e-Transfer</TabsTrigger>
-            <TabsTrigger value="eft">Bank EFT</TabsTrigger>
-          </TabsList>
+      <CardContent className="space-y-4">
+        <CheckoutMethodGrid
+          amountLabel={
+            Number(initialAmount) > 0 ? `CAD ${Number(initialAmount).toFixed(2)}` : undefined
+          }
+          value={tab}
+          onChange={setTab}
+          interacAvailable={walletCurrency.toUpperCase() === "CAD"}
+        />
 
-          <TabsContent value="interac" className="mt-4">
-            <CadInteracTopUpCard
-              walletId={walletId}
-              walletCurrency={walletCurrency}
-              initialAmount={initialAmount}
-              onComplete={onComplete}
-            />
-          </TabsContent>
-
-          <TabsContent value="eft" className="mt-4">
-            {eftAvailable === false ? (
-              <div className="rounded-lg border bg-muted/40 p-4 text-sm text-muted-foreground">
-                Bank EFT is not available yet for CAD. Use Interac e-Transfer in the meantime.
-              </div>
-            ) : (
-              <WiseTopUpCard
-                walletId={walletId}
-                walletCurrency={walletCurrency}
-                initialAmount={initialAmount}
-                onComplete={onComplete}
-              />
-            )}
-          </TabsContent>
-        </Tabs>
+        {tab === "interac" ? (
+          <CadInteracTopUpCard
+            walletId={walletId}
+            walletCurrency={walletCurrency}
+            initialAmount={initialAmount}
+            onComplete={onComplete}
+          />
+        ) : eftAvailable === false ? (
+          <div className="rounded-lg border bg-muted/40 p-4 text-sm text-muted-foreground">
+            Bank EFT is not available yet for CAD. Use Interac e-Transfer in the meantime.
+          </div>
+        ) : (
+          <WiseTopUpCard
+            walletId={walletId}
+            walletCurrency={walletCurrency}
+            initialAmount={initialAmount}
+            onComplete={onComplete}
+          />
+        )}
       </CardContent>
+
     </Card>
   );
 }
