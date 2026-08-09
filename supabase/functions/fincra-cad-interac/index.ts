@@ -186,6 +186,13 @@ Deno.serve(async (req) => {
       customer_name?: string;
       customer_email?: string;
       customer_phone?: string;
+      sender_account_type?: string;
+      sender_address_line1?: string;
+      sender_address_line2?: string;
+      sender_city?: string;
+      sender_region?: string;
+      sender_postal_code?: string;
+      sender_country?: string;
     };
 
     const action = String(body.action || "create").toLowerCase();
