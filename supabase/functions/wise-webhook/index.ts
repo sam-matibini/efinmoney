@@ -252,6 +252,7 @@ Deno.serve(async (req) => {
     if (isCredit && amount > 0) {
       const nowIso = new Date().toISOString();
       const haystack = `${transferReference || ""} ${rawBody}`.toLowerCase();
+      const digits = haystack.replace(/[^\d]/g, "");
       const needle = extractRefNeedle(haystack) || extractRefNeedle(transferReference || "");
       const interacNeedle =
         extractInteracRefNeedle(haystack) || extractInteracRefNeedle(transferReference || "");
@@ -264,8 +265,13 @@ Deno.serve(async (req) => {
         currency_code: string;
         reference: string;
         transfer_id?: string | null;
+        sender_email?: string | null;
+        sender_phone?: string | null;
       } | null = null;
       let intentTable: "wise_topup_intents" | "fincra_cad_interac_intents" = "wise_topup_intents";
+      let matchTier: string | null = null;
+      let interacAmbiguous = 0;
+
 
       if (needle) {
         const { data } = await supabase
