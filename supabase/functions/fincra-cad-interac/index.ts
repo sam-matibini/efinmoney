@@ -186,11 +186,12 @@ Deno.serve(async (req) => {
     if (purpose === "transfer") {
       const { data: tr } = await admin
         .from("transfers")
-        .select("id, user_id")
+        .select("id, sender_id")
         .eq("id", transferId)
         .maybeSingle();
-      if (!tr || tr.user_id !== user.id) return json({ error: "Transfer not found" }, 404);
+      if (!tr || tr.sender_id !== user.id) return json({ error: "Transfer not found" }, 404);
     }
+
 
 
 
