@@ -9,13 +9,16 @@ import { supabase } from "@/integrations/supabase/client";
 
 export type InteracIntent = {
   id: string;
+  public_id?: string | null;
   amount: number;
   currency_code: string;
   reference: string;
   status: string;
   expires_at?: string;
+  claimed_sent_at?: string | null;
   sender_name?: string | null;
   sender_email?: string | null;
+  sender_phone?: string | null;
   sender_bank?: string | null;
 };
 
@@ -23,31 +26,67 @@ interface Props {
   /** CAD wallet that receives the deposit. */
   walletId: string;
   /** `topup` credits the wallet only; `transfer` also releases the linked payout. */
-  purpose?: "topup" | "transfer";
+  purpose?: "topup" | "transfer" | "merchant_collection";
   /** Transfer that should execute automatically once the deposit lands. */
   transferId?: string;
   /** Fixed amount (send flow). When omitted the user types the amount. */
   fixedAmount?: number;
   /** Prefill for the editable amount field. */
   initialAmount?: string;
-  /** Resume the most recent pending intent (top-up only). */
+  /** Resume the most recent open intent (top-up only). */
   resumePending?: boolean;
-  /** Submit label for the sender form. */
+  /** Submit label for the identity step. */
   submitLabel?: string;
   onComplete?: () => void;
   onIntentCreated?: (intent: InteracIntent) => void;
 }
 
-const senderSchema = z.object({
-  amount: z.coerce.number().min(1, "Enter an amount of at least CAD 1.00"),
-  senderName: z.string().trim().min(2, "Enter the sender's full name").max(100, "Name is too long"),
-  senderEmail: z.string().trim().email("Enter a valid email address").max(255, "Email is too long"),
-  senderBank: z.string().trim().max(100, "Bank name is too long"),
-});
+/** Terminal-success statuses (`completed` kept for intents created before the lifecycle change). */
+const DONE = ["settled", "completed"];
+const OPEN = ["pending", "awaiting_payment"];
+
+const CA_PHONE_RE = /^\+?1?[2-9]\d{9}$/;
+
+const identitySchema = z
+  .object({
+    amount: z.coerce.number().min(1, "Enter an amount of at least CAD 1.00"),
+    senderName: z.string().trim().min(2, "Enter the sender's full name").max(100, "Name is too long"),
+    senderEmail: z.string().trim().max(255, "Email is too long"),
+    senderPhone: z.string().trim().max(20, "Mobile number is too long"),
+    senderBank: z.string().trim().max(100, "Bank name is too long"),
+  })
+  .refine((v) => Boolean(v.senderEmail || v.senderPhone), {
+    message: "Enter the email or mobile number you use with Interac",
+    path: ["senderEmail"],
+  })
+  .refine((v) => !v.senderEmail || z.string().email().safeParse(v.senderEmail).success, {
+    message: "Enter a valid email address",
+    path: ["senderEmail"],
+  })
+  .refine((v) => !v.senderPhone || CA_PHONE_RE.test(v.senderPhone.replace(/[^\d+]/g, "")), {
+    message: "Enter a valid Canadian mobile number",
+    path: ["senderPhone"],
+  });
+
+function waitingCopy(status: string, purpose: string): string {
+  switch (status) {
+    case "awaiting_payment":
+      return "Thanks — we're watching for your e-Transfer. This usually confirms within minutes.";
+    case "received":
+    case "matched":
+      return "Deposit received — confirming it against your payment reference.";
+    case "confirmed":
+      return purpose === "transfer" ? "Payment confirmed — releasing your transfer." : "Payment confirmed — crediting your wallet.";
+    case "unmatched":
+      return "We received a deposit we couldn't match automatically. Our team is allocating it.";
+    default:
+      return "Waiting for your Interac transfer…";
+  }
+}
 
 /**
- * Shared Interac e-Transfer checkout: sender form → Wise deposit alias + reference.
- * Deposits are matched by reference in `wise-webhook`, which credits the wallet and
+ * Shared Interac e-Transfer checkout: identity step → payment instructions.
+ * Deposits are reconciled in `wise-webhook`, which credits the wallet and
  * (for `purpose: "transfer"`) releases the linked payout.
  */
 export default function InteracCheckout({
@@ -72,8 +111,10 @@ export default function InteracCheckout({
 
   const [senderName, setSenderName] = useState("");
   const [senderEmail, setSenderEmail] = useState("");
+  const [senderPhone, setSenderPhone] = useState("");
   const [senderBank, setSenderBank] = useState("");
   const [loading, setLoading] = useState(false);
+  const [claiming, setClaiming] = useState(false);
   const [alias, setAlias] = useState<string | null>(null);
   const [intent, setIntent] = useState<InteracIntent | null>(null);
   const [instructions, setInstructions] = useState<string[]>([]);
@@ -82,7 +123,7 @@ export default function InteracCheckout({
   const [autoError, setAutoError] = useState<string | null>(null);
   const nameRef = useRef<HTMLInputElement | null>(null);
 
-  // Prefill the sender from the signed-in profile so the form is mostly done
+  // Prefill the sender from the signed-in profile so the step is mostly done
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -99,7 +140,7 @@ export default function InteracCheckout({
   }, []);
 
   const createIntent = useCallback(async () => {
-    const parsed = senderSchema.safeParse({ amount, senderName, senderEmail, senderBank });
+    const parsed = identitySchema.safeParse({ amount, senderName, senderEmail, senderPhone, senderBank });
     if (!parsed.success) {
       toast.error(parsed.error.errors[0]?.message ?? "Check your details");
       return;
@@ -115,7 +156,8 @@ export default function InteracCheckout({
           purpose,
           transfer_id: transferId,
           sender_name: parsed.data.senderName,
-          sender_email: parsed.data.senderEmail,
+          sender_email: parsed.data.senderEmail || undefined,
+          sender_phone: parsed.data.senderPhone || undefined,
           sender_bank: parsed.data.senderBank || undefined,
         },
       });
@@ -135,9 +177,9 @@ export default function InteracCheckout({
     } finally {
       setLoading(false);
     }
-  }, [amount, senderName, senderEmail, senderBank, walletId, purpose, transferId, onIntentCreated]);
+  }, [amount, senderName, senderEmail, senderPhone, senderBank, walletId, purpose, transferId, onIntentCreated]);
 
-  // Resolve the deposit alias (and any resumable pending intent)
+  // Resolve the deposit alias (and any resumable open intent)
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -171,15 +213,15 @@ export default function InteracCheckout({
     };
   }, [resumePending]);
 
-  // Focus the form as soon as it opens so it acts like a checkout
+  // Focus the identity step as soon as it opens so it acts like a checkout
   useEffect(() => {
     if (!bootstrapped || intent) return;
     nameRef.current?.focus();
   }, [bootstrapped, intent]);
 
-  // Poll the active intent until it credits
+  // Poll the active intent until it settles
   useEffect(() => {
-    if (!intent || intent.status !== "pending") return;
+    if (!intent || DONE.includes(intent.status)) return;
     let cancelled = false;
     let attempts = 0;
 
@@ -201,7 +243,7 @@ export default function InteracCheckout({
         const next = json?.intent as InteracIntent | undefined;
         if (next) {
           setIntent(next);
-          if (next.status === "completed") {
+          if (DONE.includes(next.status)) {
             toast.success(
               purpose === "transfer"
                 ? `CAD ${next.amount} received — sending your transfer now`
@@ -229,7 +271,25 @@ export default function InteracCheckout({
     toast.success(`${label} copied`);
   };
 
-  if (intent?.status === "completed") {
+  const claimSent = useCallback(async () => {
+    if (!intent) return;
+    setClaiming(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("fincra-cad-interac", {
+        body: { action: "claim_sent", intent_id: intent.id },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      if (data?.intent) setIntent(data.intent as InteracIntent);
+      toast.success("Thanks — we'll confirm as soon as the deposit arrives");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not record your payment");
+    } finally {
+      setClaiming(false);
+    }
+  }, [intent]);
+
+  if (intent && DONE.includes(intent.status)) {
     return (
       <div className="space-y-2 py-4 text-center">
         <CheckCircle2 className="mx-auto h-10 w-10 text-emerald-500" />
@@ -240,6 +300,9 @@ export default function InteracCheckout({
       </div>
     );
   }
+
+  const showInstructions = Boolean(intent && OPEN.includes(intent.status));
+  const showStatusOnly = Boolean(intent && !OPEN.includes(intent.status));
 
   return (
     <div className="space-y-4">
@@ -266,7 +329,7 @@ export default function InteracCheckout({
             void createIntent();
           }}
         >
-          <p className="text-sm font-medium">Your e-Transfer details</p>
+          <p className="text-sm font-medium">Your Interac details</p>
 
           {amountLocked ? (
             <div className="flex justify-between rounded-lg border bg-muted/40 px-3 py-2 text-sm">
@@ -290,7 +353,7 @@ export default function InteracCheckout({
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="etx-name">Sender full name</Label>
+            <Label htmlFor="etx-name">Full name</Label>
             <Input
               id="etx-name"
               ref={nameRef}
@@ -302,7 +365,7 @@ export default function InteracCheckout({
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="etx-email">Sender email</Label>
+            <Label htmlFor="etx-email">Interac email</Label>
             <Input
               id="etx-email"
               type="email"
@@ -312,8 +375,20 @@ export default function InteracCheckout({
               value={senderEmail}
               onChange={(e) => setSenderEmail(e.target.value)}
             />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="etx-phone">Interac mobile number (optional)</Label>
+            <Input
+              id="etx-phone"
+              type="tel"
+              autoComplete="tel"
+              maxLength={20}
+              placeholder="e.g. +1 416 555 0134"
+              value={senderPhone}
+              onChange={(e) => setSenderPhone(e.target.value)}
+            />
             <p className="text-xs text-muted-foreground">
-              Send the e-Transfer from this email so we can match it.
+              Give the email or mobile you use with Interac so we can match your deposit.
             </p>
           </div>
           <div className="space-y-2">
@@ -332,18 +407,20 @@ export default function InteracCheckout({
         </form>
       )}
 
-      {intent && intent.status === "pending" && (
+      {showInstructions && intent && (
         <div className="space-y-3">
           <div className="space-y-2 rounded-lg border bg-muted/40 p-3">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Send exactly</span>
               <span className="font-semibold tabular-nums">CAD {Number(intent.amount).toFixed(2)}</span>
             </div>
-            {(intent.sender_name || intent.sender_email) && (
+            {(intent.sender_name || intent.sender_email || intent.sender_phone) && (
               <div className="flex justify-between gap-2 text-xs text-muted-foreground">
                 <span>Sending from</span>
                 <span className="break-all text-right">
-                  {[intent.sender_name, intent.sender_email, intent.sender_bank].filter(Boolean).join(" · ")}
+                  {[intent.sender_name, intent.sender_email || intent.sender_phone, intent.sender_bank]
+                    .filter(Boolean)
+                    .join(" · ")}
                 </span>
               </div>
             )}
@@ -353,26 +430,45 @@ export default function InteracCheckout({
                 <p className="text-xs text-muted-foreground">Interac recipient</p>
                 <div className="flex items-center gap-2">
                   <code className="flex-1 break-all text-sm">{alias}</code>
-                  <Button type="button" size="sm" variant="outline" onClick={() => void copy(alias, "Interac address")}>
-                    <Copy className="h-3.5 w-3.5" />
+                  <Button type="button" size="sm" variant="outline" onClick={() => void copy(alias, "Email")}>
+                    <Copy className="mr-1 h-3.5 w-3.5" /> Copy email
                   </Button>
                 </div>
               </div>
             )}
             <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">Reference (put this in the message field)</p>
+              <p className="text-xs text-muted-foreground">Payment reference (put this in the message field)</p>
               <div className="flex items-center gap-2">
-                <code className="flex-1 break-all text-sm">{intent.reference}</code>
+                <code className="flex-1 break-all text-sm">{intent.public_id || intent.reference}</code>
                 <Button
                   type="button"
                   size="sm"
                   variant="outline"
-                  onClick={() => void copy(intent.reference, "Reference")}
+                  onClick={() => void copy(intent.public_id || intent.reference, "Reference")}
                 >
-                  <Copy className="h-3.5 w-3.5" />
+                  <Copy className="mr-1 h-3.5 w-3.5" /> Copy reference
                 </Button>
               </div>
             </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="w-full"
+              onClick={() =>
+                void copy(
+                  [
+                    `Amount: CAD ${Number(intent.amount).toFixed(2)}`,
+                    alias ? `Send to: ${alias}` : null,
+                    `Reference: ${intent.public_id || intent.reference}`,
+                  ]
+                    .filter(Boolean)
+                    .join("\n"),
+                  "Payment details",
+                )}
+            >
+              <Copy className="mr-1 h-3.5 w-3.5" /> Copy payment details
+            </Button>
           </div>
 
           <ul className="list-inside list-disc space-y-1.5 text-xs text-muted-foreground">
@@ -384,16 +480,31 @@ export default function InteracCheckout({
                   "Autodeposit is on — no security question.",
                   purpose === "transfer"
                     ? "Your transfer is sent automatically once the deposit arrives."
-                    : "This page updates when your wallet is credited.",
+                    : "This page updates when your payment is confirmed.",
                 ]
             ).map((line) => (
               <li key={line}>{line}</li>
             ))}
           </ul>
+
+          {intent.status === "pending" ? (
+            <Button type="button" variant="outline" className="w-full" disabled={claiming} onClick={() => void claimSent()}>
+              {claiming ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              I've sent the payment
+            </Button>
+          ) : null}
+
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            Waiting for your Interac transfer…
+            {waitingCopy(intent.status, purpose)}
           </div>
+        </div>
+      )}
+
+      {showStatusOnly && intent && (
+        <div className="flex items-center gap-2 rounded-lg border bg-muted/40 p-3 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          {waitingCopy(intent.status, purpose)}
         </div>
       )}
     </div>
