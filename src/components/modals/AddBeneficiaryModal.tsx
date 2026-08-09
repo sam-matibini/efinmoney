@@ -333,14 +333,30 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
                 <p className="text-xs text-muted-foreground">Also used as the mobile money payout number.</p>
               )}
             </div>
-            <div className="space-y-2">
-              <Label>Address</Label>
-              <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="123 Main St, City" required />
+          </div>
+
+          <div className="space-y-2 pt-2 border-t">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Address</p>
+            <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Street address" required />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Input value={addressCity} onChange={(e) => setAddressCity(e.target.value)} placeholder="City / Town" />
+              <Input value={addressRegion} onChange={(e) => setAddressRegion(e.target.value)} placeholder="State / Province" />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Select value={addressCountry} onValueChange={setAddressCountry}>
+                <SelectTrigger><SelectValue placeholder="Country" /></SelectTrigger>
+                <SelectContent>
+                  {ISO_COUNTRIES.map((c) => (
+                    <SelectItem key={c.code} value={c.code}>{c.flag} {c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Input value={addressPostal} onChange={(e) => setAddressPostal(e.target.value)} placeholder="Postal / ZIP code" />
             </div>
           </div>
 
           <div className="space-y-2 pt-2 border-t">
-            <Label>Mailing address (optional)</Label>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Mailing address (optional)</p>
             <div className="flex items-center gap-2">
               <Checkbox
                 id="same-as-address"
@@ -358,25 +374,50 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
               readOnly={sameAsAddress}
               className={sameAsAddress ? "bg-muted/40" : undefined}
             />
-
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Input
-                value={mailingCity}
+                value={sameAsAddress ? addressCity : mailingCity}
                 onChange={(e) => setMailingCity(e.target.value)}
-                placeholder="City"
+                placeholder="City / Town"
+                readOnly={sameAsAddress}
+                className={sameAsAddress ? "bg-muted/40" : undefined}
               />
               <Input
-                value={mailingRegion}
+                value={sameAsAddress ? addressRegion : mailingRegion}
                 onChange={(e) => setMailingRegion(e.target.value)}
                 placeholder="State / Province"
+                readOnly={sameAsAddress}
+                className={sameAsAddress ? "bg-muted/40" : undefined}
               />
             </div>
-            <Input
-              value={mailingPostal}
-              onChange={(e) => setMailingPostal(e.target.value)}
-              placeholder="Postal / ZIP code"
-            />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {sameAsAddress ? (
+                <Input
+                  value={findIsoCountry(addressCountry)?.name || ""}
+                  readOnly
+                  placeholder="Country"
+                  className="bg-muted/40"
+                />
+              ) : (
+                <Select value={mailingCountry} onValueChange={setMailingCountry}>
+                  <SelectTrigger><SelectValue placeholder="Country" /></SelectTrigger>
+                  <SelectContent>
+                    {ISO_COUNTRIES.map((c) => (
+                      <SelectItem key={c.code} value={c.code}>{c.flag} {c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              <Input
+                value={sameAsAddress ? addressPostal : mailingPostal}
+                onChange={(e) => setMailingPostal(e.target.value)}
+                placeholder="Postal / ZIP code"
+                readOnly={sameAsAddress}
+                className={sameAsAddress ? "bg-muted/40" : undefined}
+              />
+            </div>
           </div>
+
 
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground pt-2 border-t">Payout details</p>
           <div className="space-y-2">
