@@ -7,6 +7,7 @@ import { Send, Pencil, Trash2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { BENEFICIARY_COUNTRIES } from "@/components/modals/AddBeneficiaryModal";
 import type { Beneficiary } from "@/hooks/useBeneficiaries";
+import { payoutPartnerLabel } from "@/lib/payoutPartner";
 
 interface Props {
   contact: Beneficiary | null;
