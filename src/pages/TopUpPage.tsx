@@ -28,6 +28,8 @@ import ElicateTopUpCard from "@/components/payments/ElicateTopUpCard";
 import CadInteracTopUpCard from "@/components/payments/CadInteracTopUpCard";
 import LinkBankPanel from "@/components/payments/LinkBankPanel";
 import WiseTopUpCard from "@/components/payments/WiseTopUpCard";
+import CadCollectionPanel from "@/components/topup/CadCollectionPanel";
+
 import GhanaTopUpCard from "@/components/payments/GhanaTopUpCard";
 import NombaTopUpCard from "@/components/payments/NombaTopUpCard";
 import LenhubFlutterTopUpCard from "@/components/payments/LenhubFlutterTopUpCard";
