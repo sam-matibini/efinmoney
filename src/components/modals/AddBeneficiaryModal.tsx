@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -61,6 +62,7 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
   const [mailingCity, setMailingCity] = useState("");
   const [mailingRegion, setMailingRegion] = useState("");
   const [mailingPostal, setMailingPostal] = useState("");
+  const [sameAsAddress, setSameAsAddress] = useState(false);
   const [notes, setNotes] = useState("");
   const [tags, setTags] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -104,6 +106,8 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
     setMailingCity(editing?.mailing_city || "");
     setMailingRegion(editing?.mailing_region || "");
     setMailingPostal(editing?.mailing_postal_code || "");
+    const norm = (s?: string | null) => (s || "").trim().toLowerCase();
+    setSameAsAddress(!!norm(editing?.address) && norm(editing?.mailing_address) === norm(editing?.address));
     setNotes(editing?.notes || "");
     setTags((editing?.tags || []).join(", "));
     setShowAdvanced(!!editing?.notes || !!editing?.tags?.length);
@@ -223,7 +227,7 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
       eft_account: method === "eft" ? eftAcct : null,
       eft_account_holder: method === "eft" ? (eftHolder.trim() || name.trim()) : null,
       interac_email: method === "interac" ? interacEmail.trim() : null,
-      mailing_address: mailingAddress.trim() || null,
+      mailing_address: (sameAsAddress ? address.trim() : mailingAddress.trim()) || null,
       mailing_city: mailingCity.trim() || null,
       mailing_region: mailingRegion.trim() || null,
       mailing_postal_code: mailingPostal.trim() || null,
@@ -314,10 +318,21 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
 
           <div className="space-y-2 pt-2 border-t">
             <Label>Mailing address (optional)</Label>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="same-as-address"
+                checked={sameAsAddress}
+                onCheckedChange={(v) => setSameAsAddress(v === true)}
+              />
+              <Label htmlFor="same-as-address" className="text-sm font-normal text-muted-foreground">
+                Same as address
+              </Label>
+            </div>
             <Input
-              value={mailingAddress}
+              value={sameAsAddress ? address : mailingAddress}
               onChange={(e) => setMailingAddress(e.target.value)}
               placeholder="Street address"
+              disabled={sameAsAddress}
             />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Input
