@@ -99,7 +99,7 @@ Deno.serve(async (req) => {
 
       const { data: pending } = await admin
         .from("fincra_cad_interac_intents")
-        .select("id, amount, currency_code, reference, status, created_at, expires_at")
+        .select("id, amount, currency_code, reference, status, created_at, expires_at, sender_name, sender_email, sender_bank")
         .eq("user_id", user.id)
         .eq("status", "pending")
         .gt("expires_at", new Date().toISOString())
