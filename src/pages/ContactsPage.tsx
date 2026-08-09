@@ -26,10 +26,8 @@ import AppPage from "@/components/layout/AppPage";
 
 const flagFor = (code: string | null) =>
   BENEFICIARY_COUNTRIES.find((c) => c.code === code)?.flag || "🌍";
-const methodLabel = (b: Beneficiary) => {
-  if (b.bank_account) return `Bank · ${b.bank_name || ""}`.trim();
-  return BENEFICIARY_COUNTRIES.find((c) => c.code === b.country_code)?.method || "Mobile Money";
-};
+const methodLabel = (b: Beneficiary) => payoutMethodLabel(b);
+
 
 type ViewMode = "grid" | "list";
 const VIEW_KEY = "contacts.viewMode";
