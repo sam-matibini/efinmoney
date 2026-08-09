@@ -71,8 +71,8 @@ export default function ContactDetailsSheet({
               </Section>
 
               <Section title="Payout details">
-                <Row label="Method" value={c.bank_account ? "Bank transfer" : country?.method || "Mobile Money"} />
-                <Row label="Network" value={c.network} />
+                <Row label="Method" value={c.bank_account ? "Bank transfer" : "Mobile money"} />
+                {!c.bank_account && <Row label="Payout partner" value={payoutPartnerLabel(c)} />}
                 <Row label="Bank" value={c.bank_name} />
                 <Row label="Account" value={c.bank_account} />
                 <Row label="Bank code" value={c.bank_code} />
