@@ -83,7 +83,15 @@ export default function CadCollectionPanel({ walletId, walletCurrency, initialAm
           lang={lang}
           onComplete={onComplete}
         />
+      ) : method === "wise" ? (
+        <WisePayLinkCard
+          walletId={walletId}
+          walletCurrency={walletCurrency}
+          initialAmount={initialAmount}
+          onComplete={onComplete}
+        />
       ) : eftAvailable === false ? (
+
         <div className="rounded-lg border bg-muted/40 p-4 text-sm text-muted-foreground">
           Bank EFT is not available yet for CAD. Use Interac e-Transfer in the meantime.
         </div>
