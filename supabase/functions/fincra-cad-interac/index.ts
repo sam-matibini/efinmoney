@@ -120,9 +120,13 @@ Deno.serve(async (req) => {
       amount?: number;
       wallet_id?: string;
       intent_id?: string;
+      sender_name?: string;
+      sender_email?: string;
+      sender_bank?: string;
     };
 
     const action = String(body.action || "create").toLowerCase();
+
 
     if (action === "cancel") {
       const intentId = String(body.intent_id || "");
