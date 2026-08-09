@@ -190,14 +190,24 @@ export default function CadInteracTopUpCard({ walletId, walletCurrency, onComple
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
-        {!configured && !intent && (
+        {!configured && !intent && !loading && (
           <p className="text-sm text-muted-foreground">
             Interac details are being prepared — try again in a moment.
           </p>
         )}
 
+        {autoError && !intent && (
+          <p className="text-sm text-destructive">{autoError}</p>
+        )}
 
-        {!intent && (
+        {!intent && loading && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Preparing Interac details…
+          </div>
+        )}
+
+        {!intent && !loading && (
           <>
             {!initialAmount && (
               <div className="space-y-2">
@@ -213,15 +223,15 @@ export default function CadInteracTopUpCard({ walletId, walletCurrency, onComple
                 <p className="text-xs text-muted-foreground">Minimum CAD 1.00 · Send this exact amount</p>
               </div>
             )}
-            <Button className="w-full" onClick={handleCreate} disabled={loading || !(Number(amount) > 0)}>
-              {loading ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Preparing…
-                </>
-              ) : (
-                "Get Interac details"
-              )}
+            <Button
+              className="w-full"
+              onClick={() => {
+                autoTriedRef.current = String(Number(amount));
+                void createIntent(false);
+              }}
+              disabled={!(Number(amount) > 0)}
+            >
+              {autoError ? "Try again" : "Get Interac details"}
             </Button>
           </>
         )}
