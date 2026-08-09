@@ -6,6 +6,11 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+function fail(branch: string, message: string, status: number, extra: Record<string, unknown> = {}) {
+  console.warn(`fincra-cad-interac: rejected [${branch}] ${status} ${message}`, JSON.stringify(extra));
+  return json({ error: message, branch }, status);
+}
+
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -240,18 +245,15 @@ Deno.serve(async (req) => {
     }
 
     if (!alias) {
-      return json({
-        error: "Interac details are being prepared. Please try again in a moment.",
-        code: "alias_missing",
-      }, 503);
+      return fail("alias_missing", "Interac details are being prepared. Please try again in a moment.", 503);
     }
 
     const amount = Number(body.amount);
     const walletId = String(body.wallet_id || "");
     if (!Number.isFinite(amount) || amount < 1) {
-      return json({ error: "Enter an amount of at least CAD 1.00" }, 400);
+      return fail("amount", "Enter an amount of at least CAD 1.00", 400, { amount: body.amount });
     }
-    if (!walletId) return json({ error: "wallet_id required" }, 400);
+    if (!walletId) return fail("wallet_id", "wallet_id required", 400);
 
     const senderName = String(body.sender_name || "").trim();
     const senderEmail = String(body.sender_email || "").trim().toLowerCase();
@@ -261,25 +263,25 @@ Deno.serve(async (req) => {
     const purpose = String(body.purpose || "topup").toLowerCase();
     const transferId = String(body.transfer_id || "").trim();
     if (!["topup", "transfer", "merchant_collection"].includes(purpose)) {
-      return json({ error: "purpose must be topup, transfer or merchant_collection" }, 400);
+      return fail("purpose", "purpose must be topup, transfer or merchant_collection", 400, { purpose });
     }
     if (purpose === "transfer" && !/^[0-9a-f-]{36}$/i.test(transferId)) {
-      return json({ error: "transfer_id required for transfer funding" }, 400);
+      return fail("transfer_id", "transfer_id required for transfer funding", 400, { transferId });
     }
     if (senderName.length < 2 || senderName.length > 100) {
-      return json({ error: "Enter the sender's full name (2-100 characters)" }, 400);
+      return fail("sender_name", "Enter the sender's full name (2-100 characters)", 400, { length: senderName.length });
     }
     if (!senderEmail && !senderPhone) {
-      return json({ error: "Enter the email or mobile number you use with Interac" }, 400);
+      return fail("sender_contact", "Enter the email or mobile number you use with Interac", 400);
     }
     if (senderEmail && (!EMAIL_RE.test(senderEmail) || senderEmail.length > 255)) {
-      return json({ error: "Enter a valid sender email address" }, 400);
+      return fail("sender_email", "Enter a valid sender email address", 400);
     }
     if (senderPhone && !CA_PHONE_RE.test(senderPhone)) {
-      return json({ error: "Enter a valid Canadian mobile number" }, 400);
+      return fail("sender_phone", "Enter a valid Canadian mobile number", 400, { normalized: senderPhone });
     }
     if (senderBank.length > 100) {
-      return json({ error: "Sending bank must be 100 characters or less" }, 400);
+      return fail("sender_bank", "Sending bank must be 100 characters or less", 400);
     }
 
     const merchantId = String(body.merchant_id || "").trim();
@@ -289,7 +291,7 @@ Deno.serve(async (req) => {
 
     const accountType = String(body.sender_account_type || "personal").trim().toLowerCase();
     if (!["personal", "business"].includes(accountType)) {
-      return json({ error: "Account type must be personal or business" }, 400);
+      return fail("account_type", "Account type must be personal or business", 400, { accountType });
     }
     const trim = (v: unknown, max: number) => String(v ?? "").trim().slice(0, max) || null;
     const addressLine1 = trim(body.sender_address_line1, 200);
@@ -305,7 +307,7 @@ Deno.serve(async (req) => {
         .select("id, sender_id")
         .eq("id", transferId)
         .maybeSingle();
-      if (!tr || tr.sender_id !== user.id) return json({ error: "Transfer not found" }, 404);
+      if (!tr || tr.sender_id !== user.id) return fail("transfer_lookup", "Transfer not found", 404, { transferId });
     }
 
     const { data: wallet, error: wErr } = await admin
@@ -314,10 +316,10 @@ Deno.serve(async (req) => {
       .eq("id", walletId)
       .maybeSingle();
     if (wErr || !wallet || wallet.user_id !== user.id) {
-      return json({ error: "Wallet not found" }, 404);
+      return fail("wallet_lookup", "Wallet not found", 404, { walletId, dbError: wErr?.message });
     }
     if (String(wallet.currency_code).toUpperCase() !== "CAD") {
-      return json({ error: "Interac e-Transfer only funds CAD wallets" }, 400);
+      return fail("wallet_currency", "Interac e-Transfer only funds CAD wallets", 400, { currency: wallet.currency_code });
     }
 
     // Expire stale open intents for this user
@@ -376,7 +378,7 @@ Deno.serve(async (req) => {
       .single();
 
     if (insErr || !intent) {
-      return json({ error: insErr?.message || "Could not create Interac intent" }, 500);
+      return fail("insert", insErr?.message || "Could not create Interac intent", 500, { code: insErr?.code, details: insErr?.details });
     }
 
     return json({
