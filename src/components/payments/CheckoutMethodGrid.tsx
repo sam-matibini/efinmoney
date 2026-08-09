@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils";
 import { Building2, ChevronRight, CreditCard, Send, Wallet } from "lucide-react";
 import { CHECKOUT_STRINGS, type Lang } from "@/components/payments/checkoutStrings";
 
-export type CheckoutMethod = "interac" | "eft" | "wise";
+export type CheckoutMethod = "card" | "interac" | "eft" | "wise";
 
 interface Props {
   amountLabel?: string;
@@ -10,8 +10,11 @@ interface Props {
   onChange: (method: CheckoutMethod) => void;
   /** Hide the Interac row when the collection currency is not CAD. */
   interacAvailable?: boolean;
+  /** Hide the card row when Square does not support the collection currency. */
+  cardAvailable?: boolean;
   lang?: Lang;
 }
+
 
 interface RowProps {
   title: string;
