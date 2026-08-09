@@ -57,8 +57,9 @@ const FLW_PENDING_KEY = "efm_flw_card_send_txn";
 
 function inferProvider(intent: Partial<CardSendIntent>): CardSendProvider {
   if (intent.provider) return intent.provider;
+  if (intent.squareOrderId) return "square";
   if (intent.fincraReference) return "fincra";
-  if (intent.nombaTxnId) return "nomba";
+
   if (intent.lenhubChargeId) return "lenhub";
   if (intent.paytotaTxnId) return "paytota";
   if (intent.swychrTxnId) return "swychr";
