@@ -105,6 +105,8 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
     setMailingCity(editing?.mailing_city || "");
     setMailingRegion(editing?.mailing_region || "");
     setMailingPostal(editing?.mailing_postal_code || "");
+    const norm = (s?: string | null) => (s || "").trim().toLowerCase();
+    setSameAsAddress(!!norm(editing?.address) && norm(editing?.mailing_address) === norm(editing?.address));
     setNotes(editing?.notes || "");
     setTags((editing?.tags || []).join(", "));
     setShowAdvanced(!!editing?.notes || !!editing?.tags?.length);
