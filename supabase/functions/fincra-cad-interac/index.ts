@@ -84,7 +84,7 @@ Deno.serve(async (req) => {
       if (intentId) {
         const { data, error } = await admin
           .from("fincra_cad_interac_intents")
-          .select("id, amount, currency_code, reference, status, created_at, expires_at, credited_at")
+          .select("id, amount, currency_code, reference, status, created_at, expires_at, credited_at, sender_name, sender_email, sender_bank")
           .eq("id", intentId)
           .eq("user_id", user.id)
           .maybeSingle();
