@@ -158,31 +158,8 @@ export default function CadInteracTopUpCard({ walletId, walletCurrency, onComple
 
   if (currency !== "CAD") return null;
 
-  const handleCreate = async () => {
-    const amt = Number(amount);
-    if (!Number.isFinite(amt) || amt < 1) {
-      toast.error("Enter an amount of at least CAD 1.00");
-      return;
-    }
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("fincra-cad-interac", {
-        body: { action: "create", amount: amt, wallet_id: walletId },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      setAlias(data.alias ?? alias);
-      setIntent(data.intent);
-      setInstructions(Array.isArray(data.instructions) ? data.instructions : []);
-      toast.message("Interac details ready", {
-        description: "Send the exact amount from your bank app.",
-      });
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not start Interac top-up");
-    } finally {
-      setLoading(false);
-    }
-  };
+
+
 
   const copyAlias = async () => {
     if (!alias) return;
