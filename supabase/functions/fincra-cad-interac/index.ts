@@ -14,6 +14,13 @@ function json(body: unknown, status = 200) {
 }
 
 const EMAIL_RE = /[\w.+-]+@[\w-]+\.[\w.-]+/;
+const CA_PHONE_RE = /^\+?1?[2-9]\d{9}$/;
+
+/** Statuses where the customer can still pay and the deposit can still be allocated. */
+const OPEN_STATUSES = ["pending", "awaiting_payment"];
+
+const INTENT_COLUMNS =
+  "id, public_id, amount, currency_code, reference, status, created_at, expires_at, credited_at, claimed_sent_at, sender_name, sender_email, sender_bank, sender_phone, purpose, transfer_id";
 
 /**
  * Interac e-Transfer deposits land in the Wise CAD balance.
@@ -59,6 +66,26 @@ async function resolveInteracAlias(): Promise<string> {
   );
 }
 
+function buildInstructions(
+  amount: number,
+  alias: string,
+  reference: string,
+  contact: string,
+  purpose: string,
+): string[] {
+  return [
+    `Open your Canadian banking app and start an Interac e-Transfer.`,
+    `Send exactly CAD ${amount.toFixed(2)} to ${alias}.`,
+    `Put the reference ${reference} in the message field.`,
+    `Send from ${contact} so we can match your deposit automatically.`,
+    `Autodeposit is enabled — no security question needed.`,
+    purpose === "transfer"
+      ? `Your transfer is released automatically once the deposit arrives (usually within minutes).`
+      : purpose === "merchant_collection"
+      ? `The payment is confirmed automatically once the deposit arrives (usually within minutes).`
+      : `Your CAD wallet credits when the transfer arrives (usually within minutes).`,
+  ];
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -84,7 +111,7 @@ Deno.serve(async (req) => {
       if (intentId) {
         const { data, error } = await admin
           .from("fincra_cad_interac_intents")
-          .select("id, amount, currency_code, reference, status, created_at, expires_at, credited_at, sender_name, sender_email, sender_bank")
+          .select(INTENT_COLUMNS)
           .eq("id", intentId)
           .eq("user_id", user.id)
           .maybeSingle();
@@ -99,9 +126,9 @@ Deno.serve(async (req) => {
 
       const { data: pending } = await admin
         .from("fincra_cad_interac_intents")
-        .select("id, amount, currency_code, reference, status, created_at, expires_at, sender_name, sender_email, sender_bank")
+        .select(INTENT_COLUMNS)
         .eq("user_id", user.id)
-        .eq("status", "pending")
+        .in("status", OPEN_STATUSES)
         .gt("expires_at", new Date().toISOString())
         .order("created_at", { ascending: false })
         .limit(5);
@@ -122,14 +149,17 @@ Deno.serve(async (req) => {
       intent_id?: string;
       sender_name?: string;
       sender_email?: string;
+      sender_phone?: string;
       sender_bank?: string;
       purpose?: string;
       transfer_id?: string;
+      merchant_id?: string;
+      customer_name?: string;
+      customer_email?: string;
+      customer_phone?: string;
     };
 
     const action = String(body.action || "create").toLowerCase();
-
-
 
     if (action === "cancel") {
       const intentId = String(body.intent_id || "");
@@ -139,12 +169,38 @@ Deno.serve(async (req) => {
         .update({ status: "cancelled" })
         .eq("id", intentId)
         .eq("user_id", user.id)
-        .eq("status", "pending")
+        .in("status", OPEN_STATUSES)
         .select("id, status")
         .maybeSingle();
       if (error) return json({ error: error.message }, 500);
-      if (!data) return json({ error: "Intent not found or not pending" }, 404);
+      if (!data) return json({ error: "Intent not found or not payable" }, 404);
       return json({ ok: true, intent: data });
+    }
+
+    // The customer says they have sent the e-Transfer. This is a claim only — never a payment.
+    if (action === "claim_sent") {
+      const intentId = String(body.intent_id || "");
+      if (!intentId) return json({ error: "intent_id required" }, 400);
+      const { data, error } = await admin
+        .from("fincra_cad_interac_intents")
+        .update({ status: "awaiting_payment", claimed_sent_at: new Date().toISOString() })
+        .eq("id", intentId)
+        .eq("user_id", user.id)
+        .eq("status", "pending")
+        .select(INTENT_COLUMNS)
+        .maybeSingle();
+      if (error) return json({ error: error.message }, 500);
+      if (data) return json({ ok: true, intent: data });
+
+      // Already claimed or further along — return the current row instead of failing
+      const { data: current } = await admin
+        .from("fincra_cad_interac_intents")
+        .select(INTENT_COLUMNS)
+        .eq("id", intentId)
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (!current) return json({ error: "Intent not found" }, 404);
+      return json({ ok: true, intent: current });
     }
 
     if (!alias) {
@@ -153,7 +209,6 @@ Deno.serve(async (req) => {
         code: "alias_missing",
       }, 503);
     }
-
 
     const amount = Number(body.amount);
     const walletId = String(body.wallet_id || "");
@@ -164,11 +219,13 @@ Deno.serve(async (req) => {
 
     const senderName = String(body.sender_name || "").trim();
     const senderEmail = String(body.sender_email || "").trim().toLowerCase();
+    const senderPhoneRaw = String(body.sender_phone || "").trim();
+    const senderPhone = senderPhoneRaw.replace(/[^\d+]/g, "");
     const senderBank = String(body.sender_bank || "").trim();
     const purpose = String(body.purpose || "topup").toLowerCase();
     const transferId = String(body.transfer_id || "").trim();
-    if (purpose !== "topup" && purpose !== "transfer") {
-      return json({ error: "purpose must be topup or transfer" }, 400);
+    if (!["topup", "transfer", "merchant_collection"].includes(purpose)) {
+      return json({ error: "purpose must be topup, transfer or merchant_collection" }, 400);
     }
     if (purpose === "transfer" && !/^[0-9a-f-]{36}$/i.test(transferId)) {
       return json({ error: "transfer_id required for transfer funding" }, 400);
@@ -176,12 +233,23 @@ Deno.serve(async (req) => {
     if (senderName.length < 2 || senderName.length > 100) {
       return json({ error: "Enter the sender's full name (2-100 characters)" }, 400);
     }
-    if (!EMAIL_RE.test(senderEmail) || senderEmail.length > 255) {
+    if (!senderEmail && !senderPhone) {
+      return json({ error: "Enter the email or mobile number you use with Interac" }, 400);
+    }
+    if (senderEmail && (!EMAIL_RE.test(senderEmail) || senderEmail.length > 255)) {
       return json({ error: "Enter a valid sender email address" }, 400);
+    }
+    if (senderPhone && !CA_PHONE_RE.test(senderPhone)) {
+      return json({ error: "Enter a valid Canadian mobile number" }, 400);
     }
     if (senderBank.length > 100) {
       return json({ error: "Sending bank must be 100 characters or less" }, 400);
     }
+
+    const merchantId = String(body.merchant_id || "").trim();
+    const customerName = String(body.customer_name || "").trim().slice(0, 100) || null;
+    const customerEmail = String(body.customer_email || "").trim().toLowerCase().slice(0, 255) || null;
+    const customerPhone = String(body.customer_phone || "").trim().slice(0, 30) || null;
 
     if (purpose === "transfer") {
       const { data: tr } = await admin
@@ -191,9 +259,6 @@ Deno.serve(async (req) => {
         .maybeSingle();
       if (!tr || tr.sender_id !== user.id) return json({ error: "Transfer not found" }, 404);
     }
-
-
-
 
     const { data: wallet, error: wErr } = await admin
       .from("wallets")
@@ -207,15 +272,25 @@ Deno.serve(async (req) => {
       return json({ error: "Interac e-Transfer only funds CAD wallets" }, 400);
     }
 
-    // Expire stale pending intents for this user
+    // Expire stale open intents for this user
     await admin
       .from("fincra_cad_interac_intents")
       .update({ status: "expired" })
       .eq("user_id", user.id)
-      .eq("status", "pending")
+      .in("status", OPEN_STATUSES)
       .lt("expires_at", new Date().toISOString());
 
-    const reference = `efm-interac-${user.id.slice(0, 8)}-${Date.now()}`;
+    // EFM-YYYYMMDD-00000000 reference, generated by the database sequence
+    let reference = "";
+    const { data: generated, error: refErr } = await admin.rpc("next_interac_public_id");
+    if (!refErr && typeof generated === "string" && generated) {
+      reference = generated;
+    } else {
+      console.warn("fincra-cad-interac: reference generator unavailable", refErr?.message);
+      const day = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+      reference = `EFM-${day}-${String(Date.now() % 100000000).padStart(8, "0")}`;
+    }
+
     const { data: intent, error: insErr } = await admin
       .from("fincra_cad_interac_intents")
       .insert({
@@ -224,16 +299,20 @@ Deno.serve(async (req) => {
         amount: Math.round(amount * 100) / 100,
         currency_code: "CAD",
         reference,
+        public_id: reference,
         status: "pending",
         sender_name: senderName,
-        sender_email: senderEmail,
+        sender_email: senderEmail || null,
+        sender_phone: senderPhone || null,
         sender_bank: senderBank || null,
         purpose,
         transfer_id: purpose === "transfer" ? transferId : null,
+        merchant_id: /^[0-9a-f-]{36}$/i.test(merchantId) ? merchantId : null,
+        customer_name: customerName,
+        customer_email: customerEmail,
+        customer_phone: customerPhone,
       })
-      .select(
-        "id, amount, currency_code, reference, status, created_at, expires_at, sender_name, sender_email, sender_bank, purpose, transfer_id",
-      )
+      .select(INTENT_COLUMNS)
       .single();
 
     if (insErr || !intent) {
@@ -244,19 +323,14 @@ Deno.serve(async (req) => {
       ok: true,
       alias,
       intent,
-      instructions: [
-        `Open your Canadian banking app and send an Interac e-Transfer.`,
-        `Send exactly CAD ${intent.amount} to ${alias}.`,
-        `Put the reference ${intent.reference} in the message field.`,
-        `Send from ${senderEmail} so we can match your deposit.`,
-        `Autodeposit is enabled — no security question needed.`,
-        purpose === "transfer"
-          ? `Your transfer is released automatically once the deposit arrives (usually within minutes).`
-          : `Your CAD wallet credits when the transfer arrives (usually within minutes).`,
-
-      ],
+      instructions: buildInstructions(
+        Number(intent.amount),
+        alias,
+        intent.reference,
+        senderEmail || senderPhone,
+        purpose,
+      ),
     });
-
   } catch (err) {
     console.error("fincra-cad-interac error:", err);
     return json({ error: err instanceof Error ? err.message : "Server error" }, 500);

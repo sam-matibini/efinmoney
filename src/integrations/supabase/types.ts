@@ -4509,57 +4509,96 @@ export type Database = {
       fincra_cad_interac_intents: {
         Row: {
           amount: number
+          claimed_sent_at: string | null
+          confirmed_at: string | null
           created_at: string
           credited_at: string | null
           currency_code: string
+          customer_email: string | null
+          customer_name: string | null
+          customer_phone: string | null
           expires_at: string
           id: string
+          match_tier: string | null
+          matched_at: string | null
+          merchant_id: string | null
           provider_reference: string | null
+          public_id: string | null
           purpose: string
+          received_at: string | null
           reference: string
           sender_bank: string | null
           sender_email: string | null
           sender_name: string | null
+          sender_phone: string | null
           status: string
           transfer_id: string | null
+          unmatched_reason: string | null
           user_id: string
           wallet_id: string
+          wise_transaction_id: string | null
         }
         Insert: {
           amount: number
+          claimed_sent_at?: string | null
+          confirmed_at?: string | null
           created_at?: string
           credited_at?: string | null
           currency_code?: string
+          customer_email?: string | null
+          customer_name?: string | null
+          customer_phone?: string | null
           expires_at?: string
           id?: string
+          match_tier?: string | null
+          matched_at?: string | null
+          merchant_id?: string | null
           provider_reference?: string | null
+          public_id?: string | null
           purpose?: string
+          received_at?: string | null
           reference: string
           sender_bank?: string | null
           sender_email?: string | null
           sender_name?: string | null
+          sender_phone?: string | null
           status?: string
           transfer_id?: string | null
+          unmatched_reason?: string | null
           user_id: string
           wallet_id: string
+          wise_transaction_id?: string | null
         }
         Update: {
           amount?: number
+          claimed_sent_at?: string | null
+          confirmed_at?: string | null
           created_at?: string
           credited_at?: string | null
           currency_code?: string
+          customer_email?: string | null
+          customer_name?: string | null
+          customer_phone?: string | null
           expires_at?: string
           id?: string
+          match_tier?: string | null
+          matched_at?: string | null
+          merchant_id?: string | null
           provider_reference?: string | null
+          public_id?: string | null
           purpose?: string
+          received_at?: string | null
           reference?: string
           sender_bank?: string | null
           sender_email?: string | null
           sender_name?: string | null
+          sender_phone?: string | null
           status?: string
           transfer_id?: string | null
+          unmatched_reason?: string | null
           user_id?: string
           wallet_id?: string
+          wise_transaction_id?: string | null
         }
         Relationships: [
           {
@@ -13759,6 +13798,7 @@ export type Database = {
           tier_label: string
         }[]
       }
+      next_interac_public_id: { Args: never; Returns: string }
       owns_business: {
         Args: { _business_profile_id: string; _user_id: string }
         Returns: boolean

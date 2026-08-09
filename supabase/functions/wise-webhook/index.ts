@@ -95,11 +95,17 @@ function extractRefNeedle(raw: string): string | null {
   return m?.[0] || null;
 }
 
-/** Interac e-Transfer intents use their own reference prefix. */
+/** Columns/statuses used when matching Interac e-Transfer intents. */
+const INTERAC_COLS =
+  "id, user_id, wallet_id, amount, currency_code, reference, transfer_id, sender_email, sender_phone";
+const INTERAC_OPEN = ["pending", "awaiting_payment"];
+
+/** Interac intents use EFM-YYYYMMDD-00000000 (legacy: efm-interac-…). */
 function extractInteracRefNeedle(raw: string): string | null {
-  const m = raw.match(/efm-interac-[a-z0-9]+-\d+/i);
+  const m = raw.match(/efm-\d{8}-\d{8}/i) || raw.match(/efm-interac-[a-z0-9]+-\d+/i);
   return m?.[0] || null;
 }
+
 
 
 Deno.serve(async (req) => {
@@ -252,6 +258,7 @@ Deno.serve(async (req) => {
     if (isCredit && amount > 0) {
       const nowIso = new Date().toISOString();
       const haystack = `${transferReference || ""} ${rawBody}`.toLowerCase();
+      const digits = haystack.replace(/[^\d]/g, "");
       const needle = extractRefNeedle(haystack) || extractRefNeedle(transferReference || "");
       const interacNeedle =
         extractInteracRefNeedle(haystack) || extractInteracRefNeedle(transferReference || "");
@@ -264,8 +271,13 @@ Deno.serve(async (req) => {
         currency_code: string;
         reference: string;
         transfer_id?: string | null;
+        sender_email?: string | null;
+        sender_phone?: string | null;
       } | null = null;
       let intentTable: "wise_topup_intents" | "fincra_cad_interac_intents" = "wise_topup_intents";
+      let matchTier: string | null = null;
+      let interacAmbiguous = 0;
+
 
       if (needle) {
         const { data } = await supabase
@@ -278,20 +290,26 @@ Deno.serve(async (req) => {
         intent = data;
       }
 
-      // Interac e-Transfer deposits land in the same CAD balance — match their intents too
+      // Interac tier 1: reference + amount + currency (exact)
       if (!intent && interacNeedle) {
         const { data } = await supabase
           .from("fincra_cad_interac_intents")
-          .select("id, user_id, wallet_id, amount, currency_code, reference, transfer_id")
-          .eq("reference", interacNeedle)
-          .eq("status", "pending")
+          .select(INTERAC_COLS)
+          .ilike("reference", interacNeedle)
+          .in("status", INTERAC_OPEN)
           .gt("expires_at", nowIso)
           .maybeSingle();
-        if (data) {
+        const expected = Number(data?.amount);
+        if (
+          data && String(data.currency_code).toUpperCase() === currency &&
+          Number.isFinite(expected) && Math.abs(expected - amount) < 0.02
+        ) {
           intent = data;
           intentTable = "fincra_cad_interac_intents";
+          matchTier = "tier1_reference";
         }
       }
+
 
       if (!intent) {
         const { data: candidates } = await supabase
@@ -308,24 +326,52 @@ Deno.serve(async (req) => {
         }) ?? null;
       }
 
+      // Interac tiers 2 & 3: contact match, then a single amount match inside the validity window
       if (!intent && currency === "CAD") {
         const { data: interacCandidates } = await supabase
           .from("fincra_cad_interac_intents")
-          .select("id, user_id, wallet_id, amount, currency_code, reference, transfer_id")
-          .eq("status", "pending")
+          .select(INTERAC_COLS)
+          .in("status", INTERAC_OPEN)
           .eq("currency_code", "CAD")
           .gt("expires_at", nowIso)
           .order("created_at", { ascending: true })
-          .limit(30);
-        const match = (interacCandidates ?? []).find((row) => {
+          .limit(50);
+
+        const sameAmount = (interacCandidates ?? []).filter((row) => {
           const expected = Number(row.amount);
           return Number.isFinite(expected) && Math.abs(expected - amount) < 0.02;
-        }) ?? null;
-        if (match) {
-          intent = match;
+        });
+
+        const contactMatches = sameAmount.filter((row) => {
+          const email = String(row.sender_email || "").toLowerCase();
+          const phone = String(row.sender_phone || "").replace(/[^\d]/g, "").slice(-10);
+          return (email && haystack.includes(email)) || (phone && digits.includes(phone));
+        });
+
+        if (contactMatches.length === 1) {
+          intent = contactMatches[0];
           intentTable = "fincra_cad_interac_intents";
+          matchTier = "tier2_contact";
+        } else if (contactMatches.length > 1) {
+          interacAmbiguous = contactMatches.length;
+        } else if (sameAmount.length === 1) {
+          intent = sameAmount[0];
+          intentTable = "fincra_cad_interac_intents";
+          matchTier = "tier3_window";
+        } else if (sameAmount.length > 1) {
+          interacAmbiguous = sameAmount.length;
+        }
+
+        if (!intent && interacAmbiguous > 1) {
+          await supabase.from("admin_notifications").insert({
+            title: "Interac deposit needs manual allocation",
+            message:
+              `CAD ${amount} arrived but ${interacAmbiguous} open Interac payments match. Allocate manually. Wise txn ${idempotencyKey}.`,
+            type: "treasury",
+          }).catch(() => {/* ignore */});
         }
       }
+
 
       if (intent) {
         const isInterac = intentTable === "fincra_cad_interac_intents";
@@ -342,11 +388,25 @@ Deno.serve(async (req) => {
               ? `Interac e-Transfer top-up (${intent.reference})`
               : `Wise top-up (${intent.reference})`,
           );
-          await supabase.from(intentTable).update({
-            status: "completed",
-            provider_reference: transferReference || balanceId || idempotencyKey,
-            credited_at: nowIso,
-          }).eq("id", intent.id).eq("status", "pending");
+          await supabase.from(intentTable).update(
+            isInterac
+              ? {
+                status: "settled",
+                provider_reference: transferReference || balanceId || idempotencyKey,
+                credited_at: nowIso,
+                received_at: nowIso,
+                matched_at: nowIso,
+                confirmed_at: nowIso,
+                match_tier: matchTier,
+                wise_transaction_id: idempotencyKey,
+              }
+              : {
+                status: "completed",
+                provider_reference: transferReference || balanceId || idempotencyKey,
+                credited_at: nowIso,
+              },
+          ).eq("id", intent.id).in("status", ["pending", "awaiting_payment"]);
+
           console.log("wise-webhook: credited intent", intentTable, intent.id, result);
 
           // Interac-funded sends: release the linked payout now that funds arrived
