@@ -2640,6 +2640,20 @@ const SendPage = () => {
                                     </motion.div>
 
                                     <motion.div custom={1} variants={fieldVariants} initial="hidden" animate="show">
+                                      {fundingSource === "wise" ? (
+                                        <SectionBoundary name="WisePayLinkSend">
+                                          <WisePayLinkCard
+                                            walletId={(selectedWallet && isWisePayCurrency(selectedWallet.currency_code)
+                                              ? selectedWallet.wallet_id
+                                              : wisePayWallet?.wallet_id) || ""}
+                                            walletCurrency={(selectedWallet && isWisePayCurrency(selectedWallet.currency_code)
+                                              ? selectedWallet.currency_code
+                                              : wisePayWallet?.currency_code) || "CAD"}
+                                            initialAmount={totalCharge > 0 ? totalCharge.toFixed(2) : ""}
+                                            onComplete={() => setFundingSource("wallet")}
+                                          />
+                                        </SectionBoundary>
+                                      ) : (
                                       <MethodCheckoutPanel
                                         method={fundingSource}
                                         wallets={(fundingSource === "card" ? cardWallets : (wallets ?? [])).map((w) => ({
@@ -2694,6 +2708,7 @@ const SendPage = () => {
                                         insufficientBalance={insufficientFunds}
                                         onTopUp={() => navigate("/wallet/topup")}
                                       />
+                                      )}
                                     </motion.div>
 
 
