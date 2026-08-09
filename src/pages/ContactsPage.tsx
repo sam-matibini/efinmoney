@@ -16,6 +16,7 @@ import {
   useBeneficiaries, useDeleteBeneficiary, isCanadaBeneficiary, type Beneficiary,
 } from "@/hooks/useBeneficiaries";
 import ContactDetailsSheet from "@/components/contacts/ContactDetailsSheet";
+import { payoutMethodLabel } from "@/lib/payoutPartner";
 import { Search, Plus, Send, Pencil, Trash2, Users, LayoutGrid, List as ListIcon, Eye } from "lucide-react";
 
 import { formatDistanceToNow } from "date-fns";
