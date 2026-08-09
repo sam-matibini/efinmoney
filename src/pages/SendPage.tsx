@@ -2619,8 +2619,9 @@ const SendPage = () => {
                                           exp_year: c.exp_year,
                                         }))}
                                         selectedCardId={activeSavedCard?.stripe_payment_method_id}
-                                        onCardChange={setSelectedSavedCardId}
-                                        onAddCard={() => setAddCardOpen(true)}
+                                        onCardChange={(id) => { setSelectedSavedCardId(id); setShowNewCardForm(false); }}
+                                        onAddCard={openNewCardForm}
+
                                         onAddWallet={() => createWalletTriggerRef.current?.click()}
                                         amount={parsedAmount}
                                         fee={fee}
