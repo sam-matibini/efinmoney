@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Landmark } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import CadInteracTopUpCard from "@/components/payments/CadInteracTopUpCard";
 import WiseTopUpCard from "@/components/payments/WiseTopUpCard";
+import CheckoutMethodGrid, { type CheckoutMethod } from "@/components/payments/CheckoutMethodGrid";
+
 
 interface Props {
   walletId: string;
