@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { CheckCircle2, Copy, Landmark, Loader2 } from "lucide-react";
+import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 
 interface Props {
@@ -21,7 +22,17 @@ type Intent = {
   reference: string;
   status: string;
   expires_at?: string;
+  sender_name?: string | null;
+  sender_email?: string | null;
+  sender_bank?: string | null;
 };
+
+const senderSchema = z.object({
+  amount: z.coerce.number().min(1, "Enter an amount of at least CAD 1.00"),
+  senderName: z.string().trim().min(2, "Enter the sender's full name").max(100, "Name is too long"),
+  senderEmail: z.string().trim().email("Enter a valid email address").max(255, "Email is too long"),
+  senderBank: z.string().trim().max(100, "Bank name is too long"),
+});
 
 export default function CadInteracTopUpCard({ walletId, walletCurrency, onComplete, initialAmount }: Props) {
   const currency = walletCurrency.toUpperCase();
@@ -29,6 +40,9 @@ export default function CadInteracTopUpCard({ walletId, walletCurrency, onComple
   useEffect(() => {
     if (initialAmount != null && initialAmount !== "") setAmount(initialAmount);
   }, [initialAmount]);
+  const [senderName, setSenderName] = useState("");
+  const [senderEmail, setSenderEmail] = useState("");
+  const [senderBank, setSenderBank] = useState("");
   const [loading, setLoading] = useState(false);
   const [alias, setAlias] = useState<string | null>(null);
   const [intent, setIntent] = useState<Intent | null>(null);
@@ -36,41 +50,59 @@ export default function CadInteracTopUpCard({ walletId, walletCurrency, onComple
   const [configured, setConfigured] = useState(true);
   const [bootstrapped, setBootstrapped] = useState(false);
   const [autoError, setAutoError] = useState<string | null>(null);
-  const autoTriedRef = useRef<string | null>(null);
+  const nameRef = useRef<HTMLInputElement | null>(null);
 
-  const createIntent = useCallback(
-    async (auto = false) => {
-      const amt = Number(amount);
-      if (!Number.isFinite(amt) || amt < 1) {
-        if (!auto) toast.error("Enter an amount of at least CAD 1.00");
-        return;
-      }
-      setLoading(true);
-      setAutoError(null);
-      try {
-        const { data, error } = await supabase.functions.invoke("fincra-cad-interac", {
-          body: { action: "create", amount: amt, wallet_id: walletId },
-        });
-        if (error) throw error;
-        if (data?.error) throw new Error(data.error);
-        setAlias((prev) => data.alias ?? prev);
-        setIntent(data.intent);
-        setInstructions(Array.isArray(data.instructions) ? data.instructions : []);
-        if (!auto) {
-          toast.message("Interac details ready", {
-            description: "Send the exact amount from your bank app.",
-          });
-        }
-      } catch (e) {
-        const message = e instanceof Error ? e.message : "Could not start Interac top-up";
-        setAutoError(message);
-        if (!auto) toast.error(message);
-      } finally {
-        setLoading(false);
-      }
-    },
-    [amount, walletId],
-  );
+  // Prefill the sender from the signed-in profile so the form is mostly done
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const { data } = await supabase.auth.getUser();
+      if (cancelled || !data.user) return;
+      const meta = (data.user.user_metadata ?? {}) as Record<string, unknown>;
+      const fullName = String(meta.full_name ?? meta.name ?? "").trim();
+      setSenderName((prev) => prev || fullName);
+      setSenderEmail((prev) => prev || (data.user!.email ?? ""));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const createIntent = useCallback(async () => {
+    const parsed = senderSchema.safeParse({ amount, senderName, senderEmail, senderBank });
+    if (!parsed.success) {
+      toast.error(parsed.error.errors[0]?.message ?? "Check your details");
+      return;
+    }
+    setLoading(true);
+    setAutoError(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("fincra-cad-interac", {
+        body: {
+          action: "create",
+          amount: parsed.data.amount,
+          wallet_id: walletId,
+          sender_name: parsed.data.senderName,
+          sender_email: parsed.data.senderEmail,
+          sender_bank: parsed.data.senderBank || undefined,
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      setAlias((prev) => data.alias ?? prev);
+      setIntent(data.intent);
+      setInstructions(Array.isArray(data.instructions) ? data.instructions : []);
+      toast.message("Interac details ready", {
+        description: "Send the exact amount from your bank app.",
+      });
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Could not start Interac top-up";
+      setAutoError(message);
+      toast.error(message);
+    } finally {
+      setLoading(false);
+    }
+  }, [amount, senderName, senderEmail, senderBank, walletId]);
 
   useEffect(() => {
     if (currency !== "CAD") return;
@@ -93,10 +125,7 @@ export default function CadInteracTopUpCard({ walletId, walletCurrency, onComple
           setAlias(json.alias ?? null);
           setConfigured(Boolean(json.configured));
           const pending = Array.isArray(json.pending) ? json.pending[0] : null;
-          if (pending) {
-            setIntent(pending);
-            autoTriedRef.current = String(Number(pending.amount));
-          }
+          if (pending) setIntent(pending);
         }
       } finally {
         if (!cancelled) setBootstrapped(true);
@@ -107,16 +136,12 @@ export default function CadInteracTopUpCard({ walletId, walletCurrency, onComple
     };
   }, [currency]);
 
-  // Auto-create the intent so the checkout details show without an extra click
+  // Focus the form as soon as the tab opens so it acts like a checkout
   useEffect(() => {
-    if (currency !== "CAD" || !bootstrapped || intent || loading) return;
-    const amt = Number(amount);
-    if (!Number.isFinite(amt) || amt < 1) return;
-    const key = String(amt);
-    if (autoTriedRef.current === key) return;
-    autoTriedRef.current = key;
-    void createIntent(true);
-  }, [currency, bootstrapped, intent, loading, amount, createIntent]);
+    if (currency !== "CAD" || !bootstrapped || intent) return;
+    nameRef.current?.focus();
+  }, [currency, bootstrapped, intent]);
+
 
   // Poll active intent
   useEffect(() => {
@@ -208,33 +233,68 @@ export default function CadInteracTopUpCard({ walletId, walletCurrency, onComple
         )}
 
         {!intent && !loading && (
-          <>
-            {!initialAmount && (
-              <div className="space-y-2">
-                <Label>Amount (CAD)</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  step="0.01"
-                  placeholder="e.g. 25"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                />
-                <p className="text-xs text-muted-foreground">Minimum CAD 1.00 · Send this exact amount</p>
-              </div>
-            )}
-            <Button
-              className="w-full"
-              onClick={() => {
-                autoTriedRef.current = String(Number(amount));
-                void createIntent(false);
-              }}
-              disabled={!(Number(amount) > 0)}
-            >
-              {autoError ? "Try again" : "Get Interac details"}
+          <form
+            className="space-y-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void createIntent();
+            }}
+          >
+            <p className="text-sm font-medium">Your e-Transfer details</p>
+            <div className="space-y-2">
+              <Label htmlFor="etx-amount">Amount (CAD)</Label>
+              <Input
+                id="etx-amount"
+                type="number"
+                min={1}
+                step="0.01"
+                placeholder="e.g. 25"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">Minimum CAD 1.00 · Send this exact amount</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="etx-name">Sender full name</Label>
+              <Input
+                id="etx-name"
+                ref={nameRef}
+                autoComplete="name"
+                maxLength={100}
+                placeholder="As it appears on your bank account"
+                value={senderName}
+                onChange={(e) => setSenderName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="etx-email">Sender email</Label>
+              <Input
+                id="etx-email"
+                type="email"
+                autoComplete="email"
+                maxLength={255}
+                placeholder="you@example.com"
+                value={senderEmail}
+                onChange={(e) => setSenderEmail(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">Send the e-Transfer from this email so we can match it.</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="etx-bank">Sending bank (optional)</Label>
+              <Input
+                id="etx-bank"
+                maxLength={100}
+                placeholder="e.g. RBC, TD, Scotiabank"
+                value={senderBank}
+                onChange={(e) => setSenderBank(e.target.value)}
+              />
+            </div>
+            <Button type="submit" className="w-full" disabled={!(Number(amount) > 0)}>
+              {autoError ? "Try again" : "Continue"}
             </Button>
-          </>
+          </form>
         )}
+
 
         {intent && intent.status === "pending" && (
           <div className="space-y-3">
@@ -243,6 +303,15 @@ export default function CadInteracTopUpCard({ walletId, walletCurrency, onComple
                 <span className="text-muted-foreground">Send exactly</span>
                 <span className="font-semibold tabular-nums">CAD {Number(intent.amount).toFixed(2)}</span>
               </div>
+              {(intent.sender_name || intent.sender_email) && (
+                <div className="flex justify-between gap-2 text-xs text-muted-foreground">
+                  <span>Sending from</span>
+                  <span className="text-right break-all">
+                    {[intent.sender_name, intent.sender_email, intent.sender_bank].filter(Boolean).join(" · ")}
+                  </span>
+                </div>
+              )}
+
               {alias && (
                 <div className="space-y-1">
                   <p className="text-xs text-muted-foreground">Interac recipient</p>

@@ -4516,6 +4516,9 @@ export type Database = {
           id: string
           provider_reference: string | null
           reference: string
+          sender_bank: string | null
+          sender_email: string | null
+          sender_name: string | null
           status: string
           user_id: string
           wallet_id: string
@@ -4529,6 +4532,9 @@ export type Database = {
           id?: string
           provider_reference?: string | null
           reference: string
+          sender_bank?: string | null
+          sender_email?: string | null
+          sender_name?: string | null
           status?: string
           user_id: string
           wallet_id: string
@@ -4542,6 +4548,9 @@ export type Database = {
           id?: string
           provider_reference?: string | null
           reference?: string
+          sender_bank?: string | null
+          sender_email?: string | null
+          sender_name?: string | null
           status?: string
           user_id?: string
           wallet_id?: string
