@@ -75,9 +75,15 @@ export function cardSendProvidersForCorridor(
     (transferType === "mobile_money" && ["GHS", "KES", "UGX", "RWF", "TZS", "ZMW"].includes(d));
   if (!destOk) return out;
 
+  // Square hosted card checkout — debit/credit collect on the western currencies.
+  if (productFeatures.square && (SQUARE_CARD_COLLECT as readonly string[]).includes(s)) {
+    out.push("square");
+  }
+
   if (productFeatures.fincra && (FINCRA_CARD_COLLECT as readonly string[]).includes(s)) {
     out.push("fincra");
   }
+
 
   if (
     productFeatures.nombaNigeria &&
