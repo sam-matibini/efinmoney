@@ -2860,7 +2860,6 @@ const SendPage = () => {
                                           purpose="transfer"
                                           transferId={interacFunding.transferId}
                                           fixedAmount={interacFunding.amount}
-                                          submitLabel="Get Interac details"
                                           onComplete={() => setInteracFunding(null)}
                                         />
                                       </div>
