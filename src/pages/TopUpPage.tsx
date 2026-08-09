@@ -948,7 +948,7 @@ const TopUpPage = () => {
       });
     }
 
-    if (productFeatures.wise && rails.has("wise")) {
+    if (productFeatures.wise && rails.has("wise") && !isCadWallet) {
       payMethods.push({
         id: "wise",
         tone: "bank",
