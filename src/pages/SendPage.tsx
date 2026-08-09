@@ -1857,7 +1857,26 @@ const SendPage = () => {
   };
   /** Card details captured once, in the step-1 checkout panel. */
   const [cardFields, setCardFields] = useState<CardFieldsValue>(emptyCardFields);
+  /**
+   * The new-card form is only expanded when the user has no saved card, or
+   * after they explicitly click "Quick add new card".
+   */
+  const [showNewCardForm, setShowNewCardForm] = useState(false);
+  useEffect(() => {
+    if (savedCards.length === 0) setShowNewCardForm(true);
+  }, [savedCards.length]);
 
+  const openNewCardForm = () => {
+    setCardFields((prev) => ({
+      ...prev,
+      cardholderName: prev.cardholderName || activeSavedCard?.cardholder_name || "",
+      expiry: prev.expiry
+        || (activeSavedCard?.exp_month && activeSavedCard?.exp_year
+          ? `${String(activeSavedCard.exp_month).padStart(2, "0")}/${String(activeSavedCard.exp_year).slice(-2)}`
+          : ""),
+    }));
+    setShowNewCardForm(true);
+  };
 
   const isStep1Valid =
     parsedAmount > 0
@@ -1871,8 +1890,12 @@ const SendPage = () => {
       && availableCardProviders.length > 0
       && !!cardSendProvider
       && parsedAmount >= cardSendMinAmount(cardSendProvider, sourceCurrency)
-      && (!inlineCardEntry || isCardFieldsValid(cardFields))
+      && (
+        !inlineCardEntry
+        || (showNewCardForm ? isCardFieldsValid(cardFields) : !!activeSavedCard)
+      )
     ));
+
   const isStep2Valid = useLink
     ? (recipientName.trim().length > 2 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail) && parsedAmount > 0)
     : isNGNBank
