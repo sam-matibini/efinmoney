@@ -65,6 +65,10 @@ interface Props {
   /** Inline card capture (single-capture flows). */
   cardFields?: CardFieldsValue;
   onCardFieldsChange?: (next: CardFieldsValue) => void;
+  /** Whether the new-card entry form is expanded. */
+  showCardForm?: boolean;
+  onCancelCardForm?: () => void;
+
   insufficientBalance?: boolean;
   onTopUp?: () => void;
 }
