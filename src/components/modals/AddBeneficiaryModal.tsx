@@ -107,12 +107,25 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
     setEftAcct(editing?.eft_account || "");
     setEftHolder(editing?.eft_account_holder || "");
     setInteracEmail(editing?.interac_email || "");
+    const e: any = editing || {};
+    setAddressCity(e.address_city || "");
+    setAddressRegion(e.address_region || "");
+    setAddressPostal(e.address_postal_code || "");
+    setAddressCountry(e.address_country_code || "");
     setMailingAddress(editing?.mailing_address || "");
     setMailingCity(editing?.mailing_city || "");
     setMailingRegion(editing?.mailing_region || "");
     setMailingPostal(editing?.mailing_postal_code || "");
+    setMailingCountry(e.mailing_country_code || "");
     const norm = (s?: string | null) => (s || "").trim().toLowerCase();
-    setSameAsAddress(!!norm(editing?.address) && norm(editing?.mailing_address) === norm(editing?.address));
+    const parts: [string, string][] = [
+      [e.address, e.mailing_address],
+      [e.address_city, e.mailing_city],
+      [e.address_region, e.mailing_region],
+      [e.address_postal_code, e.mailing_postal_code],
+      [e.address_country_code, e.mailing_country_code],
+    ];
+    setSameAsAddress(!!norm(e.address) && parts.every(([a, m]) => norm(a) === norm(m)));
     setNotes(editing?.notes || "");
     setTags((editing?.tags || []).join(", "));
     setShowAdvanced(!!editing?.notes || !!editing?.tags?.length);
