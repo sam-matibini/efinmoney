@@ -106,21 +106,21 @@ export default function InteracCheckout({
       const [first, ...rest] = fullName.split(/\s+/);
       const { data: profile } = await supabase
         .from("profiles")
-        .select("first_name, last_name, phone, address_line1, address_line2, city, province, postal_code")
-        .eq("id", data.user.id)
+        .select("full_name, phone_number, street_address, city, state_province, postal_code")
+        .eq("user_id", data.user.id)
         .maybeSingle();
       if (cancelled) return;
       const p = (profile ?? {}) as Record<string, string | null>;
+      const [pFirst, ...pRest] = String(p.full_name || "").trim().split(/\s+/);
       setForm((prev) => ({
         ...prev,
-        firstName: prev.firstName || p.first_name || first || "",
-        lastName: prev.lastName || p.last_name || rest.join(" ") || "",
+        firstName: prev.firstName || pFirst || first || "",
+        lastName: prev.lastName || pRest.join(" ") || rest.join(" ") || "",
         email: prev.email || (data.user!.email ?? ""),
-        phone: prev.phone || p.phone || "",
-        line1: prev.line1 || p.address_line1 || "",
-        line2: prev.line2 || p.address_line2 || "",
+        phone: prev.phone || p.phone_number || "",
+        line1: prev.line1 || p.street_address || "",
         city: prev.city || p.city || "",
-        region: prev.region || p.province || "",
+        region: prev.region || p.state_province || "",
         postalCode: prev.postalCode || p.postal_code || "",
       }));
     })();
