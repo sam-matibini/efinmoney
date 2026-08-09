@@ -34,7 +34,7 @@ export default function CadCollectionPanel({ walletId, walletCurrency, initialAm
           {
             headers: {
               Authorization: `Bearer ${session?.access_token || ""}`,
-              apikey: import.meta.env.VITE_SUPABASE_ANON_KEY as string,
+              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string,
             },
           },
         );
