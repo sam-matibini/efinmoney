@@ -4,13 +4,13 @@ import path from "path";
 import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
-// Committed public backend configuration for production builds. Vercel still has
-// legacy VITE_SUPABASE_* values configured, so production must not inherit them.
+// Production builds bake the eFinMoney Supabase project so Vercel/Lovable
+// misconfigured VITE_SUPABASE_* cannot point the site at the old Lovable cloud DB.
 // These are publishable values — access remains protected by Row Level Security.
-const FALLBACK_SUPABASE_PROJECT_ID = "hgmskcvaeadnyovbroup";
-const FALLBACK_SUPABASE_URL = "https://hgmskcvaeadnyovbroup.supabase.co";
+const FALLBACK_SUPABASE_PROJECT_ID = "dkdnwumllibwdlqbjkwy";
+const FALLBACK_SUPABASE_URL = "https://dkdnwumllibwdlqbjkwy.supabase.co";
 const FALLBACK_SUPABASE_PUBLISHABLE_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhnbXNrY3ZhZWFkbnlvdmJyb3VwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5MTYwNDAsImV4cCI6MjA4MzQ5MjA0MH0.RLEn7EDysi6kgT9t_dOm92uwC5BeAU495wrDtvHypyM";
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRrZG53dW1sbGlid2RscWJqa3d5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIwMjE5MTIsImV4cCI6MjA3NzU5NzkxMn0.DxMKTL99wjiBUkqUZGfuDtYHFEQFHs9qJqlSJYLmKAk";
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
@@ -26,33 +26,33 @@ export default defineConfig(({ mode }) => {
     : env.VITE_SUPABASE_PROJECT_ID || FALLBACK_SUPABASE_PROJECT_ID;
 
   return {
-  server: {
-    host: "::",
-    port: 8080,
-  },
-  plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
+    server: {
+      host: "::",
+      port: 8080,
     },
-  },
-  define: {
-    "import.meta.env.VITE_SUPABASE_URL": JSON.stringify(supabaseUrl),
-    "import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY": JSON.stringify(supabaseKey),
-    "import.meta.env.VITE_SUPABASE_PROJECT_ID": JSON.stringify(supabaseProjectId),
-  },
-  build: {
-    rollupOptions: {
-      output: {
-        manualChunks(id) {
-          if (!id.includes("node_modules")) return;
-          // Only split libs that are lazy-loaded and do not share React init order with the app shell.
-          // Separate chunks for stripe/recharts/d3/sentry/etc. caused TDZ ReferenceErrors on Vercel prod.
-          if (id.includes("@remotion") || id.includes("remotion")) return "remotion";
-          if (id.includes("jspdf") || id.includes("xlsx")) return "export";
+    plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
+    resolve: {
+      alias: {
+        "@": path.resolve(__dirname, "./src"),
+      },
+    },
+    define: {
+      "import.meta.env.VITE_SUPABASE_URL": JSON.stringify(supabaseUrl),
+      "import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY": JSON.stringify(supabaseKey),
+      "import.meta.env.VITE_SUPABASE_PROJECT_ID": JSON.stringify(supabaseProjectId),
+    },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (!id.includes("node_modules")) return;
+            // Only split libs that are lazy-loaded and do not share React init order with the app shell.
+            // Separate chunks for stripe/recharts/d3/sentry/etc. caused TDZ ReferenceErrors on Vercel prod.
+            if (id.includes("@remotion") || id.includes("remotion")) return "remotion";
+            if (id.includes("jspdf") || id.includes("xlsx")) return "export";
+          },
         },
       },
     },
-  },
   };
 });
