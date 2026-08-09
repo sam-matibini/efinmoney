@@ -4,3 +4,6 @@
 ALTER TABLE public.beneficiaries
   ADD COLUMN IF NOT EXISTS address text,
   ADD COLUMN IF NOT EXISTS tel text;
+
+-- Required: tell PostgREST to reload its schema cache so new columns are visible via the API.
+NOTIFY pgrst, 'reload schema';
