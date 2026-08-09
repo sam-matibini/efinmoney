@@ -347,9 +347,13 @@ export function pickBestIntlTopupMethod(
   const pool = live.length > 0 ? live : available;
 
   let priority: IntlTopupMethod[];
-  if (c === "USD" || c === "CAD" || c === "GBP" || c === "EUR") {
+  if (c === "CAD") {
+    // Cheapest CAD path first: Interac e-Transfer / bank EFT, then cards
+    priority = ["interac", "wise", "square", "paytota", "dodo", "paypal", "nomba", "flutterwave", "fincra"];
+  } else if (c === "USD" || c === "GBP" || c === "EUR") {
     // Square / Dodo card first; PayPal after (do not displace Dodo)
     priority = ["square", "wise", "paytota", "dodo", "paypal", "interac", "nomba", "flutterwave", "fincra"];
+
   } else if (c === "NGN") {
     priority = ["fincra", "flutterwave", "nomba", "wise"];
   } else {
