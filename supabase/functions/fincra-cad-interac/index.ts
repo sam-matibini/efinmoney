@@ -287,6 +287,18 @@ Deno.serve(async (req) => {
     const customerEmail = String(body.customer_email || "").trim().toLowerCase().slice(0, 255) || null;
     const customerPhone = String(body.customer_phone || "").trim().slice(0, 30) || null;
 
+    const accountType = String(body.sender_account_type || "personal").trim().toLowerCase();
+    if (!["personal", "business"].includes(accountType)) {
+      return json({ error: "Account type must be personal or business" }, 400);
+    }
+    const trim = (v: unknown, max: number) => String(v ?? "").trim().slice(0, max) || null;
+    const addressLine1 = trim(body.sender_address_line1, 200);
+    const addressLine2 = trim(body.sender_address_line2, 200);
+    const city = trim(body.sender_city, 100);
+    const region = trim(body.sender_region, 100);
+    const postalCode = trim(body.sender_postal_code, 20);
+    const country = (trim(body.sender_country, 2) || "CA").toUpperCase();
+
     if (purpose === "transfer") {
       const { data: tr } = await admin
         .from("transfers")
