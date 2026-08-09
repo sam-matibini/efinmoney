@@ -58,10 +58,15 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
   const [eftHolder, setEftHolder] = useState("");
   // Interac
   const [interacEmail, setInteracEmail] = useState("");
+  const [addressCity, setAddressCity] = useState("");
+  const [addressRegion, setAddressRegion] = useState("");
+  const [addressPostal, setAddressPostal] = useState("");
+  const [addressCountry, setAddressCountry] = useState("");
   const [mailingAddress, setMailingAddress] = useState("");
   const [mailingCity, setMailingCity] = useState("");
   const [mailingRegion, setMailingRegion] = useState("");
   const [mailingPostal, setMailingPostal] = useState("");
+  const [mailingCountry, setMailingCountry] = useState("");
   const [sameAsAddress, setSameAsAddress] = useState(false);
   const [notes, setNotes] = useState("");
   const [tags, setTags] = useState("");
