@@ -332,8 +332,10 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
               value={sameAsAddress ? address : mailingAddress}
               onChange={(e) => setMailingAddress(e.target.value)}
               placeholder="Street address"
-              disabled={sameAsAddress}
+              readOnly={sameAsAddress}
+              className={sameAsAddress ? "bg-muted/40" : undefined}
             />
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Input
                 value={mailingCity}
