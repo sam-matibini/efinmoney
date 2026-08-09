@@ -237,7 +237,7 @@ const MethodCheckoutPanel = ({
                 </div>
               )}
 
-              {onAddCard && (
+              {onAddCard && !(showCardForm && savedCards.length === 0) && (
                 <QuickAddRow
                   tone="card"
                   label={savedCards.length > 0 ? "Quick add new card" : "Quick add card details"}
@@ -245,11 +245,21 @@ const MethodCheckoutPanel = ({
                 />
               )}
 
-              {inlineEntry && cardFields && onCardFieldsChange && (
-                <div className="pt-1">
+              {inlineEntry && showCardForm && cardFields && onCardFieldsChange && (
+                <div className="pt-1 space-y-2">
                   <CardFieldsInputs value={cardFields} onChange={onCardFieldsChange} />
+                  {savedCards.length > 0 && onCancelCardForm && (
+                    <button
+                      type="button"
+                      onClick={onCancelCardForm}
+                      className="text-[11px] font-medium text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                    >
+                      Cancel — use a saved card
+                    </button>
+                  )}
                 </div>
               )}
+
 
               <p className="text-[11px] text-muted-foreground">
                 {inlineEntry
