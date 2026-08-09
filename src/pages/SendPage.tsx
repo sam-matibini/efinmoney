@@ -52,6 +52,7 @@ import EfinmoneyP2PFlow from "@/components/send/EfinmoneyP2PFlow";
 import MoneyFlowShell from "@/components/money/MoneyFlowShell";
 import PaymentMethodRow, { type PaymentMethodOption } from "@/components/money/PaymentMethodRow";
 import MethodCheckoutPanel from "@/components/send/MethodCheckoutPanel";
+import InteracCheckout from "@/components/payments/InteracCheckout";
 import SendHeaderCountry from "@/components/send/SendHeaderCountry";
 import RecipientQuickBox from "@/components/send/RecipientQuickBox";
 import FlutterwaveCardForm from "@/components/payments/FlutterwaveCardForm";
@@ -133,7 +134,7 @@ const looseDb = supabase as unknown as { from: (t: string) => any };
 
 
 
-type FundingSource = 'wallet' | 'bank' | 'card';
+type FundingSource = 'wallet' | 'bank' | 'card' | 'interac';
 type CardResumeStage = "confirming" | "sending";
 
 const CARD_RESUME_COPY: Record<CardResumeStage, { title: string; sub: string }> = {
@@ -360,7 +361,11 @@ const SendPage = () => {
     || savedCards[0];
 
 
-  const sourceCurrency = fundingSource === 'wallet'
+  const cadWallet = wallets?.find((w) => w.currency_code === 'CAD');
+
+  const sourceCurrency = fundingSource === 'interac'
+    ? 'CAD'
+    : fundingSource === 'wallet'
     ? (selectedWallet?.currency_code || profileCurrency || SYSTEM_DEFAULT_CURRENCY)
     : fundingSource === 'card'
     ? (selectedWallet && isCardSendCollectCurrency(selectedWallet.currency_code)
@@ -789,7 +794,9 @@ const SendPage = () => {
     const funding = overrides?.funding_source ?? fundingSource;
     const walletId =
       overrides?.sender_wallet_id
-      ?? (funding === "wallet" || funding === "card"
+      ?? (funding === "interac"
+        ? (cadWallet?.wallet_id || "")
+        : funding === "wallet" || funding === "card"
         ? selectedWallet!.wallet_id
         : wallets?.[0]?.wallet_id || "");
     const destCurrency = overrides?.target_currency ?? targetCountry.code;
@@ -810,7 +817,8 @@ const SendPage = () => {
       exchange_rate: overrides?.exchange_rate ?? effectiveRate,
       fee_amount: overrides?.fee_amount ?? fee,
       // Card sends are prepaid via Nomba into the wallet, then paid out as wallet
-      funding_source: funding === "card" ? "wallet" : funding,
+      // Card and Interac sends are prepaid into the wallet, then paid out as wallet
+      funding_source: funding === "card" || funding === "interac" ? "wallet" : funding,
     });
     setLastTransferId(transfer.id);
     if (user) {
@@ -1913,12 +1921,17 @@ const SendPage = () => {
   const cardFundingAvailable = productFeatures.nombaNigeria || productFeatures.lenhubFlutter
     || productFeatures.paytota || productFeatures.swychr || productFeatures.flutterwave;
 
-  const fundingMethodOptions: PaymentMethodOption<"wallet" | "bank" | "card">[] = [
+  const interacFundingAvailable = !!cadWallet;
+
+  const fundingMethodOptions: PaymentMethodOption<FundingSource>[] = [
     ...(cardFundingAvailable
       ? [{ id: "card" as const, label: "Card", sublabel: "Debit or credit", icon: CreditCard, tone: "card" as const }]
       : []),
     ...(productFeatures.plaid
       ? [{ id: "bank" as const, label: "Bank", sublabel: "Linked account", icon: Landmark, tone: "bank" as const }]
+      : []),
+    ...(interacFundingAvailable
+      ? [{ id: "interac" as const, label: "Interac", sublabel: "e-Transfer (CAD)", icon: Landmark, tone: "bank" as const }]
       : []),
     { id: "wallet" as const, label: "Wallet", sublabel: "eFinMoney balance", icon: Wallet, tone: "wallet" as const },
   ];
@@ -2595,7 +2608,7 @@ const SendPage = () => {
 
                                     <motion.div custom={1} variants={fieldVariants} initial="hidden" animate="show">
                                       <MethodCheckoutPanel
-                                        method={fundingSource as "card" | "bank" | "wallet"}
+                                        method={fundingSource}
                                         wallets={(fundingSource === "card" ? cardWallets : (wallets ?? [])).map((w) => ({
                                           wallet_id: w.wallet_id,
                                           currency_code: w.currency_code,
