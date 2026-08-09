@@ -20,7 +20,36 @@ const CA_PHONE_RE = /^\+?1?[2-9]\d{9}$/;
 const OPEN_STATUSES = ["pending", "awaiting_payment"];
 
 const INTENT_COLUMNS =
-  "id, public_id, amount, currency_code, reference, status, created_at, expires_at, credited_at, claimed_sent_at, sender_name, sender_email, sender_bank, sender_phone, purpose, transfer_id";
+  "id, public_id, amount, currency_code, reference, status, created_at, expires_at, credited_at, claimed_sent_at, sender_name, sender_email, sender_bank, sender_phone, purpose, transfer_id, hosted_url, sender_account_type, sender_address_line1, sender_address_line2, sender_city, sender_region, sender_postal_code, sender_country";
+
+/**
+ * Best-effort hosted payment request on Wise. When the account exposes the
+ * payment-request API we hand the payer a Wise-hosted page (closest match to a
+ * card-style redirect checkout); otherwise we fall back to the e-Transfer push.
+ */
+async function hostedPaymentRequest(amount: number, reference: string): Promise<string | null> {
+  try {
+    if (!getWiseConfig().apiToken) return null;
+    const profileId = await resolveWiseProfileId();
+    const res = await wiseFetch(`/v2/profiles/${encodeURIComponent(profileId)}/payment-requests`, {
+      method: "POST",
+      body: JSON.stringify({
+        amount: { value: Math.round(amount * 100) / 100, currency: "CAD" },
+        description: reference,
+        reference,
+        selectedPaymentMethods: ["PISP", "CARD"],
+      }),
+    });
+    if (!res.ok || !res.json || typeof res.json !== "object") return null;
+    const row = res.json as Record<string, unknown>;
+    const link = row.link ?? row.paymentLink ?? row.url ?? (row.links as Record<string, unknown> | undefined)?.pay;
+    return typeof link === "string" && link.startsWith("http") ? link : null;
+  } catch (e) {
+    console.warn("fincra-cad-interac: hosted payment request unavailable", e instanceof Error ? e.message : e);
+    return null;
+  }
+}
+
 
 /**
  * Interac e-Transfer deposits land in the Wise CAD balance.
