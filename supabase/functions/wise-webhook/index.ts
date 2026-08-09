@@ -263,6 +263,7 @@ Deno.serve(async (req) => {
         amount: number;
         currency_code: string;
         reference: string;
+        transfer_id?: string | null;
       } | null = null;
       let intentTable: "wise_topup_intents" | "fincra_cad_interac_intents" = "wise_topup_intents";
 
@@ -281,7 +282,7 @@ Deno.serve(async (req) => {
       if (!intent && interacNeedle) {
         const { data } = await supabase
           .from("fincra_cad_interac_intents")
-          .select("id, user_id, wallet_id, amount, currency_code, reference")
+          .select("id, user_id, wallet_id, amount, currency_code, reference, transfer_id")
           .eq("reference", interacNeedle)
           .eq("status", "pending")
           .gt("expires_at", nowIso)
@@ -310,7 +311,7 @@ Deno.serve(async (req) => {
       if (!intent && currency === "CAD") {
         const { data: interacCandidates } = await supabase
           .from("fincra_cad_interac_intents")
-          .select("id, user_id, wallet_id, amount, currency_code, reference")
+          .select("id, user_id, wallet_id, amount, currency_code, reference, transfer_id")
           .eq("status", "pending")
           .eq("currency_code", "CAD")
           .gt("expires_at", nowIso)
@@ -347,6 +348,37 @@ Deno.serve(async (req) => {
             credited_at: nowIso,
           }).eq("id", intent.id).eq("status", "pending");
           console.log("wise-webhook: credited intent", intentTable, intent.id, result);
+
+          // Interac-funded sends: release the linked payout now that funds arrived
+          if (isInterac && intent.transfer_id) {
+            try {
+              const res = await fetch(
+                `${Deno.env.get("SUPABASE_URL")}/functions/v1/execute-transfer`,
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+                    apikey: Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+                    "x-idempotency-key": creditIdem,
+                  },
+                  body: JSON.stringify({ transfer_id: intent.transfer_id }),
+                },
+              );
+              const payoutBody = await res.text();
+              if (!res.ok) {
+                console.error(`wise-webhook: execute-transfer failed [${res.status}]: ${payoutBody}`);
+                await supabase.from("transfers").update({
+                  status: "failed",
+                  failure_reason: payoutBody.slice(0, 500),
+                }).eq("id", intent.transfer_id);
+              } else {
+                console.log("wise-webhook: released Interac-funded transfer", intent.transfer_id, payoutBody.slice(0, 300));
+              }
+            } catch (payoutErr) {
+              console.error("wise-webhook: execute-transfer threw", payoutErr);
+            }
+          }
 
         } catch (creditErr) {
           console.error("wise-webhook: credit failed", creditErr);

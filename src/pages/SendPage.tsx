@@ -52,6 +52,7 @@ import EfinmoneyP2PFlow from "@/components/send/EfinmoneyP2PFlow";
 import MoneyFlowShell from "@/components/money/MoneyFlowShell";
 import PaymentMethodRow, { type PaymentMethodOption } from "@/components/money/PaymentMethodRow";
 import MethodCheckoutPanel from "@/components/send/MethodCheckoutPanel";
+import InteracCheckout from "@/components/payments/InteracCheckout";
 import SendHeaderCountry from "@/components/send/SendHeaderCountry";
 import RecipientQuickBox from "@/components/send/RecipientQuickBox";
 import FlutterwaveCardForm from "@/components/payments/FlutterwaveCardForm";
@@ -133,7 +134,7 @@ const looseDb = supabase as unknown as { from: (t: string) => any };
 
 
 
-type FundingSource = 'wallet' | 'bank' | 'card';
+type FundingSource = 'wallet' | 'bank' | 'card' | 'interac';
 type CardResumeStage = "confirming" | "sending";
 
 const CARD_RESUME_COPY: Record<CardResumeStage, { title: string; sub: string }> = {
@@ -200,6 +201,9 @@ const SendPage = () => {
   const [recipientPhone, setRecipientPhone] = useState("");
   const [selectedSourceId, setSelectedSourceId] = useState<string>("");
   const [lastTransferId, setLastTransferId] = useState<string | null>(null);
+  const [interacFunding, setInteracFunding] = useState<
+    { transferId: string; walletId: string; amount: number } | null
+  >(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [saveModalOpen, setSaveModalOpen] = useState(false);     // pre-filled Add modal
   const [addCardOpen, setAddCardOpen] = useState(false);
@@ -360,7 +364,11 @@ const SendPage = () => {
     || savedCards[0];
 
 
-  const sourceCurrency = fundingSource === 'wallet'
+  const cadWallet = wallets?.find((w) => w.currency_code === 'CAD');
+
+  const sourceCurrency = fundingSource === 'interac'
+    ? 'CAD'
+    : fundingSource === 'wallet'
     ? (selectedWallet?.currency_code || profileCurrency || SYSTEM_DEFAULT_CURRENCY)
     : fundingSource === 'card'
     ? (selectedWallet && isCardSendCollectCurrency(selectedWallet.currency_code)
@@ -762,7 +770,7 @@ const SendPage = () => {
 
   // Create transfer row + maybe save beneficiary. Returns id.
   const createTransferRecord = async (overrides?: {
-    funding_source?: "wallet" | "card" | "bank";
+    funding_source?: FundingSource;
     sender_wallet_id?: string;
     source_currency?: string;
     target_currency?: string;
@@ -789,7 +797,9 @@ const SendPage = () => {
     const funding = overrides?.funding_source ?? fundingSource;
     const walletId =
       overrides?.sender_wallet_id
-      ?? (funding === "wallet" || funding === "card"
+      ?? (funding === "interac"
+        ? (cadWallet?.wallet_id || "")
+        : funding === "wallet" || funding === "card"
         ? selectedWallet!.wallet_id
         : wallets?.[0]?.wallet_id || "");
     const destCurrency = overrides?.target_currency ?? targetCountry.code;
@@ -810,7 +820,8 @@ const SendPage = () => {
       exchange_rate: overrides?.exchange_rate ?? effectiveRate,
       fee_amount: overrides?.fee_amount ?? fee,
       // Card sends are prepaid via Nomba into the wallet, then paid out as wallet
-      funding_source: funding === "card" ? "wallet" : funding,
+      // Card and Interac sends are prepaid into the wallet, then paid out as wallet
+      funding_source: funding === "card" || funding === "interac" ? "wallet" : funding,
     });
     setLastTransferId(transfer.id);
     if (user) {
@@ -874,10 +885,33 @@ const SendPage = () => {
     }
   };
 
-  const handleConfirm = async (fundingOverride?: "wallet" | "card" | "bank") => {
+  const handleConfirm = async (fundingOverride?: FundingSource) => {
     if (confirming) return;
     setConfirming(true);
     const funding = fundingOverride ?? fundingSource;
+
+    // Interac e-Transfer: park the transfer, then show deposit instructions.
+    // wise-webhook credits the CAD wallet and releases the payout on arrival.
+    if (funding === 'interac') {
+      if (!cadWallet) {
+        toast.error('You need a CAD wallet to pay by Interac e-Transfer.');
+        setConfirming(false);
+        return;
+      }
+      try {
+        const tid = await createTransferRecord({
+          funding_source: 'interac',
+          sender_wallet_id: cadWallet.wallet_id,
+        });
+        setInteracFunding({ transferId: tid, walletId: cadWallet.wallet_id, amount: totalCharge });
+        goToStep(4);
+      } catch (e: any) {
+        toast.error(e?.message || 'Could not start the Interac e-Transfer');
+      } finally {
+        setConfirming(false);
+      }
+      return;
+    }
 
     // ── Wallet: create + execute payout immediately ──────────────────────
     if (funding === 'wallet') {
@@ -1851,6 +1885,7 @@ const SendPage = () => {
     setPickedBeneficiaryId(null);
     setIntlLinkMode(false);
     setLinkResult(null);
+    setInteracFunding(null);
     setFromQuickSend(false);
     clearSendHandoff();
     clearCardSendIntent();
@@ -1913,12 +1948,17 @@ const SendPage = () => {
   const cardFundingAvailable = productFeatures.nombaNigeria || productFeatures.lenhubFlutter
     || productFeatures.paytota || productFeatures.swychr || productFeatures.flutterwave;
 
-  const fundingMethodOptions: PaymentMethodOption<"wallet" | "bank" | "card">[] = [
+  const interacFundingAvailable = !!cadWallet;
+
+  const fundingMethodOptions: PaymentMethodOption<FundingSource>[] = [
     ...(cardFundingAvailable
       ? [{ id: "card" as const, label: "Card", sublabel: "Debit or credit", icon: CreditCard, tone: "card" as const }]
       : []),
     ...(productFeatures.plaid
       ? [{ id: "bank" as const, label: "Bank", sublabel: "Linked account", icon: Landmark, tone: "bank" as const }]
+      : []),
+    ...(interacFundingAvailable
+      ? [{ id: "interac" as const, label: "Interac", sublabel: "e-Transfer (CAD)", icon: Landmark, tone: "bank" as const }]
       : []),
     { id: "wallet" as const, label: "Wallet", sublabel: "eFinMoney balance", icon: Wallet, tone: "wallet" as const },
   ];
@@ -2595,7 +2635,7 @@ const SendPage = () => {
 
                                     <motion.div custom={1} variants={fieldVariants} initial="hidden" animate="show">
                                       <MethodCheckoutPanel
-                                        method={fundingSource as "card" | "bank" | "wallet"}
+                                        method={fundingSource}
                                         wallets={(fundingSource === "card" ? cardWallets : (wallets ?? [])).map((w) => ({
                                           wallet_id: w.wallet_id,
                                           currency_code: w.currency_code,
@@ -2806,7 +2846,27 @@ const SendPage = () => {
                                 exit="exit"
                                 transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
                               >
-                                {linkResult ? (
+                                {interacFunding ? (
+                                  <SectionBoundary name="InteracSendCheckout">
+                                    <div className="rounded-xl border-2 border-pay-bank/30 bg-pay-bank/5 p-4">
+                                      <p className="text-sm font-semibold">Pay by Interac e-Transfer</p>
+                                      <p className="mt-1 text-xs text-muted-foreground">
+                                        Send the exact amount with the reference below. Your transfer to{" "}
+                                        {recipientName || "your recipient"} is released automatically once it arrives.
+                                      </p>
+                                      <div className="mt-3">
+                                        <InteracCheckout
+                                          walletId={interacFunding.walletId}
+                                          purpose="transfer"
+                                          transferId={interacFunding.transferId}
+                                          fixedAmount={interacFunding.amount}
+                                          submitLabel="Get Interac details"
+                                          onComplete={() => setInteracFunding(null)}
+                                        />
+                                      </div>
+                                    </div>
+                                  </SectionBoundary>
+                                ) : linkResult ? (
                                   <SectionBoundary name="PaymentLinkSuccess"><PaymentLinkSuccess
                                     result={linkResult}
                                     amountLabel={`${targetSymbol}${parsedAmount.toFixed(2)}`}
