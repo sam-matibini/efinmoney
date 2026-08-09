@@ -228,9 +228,11 @@ Deno.serve(async (req) => {
         sender_name: senderName,
         sender_email: senderEmail,
         sender_bank: senderBank || null,
+        purpose,
+        transfer_id: purpose === "transfer" ? transferId : null,
       })
       .select(
-        "id, amount, currency_code, reference, status, created_at, expires_at, sender_name, sender_email, sender_bank",
+        "id, amount, currency_code, reference, status, created_at, expires_at, sender_name, sender_email, sender_bank, purpose, transfer_id",
       )
       .single();
 
@@ -248,7 +250,10 @@ Deno.serve(async (req) => {
         `Put the reference ${intent.reference} in the message field.`,
         `Send from ${senderEmail} so we can match your deposit.`,
         `Autodeposit is enabled — no security question needed.`,
-        `Your CAD wallet credits when the transfer arrives (usually within minutes).`,
+        purpose === "transfer"
+          ? `Your transfer is released automatically once the deposit arrives (usually within minutes).`
+          : `Your CAD wallet credits when the transfer arrives (usually within minutes).`,
+
       ],
     });
 
