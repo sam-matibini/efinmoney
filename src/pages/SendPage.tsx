@@ -53,6 +53,8 @@ import MoneyFlowShell from "@/components/money/MoneyFlowShell";
 import PaymentMethodRow, { type PaymentMethodOption } from "@/components/money/PaymentMethodRow";
 import MethodCheckoutPanel from "@/components/send/MethodCheckoutPanel";
 import WisePayLinkCard from "@/components/payments/WisePayLinkCard";
+import { verifySquareCheckout } from "@/components/payments/SquareTopUpCard";
+
 import { isWisePayCurrency } from "@/lib/wisePayLink";
 import InteracCheckout from "@/components/payments/InteracCheckout";
 import SendHeaderCountry from "@/components/send/SendHeaderCountry";
@@ -1109,7 +1111,34 @@ const SendPage = () => {
           recipientCountryHint: targetCountry.country,
         };
 
+        if (provider === "square") {
+          const returnUrl =
+            `${window.location.origin}/send?cardSend=1&provider=square&walletId=${encodeURIComponent(selectedWallet.wallet_id)}`;
+          const { data, error } = await supabase.functions.invoke("square-create-checkout", {
+            body: {
+              walletId: selectedWallet.wallet_id,
+              amount: totalCharge,
+              currency: selectedWallet.currency_code,
+              redirectUrl: returnUrl,
+            },
+          });
+          const sqErr = (data as { error?: string } | null)?.error || error?.message;
+          const checkoutUrl = String((data as { checkout_url?: string } | null)?.checkout_url || "");
+          if (sqErr || !checkoutUrl) {
+            throw new Error(sqErr || "Could not start card checkout");
+          }
+          saveCardSendIntent({
+            ...intentBase,
+            provider: "square",
+            squareOrderId: String((data as { order_id?: string }).order_id || ""),
+          });
+          toast.message("Opening secure card checkout…");
+          window.location.href = checkoutUrl;
+          return;
+        }
+
         if (provider === "fincra") {
+
           if (!isFincraCheckoutCurrency(selectedWallet.currency_code)) {
             toast.error(`Secure checkout does not support ${selectedWallet.currency_code}. Try another payment method.`);
             setConfirming(false);
@@ -1689,7 +1718,22 @@ const SendPage = () => {
         if (intent.networkId) setSelectedNetworkId(intent.networkId);
 
         let paid = false;
-        if (provider === "lenhub") {
+        if (provider === "square") {
+          const orderId = intent.squareOrderId || searchParams.get("orderId") || "";
+          if (!orderId) throw new Error("Missing card payment reference");
+          for (let i = 0; i < 40; i++) {
+            if (cardResumeAbort.current) throw new Error("cancelled");
+            try {
+              const result = await verifySquareCheckout(orderId);
+              if (result?.success) {
+                paid = true;
+                break;
+              }
+            } catch { /* keep polling — Square settles a moment after redirect */ }
+            await sleep(1500);
+          }
+        } else if (provider === "lenhub") {
+
           const chargeId = intent.lenhubChargeId;
           if (!chargeId) throw new Error("Missing payment reference");
           for (let i = 0; i < 40; i++) {

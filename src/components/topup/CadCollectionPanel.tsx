@@ -3,6 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import InteracCheckout from "@/components/payments/InteracCheckout";
 import WiseTopUpCard from "@/components/payments/WiseTopUpCard";
 import WisePayLinkCard from "@/components/payments/WisePayLinkCard";
+import SquareTopUpCard from "@/components/payments/SquareTopUpCard";
+import { productFeatures } from "@/lib/productFeatures";
 
 import CheckoutMethodGrid, { type CheckoutMethod } from "@/components/payments/CheckoutMethodGrid";
 import CheckoutShell from "@/components/payments/CheckoutShell";
@@ -25,6 +27,8 @@ export default function CadCollectionPanel({ walletId, walletCurrency, initialAm
   const [lang, setLang] = useState<Lang>("en");
   const [eftAvailable, setEftAvailable] = useState<boolean | null>(null);
   const isCad = walletCurrency.toUpperCase() === "CAD";
+  const cardAvailable = productFeatures.square
+    && ["USD", "CAD", "EUR", "GBP"].includes(walletCurrency.toUpperCase());
 
   useEffect(() => {
     let cancelled = false;
@@ -72,10 +76,19 @@ export default function CadCollectionPanel({ walletId, walletCurrency, initialAm
       {method === null ? (
         <CheckoutMethodGrid
           amountLabel={amount > 0 ? amountLabel : undefined}
-          value={"interac"}
+          value={cardAvailable ? "card" : "interac"}
           onChange={setMethod}
           interacAvailable={isCad}
+          cardAvailable={cardAvailable}
           lang={lang}
+        />
+      ) : method === "card" ? (
+        <SquareTopUpCard
+          walletId={walletId}
+          walletCurrency={walletCurrency}
+          initialAmount={initialAmount}
+          embedded
+          onComplete={onComplete}
         />
       ) : method === "interac" ? (
         <InteracCheckout

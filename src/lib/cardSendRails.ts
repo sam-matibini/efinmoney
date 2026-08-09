@@ -33,6 +33,10 @@ const PAYTOTA_MOMO_DEST = ["UGX", "KES", "RWF"] as const;
 
 const SWYCHR_COLLECT = ["XAF", "XOF", "KES", "UGX"] as const;
 
+/** Square hosted checkout collect currencies (debit + credit cards). */
+const SQUARE_CARD_COLLECT = ["USD", "CAD", "EUR", "GBP"] as const;
+
+
 /** Flutterwave collect currencies used for card-send. */
 const FLW_COLLECT = ["USD", "CAD", "NGN", "GHS", "KES", "UGX", "RWF", "TZS", "ZMW"] as const;
 const FLW_MOMO_DEST = ["GHS", "KES", "UGX", "RWF", "TZS", "ZMW"] as const;
@@ -75,9 +79,15 @@ export function cardSendProvidersForCorridor(
     (transferType === "mobile_money" && ["GHS", "KES", "UGX", "RWF", "TZS", "ZMW"].includes(d));
   if (!destOk) return out;
 
+  // Square hosted card checkout — debit/credit collect on the western currencies.
+  if (productFeatures.square && (SQUARE_CARD_COLLECT as readonly string[]).includes(s)) {
+    out.push("square");
+  }
+
   if (productFeatures.fincra && (FINCRA_CARD_COLLECT as readonly string[]).includes(s)) {
     out.push("fincra");
   }
+
 
   if (
     productFeatures.nombaNigeria &&
@@ -148,7 +158,7 @@ export function pickBestCardProvider(
 ): CardSendProvider | null {
   const available = cardSendProvidersForCorridor(sourceCurrency, destCurrency, transferType);
   if (available.length === 0) return null;
-  const priority: CardSendProvider[] = ["fincra", "flutterwave", "nomba", "lenhub", "paytota", "swychr"];
+  const priority: CardSendProvider[] = ["square", "fincra", "flutterwave", "nomba", "lenhub", "paytota", "swychr"];
   for (const p of priority) {
     if (available.includes(p)) return p;
   }
@@ -169,6 +179,7 @@ export function cardSendDestCurrencies(sourceCurrency: string): string[] {
 }
 
 export function cardSendProviderLabel(provider: CardSendProvider): string {
+  if (provider === "square") return "Debit or credit card";
   if (provider === "fincra") return "Secure checkout";
   if (provider === "nomba") return "Express card";
   if (provider === "lenhub") return "Card (direct)";
@@ -178,6 +189,7 @@ export function cardSendProviderLabel(provider: CardSendProvider): string {
 }
 
 export function cardSendProviderBenefit(provider: CardSendProvider): string {
+  if (provider === "square") return "Instant";
   if (provider === "fincra") return "Flexible";
   if (provider === "nomba") return "Fast";
   if (provider === "lenhub") return "In-app";
@@ -187,6 +199,9 @@ export function cardSendProviderBenefit(provider: CardSendProvider): string {
 }
 
 export function cardSendProviderDescription(provider: CardSendProvider): string {
+  if (provider === "square") {
+    return "Pay with Visa, Mastercard or Amex on Square\u2019s secure page, then we deliver the transfer.";
+  }
   if (provider === "fincra") {
     return "Pay by card or bank transfer on a secure page, then we deliver the transfer.";
   }
@@ -206,6 +221,7 @@ export function cardSendProviderDescription(provider: CardSendProvider): string 
 }
 
 export function cardSendProviderStaffName(provider: CardSendProvider): string {
+  if (provider === "square") return "Square";
   if (provider === "fincra") return "Fincra";
   if (provider === "nomba") return "Nomba";
   if (provider === "lenhub") return "Lenhub";
@@ -216,6 +232,7 @@ export function cardSendProviderStaffName(provider: CardSendProvider): string {
 
 export function cardSendMinAmount(provider: CardSendProvider, currency: string): number {
   const c = currency.toUpperCase();
+  if (provider === "square") return 1;
   if (provider === "fincra") {
     return c === "NGN" ? 100 : 1;
   }
