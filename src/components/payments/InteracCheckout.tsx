@@ -313,6 +313,25 @@ export default function InteracCheckout({
     );
   }
 
+  if (!configured) {
+    return (
+      <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-muted-foreground">
+        <p className="font-medium text-destructive">
+          {lang === "fr"
+            ? "Le virement Interac n'est pas disponible pour le moment."
+            : "Interac e-Transfer is temporarily unavailable."}
+        </p>
+        <p className="mt-1">
+          {lang === "fr"
+            ? "Veuillez utiliser le paiement par carte. Nous rétablissons ce mode de paiement sous peu."
+            : "Please use card checkout instead — we're restoring this payment method shortly."}
+        </p>
+      </div>
+    );
+  }
+
+
+
   return (
     <InteracPayerForm
       lang={lang}
