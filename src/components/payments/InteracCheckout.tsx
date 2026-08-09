@@ -206,7 +206,7 @@ export default function InteracCheckout({
           sender_country: "CA",
         },
       });
-      if (fnError) throw fnError;
+      if (fnError) throw new Error(await edgeErrorMessage(fnError, "Could not start the payment"));
       if (data?.error) throw new Error(data.error);
       setAlias((prev) => data.alias ?? prev);
       const created = data.intent as InteracIntent;
