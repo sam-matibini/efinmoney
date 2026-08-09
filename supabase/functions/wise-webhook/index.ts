@@ -95,6 +95,13 @@ function extractRefNeedle(raw: string): string | null {
   return m?.[0] || null;
 }
 
+/** Interac e-Transfer intents use their own reference prefix. */
+function extractInteracRefNeedle(raw: string): string | null {
+  const m = raw.match(/efm-interac-[a-z0-9]+-\d+/i);
+  return m?.[0] || null;
+}
+
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method === "GET" || req.method === "HEAD") {
