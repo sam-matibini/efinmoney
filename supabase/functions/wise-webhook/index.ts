@@ -253,6 +253,8 @@ Deno.serve(async (req) => {
       const nowIso = new Date().toISOString();
       const haystack = `${transferReference || ""} ${rawBody}`.toLowerCase();
       const needle = extractRefNeedle(haystack) || extractRefNeedle(transferReference || "");
+      const interacNeedle =
+        extractInteracRefNeedle(haystack) || extractInteracRefNeedle(transferReference || "");
 
       let intent: {
         id: string;
@@ -262,6 +264,7 @@ Deno.serve(async (req) => {
         currency_code: string;
         reference: string;
       } | null = null;
+      let intentTable: "wise_topup_intents" | "fincra_cad_interac_intents" = "wise_topup_intents";
 
       if (needle) {
         const { data } = await supabase
@@ -272,6 +275,21 @@ Deno.serve(async (req) => {
           .gt("expires_at", nowIso)
           .maybeSingle();
         intent = data;
+      }
+
+      // Interac e-Transfer deposits land in the same CAD balance — match their intents too
+      if (!intent && interacNeedle) {
+        const { data } = await supabase
+          .from("fincra_cad_interac_intents")
+          .select("id, user_id, wallet_id, amount, currency_code, reference")
+          .eq("reference", interacNeedle)
+          .eq("status", "pending")
+          .gt("expires_at", nowIso)
+          .maybeSingle();
+        if (data) {
+          intent = data;
+          intentTable = "fincra_cad_interac_intents";
+        }
       }
 
       if (!intent) {
@@ -289,7 +307,27 @@ Deno.serve(async (req) => {
         }) ?? null;
       }
 
+      if (!intent && currency === "CAD") {
+        const { data: interacCandidates } = await supabase
+          .from("fincra_cad_interac_intents")
+          .select("id, user_id, wallet_id, amount, currency_code, reference")
+          .eq("status", "pending")
+          .eq("currency_code", "CAD")
+          .gt("expires_at", nowIso)
+          .order("created_at", { ascending: true })
+          .limit(30);
+        const match = (interacCandidates ?? []).find((row) => {
+          const expected = Number(row.amount);
+          return Number.isFinite(expected) && Math.abs(expected - amount) < 0.02;
+        }) ?? null;
+        if (match) {
+          intent = match;
+          intentTable = "fincra_cad_interac_intents";
+        }
+      }
+
       if (intent) {
+        const isInterac = intentTable === "fincra_cad_interac_intents";
         try {
           const creditIdem = `wise-intent-${intent.id}-${idempotencyKey}`;
           const result = await creditWalletViaWise(
@@ -299,14 +337,17 @@ Deno.serve(async (req) => {
             Number(intent.amount),
             creditIdem,
             intent.wallet_id,
-            `Wise top-up (${intent.reference})`,
+            isInterac
+              ? `Interac e-Transfer top-up (${intent.reference})`
+              : `Wise top-up (${intent.reference})`,
           );
-          await supabase.from("wise_topup_intents").update({
+          await supabase.from(intentTable).update({
             status: "completed",
             provider_reference: transferReference || balanceId || idempotencyKey,
             credited_at: nowIso,
           }).eq("id", intent.id).eq("status", "pending");
-          console.log("wise-webhook: credited intent", intent.id, result);
+          console.log("wise-webhook: credited intent", intentTable, intent.id, result);
+
         } catch (creditErr) {
           console.error("wise-webhook: credit failed", creditErr);
           await supabase.from("admin_notifications").insert({
