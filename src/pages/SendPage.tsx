@@ -1716,7 +1716,22 @@ const SendPage = () => {
         if (intent.networkId) setSelectedNetworkId(intent.networkId);
 
         let paid = false;
-        if (provider === "lenhub") {
+        if (provider === "square") {
+          const orderId = intent.squareOrderId || searchParams.get("orderId") || "";
+          if (!orderId) throw new Error("Missing card payment reference");
+          for (let i = 0; i < 40; i++) {
+            if (cardResumeAbort.current) throw new Error("cancelled");
+            try {
+              const result = await verifySquareCheckout(orderId);
+              if (result?.success) {
+                paid = true;
+                break;
+              }
+            } catch { /* keep polling — Square settles a moment after redirect */ }
+            await sleep(1500);
+          }
+        } else if (provider === "lenhub") {
+
           const chargeId = intent.lenhubChargeId;
           if (!chargeId) throw new Error("Missing payment reference");
           for (let i = 0; i < 40; i++) {
