@@ -278,20 +278,26 @@ Deno.serve(async (req) => {
         intent = data;
       }
 
-      // Interac e-Transfer deposits land in the same CAD balance — match their intents too
+      // Interac tier 1: reference + amount + currency (exact)
       if (!intent && interacNeedle) {
         const { data } = await supabase
           .from("fincra_cad_interac_intents")
-          .select("id, user_id, wallet_id, amount, currency_code, reference, transfer_id")
-          .eq("reference", interacNeedle)
-          .eq("status", "pending")
+          .select(INTERAC_COLS)
+          .ilike("reference", interacNeedle)
+          .in("status", INTERAC_OPEN)
           .gt("expires_at", nowIso)
           .maybeSingle();
-        if (data) {
+        const expected = Number(data?.amount);
+        if (
+          data && String(data.currency_code).toUpperCase() === currency &&
+          Number.isFinite(expected) && Math.abs(expected - amount) < 0.02
+        ) {
           intent = data;
           intentTable = "fincra_cad_interac_intents";
+          matchTier = "tier1_reference";
         }
       }
+
 
       if (!intent) {
         const { data: candidates } = await supabase
