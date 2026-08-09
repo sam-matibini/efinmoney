@@ -76,7 +76,7 @@ Deno.serve(async (req) => {
     if (userErr || !user) return json({ error: "Unauthorized" }, 401);
 
     const admin = createClient(supabaseUrl, service);
-    const alias = (Deno.env.get("FINCRA_CAD_INTERAC_ALIAS") || "").trim();
+    const alias = await resolveInteracAlias();
 
     if (req.method === "GET") {
       const url = new URL(req.url);
@@ -142,10 +142,11 @@ Deno.serve(async (req) => {
 
     if (!alias) {
       return json({
-        error: "Interac e-Transfer is not configured yet. Please try card checkout or pay by invoice.",
+        error: "Interac details are being prepared. Please try again in a moment.",
         code: "alias_missing",
       }, 503);
     }
+
 
     const amount = Number(body.amount);
     const walletId = String(body.wallet_id || "");
@@ -199,9 +200,11 @@ Deno.serve(async (req) => {
       instructions: [
         `Open your Canadian banking app and send an Interac e-Transfer.`,
         `Send exactly CAD ${intent.amount} to ${alias}.`,
+        `Put the reference ${intent.reference} in the message field.`,
         `Autodeposit is enabled — no security question needed.`,
         `Your CAD wallet credits when the transfer arrives (usually within minutes).`,
       ],
+
     });
   } catch (err) {
     console.error("fincra-cad-interac error:", err);
