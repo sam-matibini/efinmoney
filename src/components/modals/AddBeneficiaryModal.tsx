@@ -61,6 +61,7 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
   const [mailingCity, setMailingCity] = useState("");
   const [mailingRegion, setMailingRegion] = useState("");
   const [mailingPostal, setMailingPostal] = useState("");
+  const [sameAsAddress, setSameAsAddress] = useState(false);
   const [notes, setNotes] = useState("");
   const [tags, setTags] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
