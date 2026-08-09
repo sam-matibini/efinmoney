@@ -339,6 +339,9 @@ Deno.serve(async (req) => {
       reference = `EFM-${day}-${String(Date.now() % 100000000).padStart(8, "0")}`;
     }
 
+    // The payer pressed "Pay", so the intent is already awaiting the deposit.
+    const hostedUrl = await hostedPaymentRequest(amount, reference);
+
     const { data: intent, error: insErr } = await admin
       .from("fincra_cad_interac_intents")
       .insert({
@@ -348,11 +351,20 @@ Deno.serve(async (req) => {
         currency_code: "CAD",
         reference,
         public_id: reference,
-        status: "pending",
+        status: "awaiting_payment",
+        claimed_sent_at: new Date().toISOString(),
+        hosted_url: hostedUrl,
         sender_name: senderName,
         sender_email: senderEmail || null,
         sender_phone: senderPhone || null,
         sender_bank: senderBank || null,
+        sender_account_type: accountType,
+        sender_address_line1: addressLine1,
+        sender_address_line2: addressLine2,
+        sender_city: city,
+        sender_region: region,
+        sender_postal_code: postalCode,
+        sender_country: country,
         purpose,
         transfer_id: purpose === "transfer" ? transferId : null,
         merchant_id: /^[0-9a-f-]{36}$/i.test(merchantId) ? merchantId : null,
@@ -370,6 +382,7 @@ Deno.serve(async (req) => {
     return json({
       ok: true,
       alias,
+      hosted_url: hostedUrl,
       intent,
       instructions: buildInstructions(
         Number(intent.amount),
