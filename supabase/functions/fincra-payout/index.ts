@@ -35,7 +35,11 @@ function isFincraBalanceError(message: string): boolean {
 }
 
 const FINCRA_MM_CODE: Record<string, string> = {
-  "KES:mpesa": "MPESA",
+  // Fincra Kenya docs use SAFARICOM for M-Pesa (not "MPESA")
+  "KES:mpesa": "SAFARICOM",
+  "KES:safaricom": "SAFARICOM",
+  "KES:m-pesa": "SAFARICOM",
+  "KES:airtel": "AIRTEL",
   "GHS:mtn": "MTN",
   "GHS:vodafone": "VODAFONE",
   "GHS:airtel": "AIRTELTIGO",
@@ -482,10 +486,12 @@ Deno.serve(async (req) => {
     }
 
 
-    // For Zambia, if the selected network is rejected, also try the other MoMo operators.
+    // For Zambia / Kenya, if the selected network is rejected, also try other MoMo operators.
     const networkVariants: string[] = mmCode
       ? (ccy === "ZMW"
         ? [...new Set([mmCode, "AIRTEL", "MTN", "ZAMTEL"])]
+        : ccy === "KES"
+        ? [...new Set([mmCode, "SAFARICOM", "AIRTEL"])]
         : [mmCode])
       : [];
 
