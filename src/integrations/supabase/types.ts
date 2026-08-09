@@ -4515,11 +4515,13 @@ export type Database = {
           expires_at: string
           id: string
           provider_reference: string | null
+          purpose: string
           reference: string
           sender_bank: string | null
           sender_email: string | null
           sender_name: string | null
           status: string
+          transfer_id: string | null
           user_id: string
           wallet_id: string
         }
@@ -4531,11 +4533,13 @@ export type Database = {
           expires_at?: string
           id?: string
           provider_reference?: string | null
+          purpose?: string
           reference: string
           sender_bank?: string | null
           sender_email?: string | null
           sender_name?: string | null
           status?: string
+          transfer_id?: string | null
           user_id: string
           wallet_id: string
         }
@@ -4547,15 +4551,24 @@ export type Database = {
           expires_at?: string
           id?: string
           provider_reference?: string | null
+          purpose?: string
           reference?: string
           sender_bank?: string | null
           sender_email?: string | null
           sender_name?: string | null
           status?: string
+          transfer_id?: string | null
           user_id?: string
           wallet_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "fincra_cad_interac_intents_transfer_id_fkey"
+            columns: ["transfer_id"]
+            isOneToOne: false
+            referencedRelation: "transfers"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "fincra_cad_interac_intents_wallet_id_fkey"
             columns: ["wallet_id"]
