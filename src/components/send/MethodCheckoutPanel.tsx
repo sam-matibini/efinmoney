@@ -180,16 +180,20 @@ const MethodCheckoutPanel = ({
 
   if (method === "interac") {
     return (
-      <div className="rounded-xl border-2 border-pay-bank/30 bg-pay-bank/5 p-4">
-        <p className="text-sm font-semibold">Interac e-Transfer (CAD)</p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Confirm the transfer and we'll show you the Interac details to send{" "}
-          {formatMoney(total, sourceCurrency)} from your Canadian bank. Your payout is released
-          automatically once the deposit arrives — usually within minutes.
-        </p>
+      <div className="rounded-xl border-2 border-pay-bank/30 bg-pay-bank/5 p-4 space-y-3">
+        <div>
+          <p className="text-sm font-semibold">Interac e-Transfer (CAD)</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Confirm the transfer and we'll show you the Interac details to send {symbol}{money(total)} {currency}
+            {" "}from your Canadian bank. Your payout is released automatically once the deposit arrives — usually
+            within minutes.
+          </p>
+        </div>
+        <ChargeSummary amount={amount} fee={fee} total={total} currency={currency} symbol={symbol} debitLabel="You send by Interac" />
       </div>
     );
   }
+
 
   if (method === "card") {
     return (
