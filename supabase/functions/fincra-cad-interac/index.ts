@@ -123,9 +123,12 @@ Deno.serve(async (req) => {
       sender_name?: string;
       sender_email?: string;
       sender_bank?: string;
+      purpose?: string;
+      transfer_id?: string;
     };
 
     const action = String(body.action || "create").toLowerCase();
+
 
 
     if (action === "cancel") {
