@@ -308,24 +308,52 @@ Deno.serve(async (req) => {
         }) ?? null;
       }
 
+      // Interac tiers 2 & 3: contact match, then a single amount match inside the validity window
       if (!intent && currency === "CAD") {
         const { data: interacCandidates } = await supabase
           .from("fincra_cad_interac_intents")
-          .select("id, user_id, wallet_id, amount, currency_code, reference, transfer_id")
-          .eq("status", "pending")
+          .select(INTERAC_COLS)
+          .in("status", INTERAC_OPEN)
           .eq("currency_code", "CAD")
           .gt("expires_at", nowIso)
           .order("created_at", { ascending: true })
-          .limit(30);
-        const match = (interacCandidates ?? []).find((row) => {
+          .limit(50);
+
+        const sameAmount = (interacCandidates ?? []).filter((row) => {
           const expected = Number(row.amount);
           return Number.isFinite(expected) && Math.abs(expected - amount) < 0.02;
-        }) ?? null;
-        if (match) {
-          intent = match;
+        });
+
+        const contactMatches = sameAmount.filter((row) => {
+          const email = String(row.sender_email || "").toLowerCase();
+          const phone = String(row.sender_phone || "").replace(/[^\d]/g, "").slice(-10);
+          return (email && haystack.includes(email)) || (phone && digits.includes(phone));
+        });
+
+        if (contactMatches.length === 1) {
+          intent = contactMatches[0];
           intentTable = "fincra_cad_interac_intents";
+          matchTier = "tier2_contact";
+        } else if (contactMatches.length > 1) {
+          interacAmbiguous = contactMatches.length;
+        } else if (sameAmount.length === 1) {
+          intent = sameAmount[0];
+          intentTable = "fincra_cad_interac_intents";
+          matchTier = "tier3_window";
+        } else if (sameAmount.length > 1) {
+          interacAmbiguous = sameAmount.length;
+        }
+
+        if (!intent && interacAmbiguous > 1) {
+          await supabase.from("admin_notifications").insert({
+            title: "Interac deposit needs manual allocation",
+            message:
+              `CAD ${amount} arrived but ${interacAmbiguous} open Interac payments match. Allocate manually. Wise txn ${idempotencyKey}.`,
+            type: "treasury",
+          }).catch(() => {/* ignore */});
         }
       }
+
 
       if (intent) {
         const isInterac = intentTable === "fincra_cad_interac_intents";
