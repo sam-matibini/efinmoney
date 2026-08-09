@@ -52,6 +52,8 @@ import EfinmoneyP2PFlow from "@/components/send/EfinmoneyP2PFlow";
 import MoneyFlowShell from "@/components/money/MoneyFlowShell";
 import PaymentMethodRow, { type PaymentMethodOption } from "@/components/money/PaymentMethodRow";
 import MethodCheckoutPanel from "@/components/send/MethodCheckoutPanel";
+import WisePayLinkCard from "@/components/payments/WisePayLinkCard";
+import { isWisePayCurrency } from "@/lib/wisePayLink";
 import InteracCheckout from "@/components/payments/InteracCheckout";
 import SendHeaderCountry from "@/components/send/SendHeaderCountry";
 import RecipientQuickBox from "@/components/send/RecipientQuickBox";
@@ -134,7 +136,7 @@ const looseDb = supabase as unknown as { from: (t: string) => any };
 
 
 
-type FundingSource = 'wallet' | 'bank' | 'card' | 'interac';
+type FundingSource = 'wallet' | 'bank' | 'card' | 'interac' | 'wise';
 type CardResumeStage = "confirming" | "sending";
 
 const CARD_RESUME_COPY: Record<CardResumeStage, { title: string; sub: string }> = {
@@ -368,7 +370,7 @@ const SendPage = () => {
 
   const sourceCurrency = fundingSource === 'interac'
     ? 'CAD'
-    : fundingSource === 'wallet'
+    : fundingSource === 'wallet' || fundingSource === 'wise'
     ? (selectedWallet?.currency_code || profileCurrency || SYSTEM_DEFAULT_CURRENCY)
     : fundingSource === 'card'
     ? (selectedWallet && isCardSendCollectCurrency(selectedWallet.currency_code)
@@ -799,7 +801,7 @@ const SendPage = () => {
       overrides?.sender_wallet_id
       ?? (funding === "interac"
         ? (cadWallet?.wallet_id || "")
-        : funding === "wallet" || funding === "card"
+        : funding === "wallet" || funding === "card" || funding === "wise"
         ? selectedWallet!.wallet_id
         : wallets?.[0]?.wallet_id || "");
     const destCurrency = overrides?.target_currency ?? targetCountry.code;
@@ -821,7 +823,7 @@ const SendPage = () => {
       fee_amount: overrides?.fee_amount ?? fee,
       // Card sends are prepaid via Nomba into the wallet, then paid out as wallet
       // Card and Interac sends are prepaid into the wallet, then paid out as wallet
-      funding_source: funding === "card" || funding === "interac" ? "wallet" : funding,
+      funding_source: funding === "card" || funding === "interac" || funding === "wise" ? "wallet" : funding,
     });
     setLastTransferId(transfer.id);
     if (user) {
@@ -1949,6 +1951,7 @@ const SendPage = () => {
     || productFeatures.paytota || productFeatures.swychr || productFeatures.flutterwave;
 
   const interacFundingAvailable = !!cadWallet;
+  const wisePayWallet = wallets?.find((w) => isWisePayCurrency(w.currency_code));
 
   const fundingMethodOptions: PaymentMethodOption<FundingSource>[] = [
     ...(cardFundingAvailable
@@ -1959,6 +1962,9 @@ const SendPage = () => {
       : []),
     ...(interacFundingAvailable
       ? [{ id: "interac" as const, label: "Interac", sublabel: "e-Transfer (CAD)", icon: Landmark, tone: "bank" as const }]
+      : []),
+    ...(wisePayWallet
+      ? [{ id: "wise" as const, label: "Wise", sublabel: "Bank or card via Wise", icon: Wallet, tone: "bank" as const }]
       : []),
     { id: "wallet" as const, label: "Wallet", sublabel: "eFinMoney balance", icon: Wallet, tone: "wallet" as const },
   ];
@@ -2634,6 +2640,20 @@ const SendPage = () => {
                                     </motion.div>
 
                                     <motion.div custom={1} variants={fieldVariants} initial="hidden" animate="show">
+                                      {fundingSource === "wise" ? (
+                                        <SectionBoundary name="WisePayLinkSend">
+                                          <WisePayLinkCard
+                                            walletId={(selectedWallet && isWisePayCurrency(selectedWallet.currency_code)
+                                              ? selectedWallet.wallet_id
+                                              : wisePayWallet?.wallet_id) || ""}
+                                            walletCurrency={(selectedWallet && isWisePayCurrency(selectedWallet.currency_code)
+                                              ? selectedWallet.currency_code
+                                              : wisePayWallet?.currency_code) || "CAD"}
+                                            initialAmount={totalCharge > 0 ? totalCharge.toFixed(2) : ""}
+                                            onComplete={() => setFundingSource("wallet")}
+                                          />
+                                        </SectionBoundary>
+                                      ) : (
                                       <MethodCheckoutPanel
                                         method={fundingSource}
                                         wallets={(fundingSource === "card" ? cardWallets : (wallets ?? [])).map((w) => ({
@@ -2688,6 +2708,7 @@ const SendPage = () => {
                                         insufficientBalance={insufficientFunds}
                                         onTopUp={() => navigate("/wallet/topup")}
                                       />
+                                      )}
                                     </motion.div>
 
 

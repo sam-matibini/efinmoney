@@ -1,8 +1,8 @@
 import { cn } from "@/lib/utils";
-import { Building2, ChevronRight, CreditCard, Send } from "lucide-react";
+import { Building2, ChevronRight, CreditCard, Send, Wallet } from "lucide-react";
 import { CHECKOUT_STRINGS, type Lang } from "@/components/payments/checkoutStrings";
 
-export type CheckoutMethod = "interac" | "eft";
+export type CheckoutMethod = "interac" | "eft" | "wise";
 
 interface Props {
   amountLabel?: string;
@@ -76,6 +76,13 @@ export default function CheckoutMethodGrid({
             onSelect={() => onChange("interac")}
           />
         )}
+        <MethodRow
+          title={t.wise}
+          description={t.wiseDesc}
+          icon={<Wallet className="h-5 w-5" />}
+          selected={value === "wise"}
+          onSelect={() => onChange("wise")}
+        />
         <MethodRow
           title={t.eft}
           description={t.eftDesc}

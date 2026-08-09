@@ -205,7 +205,22 @@ Deno.serve(async (req) => {
       return json(out, out.ok ? 200 : 502);
     }
 
+    if (action === "status") {
+      const intentId = String(body.intent_id || "");
+      if (!intentId) return json({ error: "intent_id required" }, 400);
+      const { data, error } = await admin
+        .from("wise_topup_intents")
+        .select("id, amount, currency_code, reference, status, created_at, expires_at, credited_at")
+        .eq("id", intentId)
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (error) return json({ error: error.message }, 500);
+      if (!data) return json({ error: "Intent not found" }, 404);
+      return json({ intent: data });
+    }
+
     if (action === "cancel") {
+
       const intentId = String(body.intent_id || "");
       if (!intentId) return json({ error: "intent_id required" }, 400);
       const { data, error } = await admin
@@ -220,6 +235,45 @@ Deno.serve(async (req) => {
       if (!data) return json({ error: "Intent not found or not pending" }, 404);
       return json({ ok: true, intent: data });
     }
+
+    // Hosted Wise pay-link intent: no Wise API call needed — we only need a
+    // pending intent + unique reference so the wise-webhook can match the credit.
+    if (action === "create_link") {
+      const linkAmount = Number(body.amount);
+      const linkWalletId = String(body.wallet_id || "");
+      if (!Number.isFinite(linkAmount) || linkAmount < 1) {
+        return json({ error: "Enter an amount of at least 1.00" }, 400);
+      }
+      if (!linkWalletId) return json({ error: "wallet_id required" }, 400);
+
+      const { data: linkWallet } = await admin
+        .from("wallets")
+        .select("id, user_id, currency_code")
+        .eq("id", linkWalletId)
+        .maybeSingle();
+      if (!linkWallet || linkWallet.user_id !== user.id) {
+        return json({ error: "Wallet not found" }, 404);
+      }
+
+      const reference = `efm-wl-${user.id.slice(0, 8)}-${Date.now()}`;
+      const { data: linkIntent, error: linkErr } = await admin
+        .from("wise_topup_intents")
+        .insert({
+          user_id: user.id,
+          wallet_id: linkWalletId,
+          amount: Math.round(linkAmount * 100) / 100,
+          currency_code: String(linkWallet.currency_code).toUpperCase(),
+          reference,
+          status: "pending",
+        })
+        .select("id, amount, currency_code, reference, status, created_at, expires_at")
+        .single();
+      if (linkErr || !linkIntent) {
+        return json({ error: linkErr?.message || "Could not create Wise payment intent" }, 500);
+      }
+      return json({ ok: true, intent: linkIntent });
+    }
+
 
     if (!configured) {
       return json({
