@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -34,28 +34,89 @@ export default function CadInteracTopUpCard({ walletId, walletCurrency, onComple
   const [intent, setIntent] = useState<Intent | null>(null);
   const [instructions, setInstructions] = useState<string[]>([]);
   const [configured, setConfigured] = useState(true);
+  const [bootstrapped, setBootstrapped] = useState(false);
+  const [autoError, setAutoError] = useState<string | null>(null);
+  const autoTriedRef = useRef<string | null>(null);
+
+  const createIntent = useCallback(
+    async (auto = false) => {
+      const amt = Number(amount);
+      if (!Number.isFinite(amt) || amt < 1) {
+        if (!auto) toast.error("Enter an amount of at least CAD 1.00");
+        return;
+      }
+      setLoading(true);
+      setAutoError(null);
+      try {
+        const { data, error } = await supabase.functions.invoke("fincra-cad-interac", {
+          body: { action: "create", amount: amt, wallet_id: walletId },
+        });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+        setAlias((prev) => data.alias ?? prev);
+        setIntent(data.intent);
+        setInstructions(Array.isArray(data.instructions) ? data.instructions : []);
+        if (!auto) {
+          toast.message("Interac details ready", {
+            description: "Send the exact amount from your bank app.",
+          });
+        }
+      } catch (e) {
+        const message = e instanceof Error ? e.message : "Could not start Interac top-up";
+        setAutoError(message);
+        if (!auto) toast.error(message);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [amount, walletId],
+  );
 
   useEffect(() => {
     if (currency !== "CAD") return;
+    let cancelled = false;
     void (async () => {
-      const { data, error } = await supabase.functions.invoke("fincra-cad-interac", {
-        method: "GET",
-      });
-      // invoke doesn't support GET well — use fetch
-      const session = (await supabase.auth.getSession()).data.session;
-      const res = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fincra-cad-interac`,
-        { headers: { Authorization: `Bearer ${session?.access_token || ""}`, apikey: import.meta.env.VITE_SUPABASE_ANON_KEY } },
-      );
-      const json = await res.json().catch(() => ({}));
-      if (!error && json) {
-        setAlias(json.alias ?? null);
-        setConfigured(Boolean(json.configured));
-        const pending = Array.isArray(json.pending) ? json.pending[0] : null;
-        if (pending) setIntent(pending);
+      try {
+        const session = (await supabase.auth.getSession()).data.session;
+        const res = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fincra-cad-interac`,
+          {
+            headers: {
+              Authorization: `Bearer ${session?.access_token || ""}`,
+              apikey: import.meta.env.VITE_SUPABASE_ANON_KEY as string,
+            },
+          },
+        );
+        const json = await res.json().catch(() => ({}));
+        if (cancelled) return;
+        if (res.ok) {
+          setAlias(json.alias ?? null);
+          setConfigured(Boolean(json.configured));
+          const pending = Array.isArray(json.pending) ? json.pending[0] : null;
+          if (pending) {
+            setIntent(pending);
+            autoTriedRef.current = String(Number(pending.amount));
+          }
+        }
+      } finally {
+        if (!cancelled) setBootstrapped(true);
       }
     })();
+    return () => {
+      cancelled = true;
+    };
   }, [currency]);
+
+  // Auto-create the intent so the checkout details show without an extra click
+  useEffect(() => {
+    if (currency !== "CAD" || !bootstrapped || intent || loading) return;
+    const amt = Number(amount);
+    if (!Number.isFinite(amt) || amt < 1) return;
+    const key = String(amt);
+    if (autoTriedRef.current === key) return;
+    autoTriedRef.current = key;
+    void createIntent(true);
+  }, [currency, bootstrapped, intent, loading, amount, createIntent]);
 
   // Poll active intent
   useEffect(() => {
@@ -97,31 +158,8 @@ export default function CadInteracTopUpCard({ walletId, walletCurrency, onComple
 
   if (currency !== "CAD") return null;
 
-  const handleCreate = async () => {
-    const amt = Number(amount);
-    if (!Number.isFinite(amt) || amt < 1) {
-      toast.error("Enter an amount of at least CAD 1.00");
-      return;
-    }
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("fincra-cad-interac", {
-        body: { action: "create", amount: amt, wallet_id: walletId },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      setAlias(data.alias ?? alias);
-      setIntent(data.intent);
-      setInstructions(Array.isArray(data.instructions) ? data.instructions : []);
-      toast.message("Interac details ready", {
-        description: "Send the exact amount from your bank app.",
-      });
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not start Interac top-up");
-    } finally {
-      setLoading(false);
-    }
-  };
+
+
 
   const copyAlias = async () => {
     if (!alias) return;
@@ -152,14 +190,24 @@ export default function CadInteracTopUpCard({ walletId, walletCurrency, onComple
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
-        {!configured && !intent && (
+        {!configured && !intent && !loading && (
           <p className="text-sm text-muted-foreground">
             Interac details are being prepared — try again in a moment.
           </p>
         )}
 
+        {autoError && !intent && (
+          <p className="text-sm text-destructive">{autoError}</p>
+        )}
 
-        {!intent && (
+        {!intent && loading && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Preparing Interac details…
+          </div>
+        )}
+
+        {!intent && !loading && (
           <>
             {!initialAmount && (
               <div className="space-y-2">
@@ -175,15 +223,15 @@ export default function CadInteracTopUpCard({ walletId, walletCurrency, onComple
                 <p className="text-xs text-muted-foreground">Minimum CAD 1.00 · Send this exact amount</p>
               </div>
             )}
-            <Button className="w-full" onClick={handleCreate} disabled={loading || !(Number(amount) > 0)}>
-              {loading ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Preparing…
-                </>
-              ) : (
-                "Get Interac details"
-              )}
+            <Button
+              className="w-full"
+              onClick={() => {
+                autoTriedRef.current = String(Number(amount));
+                void createIntent(false);
+              }}
+              disabled={!(Number(amount) > 0)}
+            >
+              {autoError ? "Try again" : "Get Interac details"}
             </Button>
           </>
         )}
