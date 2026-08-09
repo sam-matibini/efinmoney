@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import InteracCheckout from "@/components/payments/InteracCheckout";
 import WiseTopUpCard from "@/components/payments/WiseTopUpCard";
+import WisePayLinkCard from "@/components/payments/WisePayLinkCard";
+
 import CheckoutMethodGrid, { type CheckoutMethod } from "@/components/payments/CheckoutMethodGrid";
 import CheckoutShell from "@/components/payments/CheckoutShell";
 import { type Lang } from "@/components/payments/checkoutStrings";
