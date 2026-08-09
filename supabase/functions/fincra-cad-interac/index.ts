@@ -20,7 +20,36 @@ const CA_PHONE_RE = /^\+?1?[2-9]\d{9}$/;
 const OPEN_STATUSES = ["pending", "awaiting_payment"];
 
 const INTENT_COLUMNS =
-  "id, public_id, amount, currency_code, reference, status, created_at, expires_at, credited_at, claimed_sent_at, sender_name, sender_email, sender_bank, sender_phone, purpose, transfer_id";
+  "id, public_id, amount, currency_code, reference, status, created_at, expires_at, credited_at, claimed_sent_at, sender_name, sender_email, sender_bank, sender_phone, purpose, transfer_id, hosted_url, sender_account_type, sender_address_line1, sender_address_line2, sender_city, sender_region, sender_postal_code, sender_country";
+
+/**
+ * Best-effort hosted payment request on Wise. When the account exposes the
+ * payment-request API we hand the payer a Wise-hosted page (closest match to a
+ * card-style redirect checkout); otherwise we fall back to the e-Transfer push.
+ */
+async function hostedPaymentRequest(amount: number, reference: string): Promise<string | null> {
+  try {
+    if (!getWiseConfig().apiToken) return null;
+    const profileId = await resolveWiseProfileId();
+    const res = await wiseFetch(`/v2/profiles/${encodeURIComponent(profileId)}/payment-requests`, {
+      method: "POST",
+      body: JSON.stringify({
+        amount: { value: Math.round(amount * 100) / 100, currency: "CAD" },
+        description: reference,
+        reference,
+        selectedPaymentMethods: ["PISP", "CARD"],
+      }),
+    });
+    if (!res.ok || !res.json || typeof res.json !== "object") return null;
+    const row = res.json as Record<string, unknown>;
+    const link = row.link ?? row.paymentLink ?? row.url ?? (row.links as Record<string, unknown> | undefined)?.pay;
+    return typeof link === "string" && link.startsWith("http") ? link : null;
+  } catch (e) {
+    console.warn("fincra-cad-interac: hosted payment request unavailable", e instanceof Error ? e.message : e);
+    return null;
+  }
+}
+
 
 /**
  * Interac e-Transfer deposits land in the Wise CAD balance.
@@ -157,6 +186,13 @@ Deno.serve(async (req) => {
       customer_name?: string;
       customer_email?: string;
       customer_phone?: string;
+      sender_account_type?: string;
+      sender_address_line1?: string;
+      sender_address_line2?: string;
+      sender_city?: string;
+      sender_region?: string;
+      sender_postal_code?: string;
+      sender_country?: string;
     };
 
     const action = String(body.action || "create").toLowerCase();
@@ -251,6 +287,18 @@ Deno.serve(async (req) => {
     const customerEmail = String(body.customer_email || "").trim().toLowerCase().slice(0, 255) || null;
     const customerPhone = String(body.customer_phone || "").trim().slice(0, 30) || null;
 
+    const accountType = String(body.sender_account_type || "personal").trim().toLowerCase();
+    if (!["personal", "business"].includes(accountType)) {
+      return json({ error: "Account type must be personal or business" }, 400);
+    }
+    const trim = (v: unknown, max: number) => String(v ?? "").trim().slice(0, max) || null;
+    const addressLine1 = trim(body.sender_address_line1, 200);
+    const addressLine2 = trim(body.sender_address_line2, 200);
+    const city = trim(body.sender_city, 100);
+    const region = trim(body.sender_region, 100);
+    const postalCode = trim(body.sender_postal_code, 20);
+    const country = (trim(body.sender_country, 2) || "CA").toUpperCase();
+
     if (purpose === "transfer") {
       const { data: tr } = await admin
         .from("transfers")
@@ -291,6 +339,9 @@ Deno.serve(async (req) => {
       reference = `EFM-${day}-${String(Date.now() % 100000000).padStart(8, "0")}`;
     }
 
+    // The payer pressed "Pay", so the intent is already awaiting the deposit.
+    const hostedUrl = await hostedPaymentRequest(amount, reference);
+
     const { data: intent, error: insErr } = await admin
       .from("fincra_cad_interac_intents")
       .insert({
@@ -300,11 +351,20 @@ Deno.serve(async (req) => {
         currency_code: "CAD",
         reference,
         public_id: reference,
-        status: "pending",
+        status: "awaiting_payment",
+        claimed_sent_at: new Date().toISOString(),
+        hosted_url: hostedUrl,
         sender_name: senderName,
         sender_email: senderEmail || null,
         sender_phone: senderPhone || null,
         sender_bank: senderBank || null,
+        sender_account_type: accountType,
+        sender_address_line1: addressLine1,
+        sender_address_line2: addressLine2,
+        sender_city: city,
+        sender_region: region,
+        sender_postal_code: postalCode,
+        sender_country: country,
         purpose,
         transfer_id: purpose === "transfer" ? transferId : null,
         merchant_id: /^[0-9a-f-]{36}$/i.test(merchantId) ? merchantId : null,
@@ -322,6 +382,7 @@ Deno.serve(async (req) => {
     return json({
       ok: true,
       alias,
+      hosted_url: hostedUrl,
       intent,
       instructions: buildInstructions(
         Number(intent.amount),

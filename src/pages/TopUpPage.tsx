@@ -25,10 +25,10 @@ import { CheckCircle2, XCircle } from "lucide-react";
 import { useWallets } from "@/hooks/useWallets";
 import { useAuth } from "@/hooks/useAuth";
 import ElicateTopUpCard from "@/components/payments/ElicateTopUpCard";
-import CadInteracTopUpCard from "@/components/payments/CadInteracTopUpCard";
 import LinkBankPanel from "@/components/payments/LinkBankPanel";
 import WiseTopUpCard from "@/components/payments/WiseTopUpCard";
 import CadCollectionPanel from "@/components/topup/CadCollectionPanel";
+import InteracCheckout from "@/components/payments/InteracCheckout";
 
 import GhanaTopUpCard from "@/components/payments/GhanaTopUpCard";
 import NombaTopUpCard from "@/components/payments/NombaTopUpCard";
@@ -892,7 +892,7 @@ const TopUpPage = () => {
         description: "Send from your Canadian bank",
         content: (
           <SectionBoundary name="CadInteracTopUp">
-            <CadInteracTopUpCard walletId={walletId} walletCurrency={currency} initialAmount={amount} onComplete={invalidateWallets} />
+            <InteracCheckout walletId={walletId} purpose="topup" initialAmount={amount} onComplete={invalidateWallets} />
           </SectionBoundary>
         ),
       });

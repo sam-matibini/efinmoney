@@ -4518,6 +4518,7 @@ export type Database = {
           customer_name: string | null
           customer_phone: string | null
           expires_at: string
+          hosted_url: string | null
           id: string
           match_tier: string | null
           matched_at: string | null
@@ -4527,10 +4528,17 @@ export type Database = {
           purpose: string
           received_at: string | null
           reference: string
+          sender_account_type: string | null
+          sender_address_line1: string | null
+          sender_address_line2: string | null
           sender_bank: string | null
+          sender_city: string | null
+          sender_country: string | null
           sender_email: string | null
           sender_name: string | null
           sender_phone: string | null
+          sender_postal_code: string | null
+          sender_region: string | null
           status: string
           transfer_id: string | null
           unmatched_reason: string | null
@@ -4549,6 +4557,7 @@ export type Database = {
           customer_name?: string | null
           customer_phone?: string | null
           expires_at?: string
+          hosted_url?: string | null
           id?: string
           match_tier?: string | null
           matched_at?: string | null
@@ -4558,10 +4567,17 @@ export type Database = {
           purpose?: string
           received_at?: string | null
           reference: string
+          sender_account_type?: string | null
+          sender_address_line1?: string | null
+          sender_address_line2?: string | null
           sender_bank?: string | null
+          sender_city?: string | null
+          sender_country?: string | null
           sender_email?: string | null
           sender_name?: string | null
           sender_phone?: string | null
+          sender_postal_code?: string | null
+          sender_region?: string | null
           status?: string
           transfer_id?: string | null
           unmatched_reason?: string | null
@@ -4580,6 +4596,7 @@ export type Database = {
           customer_name?: string | null
           customer_phone?: string | null
           expires_at?: string
+          hosted_url?: string | null
           id?: string
           match_tier?: string | null
           matched_at?: string | null
@@ -4589,10 +4606,17 @@ export type Database = {
           purpose?: string
           received_at?: string | null
           reference?: string
+          sender_account_type?: string | null
+          sender_address_line1?: string | null
+          sender_address_line2?: string | null
           sender_bank?: string | null
+          sender_city?: string | null
+          sender_country?: string | null
           sender_email?: string | null
           sender_name?: string | null
           sender_phone?: string | null
+          sender_postal_code?: string | null
+          sender_region?: string | null
           status?: string
           transfer_id?: string | null
           unmatched_reason?: string | null
