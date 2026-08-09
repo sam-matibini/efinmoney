@@ -16,6 +16,7 @@ import {
   useBeneficiaries, useDeleteBeneficiary, isCanadaBeneficiary, type Beneficiary,
 } from "@/hooks/useBeneficiaries";
 import ContactDetailsSheet from "@/components/contacts/ContactDetailsSheet";
+import { payoutMethodLabel } from "@/lib/payoutPartner";
 import { Search, Plus, Send, Pencil, Trash2, Users, LayoutGrid, List as ListIcon, Eye } from "lucide-react";
 
 import { formatDistanceToNow } from "date-fns";
@@ -26,10 +27,8 @@ import AppPage from "@/components/layout/AppPage";
 
 const flagFor = (code: string | null) =>
   BENEFICIARY_COUNTRIES.find((c) => c.code === code)?.flag || "🌍";
-const methodLabel = (b: Beneficiary) => {
-  if (b.bank_account) return `Bank · ${b.bank_name || ""}`.trim();
-  return BENEFICIARY_COUNTRIES.find((c) => c.code === b.country_code)?.method || "Mobile Money";
-};
+const methodLabel = (b: Beneficiary) => payoutMethodLabel(b);
+
 
 type ViewMode = "grid" | "list";
 const VIEW_KEY = "contacts.viewMode";
