@@ -27,6 +27,8 @@ import { useAuth } from "@/hooks/useAuth";
 import ElicateTopUpCard from "@/components/payments/ElicateTopUpCard";
 import LinkBankPanel from "@/components/payments/LinkBankPanel";
 import WiseTopUpCard from "@/components/payments/WiseTopUpCard";
+import WisePayLinkCard from "@/components/payments/WisePayLinkCard";
+import { isWisePayCurrency } from "@/lib/wisePayLink";
 import CadCollectionPanel from "@/components/topup/CadCollectionPanel";
 import InteracCheckout from "@/components/payments/InteracCheckout";
 
@@ -944,6 +946,20 @@ const TopUpPage = () => {
               {loading ? "Opening checkout…" : "Continue to checkout"}
             </Button>
           </div>
+        ),
+      });
+    }
+
+    if (productFeatures.wise && isWisePayCurrency(currency)) {
+      payMethods.push({
+        id: "wise_link",
+        tone: "bank",
+        label: "Pay with Wise",
+        description: "Bank transfer or card via Wise",
+        content: (
+          <SectionBoundary name="WisePayLink">
+            <WisePayLinkCard walletId={walletId} walletCurrency={currency} initialAmount={amount} onComplete={invalidateWallets} />
+          </SectionBoundary>
         ),
       });
     }
