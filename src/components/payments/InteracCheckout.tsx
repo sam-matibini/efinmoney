@@ -105,9 +105,11 @@ export default function InteracCheckout({
   const [form, setForm] = useState<PayerForm>(emptyPayerForm);
   const [loading, setLoading] = useState(false);
   const [alias, setAlias] = useState<string | null>(null);
+  const [configured, setConfigured] = useState(true);
   const [intent, setIntent] = useState<InteracIntent | null>(null);
   const [bootstrapped, setBootstrapped] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
 
   const amountLabel = `CAD ${(Number(amount) || 0).toFixed(2)}`;
 
@@ -161,11 +163,15 @@ export default function InteracCheckout({
         if (cancelled) return;
         if (res.ok) {
           setAlias(json.alias ?? null);
+          setConfigured(Boolean(json.configured ?? json.alias));
           if (resumePending) {
             const pending = Array.isArray(json.pending) ? json.pending[0] : null;
             if (pending) setIntent(pending);
           }
+        } else {
+          setConfigured(false);
         }
+
       } finally {
         if (!cancelled) setBootstrapped(true);
       }
@@ -306,6 +312,25 @@ export default function InteracCheckout({
       />
     );
   }
+
+  if (!configured) {
+    return (
+      <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-muted-foreground">
+        <p className="font-medium text-destructive">
+          {lang === "fr"
+            ? "Le virement Interac n'est pas disponible pour le moment."
+            : "Interac e-Transfer is temporarily unavailable."}
+        </p>
+        <p className="mt-1">
+          {lang === "fr"
+            ? "Veuillez utiliser le paiement par carte. Nous rétablissons ce mode de paiement sous peu."
+            : "Please use card checkout instead — we're restoring this payment method shortly."}
+        </p>
+      </div>
+    );
+  }
+
+
 
   return (
     <InteracPayerForm
