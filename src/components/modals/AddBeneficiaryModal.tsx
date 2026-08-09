@@ -145,6 +145,15 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
   const countryNetworks = country.networks || [];
   const activeNetwork = countryNetworks.find((n) => n.id === networkId) || null;
 
+  // Prefill the address country from the selected contact country until the user picks one.
+  useEffect(() => {
+    if (!open || addressCountryTouched) return;
+    const iso = COUNTRY_ISO2[country.country] || COUNTRY_ISO2[country.id];
+    if (iso && iso !== addressCountry) setAddressCountry(iso);
+  }, [open, countryId, addressCountryTouched]); // eslint-disable-line react-hooks/exhaustive-deps
+
+
+
   // Keep the operator valid for the selected country.
   useEffect(() => {
     if (countryNetworks.length === 0) {
