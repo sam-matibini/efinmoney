@@ -249,18 +249,12 @@ export default function InteracCheckout({
       if (cancelled || attempts > 80) return;
       attempts += 1;
       try {
-        const session = (await supabase.auth.getSession()).data.session;
-        const res = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fincra-cad-interac?intent_id=${encodeURIComponent(intent.id)}`,
-          {
-            headers: {
-              Authorization: `Bearer ${session?.access_token || ""}`,
-              apikey: import.meta.env.VITE_SUPABASE_ANON_KEY as string,
-            },
-          },
+        const { data } = await supabase.functions.invoke(
+          `fincra-cad-interac?intent_id=${encodeURIComponent(intent.id)}`,
+          { method: "GET" },
         );
-        const json = await res.json();
-        const next = json?.intent as InteracIntent | undefined;
+        const next = (data as { intent?: InteracIntent } | null)?.intent;
+
         if (next) {
           setIntent(next);
           if (DONE.includes(next.status)) {
