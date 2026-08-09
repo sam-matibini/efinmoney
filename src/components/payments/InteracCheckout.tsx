@@ -152,30 +152,24 @@ export default function InteracCheckout({
     let cancelled = false;
     void (async () => {
       try {
-        const session = (await supabase.auth.getSession()).data.session;
-        const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fincra-cad-interac`, {
-          headers: {
-            Authorization: `Bearer ${session?.access_token || ""}`,
-            apikey: import.meta.env.VITE_SUPABASE_ANON_KEY as string,
-          },
+        const { data, error: fnError } = await supabase.functions.invoke("fincra-cad-interac", {
+          method: "GET",
         });
-        const json = await res.json().catch(() => ({}));
         if (cancelled) return;
-        if (res.ok) {
-          setAlias(json.alias ?? null);
-          setConfigured(Boolean(json.configured ?? json.alias));
-          if (resumePending) {
-            const pending = Array.isArray(json.pending) ? json.pending[0] : null;
-            if (pending) setIntent(pending);
-          }
-        } else {
-          setConfigured(false);
+        if (fnError) return; // transient/auth hiccup — keep the form usable
+        const json = (data ?? {}) as Record<string, unknown>;
+        setAlias((json.alias as string | null) ?? null);
+        // Only block when the backend explicitly says there is no deposit alias.
+        if (json.configured === false) setConfigured(false);
+        if (resumePending) {
+          const pending = Array.isArray(json.pending) ? (json.pending[0] as InteracIntent) : null;
+          if (pending) setIntent(pending);
         }
-
       } finally {
         if (!cancelled) setBootstrapped(true);
       }
     })();
+
     return () => {
       cancelled = true;
     };
@@ -255,18 +249,12 @@ export default function InteracCheckout({
       if (cancelled || attempts > 80) return;
       attempts += 1;
       try {
-        const session = (await supabase.auth.getSession()).data.session;
-        const res = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fincra-cad-interac?intent_id=${encodeURIComponent(intent.id)}`,
-          {
-            headers: {
-              Authorization: `Bearer ${session?.access_token || ""}`,
-              apikey: import.meta.env.VITE_SUPABASE_ANON_KEY as string,
-            },
-          },
+        const { data } = await supabase.functions.invoke(
+          `fincra-cad-interac?intent_id=${encodeURIComponent(intent.id)}`,
+          { method: "GET" },
         );
-        const json = await res.json();
-        const next = json?.intent as InteracIntent | undefined;
+        const next = (data as { intent?: InteracIntent } | null)?.intent;
+
         if (next) {
           setIntent(next);
           if (DONE.includes(next.status)) {

@@ -28,7 +28,7 @@ const fnHeaders = async () => {
   const session = (await supabase.auth.getSession()).data.session;
   return {
     Authorization: `Bearer ${session?.access_token || ""}`,
-    apikey: import.meta.env.VITE_SUPABASE_ANON_KEY as string,
+    apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string,
   };
 };
 
