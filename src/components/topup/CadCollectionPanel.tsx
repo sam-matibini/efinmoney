@@ -1,11 +1,10 @@
 import { useEffect, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Landmark } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import CadInteracTopUpCard from "@/components/payments/CadInteracTopUpCard";
+import InteracCheckout from "@/components/payments/InteracCheckout";
 import WiseTopUpCard from "@/components/payments/WiseTopUpCard";
 import CheckoutMethodGrid, { type CheckoutMethod } from "@/components/payments/CheckoutMethodGrid";
-
+import CheckoutShell from "@/components/payments/CheckoutShell";
+import { type Lang } from "@/components/payments/checkoutStrings";
 
 interface Props {
   walletId: string;
@@ -15,12 +14,15 @@ interface Props {
 }
 
 /**
- * Single CAD collection screen: Interac e-Transfer or bank EFT.
- * Both rails create a referenced intent and credit automatically when the deposit arrives.
+ * Hosted CAD collection checkout: pick a rail, fill one payer form, pay.
+ * Both rails create a referenced intent and credit automatically once the
+ * deposit arrives.
  */
 export default function CadCollectionPanel({ walletId, walletCurrency, initialAmount, onComplete }: Props) {
-  const [tab, setTab] = useState<CheckoutMethod>("interac");
+  const [method, setMethod] = useState<CheckoutMethod | null>(null);
+  const [lang, setLang] = useState<Lang>("en");
   const [eftAvailable, setEftAvailable] = useState<boolean | null>(null);
+  const isCad = walletCurrency.toUpperCase() === "CAD";
 
   useEffect(() => {
     let cancelled = false;
@@ -50,49 +52,50 @@ export default function CadCollectionPanel({ walletId, walletCurrency, initialAm
     };
   }, []);
 
+  const amount = Number(initialAmount) > 0 ? Number(initialAmount) : 0;
+  const amountLabel = `CAD ${amount.toFixed(2)}`;
+
   return (
-    <Card className="border-border bg-gradient-to-br from-muted/40 to-background">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base flex items-center gap-2">
-          <Landmark className="h-4 w-4" />
-          Pay from your Canadian bank
-        </CardTitle>
-        <p className="text-sm text-muted-foreground">
-          Send CAD with Interac e-Transfer or a bank EFT. Your wallet credits automatically once the
-          deposit arrives with your reference.
-        </p>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <CheckoutShell
+      lang={lang}
+      onLangChange={setLang}
+      onBack={method ? () => setMethod(null) : undefined}
+      summary={{
+        payeeName: "eFinMoney wallet top-up",
+        amountLabel,
+        description: "Funds are credited to your CAD wallet automatically once the deposit arrives.",
+        lineItem: `CAD wallet top-up${walletCurrency ? ` (${walletCurrency.toUpperCase()})` : ""}`,
+      }}
+    >
+      {method === null ? (
         <CheckoutMethodGrid
-          amountLabel={
-            Number(initialAmount) > 0 ? `CAD ${Number(initialAmount).toFixed(2)}` : undefined
-          }
-          value={tab}
-          onChange={setTab}
-          interacAvailable={walletCurrency.toUpperCase() === "CAD"}
+          amountLabel={amount > 0 ? amountLabel : undefined}
+          value={"interac"}
+          onChange={setMethod}
+          interacAvailable={isCad}
+          lang={lang}
         />
-
-        {tab === "interac" ? (
-          <CadInteracTopUpCard
-            walletId={walletId}
-            walletCurrency={walletCurrency}
-            initialAmount={initialAmount}
-            onComplete={onComplete}
-          />
-        ) : eftAvailable === false ? (
-          <div className="rounded-lg border bg-muted/40 p-4 text-sm text-muted-foreground">
-            Bank EFT is not available yet for CAD. Use Interac e-Transfer in the meantime.
-          </div>
-        ) : (
-          <WiseTopUpCard
-            walletId={walletId}
-            walletCurrency={walletCurrency}
-            initialAmount={initialAmount}
-            onComplete={onComplete}
-          />
-        )}
-      </CardContent>
-
-    </Card>
+      ) : method === "interac" ? (
+        <InteracCheckout
+          walletId={walletId}
+          purpose="topup"
+          initialAmount={initialAmount}
+          lang={lang}
+          onComplete={onComplete}
+        />
+      ) : eftAvailable === false ? (
+        <div className="rounded-lg border bg-muted/40 p-4 text-sm text-muted-foreground">
+          Bank EFT is not available yet for CAD. Use Interac e-Transfer in the meantime.
+        </div>
+      ) : (
+        <WiseTopUpCard
+          walletId={walletId}
+          walletCurrency={walletCurrency}
+          initialAmount={initialAmount}
+          onComplete={onComplete}
+        />
+      )}
+    </CheckoutShell>
   );
 }
+
