@@ -165,6 +165,14 @@ Deno.serve(async (req) => {
     const senderName = String(body.sender_name || "").trim();
     const senderEmail = String(body.sender_email || "").trim().toLowerCase();
     const senderBank = String(body.sender_bank || "").trim();
+    const purpose = String(body.purpose || "topup").toLowerCase();
+    const transferId = String(body.transfer_id || "").trim();
+    if (purpose !== "topup" && purpose !== "transfer") {
+      return json({ error: "purpose must be topup or transfer" }, 400);
+    }
+    if (purpose === "transfer" && !/^[0-9a-f-]{36}$/i.test(transferId)) {
+      return json({ error: "transfer_id required for transfer funding" }, 400);
+    }
     if (senderName.length < 2 || senderName.length > 100) {
       return json({ error: "Enter the sender's full name (2-100 characters)" }, 400);
     }
@@ -174,6 +182,17 @@ Deno.serve(async (req) => {
     if (senderBank.length > 100) {
       return json({ error: "Sending bank must be 100 characters or less" }, 400);
     }
+
+    if (purpose === "transfer") {
+      const { data: tr } = await admin
+        .from("transfers")
+        .select("id, user_id")
+        .eq("id", transferId)
+        .maybeSingle();
+      if (!tr || tr.user_id !== user.id) return json({ error: "Transfer not found" }, 404);
+    }
+
+
 
     const { data: wallet, error: wErr } = await admin
       .from("wallets")
