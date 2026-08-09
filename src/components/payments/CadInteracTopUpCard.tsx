@@ -233,33 +233,68 @@ export default function CadInteracTopUpCard({ walletId, walletCurrency, onComple
         )}
 
         {!intent && !loading && (
-          <>
-            {!initialAmount && (
-              <div className="space-y-2">
-                <Label>Amount (CAD)</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  step="0.01"
-                  placeholder="e.g. 25"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                />
-                <p className="text-xs text-muted-foreground">Minimum CAD 1.00 · Send this exact amount</p>
-              </div>
-            )}
-            <Button
-              className="w-full"
-              onClick={() => {
-                autoTriedRef.current = String(Number(amount));
-                void createIntent(false);
-              }}
-              disabled={!(Number(amount) > 0)}
-            >
-              {autoError ? "Try again" : "Get Interac details"}
+          <form
+            className="space-y-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void createIntent();
+            }}
+          >
+            <p className="text-sm font-medium">Your e-Transfer details</p>
+            <div className="space-y-2">
+              <Label htmlFor="etx-amount">Amount (CAD)</Label>
+              <Input
+                id="etx-amount"
+                type="number"
+                min={1}
+                step="0.01"
+                placeholder="e.g. 25"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">Minimum CAD 1.00 · Send this exact amount</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="etx-name">Sender full name</Label>
+              <Input
+                id="etx-name"
+                ref={nameRef}
+                autoComplete="name"
+                maxLength={100}
+                placeholder="As it appears on your bank account"
+                value={senderName}
+                onChange={(e) => setSenderName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="etx-email">Sender email</Label>
+              <Input
+                id="etx-email"
+                type="email"
+                autoComplete="email"
+                maxLength={255}
+                placeholder="you@example.com"
+                value={senderEmail}
+                onChange={(e) => setSenderEmail(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">Send the e-Transfer from this email so we can match it.</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="etx-bank">Sending bank (optional)</Label>
+              <Input
+                id="etx-bank"
+                maxLength={100}
+                placeholder="e.g. RBC, TD, Scotiabank"
+                value={senderBank}
+                onChange={(e) => setSenderBank(e.target.value)}
+              />
+            </div>
+            <Button type="submit" className="w-full" disabled={!(Number(amount) > 0)}>
+              {autoError ? "Try again" : "Continue"}
             </Button>
-          </>
+          </form>
         )}
+
 
         {intent && intent.status === "pending" && (
           <div className="space-y-3">
