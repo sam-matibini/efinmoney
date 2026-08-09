@@ -53,6 +53,8 @@ import MoneyFlowShell from "@/components/money/MoneyFlowShell";
 import PaymentMethodRow, { type PaymentMethodOption } from "@/components/money/PaymentMethodRow";
 import MethodCheckoutPanel from "@/components/send/MethodCheckoutPanel";
 import WisePayLinkCard from "@/components/payments/WisePayLinkCard";
+import { verifySquareCheckout } from "@/components/payments/SquareTopUpCard";
+
 import { isWisePayCurrency } from "@/lib/wisePayLink";
 import InteracCheckout from "@/components/payments/InteracCheckout";
 import SendHeaderCountry from "@/components/send/SendHeaderCountry";
