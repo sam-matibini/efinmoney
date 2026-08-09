@@ -95,11 +95,17 @@ function extractRefNeedle(raw: string): string | null {
   return m?.[0] || null;
 }
 
-/** Interac e-Transfer intents use their own reference prefix. */
+/** Columns/statuses used when matching Interac e-Transfer intents. */
+const INTERAC_COLS =
+  "id, user_id, wallet_id, amount, currency_code, reference, transfer_id, sender_email, sender_phone";
+const INTERAC_OPEN = ["pending", "awaiting_payment"];
+
+/** Interac intents use EFM-YYYYMMDD-00000000 (legacy: efm-interac-…). */
 function extractInteracRefNeedle(raw: string): string | null {
-  const m = raw.match(/efm-interac-[a-z0-9]+-\d+/i);
+  const m = raw.match(/efm-\d{8}-\d{8}/i) || raw.match(/efm-interac-[a-z0-9]+-\d+/i);
   return m?.[0] || null;
 }
+
 
 
 Deno.serve(async (req) => {
