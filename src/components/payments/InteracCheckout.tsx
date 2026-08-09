@@ -1,11 +1,27 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
+import { FunctionsHttpError } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
 import InteracPayerForm, { emptyPayerForm, type PayerForm } from "@/components/payments/InteracPayerForm";
 import InteracStatusView from "@/components/payments/InteracStatusView";
 import { CHECKOUT_STRINGS, type Lang } from "@/components/payments/checkoutStrings";
+
+/** Supabase hides the response body on FunctionsHttpError — read the real reason out of it. */
+async function edgeErrorMessage(error: unknown, fallback: string): Promise<string> {
+  if (error instanceof FunctionsHttpError) {
+    try {
+      const body = await error.context.json();
+      const message = body?.error ?? body?.message;
+      if (typeof message === "string" && message.trim()) return message;
+    } catch {
+      /* non-JSON body */
+    }
+  }
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
 
 export type InteracIntent = {
   id: string;
