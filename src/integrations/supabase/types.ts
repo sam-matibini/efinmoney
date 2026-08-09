@@ -1138,6 +1138,10 @@ export type Database = {
       beneficiaries: {
         Row: {
           address: string | null
+          address_city: string | null
+          address_country_code: string | null
+          address_postal_code: string | null
+          address_region: string | null
           avatar_initials: string | null
           bank_account: string | null
           bank_code: string | null
@@ -1156,6 +1160,7 @@ export type Database = {
           last_sent_at: string | null
           mailing_address: string | null
           mailing_city: string | null
+          mailing_country_code: string | null
           mailing_postal_code: string | null
           mailing_region: string | null
           name: string
@@ -1172,6 +1177,10 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          address_city?: string | null
+          address_country_code?: string | null
+          address_postal_code?: string | null
+          address_region?: string | null
           avatar_initials?: string | null
           bank_account?: string | null
           bank_code?: string | null
@@ -1190,6 +1199,7 @@ export type Database = {
           last_sent_at?: string | null
           mailing_address?: string | null
           mailing_city?: string | null
+          mailing_country_code?: string | null
           mailing_postal_code?: string | null
           mailing_region?: string | null
           name: string
@@ -1206,6 +1216,10 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          address_city?: string | null
+          address_country_code?: string | null
+          address_postal_code?: string | null
+          address_region?: string | null
           avatar_initials?: string | null
           bank_account?: string | null
           bank_code?: string | null
@@ -1224,6 +1238,7 @@ export type Database = {
           last_sent_at?: string | null
           mailing_address?: string | null
           mailing_city?: string | null
+          mailing_country_code?: string | null
           mailing_postal_code?: string | null
           mailing_region?: string | null
           name?: string
