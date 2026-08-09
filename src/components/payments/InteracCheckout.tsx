@@ -105,9 +105,11 @@ export default function InteracCheckout({
   const [form, setForm] = useState<PayerForm>(emptyPayerForm);
   const [loading, setLoading] = useState(false);
   const [alias, setAlias] = useState<string | null>(null);
+  const [configured, setConfigured] = useState(true);
   const [intent, setIntent] = useState<InteracIntent | null>(null);
   const [bootstrapped, setBootstrapped] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
 
   const amountLabel = `CAD ${(Number(amount) || 0).toFixed(2)}`;
 
