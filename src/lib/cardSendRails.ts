@@ -33,6 +33,10 @@ const PAYTOTA_MOMO_DEST = ["UGX", "KES", "RWF"] as const;
 
 const SWYCHR_COLLECT = ["XAF", "XOF", "KES", "UGX"] as const;
 
+/** Square hosted checkout collect currencies (debit + credit cards). */
+const SQUARE_CARD_COLLECT = ["USD", "CAD", "EUR", "GBP"] as const;
+
+
 /** Flutterwave collect currencies used for card-send. */
 const FLW_COLLECT = ["USD", "CAD", "NGN", "GHS", "KES", "UGX", "RWF", "TZS", "ZMW"] as const;
 const FLW_MOMO_DEST = ["GHS", "KES", "UGX", "RWF", "TZS", "ZMW"] as const;
