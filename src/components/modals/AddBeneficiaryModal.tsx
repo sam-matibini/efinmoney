@@ -317,10 +317,21 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
 
           <div className="space-y-2 pt-2 border-t">
             <Label>Mailing address (optional)</Label>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="same-as-address"
+                checked={sameAsAddress}
+                onCheckedChange={(v) => setSameAsAddress(v === true)}
+              />
+              <Label htmlFor="same-as-address" className="text-sm font-normal text-muted-foreground">
+                Same as address
+              </Label>
+            </div>
             <Input
-              value={mailingAddress}
+              value={sameAsAddress ? address : mailingAddress}
               onChange={(e) => setMailingAddress(e.target.value)}
               placeholder="Street address"
+              disabled={sameAsAddress}
             />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Input
