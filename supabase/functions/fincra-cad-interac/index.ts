@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { getWiseConfig, wiseFetch, resolveWiseProfileId } from "../_shared/wise.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,6 +12,53 @@ function json(body: unknown, status = 200) {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 }
+
+const EMAIL_RE = /[\w.+-]+@[\w-]+\.[\w.-]+/;
+
+/**
+ * Interac e-Transfer deposits land in the Wise CAD balance.
+ * Prefer an Interac/e-Transfer receive option exposed by Wise, then the configured alias.
+ */
+async function aliasFromWise(): Promise<string | null> {
+  try {
+    if (!getWiseConfig().apiToken) return null;
+    const profileId = await resolveWiseProfileId();
+    const res = await wiseFetch(`/v1/profiles/${encodeURIComponent(profileId)}/account-details`);
+    if (!res.ok || !Array.isArray(res.json)) return null;
+    for (const row of res.json as Array<Record<string, unknown>>) {
+      if (String(row.status).toUpperCase() !== "ACTIVE") continue;
+      const currency = typeof row.currency === "string"
+        ? row.currency
+        : String((row.currency as Record<string, unknown> | undefined)?.code || "");
+      if (currency.toUpperCase() !== "CAD") continue;
+      const options = Array.isArray(row.receiveOptions) ? row.receiveOptions as Array<Record<string, unknown>> : [];
+      for (const opt of options) {
+        const label = `${opt.type ?? ""} ${opt.title ?? ""}`.toUpperCase();
+        if (!label.includes("INTERAC") && !label.includes("EMAIL")) continue;
+        const details = Array.isArray(opt.details) ? opt.details as Array<Record<string, unknown>> : [];
+        for (const d of details) {
+          const value = String(d.value ?? d.body ?? "");
+          const email = value.match(EMAIL_RE)?.[0];
+          if (email) return email;
+        }
+      }
+    }
+  } catch (e) {
+    console.warn("fincra-cad-interac: Wise alias lookup failed", e instanceof Error ? e.message : e);
+  }
+  return null;
+}
+
+async function resolveInteracAlias(): Promise<string> {
+  const fromWise = await aliasFromWise();
+  if (fromWise) return fromWise;
+  return (
+    Deno.env.get("WISE_CAD_INTERAC_ALIAS")?.trim() ||
+    Deno.env.get("FINCRA_CAD_INTERAC_ALIAS")?.trim() ||
+    ""
+  );
+}
+
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
