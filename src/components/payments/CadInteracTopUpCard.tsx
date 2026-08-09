@@ -153,10 +153,11 @@ export default function CadInteracTopUpCard({ walletId, walletCurrency, onComple
       </CardHeader>
       <CardContent className="space-y-4">
         {!configured && !intent && (
-          <p className="text-sm text-amber-700 dark:text-amber-400">
-            Interac e-Transfer is not available yet. Use card checkout or pay by invoice instead.
+          <p className="text-sm text-muted-foreground">
+            Interac details are being prepared — try again in a moment.
           </p>
         )}
+
 
         {!intent && (
           <>
@@ -174,7 +175,7 @@ export default function CadInteracTopUpCard({ walletId, walletCurrency, onComple
                 <p className="text-xs text-muted-foreground">Minimum CAD 1.00 · Send this exact amount</p>
               </div>
             )}
-            <Button className="w-full" onClick={handleCreate} disabled={loading || !configured || !(Number(amount) > 0)}>
+            <Button className="w-full" onClick={handleCreate} disabled={loading || !(Number(amount) > 0)}>
               {loading ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -205,7 +206,25 @@ export default function CadInteracTopUpCard({ walletId, walletCurrency, onComple
                   </div>
                 </div>
               )}
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">Reference (put this in the message field)</p>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 text-sm break-all">{intent.reference}</code>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={async () => {
+                      await navigator.clipboard.writeText(intent.reference);
+                      toast.success("Reference copied");
+                    }}
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
             </div>
+
             <ul className="text-xs text-muted-foreground space-y-1.5 list-disc list-inside">
               {(instructions.length ? instructions : [
                 "Open your Canadian banking app and start an Interac e-Transfer.",
