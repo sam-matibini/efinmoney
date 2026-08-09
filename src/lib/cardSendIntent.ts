@@ -3,7 +3,7 @@
  * After collection succeeds, Send page resumes and pays out from the credited wallet.
  */
 
-export type CardSendProvider = "fincra" | "nomba" | "lenhub" | "paytota" | "swychr" | "flutterwave";
+export type CardSendProvider = "square" | "fincra" | "nomba" | "lenhub" | "paytota" | "swychr" | "flutterwave";
 
 export type CardSendIntent = {
   provider: CardSendProvider;
@@ -17,7 +17,10 @@ export type CardSendIntent = {
   flwTransactionId?: string;
   /** Fincra checkout merchant reference */
   fincraReference?: string;
+  /** Square hosted checkout order id (square-create-checkout) */
+  squareOrderId?: string;
   useLenhubFlutter?: boolean;
+
   useSwychr?: boolean;
   useFlutterwave?: boolean;
   useFincraCollect?: boolean;
