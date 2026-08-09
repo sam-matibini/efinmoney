@@ -30,7 +30,7 @@ export interface PanelSavedCard {
 }
 
 interface Props {
-  method: "card" | "bank" | "wallet";
+  method: "card" | "bank" | "wallet" | "interac";
   /** Wallets valid for the active method. */
   wallets: PanelWallet[];
   selectedWalletId?: string;
@@ -177,6 +177,19 @@ const MethodCheckoutPanel = ({
       {helper && <p className="text-[11px] text-muted-foreground">{helper}</p>}
     </div>
   );
+
+  if (method === "interac") {
+    return (
+      <div className="rounded-xl border-2 border-pay-bank/30 bg-pay-bank/5 p-4">
+        <p className="text-sm font-semibold">Interac e-Transfer (CAD)</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Confirm the transfer and we'll show you the Interac details to send{" "}
+          {formatMoney(total, sourceCurrency)} from your Canadian bank. Your payout is released
+          automatically once the deposit arrives — usually within minutes.
+        </p>
+      </div>
+    );
+  }
 
   if (method === "card") {
     return (
