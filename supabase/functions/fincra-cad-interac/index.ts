@@ -159,6 +159,19 @@ Deno.serve(async (req) => {
     }
     if (!walletId) return json({ error: "wallet_id required" }, 400);
 
+    const senderName = String(body.sender_name || "").trim();
+    const senderEmail = String(body.sender_email || "").trim().toLowerCase();
+    const senderBank = String(body.sender_bank || "").trim();
+    if (senderName.length < 2 || senderName.length > 100) {
+      return json({ error: "Enter the sender's full name (2-100 characters)" }, 400);
+    }
+    if (!EMAIL_RE.test(senderEmail) || senderEmail.length > 255) {
+      return json({ error: "Enter a valid sender email address" }, 400);
+    }
+    if (senderBank.length > 100) {
+      return json({ error: "Sending bank must be 100 characters or less" }, 400);
+    }
+
     const { data: wallet, error: wErr } = await admin
       .from("wallets")
       .select("id, user_id, currency_code")
@@ -189,8 +202,13 @@ Deno.serve(async (req) => {
         currency_code: "CAD",
         reference,
         status: "pending",
+        sender_name: senderName,
+        sender_email: senderEmail,
+        sender_bank: senderBank || null,
       })
-      .select("id, amount, currency_code, reference, status, created_at, expires_at")
+      .select(
+        "id, amount, currency_code, reference, status, created_at, expires_at, sender_name, sender_email, sender_bank",
+      )
       .single();
 
     if (insErr || !intent) {
@@ -205,11 +223,12 @@ Deno.serve(async (req) => {
         `Open your Canadian banking app and send an Interac e-Transfer.`,
         `Send exactly CAD ${intent.amount} to ${alias}.`,
         `Put the reference ${intent.reference} in the message field.`,
+        `Send from ${senderEmail} so we can match your deposit.`,
         `Autodeposit is enabled — no security question needed.`,
         `Your CAD wallet credits when the transfer arrives (usually within minutes).`,
       ],
-
     });
+
   } catch (err) {
     console.error("fincra-cad-interac error:", err);
     return json({ error: err instanceof Error ? err.message : "Server error" }, 500);
