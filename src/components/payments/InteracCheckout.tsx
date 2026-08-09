@@ -163,11 +163,15 @@ export default function InteracCheckout({
         if (cancelled) return;
         if (res.ok) {
           setAlias(json.alias ?? null);
+          setConfigured(Boolean(json.configured ?? json.alias));
           if (resumePending) {
             const pending = Array.isArray(json.pending) ? json.pending[0] : null;
             if (pending) setIntent(pending);
           }
+        } else {
+          setConfigured(false);
         }
+
       } finally {
         if (!cancelled) setBootstrapped(true);
       }
