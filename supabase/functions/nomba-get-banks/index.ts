@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { fetchNombaBankCodes, isNombaNigeriaConfigured } from "../_shared/nomba-nigeria.ts";
-// NG_BANKS_FALLBACK + fallbackFlw disabled while debugging Nomba-only mode
+import { NG_BANKS_FALLBACK } from "../_shared/ng-banks-fallback.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -48,9 +48,12 @@ Deno.serve(async (req) => {
 
     if (!isNombaNigeriaConfigured()) {
       return new Response(JSON.stringify({
+        banks: cached?.banks ?? NG_BANKS_FALLBACK,
+        cached: Boolean(cached?.banks),
+        fallback: "static",
+        source: "static",
         error: "Nomba Nigeria not configured (NOMBA_PAY_API_URL / NOMBA_PAY_USER)",
-        source: "nomba",
-      }), { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const { banks, result } = await fetchNombaBankCodes();
@@ -76,12 +79,15 @@ Deno.serve(async (req) => {
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    // Nomba upstream (lenhub) currently 404s on the bankcode path, so never fail
+    // the request: serve the static NG bank list instead of blanking the UI.
     return new Response(JSON.stringify({
+      banks: NG_BANKS_FALLBACK,
+      cached: false,
+      fallback: "static",
+      source: "static",
       error: result.message || "Nomba bank list unavailable",
-      code: result.code,
-      source: "nomba",
-      nomba_raw: result.json,
-    }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     // Flutterwave/static fallbacks disabled while debugging Nomba:
     // return fallbackFlw(req, admin, cached, result.message);
