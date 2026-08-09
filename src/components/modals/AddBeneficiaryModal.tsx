@@ -227,7 +227,7 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
       eft_account: method === "eft" ? eftAcct : null,
       eft_account_holder: method === "eft" ? (eftHolder.trim() || name.trim()) : null,
       interac_email: method === "interac" ? interacEmail.trim() : null,
-      mailing_address: mailingAddress.trim() || null,
+      mailing_address: (sameAsAddress ? address.trim() : mailingAddress.trim()) || null,
       mailing_city: mailingCity.trim() || null,
       mailing_region: mailingRegion.trim() || null,
       mailing_postal_code: mailingPostal.trim() || null,
