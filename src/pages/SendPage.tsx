@@ -201,6 +201,9 @@ const SendPage = () => {
   const [recipientPhone, setRecipientPhone] = useState("");
   const [selectedSourceId, setSelectedSourceId] = useState<string>("");
   const [lastTransferId, setLastTransferId] = useState<string | null>(null);
+  const [interacFunding, setInteracFunding] = useState<
+    { transferId: string; walletId: string; amount: number } | null
+  >(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [saveModalOpen, setSaveModalOpen] = useState(false);     // pre-filled Add modal
   const [addCardOpen, setAddCardOpen] = useState(false);
@@ -767,7 +770,7 @@ const SendPage = () => {
 
   // Create transfer row + maybe save beneficiary. Returns id.
   const createTransferRecord = async (overrides?: {
-    funding_source?: "wallet" | "card" | "bank";
+    funding_source?: FundingSource;
     sender_wallet_id?: string;
     source_currency?: string;
     target_currency?: string;
@@ -882,10 +885,33 @@ const SendPage = () => {
     }
   };
 
-  const handleConfirm = async (fundingOverride?: "wallet" | "card" | "bank") => {
+  const handleConfirm = async (fundingOverride?: FundingSource) => {
     if (confirming) return;
     setConfirming(true);
     const funding = fundingOverride ?? fundingSource;
+
+    // Interac e-Transfer: park the transfer, then show deposit instructions.
+    // wise-webhook credits the CAD wallet and releases the payout on arrival.
+    if (funding === 'interac') {
+      if (!cadWallet) {
+        toast.error('You need a CAD wallet to pay by Interac e-Transfer.');
+        setConfirming(false);
+        return;
+      }
+      try {
+        const tid = await createTransferRecord({
+          funding_source: 'interac',
+          sender_wallet_id: cadWallet.wallet_id,
+        });
+        setInteracFunding({ transferId: tid, walletId: cadWallet.wallet_id, amount: totalCharge });
+        goToStep(4);
+      } catch (e: any) {
+        toast.error(e?.message || 'Could not start the Interac e-Transfer');
+      } finally {
+        setConfirming(false);
+      }
+      return;
+    }
 
     // ── Wallet: create + execute payout immediately ──────────────────────
     if (funding === 'wallet') {
@@ -1859,6 +1885,7 @@ const SendPage = () => {
     setPickedBeneficiaryId(null);
     setIntlLinkMode(false);
     setLinkResult(null);
+    setInteracFunding(null);
     setFromQuickSend(false);
     clearSendHandoff();
     clearCardSendIntent();
@@ -2819,7 +2846,27 @@ const SendPage = () => {
                                 exit="exit"
                                 transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
                               >
-                                {linkResult ? (
+                                {interacFunding ? (
+                                  <SectionBoundary name="InteracSendCheckout">
+                                    <div className="rounded-xl border-2 border-pay-bank/30 bg-pay-bank/5 p-4">
+                                      <p className="text-sm font-semibold">Pay by Interac e-Transfer</p>
+                                      <p className="mt-1 text-xs text-muted-foreground">
+                                        Send the exact amount with the reference below. Your transfer to{" "}
+                                        {recipientName || "your recipient"} is released automatically once it arrives.
+                                      </p>
+                                      <div className="mt-3">
+                                        <InteracCheckout
+                                          walletId={interacFunding.walletId}
+                                          purpose="transfer"
+                                          transferId={interacFunding.transferId}
+                                          fixedAmount={interacFunding.amount}
+                                          submitLabel="Get Interac details"
+                                          onComplete={() => setInteracFunding(null)}
+                                        />
+                                      </div>
+                                    </div>
+                                  </SectionBoundary>
+                                ) : linkResult ? (
                                   <SectionBoundary name="PaymentLinkSuccess"><PaymentLinkSuccess
                                     result={linkResult}
                                     amountLabel={`${targetSymbol}${parsedAmount.toFixed(2)}`}
