@@ -22,6 +22,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Pencil, Trash2, Network, AlertCircle, RefreshCw, Upload, FileDown, Eye } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { PartnerDetailSheet } from "./PartnerDetailSheet";
 import { downloadCsv, parseSpreadsheet } from "@/lib/tableExport";
 import { toast } from "sonner";
@@ -166,6 +167,42 @@ const emptyPartner: Partial<PaymentPartner> = {
 };
 
 const ISO_CODES = ISO_COUNTRIES.map((c) => c.code);
+
+/** Compact, single-line-ish list of destination countries with an overflow popover. */
+const ServesCell = ({ codes }: { codes: string[] }) => {
+  const MAX = 4;
+  if (!codes.length) return <span className="text-muted-foreground">—</span>;
+  const shown = codes.slice(0, MAX);
+  const rest = codes.slice(MAX);
+  return (
+    <div className="flex flex-wrap items-center gap-1">
+      {shown.map((c) => (
+        <Badge key={c} variant="secondary" className="font-mono text-[10px] leading-none px-1.5 py-1" title={countryLabel(c)}>
+          {c}
+        </Badge>
+      ))}
+      {rest.length ? (
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="ghost" size="sm" className="h-6 px-1.5 text-[10px] font-mono text-muted-foreground">
+              +{rest.length}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-64">
+            <p className="mb-2 text-xs font-medium">Serves {codes.length} destinations</p>
+            <div className="flex flex-wrap gap-1">
+              {codes.map((c) => (
+                <Badge key={c} variant="outline" className="font-mono text-[10px]" title={countryLabel(c)}>
+                  {c}
+                </Badge>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
+      ) : null}
+    </div>
+  );
+};
 
 export const PartnersPanel = () => {
   const { data: partners, isLoading, isError, error, refetch, isFetching } = usePaymentPartners();
