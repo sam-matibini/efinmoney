@@ -110,7 +110,6 @@ export function useTableQuery<T>(rows: T[] | undefined, cols: Col<T>[], opts: Ta
       if (col) out = [...out].sort(cmp(col, sortDir));
     }
     return out;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [all, cols, search, filters, sortKey, sortDir]);
 
   const exportCols = cols.filter((c) => c.sortable !== false);
