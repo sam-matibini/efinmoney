@@ -247,18 +247,12 @@ export const NetworkActivationPanel = () => {
                 </TabsContent>
 
                 <TabsContent value="fx">
+                  <fxQ.Controls />
                   <div className="overflow-x-auto">
                     <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Partner</TableHead>
-                          <TableHead>Pair</TableHead>
-                          <TableHead className="text-right">Mid-market</TableHead>
-                          <TableHead className="text-right">Partner rate</TableHead>
-                        </TableRow>
-                      </TableHeader>
+                      <fxQ.HeadRow />
                       <TableBody>
-                        {preview.fx.map((r, i) => (
+                        {fxQ.view.map((r, i) => (
                           <TableRow key={i}>
                             <TableCell className="font-medium">{String(r.partner_code)}</TableCell>
                             <TableCell>
