@@ -296,14 +296,20 @@ export function useTableQuery<T>(rows: T[] | undefined, cols: Col<T>[], opts: Ta
     const map: Record<string, FilterOption[]> = {};
     for (const c of filterCols) {
       const counts = new Map<string, number>();
+      for (const v of c.filterOptions ?? []) counts.set(v, 0);
       for (const r of all) {
-        const v = norm(c.value(r));
-        if (!v) continue;
-        counts.set(v, (counts.get(v) ?? 0) + 1);
+        const raw = norm(c.value(r));
+        if (!raw) continue;
+        const parts = c.filterMode === "includes" ? raw.split(",").map((s) => s.trim()).filter(Boolean) : [raw];
+        for (const v of parts) counts.set(v, (counts.get(v) ?? 0) + 1);
       }
       map[c.key] = [...counts.entries()]
-        .sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true }))
-        .map(([value, count]) => ({ value, count }));
+        .map(([value, count]) => ({ value, count, label: c.filterLabel?.(value) }))
+        .sort(
+          (a, b) =>
+            (b.count > 0 ? 1 : 0) - (a.count > 0 ? 1 : 0) ||
+            (a.label ?? a.value).localeCompare(b.label ?? b.value, undefined, { numeric: true }),
+        );
     }
     return map;
   }, [all, filterCols]);
@@ -314,7 +320,11 @@ export function useTableQuery<T>(rows: T[] | undefined, cols: Col<T>[], opts: Ta
       for (const [key, val] of Object.entries(filters)) {
         if (!val || val === ALL) continue;
         const col = cols.find((c) => c.key === key);
-        if (col && norm(col.value(r)) !== val) return false;
+        if (!col) continue;
+        const raw = norm(col.value(r));
+        if (col.filterMode === "includes") {
+          if (!raw.split(",").map((s) => s.trim()).includes(val)) return false;
+        } else if (raw !== val) return false;
       }
       if (!q) return true;
       return cols.some((c) => norm(c.value(r)).toLowerCase().includes(q));
