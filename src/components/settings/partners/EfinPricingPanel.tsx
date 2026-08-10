@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useEfinPricing, useAddEfinPricing, useRetireEfinPricing, type EfinPricing } from "@/hooks/usePartnerNetwork";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,11 +7,14 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Archive, Receipt, History } from "lucide-react";
+import { Plus, Archive, Receipt, History, Pencil, Upload, FileDown } from "lucide-react";
 import { format } from "date-fns";
+import { toast } from "sonner";
+import { useTableQuery, type Col } from "./tableToolkit";
+import { downloadCsv, parseSpreadsheet } from "@/lib/tableExport";
 
 const empty: Partial<EfinPricing> = {
   customer_type: "consumer",
@@ -24,6 +27,21 @@ const empty: Partial<EfinPricing> = {
   fx_margin_bps: 0,
 };
 
+/** Import / template columns, matching the editable fields on the form. */
+const IMPORT_COLUMNS = [
+  "customer_type",
+  "direction",
+  "source_currency",
+  "dest_currency",
+  "dest_country",
+  "payment_method",
+  "fixed_fee",
+  "percentage_fee",
+  "fx_margin_bps",
+  "min_fee",
+  "max_fee",
+];
+
 export const EfinPricingPanel = () => {
   const [history, setHistory] = useState(false);
   const { data: pricing, isLoading } = useEfinPricing(history);
@@ -31,7 +49,85 @@ export const EfinPricingPanel = () => {
   const retire = useRetireEfinPricing();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<Partial<EfinPricing>>(empty);
+  /** Row being superseded — retired once the new version saves. */
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const set = (patch: Partial<EfinPricing>) => setDraft((d) => ({ ...d, ...patch }));
+
+  const openNew = () => {
+    setEditingId(null);
+    setDraft(empty);
+    setOpen(true);
+  };
+
+  const openEdit = (p: EfinPricing) => {
+    const { id, effective_from, effective_to, ...rest } = p;
+    setEditingId(id);
+    setDraft(rest);
+    setOpen(true);
+  };
+
+  const save = () =>
+    add.mutate(draft, {
+      onSuccess: () => {
+        if (editingId) retire.mutate(editingId);
+        setEditingId(null);
+        setOpen(false);
+      },
+    });
+
+  const onFile = async (file: File) => {
+    const rows = await parseSpreadsheet(file);
+    if (!rows.length) {
+      toast.error("No rows found in file");
+      return;
+    }
+    let ok = 0;
+    for (const r of rows) {
+      if (!r.source_currency || !r.dest_currency) continue;
+      add.mutate({
+        customer_type: (r.customer_type || "consumer").toLowerCase(),
+        direction: ((r.direction || "payout").toLowerCase()) as EfinPricing["direction"],
+        source_currency: r.source_currency.toUpperCase(),
+        dest_currency: r.dest_currency.toUpperCase(),
+        dest_country: r.dest_country ? r.dest_country.toUpperCase() : null,
+        payment_method: r.payment_method ? r.payment_method.toLowerCase() : null,
+        fixed_fee: Number(r.fixed_fee || 0),
+        percentage_fee: Number(r.percentage_fee || 0),
+        fx_margin_bps: Number(r.fx_margin_bps || 0),
+        min_fee: r.min_fee ? Number(r.min_fee) : null,
+        max_fee: r.max_fee ? Number(r.max_fee) : null,
+      });
+      ok += 1;
+    }
+    toast.success(`Importing ${ok} pricing row${ok === 1 ? "" : "s"}`);
+  };
+
+  const cols = useMemo<Col<EfinPricing>[]>(
+    () => [
+      { key: "customer", label: "Customer type", value: (p) => p.customer_type, filter: true },
+      {
+        key: "corridor",
+        label: "Corridor",
+        value: (p) => `${p.direction} ${p.source_currency}→${p.dest_currency}${p.dest_country ? ` (${p.dest_country})` : ""}`,
+        filter: true,
+      },
+      { key: "fixed", label: "Fixed", value: (p) => p.fixed_fee, type: "number", align: "right" },
+      { key: "pct", label: "%", value: (p) => p.percentage_fee, type: "number", align: "right" },
+      { key: "fx", label: "FX margin", value: (p) => p.fx_margin_bps, type: "number", align: "right" },
+      { key: "effective", label: "Effective", value: (p) => p.effective_from, type: "date" },
+      { key: "actions", label: "", value: () => "", sortable: false },
+    ],
+    [],
+  );
+
+  const { view, Controls, HeadRow } = useTableQuery(pricing, cols, {
+    defaultSort: "effective",
+    defaultDir: "desc",
+    exportName: "customer-pricing",
+    searchPlaceholder: "Search customer, corridor…",
+  });
+
 
   return (
     <Card>
