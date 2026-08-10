@@ -152,12 +152,22 @@ export const PartnersPanel = () => {
 
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<Partial<PaymentPartner>>(emptyPartner);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importRows, setImportRows] = useState<ImportRow[]>([]);
+  const [importing, setImporting] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const set = (patch: Partial<PaymentPartner>) => setDraft((d) => ({ ...d, ...patch }));
 
+  const codeTaken =
+    !draft.id &&
+    !!draft.code &&
+    (partners ?? []).some((p) => p.code.toLowerCase() === String(draft.code).toLowerCase());
+
   const cols = useMemo<Col<PaymentPartner>[]>(
     () => [
-      { key: "name", label: "Partner", value: (p) => `${p.name} ${p.code}` },
+      { key: "name", label: "Partner", value: (p) => p.name, filter: true },
+      { key: "code", label: "Code", value: (p) => p.code },
       { key: "direction", label: "Direction", value: (p) => p.direction, filter: true },
       { key: "country", label: "Country", value: (p) => p.country ?? "", filter: true },
       { key: "settlement", label: "Settlement", value: (p) => p.settlement_currency ?? "", filter: true },
@@ -177,13 +187,81 @@ export const PartnersPanel = () => {
   });
 
   const save = () => {
-    if (!draft.code || !draft.name) return;
+    if (!draft.code || !draft.name || codeTaken) return;
     if (draft.id) {
       const { id, created_at, updated_at, ...patch } = draft as PaymentPartner;
       update.mutate({ id, patch }, { onSuccess: () => setOpen(false) });
     } else {
-      create.mutate(draft, { onSuccess: () => setOpen(false) });
+      create.mutate({ ...draft, code: normalizeCode(String(draft.code)) }, { onSuccess: () => setOpen(false) });
     }
+  };
+
+  const downloadTemplate = () =>
+    downloadCsv("payment-partners-template", [...TEMPLATE_HEADERS], [
+      [
+        "nomba",
+        "Nomba",
+        "both",
+        "NG",
+        "CBN licensed PSP",
+        "NGN",
+        "minutes",
+        "active",
+        "active",
+        "low",
+        96,
+        10,
+        "",
+        "",
+        "",
+        "",
+        "NGN, USD",
+        "NG",
+        "bank, card",
+        "nomba-initiate-payment",
+        "nomba-payout",
+        "nomba-exchange-rate",
+        "active",
+        "",
+      ],
+    ]);
+
+  const pickFile = async (file: File) => {
+    try {
+      const raw = await parseSpreadsheet(file);
+      if (!raw.length) {
+        toast.error("That file has no rows");
+        return;
+      }
+      setImportRows(buildImportRows(raw, partners ?? []));
+      setImportOpen(true);
+    } catch {
+      toast.error("Could not read that file. Use the CSV/XLSX template.");
+    }
+  };
+
+  const applyImport = async () => {
+    const apply = importRows.filter((r) => r.kind === "new" || r.kind === "update");
+    if (!apply.length) return;
+    setImporting(true);
+    let ok = 0;
+    let failed = 0;
+    for (const r of apply) {
+      try {
+        if (r.existingId) await update.mutateAsync({ id: r.existingId, patch: r.payload });
+        else await create.mutateAsync(r.payload);
+        ok++;
+      } catch {
+        failed++;
+      }
+    }
+    setImporting(false);
+    setImportOpen(false);
+    setImportRows([]);
+    refetch();
+    toast[failed ? "warning" : "success"](
+      failed ? `${ok} partners saved, ${failed} failed` : `${ok} partners saved`,
+    );
   };
 
   return (
@@ -195,16 +273,36 @@ export const PartnersPanel = () => {
           </CardTitle>
           <CardDescription>Pay-in and pay-out providers available to the routing engine</CardDescription>
         </div>
-        <Button
-          size="sm"
-          onClick={() => {
-            setDraft(emptyPartner);
-            setOpen(true);
-          }}
-        >
-          <Plus className="h-4 w-4 mr-1" /> Add partner
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".csv,.xlsx,.xls"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) pickFile(f);
+              e.target.value = "";
+            }}
+          />
+          <Button variant="outline" size="sm" onClick={downloadTemplate}>
+            <FileDown className="h-4 w-4 mr-1" /> Template
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
+            <Upload className="h-4 w-4 mr-1" /> Import
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => {
+              setDraft(emptyPartner);
+              setOpen(true);
+            }}
+          >
+            <Plus className="h-4 w-4 mr-1" /> Add partner
+          </Button>
+        </div>
       </CardHeader>
+
       <CardContent>
         {isLoading ? (
           <div className="space-y-2">
