@@ -7688,6 +7688,7 @@ export type Database = {
           monthly_limit: number | null
           name: string
           notes: string | null
+          partner_ref: string | null
           payin_function_slug: string | null
           payment_methods: string[]
           payout_function_slug: string | null
@@ -7722,6 +7723,7 @@ export type Database = {
           monthly_limit?: number | null
           name: string
           notes?: string | null
+          partner_ref?: string | null
           payin_function_slug?: string | null
           payment_methods?: string[]
           payout_function_slug?: string | null
@@ -7756,6 +7758,7 @@ export type Database = {
           monthly_limit?: number | null
           name?: string
           notes?: string | null
+          partner_ref?: string | null
           payin_function_slug?: string | null
           payment_methods?: string[]
           payout_function_slug?: string | null

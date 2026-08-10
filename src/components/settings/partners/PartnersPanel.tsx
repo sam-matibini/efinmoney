@@ -32,6 +32,7 @@ const normalizeCode = (v: string) =>
   v.toLowerCase().replace(/[^a-z0-9_-]/g, "_").replace(/_{2,}/g, "_");
 
 const TEMPLATE_HEADERS = [
+  "partner_ref",
   "code",
   "name",
   "direction",
@@ -66,6 +67,7 @@ type ImportKind = "new" | "update" | "unchanged" | "invalid";
 interface ImportRow {
   kind: ImportKind;
   reason?: string;
+  ref: string;
   code: string;
   name: string;
   payload: Partial<PaymentPartner>;
@@ -74,13 +76,19 @@ interface ImportRow {
 
 const num = (v: string) => (v === "" || v === undefined ? null : Number(v));
 
+const normalizeRef = (v: string) => v.trim().toUpperCase();
+
 const buildImportRows = (raw: Record<string, string>[], existing: PaymentPartner[]): ImportRow[] => {
   const byCode = new Map(existing.map((p) => [p.code.toLowerCase(), p]));
+  const byRef = new Map(existing.filter((p) => p.partner_ref).map((p) => [normalizeRef(p.partner_ref!), p]));
   const seen = new Set<string>();
   return raw.map((r) => {
-    const code = normalizeCode(String(r.code ?? "").trim());
-    const name = String(r.name ?? "").trim();
-    const invalid = (reason: string): ImportRow => ({ kind: "invalid", reason, code, name, payload: {} });
+    const ref = normalizeRef(String(r.partner_ref ?? ""));
+    const matchByRef = ref ? byRef.get(ref) : undefined;
+    const code = normalizeCode(String(r.code ?? "").trim()) || matchByRef?.code || "";
+    const name = String(r.name ?? "").trim() || matchByRef?.name || "";
+    const invalid = (reason: string): ImportRow => ({ kind: "invalid", reason, ref, code, name, payload: {} });
+    if (ref && !matchByRef) return invalid(`Unknown reference "${ref}"`);
     if (!code || !name) return invalid("Code and name are required");
     if (seen.has(code)) return invalid("Duplicate code in file");
     seen.add(code);
@@ -121,14 +129,21 @@ const buildImportRows = (raw: Record<string, string>[], existing: PaymentPartner
       quote_function_slug: r.quote_function_slug?.trim() || null,
       notes: r.notes?.trim() || null,
     };
-    const match = byCode.get(code);
-    if (!match) return { kind: "new", code, name, payload };
+    const match = matchByRef ?? byCode.get(code);
+    if (!match) return { kind: "new", ref, code, name, payload };
     const changed = Object.entries(payload).some(([k, v]) => {
       const cur = (match as unknown as Record<string, unknown>)[k];
       if (Array.isArray(v)) return JSON.stringify(v) !== JSON.stringify(cur ?? []);
       return String(v ?? "") !== String(cur ?? "");
     });
-    return { kind: changed ? "update" : "unchanged", code, name, payload, existingId: match.id };
+    return {
+      kind: changed ? "update" : "unchanged",
+      ref: match.partner_ref ?? ref,
+      code,
+      name,
+      payload,
+      existingId: match.id,
+    };
   });
 };
 
@@ -187,6 +202,7 @@ export const PartnersPanel = () => {
 
   const cols = useMemo<Col<PaymentPartner>[]>(
     () => [
+      { key: "partner_ref", label: "Ref", value: (p) => p.partner_ref ?? "", filter: true },
       { key: "name", label: "Partner", value: (p) => p.name, filter: true },
       { key: "code", label: "Code", value: (p) => p.code },
       { key: "direction", label: "Direction", value: (p) => p.direction, filter: true },
@@ -217,25 +233,27 @@ export const PartnersPanel = () => {
   );
 
   const { view, Controls, HeadRow } = useTableQuery(partners, cols, {
-    defaultSort: "priority",
+    defaultSort: "partner_ref",
     defaultDir: "asc",
     exportName: "payment-partners",
-    searchPlaceholder: "Search partner, code, country…",
+    searchPlaceholder: "Search ref, partner, code, country…",
   });
 
   const save = () => {
     if (!draft.code || !draft.name || codeTaken) return;
     if (draft.id) {
-      const { id, created_at, updated_at, ...patch } = draft as PaymentPartner;
+      const { id, created_at, updated_at, partner_ref, ...patch } = draft as PaymentPartner;
       update.mutate({ id, patch }, { onSuccess: () => setOpen(false) });
     } else {
-      create.mutate({ ...draft, code: normalizeCode(String(draft.code)) }, { onSuccess: () => setOpen(false) });
+      const { partner_ref, ...rest } = draft as Partial<PaymentPartner>;
+      create.mutate({ ...rest, code: normalizeCode(String(draft.code)) }, { onSuccess: () => setOpen(false) });
     }
   };
 
   const downloadTemplate = () =>
     downloadCsv("payment-partners-template", [...TEMPLATE_HEADERS], [
       [
+        "",
         "nomba",
         "Nomba",
         "both",
@@ -374,6 +392,7 @@ export const PartnersPanel = () => {
               <TableBody>
                 {view.map((p) => (
                   <TableRow key={p.id}>
+                    <TableCell className="font-mono text-xs">{p.partner_ref ?? "—"}</TableCell>
                     <TableCell>
                       <div className="font-medium">{p.name}</div>
                     </TableCell>
@@ -439,6 +458,13 @@ export const PartnersPanel = () => {
           </DialogHeader>
 
           <div className="grid gap-4 sm:grid-cols-2">
+            <div className="sm:col-span-2">
+              <Label>Reference</Label>
+              <Input value={draft.partner_ref || ""} readOnly className="bg-muted font-mono" placeholder="Assigned automatically" />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Issued automatically (EFN####) — use it for ops, invoices and reconciliation.
+              </p>
+            </div>
             <div>
               <Label>
                 Partner code <span className="text-destructive">*</span>
@@ -692,6 +718,7 @@ export const PartnersPanel = () => {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Ref</TableHead>
                   <TableHead>Code</TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>Direction</TableHead>
@@ -702,6 +729,7 @@ export const PartnersPanel = () => {
               <TableBody>
                 {importRows.map((r, i) => (
                   <TableRow key={`${r.code}-${i}`}>
+                    <TableCell className="font-mono text-xs">{r.ref || "—"}</TableCell>
                     <TableCell className="font-mono text-xs">{r.code || "—"}</TableCell>
                     <TableCell>{r.name || "—"}</TableCell>
                     <TableCell className="capitalize">{r.payload.direction || "—"}</TableCell>
