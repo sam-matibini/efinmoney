@@ -458,6 +458,13 @@ export const PartnersPanel = () => {
           </DialogHeader>
 
           <div className="grid gap-4 sm:grid-cols-2">
+            <div className="sm:col-span-2">
+              <Label>Reference</Label>
+              <Input value={draft.partner_ref || ""} readOnly className="bg-muted font-mono" placeholder="Assigned automatically" />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Issued automatically (EFN####) — use it for ops, invoices and reconciliation.
+              </p>
+            </div>
             <div>
               <Label>
                 Partner code <span className="text-destructive">*</span>
