@@ -177,6 +177,9 @@ export const NetworkActivationPanel = () => {
           >
             <Rocket className="h-4 w-4 mr-1" /> Apply {result ? `${result.summary.pricing + result.summary.fx + result.summary.retail} rows` : ""}
           </Button>
+          <Button variant="outline" size="sm" onClick={exportWorkbook} disabled={!preview}>
+            <FileSpreadsheet className="h-4 w-4 mr-1" /> Export Excel
+          </Button>
         </div>
       </CardHeader>
 
