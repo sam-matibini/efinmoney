@@ -143,6 +143,7 @@ export const PartnerCorridorsPanel = () => {
                 ))}
               </TableBody>
             </Table>
+            </div>
           </div>
         )}
       </CardContent>
