@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useTableQuery, type Col } from "./tableToolkit";
 import {
   usePaymentPartners,
@@ -17,11 +17,117 @@ import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Pencil, Trash2, Network, AlertCircle, RefreshCw } from "lucide-react";
+import { Plus, Pencil, Trash2, Network, AlertCircle, RefreshCw, Upload, FileDown } from "lucide-react";
+import { downloadCsv, parseSpreadsheet } from "@/lib/tableExport";
+import { toast } from "sonner";
 
 const csv = (v: string) => v.split(",").map((s) => s.trim()).filter(Boolean);
 
 const statusVariant = (s: string) => (s === "active" ? "default" : s === "pending" ? "secondary" : "outline");
+
+const normalizeCode = (v: string) =>
+  v.toLowerCase().replace(/[^a-z0-9_-]/g, "_").replace(/_{2,}/g, "_");
+
+const TEMPLATE_HEADERS = [
+  "code",
+  "name",
+  "direction",
+  "country",
+  "regulatory_status",
+  "settlement_currency",
+  "settlement_time",
+  "api_status",
+  "integration_status",
+  "compliance_risk",
+  "reliability_score",
+  "priority",
+  "min_transaction",
+  "max_transaction",
+  "daily_limit",
+  "monthly_limit",
+  "supported_currencies",
+  "supported_countries",
+  "payment_methods",
+  "payin_function_slug",
+  "payout_function_slug",
+  "quote_function_slug",
+  "status",
+  "notes",
+] as const;
+
+const DIRECTIONS = ["payin", "payout", "both"];
+const STATUSES = ["active", "inactive", "suspended", "pending"];
+const RISKS = ["low", "medium", "high"];
+
+type ImportKind = "new" | "update" | "unchanged" | "invalid";
+interface ImportRow {
+  kind: ImportKind;
+  reason?: string;
+  code: string;
+  name: string;
+  payload: Partial<PaymentPartner>;
+  existingId?: string;
+}
+
+const num = (v: string) => (v === "" || v === undefined ? null : Number(v));
+
+const buildImportRows = (raw: Record<string, string>[], existing: PaymentPartner[]): ImportRow[] => {
+  const byCode = new Map(existing.map((p) => [p.code.toLowerCase(), p]));
+  const seen = new Set<string>();
+  return raw.map((r) => {
+    const code = normalizeCode(String(r.code ?? "").trim());
+    const name = String(r.name ?? "").trim();
+    const invalid = (reason: string): ImportRow => ({ kind: "invalid", reason, code, name, payload: {} });
+    if (!code || !name) return invalid("Code and name are required");
+    if (seen.has(code)) return invalid("Duplicate code in file");
+    seen.add(code);
+    const direction = (r.direction || "both").trim().toLowerCase();
+    if (!DIRECTIONS.includes(direction)) return invalid(`Invalid direction "${direction}"`);
+    const status = (r.status || "active").trim().toLowerCase();
+    if (!STATUSES.includes(status)) return invalid(`Invalid status "${status}"`);
+    const risk = (r.compliance_risk || "low").trim().toLowerCase();
+    if (!RISKS.includes(risk)) return invalid(`Invalid compliance risk "${risk}"`);
+    for (const k of ["reliability_score", "priority", "min_transaction", "max_transaction", "daily_limit", "monthly_limit"]) {
+      const v = String(r[k] ?? "").trim();
+      if (v !== "" && Number.isNaN(Number(v))) return invalid(`"${k}" must be a number`);
+    }
+    const payload: Partial<PaymentPartner> = {
+      code,
+      name,
+      direction: direction as PaymentPartner["direction"],
+      status: status as PaymentPartner["status"],
+      compliance_risk: risk as PaymentPartner["compliance_risk"],
+      country: r.country?.trim().toUpperCase() || null,
+      regulatory_status: r.regulatory_status?.trim() || null,
+      settlement_currency: r.settlement_currency?.trim().toUpperCase() || null,
+      settlement_time: r.settlement_time?.trim() || null,
+      api_status: (r.api_status?.trim().toLowerCase() || "pending") as PaymentPartner["api_status"],
+      integration_status: (r.integration_status?.trim().toLowerCase() || "pending") as PaymentPartner["integration_status"],
+      reliability_score: Number(String(r.reliability_score ?? "").trim() || 100),
+      priority: Number(String(r.priority ?? "").trim() || 100),
+      min_transaction: num(String(r.min_transaction ?? "").trim()),
+      max_transaction: num(String(r.max_transaction ?? "").trim()),
+      daily_limit: num(String(r.daily_limit ?? "").trim()),
+      monthly_limit: num(String(r.monthly_limit ?? "").trim()),
+      supported_currencies: csv(String(r.supported_currencies ?? "").toUpperCase()),
+      supported_countries: csv(String(r.supported_countries ?? "").toUpperCase()),
+      payment_methods: csv(String(r.payment_methods ?? "").toLowerCase()),
+      payin_function_slug: r.payin_function_slug?.trim() || null,
+      payout_function_slug: r.payout_function_slug?.trim() || null,
+      quote_function_slug: r.quote_function_slug?.trim() || null,
+      notes: r.notes?.trim() || null,
+    };
+    const match = byCode.get(code);
+    if (!match) return { kind: "new", code, name, payload };
+    const changed = Object.entries(payload).some(([k, v]) => {
+      const cur = (match as unknown as Record<string, unknown>)[k];
+      if (Array.isArray(v)) return JSON.stringify(v) !== JSON.stringify(cur ?? []);
+      return String(v ?? "") !== String(cur ?? "");
+    });
+    return { kind: changed ? "update" : "unchanged", code, name, payload, existingId: match.id };
+  });
+};
+
 
 const emptyPartner: Partial<PaymentPartner> = {
   code: "",
