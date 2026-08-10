@@ -69,6 +69,10 @@ verify_jwt = false
 [functions.nomba-collection]
 verify_jwt = true
 
+# Official Nomba Developer API smoke (OAuth). Secrets: NOMBA_CLIENT_ID, NOMBA_CLIENT_SECRET, NOMBA_ACCOUNT_ID
+[functions.nomba-api-smoke]
+verify_jwt = false
+
 [functions.nomba-payment-callback]
 verify_jwt = false
 
