@@ -19,6 +19,8 @@ export type RoutingStrategy =
 export interface PaymentPartner {
   id: string;
   code: string;
+  /** Human reference (EFN####), auto-assigned by the database. */
+  partner_ref: string | null;
   name: string;
   direction: PartnerDirection;
   country: string | null;
