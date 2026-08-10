@@ -110,22 +110,13 @@ export const PartnerCorridorsPanel = () => {
         ) : !corridors?.length ? (
           <p className="text-sm text-muted-foreground py-6 text-center">No corridors configured.</p>
         ) : (
-          <div className="overflow-x-auto">
+          <div>
+            <Controls />
+            <div className="overflow-x-auto">
             <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Partner</TableHead>
-                  <TableHead>Direction</TableHead>
-                  <TableHead>Corridor</TableHead>
-                  <TableHead>Pair</TableHead>
-                  <TableHead>Method</TableHead>
-                  <TableHead className="text-right">ETA (min)</TableHead>
-                  <TableHead>Enabled</TableHead>
-                  <TableHead />
-                </TableRow>
-              </TableHeader>
+              <HeadRow />
               <TableBody>
-                {corridors.map((c) => (
+                {view.map((c) => (
                   <TableRow key={c.id}>
                     <TableCell className="font-medium">{nameOf(c.partner_id)}</TableCell>
                     <TableCell className="capitalize">{c.direction}</TableCell>
