@@ -1548,6 +1548,11 @@ const CanadaSendFlow = () => {
           mailing_city: null,
           mailing_region: null,
           mailing_postal_code: null,
+          mailing_country_code: null,
+          address_city: null,
+          address_region: null,
+          address_postal_code: null,
+          address_country_code: null,
         }}
       />
 
