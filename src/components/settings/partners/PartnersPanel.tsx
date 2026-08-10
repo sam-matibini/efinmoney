@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useTableQuery, type Col } from "./tableToolkit";
 import {
   usePaymentPartners,
@@ -17,11 +17,117 @@ import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Pencil, Trash2, Network, AlertCircle, RefreshCw } from "lucide-react";
+import { Plus, Pencil, Trash2, Network, AlertCircle, RefreshCw, Upload, FileDown } from "lucide-react";
+import { downloadCsv, parseSpreadsheet } from "@/lib/tableExport";
+import { toast } from "sonner";
 
 const csv = (v: string) => v.split(",").map((s) => s.trim()).filter(Boolean);
 
 const statusVariant = (s: string) => (s === "active" ? "default" : s === "pending" ? "secondary" : "outline");
+
+const normalizeCode = (v: string) =>
+  v.toLowerCase().replace(/[^a-z0-9_-]/g, "_").replace(/_{2,}/g, "_");
+
+const TEMPLATE_HEADERS = [
+  "code",
+  "name",
+  "direction",
+  "country",
+  "regulatory_status",
+  "settlement_currency",
+  "settlement_time",
+  "api_status",
+  "integration_status",
+  "compliance_risk",
+  "reliability_score",
+  "priority",
+  "min_transaction",
+  "max_transaction",
+  "daily_limit",
+  "monthly_limit",
+  "supported_currencies",
+  "supported_countries",
+  "payment_methods",
+  "payin_function_slug",
+  "payout_function_slug",
+  "quote_function_slug",
+  "status",
+  "notes",
+] as const;
+
+const DIRECTIONS = ["payin", "payout", "both"];
+const STATUSES = ["active", "inactive", "suspended", "pending"];
+const RISKS = ["low", "medium", "high"];
+
+type ImportKind = "new" | "update" | "unchanged" | "invalid";
+interface ImportRow {
+  kind: ImportKind;
+  reason?: string;
+  code: string;
+  name: string;
+  payload: Partial<PaymentPartner>;
+  existingId?: string;
+}
+
+const num = (v: string) => (v === "" || v === undefined ? null : Number(v));
+
+const buildImportRows = (raw: Record<string, string>[], existing: PaymentPartner[]): ImportRow[] => {
+  const byCode = new Map(existing.map((p) => [p.code.toLowerCase(), p]));
+  const seen = new Set<string>();
+  return raw.map((r) => {
+    const code = normalizeCode(String(r.code ?? "").trim());
+    const name = String(r.name ?? "").trim();
+    const invalid = (reason: string): ImportRow => ({ kind: "invalid", reason, code, name, payload: {} });
+    if (!code || !name) return invalid("Code and name are required");
+    if (seen.has(code)) return invalid("Duplicate code in file");
+    seen.add(code);
+    const direction = (r.direction || "both").trim().toLowerCase();
+    if (!DIRECTIONS.includes(direction)) return invalid(`Invalid direction "${direction}"`);
+    const status = (r.status || "active").trim().toLowerCase();
+    if (!STATUSES.includes(status)) return invalid(`Invalid status "${status}"`);
+    const risk = (r.compliance_risk || "low").trim().toLowerCase();
+    if (!RISKS.includes(risk)) return invalid(`Invalid compliance risk "${risk}"`);
+    for (const k of ["reliability_score", "priority", "min_transaction", "max_transaction", "daily_limit", "monthly_limit"]) {
+      const v = String(r[k] ?? "").trim();
+      if (v !== "" && Number.isNaN(Number(v))) return invalid(`"${k}" must be a number`);
+    }
+    const payload: Partial<PaymentPartner> = {
+      code,
+      name,
+      direction: direction as PaymentPartner["direction"],
+      status: status as PaymentPartner["status"],
+      compliance_risk: risk as PaymentPartner["compliance_risk"],
+      country: r.country?.trim().toUpperCase() || null,
+      regulatory_status: r.regulatory_status?.trim() || null,
+      settlement_currency: r.settlement_currency?.trim().toUpperCase() || null,
+      settlement_time: r.settlement_time?.trim() || null,
+      api_status: (r.api_status?.trim().toLowerCase() || "pending") as PaymentPartner["api_status"],
+      integration_status: (r.integration_status?.trim().toLowerCase() || "pending") as PaymentPartner["integration_status"],
+      reliability_score: Number(String(r.reliability_score ?? "").trim() || 100),
+      priority: Number(String(r.priority ?? "").trim() || 100),
+      min_transaction: num(String(r.min_transaction ?? "").trim()),
+      max_transaction: num(String(r.max_transaction ?? "").trim()),
+      daily_limit: num(String(r.daily_limit ?? "").trim()),
+      monthly_limit: num(String(r.monthly_limit ?? "").trim()),
+      supported_currencies: csv(String(r.supported_currencies ?? "").toUpperCase()),
+      supported_countries: csv(String(r.supported_countries ?? "").toUpperCase()),
+      payment_methods: csv(String(r.payment_methods ?? "").toLowerCase()),
+      payin_function_slug: r.payin_function_slug?.trim() || null,
+      payout_function_slug: r.payout_function_slug?.trim() || null,
+      quote_function_slug: r.quote_function_slug?.trim() || null,
+      notes: r.notes?.trim() || null,
+    };
+    const match = byCode.get(code);
+    if (!match) return { kind: "new", code, name, payload };
+    const changed = Object.entries(payload).some(([k, v]) => {
+      const cur = (match as unknown as Record<string, unknown>)[k];
+      if (Array.isArray(v)) return JSON.stringify(v) !== JSON.stringify(cur ?? []);
+      return String(v ?? "") !== String(cur ?? "");
+    });
+    return { kind: changed ? "update" : "unchanged", code, name, payload, existingId: match.id };
+  });
+};
+
 
 const emptyPartner: Partial<PaymentPartner> = {
   code: "",
@@ -46,12 +152,22 @@ export const PartnersPanel = () => {
 
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<Partial<PaymentPartner>>(emptyPartner);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importRows, setImportRows] = useState<ImportRow[]>([]);
+  const [importing, setImporting] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const set = (patch: Partial<PaymentPartner>) => setDraft((d) => ({ ...d, ...patch }));
 
+  const codeTaken =
+    !draft.id &&
+    !!draft.code &&
+    (partners ?? []).some((p) => p.code.toLowerCase() === String(draft.code).toLowerCase());
+
   const cols = useMemo<Col<PaymentPartner>[]>(
     () => [
-      { key: "name", label: "Partner", value: (p) => `${p.name} ${p.code}` },
+      { key: "name", label: "Partner", value: (p) => p.name, filter: true },
+      { key: "code", label: "Code", value: (p) => p.code },
       { key: "direction", label: "Direction", value: (p) => p.direction, filter: true },
       { key: "country", label: "Country", value: (p) => p.country ?? "", filter: true },
       { key: "settlement", label: "Settlement", value: (p) => p.settlement_currency ?? "", filter: true },
@@ -71,13 +187,81 @@ export const PartnersPanel = () => {
   });
 
   const save = () => {
-    if (!draft.code || !draft.name) return;
+    if (!draft.code || !draft.name || codeTaken) return;
     if (draft.id) {
       const { id, created_at, updated_at, ...patch } = draft as PaymentPartner;
       update.mutate({ id, patch }, { onSuccess: () => setOpen(false) });
     } else {
-      create.mutate(draft, { onSuccess: () => setOpen(false) });
+      create.mutate({ ...draft, code: normalizeCode(String(draft.code)) }, { onSuccess: () => setOpen(false) });
     }
+  };
+
+  const downloadTemplate = () =>
+    downloadCsv("payment-partners-template", [...TEMPLATE_HEADERS], [
+      [
+        "nomba",
+        "Nomba",
+        "both",
+        "NG",
+        "CBN licensed PSP",
+        "NGN",
+        "minutes",
+        "active",
+        "active",
+        "low",
+        96,
+        10,
+        "",
+        "",
+        "",
+        "",
+        "NGN, USD",
+        "NG",
+        "bank, card",
+        "nomba-initiate-payment",
+        "nomba-payout",
+        "nomba-exchange-rate",
+        "active",
+        "",
+      ],
+    ]);
+
+  const pickFile = async (file: File) => {
+    try {
+      const raw = await parseSpreadsheet(file);
+      if (!raw.length) {
+        toast.error("That file has no rows");
+        return;
+      }
+      setImportRows(buildImportRows(raw, partners ?? []));
+      setImportOpen(true);
+    } catch {
+      toast.error("Could not read that file. Use the CSV/XLSX template.");
+    }
+  };
+
+  const applyImport = async () => {
+    const apply = importRows.filter((r) => r.kind === "new" || r.kind === "update");
+    if (!apply.length) return;
+    setImporting(true);
+    let ok = 0;
+    let failed = 0;
+    for (const r of apply) {
+      try {
+        if (r.existingId) await update.mutateAsync({ id: r.existingId, patch: r.payload });
+        else await create.mutateAsync(r.payload);
+        ok++;
+      } catch {
+        failed++;
+      }
+    }
+    setImporting(false);
+    setImportOpen(false);
+    setImportRows([]);
+    refetch();
+    toast[failed ? "warning" : "success"](
+      failed ? `${ok} partners saved, ${failed} failed` : `${ok} partners saved`,
+    );
   };
 
   return (
@@ -89,16 +273,36 @@ export const PartnersPanel = () => {
           </CardTitle>
           <CardDescription>Pay-in and pay-out providers available to the routing engine</CardDescription>
         </div>
-        <Button
-          size="sm"
-          onClick={() => {
-            setDraft(emptyPartner);
-            setOpen(true);
-          }}
-        >
-          <Plus className="h-4 w-4 mr-1" /> Add partner
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".csv,.xlsx,.xls"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) pickFile(f);
+              e.target.value = "";
+            }}
+          />
+          <Button variant="outline" size="sm" onClick={downloadTemplate}>
+            <FileDown className="h-4 w-4 mr-1" /> Template
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
+            <Upload className="h-4 w-4 mr-1" /> Import
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => {
+              setDraft(emptyPartner);
+              setOpen(true);
+            }}
+          >
+            <Plus className="h-4 w-4 mr-1" /> Add partner
+          </Button>
+        </div>
       </CardHeader>
+
       <CardContent>
         {isLoading ? (
           <div className="space-y-2">
@@ -135,8 +339,9 @@ export const PartnersPanel = () => {
                   <TableRow key={p.id}>
                     <TableCell>
                       <div className="font-medium">{p.name}</div>
-                      <div className="text-xs text-muted-foreground">{p.code}</div>
                     </TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">{p.code}</TableCell>
+
                     <TableCell className="capitalize">{p.direction}</TableCell>
                     <TableCell>{p.country || "—"}</TableCell>
                     <TableCell>
@@ -185,9 +390,25 @@ export const PartnersPanel = () => {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <Label>Code</Label>
-              <Input value={draft.code || ""} onChange={(e) => set({ code: e.target.value })} placeholder="flutterwave" />
+              <Label>
+                Partner code <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                value={draft.code || ""}
+                readOnly={!!draft.id}
+                onChange={(e) => set({ code: normalizeCode(e.target.value) })}
+                placeholder="flutterwave"
+                className={draft.id ? "bg-muted" : ""}
+              />
+              <p className={`mt-1 text-xs ${codeTaken ? "text-destructive" : "text-muted-foreground"}`}>
+                {codeTaken
+                  ? "That code is already in use."
+                  : draft.id
+                    ? "Locked — routing and edge functions look this partner up by code."
+                    : "Lowercase, letters, numbers, - and _ only."}
+              </p>
             </div>
+
             <div>
               <Label>Name</Label>
               <Input value={draft.name || ""} onChange={(e) => set({ name: e.target.value })} placeholder="Flutterwave" />
@@ -385,13 +606,78 @@ export const PartnersPanel = () => {
             <Button variant="outline" onClick={() => setOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={save} disabled={create.isPending || update.isPending}>
+            <Button
+              onClick={save}
+              disabled={create.isPending || update.isPending || codeTaken || !draft.code || !draft.name}
+            >
               Save partner
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={importOpen} onOpenChange={setImportOpen}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Import partners</DialogTitle>
+            <DialogDescription>
+              Nothing is written until you apply. Invalid rows are never applied.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex flex-wrap gap-2 text-xs">
+            {(["new", "update", "unchanged", "invalid"] as ImportKind[]).map((k) => (
+              <Badge key={k} variant={k === "invalid" ? "destructive" : "secondary"} className="capitalize">
+                {k}: {importRows.filter((r) => r.kind === k).length}
+              </Badge>
+            ))}
+          </div>
+
+          <div className="max-h-[45vh] overflow-auto rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Code</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Direction</TableHead>
+                  <TableHead>Country</TableHead>
+                  <TableHead>Result</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {importRows.map((r, i) => (
+                  <TableRow key={`${r.code}-${i}`}>
+                    <TableCell className="font-mono text-xs">{r.code || "—"}</TableCell>
+                    <TableCell>{r.name || "—"}</TableCell>
+                    <TableCell className="capitalize">{r.payload.direction || "—"}</TableCell>
+                    <TableCell>{r.payload.country || "—"}</TableCell>
+                    <TableCell>
+                      <Badge variant={r.kind === "invalid" ? "destructive" : "secondary"} className="capitalize">
+                        {r.kind}
+                      </Badge>
+                      {r.reason && <span className="ml-2 text-xs text-muted-foreground">{r.reason}</span>}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setImportOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={applyImport}
+              disabled={importing || !importRows.some((r) => r.kind === "new" || r.kind === "update")}
+            >
+              Apply {importRows.filter((r) => r.kind === "new" || r.kind === "update").length} rows
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
+
   );
 };
 
