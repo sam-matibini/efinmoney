@@ -225,8 +225,12 @@ export const EfinPricingPanel = () => {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-xl">
           <DialogHeader>
-            <DialogTitle>Add customer pricing</DialogTitle>
-            <DialogDescription>Applies from now until retired. Existing rows stay for historical reconciliation.</DialogDescription>
+            <DialogTitle>{editingId ? "Edit customer pricing" : "Add customer pricing"}</DialogTitle>
+            <DialogDescription>
+              {editingId
+                ? "Saves a new version and retires the current one, so history stays intact."
+                : "Applies from now until retired. Existing rows stay for historical reconciliation."}
+            </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
