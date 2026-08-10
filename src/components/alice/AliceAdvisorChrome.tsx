@@ -11,9 +11,11 @@ import {
 import { Logo } from "@/components/Logo";
 import { cn } from "@/lib/utils";
 import {
+  ALICE_ACCENT,
+  ALICE_BRAND,
+  ALICE_BRAND_MID,
+  ALICE_BRAND_SOFT,
   ALICE_CREAM,
-  ALICE_FOREST,
-  ALICE_FOREST_SOFT,
   type AliceTab,
 } from "@/components/alice/aliceAdvisorTheme";
 
@@ -65,7 +67,7 @@ export function AliceAdvisorChrome({
         <div
           className="relative shrink-0 min-h-[168px] px-5 pt-4 pb-5 text-white"
           style={{
-            background: `linear-gradient(165deg, ${ALICE_FOREST} 0%, ${ALICE_FOREST_SOFT} 55%, #145C45 100%)`,
+            background: `linear-gradient(165deg, ${ALICE_BRAND} 0%, ${ALICE_BRAND_SOFT} 52%, ${ALICE_BRAND_MID} 100%)`,
           }}
         >
           <div className="relative z-10 flex items-center justify-between gap-2 mb-4 pr-2">
@@ -115,15 +117,15 @@ export function AliceAdvisorChrome({
             <img
               src="/alice.png"
               alt="Alice, eFinMoney AI Expert"
-              className="h-full w-full object-contain object-bottom mix-blend-multiply drop-shadow-[0_10px_22px_rgba(0,0,0,0.25)]"
+              className="h-full w-full object-contain object-bottom drop-shadow-[0_10px_22px_rgba(0,0,0,0.35)]"
               onError={(e) => {
                 e.currentTarget.style.display = "none";
               }}
             />
-            {/* Phone cue — ready to engage */}
+            {/* Phone cue — amber accent */}
             <span
-              className="absolute bottom-4 left-1 flex h-9 w-9 items-center justify-center rounded-full bg-white text-[color:var(--af)] shadow-md ring-2 ring-white/90"
-              style={{ ["--af" as string]: ALICE_FOREST }}
+              className="absolute bottom-4 left-1 flex h-9 w-9 items-center justify-center rounded-full shadow-md ring-2 ring-white/90"
+              style={{ background: ALICE_ACCENT, color: ALICE_BRAND }}
               aria-hidden
             >
               <Phone className="h-4 w-4" strokeWidth={2.5} />
@@ -160,23 +162,24 @@ export function AliceAdvisorChrome({
                   onClick={() => onTabChange(item.id)}
                   className={cn(
                     "relative flex flex-col items-center gap-0.5 py-1.5 text-[10px] font-medium transition-colors",
-                    active && !isCall ? "text-[color:var(--alice-forest)]" : "text-slate-400",
-                    active && isCall && "text-[color:var(--alice-forest)]",
+                    active && !isCall ? "text-[color:var(--alice-brand)]" : "text-slate-400",
+                    active && isCall && "text-[color:var(--alice-brand)]",
                   )}
-                  style={{ ["--alice-forest" as string]: ALICE_FOREST }}
+                  style={{ ["--alice-brand" as string]: ALICE_BRAND }}
                 >
                   {isCall ? (
                     <span
                       className={cn(
-                        "absolute -top-5 flex h-12 w-12 items-center justify-center rounded-full text-white shadow-lg",
+                        "absolute -top-5 flex h-12 w-12 items-center justify-center rounded-full shadow-lg",
                         "ring-4 ring-white transition-transform",
                         active ? "scale-105" : "scale-100 hover:scale-105",
                       )}
                       style={{
-                        background: `linear-gradient(145deg, ${ALICE_FOREST_SOFT}, ${ALICE_FOREST})`,
+                        background: `linear-gradient(145deg, ${ALICE_ACCENT}, #FF9F0A)`,
+                        color: ALICE_BRAND,
                         boxShadow: active
-                          ? `0 8px 24px rgba(11,61,46,0.45), 0 0 0 6px rgba(11,61,46,0.12)`
-                          : `0 8px 20px rgba(11,61,46,0.35)`,
+                          ? `0 8px 24px rgba(255,184,0,0.55), 0 0 0 6px rgba(255,184,0,0.18)`
+                          : `0 8px 20px rgba(26,15,60,0.35)`,
                       }}
                     >
                       <Phone className="h-5 w-5" strokeWidth={2.25} />
@@ -197,7 +200,7 @@ export function AliceAdvisorChrome({
         onClick={onMinimize}
         aria-label="Minimize Alice"
         className="pointer-events-auto h-10 w-10 rounded-full flex items-center justify-center text-white shadow-lg"
-        style={{ background: ALICE_FOREST }}
+        style={{ background: ALICE_BRAND }}
       >
         <ChevronDown className="h-5 w-5" />
       </button>
