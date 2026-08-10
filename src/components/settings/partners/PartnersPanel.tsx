@@ -390,9 +390,25 @@ export const PartnersPanel = () => {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <Label>Code</Label>
-              <Input value={draft.code || ""} onChange={(e) => set({ code: e.target.value })} placeholder="flutterwave" />
+              <Label>
+                Partner code <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                value={draft.code || ""}
+                readOnly={!!draft.id}
+                onChange={(e) => set({ code: normalizeCode(e.target.value) })}
+                placeholder="flutterwave"
+                className={draft.id ? "bg-muted" : ""}
+              />
+              <p className={`mt-1 text-xs ${codeTaken ? "text-destructive" : "text-muted-foreground"}`}>
+                {codeTaken
+                  ? "That code is already in use."
+                  : draft.id
+                    ? "Locked — routing and edge functions look this partner up by code."
+                    : "Lowercase, letters, numbers, - and _ only."}
+              </p>
             </div>
+
             <div>
               <Label>Name</Label>
               <Input value={draft.name || ""} onChange={(e) => set({ name: e.target.value })} placeholder="Flutterwave" />
