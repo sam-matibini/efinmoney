@@ -403,19 +403,10 @@ export const PartnersPanel = () => {
 
                     <TableCell className="capitalize">{p.direction}</TableCell>
                     <TableCell>{p.country ? countryLabel(p.country) : "—"}</TableCell>
-                    <TableCell className="max-w-[220px]">
-                      {(serves.get(p.id) ?? []).length ? (
-                        <div className="flex flex-wrap gap-1">
-                          {(serves.get(p.id) ?? []).map((c) => (
-                            <Badge key={c} variant="outline" className="font-mono text-[10px]" title={countryLabel(c)}>
-                              {c}
-                            </Badge>
-                          ))}
-                        </div>
-                      ) : (
-                        "—"
-                      )}
+                    <TableCell className="min-w-[190px] align-middle">
+                      <ServesCell codes={serves.get(p.id) ?? []} />
                     </TableCell>
+
                     <TableCell>
                       {p.settlement_currency || "—"}
                       <div className="text-xs text-muted-foreground">{p.settlement_time || ""}</div>
