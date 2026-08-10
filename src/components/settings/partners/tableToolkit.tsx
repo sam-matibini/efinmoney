@@ -89,6 +89,7 @@ export const FilterCombobox = ({
 }) => {
   const [open, setOpen] = useState(false);
   const selected = value && value !== ALL ? value : "";
+  const selectedLabel = selected ? (options.find((o) => o.value === selected)?.label ?? selected) : "";
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -98,7 +99,7 @@ export const FilterCombobox = ({
           aria-expanded={open}
           className={`h-9 ${width} justify-between font-normal`}
         >
-          <span className="truncate">{selected || `All ${label.toLowerCase()}`}</span>
+          <span className="truncate">{selectedLabel || `All ${label.toLowerCase()}`}</span>
           <ChevronsUpDown className="ml-1 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
