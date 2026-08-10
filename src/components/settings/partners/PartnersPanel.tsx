@@ -202,6 +202,7 @@ export const PartnersPanel = () => {
 
   const cols = useMemo<Col<PaymentPartner>[]>(
     () => [
+      { key: "partner_ref", label: "Ref", value: (p) => p.partner_ref ?? "", filter: true },
       { key: "name", label: "Partner", value: (p) => p.name, filter: true },
       { key: "code", label: "Code", value: (p) => p.code },
       { key: "direction", label: "Direction", value: (p) => p.direction, filter: true },
