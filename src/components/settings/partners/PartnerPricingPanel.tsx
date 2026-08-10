@@ -305,6 +305,7 @@ export const PartnerPricingPanel = () => {
                 ))}
               </TableBody>
             </Table>
+            </div>
           </div>
         )}
       </CardContent>
