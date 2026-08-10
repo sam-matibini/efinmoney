@@ -606,13 +606,78 @@ export const PartnersPanel = () => {
             <Button variant="outline" onClick={() => setOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={save} disabled={create.isPending || update.isPending}>
+            <Button
+              onClick={save}
+              disabled={create.isPending || update.isPending || codeTaken || !draft.code || !draft.name}
+            >
               Save partner
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={importOpen} onOpenChange={setImportOpen}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Import partners</DialogTitle>
+            <DialogDescription>
+              Nothing is written until you apply. Invalid rows are never applied.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex flex-wrap gap-2 text-xs">
+            {(["new", "update", "unchanged", "invalid"] as ImportKind[]).map((k) => (
+              <Badge key={k} variant={k === "invalid" ? "destructive" : "secondary"} className="capitalize">
+                {k}: {importRows.filter((r) => r.kind === k).length}
+              </Badge>
+            ))}
+          </div>
+
+          <div className="max-h-[45vh] overflow-auto rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Code</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Direction</TableHead>
+                  <TableHead>Country</TableHead>
+                  <TableHead>Result</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {importRows.map((r, i) => (
+                  <TableRow key={`${r.code}-${i}`}>
+                    <TableCell className="font-mono text-xs">{r.code || "—"}</TableCell>
+                    <TableCell>{r.name || "—"}</TableCell>
+                    <TableCell className="capitalize">{r.payload.direction || "—"}</TableCell>
+                    <TableCell>{r.payload.country || "—"}</TableCell>
+                    <TableCell>
+                      <Badge variant={r.kind === "invalid" ? "destructive" : "secondary"} className="capitalize">
+                        {r.kind}
+                      </Badge>
+                      {r.reason && <span className="ml-2 text-xs text-muted-foreground">{r.reason}</span>}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setImportOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={applyImport}
+              disabled={importing || !importRows.some((r) => r.kind === "new" || r.kind === "update")}
+            >
+              Apply {importRows.filter((r) => r.kind === "new" || r.kind === "update").length} rows
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
+
   );
 };
 
