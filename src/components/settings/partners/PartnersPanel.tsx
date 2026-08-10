@@ -392,6 +392,7 @@ export const PartnersPanel = () => {
               <TableBody>
                 {view.map((p) => (
                   <TableRow key={p.id}>
+                    <TableCell className="font-mono text-xs">{p.partner_ref ?? "—"}</TableCell>
                     <TableCell>
                       <div className="font-medium">{p.name}</div>
                     </TableCell>
