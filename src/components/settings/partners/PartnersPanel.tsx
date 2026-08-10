@@ -784,9 +784,11 @@ export const PartnersPanel = () => {
           setDraft(p);
           setOpen(true);
         }}
-        onToggleStatus={(p, active) =>
-          update.mutate({ id: p.id, patch: { status: active ? "active" : "inactive" } })
-        }
+        onToggleStatus={(p, active) => {
+          const status = (active ? "active" : "inactive") as PaymentPartner["status"];
+          setViewing({ ...p, status });
+          update.mutate({ id: p.id, patch: { status } });
+        }}
       />
     </Card>
 
