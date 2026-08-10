@@ -103,21 +103,13 @@ export const PartnerFxRatesPanel = () => {
         ) : !rates?.length ? (
           <p className="text-sm text-muted-foreground py-6 text-center">No partner rates recorded yet.</p>
         ) : (
-          <div className="overflow-x-auto">
+          <div>
+            <Controls />
+            <div className="overflow-x-auto">
             <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Partner</TableHead>
-                  <TableHead>Pair</TableHead>
-                  <TableHead className="text-right">Partner rate</TableHead>
-                  <TableHead className="text-right">Mid-market</TableHead>
-                  <TableHead className="text-right">Spread</TableHead>
-                  <TableHead>Recorded</TableHead>
-                  <TableHead>Source</TableHead>
-                </TableRow>
-              </TableHeader>
+              <HeadRow />
               <TableBody>
-                {rates.map((r) => {
+                {view.map((r) => {
                   const expired = r.expires_at ? new Date(r.expires_at) < new Date() : false;
                   return (
                     <TableRow key={r.id} className={expired ? "opacity-60" : ""}>
