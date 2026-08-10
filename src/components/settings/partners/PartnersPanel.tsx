@@ -462,7 +462,12 @@ export const PartnersPanel = () => {
             </div>
             <div>
               <Label>Operating country</Label>
-              <Input value={draft.country || ""} onChange={(e) => set({ country: e.target.value })} placeholder="NG" />
+              <CountryCombobox
+                value={draft.country}
+                onChange={(code) => set({ country: code })}
+                placeholder="Select country"
+                className="mt-0.5 h-10"
+              />
             </div>
             <div>
               <Label>Regulatory status</Label>
