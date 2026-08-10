@@ -272,22 +272,13 @@ export const PartnerPricingPanel = () => {
         ) : !pricing?.length ? (
           <p className="text-sm text-muted-foreground py-6 text-center">No pricing recorded yet.</p>
         ) : (
-          <div className="overflow-x-auto">
+          <div>
+            <Controls />
+            <div className="overflow-x-auto">
             <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Partner</TableHead>
-                  <TableHead>Route</TableHead>
-                  <TableHead className="text-right">Fixed</TableHead>
-                  <TableHead className="text-right">%</TableHead>
-                  <TableHead className="text-right">FX bps</TableHead>
-                  <TableHead className="text-right">Other fees</TableHead>
-                  <TableHead>Effective</TableHead>
-                  <TableHead>Source</TableHead>
-                </TableRow>
-              </TableHeader>
+              <HeadRow />
               <TableBody>
-                {pricing.map((p) => (
+                {view.map((p) => (
                   <TableRow key={p.id} className={p.effective_to ? "opacity-60" : ""}>
                     <TableCell className="font-medium">{nameOf(p.partner_id)}</TableCell>
                     <TableCell>
