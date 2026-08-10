@@ -100,7 +100,7 @@ const buildImportRows = (raw: Record<string, string>[], existing: PaymentPartner
       direction: direction as PaymentPartner["direction"],
       status: status as PaymentPartner["status"],
       compliance_risk: risk as PaymentPartner["compliance_risk"],
-      country: r.country?.trim().toUpperCase() || null,
+      country: toCountryCode(r.country),
       regulatory_status: r.regulatory_status?.trim() || null,
       settlement_currency: r.settlement_currency?.trim().toUpperCase() || null,
       settlement_time: r.settlement_time?.trim() || null,
