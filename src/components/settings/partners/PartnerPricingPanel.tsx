@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from "react";
+import { useTableQuery, type Col } from "./tableToolkit";
 import {
   usePaymentPartners,
   usePartnerPricing,
