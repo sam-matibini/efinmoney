@@ -1,7 +1,10 @@
 import { useMemo, useRef, useState } from "react";
 import { useTableQuery, type Col } from "./tableToolkit";
+import { CountryCombobox, countryLabel, toCountryCode, isKnownCountry } from "./CountryCombobox";
+import { ISO_COUNTRIES } from "@/lib/isoCountries";
 import {
   usePaymentPartners,
+  usePartnerCorridors,
   useCreatePartner,
   useUpdatePartner,
   useDeletePartner,
