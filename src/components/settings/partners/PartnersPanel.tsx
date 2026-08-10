@@ -129,14 +129,21 @@ const buildImportRows = (raw: Record<string, string>[], existing: PaymentPartner
       quote_function_slug: r.quote_function_slug?.trim() || null,
       notes: r.notes?.trim() || null,
     };
-    const match = byCode.get(code);
-    if (!match) return { kind: "new", code, name, payload };
+    const match = matchByRef ?? byCode.get(code);
+    if (!match) return { kind: "new", ref, code, name, payload };
     const changed = Object.entries(payload).some(([k, v]) => {
       const cur = (match as unknown as Record<string, unknown>)[k];
       if (Array.isArray(v)) return JSON.stringify(v) !== JSON.stringify(cur ?? []);
       return String(v ?? "") !== String(cur ?? "");
     });
-    return { kind: changed ? "update" : "unchanged", code, name, payload, existingId: match.id };
+    return {
+      kind: changed ? "update" : "unchanged",
+      ref: match.partner_ref ?? ref,
+      code,
+      name,
+      payload,
+      existingId: match.id,
+    };
   });
 };
 
