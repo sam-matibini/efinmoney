@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   usePaymentPartners,
   usePartnerFxRates,
@@ -16,6 +16,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, TrendingUp } from "lucide-react";
 import { format } from "date-fns";
+import { useTableQuery, type Col } from "./tableToolkit";
 
 const empty: Partial<PartnerFxRate> = {
   base_currency: "CAD",
@@ -33,6 +34,29 @@ export const PartnerFxRatesPanel = () => {
   const set = (patch: Partial<PartnerFxRate>) => setDraft((d) => ({ ...d, ...patch }));
 
   const nameOf = (id: string) => partners?.find((p) => p.id === id)?.name || "—";
+
+  const cols = useMemo<Col<PartnerFxRate>[]>(
+    () => [
+      { key: "partner", label: "Partner", value: (r) => nameOf(r.partner_id), filter: true },
+      { key: "pair", label: "Pair", value: (r) => `${r.base_currency}/${r.quote_currency}`, filter: true },
+      { key: "partner_rate", label: "Partner rate", value: (r) => r.partner_rate, type: "number", align: "right" },
+      { key: "mid", label: "Mid-market", value: (r) => r.mid_market_rate ?? 0, type: "number", align: "right" },
+      { key: "spread", label: "Spread", value: (r) => r.fx_spread_bps ?? 0, type: "number", align: "right" },
+      { key: "recorded", label: "Recorded", value: (r) => r.rate_timestamp, type: "date" },
+      { key: "source", label: "Source", value: (r) => r.source, filter: true },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [partners],
+  );
+
+  const { view, Controls, HeadRow } = useTableQuery(rates, cols, {
+    defaultSort: "recorded",
+    defaultDir: "desc",
+    exportName: "partner-fx-rates",
+    searchPlaceholder: "Search partner, pair, source…",
+  });
+
+
 
   return (
     <Card>
@@ -79,21 +103,13 @@ export const PartnerFxRatesPanel = () => {
         ) : !rates?.length ? (
           <p className="text-sm text-muted-foreground py-6 text-center">No partner rates recorded yet.</p>
         ) : (
-          <div className="overflow-x-auto">
+          <div>
+            <Controls />
+            <div className="overflow-x-auto">
             <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Partner</TableHead>
-                  <TableHead>Pair</TableHead>
-                  <TableHead className="text-right">Partner rate</TableHead>
-                  <TableHead className="text-right">Mid-market</TableHead>
-                  <TableHead className="text-right">Spread</TableHead>
-                  <TableHead>Recorded</TableHead>
-                  <TableHead>Source</TableHead>
-                </TableRow>
-              </TableHeader>
+              <HeadRow />
               <TableBody>
-                {rates.map((r) => {
+                {view.map((r) => {
                   const expired = r.expires_at ? new Date(r.expires_at) < new Date() : false;
                   return (
                     <TableRow key={r.id} className={expired ? "opacity-60" : ""}>
@@ -121,6 +137,7 @@ export const PartnerFxRatesPanel = () => {
                 })}
               </TableBody>
             </Table>
+            </div>
           </div>
         )}
       </CardContent>

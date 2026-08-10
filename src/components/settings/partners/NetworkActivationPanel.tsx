@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { useTableQuery, type Col } from "./tableToolkit";
+import { downloadXlsx } from "@/lib/tableExport";
 import {
   usePaymentPartners,
   useSeedPartnerNetwork,
@@ -13,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Rocket, Eye, AlertTriangle } from "lucide-react";
+import { Rocket, Eye, AlertTriangle, FileSpreadsheet } from "lucide-react";
 
 const SCOPES: { value: SeedScope; label: string; hint: string }[] = [
   { value: "pricing", label: "Partner pricing", hint: "Rate cards for every enabled corridor" },
@@ -40,6 +42,87 @@ export const NetworkActivationPanel = () => {
     );
 
   const preview = result?.preview;
+
+  type Row = Record<string, unknown>;
+  const str = (v: unknown) => String(v ?? "");
+
+  const pricingCols = useMemo<Col<Row>[]>(
+    () => [
+      { key: "partner", label: "Partner", value: (r) => str(r.partner_code), filter: true },
+      {
+        key: "route",
+        label: "Route",
+        value: (r) => `${str(r.source_currency)}→${str(r.dest_currency)} ${str(r.payment_method)}`,
+        filter: true,
+      },
+      { key: "fixed", label: "Fixed", value: (r) => num(r.fixed_fee), type: "number", align: "right" },
+      { key: "pct", label: "%", value: (r) => num(r.percentage_fee), type: "number", align: "right" },
+      { key: "fxbps", label: "FX bps", value: (r) => num(r.fx_markup_bps), type: "number", align: "right" },
+      {
+        key: "other",
+        label: "Other",
+        value: (r) => num(r.settlement_fee) + num(r.network_fee) + num(r.compliance_fee),
+        type: "number",
+        align: "right",
+      },
+    ],
+    [],
+  );
+
+  const fxCols = useMemo<Col<Row>[]>(
+    () => [
+      { key: "partner", label: "Partner", value: (r) => str(r.partner_code), filter: true },
+      { key: "pair", label: "Pair", value: (r) => `${str(r.base_currency)}/${str(r.quote_currency)}`, filter: true },
+      { key: "mid", label: "Mid-market", value: (r) => num(r.mid_market_rate), type: "number", align: "right" },
+      { key: "rate", label: "Partner rate", value: (r) => num(r.partner_rate), type: "number", align: "right" },
+    ],
+    [],
+  );
+
+  const retailCols = useMemo<Col<Row>[]>(
+    () => [
+      { key: "customer", label: "Customer", value: (r) => str(r.customer_type), filter: true },
+      {
+        key: "route",
+        label: "Route",
+        value: (r) => `${str(r.source_currency)}→${str(r.dest_currency)} ${str(r.payment_method)}`,
+        filter: true,
+      },
+      { key: "fixed", label: "Fixed", value: (r) => num(r.fixed_fee), type: "number", align: "right" },
+      { key: "pct", label: "%", value: (r) => num(r.percentage_fee), type: "number", align: "right" },
+      { key: "fxbps", label: "FX bps", value: (r) => num(r.fx_margin_bps), type: "number", align: "right" },
+    ],
+    [],
+  );
+
+  const pricingQ = useTableQuery(preview?.pricing as Row[] | undefined, pricingCols, {
+    defaultSort: "partner",
+    defaultDir: "asc",
+    exportName: "activation-pricing",
+    searchPlaceholder: "Search partner, route…",
+  });
+  const fxQ = useTableQuery(preview?.fx as Row[] | undefined, fxCols, {
+    defaultSort: "partner",
+    defaultDir: "asc",
+    exportName: "activation-fx",
+    searchPlaceholder: "Search partner, pair…",
+  });
+  const retailQ = useTableQuery(preview?.retail as Row[] | undefined, retailCols, {
+    defaultSort: "customer",
+    defaultDir: "asc",
+    exportName: "activation-retail",
+    searchPlaceholder: "Search customer, route…",
+  });
+
+  /** One workbook with a sheet per preview scope, matching what's on screen. */
+  const exportWorkbook = () =>
+    downloadXlsx("network-activation-preview", [
+      { name: "Pricing", header: pricingQ.exportHeader, rows: pricingQ.exportRows() },
+      { name: "FX", header: fxQ.exportHeader, rows: fxQ.exportRows() },
+      { name: "Retail", header: retailQ.exportHeader, rows: retailQ.exportRows() },
+    ]);
+
+
 
   return (
     <Card>
@@ -94,6 +177,9 @@ export const NetworkActivationPanel = () => {
           >
             <Rocket className="h-4 w-4 mr-1" /> Apply {result ? `${result.summary.pricing + result.summary.fx + result.summary.retail} rows` : ""}
           </Button>
+          <Button variant="outline" size="sm" onClick={exportWorkbook} disabled={!preview}>
+            <FileSpreadsheet className="h-4 w-4 mr-1" /> Export Excel
+          </Button>
         </div>
       </CardHeader>
 
@@ -133,20 +219,12 @@ export const NetworkActivationPanel = () => {
                 </TabsList>
 
                 <TabsContent value="pricing">
+                  <pricingQ.Controls />
                   <div className="overflow-x-auto">
                     <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Partner</TableHead>
-                          <TableHead>Route</TableHead>
-                          <TableHead className="text-right">Fixed</TableHead>
-                          <TableHead className="text-right">%</TableHead>
-                          <TableHead className="text-right">FX bps</TableHead>
-                          <TableHead className="text-right">Other</TableHead>
-                        </TableRow>
-                      </TableHeader>
+                      <pricingQ.HeadRow />
                       <TableBody>
-                        {preview.pricing.map((r, i) => (
+                        {pricingQ.view.map((r, i) => (
                           <TableRow key={i}>
                             <TableCell className="font-medium">{String(r.partner_code)}</TableCell>
                             <TableCell>
@@ -169,18 +247,12 @@ export const NetworkActivationPanel = () => {
                 </TabsContent>
 
                 <TabsContent value="fx">
+                  <fxQ.Controls />
                   <div className="overflow-x-auto">
                     <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Partner</TableHead>
-                          <TableHead>Pair</TableHead>
-                          <TableHead className="text-right">Mid-market</TableHead>
-                          <TableHead className="text-right">Partner rate</TableHead>
-                        </TableRow>
-                      </TableHeader>
+                      <fxQ.HeadRow />
                       <TableBody>
-                        {preview.fx.map((r, i) => (
+                        {fxQ.view.map((r, i) => (
                           <TableRow key={i}>
                             <TableCell className="font-medium">{String(r.partner_code)}</TableCell>
                             <TableCell>
@@ -196,19 +268,12 @@ export const NetworkActivationPanel = () => {
                 </TabsContent>
 
                 <TabsContent value="retail">
+                  <retailQ.Controls />
                   <div className="overflow-x-auto">
                     <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Customer</TableHead>
-                          <TableHead>Route</TableHead>
-                          <TableHead className="text-right">Fixed</TableHead>
-                          <TableHead className="text-right">%</TableHead>
-                          <TableHead className="text-right">FX bps</TableHead>
-                        </TableRow>
-                      </TableHeader>
+                      <retailQ.HeadRow />
                       <TableBody>
-                        {preview.retail.map((r, i) => (
+                        {retailQ.view.map((r, i) => (
                           <TableRow key={i}>
                             <TableCell className="capitalize">{String(r.customer_type)}</TableCell>
                             <TableCell>

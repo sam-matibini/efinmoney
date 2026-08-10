@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { useTableQuery, type Col } from "./tableToolkit";
 import {
   usePaymentPartners,
   useCreatePartner,
@@ -47,6 +48,27 @@ export const PartnersPanel = () => {
   const [draft, setDraft] = useState<Partial<PaymentPartner>>(emptyPartner);
 
   const set = (patch: Partial<PaymentPartner>) => setDraft((d) => ({ ...d, ...patch }));
+
+  const cols = useMemo<Col<PaymentPartner>[]>(
+    () => [
+      { key: "name", label: "Partner", value: (p) => `${p.name} ${p.code}` },
+      { key: "direction", label: "Direction", value: (p) => p.direction, filter: true },
+      { key: "country", label: "Country", value: (p) => p.country ?? "", filter: true },
+      { key: "settlement", label: "Settlement", value: (p) => p.settlement_currency ?? "", filter: true },
+      { key: "reliability", label: "Reliability", value: (p) => p.reliability_score, type: "number", align: "right" },
+      { key: "priority", label: "Priority", value: (p) => p.priority, type: "number", align: "right" },
+      { key: "status", label: "Status", value: (p) => p.status, filter: true },
+      { key: "actions", label: "", value: () => "", sortable: false },
+    ],
+    [],
+  );
+
+  const { view, Controls, HeadRow } = useTableQuery(partners, cols, {
+    defaultSort: "priority",
+    defaultDir: "asc",
+    exportName: "payment-partners",
+    searchPlaceholder: "Search partner, code, country…",
+  });
 
   const save = () => {
     if (!draft.code || !draft.name) return;
@@ -103,22 +125,13 @@ export const PartnersPanel = () => {
             No partners yet. Add your first pay-in or pay-out provider.
           </p>
         ) : (
-          <div className="overflow-x-auto">
+          <div>
+            <Controls />
+            <div className="overflow-x-auto">
             <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Partner</TableHead>
-                  <TableHead>Direction</TableHead>
-                  <TableHead>Country</TableHead>
-                  <TableHead>Settlement</TableHead>
-                  <TableHead className="text-right">Reliability</TableHead>
-                  <TableHead className="text-right">Priority</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead />
-                </TableRow>
-              </TableHeader>
+              <HeadRow />
               <TableBody>
-                {partners.map((p) => (
+                {view.map((p) => (
                   <TableRow key={p.id}>
                     <TableCell>
                       <div className="font-medium">{p.name}</div>
@@ -156,6 +169,7 @@ export const PartnersPanel = () => {
                 ))}
               </TableBody>
             </Table>
+            </div>
           </div>
         )}
       </CardContent>
