@@ -6694,6 +6694,74 @@ export type Database = {
           },
         ]
       }
+      partner_bank_accounts: {
+        Row: {
+          account_holder: string | null
+          account_number: string | null
+          bank_name: string | null
+          country: string | null
+          created_at: string
+          created_by: string | null
+          currency_code: string | null
+          iban: string | null
+          id: string
+          is_primary: boolean
+          label: string
+          notes: string | null
+          partner_id: string
+          purpose: string
+          routing_code: string | null
+          swift_bic: string | null
+          updated_at: string
+        }
+        Insert: {
+          account_holder?: string | null
+          account_number?: string | null
+          bank_name?: string | null
+          country?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency_code?: string | null
+          iban?: string | null
+          id?: string
+          is_primary?: boolean
+          label?: string
+          notes?: string | null
+          partner_id: string
+          purpose?: string
+          routing_code?: string | null
+          swift_bic?: string | null
+          updated_at?: string
+        }
+        Update: {
+          account_holder?: string | null
+          account_number?: string | null
+          bank_name?: string | null
+          country?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency_code?: string | null
+          iban?: string | null
+          id?: string
+          is_primary?: boolean
+          label?: string
+          notes?: string | null
+          partner_id?: string
+          purpose?: string
+          routing_code?: string | null
+          swift_bic?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_bank_accounts_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "payment_partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       partner_corridors: {
         Row: {
           created_at: string
