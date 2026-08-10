@@ -90,6 +90,38 @@ export const PartnerPricingPanel = () => {
 
   const nameOf = (id: string) => partners?.find((p) => p.id === id)?.name || "—";
 
+  const cols = useMemo<Col<PartnerPricing>[]>(
+    () => [
+      { key: "partner", label: "Partner", value: (p) => nameOf(p.partner_id), filter: true },
+      {
+        key: "route",
+        label: "Route",
+        value: (p) => `${p.direction} ${p.source_currency}→${p.dest_currency}${p.dest_country ? ` (${p.dest_country})` : ""} ${p.payment_method}`,
+      },
+      { key: "fixed", label: "Fixed", value: (p) => p.fixed_fee, type: "number", align: "right" },
+      { key: "pct", label: "%", value: (p) => p.percentage_fee, type: "number", align: "right" },
+      { key: "fx", label: "FX bps", value: (p) => p.fx_markup_bps, type: "number", align: "right" },
+      {
+        key: "other",
+        label: "Other fees",
+        value: (p) => p.settlement_fee + p.network_fee + p.compliance_fee,
+        type: "number",
+        align: "right",
+      },
+      { key: "effective", label: "Effective", value: (p) => p.effective_from, type: "date" },
+      { key: "source", label: "Source", value: (p) => p.source, filter: true },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [partners],
+  );
+
+  const { view, Controls, HeadRow } = useTableQuery(pricing, cols, {
+    defaultSort: "effective",
+    defaultDir: "desc",
+    exportName: "partner-pricing",
+    searchPlaceholder: "Search partner, route, method…",
+  });
+
   const onFile = async (file: File) => {
     const rows = parseCsv(await file.text());
     if (!rows.length) {
