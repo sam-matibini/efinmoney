@@ -16,6 +16,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, TrendingUp } from "lucide-react";
 import { format } from "date-fns";
+import { useTableQuery, type Col } from "./tableToolkit";
 
 const empty: Partial<PartnerFxRate> = {
   base_currency: "CAD",
