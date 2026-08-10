@@ -69,7 +69,8 @@ export default function AliceWidget({ context }: { context: "user" | "admin" }) 
   const [liveCall, setLiveCall] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [input, setInput] = useState("");
-  const { messages, isSending, send, newChat, loadConversation, conversations } = useAliceChat(context);
+  const { messages, isSending, conversationId, send, newChat, loadConversation, conversations } =
+    useAliceChat(context);
   const bottomRef = useRef<HTMLDivElement>(null);
   const offerHumanSupport = context === "user" && shouldOfferHumanSupport(messages);
   const firstName = firstNameOf(profile?.full_name, profile?.email);
@@ -567,7 +568,16 @@ export default function AliceWidget({ context }: { context: "user" | "admin" }) 
       {open && overlay && (
         <div className="fixed z-50 right-3 bottom-3 sm:right-5 sm:bottom-5 w-[min(100vw-1.5rem,380px)] h-[min(72vh,640px)] flex flex-col overflow-hidden rounded-[1.35rem] border border-black/5 bg-white shadow-[0_24px_64px_rgba(15,23,42,0.22)]">
           {overlay === "support" ? (
-            <LiveSupportChat onBack={() => setOverlay(null)} />
+            <LiveSupportChat
+              onBack={() => setOverlay(null)}
+              aliceConversationId={context === "user" ? conversationId : null}
+              aliceMessages={context === "user" ? messages : []}
+              aliceTitle={
+                context === "user"
+                  ? messages.find((m) => m.role === "user")?.content?.slice(0, 60) ?? null
+                  : null
+              }
+            />
           ) : (
             <div className="flex flex-col h-full">
               <div className="flex items-center gap-2 px-4 h-14 border-b shrink-0">

@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { syncAliceTurnToSupport } from "@/lib/syncAliceToSupport";
 
 export type AliceRole = "user" | "assistant";
 export interface AliceMessage {
@@ -25,6 +26,7 @@ export const useAliceChat = (context: Context) => {
   const qc = useQueryClient();
   const [messages, setMessages] = useState<AliceMessage[]>([]);
   const [isSending, setIsSending] = useState(false);
+  const [conversationId, setConversationId] = useState<string | null>(null);
   const conversationIdRef = useRef<string | null>(null);
   // alice_* tables aren't in generated Supabase types yet.
   // deno-lint-ignore no-explicit-any
@@ -46,6 +48,7 @@ export const useAliceChat = (context: Context) => {
 
   const newChat = useCallback(() => {
     conversationIdRef.current = null;
+    setConversationId(null);
     setMessages([]);
   }, []);
 
@@ -57,6 +60,7 @@ export const useAliceChat = (context: Context) => {
       .order("created_at", { ascending: true });
     if (error) return;
     conversationIdRef.current = id;
+    setConversationId(id);
     setMessages((data || []).map((m) => ({ role: m.role as AliceRole, content: m.content })));
   }, []);
 
@@ -81,10 +85,11 @@ export const useAliceChat = (context: Context) => {
           .single();
         if (convErr) throw convErr;
         conversationIdRef.current = conv.id;
+        setConversationId(conv.id);
       }
-      const conversationId = conversationIdRef.current;
+      const convId = conversationIdRef.current!;
 
-      await db.from("alice_messages").insert({ conversation_id: conversationId, role: "user", content: trimmed });
+      await db.from("alice_messages").insert({ conversation_id: convId, role: "user", content: trimmed });
 
       const { data, error } = await supabase.functions.invoke("alice-chat", {
         body: { messages: thread.map((m) => ({ role: m.role, content: m.content })), context },
@@ -92,11 +97,24 @@ export const useAliceChat = (context: Context) => {
       if (error) throw error;
       const reply: string = data?.reply || data?.error || "Sorry, I couldn't answer that. Please try again.";
 
-      await db.from("alice_messages").insert({ conversation_id: conversationId, role: "assistant", content: reply });
-      await db.from("alice_conversations").update({ updated_at: new Date().toISOString() }).eq("id", conversationId);
+      await db.from("alice_messages").insert({ conversation_id: convId, role: "assistant", content: reply });
+      await db.from("alice_conversations").update({ updated_at: new Date().toISOString() }).eq("id", convId);
 
       setMessages([...thread, { role: "assistant", content: reply }]);
       qc.invalidateQueries({ queryKey: ["alice-conversations", context] });
+
+      // Mirror into Support CRM so the user (and staff) can follow up from /support.
+      if (context === "user" && !reply.startsWith("⚠️")) {
+        void syncAliceTurnToSupport({
+          conversationId: convId,
+          title: trimmed.slice(0, 60),
+          userText: trimmed,
+          aliceText: reply,
+        }).then(() => {
+          qc.invalidateQueries({ queryKey: ["support-threads"] });
+        });
+      }
+
       return reply;
     } catch (err) {
       let msg = err instanceof Error ? err.message : "Something went wrong.";
@@ -120,6 +138,7 @@ export const useAliceChat = (context: Context) => {
   return {
     messages,
     isSending,
+    conversationId,
     send,
     newChat,
     loadConversation,
