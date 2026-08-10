@@ -217,6 +217,7 @@ export const EfinPricingPanel = () => {
                 ))}
               </TableBody>
             </Table>
+            </div>
           </div>
         )}
       </CardContent>
