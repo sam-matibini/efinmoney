@@ -203,5 +203,8 @@ export async function verifyFlwPayment(params: {
     amount?: number;
     error?: string;
     status?: string;
+    wallet_funded?: boolean;
+    credited?: boolean;
+    already?: boolean;
   };
 }
