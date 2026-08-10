@@ -70,6 +70,7 @@ const cmp = <T,>(col: Col<T>, dir: SortDir) => (a: T, b: T) => {
 export interface FilterOption {
   value: string;
   count: number;
+  label?: string;
 }
 
 /** Searchable, scrollable, typable single-select filter. */
