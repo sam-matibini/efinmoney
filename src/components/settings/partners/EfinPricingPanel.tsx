@@ -139,18 +139,33 @@ export const EfinPricingPanel = () => {
             </CardTitle>
             <CardDescription>What we charge the customer — the revenue side of every profitability calculation</CardDescription>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <History className="h-4 w-4" />
               <Switch checked={history} onCheckedChange={setHistory} />
             </div>
-            <Button
-              size="sm"
-              onClick={() => {
-                setDraft(empty);
-                setOpen(true);
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".csv,.xlsx,.xls"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) onFile(f);
+                e.target.value = "";
               }}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => downloadCsv("customer-pricing-template", IMPORT_COLUMNS, [])}
             >
+              <FileDown className="h-4 w-4 mr-1" /> Template
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()} disabled={add.isPending}>
+              <Upload className="h-4 w-4 mr-1" /> Import
+            </Button>
+            <Button size="sm" onClick={openNew}>
               <Plus className="h-4 w-4 mr-1" /> Add pricing
             </Button>
           </div>
@@ -162,21 +177,13 @@ export const EfinPricingPanel = () => {
         ) : !pricing?.length ? (
           <p className="text-sm text-muted-foreground py-6 text-center">No customer pricing configured yet.</p>
         ) : (
-          <div className="overflow-x-auto">
+          <div>
+            <Controls />
+            <div className="overflow-x-auto">
             <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Customer type</TableHead>
-                  <TableHead>Corridor</TableHead>
-                  <TableHead className="text-right">Fixed</TableHead>
-                  <TableHead className="text-right">%</TableHead>
-                  <TableHead className="text-right">FX margin</TableHead>
-                  <TableHead>Effective</TableHead>
-                  <TableHead />
-                </TableRow>
-              </TableHeader>
+              <HeadRow />
               <TableBody>
-                {pricing.map((p) => (
+                {view.map((p) => (
                   <TableRow key={p.id} className={p.effective_to ? "opacity-60" : ""}>
                     <TableCell className="capitalize font-medium">{p.customer_type}</TableCell>
                     <TableCell>
@@ -194,11 +201,16 @@ export const EfinPricingPanel = () => {
                         <Badge className="ml-1">current</Badge>
                       )}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right whitespace-nowrap">
                       {!p.effective_to && (
-                        <Button variant="ghost" size="icon" onClick={() => retire.mutate(p.id)} title="Retire">
-                          <Archive className="h-4 w-4" />
-                        </Button>
+                        <>
+                          <Button variant="ghost" size="icon" onClick={() => openEdit(p)} title="Edit">
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => retire.mutate(p.id)} title="Retire">
+                            <Archive className="h-4 w-4" />
+                          </Button>
+                        </>
                       )}
                     </TableCell>
                   </TableRow>
