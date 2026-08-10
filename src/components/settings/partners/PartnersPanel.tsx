@@ -125,22 +125,13 @@ export const PartnersPanel = () => {
             No partners yet. Add your first pay-in or pay-out provider.
           </p>
         ) : (
-          <div className="overflow-x-auto">
+          <div>
+            <Controls />
+            <div className="overflow-x-auto">
             <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Partner</TableHead>
-                  <TableHead>Direction</TableHead>
-                  <TableHead>Country</TableHead>
-                  <TableHead>Settlement</TableHead>
-                  <TableHead className="text-right">Reliability</TableHead>
-                  <TableHead className="text-right">Priority</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead />
-                </TableRow>
-              </TableHeader>
+              <HeadRow />
               <TableBody>
-                {partners.map((p) => (
+                {view.map((p) => (
                   <TableRow key={p.id}>
                     <TableCell>
                       <div className="font-medium">{p.name}</div>
