@@ -32,6 +32,7 @@ const normalizeCode = (v: string) =>
   v.toLowerCase().replace(/[^a-z0-9_-]/g, "_").replace(/_{2,}/g, "_");
 
 const TEMPLATE_HEADERS = [
+  "partner_ref",
   "code",
   "name",
   "direction",
