@@ -45,6 +45,27 @@ Deno.serve(async (req) => {
     result.oauth = "ok";
     result.accessTokenPreview = `${token.slice(0, 12)}…`;
 
+    const wantAccounts = url.searchParams.get("accounts") === "1";
+    if (wantAccounts) {
+      const { nombaApiFetch } = await import("../_shared/nomba-api.ts");
+      const paths = [
+        "/v1/accounts/details",
+        "/v1/accounts/balance",
+        "/v1/accounts",
+        "/v1/accounts/secondary",
+      ];
+      const probes: Record<string, unknown> = {};
+      for (const path of paths) {
+        try {
+          const r = await nombaApiFetch(path, { method: "GET" });
+          probes[path] = { status: r.status, ok: r.ok, json: r.json };
+        } catch (e) {
+          probes[path] = { error: e instanceof Error ? e.message : String(e) };
+        }
+      }
+      result.accountProbes = probes;
+    }
+
     if (wantCheckout) {
       const amount = Number(url.searchParams.get("amount") || "100");
       const currency = (url.searchParams.get("currency") || "NGN").toUpperCase();

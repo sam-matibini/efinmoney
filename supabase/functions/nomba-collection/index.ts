@@ -238,7 +238,7 @@ Deno.serve(async (req) => {
           raw_response: { error: created.error, rail: "nomba_api" },
         }).eq("id", txn.id);
         const accountHint = created.error.toLowerCase().includes("account number")
-          ? " Nomba business wallet/account number still needs setup in the Nomba dashboard."
+          ? " If this persists, ask Nomba support to confirm Checkout is enabled on the Live parent account (do not put parent accountId in the order body)."
           : "";
         return json({
           error: `${created.error}${accountHint}`,

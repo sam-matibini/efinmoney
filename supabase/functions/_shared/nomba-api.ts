@@ -95,23 +95,29 @@ export async function createNombaCheckoutOrder(params: {
   callbackUrl: string;
   customerEmail?: string;
   orderReference?: string;
+  /** Optional outlet/sub-account ID to credit (NOT the parent accountId header). */
+  subAccountId?: string;
   meta?: Record<string, string>;
 }): Promise<{ ok: true; checkoutLink: string; orderReference: string } | { ok: false; error: string }> {
-  const cfg = getNombaApiConfig();
   const amountStr = params.amount.toFixed(2);
+  // Parent accountId belongs in the header only (via nombaApiFetch).
+  // Body accountId is ONLY for outlet/sub-accounts — putting the parent UUID here
+  // makes Nomba look up a settlement account number and fail with
+  // "Invalid input: No Account Number found".
+  const subAccountId = (params.subAccountId || Deno.env.get("NOMBA_SUBACCOUNT_ID") || "").trim();
+  const order: Record<string, unknown> = {
+    amount: amountStr,
+    currency: params.currency.toUpperCase(),
+    callbackUrl: params.callbackUrl,
+    customerEmail: params.customerEmail,
+    orderReference: params.orderReference,
+    orderMetaData: params.meta,
+  };
+  if (subAccountId) order.accountId = subAccountId;
+
   const { ok, status, json } = await nombaApiFetch("/v1/checkout/order", {
     method: "POST",
-    body: JSON.stringify({
-      order: {
-        amount: amountStr,
-        currency: params.currency.toUpperCase(),
-        callbackUrl: params.callbackUrl,
-        customerEmail: params.customerEmail,
-        orderReference: params.orderReference,
-        accountId: cfg.accountId,
-        orderMetaData: params.meta,
-      },
-    }),
+    body: JSON.stringify({ order }),
   });
   if (!ok) {
     return { ok: false, error: String(json?.description || json?.message || `Nomba checkout HTTP ${status}`) };
