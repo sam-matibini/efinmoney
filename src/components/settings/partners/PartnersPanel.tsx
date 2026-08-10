@@ -20,7 +20,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Pencil, Trash2, Network, AlertCircle, RefreshCw, Upload, FileDown } from "lucide-react";
+import { Plus, Pencil, Trash2, Network, AlertCircle, RefreshCw, Upload, FileDown, Eye } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { PartnerDetailSheet } from "./PartnerDetailSheet";
 import { downloadCsv, parseSpreadsheet } from "@/lib/tableExport";
 import { toast } from "sonner";
 
@@ -174,6 +176,7 @@ export const PartnersPanel = () => {
 
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<Partial<PaymentPartner>>(emptyPartner);
+  const [viewing, setViewing] = useState<PaymentPartner | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [importRows, setImportRows] = useState<ImportRow[]>([]);
   const [importing, setImporting] = useState(false);
@@ -420,11 +423,23 @@ export const PartnersPanel = () => {
                     <TableCell className="text-right tabular-nums">{p.reliability_score}</TableCell>
                     <TableCell className="text-right tabular-nums">{p.priority}</TableCell>
                     <TableCell>
-                      <Badge variant={statusVariant(p.status)} className="capitalize">
-                        {p.status}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={p.status === "active"}
+                          aria-label={`Toggle ${p.name}`}
+                          onCheckedChange={(v) =>
+                            update.mutate({ id: p.id, patch: { status: v ? "active" : "inactive" } })
+                          }
+                        />
+                        <Badge variant={statusVariant(p.status)} className="capitalize">
+                          {p.status}
+                        </Badge>
+                      </div>
                     </TableCell>
                     <TableCell className="text-right whitespace-nowrap">
+                      <Button variant="ghost" size="icon" onClick={() => setViewing(p)}>
+                        <Eye className="h-4 w-4" />
+                      </Button>
                       <Button
                         variant="ghost"
                         size="icon"
