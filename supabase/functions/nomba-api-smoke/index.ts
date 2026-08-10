@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
         currency,
         callbackUrl: `${appUrl}/wallet/topup?nomba=1`,
         orderReference: `efm-smoke-${Date.now()}`,
-        customerEmail: "smoke@efin.money",
+        customerEmail: "sam@efintax.biz",
       });
       result.checkout = created;
     }

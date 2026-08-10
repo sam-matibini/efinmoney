@@ -97,6 +97,7 @@ export async function createNombaCheckoutOrder(params: {
   orderReference?: string;
   meta?: Record<string, string>;
 }): Promise<{ ok: true; checkoutLink: string; orderReference: string } | { ok: false; error: string }> {
+  const cfg = getNombaApiConfig();
   const amountStr = params.amount.toFixed(2);
   const { ok, status, json } = await nombaApiFetch("/v1/checkout/order", {
     method: "POST",
@@ -107,6 +108,7 @@ export async function createNombaCheckoutOrder(params: {
         callbackUrl: params.callbackUrl,
         customerEmail: params.customerEmail,
         orderReference: params.orderReference,
+        accountId: cfg.accountId,
         orderMetaData: params.meta,
       },
     }),
