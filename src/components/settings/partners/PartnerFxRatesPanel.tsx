@@ -35,6 +35,29 @@ export const PartnerFxRatesPanel = () => {
 
   const nameOf = (id: string) => partners?.find((p) => p.id === id)?.name || "—";
 
+  const cols = useMemo<Col<PartnerFxRate>[]>(
+    () => [
+      { key: "partner", label: "Partner", value: (r) => nameOf(r.partner_id), filter: true },
+      { key: "pair", label: "Pair", value: (r) => `${r.base_currency}/${r.quote_currency}`, filter: true },
+      { key: "partner_rate", label: "Partner rate", value: (r) => r.partner_rate, type: "number", align: "right" },
+      { key: "mid", label: "Mid-market", value: (r) => r.mid_market_rate ?? 0, type: "number", align: "right" },
+      { key: "spread", label: "Spread", value: (r) => r.fx_spread_bps ?? 0, type: "number", align: "right" },
+      { key: "recorded", label: "Recorded", value: (r) => r.rate_timestamp, type: "date" },
+      { key: "source", label: "Source", value: (r) => r.source, filter: true },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [partners],
+  );
+
+  const { view, Controls, HeadRow } = useTableQuery(rates, cols, {
+    defaultSort: "recorded",
+    defaultDir: "desc",
+    exportName: "partner-fx-rates",
+    searchPlaceholder: "Search partner, pair, source…",
+  });
+
+
+
   return (
     <Card>
       <CardHeader className="gap-3">
