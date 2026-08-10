@@ -169,6 +169,7 @@ export const PartnersPanel = () => {
                 ))}
               </TableBody>
             </Table>
+            </div>
           </div>
         )}
       </CardContent>
