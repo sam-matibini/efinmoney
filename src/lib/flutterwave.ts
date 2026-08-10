@@ -183,6 +183,10 @@ export async function verifyFlwPayment(params: {
   amount?: number;
   error?: string;
   status?: string;
+  /** True when the pay-in was credited to the wallet ledger. */
+  wallet_funded?: boolean;
+  credited?: boolean;
+  already?: boolean;
 }> {
   const session = (await supabase.auth.getSession()).data.session;
   const qs = new URLSearchParams();
@@ -199,5 +203,8 @@ export async function verifyFlwPayment(params: {
     amount?: number;
     error?: string;
     status?: string;
+    wallet_funded?: boolean;
+    credited?: boolean;
+    already?: boolean;
   };
 }
