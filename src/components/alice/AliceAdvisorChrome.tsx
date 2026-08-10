@@ -16,6 +16,7 @@ import {
   ALICE_BRAND_MID,
   ALICE_BRAND_SOFT,
   ALICE_CREAM,
+  ALICE_NAV_CELLS,
   type AliceTab,
 } from "@/components/alice/aliceAdvisorTheme";
 
@@ -141,9 +142,9 @@ export function AliceAdvisorChrome({
           {children}
         </div>
 
-        {/* Bottom nav — Call is the focal elevated item */}
+        {/* Bottom nav — filled color cells; Call stays elevated */}
         <nav
-          className="shrink-0 border-t border-black/5 bg-white px-1 pt-6 pb-[max(0.5rem,env(safe-area-inset-bottom))] grid"
+          className="shrink-0 border-t border-black/5 bg-white px-1.5 pt-6 pb-[max(0.5rem,env(safe-area-inset-bottom))] grid gap-1"
           style={{
             gridTemplateColumns: `repeat(${nav.filter((n) => !n.hide).length}, minmax(0, 1fr))`,
           }}
@@ -155,39 +156,59 @@ export function AliceAdvisorChrome({
               const active = tab === item.id;
               const isCall = item.id === "call";
               const Icon = item.icon;
+              const cell = !isCall ? ALICE_NAV_CELLS[item.id as Exclude<AliceTab, "call">] : null;
               return (
                 <button
                   key={item.id}
                   type="button"
                   onClick={() => onTabChange(item.id)}
+                  aria-current={active ? "page" : undefined}
                   className={cn(
-                    "relative flex flex-col items-center gap-0.5 py-1.5 text-[10px] font-medium transition-colors",
-                    active && !isCall ? "text-[color:var(--alice-brand)]" : "text-slate-400",
-                    active && isCall && "text-[color:var(--alice-brand)]",
+                    "relative flex flex-col items-center justify-center gap-0.5 text-[10px] font-semibold",
+                    "transition-all duration-200 active:scale-95",
+                    isCall
+                      ? "py-1.5 text-[color:var(--alice-brand)]"
+                      : "mx-0.5 min-h-[3.25rem] rounded-2xl px-1 py-2 hover:-translate-y-0.5 hover:shadow-md",
+                    !isCall && active && "shadow-md scale-[1.02]",
                   )}
-                  style={{ ["--alice-brand" as string]: ALICE_BRAND }}
+                  style={
+                    isCall
+                      ? { ["--alice-brand" as string]: ALICE_BRAND }
+                      : {
+                          background: active ? cell!.fillActive : cell!.fill,
+                          color: active ? cell!.inkActive : cell!.ink,
+                          boxShadow: active
+                            ? `0 6px 16px -4px ${cell!.fillActive}99`
+                            : undefined,
+                        }
+                  }
                 >
                   {isCall ? (
-                    <span
-                      className={cn(
-                        "absolute -top-5 flex h-12 w-12 items-center justify-center rounded-full shadow-lg",
-                        "ring-4 ring-white transition-transform",
-                        active ? "scale-105" : "scale-100 hover:scale-105",
-                      )}
-                      style={{
-                        background: `linear-gradient(145deg, ${ALICE_ACCENT}, #FF9F0A)`,
-                        color: ALICE_BRAND,
-                        boxShadow: active
-                          ? `0 8px 24px rgba(255,184,0,0.55), 0 0 0 6px rgba(255,184,0,0.18)`
-                          : `0 8px 20px rgba(26,15,60,0.35)`,
-                      }}
-                    >
-                      <Phone className="h-5 w-5" strokeWidth={2.25} />
-                    </span>
+                    <>
+                      <span
+                        className={cn(
+                          "absolute -top-5 flex h-12 w-12 items-center justify-center rounded-full shadow-lg",
+                          "ring-4 ring-white transition-transform",
+                          active ? "scale-105" : "scale-100 hover:scale-105",
+                        )}
+                        style={{
+                          background: `linear-gradient(145deg, ${ALICE_ACCENT}, #FF9F0A)`,
+                          color: ALICE_BRAND,
+                          boxShadow: active
+                            ? `0 8px 24px rgba(255,184,0,0.55), 0 0 0 6px rgba(255,184,0,0.18)`
+                            : `0 8px 20px rgba(26,15,60,0.35)`,
+                        }}
+                      >
+                        <Phone className="h-5 w-5" strokeWidth={2.25} />
+                      </span>
+                      <span className="mt-6">{item.label}</span>
+                    </>
                   ) : (
-                    <Icon className={cn("h-5 w-5", active && "stroke-[2.25]")} />
+                    <>
+                      <Icon className={cn("h-5 w-5", active && "stroke-[2.4]")} />
+                      <span>{item.label}</span>
+                    </>
                   )}
-                  <span className={cn(isCall && "mt-6")}>{item.label}</span>
                 </button>
               );
             })}
