@@ -137,6 +137,7 @@ export const PartnerFxRatesPanel = () => {
                 })}
               </TableBody>
             </Table>
+            </div>
           </div>
         )}
       </CardContent>
