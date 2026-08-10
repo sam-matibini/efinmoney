@@ -233,25 +233,27 @@ export const PartnersPanel = () => {
   );
 
   const { view, Controls, HeadRow } = useTableQuery(partners, cols, {
-    defaultSort: "priority",
+    defaultSort: "partner_ref",
     defaultDir: "asc",
     exportName: "payment-partners",
-    searchPlaceholder: "Search partner, code, country…",
+    searchPlaceholder: "Search ref, partner, code, country…",
   });
 
   const save = () => {
     if (!draft.code || !draft.name || codeTaken) return;
     if (draft.id) {
-      const { id, created_at, updated_at, ...patch } = draft as PaymentPartner;
+      const { id, created_at, updated_at, partner_ref, ...patch } = draft as PaymentPartner;
       update.mutate({ id, patch }, { onSuccess: () => setOpen(false) });
     } else {
-      create.mutate({ ...draft, code: normalizeCode(String(draft.code)) }, { onSuccess: () => setOpen(false) });
+      const { partner_ref, ...rest } = draft as Partial<PaymentPartner>;
+      create.mutate({ ...rest, code: normalizeCode(String(draft.code)) }, { onSuccess: () => setOpen(false) });
     }
   };
 
   const downloadTemplate = () =>
     downloadCsv("payment-partners-template", [...TEMPLATE_HEADERS], [
       [
+        "",
         "nomba",
         "Nomba",
         "both",
