@@ -43,6 +43,30 @@ export const PartnerCorridorsPanel = () => {
 
   const nameOf = (id: string) => partners?.find((p) => p.id === id)?.name || "—";
 
+  const cols = useMemo<Col<PartnerCorridor>[]>(
+    () => [
+      { key: "partner", label: "Partner", value: (c) => nameOf(c.partner_id), filter: true },
+      { key: "direction", label: "Direction", value: (c) => c.direction, filter: true },
+      { key: "corridor", label: "Corridor", value: (c) => `${c.source_country || "—"} → ${c.dest_country}`, filter: true },
+      { key: "pair", label: "Pair", value: (c) => `${c.source_currency}/${c.dest_currency}`, filter: true },
+      { key: "method", label: "Method", value: (c) => c.payment_method, filter: true },
+      { key: "eta", label: "ETA (min)", value: (c) => c.est_minutes ?? 0, type: "number", align: "right" },
+      { key: "enabled", label: "Enabled", value: (c) => (c.enabled ? "Yes" : "No"), filter: true },
+      { key: "actions", label: "", value: () => "", sortable: false },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [partners],
+  );
+
+  const { view, Controls, HeadRow } = useTableQuery(corridors, cols, {
+    defaultSort: "partner",
+    defaultDir: "asc",
+    exportName: "partner-corridors",
+    searchPlaceholder: "Search corridor, pair, method…",
+  });
+
+
+
   return (
     <Card>
       <CardHeader className="gap-3">
