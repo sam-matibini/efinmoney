@@ -319,10 +319,10 @@ export const EfinPricingPanel = () => {
               Cancel
             </Button>
             <Button
-              onClick={() => add.mutate(draft, { onSuccess: () => setOpen(false) })}
+              onClick={save}
               disabled={!draft.source_currency || !draft.dest_currency || add.isPending}
             >
-              Save pricing
+              {editingId ? "Save new version" : "Save pricing"}
             </Button>
           </DialogFooter>
         </DialogContent>
