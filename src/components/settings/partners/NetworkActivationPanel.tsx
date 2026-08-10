@@ -219,20 +219,12 @@ export const NetworkActivationPanel = () => {
                 </TabsList>
 
                 <TabsContent value="pricing">
+                  <pricingQ.Controls />
                   <div className="overflow-x-auto">
                     <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Partner</TableHead>
-                          <TableHead>Route</TableHead>
-                          <TableHead className="text-right">Fixed</TableHead>
-                          <TableHead className="text-right">%</TableHead>
-                          <TableHead className="text-right">FX bps</TableHead>
-                          <TableHead className="text-right">Other</TableHead>
-                        </TableRow>
-                      </TableHeader>
+                      <pricingQ.HeadRow />
                       <TableBody>
-                        {preview.pricing.map((r, i) => (
+                        {pricingQ.view.map((r, i) => (
                           <TableRow key={i}>
                             <TableCell className="font-medium">{String(r.partner_code)}</TableCell>
                             <TableCell>
