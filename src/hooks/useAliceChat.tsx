@@ -60,9 +60,9 @@ export const useAliceChat = (context: Context) => {
     setMessages((data || []).map((m) => ({ role: m.role as AliceRole, content: m.content })));
   }, []);
 
-  const send = useCallback(async (text: string) => {
+  const send = useCallback(async (text: string): Promise<string | null> => {
     const trimmed = text.trim();
-    if (!trimmed || isSending) return;
+    if (!trimmed || isSending) return null;
 
     const userMsg: AliceMessage = { role: "user", content: trimmed };
     const thread = [...messages, userMsg];
@@ -97,6 +97,7 @@ export const useAliceChat = (context: Context) => {
 
       setMessages([...thread, { role: "assistant", content: reply }]);
       qc.invalidateQueries({ queryKey: ["alice-conversations", context] });
+      return reply;
     } catch (err) {
       let msg = err instanceof Error ? err.message : "Something went wrong.";
       // Supabase FunctionsHttpError hides the body — read it for the real reason.
@@ -108,7 +109,9 @@ export const useAliceChat = (context: Context) => {
           if (b?.error) msg = b.error;
         } catch { /* ignore */ }
       }
-      setMessages([...thread, { role: "assistant", content: `⚠️ ${msg}` }]);
+      const fail = `⚠️ ${msg}`;
+      setMessages([...thread, { role: "assistant", content: fail }]);
+      return fail;
     } finally {
       setIsSending(false);
     }
