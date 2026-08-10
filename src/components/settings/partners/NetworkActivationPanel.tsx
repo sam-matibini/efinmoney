@@ -268,19 +268,12 @@ export const NetworkActivationPanel = () => {
                 </TabsContent>
 
                 <TabsContent value="retail">
+                  <retailQ.Controls />
                   <div className="overflow-x-auto">
                     <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Customer</TableHead>
-                          <TableHead>Route</TableHead>
-                          <TableHead className="text-right">Fixed</TableHead>
-                          <TableHead className="text-right">%</TableHead>
-                          <TableHead className="text-right">FX bps</TableHead>
-                        </TableRow>
-                      </TableHeader>
+                      <retailQ.HeadRow />
                       <TableBody>
-                        {preview.retail.map((r, i) => (
+                        {retailQ.view.map((r, i) => (
                           <TableRow key={i}>
                             <TableCell className="capitalize">{String(r.customer_type)}</TableCell>
                             <TableCell>
