@@ -147,8 +147,11 @@ const emptyPartner: Partial<PaymentPartner> = {
   payment_methods: [],
 };
 
+const ISO_CODES = ISO_COUNTRIES.map((c) => c.code);
+
 export const PartnersPanel = () => {
   const { data: partners, isLoading, isError, error, refetch, isFetching } = usePaymentPartners();
+  const { data: corridors } = usePartnerCorridors();
   const create = useCreatePartner();
   const update = useUpdatePartner();
   const remove = useDeletePartner();
@@ -167,19 +170,49 @@ export const PartnersPanel = () => {
     !!draft.code &&
     (partners ?? []).some((p) => p.code.toLowerCase() === String(draft.code).toLowerCase());
 
+  /** partner id → destination countries it actually serves (from enabled/known corridors). */
+  const serves = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const c of corridors ?? []) {
+      const dest = (c.dest_country || "").toUpperCase();
+      if (!dest) continue;
+      const list = map.get(c.partner_id) ?? [];
+      if (!list.includes(dest)) list.push(dest);
+      map.set(c.partner_id, list);
+    }
+    for (const [k, v] of map) map.set(k, v.sort());
+    return map;
+  }, [corridors]);
+
   const cols = useMemo<Col<PaymentPartner>[]>(
     () => [
       { key: "name", label: "Partner", value: (p) => p.name, filter: true },
       { key: "code", label: "Code", value: (p) => p.code },
       { key: "direction", label: "Direction", value: (p) => p.direction, filter: true },
-      { key: "country", label: "Country", value: (p) => p.country ?? "", filter: true },
+      {
+        key: "country",
+        label: "Country",
+        value: (p) => p.country ?? "",
+        filter: true,
+        filterOptions: ISO_CODES,
+        filterLabel: countryLabel,
+      },
+      {
+        key: "serves",
+        label: "Serves",
+        value: (p) => (serves.get(p.id) ?? []).join(", "),
+        filter: true,
+        filterMode: "includes",
+        filterOptions: ISO_CODES,
+        filterLabel: countryLabel,
+      },
       { key: "settlement", label: "Settlement", value: (p) => p.settlement_currency ?? "", filter: true },
       { key: "reliability", label: "Reliability", value: (p) => p.reliability_score, type: "number", align: "right" },
       { key: "priority", label: "Priority", value: (p) => p.priority, type: "number", align: "right" },
       { key: "status", label: "Status", value: (p) => p.status, filter: true },
       { key: "actions", label: "", value: () => "", sortable: false },
     ],
-    [],
+    [serves],
   );
 
   const { view, Controls, HeadRow } = useTableQuery(partners, cols, {
