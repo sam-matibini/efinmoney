@@ -38,6 +38,15 @@ export interface Col<T> {
   type?: "text" | "number" | "date";
   /** Show a dropdown filter for this column's distinct values. */
   filter?: boolean;
+  /**
+   * Extra option values always offered by this column's filter, even when no row
+   * uses them yet (shown with a 0 count). Useful for full reference lists.
+   */
+  filterOptions?: string[];
+  /** Pretty label for a filter option value (e.g. "ZM" → "Zambia (ZM)"). */
+  filterLabel?: (value: string) => string;
+  /** "includes" treats the value as a comma-separated list and matches any member. */
+  filterMode?: "exact" | "includes";
   align?: "left" | "right";
   className?: string;
   /** Header only, no sorting (e.g. the row-actions column). */
@@ -61,6 +70,7 @@ const cmp = <T,>(col: Col<T>, dir: SortDir) => (a: T, b: T) => {
 export interface FilterOption {
   value: string;
   count: number;
+  label?: string;
 }
 
 /** Searchable, scrollable, typable single-select filter. */
@@ -79,6 +89,7 @@ export const FilterCombobox = ({
 }) => {
   const [open, setOpen] = useState(false);
   const selected = value && value !== ALL ? value : "";
+  const selectedLabel = selected ? (options.find((o) => o.value === selected)?.label ?? selected) : "";
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -88,7 +99,7 @@ export const FilterCombobox = ({
           aria-expanded={open}
           className={`h-9 ${width} justify-between font-normal`}
         >
-          <span className="truncate">{selected || `All ${label.toLowerCase()}`}</span>
+          <span className="truncate">{selectedLabel || `All ${label.toLowerCase()}`}</span>
           <ChevronsUpDown className="ml-1 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
@@ -111,14 +122,15 @@ export const FilterCombobox = ({
               {options.map((o) => (
                 <CommandItem
                   key={o.value}
-                  value={o.value}
+                  value={`${o.label ?? ""} ${o.value}`}
                   onSelect={() => {
                     onChange(o.value);
                     setOpen(false);
                   }}
+                  className={o.count === 0 ? "opacity-50" : undefined}
                 >
                   <Check className={`mr-2 h-4 w-4 ${selected === o.value ? "opacity-100" : "opacity-0"}`} />
-                  <span className="truncate">{o.value}</span>
+                  <span className="truncate">{o.label ?? o.value}</span>
                   <span className="ml-auto text-xs text-muted-foreground">{o.count}</span>
                 </CommandItem>
               ))}
@@ -284,14 +296,20 @@ export function useTableQuery<T>(rows: T[] | undefined, cols: Col<T>[], opts: Ta
     const map: Record<string, FilterOption[]> = {};
     for (const c of filterCols) {
       const counts = new Map<string, number>();
+      for (const v of c.filterOptions ?? []) counts.set(v, 0);
       for (const r of all) {
-        const v = norm(c.value(r));
-        if (!v) continue;
-        counts.set(v, (counts.get(v) ?? 0) + 1);
+        const raw = norm(c.value(r));
+        if (!raw) continue;
+        const parts = c.filterMode === "includes" ? raw.split(",").map((s) => s.trim()).filter(Boolean) : [raw];
+        for (const v of parts) counts.set(v, (counts.get(v) ?? 0) + 1);
       }
       map[c.key] = [...counts.entries()]
-        .sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true }))
-        .map(([value, count]) => ({ value, count }));
+        .map(([value, count]) => ({ value, count, label: c.filterLabel?.(value) }))
+        .sort(
+          (a, b) =>
+            (b.count > 0 ? 1 : 0) - (a.count > 0 ? 1 : 0) ||
+            (a.label ?? a.value).localeCompare(b.label ?? b.value, undefined, { numeric: true }),
+        );
     }
     return map;
   }, [all, filterCols]);
@@ -302,7 +320,11 @@ export function useTableQuery<T>(rows: T[] | undefined, cols: Col<T>[], opts: Ta
       for (const [key, val] of Object.entries(filters)) {
         if (!val || val === ALL) continue;
         const col = cols.find((c) => c.key === key);
-        if (col && norm(col.value(r)) !== val) return false;
+        if (!col) continue;
+        const raw = norm(col.value(r));
+        if (col.filterMode === "includes") {
+          if (!raw.split(",").map((s) => s.trim()).includes(val)) return false;
+        } else if (raw !== val) return false;
       }
       if (!q) return true;
       return cols.some((c) => norm(c.value(r)).toLowerCase().includes(q));

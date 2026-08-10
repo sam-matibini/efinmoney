@@ -1,7 +1,10 @@
 import { useMemo, useRef, useState } from "react";
 import { useTableQuery, type Col } from "./tableToolkit";
+import { CountryCombobox, countryLabel, toCountryCode, isKnownCountry } from "./CountryCombobox";
+import { ISO_COUNTRIES } from "@/lib/isoCountries";
 import {
   usePaymentPartners,
+  usePartnerCorridors,
   useCreatePartner,
   useUpdatePartner,
   useDeletePartner,
@@ -87,6 +90,7 @@ const buildImportRows = (raw: Record<string, string>[], existing: PaymentPartner
     if (!STATUSES.includes(status)) return invalid(`Invalid status "${status}"`);
     const risk = (r.compliance_risk || "low").trim().toLowerCase();
     if (!RISKS.includes(risk)) return invalid(`Invalid compliance risk "${risk}"`);
+    if (!isKnownCountry(r.country)) return invalid(`Unknown country "${String(r.country).trim()}"`);
     for (const k of ["reliability_score", "priority", "min_transaction", "max_transaction", "daily_limit", "monthly_limit"]) {
       const v = String(r[k] ?? "").trim();
       if (v !== "" && Number.isNaN(Number(v))) return invalid(`"${k}" must be a number`);
@@ -97,7 +101,7 @@ const buildImportRows = (raw: Record<string, string>[], existing: PaymentPartner
       direction: direction as PaymentPartner["direction"],
       status: status as PaymentPartner["status"],
       compliance_risk: risk as PaymentPartner["compliance_risk"],
-      country: r.country?.trim().toUpperCase() || null,
+      country: toCountryCode(r.country),
       regulatory_status: r.regulatory_status?.trim() || null,
       settlement_currency: r.settlement_currency?.trim().toUpperCase() || null,
       settlement_time: r.settlement_time?.trim() || null,
@@ -144,8 +148,11 @@ const emptyPartner: Partial<PaymentPartner> = {
   payment_methods: [],
 };
 
+const ISO_CODES = ISO_COUNTRIES.map((c) => c.code);
+
 export const PartnersPanel = () => {
   const { data: partners, isLoading, isError, error, refetch, isFetching } = usePaymentPartners();
+  const { data: corridors } = usePartnerCorridors();
   const create = useCreatePartner();
   const update = useUpdatePartner();
   const remove = useDeletePartner();
@@ -164,19 +171,49 @@ export const PartnersPanel = () => {
     !!draft.code &&
     (partners ?? []).some((p) => p.code.toLowerCase() === String(draft.code).toLowerCase());
 
+  /** partner id → destination countries it actually serves (from enabled/known corridors). */
+  const serves = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const c of corridors ?? []) {
+      const dest = (c.dest_country || "").toUpperCase();
+      if (!dest) continue;
+      const list = map.get(c.partner_id) ?? [];
+      if (!list.includes(dest)) list.push(dest);
+      map.set(c.partner_id, list);
+    }
+    for (const [k, v] of map) map.set(k, v.sort());
+    return map;
+  }, [corridors]);
+
   const cols = useMemo<Col<PaymentPartner>[]>(
     () => [
       { key: "name", label: "Partner", value: (p) => p.name, filter: true },
       { key: "code", label: "Code", value: (p) => p.code },
       { key: "direction", label: "Direction", value: (p) => p.direction, filter: true },
-      { key: "country", label: "Country", value: (p) => p.country ?? "", filter: true },
+      {
+        key: "country",
+        label: "Country",
+        value: (p) => p.country ?? "",
+        filter: true,
+        filterOptions: ISO_CODES,
+        filterLabel: countryLabel,
+      },
+      {
+        key: "serves",
+        label: "Serves",
+        value: (p) => (serves.get(p.id) ?? []).join(", "),
+        filter: true,
+        filterMode: "includes",
+        filterOptions: ISO_CODES,
+        filterLabel: countryLabel,
+      },
       { key: "settlement", label: "Settlement", value: (p) => p.settlement_currency ?? "", filter: true },
       { key: "reliability", label: "Reliability", value: (p) => p.reliability_score, type: "number", align: "right" },
       { key: "priority", label: "Priority", value: (p) => p.priority, type: "number", align: "right" },
       { key: "status", label: "Status", value: (p) => p.status, filter: true },
       { key: "actions", label: "", value: () => "", sortable: false },
     ],
-    [],
+    [serves],
   );
 
   const { view, Controls, HeadRow } = useTableQuery(partners, cols, {
@@ -343,7 +380,20 @@ export const PartnersPanel = () => {
                     <TableCell className="font-mono text-xs text-muted-foreground">{p.code}</TableCell>
 
                     <TableCell className="capitalize">{p.direction}</TableCell>
-                    <TableCell>{p.country || "—"}</TableCell>
+                    <TableCell>{p.country ? countryLabel(p.country) : "—"}</TableCell>
+                    <TableCell className="max-w-[220px]">
+                      {(serves.get(p.id) ?? []).length ? (
+                        <div className="flex flex-wrap gap-1">
+                          {(serves.get(p.id) ?? []).map((c) => (
+                            <Badge key={c} variant="outline" className="font-mono text-[10px]" title={countryLabel(c)}>
+                              {c}
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : (
+                        "—"
+                      )}
+                    </TableCell>
                     <TableCell>
                       {p.settlement_currency || "—"}
                       <div className="text-xs text-muted-foreground">{p.settlement_time || ""}</div>
@@ -426,7 +476,12 @@ export const PartnersPanel = () => {
             </div>
             <div>
               <Label>Operating country</Label>
-              <Input value={draft.country || ""} onChange={(e) => set({ country: e.target.value })} placeholder="NG" />
+              <CountryCombobox
+                value={draft.country}
+                onChange={(code) => set({ country: code })}
+                placeholder="Select country"
+                className="mt-0.5 h-10"
+              />
             </div>
             <div>
               <Label>Regulatory status</Label>
