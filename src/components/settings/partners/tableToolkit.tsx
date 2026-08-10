@@ -121,14 +121,15 @@ export const FilterCombobox = ({
               {options.map((o) => (
                 <CommandItem
                   key={o.value}
-                  value={o.value}
+                  value={`${o.label ?? ""} ${o.value}`}
                   onSelect={() => {
                     onChange(o.value);
                     setOpen(false);
                   }}
+                  className={o.count === 0 ? "opacity-50" : undefined}
                 >
                   <Check className={`mr-2 h-4 w-4 ${selected === o.value ? "opacity-100" : "opacity-0"}`} />
-                  <span className="truncate">{o.value}</span>
+                  <span className="truncate">{o.label ?? o.value}</span>
                   <span className="ml-auto text-xs text-muted-foreground">{o.count}</span>
                 </CommandItem>
               ))}
