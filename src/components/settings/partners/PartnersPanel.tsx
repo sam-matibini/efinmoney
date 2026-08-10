@@ -774,6 +774,20 @@ export const PartnersPanel = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <PartnerDetailSheet
+        partner={viewing}
+        open={!!viewing}
+        onOpenChange={(v) => !v && setViewing(null)}
+        onEdit={(p) => {
+          setViewing(null);
+          setDraft(p);
+          setOpen(true);
+        }}
+        onToggleStatus={(p, active) =>
+          update.mutate({ id: p.id, patch: { status: active ? "active" : "inactive" } })
+        }
+      />
     </Card>
 
   );
