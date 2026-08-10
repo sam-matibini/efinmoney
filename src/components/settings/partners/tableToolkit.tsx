@@ -59,7 +59,7 @@ export function useTableQuery<T>(rows: T[] | undefined, cols: Col<T>[], opts: Ta
   const [sortKey, setSortKey] = useState<string | null>(defaultSort ?? null);
   const [sortDir, setSortDir] = useState<SortDir>(defaultDir);
 
-  const all = rows ?? [];
+  const all = useMemo(() => rows ?? [], [rows]);
   const filterCols = cols.filter((c) => c.filter);
 
   /** asc → desc → back to the panel default. */
