@@ -38,13 +38,26 @@ function isSuccessStatus(status: unknown): boolean {
 
 function extractOrderId(payload: Record<string, unknown>, data: Record<string, unknown>): string {
   return String(
-    data.order_id ?? data.orderId ?? payload.order_id ?? payload.orderId
+    data.orderReference ?? data.order_reference ?? payload.orderReference ?? payload.order_reference
+    ?? data.order_id ?? data.orderId ?? payload.order_id ?? payload.orderId
     ?? data.id ?? payload.id ?? "",
   ).trim();
 }
 
+function extractMerchantReference(payload: Record<string, unknown>, data: Record<string, unknown>): string {
+  return String(
+    data.merchantReference ?? data.merchant_reference ?? payload.merchantReference
+    ?? data.orderReference ?? data.order_reference ?? payload.orderReference
+    ?? data.reference ?? payload.reference ?? "",
+  ).trim();
+}
+
 function detectSuccess(payload: Record<string, unknown>, data: Record<string, unknown>): boolean {
-  const event = String(payload.event ?? payload.type ?? "").toLowerCase();
+  // Official Nomba Developer webhook: event_type === "payment_success"
+  const eventType = String(payload.event_type ?? payload.eventType ?? "").toLowerCase();
+  if (eventType === "payment_success" || eventType.includes("payment_success")) return true;
+
+  const event = String(payload.event ?? payload.type ?? eventType).toLowerCase();
   if (event.includes("success") || event.includes("completed") || event.includes("paid")) return true;
 
   const code = String(data.status_code ?? payload.status_code ?? data.code ?? payload.code ?? "");
@@ -53,7 +66,7 @@ function detectSuccess(payload: Record<string, unknown>, data: Record<string, un
   const status = data.status ?? payload.status ?? data.payment_status ?? payload.payment_status;
   if (isSuccessStatus(status)) return true;
 
-  const msg = String(data.message ?? payload.message ?? "").toLowerCase();
+  const msg = String(data.message ?? payload.message ?? payload.description ?? "").toLowerCase();
   if (msg.includes("success") || msg.includes("completed") || msg.includes("paid")) return true;
 
   return false;
@@ -295,15 +308,16 @@ Deno.serve(async (req) => {
       : payload as Record<string, unknown>;
 
     const orderId = extractOrderId(payload, data);
+    const merchantRef = extractMerchantReference(payload, data);
     const statusRaw = data.status ?? payload.status ?? data.payment_status;
     const isSuccess = detectSuccess(payload, data);
     const isFailure = isFailureStatus(statusRaw)
-      || String(payload.event ?? "").toLowerCase().includes("fail");
+      || String(payload.event ?? payload.event_type ?? "").toLowerCase().includes("fail");
 
     const txn = await findTxn(
       supabase,
       orderId,
-      String(data.reference ?? payload.reference ?? "").trim() || undefined,
+      merchantRef || String(data.reference ?? payload.reference ?? "").trim() || undefined,
     );
     if (!txn) {
       return new Response(JSON.stringify({ received: true, matched: false, order_id: orderId || null }), {

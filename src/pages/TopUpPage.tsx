@@ -849,7 +849,7 @@ const TopUpPage = () => {
         id: "nomba",
         tone: "card",
         label: "Card or bank transfer",
-        description: "Powered by Nomba",
+        description: "Powered by Nomba Checkout",
         content: (
           <SectionBoundary name="NombaTopUp">
             <NombaTopUpCard walletId={walletId} walletCurrency={currency} initialAmount={amount} embedded onComplete={invalidateWallets} />

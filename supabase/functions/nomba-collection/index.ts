@@ -8,6 +8,10 @@ import {
   type NombaCorridor,
 } from "../_shared/nomba-pay.ts";
 import {
+  createNombaCheckoutOrder,
+  nombaApiConfigured,
+} from "../_shared/nomba-api.ts";
+import {
   quoteCadWalletViaNombaUsd,
   quoteSameCurrencyTopup,
   resolveFxRate,
@@ -148,10 +152,10 @@ Deno.serve(async (req) => {
       }
     }
 
-    if (!isNombaPayConfigured()) {
+    const useOfficialApi = nombaApiConfigured() && corridor === "nigeria";
+    if (!useOfficialApi && !isNombaPayConfigured()) {
       return json({ error: "Card checkout is not configured", code: "provider_not_configured" }, 500);
     }
-    const cfg = getNombaPayConfig();
 
     const amountRounded = Math.round(checkoutAmount * 100) / 100;
     if (corridor === "international" && amountRounded < 1) {
@@ -191,6 +195,7 @@ Deno.serve(async (req) => {
         status: "pending",
         raw_request: {
           corridor,
+          rail: useOfficialApi ? "nomba_api" : "lenhub",
           credit_amount: creditAmount,
           credit_currency: creditCurrency,
           checkout_amount: amountRounded,
@@ -206,6 +211,68 @@ Deno.serve(async (req) => {
 
     if (insErr) return json({ error: "Could not record collection", detail: insErr.message }, 500);
 
+    // Prefer official Nomba Developer Checkout for NGN (company account).
+    if (useOfficialApi) {
+      const appBase = (Deno.env.get("APP_URL") || "https://www.efin.money").replace(/\/+$/, "");
+      const callbackUrl = returnUrl
+        || `${appBase}/wallet/topup?nomba=1&walletId=${encodeURIComponent(String(target_wallet_id))}`;
+      console.log("Nomba OFFICIAL checkout:", { amountRounded, checkoutCurrency, internalRef });
+
+      const created = await createNombaCheckoutOrder({
+        amount: amountRounded,
+        currency: checkoutCurrency,
+        callbackUrl,
+        customerEmail,
+        orderReference: internalRef.slice(0, 50),
+        meta: {
+          efin_txn_id: String(txn.id),
+          wallet_id: String(target_wallet_id),
+          user_id: userId,
+        },
+      });
+
+      if (!created.ok) {
+        await admin.from("nomba_pay_transactions").update({
+          status: "failed",
+          failure_reason: created.error,
+          raw_response: { error: created.error, rail: "nomba_api" },
+        }).eq("id", txn.id);
+        const accountHint = created.error.toLowerCase().includes("account number")
+          ? " Nomba business wallet/account number still needs setup in the Nomba dashboard."
+          : "";
+        return json({
+          error: `${created.error}${accountHint}`,
+          code: "nomba_checkout_failed",
+        }, 200);
+      }
+
+      await admin.from("nomba_pay_transactions").update({
+        status: "processing",
+        order_id: created.orderReference,
+        checkout_url: created.checkoutLink,
+        provider_reference: created.orderReference,
+        raw_response: { rail: "nomba_api", ...created },
+      }).eq("id", txn.id);
+
+      return json({
+        success: true,
+        transaction_id: txn.id,
+        order_id: created.orderReference,
+        payment_link: created.checkoutLink,
+        message: "Redirecting to Nomba checkout…",
+        rail: "nomba_api",
+        quote: {
+          credit_amount: creditAmount,
+          credit_currency: creditCurrency,
+          checkout_amount: amountRounded,
+          checkout_currency: checkoutCurrency,
+          platform_fee: platformFee,
+          fx_rate: fxRate,
+        },
+      });
+    }
+
+    const cfg = getNombaPayConfig();
     const payload = {
       currency: checkoutCurrency,
       amount: String(amountRounded),
@@ -215,7 +282,7 @@ Deno.serve(async (req) => {
     };
 
     const url = collectionUrlForCorridor(corridor);
-    console.log("Nomba COLLECTION:", { corridor, url, payload, walletCurrency, creditAmount, creditCurrency });
+    console.log("Nomba COLLECTION (lenhub):", { corridor, url, payload, walletCurrency, creditAmount, creditCurrency });
 
     const result = await nombaCollectionFetch(url, payload);
 
