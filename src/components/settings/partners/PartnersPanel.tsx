@@ -339,8 +339,9 @@ export const PartnersPanel = () => {
                   <TableRow key={p.id}>
                     <TableCell>
                       <div className="font-medium">{p.name}</div>
-                      <div className="text-xs text-muted-foreground">{p.code}</div>
                     </TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">{p.code}</TableCell>
+
                     <TableCell className="capitalize">{p.direction}</TableCell>
                     <TableCell>{p.country || "—"}</TableCell>
                     <TableCell>
