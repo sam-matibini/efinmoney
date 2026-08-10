@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Rocket, Eye, AlertTriangle } from "lucide-react";
+import { Rocket, Eye, AlertTriangle, FileSpreadsheet } from "lucide-react";
 
 const SCOPES: { value: SeedScope; label: string; hint: string }[] = [
   { value: "pricing", label: "Partner pricing", hint: "Rate cards for every enabled corridor" },
