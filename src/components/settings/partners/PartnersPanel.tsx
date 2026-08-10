@@ -67,6 +67,7 @@ type ImportKind = "new" | "update" | "unchanged" | "invalid";
 interface ImportRow {
   kind: ImportKind;
   reason?: string;
+  ref: string;
   code: string;
   name: string;
   payload: Partial<PaymentPartner>;
@@ -75,13 +76,19 @@ interface ImportRow {
 
 const num = (v: string) => (v === "" || v === undefined ? null : Number(v));
 
+const normalizeRef = (v: string) => v.trim().toUpperCase();
+
 const buildImportRows = (raw: Record<string, string>[], existing: PaymentPartner[]): ImportRow[] => {
   const byCode = new Map(existing.map((p) => [p.code.toLowerCase(), p]));
+  const byRef = new Map(existing.filter((p) => p.partner_ref).map((p) => [normalizeRef(p.partner_ref!), p]));
   const seen = new Set<string>();
   return raw.map((r) => {
-    const code = normalizeCode(String(r.code ?? "").trim());
-    const name = String(r.name ?? "").trim();
-    const invalid = (reason: string): ImportRow => ({ kind: "invalid", reason, code, name, payload: {} });
+    const ref = normalizeRef(String(r.partner_ref ?? ""));
+    const matchByRef = ref ? byRef.get(ref) : undefined;
+    const code = normalizeCode(String(r.code ?? "").trim()) || matchByRef?.code || "";
+    const name = String(r.name ?? "").trim() || matchByRef?.name || "";
+    const invalid = (reason: string): ImportRow => ({ kind: "invalid", reason, ref, code, name, payload: {} });
+    if (ref && !matchByRef) return invalid(`Unknown reference "${ref}"`);
     if (!code || !name) return invalid("Code and name are required");
     if (seen.has(code)) return invalid("Duplicate code in file");
     seen.add(code);
