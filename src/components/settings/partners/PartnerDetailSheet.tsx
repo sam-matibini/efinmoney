@@ -177,7 +177,6 @@ export const PartnerDetailSheet = ({ partner, open, onOpenChange, onEdit, onTogg
                   <TableHead>Route</TableHead>
                   <TableHead>Method</TableHead>
                   <TableHead>Enabled</TableHead>
-                  <TableHead>Live</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -190,16 +189,11 @@ export const PartnerDetailSheet = ({ partner, open, onOpenChange, onEdit, onTogg
                     <TableCell>
                       <Badge variant={c.enabled ? "default" : "outline"}>{c.enabled ? "yes" : "no"}</Badge>
                     </TableCell>
-                    <TableCell>
-                      <Badge variant={c.live_routing_enabled ? "default" : "outline"}>
-                        {c.live_routing_enabled ? "live" : "off"}
-                      </Badge>
-                    </TableCell>
                   </TableRow>
                 ))}
                 {!corridors?.length && (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center text-sm text-muted-foreground">
+                    <TableCell colSpan={3} className="text-center text-sm text-muted-foreground">
                       No corridors configured
                     </TableCell>
                   </TableRow>
@@ -266,7 +260,6 @@ export const PartnerDetailSheet = ({ partner, open, onOpenChange, onEdit, onTogg
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {b.as_of ? new Date(b.as_of).toLocaleString() : "—"}
-                      {b.refresh_error ? <span className="block text-destructive">{b.refresh_error}</span> : null}
                     </TableCell>
                   </TableRow>
                 ))}
