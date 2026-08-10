@@ -718,6 +718,7 @@ export const PartnersPanel = () => {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Ref</TableHead>
                   <TableHead>Code</TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>Direction</TableHead>
@@ -728,6 +729,7 @@ export const PartnersPanel = () => {
               <TableBody>
                 {importRows.map((r, i) => (
                   <TableRow key={`${r.code}-${i}`}>
+                    <TableCell className="font-mono text-xs">{r.ref || "—"}</TableCell>
                     <TableCell className="font-mono text-xs">{r.code || "—"}</TableCell>
                     <TableCell>{r.name || "—"}</TableCell>
                     <TableCell className="capitalize">{r.payload.direction || "—"}</TableCell>
