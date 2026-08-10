@@ -48,6 +48,27 @@ export const PartnersPanel = () => {
 
   const set = (patch: Partial<PaymentPartner>) => setDraft((d) => ({ ...d, ...patch }));
 
+  const cols = useMemo<Col<PaymentPartner>[]>(
+    () => [
+      { key: "name", label: "Partner", value: (p) => `${p.name} ${p.code}` },
+      { key: "direction", label: "Direction", value: (p) => p.direction, filter: true },
+      { key: "country", label: "Country", value: (p) => p.country ?? "", filter: true },
+      { key: "settlement", label: "Settlement", value: (p) => p.settlement_currency ?? "", filter: true },
+      { key: "reliability", label: "Reliability", value: (p) => p.reliability_score, type: "number", align: "right" },
+      { key: "priority", label: "Priority", value: (p) => p.priority, type: "number", align: "right" },
+      { key: "status", label: "Status", value: (p) => p.status, filter: true },
+      { key: "actions", label: "", value: () => "", sortable: false },
+    ],
+    [],
+  );
+
+  const { view, Controls, HeadRow } = useTableQuery(partners, cols, {
+    defaultSort: "priority",
+    defaultDir: "asc",
+    exportName: "payment-partners",
+    searchPlaceholder: "Search partner, code, country…",
+  });
+
   const save = () => {
     if (!draft.code || !draft.name) return;
     if (draft.id) {
