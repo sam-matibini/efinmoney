@@ -38,6 +38,15 @@ export interface Col<T> {
   type?: "text" | "number" | "date";
   /** Show a dropdown filter for this column's distinct values. */
   filter?: boolean;
+  /**
+   * Extra option values always offered by this column's filter, even when no row
+   * uses them yet (shown with a 0 count). Useful for full reference lists.
+   */
+  filterOptions?: string[];
+  /** Pretty label for a filter option value (e.g. "ZM" → "Zambia (ZM)"). */
+  filterLabel?: (value: string) => string;
+  /** "includes" treats the value as a comma-separated list and matches any member. */
+  filterMode?: "exact" | "includes";
   align?: "left" | "right";
   className?: string;
   /** Header only, no sorting (e.g. the row-actions column). */
