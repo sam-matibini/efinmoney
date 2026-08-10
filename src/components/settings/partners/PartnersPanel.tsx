@@ -90,6 +90,7 @@ const buildImportRows = (raw: Record<string, string>[], existing: PaymentPartner
     if (!STATUSES.includes(status)) return invalid(`Invalid status "${status}"`);
     const risk = (r.compliance_risk || "low").trim().toLowerCase();
     if (!RISKS.includes(risk)) return invalid(`Invalid compliance risk "${risk}"`);
+    if (!isKnownCountry(r.country)) return invalid(`Unknown country "${String(r.country).trim()}"`);
     for (const k of ["reliability_score", "priority", "min_transaction", "max_transaction", "daily_limit", "monthly_limit"]) {
       const v = String(r[k] ?? "").trim();
       if (v !== "" && Number.isNaN(Number(v))) return invalid(`"${k}" must be a number`);
