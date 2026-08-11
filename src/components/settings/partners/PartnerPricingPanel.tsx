@@ -1,10 +1,11 @@
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useTableQuery, type Col } from "./tableToolkit";
 import {
   usePaymentPartners,
   usePartnerPricing,
   useAddPartnerPricing,
   useBulkAddPartnerPricing,
+  usePartnerCostDrift,
   type PartnerPricing,
 } from "@/hooks/usePartnerNetwork";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -91,6 +92,22 @@ export const PartnerPricingPanel = () => {
 
   const nameOf = (id: string) => partners?.find((p) => p.id === id)?.name || "—";
 
+  const { data: drift } = usePartnerCostDrift();
+
+  /** Observed-vs-contracted summary for this exact route, when we have one. */
+  const driftFor = useCallback(
+    (p: PartnerPricing) =>
+      (drift ?? []).find(
+        (d) =>
+          d.partner_id === p.partner_id &&
+          d.direction === p.direction &&
+          d.source_currency === p.source_currency &&
+          (d.dest_currency ?? "") === (p.dest_currency ?? "") &&
+          (d.payment_method ?? "") === (p.payment_method ?? ""),
+      ) ?? null,
+    [drift],
+  );
+
   const cols = useMemo<Col<PartnerPricing>[]>(
     () => [
       { key: "partner", label: "Partner", value: (p) => nameOf(p.partner_id), filter: true },
@@ -110,10 +127,17 @@ export const PartnerPricingPanel = () => {
         align: "right",
       },
       { key: "effective", label: "Effective", value: (p) => p.effective_from, type: "date" },
+      {
+        key: "drift",
+        label: "Billed drift",
+        value: (p) => driftFor(p)?.avg_drift_percent ?? null,
+        type: "number",
+        align: "right",
+      },
       { key: "source", label: "Source", value: (p) => p.source, filter: true },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [partners],
+    [partners, drift],
   );
 
   const { view, Controls, HeadRow } = useTableQuery(pricing, cols, {
@@ -263,7 +287,7 @@ export const PartnerPricingPanel = () => {
           </div>
         </div>
         <p className="text-xs text-muted-foreground">
-          CSV columns: {CSV_COLUMNS.join(", ")}
+          CSV columns: {CSV_COLUMNS.join(", ")} · Billed drift compares partner invoices from the last 90 days against these contracted rates.
         </p>
       </CardHeader>
       <CardContent>
@@ -299,6 +323,22 @@ export const PartnerPricingPanel = () => {
                       ) : (
                         <Badge variant="default" className="ml-1">current</Badge>
                       )}
+                    </TableCell>
+                    <TableCell className="text-right text-xs">
+                      {(() => {
+                        const d = driftFor(p);
+                        if (!d || d.avg_drift_percent == null) {
+                          return <span className="text-muted-foreground">—</span>;
+                        }
+                        const over = d.avg_drift_percent > 2;
+                        return (
+                          <span title={`${d.samples} billed transaction(s), last ${format(new Date(d.last_observed_at), "dd MMM yy")}`}>
+                            <Badge variant={over ? "destructive" : "outline"} className="tabular-nums">
+                              {d.avg_drift_percent > 0 ? "+" : ""}{d.avg_drift_percent}%
+                            </Badge>
+                          </span>
+                        );
+                      })()}
                     </TableCell>
                     <TableCell className="text-xs capitalize">{p.source.replace(/_/g, " ")}</TableCell>
                   </TableRow>

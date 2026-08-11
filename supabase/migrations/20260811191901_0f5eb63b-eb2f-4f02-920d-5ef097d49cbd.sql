@@ -1,0 +1,1 @@
+ALTER VIEW public.partner_cost_drift SET (security_invoker = on);
