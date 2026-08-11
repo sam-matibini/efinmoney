@@ -105,7 +105,7 @@ Deno.serve(async (req) => {
 
       // Dedupe pairs — several payment methods share one currency pair.
       const pairs = new Map<string, { base: string; quote: string }>();
-      for (const c of byPartner.get(p.partner_id ?? p.id) ?? byPartner.get(p.id) ?? []) {
+      for (const c of byPartner.get(p.id) ?? []) {
         pairs.set(`${c.source_currency}/${c.dest_currency}`, {
           base: c.source_currency.toUpperCase(),
           quote: c.dest_currency.toUpperCase(),
