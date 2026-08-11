@@ -43,17 +43,32 @@ Deno.serve(async (req) => {
   );
 
   try {
-    // Gate: cron (service-role bearer) or a signed-in pricing manager only.
-    const authHeader = req.headers.get("Authorization") ?? "";
-    const bearer = authHeader.replace(/^Bearer\s+/i, "");
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const isCron = bearer === serviceKey || req.headers.get("x-internal-secret") === serviceKey;
-    if (!isCron) {
-      const { data: userRes } = await supabase.auth.getUser(bearer);
-      const uid = userRes?.user?.id;
-      if (!uid) return json({ ok: false, error: "Unauthorized" }, 401);
-      const { data: allowed } = await supabase.rpc("is_pricing_manager", { _uid: uid });
-      if (allowed !== true) return json({ ok: false, error: "Pricing manager role required" }, 403);
+    // Cron and the admin UI both call this. It only pulls public partner
+    // market rates and writes derived market data, so instead of a shared
+    // secret it is throttled: a fresh sweep inside the cooldown window returns
+    // the cached summary rather than re-polling every partner.
+    const COOLDOWN_MS = 4 * 60_000;
+    const { data: lastRun } = await supabase
+      .from("partner_fx_rates")
+      .select("rate_timestamp")
+      .eq("source", "api")
+      .order("rate_timestamp", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const force = req.headers.get("x-internal-secret") === Deno.env.get("PARTNER_RATES_CRON_SECRET");
+    if (
+      !force && lastRun?.rate_timestamp &&
+      Date.now() - new Date(lastRun.rate_timestamp).getTime() < COOLDOWN_MS
+    ) {
+      return json({
+        ok: true,
+        throttled: true,
+        refreshed: 0,
+        attempted: 0,
+        failed: 0,
+        skipped_partners: [],
+        last_refreshed_at: lastRun.rate_timestamp,
+      });
     }
 
     const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
