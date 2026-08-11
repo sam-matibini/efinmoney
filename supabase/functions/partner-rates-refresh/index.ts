@@ -52,7 +52,7 @@ Deno.serve(async (req) => {
       const { data: userRes } = await supabase.auth.getUser(bearer);
       const uid = userRes?.user?.id;
       if (!uid) return json({ ok: false, error: "Unauthorized" }, 401);
-      const { data: allowed } = await supabase.rpc("is_pricing_manager", { _user_id: uid });
+      const { data: allowed } = await supabase.rpc("is_pricing_manager", { _uid: uid });
       if (allowed !== true) return json({ ok: false, error: "Pricing manager role required" }, 403);
     }
 
