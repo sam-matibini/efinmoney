@@ -271,12 +271,20 @@ export async function resolveRoute(
     }
 
 
-    const pricing = ((pricingRows ?? []).find(
+    const cardPricing = ((pricingRows ?? []).find(
       (p: any) =>
         p.partner_id === partner.id &&
         (!p.payment_method || p.payment_method === "any" || p.payment_method === corridor.payment_method) &&
         (!p.dest_country || !dstCountry || up(p.dest_country) === dstCountry),
     ) ?? null) as PartnerPricingRow | null;
+
+    // Live FX beats the contracted markup when we have a fresh partner quote;
+    // fees always stay contract-driven.
+    const liveSpread = liveFxByPartner.get(partner.id);
+    const pricing: PartnerPricingRow | null = cardPricing
+      ? (liveSpread != null ? { ...cardPricing, fx_markup_bps: liveSpread } : cardPricing)
+      : (liveSpread != null ? ({ fx_markup_bps: liveSpread } as PartnerPricingRow) : null);
+
 
     inputs.push({
       partner_id: partner.id,
