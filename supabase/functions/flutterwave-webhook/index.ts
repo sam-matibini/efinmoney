@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { sendTopupEmail } from "../_shared/topup-email.ts";
+import { recordObservedPartnerCost } from "../_shared/observedPartnerCost.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -236,6 +237,28 @@ Deno.serve(async (req) => {
             completed_at: newStatus === "completed" ? new Date().toISOString() : transfer.completed_at,
           }).eq("id", transfer.id);
           await supabase.from("notifications").insert({ user_id: transfer.sender_id, title, message, type: newStatus === "completed" ? "transfer" : "error" });
+
+          // Capture what Flutterwave actually billed us so pricing drift is
+          // measured on real invoices, not just the contracted rate card.
+          if (newStatus === "completed") {
+            const d = data as { fee?: number; app_fee?: number; charged_amount?: number };
+            const observedFee = Number(d.fee ?? d.app_fee ?? 0);
+            if (Number.isFinite(observedFee) && observedFee > 0) {
+              await recordObservedPartnerCost(supabase, {
+                partnerCode: "flutterwave",
+                transferId: transfer.id,
+                direction: "payout",
+                sourceCurrency: String(transfer.source_currency ?? ""),
+                destCurrency: transfer.target_currency ? String(transfer.target_currency) : null,
+                destCountry: transfer.recipient_country ? String(transfer.recipient_country) : null,
+                paymentMethod: transfer.payout_method ? String(transfer.payout_method) : null,
+                amount: Number(transfer.target_amount ?? transfer.source_amount ?? 0),
+                observedFee,
+                feeCurrency: String(transfer.target_currency ?? transfer.source_currency ?? ""),
+                providerReference: flwId ? String(flwId) : null,
+              });
+            }
+          }
         }
       }
     }
