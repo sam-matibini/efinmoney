@@ -43,6 +43,34 @@ Deno.serve(async (req) => {
   );
 
   try {
+    // Cron and the admin UI both call this. It only pulls public partner
+    // market rates and writes derived market data, so instead of a shared
+    // secret it is throttled: a fresh sweep inside the cooldown window returns
+    // the cached summary rather than re-polling every partner.
+    const COOLDOWN_MS = 4 * 60_000;
+    const { data: lastRun } = await supabase
+      .from("partner_fx_rates")
+      .select("rate_timestamp")
+      .eq("source", "api")
+      .order("rate_timestamp", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const force = req.headers.get("x-internal-secret") === Deno.env.get("PARTNER_RATES_CRON_SECRET");
+    if (
+      !force && lastRun?.rate_timestamp &&
+      Date.now() - new Date(lastRun.rate_timestamp).getTime() < COOLDOWN_MS
+    ) {
+      return json({
+        ok: true,
+        throttled: true,
+        refreshed: 0,
+        attempted: 0,
+        failed: 0,
+        skipped_partners: [],
+        last_refreshed_at: lastRun.rate_timestamp,
+      });
+    }
+
     const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
     const onlyPartner = typeof body?.partner_code === "string" ? body.partner_code.toLowerCase() : null;
 
