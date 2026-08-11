@@ -281,9 +281,9 @@ export async function resolveRoute(
     // Live FX beats the contracted markup when we have a fresh partner quote;
     // fees always stay contract-driven.
     const liveSpread = liveFxByPartner.get(partner.id);
-    const pricing: PartnerPricingRow | null = cardPricing
-      ? (liveSpread != null ? { ...cardPricing, fx_markup_bps: liveSpread } : cardPricing)
-      : (liveSpread != null ? ({ fx_markup_bps: liveSpread } as PartnerPricingRow) : null);
+    const pricing: PartnerPricingRow | null = cardPricing && liveSpread != null
+      ? { ...cardPricing, fx_markup_bps: liveSpread }
+      : cardPricing;
 
 
     inputs.push({
