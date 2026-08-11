@@ -7162,6 +7162,80 @@ export type Database = {
           },
         ]
       }
+      partner_observed_costs: {
+        Row: {
+          amount: number
+          contracted_fee: number | null
+          contracted_fx_bps: number | null
+          created_at: string
+          dest_country: string | null
+          dest_currency: string | null
+          direction: string
+          drift_percent: number | null
+          fee_currency: string | null
+          id: string
+          observed_at: string
+          observed_fee: number
+          observed_fx_bps: number | null
+          partner_id: string
+          payment_method: string | null
+          provider_reference: string | null
+          source_currency: string
+          transfer_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          contracted_fee?: number | null
+          contracted_fx_bps?: number | null
+          created_at?: string
+          dest_country?: string | null
+          dest_currency?: string | null
+          direction?: string
+          drift_percent?: number | null
+          fee_currency?: string | null
+          id?: string
+          observed_at?: string
+          observed_fee?: number
+          observed_fx_bps?: number | null
+          partner_id: string
+          payment_method?: string | null
+          provider_reference?: string | null
+          source_currency: string
+          transfer_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          contracted_fee?: number | null
+          contracted_fx_bps?: number | null
+          created_at?: string
+          dest_country?: string | null
+          dest_currency?: string | null
+          direction?: string
+          drift_percent?: number | null
+          fee_currency?: string | null
+          id?: string
+          observed_at?: string
+          observed_fee?: number
+          observed_fx_bps?: number | null
+          partner_id?: string
+          payment_method?: string | null
+          provider_reference?: string | null
+          source_currency?: string
+          transfer_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_observed_costs_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "payment_partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       partner_performance: {
         Row: {
           avg_processing_seconds: number | null
@@ -13594,6 +13668,33 @@ export type Database = {
           urgency?: never
         }
         Relationships: []
+      }
+      partner_cost_drift: {
+        Row: {
+          avg_contracted_fee: number | null
+          avg_contracted_fx_bps: number | null
+          avg_drift_percent: number | null
+          avg_observed_fee: number | null
+          avg_observed_fx_bps: number | null
+          dest_currency: string | null
+          direction: string | null
+          last_observed_at: string | null
+          partner_code: string | null
+          partner_id: string | null
+          partner_name: string | null
+          payment_method: string | null
+          samples: number | null
+          source_currency: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_observed_costs_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "payment_partners"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       retention_expiry_view: {
         Row: {
