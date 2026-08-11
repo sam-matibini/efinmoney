@@ -194,7 +194,9 @@ export async function resolveRoute(
     if (!fxByPartner.has(r.partner_id)) fxByPartner.set(r.partner_id, bps);
     const fresh = !r.expires_at || new Date(r.expires_at) > new Date();
     if (r.source === "api" && fresh && !liveFxByPartner.has(r.partner_id)) {
-      liveFxByPartner.set(r.partner_id, bps);
+      // Provider quotes are often rounded, which can read as a negative spread
+      // (better than mid). Never let that book negative FX cost.
+      liveFxByPartner.set(r.partner_id, Math.max(0, bps));
     }
   }
 
