@@ -43,6 +43,19 @@ Deno.serve(async (req) => {
   );
 
   try {
+    // Gate: cron (service-role bearer) or a signed-in pricing manager only.
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const bearer = authHeader.replace(/^Bearer\s+/i, "");
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const isCron = bearer === serviceKey || req.headers.get("x-internal-secret") === serviceKey;
+    if (!isCron) {
+      const { data: userRes } = await supabase.auth.getUser(bearer);
+      const uid = userRes?.user?.id;
+      if (!uid) return json({ ok: false, error: "Unauthorized" }, 401);
+      const { data: allowed } = await supabase.rpc("is_pricing_manager", { _user_id: uid });
+      if (allowed !== true) return json({ ok: false, error: "Pricing manager role required" }, 403);
+    }
+
     const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
     const onlyPartner = typeof body?.partner_code === "string" ? body.partner_code.toLowerCase() : null;
 
