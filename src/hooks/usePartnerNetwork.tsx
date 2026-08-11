@@ -377,6 +377,37 @@ export const useRefreshPartnerLiveRates = () => {
 
 
 
+/* ------------------------- observed partner cost ------------------------ */
+
+export interface PartnerCostDrift {
+  partner_id: string;
+  partner_code: string;
+  partner_name: string;
+  direction: string;
+  source_currency: string;
+  dest_currency: string | null;
+  payment_method: string | null;
+  samples: number;
+  avg_observed_fee: number | null;
+  avg_contracted_fee: number | null;
+  avg_observed_fx_bps: number | null;
+  avg_contracted_fx_bps: number | null;
+  avg_drift_percent: number | null;
+  last_observed_at: string;
+}
+
+/** Rolling 90-day comparison of what partners billed vs their rate card. */
+export const usePartnerCostDrift = () =>
+  useQuery({
+    queryKey: ["partner_cost_drift"],
+    queryFn: async () => {
+      const { data, error } = await db.from("partner_cost_drift").select("*");
+      if (error) throw error;
+      return (data ?? []) as PartnerCostDrift[];
+    },
+    staleTime: 5 * 60_000,
+  });
+
 /* --------------------------- eFinMoney pricing -------------------------- */
 
 export const useEfinPricing = (includeHistory = false) =>
