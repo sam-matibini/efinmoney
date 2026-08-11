@@ -171,7 +171,7 @@ export async function resolveRoute(
 
   const { data: fxRows } = await supabase
     .from("partner_fx_rates")
-    .select("partner_id, fx_spread_bps, rate_timestamp")
+    .select("partner_id, fx_spread_bps, rate_timestamp, expires_at, source")
     .in("partner_id", partnerIds)
     .eq("base_currency", srcCcy)
     .eq("quote_currency", dstCcy)
@@ -184,10 +184,20 @@ export async function resolveRoute(
     .in("partner_id", partnerIds);
 
 
+  // Freshest observed spread per partner. `live` marks a non-expired API pull:
+  // only those are trusted to override the contracted rate-card markup, so a
+  // partner API outage degrades to the static card instead of quoting stale.
   const fxByPartner = new Map<string, number>();
+  const liveFxByPartner = new Map<string, number>();
   for (const r of fxRows ?? []) {
-    if (!fxByPartner.has(r.partner_id)) fxByPartner.set(r.partner_id, Number(r.fx_spread_bps) || 0);
+    const bps = Number(r.fx_spread_bps) || 0;
+    if (!fxByPartner.has(r.partner_id)) fxByPartner.set(r.partner_id, bps);
+    const fresh = !r.expires_at || new Date(r.expires_at) > new Date();
+    if (r.source === "api" && fresh && !liveFxByPartner.has(r.partner_id)) {
+      liveFxByPartner.set(r.partner_id, bps);
+    }
   }
+
 
   const inputs: CandidateInput[] = [];
 
@@ -261,12 +271,20 @@ export async function resolveRoute(
     }
 
 
-    const pricing = ((pricingRows ?? []).find(
+    const cardPricing = ((pricingRows ?? []).find(
       (p: any) =>
         p.partner_id === partner.id &&
         (!p.payment_method || p.payment_method === "any" || p.payment_method === corridor.payment_method) &&
         (!p.dest_country || !dstCountry || up(p.dest_country) === dstCountry),
     ) ?? null) as PartnerPricingRow | null;
+
+    // Live FX beats the contracted markup when we have a fresh partner quote;
+    // fees always stay contract-driven.
+    const liveSpread = liveFxByPartner.get(partner.id);
+    const pricing: PartnerPricingRow | null = cardPricing && liveSpread != null
+      ? { ...cardPricing, fx_markup_bps: liveSpread }
+      : cardPricing;
+
 
     inputs.push({
       partner_id: partner.id,

@@ -3,6 +3,7 @@ import {
   usePaymentPartners,
   usePartnerFxRates,
   useAddPartnerFxRate,
+  useRefreshPartnerLiveRates,
   type PartnerFxRate,
 } from "@/hooks/usePartnerNetwork";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,7 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, TrendingUp } from "lucide-react";
+import { Plus, TrendingUp, RefreshCw } from "lucide-react";
 import { format } from "date-fns";
 import { useTableQuery, type Col } from "./tableToolkit";
 
@@ -29,6 +30,8 @@ export const PartnerFxRatesPanel = () => {
   const [partnerId, setPartnerId] = useState("");
   const { data: rates, isLoading } = usePartnerFxRates(partnerId || undefined);
   const add = useAddPartnerFxRate();
+  const refreshLive = useRefreshPartnerLiveRates();
+  const selectedCode = partners?.find((p) => p.id === partnerId)?.code;
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<Partial<PartnerFxRate>>(empty);
   const set = (patch: Partial<PartnerFxRate>) => setDraft((d) => ({ ...d, ...patch }));
@@ -67,7 +70,7 @@ export const PartnerFxRatesPanel = () => {
               <TrendingUp className="h-5 w-5" /> Partner FX Rates
             </CardTitle>
             <CardDescription>
-              Partner quotes stored against the mid-market reference, so FX cost is separated from transaction fees.
+              Partner quotes stored against the mid-market reference, so FX cost is separated from transaction fees. Live rates are pulled from partners with a rate API (Wise, Flutterwave, Nomba) and expire after 15 minutes.
             </CardDescription>
           </div>
           <div className="flex items-center gap-2">
@@ -84,6 +87,15 @@ export const PartnerFxRatesPanel = () => {
                 ))}
               </SelectContent>
             </Select>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => refreshLive.mutate(selectedCode)}
+              disabled={refreshLive.isPending}
+            >
+              <RefreshCw className={`h-4 w-4 mr-1 ${refreshLive.isPending ? "animate-spin" : ""}`} />
+              {refreshLive.isPending ? "Pulling…" : "Refresh live rates"}
+            </Button>
             <Button
               size="sm"
               onClick={() => {
@@ -131,7 +143,14 @@ export const PartnerFxRatesPanel = () => {
                         )}
                       </TableCell>
                       <TableCell className="text-xs">{format(new Date(r.rate_timestamp), "dd MMM yy HH:mm")}</TableCell>
-                      <TableCell className="text-xs capitalize">{r.source.replace(/_/g, " ")}</TableCell>
+                      <TableCell className="text-xs">
+                        <div className="flex items-center gap-1.5">
+                          <Badge variant={r.source === "api" ? "default" : "outline"} className="capitalize">
+                            {r.source === "api" ? "Live" : r.source.replace(/_/g, " ")}
+                          </Badge>
+                          {expired && <span className="text-muted-foreground">expired</span>}
+                        </div>
+                      </TableCell>
                     </TableRow>
                   );
                 })}
