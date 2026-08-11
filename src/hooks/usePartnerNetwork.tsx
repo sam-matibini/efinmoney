@@ -338,6 +338,45 @@ export const useAddPartnerFxRate = () => {
   });
 };
 
+/**
+ * Pulls LIVE rates from the partners that expose a rate API (Wise,
+ * Flutterwave, Nomba today) and appends them to partner_fx_rates.
+ * Partners without an adapter are reported back as skipped.
+ */
+export const useRefreshPartnerLiveRates = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (partnerCode?: string) => {
+      const { data, error } = await supabase.functions.invoke("partner-rates-refresh", {
+        body: partnerCode ? { partner_code: partnerCode } : {},
+      });
+      if (error) throw error;
+      if (data && data.ok === false) throw new Error(data.error || "Rate refresh failed");
+      return data as {
+        refreshed: number;
+        attempted: number;
+        failed: number;
+        skipped_partners: string[];
+      };
+    },
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ["partner_fx_rates"] });
+      if (res.refreshed) {
+        toast.success(
+          `${res.refreshed} live rate${res.refreshed === 1 ? "" : "s"} refreshed${
+            res.failed ? ` · ${res.failed} pair(s) unavailable` : ""
+          }`,
+        );
+      } else {
+        toast.warning("No live rates returned — check partner API credentials");
+      }
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+};
+
+
+
 /* --------------------------- eFinMoney pricing -------------------------- */
 
 export const useEfinPricing = (includeHistory = false) =>
