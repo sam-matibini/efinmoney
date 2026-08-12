@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import CheckoutShell from "@/components/payments/CheckoutShell";
 import CheckoutMethodGrid, { type CheckoutMethod } from "@/components/payments/CheckoutMethodGrid";
-import PlaidInvoicePayIn from "@/components/payments/PlaidInvoicePayIn";
+import VopayInteracPayIn from "@/components/payments/VopayInteracPayIn";
 import type { InteracIntent } from "@/components/payments/InteracCheckout";
 import { type Lang } from "@/components/payments/checkoutStrings";
 import { productFeatures } from "@/lib/productFeatures";
@@ -36,7 +36,7 @@ function formatInvoiceDate(d: Date, lang: Lang): string {
 
 /**
  * Zum-style CAD invoice checkout:
- * left = invoice · right = Interac → auto-open bank login → Loop Bank.
+ * left = invoice · right = Interac Request Money (VoPay) → Loop Autodeposit.
  */
 export default function WiseInteracInvoiceCheckout({
   walletId,
@@ -120,8 +120,8 @@ export default function WiseInteracInvoiceCheckout({
       {!productFeatures.plaid ? (
         <div className="rounded-lg border bg-muted/40 p-4 text-sm text-muted-foreground">
           {lang === "fr"
-            ? "Le paiement Interac (Plaid) n'est pas disponible."
-            : "Interac bank pay-in (Plaid) is not available."}
+            ? "Le paiement Interac n'est pas disponible."
+            : "Interac pay-in is not available."}
         </div>
       ) : amount < 1 ? (
         <div className="rounded-lg border bg-muted/40 p-4 text-sm text-muted-foreground">
@@ -138,7 +138,7 @@ export default function WiseInteracInvoiceCheckout({
           onChange={(m) => setMethod(m === "plaid" ? "interac" : m)}
         />
       ) : (
-        <PlaidInvoicePayIn
+        <VopayInteracPayIn
           key={`${walletId}-${amount}-${transferId || "topup"}`}
           walletId={walletId}
           amount={amount}

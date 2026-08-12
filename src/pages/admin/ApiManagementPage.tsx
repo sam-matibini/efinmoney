@@ -132,6 +132,8 @@ const EDGE_FUNCTIONS: Array<{ name: string; description: string; jwt: boolean; c
   { name: "plaid-create-link-token",   description: "Create Plaid Link token",                  jwt: false, category: "Plaid" },
   { name: "plaid-exchange-token",      description: "Exchange Plaid public token",               jwt: false, category: "Plaid" },
   // Interac
+  { name: "vopay-interac-request",    description: "VoPay Interac Request Money → Loop Autodeposit", jwt: true,  category: "Interac" },
+  { name: "vopay-webhook",            description: "VoPay Interac / EFT webhooks",                 jwt: false, category: "Interac" },
   { name: "interac-start",             description: "Start Interac e-Transfer request",         jwt: true,  category: "Interac" },
   { name: "interac-exchange",          description: "Exchange Interac tokens",                  jwt: true,  category: "Interac" },
   { name: "interac-callback",          description: "Receives Interac callbacks",               jwt: false, category: "Interac" },
