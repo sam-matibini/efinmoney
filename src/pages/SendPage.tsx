@@ -823,9 +823,14 @@ const SendPage = () => {
       target_amount: overrides?.target_amount ?? receivedAmount,
       exchange_rate: overrides?.exchange_rate ?? effectiveRate,
       fee_amount: overrides?.fee_amount ?? fee,
-      // Card sends are prepaid via Nomba into the wallet, then paid out as wallet
-      // Card and Interac sends are prepaid into the wallet, then paid out as wallet
-      funding_source: funding === "card" || funding === "interac" || funding === "wise" ? "wallet" : funding,
+      // Card: prepaid into wallet, then paid out as wallet.
+      // Interac/Wise: park as bank-funded until Loop/Wise deposit credits the wallet.
+      funding_source:
+        funding === "card"
+          ? "wallet"
+          : funding === "interac" || funding === "wise"
+          ? "bank"
+          : funding,
     });
     setLastTransferId(transfer.id);
     if (user) {

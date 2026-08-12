@@ -8,7 +8,7 @@ import { assertQuotedFee } from "../_shared/pricingService.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-internal-secret",
 };
 
 // Map destination currency -> mobile money payable account code
@@ -112,12 +112,12 @@ Deno.serve(async (req) => {
         status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const { data: { user } } = await supabase.auth.getUser(authHeader.replace("Bearer ", ""));
-    if (!user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+    const bearer = authHeader.replace(/^Bearer\s+/i, "").trim();
+    const isInternal =
+      Boolean(serviceKey) &&
+      (bearer === serviceKey || req.headers.get("x-internal-secret") === serviceKey);
 
     const payload: Record<string, any> = (await req.json().catch(() => ({}))) || {};
     const { transfer_id } = payload;
@@ -125,6 +125,29 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "transfer_id required" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    let user: { id: string } | null = null;
+    if (isInternal) {
+      const { data: trRow } = await supabase
+        .from("transfers")
+        .select("sender_id")
+        .eq("id", transfer_id)
+        .maybeSingle();
+      if (!trRow?.sender_id) {
+        return new Response(JSON.stringify({ error: "Transfer not found" }), {
+          status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      user = { id: trRow.sender_id };
+    } else {
+      const { data: { user: authUser } } = await supabase.auth.getUser(bearer);
+      if (!authUser) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      user = authUser;
     }
 
     const forceFincraOnly = payload.force_rail === "fincra_only";
@@ -161,6 +184,23 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Block payout while a linked Interac/Loop pay-in is still unpaid.
+    const { data: unpaidIntent } = await supabase
+      .from("fincra_cad_interac_intents")
+      .select("id, status, reference")
+      .eq("transfer_id", transfer_id)
+      .in("status", ["pending", "awaiting_payment"])
+      .maybeSingle();
+    if (unpaidIntent) {
+      return new Response(JSON.stringify({
+        error: "Awaiting Loop Bank deposit — payout releases after Interac/EFT is matched",
+        code: "awaiting_loop_deposit",
+        reference: unpaidIntent.reference,
+      }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     if (forceFincraOnly) {
       const ccy = String(transfer.target_currency || transfer.source_currency || "").toUpperCase();
       const country = String(transfer.recipient_country || "").toUpperCase();
@@ -190,6 +230,29 @@ Deno.serve(async (req) => {
     }
 
     const isCardFunded = (payload.funding_source || transfer.funding_source) === "card";
+
+    // Wallet / bank-funded (Interac prepaid): require real ledger balance before payout.
+    if (!isCardFunded && transfer.sender_wallet_id) {
+      const needed = Number(transfer.source_amount) + Number(transfer.fee_amount || 0);
+      const { data: balRows } = await supabase
+        .from("ledger_entries")
+        .select("credit_amount, debit_amount")
+        .eq("wallet_id", transfer.sender_wallet_id);
+      const balance = (balRows ?? []).reduce(
+        (sum, row) => sum + Number(row.credit_amount || 0) - Number(row.debit_amount || 0),
+        0,
+      );
+      if (needed > balance + 1e-6) {
+        return new Response(JSON.stringify({
+          error: "Insufficient wallet balance — wait for Loop/Wise deposit to credit before payout",
+          code: "insufficient_balance",
+          balance,
+          needed,
+        }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
 
     // For card-funded transfers, charge the sender's card BEFORE posting any ledger.
     // If the charge fails, we never touch the ledger and the transfer is marked failed.
@@ -463,7 +526,6 @@ Deno.serve(async (req) => {
     const paytotaCapable = isMobileMoneyMethod && paytotaMomoCurrencies.has(targetCurrency);
     const swychrEnabled = Deno.env.get("SWYCHR_ENABLED") === "true";
 
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
     const internalHeaders = {
       "Content-Type": "application/json",
       "x-internal-secret": serviceKey,

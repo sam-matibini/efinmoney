@@ -133,65 +133,23 @@ Deno.serve(async (req) => {
       if (error) console.warn("intra-ca-transfer-create: interac intent insert", error.message);
     });
 
-    // Ledger: cash-in-transit → wallet liability (settles when Loop deposit matches)
-    const { data: liabAcc } = await supabase
-      .from("ledger_accounts")
-      .select("id")
-      .like("code", "21%")
-      .eq("currency_code", "CAD")
-      .limit(1)
-      .maybeSingle();
-    const { data: cashAcc } = await supabase
-      .from("ledger_accounts")
-      .select("id")
-      .like("code", "11%")
-      .eq("currency_code", "CAD")
-      .limit(1)
-      .maybeSingle();
-
-    if (liabAcc && cashAcc) {
-      const journalId = crypto.randomUUID();
-      await supabase.from("ledger_entries").insert([
-        {
-          journal_id: journalId,
-          account_id: cashAcc.id,
-          wallet_id: null,
-          currency_code: "CAD",
-          debit_amount: amount,
-          credit_amount: 0,
-          description: `Plaid→Loop CAD pay-in ${reference} (awaiting Loop)`,
-          reference_type: "intra_ca_transfer",
-          reference_id: transfer.id,
-          created_by: user.id,
-        },
-        {
-          journal_id: journalId,
-          account_id: liabAcc.id,
-          wallet_id: destination_wallet_id,
-          currency_code: "CAD",
-          debit_amount: 0,
-          credit_amount: amount,
-          description: `Wallet credit pending Loop match ${pa.name || "bank"} (••${pa.mask || ""})`,
-          reference_type: "intra_ca_transfer",
-          reference_id: transfer.id,
-          created_by: user.id,
-        },
-      ]);
-    }
+    // Do NOT credit the wallet here. Plaid Auth only links the bank — cash arrives
+    // when the customer sends Interac/EFT to Loop and wise-webhook matches the intent.
+    // Premature ledger credit caused payouts (execute-transfer) before Loop received funds.
 
     return json({
       success: true,
       provider: "loop",
       transfer_id: transfer.id,
       reference: transfer.reference || reference,
-      status: "processing",
+      status: "awaiting_payment",
       loop_alias: loop.alias,
       loop_eft: loop.eft,
       // Explicitly no Stripe micro-deposit / mandate URL
       hosted_mandate_url: null,
       stripe_status: null,
       message:
-        "Bank authorized via Plaid. Funds settle to Loop Bank Autodeposit/EFT; wallet credits when the deposit matches this reference.",
+        "Bank linked via Plaid. Send Interac Autodeposit/EFT to Loop Bank with this reference; wallet credits and any linked payout release only after the deposit matches.",
     });
   } catch (e) {
     console.error(e);

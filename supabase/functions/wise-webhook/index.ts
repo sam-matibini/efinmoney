@@ -420,6 +420,7 @@ Deno.serve(async (req) => {
                     "Content-Type": "application/json",
                     Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
                     apikey: Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+                    "x-internal-secret": Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
                     "x-idempotency-key": creditIdem,
                   },
                   body: JSON.stringify({ transfer_id: intent.transfer_id }),

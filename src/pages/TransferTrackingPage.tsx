@@ -122,7 +122,8 @@ const buildTimeline = (t: Transfer): TimelineStep[] => {
   ];
 
   if (status === "initiated") {
-    steps[1].state = "current";
+    // Still awaiting collection — do not mark Payment Received as current.
+    steps[1].state = "future";
   } else if (status === "funded") {
     steps[1].state = "done"; steps[1].timestamp = updated;
     steps[2].state = "current";

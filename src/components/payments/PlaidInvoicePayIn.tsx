@@ -2,11 +2,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { usePlaidLink } from "react-plaid-link";
 import { toast } from "sonner";
-import { Building2, CheckCircle2, Loader2 } from "lucide-react";
+import { Building2, CheckCircle2, Copy, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { LOOP_CAD_INTERAC_ALIAS } from "@/lib/loopCad";
+import { LOOP_CAD_EFT, LOOP_CAD_INTERAC_ALIAS, type LoopCadEft } from "@/lib/loopCad";
 import type { Lang } from "@/components/payments/checkoutStrings";
 
 interface Props {
@@ -39,9 +39,13 @@ export default function PlaidInvoicePayIn({
   const [opening, setOpening] = useState(false);
   const [paying, setPaying] = useState(false);
   const [done, setDone] = useState(false);
+  const [settled, setSettled] = useState(false);
   const [doneRef, setDoneRef] = useState<string | null>(null);
+  const [loopAlias, setLoopAlias] = useState(LOOP_CAD_INTERAC_ALIAS);
+  const [loopEft, setLoopEft] = useState<LoopCadEft | null>(LOOP_CAD_EFT);
   const [dismissed, setDismissed] = useState(false);
   const autoStarted = useRef(false);
+  const completedRef = useRef(false);
 
   const createDebit = useCallback(
     async (plaidAccountId: string) => {
@@ -65,32 +69,20 @@ export default function PlaidInvoicePayIn({
         }
         if (data?.error) throw new Error(data.error);
 
-        if (purpose === "transfer" && transferId) {
-          const { data: execData, error: execErr } = await supabase.functions.invoke("execute-transfer", {
-            body: { transfer_id: transferId },
-          });
-          if (execErr || execData?.error) {
-            toast.message(
-              lang === "fr"
-                ? "Banque autorisée — le transfert sera libéré quand Loop confirmera le dépôt."
-                : "Bank authorized — transfer releases when Loop confirms the deposit.",
-            );
-          } else {
-            toast.success(
-              lang === "fr" ? "Banque autorisée — transfert en cours" : "Bank authorized — transfer releasing",
-            );
-          }
-        } else {
-          toast.success(
-            lang === "fr"
-              ? `CAD ${amount.toFixed(2)} autorisé via Interac → Loop`
-              : `CAD ${amount.toFixed(2)} authorized via Interac → Loop`,
-          );
-        }
+        // Never call execute-transfer here — Plaid does not pull CAD. Payout releases
+        // only after Loop deposit match (wise-webhook → credit → execute-transfer).
+        toast.message(
+          lang === "fr"
+            ? "Banque liée — envoyez le Virement Interac à Loop Bank pour libérer le paiement."
+            : "Bank linked — send Interac e-Transfer to Loop Bank to release payment.",
+        );
 
         setDoneRef(String(data?.reference || ""));
+        setLoopAlias(String(data?.loop_alias || LOOP_CAD_INTERAC_ALIAS));
+        setLoopEft(data?.loop_eft && typeof data.loop_eft === "object" ? data.loop_eft : null);
         setDone(true);
-        onComplete?.();
+        // Keep checkout open so the user can copy Loop deposit instructions.
+        // Parent onComplete fires only after funds settle (poll) or explicit dismiss.
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Could not authorize bank payment");
         setDismissed(true);
@@ -98,8 +90,43 @@ export default function PlaidInvoicePayIn({
         setPaying(false);
       }
     },
-    [amount, lang, onComplete, purpose, transferId, walletId],
+    [amount, lang, purpose, transferId, walletId],
   );
+
+  // Poll until Loop deposit is matched (intent settled) — then notify parent.
+  useEffect(() => {
+    if (!done || !doneRef || settled || completedRef.current) return;
+    let cancelled = false;
+    const tick = async () => {
+      const { data } = await supabase
+        .from("fincra_cad_interac_intents")
+        .select("status")
+        .eq("reference", doneRef)
+        .maybeSingle();
+      if (cancelled || !data) return;
+      if (["settled", "completed", "credited", "confirmed"].includes(String(data.status))) {
+        completedRef.current = true;
+        setSettled(true);
+        void qc.invalidateQueries({ queryKey: ["wallets"] });
+        toast.success(
+          lang === "fr"
+            ? purpose === "transfer"
+              ? "Dépôt Loop confirmé — transfert libéré"
+              : "Dépôt Loop confirmé — portefeuille crédité"
+            : purpose === "transfer"
+              ? "Loop deposit confirmed — transfer released"
+              : "Loop deposit confirmed — wallet credited",
+        );
+        onComplete?.();
+      }
+    };
+    void tick();
+    const id = window.setInterval(() => void tick(), 8000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [done, doneRef, settled, lang, purpose, onComplete, qc]);
 
   const openedTokenRef = useRef<string | null>(null);
 
@@ -279,22 +306,84 @@ export default function PlaidInvoicePayIn({
   }, [autoOpen, done, startBankLogin]);
 
   if (done) {
+    const eft = loopEft || LOOP_CAD_EFT;
+    const detailsText = [
+      `Amount: CAD ${amount.toFixed(2)}`,
+      `Send to: ${loopAlias}`,
+      doneRef ? `Reference: ${doneRef}` : null,
+      "",
+      "EFT / bank transfer (Loop Bank):",
+      `Institution (Bank #): ${eft.bankNumber}`,
+      `Transit #: ${eft.transitNumber}`,
+      `Account #: ${eft.accountNumber}`,
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    if (settled) {
+      return (
+        <div className="space-y-2 py-6 text-center">
+          <CheckCircle2 className="mx-auto h-10 w-10 text-primary" />
+          <p className="font-medium">
+            {lang === "fr"
+              ? `CAD ${amount.toFixed(2)} — reçu`
+              : `CAD ${amount.toFixed(2)} — received`}
+          </p>
+          {purpose === "transfer" && (
+            <p className="text-sm text-muted-foreground">
+              {lang === "fr" ? "Votre transfert est en route." : "Your transfer is on its way."}
+            </p>
+          )}
+        </div>
+      );
+    }
+
     return (
-      <div className="space-y-2 py-6 text-center">
-        <CheckCircle2 className="mx-auto h-10 w-10 text-primary" />
-        <p className="font-medium">
+      <div className="space-y-4">
+        <div className="flex items-center gap-2 rounded-lg border bg-muted/40 p-3 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
           {lang === "fr"
-            ? `CAD ${amount.toFixed(2)} — Interac autorisé`
-            : `CAD ${amount.toFixed(2)} — Interac authorized`}
-        </p>
-        <p className="text-xs text-muted-foreground">
+            ? "En attente du dépôt Loop Bank — le paiement n'est pas encore reçu."
+            : "Waiting for Loop Bank deposit — payment not received yet."}
+        </div>
+        <p className="text-xs text-muted-foreground leading-relaxed">
           {lang === "fr"
-            ? `Règlement vers Loop Bank (${LOOP_CAD_INTERAC_ALIAS}).`
-            : `Settling to Loop Bank (${LOOP_CAD_INTERAC_ALIAS}).`}
+            ? `Envoyez exactement CAD ${amount.toFixed(2)} par Virement Interac Autodeposit à ${loopAlias}, avec la référence dans le message.`
+            : `Send exactly CAD ${amount.toFixed(2)} via Interac Autodeposit to ${loopAlias}, with the reference in the message.`}
         </p>
-        {doneRef && (
-          <p className="text-[11px] font-mono text-muted-foreground">Ref: {doneRef}</p>
-        )}
+        <div className="space-y-2 rounded-lg border p-3 text-sm">
+          <div className="flex justify-between gap-2">
+            <span className="text-muted-foreground">{lang === "fr" ? "Montant" : "Amount"}</span>
+            <span className="font-semibold tabular-nums">CAD {amount.toFixed(2)}</span>
+          </div>
+          <div className="flex justify-between gap-2">
+            <span className="text-muted-foreground">{lang === "fr" ? "Envoyer à" : "Send to"}</span>
+            <span className="font-mono text-xs">{loopAlias}</span>
+          </div>
+          {doneRef && (
+            <div className="flex justify-between gap-2">
+              <span className="text-muted-foreground">Ref</span>
+              <span className="font-mono text-xs">{doneRef}</span>
+            </div>
+          )}
+          <div className="border-t pt-2 text-xs text-muted-foreground space-y-0.5">
+            <p>Institution: {eft.bankNumber}</p>
+            <p>Transit: {eft.transitNumber}</p>
+            <p>Account: {eft.accountNumber}</p>
+          </div>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full"
+          onClick={async () => {
+            await navigator.clipboard.writeText(detailsText);
+            toast.success(lang === "fr" ? "Détails copiés" : "Details copied");
+          }}
+        >
+          <Copy className="mr-2 h-4 w-4" />
+          {lang === "fr" ? "Copier les détails" : "Copy details"}
+        </Button>
       </div>
     );
   }
