@@ -101,6 +101,8 @@ export default function PlaidInvoicePayIn({
     [amount, lang, onComplete, purpose, transferId, walletId],
   );
 
+  const openedTokenRef = useRef<string | null>(null);
+
   const startBankLogin = useCallback(async () => {
     if (amount < 1) {
       toast.error(lang === "fr" ? "Montant minimum CAD 1,00" : "Minimum amount CAD 1.00");
@@ -108,10 +110,35 @@ export default function PlaidInvoicePayIn({
     }
     setOpening(true);
     setDismissed(false);
+    openedTokenRef.current = null;
     try {
-      const { data, error } = await supabase.functions.invoke("plaid-create-link-token");
+      try {
+        sessionStorage.setItem("plaid_oauth_continue", `${window.location.pathname}${window.location.search}`);
+      } catch {
+        /* ignore */
+      }
+      const redirectUri = `${window.location.origin}/plaid-oauth`;
+      const { data, error } = await supabase.functions.invoke("plaid-create-link-token", {
+        body: {
+          language: lang,
+          // Registered in Plaid Dashboard → Team → API → Allowed redirect URIs
+          redirect_uri: redirectUri,
+        },
+      });
       if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      if (data?.error) {
+        // If redirect URI isn't registered yet, retry without it so Auth still works.
+        if (/redirect/i.test(String(data.error))) {
+          const retry = await supabase.functions.invoke("plaid-create-link-token", {
+            body: { language: lang },
+          });
+          if (retry.error) throw retry.error;
+          if (retry.data?.error) throw new Error(retry.data.error);
+          setLinkToken(retry.data.link_token);
+          return;
+        }
+        throw new Error(data.error);
+      }
       setLinkToken(data.link_token);
     } catch (e) {
       setDismissed(true);
@@ -159,6 +186,7 @@ export default function PlaidInvoicePayIn({
         setPaying(false);
       } finally {
         setLinkToken(null);
+        openedTokenRef.current = null;
       }
     },
     [createDebit, lang, qc, user],
@@ -168,6 +196,7 @@ export default function PlaidInvoicePayIn({
     err: { error_code?: string; error_message?: string; display_message?: string } | null,
   ) => {
     setLinkToken(null);
+    openedTokenRef.current = null;
     setDismissed(true);
     setOpening(false);
     if (err?.error_code === "INVALID_PHONE_NUMBER") {
@@ -176,26 +205,70 @@ export default function PlaidInvoicePayIn({
           ? "Numéro refusé par Plaid. Sur l'écran téléphone, choisissez « Continuer sans numéro » / connectez une nouvelle institution, ou vérifiez le format +1…"
           : "Plaid rejected that phone. On the phone screen, choose continue without saving a number / connect a new institution, or use +1 format.",
       );
+    } else if (err?.error_message || err?.display_message) {
+      toast.error(err.display_message || err.error_message || "Bank login closed");
     }
   }, [lang]);
 
-  const { open, ready } = usePlaidLink({
+  const receivedRedirectUri = (() => {
+    if (typeof window === "undefined") return undefined;
+    if (window.location.href.includes("oauth_state_id=")) return window.location.href;
+    try {
+      const stored = sessionStorage.getItem("plaid_oauth_return");
+      if (stored?.includes("oauth_state_id=")) {
+        sessionStorage.removeItem("plaid_oauth_return");
+        return stored;
+      }
+    } catch {
+      /* ignore */
+    }
+    return undefined;
+  })();
+
+  const { open, ready, error: linkError } = usePlaidLink({
     token: linkToken || "",
     onSuccess: onPlaidSuccess,
     onExit: (err) => onPlaidExit(err),
+    ...(receivedRedirectUri ? { receivedRedirectUri } : {}),
     onEvent: (eventName, metadata) => {
-      if (eventName === "ERROR" && (metadata as { error_code?: string })?.error_code === "INVALID_PHONE_NUMBER") {
+      const meta = metadata as { error_code?: string; view_name?: string; error_message?: string };
+      if (eventName === "ERROR" && meta?.error_code === "INVALID_PHONE_NUMBER") {
         toast.message(
           lang === "fr"
             ? "Astuce : ignorez l'enregistrement du téléphone et connectez votre banque directement."
             : "Tip: skip saving your phone with Plaid and connect your bank directly.",
         );
       }
+      // Blank "Verify your identity" often surfaces as missing credential fields
+      if (
+        eventName === "ERROR" &&
+        /credential fields|expected credential/i.test(String(meta?.error_message || ""))
+      ) {
+        toast.error(
+          lang === "fr"
+            ? "Écran banque incomplet — fermez et rouvrez la connexion bancaire."
+            : "Bank form didn’t load — close and reopen bank login.",
+        );
+        setLinkToken(null);
+        openedTokenRef.current = null;
+        setDismissed(true);
+      }
     },
   });
 
   useEffect(() => {
-    if (linkToken && ready) open();
+    if (linkError) {
+      toast.error(linkError.message || "Could not load Plaid Link");
+      setDismissed(true);
+    }
+  }, [linkError]);
+
+  // Open Link once per token — re-opening the same session blanks credential panes.
+  useEffect(() => {
+    if (!linkToken || !ready) return;
+    if (openedTokenRef.current === linkToken) return;
+    openedTokenRef.current = linkToken;
+    open();
   }, [linkToken, ready, open]);
 
   // Auto-open bank login when Interac is selected (Zum-style).

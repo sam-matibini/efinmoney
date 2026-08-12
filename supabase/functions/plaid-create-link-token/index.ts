@@ -17,7 +17,6 @@ function plaidCredentials() {
 function nanpE164(phone: string | null | undefined, countryHint?: string | null): string | undefined {
   const e164 = toE164(phone, countryHint || "CA") || toE164(phone, "US");
   if (!e164) return undefined;
-  // E.164: +1 + 10 digits
   if (!/^\+1\d{10}$/.test(e164)) return undefined;
   return e164;
 }
@@ -45,7 +44,11 @@ Deno.serve(async (req) => {
       }, 500);
     }
 
-    // Prefill phone only in production — sandbox rejects real numbers (use Plaid seeded phones there).
+    const body = await req.json().catch(() => ({})) as {
+      redirect_uri?: string;
+      language?: string;
+    };
+
     const userPayload: Record<string, unknown> = { client_user_id: user.id };
     if (user.email) userPayload.email_address = user.email;
 
@@ -60,38 +63,48 @@ Deno.serve(async (req) => {
         profile?.phone_number || user.phone || null,
         profile?.address_country || profile?.country_code || "CA",
       );
-      if (phone) {
-        userPayload.phone_number = phone;
-      }
+      if (phone) userPayload.phone_number = phone;
+    }
+
+    // Prefer Instant Auth (bank login). Instant Match is a different flow
+    // (manual account numbers) and can open a blank "Verify your identity" pane.
+    const linkBody: Record<string, unknown> = {
+      client_id: clientId,
+      secret,
+      client_name: "eFinMoney",
+      language: body.language === "fr" ? "fr" : "en",
+      country_codes: ["CA"],
+      user: userPayload,
+      products: ["auth"],
+      auth: {
+        auth_type_select_enabled: false,
+        instant_match_enabled: false,
+        automated_microdeposits_enabled: false,
+        same_day_microdeposits_enabled: false,
+        instant_microdeposits_enabled: false,
+      },
+    };
+
+    // OAuth banks (many CA institutions) need a registered https redirect URI.
+    const redirectUri = String(body.redirect_uri || Deno.env.get("PLAID_REDIRECT_URI") || "").trim();
+    if (redirectUri.startsWith("https://") || (PLAID_ENV !== "production" && redirectUri.startsWith("http://"))) {
+      linkBody.redirect_uri = redirectUri;
     }
 
     const res = await fetch(`${PLAID_BASE}/link/token/create`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        client_id: clientId,
-        secret,
-        client_name: "eFinMoney",
-        language: "en",
-        country_codes: ["CA"],
-        user: userPayload,
-        products: ["auth"],
-        // Prefer instant bank login — disable Plaid micro-deposit verification paths
-        auth: {
-          instant_match_enabled: true,
-          automated_microdeposits_enabled: false,
-          same_day_microdeposits_enabled: false,
-        },
-      }),
+      body: JSON.stringify(linkBody),
     });
     const data = await res.json();
     if (!res.ok) {
-      console.error("Plaid link/token/create error", { env: PLAID_ENV, data });
+      console.error("Plaid link/token/create error", { env: PLAID_ENV, data, redirectUri: linkBody.redirect_uri });
       const msg = data.error_message || data.display_message || "Plaid error";
-      // Common misconfig: sandbox secret with production env (or reverse)
       const hint = /invalid.*(client|secret|api.key)/i.test(String(msg))
         ? ` Check PLAID_SECRET matches PLAID_ENV=${PLAID_ENV}.`
-        : "";
+        : /redirect/i.test(String(msg))
+          ? " Register this redirect URI in the Plaid Dashboard (Team → API)."
+          : "";
       return jsonResponse({
         error: `${msg}${hint}`,
         plaid_error_code: data.error_code,

@@ -70,6 +70,7 @@ const TransfersListPage = lazyImport(() => import("./pages/TransfersListPage"));
 const WalletStatementPage = lazyImport(() => import("./pages/WalletStatementPage"));
 const TransactionDetailPage = lazyImport(() => import("./pages/TransactionDetailPage"));
 const CanadaTransferPage = lazyImport(() => import("./pages/CanadaTransferPage"));
+const PlaidOAuthReturnPage = lazyImport(() => import("./pages/PlaidOAuthReturnPage"));
 const ReceivePage = lazyImport(() => import("./pages/ReceivePage"));
 const PayBillsPage = lazyImport(() => import("./pages/PayBillsPage"));
 const CanadaBillPayPage = lazyImport(() => import("./pages/CanadaBillPayPage"));
@@ -307,6 +308,7 @@ const AppRoutes = () => {
           <Route path="/wallets" element={<WalletsPage />} />
           <Route path="/wallets/:walletId/statement" element={<WalletStatementPage />} />
           <Route path="/send" element={<SendPage />} />
+          <Route path="/plaid-oauth" element={<PlaidOAuthReturnPage />} />
           <Route path="/send/cpn" element={<GatedPage feature="crypto"><SendCpnPage /></GatedPage>} />
           <Route path="/send/african-card" element={<GatedPage feature="stripe"><AfricanCardSendPage /></GatedPage>} />
           <Route path="/ops/zm-fincra/:token" element={<ZambiaFincraTestPage />} />
