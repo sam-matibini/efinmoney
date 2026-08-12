@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { LOOP_CAD_EFT, LOOP_CAD_INTERAC_ALIAS, type LoopCadEft } from "@/lib/loopCad";
+import { edgeFunctionErrorMessage } from "@/lib/invokeEdgeFunction";
 import type { Lang } from "@/components/payments/checkoutStrings";
 
 interface Props {
@@ -63,7 +64,7 @@ export default function PlaidInvoicePayIn({
               : "Interac→Loop CAD wallet top-up",
           },
         });
-        if (error) throw error;
+        if (error) throw new Error(await edgeFunctionErrorMessage(error));
         if (data?.fallback || data?.success === false) {
           throw new Error(data?.error || "Bank authorization failed");
         }
@@ -145,27 +146,32 @@ export default function PlaidInvoicePayIn({
         /* ignore */
       }
       const redirectUri = `${window.location.origin}/plaid-oauth`;
-      const { data, error } = await supabase.functions.invoke("plaid-create-link-token", {
+      let { data, error } = await supabase.functions.invoke("plaid-create-link-token", {
         body: {
           language: lang,
           // Registered in Plaid Dashboard → Team → API → Allowed redirect URIs
           redirect_uri: redirectUri,
         },
       });
-      if (error) throw error;
-      if (data?.error) {
-        // If redirect URI isn't registered yet, retry without it so Auth still works.
-        if (/redirect/i.test(String(data.error))) {
-          const retry = await supabase.functions.invoke("plaid-create-link-token", {
-            body: { language: lang },
-          });
-          if (retry.error) throw retry.error;
-          if (retry.data?.error) throw new Error(retry.data.error);
-          setLinkToken(retry.data.link_token);
-          return;
-        }
-        throw new Error(data.error);
+
+      // Non-2xx: recover body; redirect failures → retry without redirect_uri.
+      let errMsg = data?.error as string | undefined;
+      if (error) {
+        errMsg = await edgeFunctionErrorMessage(error);
       }
+      if (errMsg && /redirect/i.test(errMsg)) {
+        const retry = await supabase.functions.invoke("plaid-create-link-token", {
+          body: { language: lang },
+        });
+        if (retry.error) throw new Error(await edgeFunctionErrorMessage(retry.error));
+        if (retry.data?.error) throw new Error(String(retry.data.error));
+        data = retry.data;
+        error = null;
+        errMsg = undefined;
+      }
+      if (error) throw new Error(errMsg || (await edgeFunctionErrorMessage(error)));
+      if (data?.error) throw new Error(String(data.error));
+      if (!data?.link_token) throw new Error("Could not open bank login");
       setLinkToken(data.link_token);
     } catch (e) {
       setDismissed(true);
@@ -182,7 +188,7 @@ export default function PlaidInvoicePayIn({
         const { data, error } = await supabase.functions.invoke("plaid-exchange-token", {
           body: { public_token, institution: metadata.institution },
         });
-        if (error) throw error;
+        if (error) throw new Error(await edgeFunctionErrorMessage(error));
         if (data?.error) throw new Error(data.error);
         await qc.invalidateQueries({ queryKey: ["plaid_accounts", user?.id] });
 

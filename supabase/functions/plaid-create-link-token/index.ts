@@ -96,20 +96,43 @@ Deno.serve(async (req) => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(linkBody),
     });
-    const data = await res.json();
-    if (!res.ok) {
+    let data = await res.json();
+
+    // Secret slot is full so PLAID_REDIRECT_URI may not be registered in Dashboard.
+    // Retry without redirect so Instant Auth still works (OAuth banks need the URI later).
+    if (!res.ok && linkBody.redirect_uri && /redirect/i.test(String(data.error_message || data.error_code || ""))) {
+      console.warn("plaid-create-link-token: retrying without redirect_uri", data.error_code || data.error_message);
+      delete linkBody.redirect_uri;
+      const retryRes = await fetch(`${PLAID_BASE}/link/token/create`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(linkBody),
+      });
+      data = await retryRes.json();
+      if (retryRes.ok) {
+        return jsonResponse({
+          link_token: data.link_token,
+          expiration: data.expiration,
+          plaid_env: PLAID_ENV,
+          redirect_uri_omitted: true,
+        });
+      }
+    }
+
+    if (!data?.link_token) {
       console.error("Plaid link/token/create error", { env: PLAID_ENV, data, redirectUri: linkBody.redirect_uri });
       const msg = data.error_message || data.display_message || "Plaid error";
       const hint = /invalid.*(client|secret|api.key)/i.test(String(msg))
         ? ` Check PLAID_SECRET matches PLAID_ENV=${PLAID_ENV}.`
         : /redirect/i.test(String(msg))
-          ? " Register this redirect URI in the Plaid Dashboard (Team → API)."
+          ? " Register https://efin.money/plaid-oauth in the Plaid Dashboard (Team → API → Allowed redirect URIs)."
           : "";
+      // Return 200 with error so the web client can read the message (invoke hides non-2xx bodies).
       return jsonResponse({
         error: `${msg}${hint}`,
         plaid_error_code: data.error_code,
         plaid_env: PLAID_ENV,
-      }, 502);
+      });
     }
 
     return jsonResponse({
