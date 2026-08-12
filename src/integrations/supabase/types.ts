@@ -4641,6 +4641,98 @@ export type Database = {
           },
         ]
       }
+      flovide_transactions: {
+        Row: {
+          amount: number
+          created_at: string
+          credit_amount: number | null
+          credit_currency: string | null
+          credited_at: string | null
+          currency_code: string
+          expires_at: string | null
+          failure_reason: string | null
+          id: string
+          kind: string
+          last_event: Json | null
+          payer_email: string | null
+          payer_name: string | null
+          provider_order_id: string | null
+          provider_reference: string | null
+          provider_txn_id: string | null
+          purpose: string
+          raw_request: Json | null
+          raw_response: Json | null
+          reference: string
+          status: string
+          target_wallet_id: string | null
+          transfer_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          credit_amount?: number | null
+          credit_currency?: string | null
+          credited_at?: string | null
+          currency_code?: string
+          expires_at?: string | null
+          failure_reason?: string | null
+          id?: string
+          kind?: string
+          last_event?: Json | null
+          payer_email?: string | null
+          payer_name?: string | null
+          provider_order_id?: string | null
+          provider_reference?: string | null
+          provider_txn_id?: string | null
+          purpose?: string
+          raw_request?: Json | null
+          raw_response?: Json | null
+          reference: string
+          status?: string
+          target_wallet_id?: string | null
+          transfer_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          credit_amount?: number | null
+          credit_currency?: string | null
+          credited_at?: string | null
+          currency_code?: string
+          expires_at?: string | null
+          failure_reason?: string | null
+          id?: string
+          kind?: string
+          last_event?: Json | null
+          payer_email?: string | null
+          payer_name?: string | null
+          provider_order_id?: string | null
+          provider_reference?: string | null
+          provider_txn_id?: string | null
+          purpose?: string
+          raw_request?: Json | null
+          raw_response?: Json | null
+          reference?: string
+          status?: string
+          target_wallet_id?: string | null
+          transfer_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flovide_transactions_target_wallet_id_fkey"
+            columns: ["target_wallet_id"]
+            isOneToOne: false
+            referencedRelation: "wallets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       flw_banks_cache: {
         Row: {
           banks: Json
