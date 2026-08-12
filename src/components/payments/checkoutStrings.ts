@@ -54,6 +54,13 @@ export const CHECKOUT_STRINGS = {
     transitNumber: "Transit #",
     accountNumber: "Account #",
     eftHint: "Or pay by EFT / bank transfer to Loop Bank using these details:",
+    flovideWaiting: "Waiting for you to approve the Interac request…",
+    flovidePushHint:
+      "Flovide sent an Interac Auto Deposit request to your email. Open your Canadian banking app and approve it — do not send money to Loop Bank for this payment.",
+    flovideRequestTo: "Request sent to",
+    flovidePoweredBy: "Powered by eFinMoney · Flovide Interac",
+    flovideCopyHint: "Open your banking app and approve the Interac request.",
+    flovideDetailsCopied: "Reminder copied",
   },
   fr: {
     selectMethod: "Choisissez un mode de paiement",
@@ -106,6 +113,13 @@ export const CHECKOUT_STRINGS = {
     transitNumber: "N° de transit",
     accountNumber: "N° de compte",
     eftHint: "Ou payez par TEF / virement bancaire vers Loop Bank :",
+    flovideWaiting: "En attente de votre approbation de la demande Interac…",
+    flovidePushHint:
+      "Flovide a envoyé une demande Interac Auto Deposit à votre courriel. Ouvrez votre app bancaire canadienne et approuvez-la — n'envoyez pas d'argent à Loop Bank pour ce paiement.",
+    flovideRequestTo: "Demande envoyée à",
+    flovidePoweredBy: "Propulsé par eFinMoney · Interac Flovide",
+    flovideCopyHint: "Ouvrez votre app bancaire et approuvez la demande Interac.",
+    flovideDetailsCopied: "Rappel copié",
   },
 } as const;
 

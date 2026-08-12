@@ -43,6 +43,9 @@ export type InteracIntent = {
   hosted_url?: string | null;
   sender_name?: string | null;
   sender_email?: string | null;
+  /** Flovide collection payer email */
+  payer_email?: string | null;
+  payer_name?: string | null;
   sender_phone?: string | null;
   sender_bank?: string | null;
 };
@@ -293,8 +296,13 @@ export default function InteracCheckout({
       const created = data.intent as InteracIntent;
 
       if (usedFn === FLOVIDE_FN) {
-        setIntent(created);
-        onIntentCreated?.(created);
+        const next = {
+          ...created,
+          sender_email: created.sender_email || created.payer_email || parsed.data.email,
+          payer_email: created.payer_email || parsed.data.email,
+        };
+        setIntent(next);
+        onIntentCreated?.(next);
         const hosted = (data.hosted_url as string | null) || created.hosted_url || null;
         if (hosted) window.open(hosted, "_blank", "noopener,noreferrer");
         else {
@@ -405,14 +413,16 @@ export default function InteracCheckout({
   }
 
   if (intent) {
+    const isFlovide = railFn === FLOVIDE_FN;
     return (
       <InteracStatusView
         intent={intent}
-        alias={alias}
-        eft={eft}
+        alias={isFlovide ? null : alias}
+        eft={isFlovide ? null : eft}
         lang={lang}
         purpose={purpose}
         done={DONE.includes(intent.status)}
+        variant={isFlovide ? "flovide" : "loop"}
       />
     );
   }

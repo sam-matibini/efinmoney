@@ -6,7 +6,7 @@ import { observeRoute } from "../_shared/routeResolver.ts";
 import { recordEconomics } from "../_shared/transactionEconomics.ts";
 import { assertQuotedFee } from "../_shared/pricingService.ts";
 import { payoutFnForRail, resolveCorridorRails } from "../_shared/corridor-rails.ts";
-import { explainPayoutError, notifyOpsBrief } from "../_shared/ops-alert.ts";
+import { explainPayoutError, notifyOpsBrief, notifyOpsFailoverPing } from "../_shared/ops-alert.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -896,11 +896,13 @@ Deno.serve(async (req) => {
           } else {
             // A hard decline is the recipient's fault, not the rail's — stop the chain.
             if (r?.error_class === "hard") hardDecline = true;
+            const err = String(r?.error || r?.provider_message || `${rail} payout failed`);
+            railErrors.push(`${rail}: ${err}`);
             payoutResult = {
               ...(r || {}),
               success: false,
               rail,
-              error: r?.error || r?.provider_message || `${rail} payout failed`,
+              error: err,
               priority_chain: attempts,
             };
           }
@@ -1212,6 +1214,24 @@ Deno.serve(async (req) => {
         source: engineRouted ? "routed" : "legacy",
         actual_customer_fee: Number(transfer.fee_amount ?? 0),
       });
+
+      // Preferred rail failed but a backup paid — short FYI to ops (no action required).
+      if (railErrors.length > 0 && payoutResult?.rail) {
+        const firstFail = railErrors[0] || "";
+        const colon = firstFail.indexOf(":");
+        const failedRail = colon > 0 ? firstFail.slice(0, colon).trim() : "unknown";
+        const failedWhy = colon > 0 ? firstFail.slice(colon + 1).trim() : firstFail;
+        const explained = explainPayoutError(failedWhy);
+        void notifyOpsFailoverPing({
+          amount: `${transfer.source_amount} ${transfer.source_currency}`,
+          recipient: String(transfer.recipient_name || ""),
+          failedRail,
+          failedWhy,
+          workedRail: String(payoutResult.rail),
+          tip: explained.tip,
+          transferId: String(transfer_id),
+        }).catch(() => null);
+      }
     }
 
 

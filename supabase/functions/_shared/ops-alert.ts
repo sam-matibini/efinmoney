@@ -103,9 +103,39 @@ export function explainPayoutError(raw: string): { plain: string; tip: string } 
   };
 }
 
-export function opsAlertEmail(): string {
-  return (Deno.env.get("OPS_ALERT_EMAIL") || DEFAULT_OPS_EMAIL).trim() || DEFAULT_OPS_EMAIL;
+export async function notifyOpsFailoverPing(params: {
+  amount: string;
+  recipient: string;
+  failedRail: string;
+  failedWhy: string;
+  workedRail: string;
+  tip: string;
+  transferId: string;
+}): Promise<{ sent: boolean; error?: string }> {
+  const failed = partnerDisplayName(params.failedRail);
+  const worked = partnerDisplayName(params.workedRail);
+  const why = explainPayoutError(params.failedWhy);
+
+  const html = `
+    <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:15px;color:#222;max-width:480px;line-height:1.4;">
+      <div style="background:#0f766e;padding:14px 18px;border-radius:8px 8px 0 0;">
+        <span style="color:#fff;font-weight:700;">eFinMoney Ops</span>
+      </div>
+      <div style="border:1px solid #e0e0e0;border-top:none;padding:16px 18px;border-radius:0 0 8px 8px;">
+        <p style="margin:0 0 10px;font-weight:700;color:#0f766e;">Payout OK — but a preferred rail failed</p>
+        <p style="margin:0 0 8px;"><strong>Failed:</strong> ${escapeHtml(failed)} — ${escapeHtml(why.plain.slice(0, 140))}</p>
+        <p style="margin:0 0 8px;"><strong>Fix:</strong> ${escapeHtml((params.tip || why.tip).slice(0, 120))}</p>
+        <p style="margin:0 0 8px;"><strong>Worked:</strong> ${escapeHtml(worked)} paid ${escapeHtml(params.amount)} to ${escapeHtml(params.recipient || "recipient")}.</p>
+        <p style="margin:0;font-size:12px;color:#888;">${escapeHtml(params.transferId.slice(0, 8))}… · no action needed unless you want to restore ${escapeHtml(failed)}</p>
+      </div>
+    </div>`;
+
+  return sendOpsEmail(
+    `[FYI] ${failed} failed → ${worked} paid ${params.amount}`,
+    html,
+  );
 }
+
 
 export type OpsBrief = {
   /** Short subject line */
@@ -249,6 +279,10 @@ function humanizeKey(k: string): string {
     policy: "Corridor rule",
   };
   return map[k] || k.replace(/_/g, " ");
+}
+
+export function opsAlertEmail(): string {
+  return (Deno.env.get("OPS_ALERT_EMAIL") || DEFAULT_OPS_EMAIL).trim() || DEFAULT_OPS_EMAIL;
 }
 
 async function sendOpsEmail(subject: string, html: string): Promise<{ sent: boolean; error?: string }> {

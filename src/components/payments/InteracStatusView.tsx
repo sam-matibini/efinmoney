@@ -1,9 +1,11 @@
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { CheckCircle2, Copy, Loader2 } from "lucide-react";
+import { CheckCircle2, Copy, Loader2, Mail } from "lucide-react";
 import { CHECKOUT_STRINGS, type Lang } from "@/components/payments/checkoutStrings";
 import type { InteracIntent } from "@/components/payments/InteracCheckout";
 import { LOOP_CAD_EFT, type LoopCadEft } from "@/lib/loopCad";
+
+export type InteracRailVariant = "flovide" | "loop";
 
 interface Props {
   intent: InteracIntent;
@@ -12,9 +14,16 @@ interface Props {
   lang: Lang;
   purpose: "topup" | "transfer" | "merchant_collection";
   done: boolean;
+  /** Flovide = email money-request; Loop = Autodeposit/EFT to etx@efin.money */
+  variant?: InteracRailVariant;
 }
 
-function waitingCopy(status: string, purpose: string, lang: Lang): string {
+function waitingCopy(
+  status: string,
+  purpose: string,
+  lang: Lang,
+  variant: InteracRailVariant,
+): string {
   const t = CHECKOUT_STRINGS[lang];
   switch (status) {
     case "received":
@@ -34,21 +43,34 @@ function waitingCopy(status: string, purpose: string, lang: Lang): string {
       return lang === "fr"
         ? "Nous avons reçu un dépôt à allouer manuellement. Notre équipe s'en occupe."
         : "We received a deposit we couldn't match automatically. Our team is allocating it.";
+    case "awaiting_payment":
+    case "pending":
+    case "processing":
     default:
-      return t.waiting;
+      return variant === "flovide" ? t.flovideWaiting : t.waiting;
   }
 }
 
 /**
- * Loop Bank Interac Autodeposit + EFT status — copy details only.
+ * Interac status: Flovide (approve email request) or Loop Bank (Autodeposit + EFT).
  */
-export default function InteracStatusView({ intent, alias, eft, lang, purpose, done }: Props) {
+export default function InteracStatusView({
+  intent,
+  alias,
+  eft,
+  lang,
+  purpose,
+  done,
+  variant = "loop",
+}: Props) {
   const t = CHECKOUT_STRINGS[lang];
   const reference = intent.public_id || intent.reference;
   const amountLabel = `CAD ${Number(intent.amount).toFixed(2)}`;
   const eftDetails = eft ?? LOOP_CAD_EFT;
+  const payerEmail = (intent.payer_email || intent.sender_email || "").trim();
+  const isFlovide = variant === "flovide";
 
-  const detailsText = [
+  const loopDetailsText = [
     `Amount: ${amountLabel}`,
     alias ? `${t.sendTo}: ${alias}` : null,
     `${t.reference}: ${reference}`,
@@ -61,9 +83,18 @@ export default function InteracStatusView({ intent, alias, eft, lang, purpose, d
     .filter((line) => line !== null)
     .join("\n");
 
+  const flovideDetailsText = [
+    `Amount: ${amountLabel}`,
+    payerEmail ? `${t.flovideRequestTo}: ${payerEmail}` : null,
+    `${t.reference}: ${reference}`,
+    t.flovideCopyHint,
+  ]
+    .filter((line) => line !== null)
+    .join("\n");
+
   const copyDetails = async () => {
-    await navigator.clipboard.writeText(detailsText);
-    toast.success(t.detailsCopied);
+    await navigator.clipboard.writeText(isFlovide ? flovideDetailsText : loopDetailsText);
+    toast.success(isFlovide ? t.flovideDetailsCopied : t.detailsCopied);
   };
 
   if (done) {
@@ -82,11 +113,53 @@ export default function InteracStatusView({ intent, alias, eft, lang, purpose, d
     );
   }
 
+  if (isFlovide) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-2 rounded-lg border bg-muted/40 p-3 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+          {waitingCopy(intent.status, purpose, lang, "flovide")}
+        </div>
+
+        <p className="text-xs text-muted-foreground leading-relaxed">{t.flovidePushHint}</p>
+
+        <div className="space-y-2 rounded-lg border p-3 text-sm">
+          <div className="flex justify-between gap-2">
+            <span className="text-muted-foreground">{t.amountDue}</span>
+            <span className="font-semibold tabular-nums">{amountLabel}</span>
+          </div>
+          {payerEmail && (
+            <div className="flex justify-between gap-2">
+              <span className="text-muted-foreground">{t.flovideRequestTo}</span>
+              <code className="break-all text-right font-medium">{payerEmail}</code>
+            </div>
+          )}
+          <div className="flex justify-between gap-2">
+            <span className="text-muted-foreground">{t.reference}</span>
+            <code className="break-all text-right font-medium">{reference}</code>
+          </div>
+          <p className="flex items-start gap-2 text-[11px] text-muted-foreground pt-1">
+            <Mail className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+            {lang === "fr"
+              ? "Cherchez le courriel Interac, puis approuvez dans votre app bancaire."
+              : "Check your email for the Interac request, then approve it in your banking app."}
+          </p>
+        </div>
+
+        <Button type="button" className="w-full" onClick={() => void copyDetails()}>
+          <Copy className="mr-2 h-4 w-4" />
+          {t.paymentDetails}
+        </Button>
+        <p className="text-center text-[11px] text-muted-foreground">{t.flovidePoweredBy}</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2 rounded-lg border bg-muted/40 p-3 text-sm text-muted-foreground">
         <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-        {waitingCopy(intent.status, purpose, lang)}
+        {waitingCopy(intent.status, purpose, lang, "loop")}
       </div>
 
       <p className="text-xs text-muted-foreground leading-relaxed">{t.pushHint}</p>
