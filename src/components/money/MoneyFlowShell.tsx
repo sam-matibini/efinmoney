@@ -21,6 +21,8 @@ type Props = {
   above?: ReactNode;
   /** Optional control rendered inline to the right of the title (e.g. country picker) */
   headerRight?: ReactNode;
+  /** Called when a completed step circle is clicked (e.g. go back to Details). */
+  onStepClick?: (stepNumber: number) => void;
 };
 
 /**
@@ -37,6 +39,7 @@ export default function MoneyFlowShell({
   className,
   above,
   headerRight,
+  onStepClick,
 }: Props) {
   const maxStep = steps[steps.length - 1]?.n ?? 1;
 
@@ -50,9 +53,20 @@ export default function MoneyFlowShell({
             {steps.map(({ n, label }) => {
               const completed = currentStep > n;
               const active = currentStep === n;
+              const clickable = !!onStepClick && completed;
               return (
                 <div key={n} className="flex items-center">
-                  <div className="flex flex-col items-center gap-1">
+                  <button
+                    type="button"
+                    disabled={!clickable}
+                    onClick={() => clickable && onStepClick?.(n)}
+                    className={cn(
+                      "flex flex-col items-center gap-1 rounded-md",
+                      clickable && "cursor-pointer hover:opacity-90",
+                      !clickable && "cursor-default",
+                    )}
+                    aria-label={clickable ? `Go back to ${label}` : label}
+                  >
                     <motion.div
                       initial={false}
                       animate={{
@@ -91,11 +105,12 @@ export default function MoneyFlowShell({
                       className={cn(
                         "text-[10px] sm:text-xs font-medium",
                         active || completed ? "text-foreground" : "text-muted-foreground",
+                        clickable && "underline-offset-2 hover:underline",
                       )}
                     >
                       {label}
                     </span>
-                  </div>
+                  </button>
                   {n < maxStep && (
                     <motion.div
                       initial={false}

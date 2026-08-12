@@ -2684,7 +2684,7 @@ const SendPage = () => {
 
 
                                     <motion.div custom={0} variants={fieldVariants} initial="hidden" animate="show" className="space-y-3">
-                                      <div className="space-y-2">
+                                      <div id="send-pay-with" className="space-y-2 scroll-mt-24">
                                         <Label>Pay with</Label>
                                         <PaymentMethodRow
                                           options={fundingMethodOptions}
@@ -2822,6 +2822,70 @@ const SendPage = () => {
                                   currentStep={2}
                                   title="Confirm"
                                   subtitle="Review the quote, then send"
+                                  onStepClick={(n) => {
+                                    if (n === 1) {
+                                      goToStep(1);
+                                      window.setTimeout(() => {
+                                        document.getElementById("send-pay-with")?.scrollIntoView({
+                                          behavior: "smooth",
+                                          block: "center",
+                                        });
+                                      }, 320);
+                                    }
+                                  }}
+                                  footer={
+                                    fundingSource === "card" && inlineCardEntry ? undefined : (
+                                      <div className="space-y-3">
+                                        <div className="flex gap-3">
+                                          <Button
+                                            type="button"
+                                            variant="outline"
+                                            className="flex-1"
+                                            onClick={() => {
+                                              goToStep(1);
+                                              // Let Details remount, then jump to Pay with so funding can be changed.
+                                              window.setTimeout(() => {
+                                                document.getElementById("send-pay-with")?.scrollIntoView({
+                                                  behavior: "smooth",
+                                                  block: "center",
+                                                });
+                                              }, 320);
+                                            }}
+                                            disabled={confirming || creatingLink}
+                                          >
+                                            Back
+                                          </Button>
+                                          <Button
+                                            type="button"
+                                            className="flex-1"
+                                            onClick={useLink ? handleCreateLink : requestConfirm}
+                                            disabled={confirming || creatingLink}
+                                          >
+                                            {(confirming || creatingLink) ? (
+                                              <span className="inline-flex items-center gap-2">
+                                                <LoadingSpinner size={16} />
+                                                Processing...
+                                              </span>
+                                            ) : (
+                                              <span className="inline-flex items-center gap-2">
+                                                {fundingSource === "card" ? <CreditCard className="w-4 h-4" /> : <Shield className="w-4 h-4" />}
+                                                {useLink ? "Send secure link" : fundingSource === "card" ? "Pay with card" : "Confirm Transfer"}
+                                              </span>
+                                            )}
+                                          </Button>
+                                        </div>
+                                        <Button
+                                          type="button"
+                                          variant="outline"
+                                          className="w-full border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                          onClick={() => setCancelOpen(true)}
+                                          disabled={confirming}
+                                        >
+                                          Cancel Transfer
+                                        </Button>
+                                      </div>
+                                    )
+                                  }
                                 >
                                     <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-2 text-sm">
                                       <div className="flex justify-between"><span className="text-muted-foreground">Recipient</span><span className="font-medium">{recipientName}</span></div>
@@ -2837,7 +2901,16 @@ const SendPage = () => {
                                       )}
                                       <div className="flex justify-between"><span className="text-muted-foreground">Destination</span><span className="font-medium">{targetCountry.flag} {targetCountry.country}</span></div>
                                       <div className="flex justify-between"><span className="text-muted-foreground">Method</span><span className="font-medium">{useLink ? "Secure link (recipient picks)" : isBankPayout ? "Bank Transfer" : effectiveMethodLabel}</span></div>
-                                      <div className="flex justify-between"><span className="text-muted-foreground">Funding</span><span className="font-medium capitalize">{fundingSource === "card" ? "Card" : fundingSource}</span></div>
+                                      <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Funding</span>
+                                        <span className="font-medium capitalize">
+                                          {fundingSource === "interac"
+                                            ? "Interac"
+                                            : fundingSource === "card"
+                                              ? "Card"
+                                              : fundingSource}
+                                        </span>
+                                      </div>
                                     </div>
                                     <div className="rounded-xl border border-border bg-card p-4 space-y-2 text-sm">
                                       <div className="flex justify-between"><span className="text-muted-foreground">You send</span><span className="font-medium">{sourceSymbol}{parsedAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {sourceCurrency}</span></div>
@@ -2873,42 +2946,34 @@ const SendPage = () => {
                                             onSuccess={() => { void handleConfirm("wallet"); }}
                                           />
                                         </SectionBoundary>
-                                        <Button
-                                          variant="outline"
-                                          className="w-full"
-                                          onClick={() => goToStep(1)}
-                                          disabled={confirming}
-                                        >
-                                          Back
-                                        </Button>
+                                        <div className="flex gap-3">
+                                          <Button
+                                            variant="outline"
+                                            className="flex-1"
+                                            onClick={() => {
+                                              goToStep(1);
+                                              window.setTimeout(() => {
+                                                document.getElementById("send-pay-with")?.scrollIntoView({
+                                                  behavior: "smooth",
+                                                  block: "center",
+                                                });
+                                              }, 320);
+                                            }}
+                                            disabled={confirming}
+                                          >
+                                            Back
+                                          </Button>
+                                          <Button
+                                            variant="outline"
+                                            className="flex-1 border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                            onClick={() => setCancelOpen(true)}
+                                            disabled={confirming}
+                                          >
+                                            Cancel
+                                          </Button>
+                                        </div>
                                       </div>
-                                    ) : (
-                                    <div className="flex gap-3">
-                                      <Button variant="outline" className="flex-1" onClick={() => goToStep(1)} disabled={confirming || creatingLink}>Back</Button>
-                                      <Button className="flex-1" onClick={useLink ? handleCreateLink : requestConfirm} disabled={confirming || creatingLink}>
-                                        {(confirming || creatingLink) ? (
-                                          <span className="inline-flex items-center gap-2">
-                                            <LoadingSpinner size={16} />
-                                            Processing...
-                                          </span>
-                                        ) : (
-                                          <span className="inline-flex items-center gap-2">
-                                            {fundingSource === "card" ? <CreditCard className="w-4 h-4" /> : <Shield className="w-4 h-4" />}
-                                            {useLink ? "Send secure link" : fundingSource === "card" ? "Pay with card" : "Confirm Transfer"}
-                                          </span>
-                                        )}
-                                      </Button>
-                                    </div>
-                                    )}
-
-                                    <Button
-                                      variant="outline"
-                                      className="w-full border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                                      onClick={() => setCancelOpen(true)}
-                                      disabled={confirming}
-                                    >
-                                      Cancel Transfer
-                                    </Button>
+                                    ) : null}
                                 </MoneyFlowShell>
                               </motion.div>
                             )}
