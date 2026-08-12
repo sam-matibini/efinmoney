@@ -166,7 +166,8 @@ const EDGE_FUNCTIONS: Array<{ name: string; description: string; jwt: boolean; c
   { name: "fincra-payout",             description: "Initiates Fincra payouts",                jwt: false, category: "Fincra" },
   { name: "fincra-verify-payment",     description: "Verify Fincra payment status",            jwt: true,  category: "Fincra" },
   { name: "fincra-webhook",            description: "Receives Fincra events",                  jwt: false, category: "Fincra" },
-  { name: "fincra-cad-interac",         description: "CAD Interac e-Transfer top-up intents",   jwt: true,  category: "Fincra" },
+  { name: "wise-cad-interac",           description: "CAD Interac e-Transfer pay-in (Wise)",    jwt: true,  category: "Wise" },
+  { name: "fincra-cad-interac",         description: "Legacy alias — use wise-cad-interac",     jwt: true,  category: "Fincra" },
   // Ghana
   { name: "ghana-collection",          description: "Ghana GHS collection initiation",         jwt: true,  category: "Ghana" },
   { name: "ghana-payout",              description: "Ghana GHS payout",                        jwt: false, category: "Ghana" },

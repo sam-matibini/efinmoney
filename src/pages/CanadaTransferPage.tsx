@@ -5,7 +5,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Building2, ArrowRight, CheckCircle2, AlertCircle, Info } from "lucide-react";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { toast } from "sonner";
@@ -15,6 +14,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useWallets } from "@/hooks/useWallets";
 import { usePlaidLink } from "react-plaid-link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { LOOP_CAD_INTERAC_ALIAS } from "@/lib/loopCad";
 
 interface PlaidAccountRow {
   id: string;
@@ -39,11 +39,17 @@ export default function CanadaTransferPage() {
   const [selectedWallet, setSelectedWallet] = useState<string>("");
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
-  const [lastResult, setLastResult] = useState<any>(null);
+  const [lastResult, setLastResult] = useState<{
+    state: "success" | "failed";
+    reference?: string;
+    error?: string;
+    error_code?: string;
+    message?: string;
+  } | null>(null);
 
-  const cadWallets = (wallets || []).filter((w: any) => w.currency_code === "CAD");
+  const cadWallets = (wallets || []).filter((w: { currency_code: string }) => w.currency_code === "CAD");
 
-  const { data: accounts = [], refetch } = useQuery({
+  const { data: accounts = [] } = useQuery({
     queryKey: ["plaid_accounts", user?.id],
     queryFn: async () => {
       if (!user) return [];
@@ -53,7 +59,7 @@ export default function CanadaTransferPage() {
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return (data || []) as any[];
+      return (data || []) as Array<PlaidAccountRow & { plaid_items?: { institution_name?: string } }>;
     },
     enabled: !!user,
   });
@@ -65,24 +71,28 @@ export default function CanadaTransferPage() {
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       setLinkToken(data.link_token);
-    } catch (e: any) {
-      toast.error(e.message || "Could not start Plaid Link");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Could not start bank login");
     } finally {
       setLinking(false);
     }
   }, []);
 
-  const onSuccess = useCallback(async (public_token: string, metadata: any) => {
+  const onSuccess = useCallback(async (public_token: string, metadata: { institution?: { name?: string } }) => {
     try {
       const { data, error } = await supabase.functions.invoke("plaid-exchange-token", {
         body: { public_token, institution: metadata.institution },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      toast.success(`Linked ${metadata.institution?.name || "bank"} (${data.accounts} accounts)`);
+      toast.success(`Linked ${metadata.institution?.name || "bank"}`);
       qc.invalidateQueries({ queryKey: ["plaid_accounts", user?.id] });
-    } catch (e: any) {
-      toast.error(e.message || "Could not link bank");
+      const firstId = Array.isArray(data?.account_ids) ? data.account_ids[0] : null;
+      if (firstId) setSelectedAccount(firstId);
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Could not link bank");
+    } finally {
+      setLinkToken(null);
     }
   }, [qc, user?.id]);
 
@@ -108,17 +118,18 @@ export default function CanadaTransferPage() {
     setSubmitting(true);
     setLastResult(null);
     try {
+      // Re-open bank login is optional on this page — account already linked via Plaid.
       const { data, error } = await supabase.functions.invoke("intra-ca-transfer-create", {
         body: {
           plaid_account_id: selectedAccount,
           destination_wallet_id: selectedWallet,
           amount_cad: amt,
           description,
+          purpose: "topup",
         },
       });
       if (error) throw error;
 
-      // Soft-failure path (function returned 200 with fallback:true)
       if (data?.fallback || data?.success === false) {
         const msg = data?.error || "Transfer failed";
         toast.error(msg);
@@ -127,30 +138,20 @@ export default function CanadaTransferPage() {
       }
       if (data?.error) throw new Error(data.error);
 
-      const stripeStatus = data?.stripe_status;
       setLastResult({
-        state: stripeStatus === "requires_action" ? "requires_action" : "success",
+        state: "success",
         reference: data.reference,
-        stripe_status: stripeStatus,
-        hosted_mandate_url: data?.hosted_mandate_url || null,
+        message: data.message,
       });
-      if (stripeStatus === "requires_action") {
-        toast.message(`Transfer ${data.reference} created — verify your bank to complete the PAD.`);
-      } else {
-        toast.success(`Transfer ${data.reference} initiated (Stripe: ${stripeStatus})`);
-        setAmount("");
-        setDescription("");
-      }
-    } catch (e: any) {
-      toast.error(e.message || "Transfer failed");
+      toast.success(`Authorized ${data.reference} — settling via Loop Bank`);
+      setAmount("");
+      setDescription("");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Transfer failed");
     } finally {
       setSubmitting(false);
     }
   };
-
-
-  const selectedAcct = accounts.find((a) => a.id === selectedAccount) as PlaidAccountRow | undefined;
-  const missingEft = selectedAcct && (!selectedAcct.institution_number || !selectedAcct.account_number);
 
   return (
     <>
@@ -158,59 +159,54 @@ export default function CanadaTransferPage() {
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">Intra-Canada Transfer</h1>
           <p className="text-muted-foreground">
-            Top up your CAD wallet from any Canadian bank using <strong>Plaid + Stripe Pre-Authorized Debit (PAD)</strong>.
+            Top up your CAD wallet by signing into your bank with <strong>Plaid</strong>. Funds collect to{" "}
+            <strong>Loop Bank</strong> ({LOOP_CAD_INTERAC_ALIAS}) — no Stripe micro-deposits, no copy/paste.
           </p>
         </div>
 
         <Alert className="mb-6 border-primary/30 bg-primary/5">
           <Info className="h-4 w-4" />
           <AlertDescription>
-            <strong>Live mode.</strong> You will link your real Canadian bank account through Plaid and authorize a Pre-Authorized Debit (PAD). Funds will be debited from your actual account.
+            <strong>Live mode.</strong> Open your Canadian bank login through Plaid to authorize the transfer request.
+            Wallet credit completes when Loop matches the deposit to your reference.
           </AlertDescription>
         </Alert>
 
-        {/* Step 1: Link bank */}
         <Card className="mb-6">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Building2 className="w-5 h-5" /> Step 1 — Linked Canadian banks
             </CardTitle>
-            <CardDescription>Connect via Plaid to access your account & routing numbers securely.</CardDescription>
+            <CardDescription>Connect via Plaid bank login (instant auth — no micro-deposits).</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {accounts.length === 0 && (
               <p className="text-sm text-muted-foreground">No bank linked yet.</p>
             )}
-            {accounts.map((a: any) => (
+            {accounts.map((a) => (
               <div key={a.id} className="flex items-center justify-between p-3 border rounded-lg">
                 <div>
                   <div className="font-medium">{a.plaid_items?.institution_name || "Bank"} — {a.name}</div>
                   <div className="text-xs text-muted-foreground">
                     ••{a.mask} · {a.subtype}
-                    {a.institution_number ? (
-                      <span className="ml-2"> · EFT {a.institution_number}-{a.branch_number}</span>
-                    ) : (
-                      <span className="ml-2 text-amber-500">· No EFT numbers available</span>
-                    )}
                   </div>
                 </div>
-                {a.institution_number ? <CheckCircle2 className="w-5 h-5 text-primary" /> : <AlertCircle className="w-5 h-5 text-amber-500" />}
+                <CheckCircle2 className="w-5 h-5 text-primary" />
               </div>
             ))}
             <Button onClick={fetchLinkToken} disabled={linking} variant="outline" className="w-full">
               {linking ? <LoadingSpinner size={16} className="mr-2" /> : <Building2 className="w-4 h-4 mr-2" />}
-              {accounts.length > 0 ? "Link another bank" : "Link your Canadian bank"}
+              {accounts.length > 0 ? "Link another bank" : "Open bank login"}
             </Button>
           </CardContent>
         </Card>
 
-        {/* Step 2: Transfer */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <ArrowRight className="w-5 h-5" /> Step 2 — Send money to your wallet
+              <ArrowRight className="w-5 h-5" /> Step 2 — Authorize pay-in to Loop Bank
             </CardTitle>
-            <CardDescription>Funds settle to your CAD wallet via PAD.</CardDescription>
+            <CardDescription>Authorize from a linked account — settlement via Loop Autodeposit/EFT.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
@@ -218,18 +214,13 @@ export default function CanadaTransferPage() {
               <Select value={selectedAccount} onValueChange={setSelectedAccount}>
                 <SelectTrigger><SelectValue placeholder="Choose linked bank account" /></SelectTrigger>
                 <SelectContent>
-                  {accounts.map((a: any) => (
+                  {accounts.map((a) => (
                     <SelectItem key={a.id} value={a.id}>
                       {a.plaid_items?.institution_name || "Bank"} — {a.name} ••{a.mask}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              {missingEft && (
-                <p className="text-xs text-amber-500">
-                  This account is missing EFT routing numbers — Stripe PAD cannot be initiated. Try linking a different account.
-                </p>
-              )}
             </div>
 
             <div className="space-y-2">
@@ -237,9 +228,9 @@ export default function CanadaTransferPage() {
               <Select value={selectedWallet} onValueChange={setSelectedWallet}>
                 <SelectTrigger><SelectValue placeholder="Choose your CAD wallet" /></SelectTrigger>
                 <SelectContent>
-                  {cadWallets.map((w: any) => (
+                  {cadWallets.map((w: { wallet_id: string; balance: number }) => (
                     <SelectItem key={w.wallet_id} value={w.wallet_id}>
-                      🇨🇦 CAD wallet — current: ${Number(w.balance).toFixed(2)}
+                      CAD wallet — current: ${Number(w.balance).toFixed(2)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -266,44 +257,29 @@ export default function CanadaTransferPage() {
 
             <Alert className="bg-muted/40">
               <AlertDescription className="text-xs">
-                By submitting you authorize eFinMoney to debit the amount from the selected bank using Pre-Authorized Debit (PAD), per Stripe's mandate terms.
+                By submitting you authorize eFinMoney to request this CAD amount from your selected bank via Plaid.
+                Funds settle to Loop Bank; your wallet credits when the deposit matches your reference.
               </AlertDescription>
             </Alert>
 
-            <Button onClick={() => requirePin(handleSubmit, `$${amount || "0.00"} CAD`)} disabled={submitting || !selectedAccount || !selectedWallet || !amount} className="w-full" size="lg">
+            <Button
+              onClick={() => requirePin(handleSubmit, `$${amount || "0.00"} CAD`)}
+              disabled={submitting || !selectedAccount || !selectedWallet || !amount}
+              className="w-full"
+              size="lg"
+            >
               {submitting ? <LoadingSpinner size={16} className="mr-2" /> : null}
-              {submitting ? "Processing PAD…" : `Transfer $${amount || "0.00"} CAD`}
+              {submitting ? "Authorizing…" : `Authorize $${amount || "0.00"} CAD → Loop`}
             </Button>
 
             {lastResult?.state === "success" && (
               <Alert className="border-emerald-500/30 bg-emerald-500/5">
                 <CheckCircle2 className="h-4 w-4 text-emerald-500" />
                 <AlertDescription>
-                  <div className="font-medium">Transfer {lastResult.reference} created</div>
-                  <div className="text-xs mt-1">
-                    Stripe status: <Badge variant="outline">{lastResult.stripe_status}</Badge>
+                  <div className="font-medium">Transfer {lastResult.reference} authorized</div>
+                  <div className="text-xs mt-1 text-muted-foreground">
+                    {lastResult.message || `Settling to Loop Bank (${LOOP_CAD_INTERAC_ALIAS}).`}
                   </div>
-                </AlertDescription>
-              </Alert>
-            )}
-
-            {lastResult?.state === "requires_action" && (
-              <Alert className="border-amber-500/30 bg-amber-500/5">
-                <AlertCircle className="h-4 w-4 text-amber-500" />
-                <AlertDescription>
-                  <div className="font-medium">Transfer {lastResult.reference} created — verification needed</div>
-                  <div className="text-xs mt-1">
-                    Stripe status: <Badge variant="outline">{lastResult.stripe_status}</Badge>
-                  </div>
-                  {lastResult.hosted_mandate_url && (
-                    <Button
-                      size="sm"
-                      className="mt-3"
-                      onClick={() => window.open(lastResult.hosted_mandate_url, "_blank", "noopener")}
-                    >
-                      Verify with your bank
-                    </Button>
-                  )}
                 </AlertDescription>
               </Alert>
             )}

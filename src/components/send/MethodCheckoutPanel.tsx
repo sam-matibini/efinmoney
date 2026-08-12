@@ -182,13 +182,13 @@ const MethodCheckoutPanel = ({
     return (
       <div className="rounded-xl border-2 border-pay-bank/30 bg-pay-bank/5 p-4 space-y-3">
         <div>
-          <p className="text-sm font-semibold">Interac e-Transfer (CAD)</p>
+          <p className="text-sm font-semibold">Interac (CAD)</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Confirm to open a Loop Bank invoice for {symbol}{money(total)} {currency}. Pay by Interac
-            e-Transfer or EFT — your payout releases once we match the Loop deposit to your reference.
+            Confirm to open checkout for {symbol}{money(total)} {currency}. Choose Interac and sign in to your
+            bank to pay instantly — funds collect to Loop Bank and your payout releases when the deposit matches.
           </p>
         </div>
-        <ChargeSummary amount={amount} fee={fee} total={total} currency={currency} symbol={symbol} debitLabel="You send by Interac" />
+        <ChargeSummary amount={amount} fee={fee} total={total} currency={currency} symbol={symbol} debitLabel="Interac from your bank" />
       </div>
     );
   }

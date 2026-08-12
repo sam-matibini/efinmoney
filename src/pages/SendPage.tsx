@@ -56,7 +56,7 @@ import WisePayLinkCard from "@/components/payments/WisePayLinkCard";
 import { verifySquareCheckout } from "@/components/payments/SquareTopUpCard";
 
 import { isWisePayCurrency } from "@/lib/wisePayLink";
-import InteracCheckout from "@/components/payments/InteracCheckout";
+import WiseInteracInvoiceCheckout from "@/components/payments/WiseInteracInvoiceCheckout";
 import SendHeaderCountry from "@/components/send/SendHeaderCountry";
 import RecipientQuickBox from "@/components/send/RecipientQuickBox";
 import FlutterwaveCardForm from "@/components/payments/FlutterwaveCardForm";
@@ -894,11 +894,10 @@ const SendPage = () => {
     setConfirming(true);
     const funding = fundingOverride ?? fundingSource;
 
-    // Interac e-Transfer: park the transfer, then show deposit instructions.
-    // wise-webhook credits the CAD wallet and releases the payout on arrival.
+    // CAD bank pay-in: park the transfer, then open Plaid → Loop authorization.
     if (funding === 'interac') {
       if (!cadWallet) {
-        toast.error('You need a CAD wallet to pay by Interac e-Transfer.');
+        toast.error('You need a CAD wallet to pay from your Canadian bank.');
         setConfirming(false);
         return;
       }
@@ -910,7 +909,7 @@ const SendPage = () => {
         setInteracFunding({ transferId: tid, walletId: cadWallet.wallet_id, amount: totalCharge });
         goToStep(4);
       } catch (e: any) {
-        toast.error(e?.message || 'Could not start the Interac e-Transfer');
+        toast.error(e?.message || 'Could not start bank pay-in');
       } finally {
         setConfirming(false);
       }
@@ -2017,8 +2016,8 @@ const SendPage = () => {
     ...(productFeatures.plaid
       ? [{ id: "bank" as const, label: "Bank", sublabel: "Linked account", icon: Landmark, tone: "bank" as const }]
       : []),
-    ...(interacFundingAvailable
-      ? [{ id: "interac" as const, label: "Interac", sublabel: "e-Transfer (CAD)", icon: Landmark, tone: "bank" as const }]
+    ...(interacFundingAvailable && productFeatures.plaid
+      ? [{ id: "interac" as const, label: "Interac", sublabel: "Bank account · instant", icon: Landmark, tone: "bank" as const }]
       : []),
     ...(wisePayWallet
       ? [{ id: "wise" as const, label: "Wise", sublabel: "Bank or card via Wise", icon: Wallet, tone: "bank" as const }]
@@ -2926,22 +2925,23 @@ const SendPage = () => {
                               >
                                 {interacFunding ? (
                                   <SectionBoundary name="InteracSendCheckout">
-                                    <div className="rounded-xl border-2 border-pay-bank/30 bg-pay-bank/5 p-4">
-                                      <p className="text-sm font-semibold">Pay by Interac e-Transfer</p>
-                                      <p className="mt-1 text-xs text-muted-foreground">
-                                        Send the exact amount with the reference below. Your transfer to{" "}
-                                        {recipientName || "your recipient"} is released automatically once it arrives.
-                                      </p>
-                                      <div className="mt-3">
-                                        <InteracCheckout
-                                          walletId={interacFunding.walletId}
-                                          purpose="transfer"
-                                          transferId={interacFunding.transferId}
-                                          fixedAmount={interacFunding.amount}
-                                          onComplete={() => setInteracFunding(null)}
-                                        />
-                                      </div>
-                                    </div>
+                                    <WiseInteracInvoiceCheckout
+                                      walletId={interacFunding.walletId}
+                                      purpose="transfer"
+                                      transferId={interacFunding.transferId}
+                                      amount={interacFunding.amount}
+                                      invoiceId={interacFunding.transferId}
+                                      payeeName="eFinMoney"
+                                      comment="Thank you for your business"
+                                      lineItem={`eFinMoney Transfer${
+                                        recipientName ? ` (to ${recipientName})` : ""
+                                      }`}
+                                      onExit={() => {
+                                        setInteracFunding(null);
+                                        goToStep(3);
+                                      }}
+                                      onComplete={() => setInteracFunding(null)}
+                                    />
                                   </SectionBoundary>
                                 ) : linkResult ? (
                                   <SectionBoundary name="PaymentLinkSuccess"><PaymentLinkSuccess

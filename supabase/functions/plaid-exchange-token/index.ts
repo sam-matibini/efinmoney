@@ -88,12 +88,23 @@ Deno.serve(async (req) => {
         currency_code: balances?.iso_currency_code || "CAD",
       };
     });
+    let insertedIds: string[] = [];
     if (accountsToInsert.length) {
-      const { error: aErr } = await supabase.from("plaid_accounts").insert(accountsToInsert);
+      const { data: inserted, error: aErr } = await supabase
+        .from("plaid_accounts")
+        .insert(accountsToInsert)
+        .select("id");
       if (aErr) throw aErr;
+      insertedIds = (inserted || []).map((r: { id: string }) => r.id);
     }
 
-    return jsonResponse({ success: true, item_id: itemRow.id, accounts: accountsToInsert.length });
+    return jsonResponse({
+      success: true,
+      item_id: itemRow.id,
+      accounts: accountsToInsert.length,
+      account_ids: insertedIds,
+      account_id: insertedIds[0] ?? null,
+    });
   } catch (e) {
     console.error("plaid-exchange-token error", e);
     return jsonResponse({ error: e instanceof Error ? e.message : "Unknown" }, 500);

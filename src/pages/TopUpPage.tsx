@@ -30,7 +30,6 @@ import WiseTopUpCard from "@/components/payments/WiseTopUpCard";
 import WisePayLinkCard from "@/components/payments/WisePayLinkCard";
 import { isWisePayCurrency } from "@/lib/wisePayLink";
 import CadCollectionPanel from "@/components/topup/CadCollectionPanel";
-import InteracCheckout from "@/components/payments/InteracCheckout";
 import WiseInteracInvoiceCheckout from "@/components/payments/WiseInteracInvoiceCheckout";
 
 import GhanaTopUpCard from "@/components/payments/GhanaTopUpCard";
@@ -106,11 +105,13 @@ function availableIntlMethods(currency: string): IntlTopupMethod[] {
     if (productFeatures.fincra && ["EUR", "GBP"].includes(c)) methods.push("fincra");
     if (productFeatures.paytota) methods.push("paytota");
     if (productFeatures.dodo) methods.push("dodo");
-    if (productFeatures.square) methods.push("square");
-    if (productFeatures.paypal) methods.push("paypal");
-    if (c === "CAD" && productFeatures.fincraInterac) methods.push("interac");
-    if (productFeatures.wise) methods.push("wise");
-    if (productFeatures.flutterwave && FLW_WESTERN_TOPUP_CURRENCIES.includes(c)) {
+    // CAD cards/Stripe micro-deposit paths disabled — use Plaid → Loop instead
+    if (productFeatures.square && c !== "CAD") methods.push("square");
+    if (productFeatures.paypal && c !== "CAD") methods.push("paypal");
+    if (c === "CAD" && productFeatures.plaid) methods.push("interac");
+    else if (c === "CAD" && productFeatures.fincraInterac) methods.push("interac");
+    if (productFeatures.wise && c !== "CAD") methods.push("wise");
+    if (productFeatures.flutterwave && FLW_WESTERN_TOPUP_CURRENCIES.includes(c) && c !== "CAD") {
       methods.push("flutterwave");
     }
     return methods;
@@ -737,7 +738,9 @@ const TopUpPage = () => {
       ),
     });
 
-    if (productFeatures.square && rails.has("square")) {
+    const isCadWalletEarly = currency.toUpperCase() === "CAD";
+    // CAD pay-in is Plaid → Loop only (no Square/Stripe card micro-deposit rails).
+    if (productFeatures.square && rails.has("square") && !isCadWalletEarly) {
       payMethods.push({
         id: "square",
         tone: "card",
@@ -875,25 +878,32 @@ const TopUpPage = () => {
 
     const isCadWallet = currency.toUpperCase() === "CAD";
 
-    if (isCadWallet && (rails.has("interac") || rails.has("wise"))) {
+    if (isCadWallet && productFeatures.plaid) {
       payMethods.push({
-        id: rails.has("interac") ? "interac" : "wise",
+        id: "plaid",
         tone: "bank",
-        label: "Interac e-Transfer or bank EFT",
-        description: "Send CAD from your Canadian bank",
+        label: "Interac",
+        description: "Use bank account to make instant payments",
         content: (
           <SectionBoundary name="CadCollection">
-            <CadCollectionPanel walletId={walletId} walletCurrency={currency} initialAmount={amount} onComplete={invalidateWallets} />
+            <CadCollectionPanel
+              walletId={walletId}
+              walletCurrency={currency}
+              initialAmount={amount}
+              onComplete={invalidateWallets}
+              onExit={() => setSelectedMethodId("")}
+            />
           </SectionBoundary>
         ),
       });
-    } else if (productFeatures.fincraInterac && rails.has("interac")) {
+    } else if (isCadWallet && (rails.has("interac") || rails.has("wise") || productFeatures.fincraInterac)) {
+      // Fallback only if Plaid is disabled — still uses Plaid-first invoice shell when amount set
       const interacAmount = Number(amount);
       payMethods.push({
         id: "interac",
         tone: "bank",
-        label: "Interac e-Transfer",
-        description: "Pay via Loop Bank — Interac or EFT from your Canadian bank",
+        label: "Interac",
+        description: "Use bank account to make instant payments",
         content: (
           <SectionBoundary name="CadInteracTopUp">
             {Number.isFinite(interacAmount) && interacAmount >= 1 ? (
@@ -903,9 +913,16 @@ const TopUpPage = () => {
                 amount={interacAmount}
                 lineItem="eFinMoney CAD wallet top-up"
                 onComplete={invalidateWallets}
+                onExit={() => setSelectedMethodId("")}
               />
             ) : (
-              <InteracCheckout walletId={walletId} purpose="topup" initialAmount={amount} onComplete={invalidateWallets} />
+              <CadCollectionPanel
+                walletId={walletId}
+                walletCurrency={currency}
+                initialAmount={amount}
+                onComplete={invalidateWallets}
+                onExit={() => setSelectedMethodId("")}
+              />
             )}
           </SectionBoundary>
         ),

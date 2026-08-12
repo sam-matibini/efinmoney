@@ -1,136 +1,104 @@
 import { cn } from "@/lib/utils";
-import { Building2, ChevronRight, CreditCard, Send, Wallet } from "lucide-react";
+import { ChevronRight, CreditCard, Send } from "lucide-react";
 import { CHECKOUT_STRINGS, type Lang } from "@/components/payments/checkoutStrings";
 
 export type CheckoutMethod = "card" | "interac" | "eft" | "wise" | "plaid";
 
 interface Props {
-  amountLabel?: string;
-  value: CheckoutMethod;
+  value?: CheckoutMethod | null;
   onChange: (method: CheckoutMethod) => void;
-  /** Hide the Interac row when the collection currency is not CAD. */
+  /** Interac / bank instant (Plaid → Loop). Default true. */
   interacAvailable?: boolean;
-  /** Hide the card row when Square does not support the collection currency. */
+  /** Visa Direct / debit card row. */
   cardAvailable?: boolean;
-  /** Show Plaid PAD row (Canada). */
+  /** @deprecated Prefer interacAvailable — Plaid is wired through Interac. */
   plaidAvailable?: boolean;
-  /** Show Loop Bank EFT row. */
   eftAvailable?: boolean;
-  /** Show legacy Wise Quick Pay (off for CAD Loop collection). */
   wiseAvailable?: boolean;
   lang?: Lang;
 }
-
 
 interface RowProps {
   title: string;
   description: string;
   icon: React.ReactNode;
-  selected: boolean;
+  iconClassName: string;
   onSelect: () => void;
 }
 
-function MethodRow({ title, description, icon, selected, onSelect }: RowProps) {
+function MethodRow({ title, description, icon, iconClassName, onSelect }: RowProps) {
   return (
     <button
       type="button"
       onClick={onSelect}
-      aria-pressed={selected}
-      className={cn(
-        "flex w-full items-center gap-3 border-b px-3 py-4 text-left transition-colors last:border-b-0",
-        selected ? "bg-primary/5" : "hover:bg-muted/50",
-      )}
+      className="flex w-full items-center gap-3 border-b px-1 py-5 text-left transition-colors last:border-b-0 hover:bg-muted/40"
     >
-      <span
-        className={cn(
-          "flex h-10 w-10 shrink-0 items-center justify-center rounded-full",
-          selected ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground",
-        )}
-      >
+      <span className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-full", iconClassName)}>
         {icon}
       </span>
       <span className="min-w-0 flex-1">
-        <span className={cn("block text-sm font-semibold", selected && "text-primary")}>{title}</span>
-        <span className="block text-xs text-muted-foreground">{description}</span>
+        <span className="block text-[15px] font-semibold text-foreground">{title}</span>
+        <span className="block text-sm text-muted-foreground">{description}</span>
       </span>
-      <ChevronRight className={cn("h-4 w-4 shrink-0", selected ? "text-primary" : "text-muted-foreground")} />
+      <ChevronRight className="h-5 w-5 shrink-0 text-rose-500" aria-hidden />
     </button>
   );
 }
 
-/** Hosted-checkout method picker: one row per rail, icon + description + chevron. */
+/**
+ * Zum-style method list: Interac (bank) + optional Visa Direct (card).
+ * Selecting Interac opens Plaid bank login → Loop collection.
+ */
 export default function CheckoutMethodGrid({
-  amountLabel,
-  value,
   onChange,
   interacAvailable = true,
-  cardAvailable = true,
+  cardAvailable = false,
   plaidAvailable = false,
   eftAvailable = false,
   wiseAvailable = false,
   lang = "en",
 }: Props) {
   const t = CHECKOUT_STRINGS[lang];
+  const showInterac = interacAvailable || plaidAvailable;
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-baseline justify-between">
-        <span className="text-sm font-medium">{t.selectMethod}</span>
-        {amountLabel && <span className="text-2xl font-semibold tabular-nums">{amountLabel}</span>}
-      </div>
-
-      <div className="overflow-hidden rounded-xl border">
-        {plaidAvailable && (
-          <MethodRow
-            title={t.plaid}
-            description={t.plaidDesc}
-            icon={<Building2 className="h-5 w-5" />}
-            selected={value === "plaid"}
-            onSelect={() => onChange("plaid")}
-          />
-        )}
-        {cardAvailable && (
-          <MethodRow
-            title={t.card}
-            description={t.cardDesc}
-            icon={<CreditCard className="h-5 w-5" />}
-            selected={value === "card"}
-            onSelect={() => onChange("card")}
-          />
-        )}
-        {interacAvailable && (
-          <MethodRow
-            title={t.interac}
-            description={t.interacDesc}
-            icon={<Send className="h-5 w-5" />}
-            selected={value === "interac"}
-            onSelect={() => onChange("interac")}
-          />
-        )}
-        {eftAvailable && (
-          <MethodRow
-            title={t.eft}
-            description={t.eftDesc}
-            icon={<Building2 className="h-5 w-5" />}
-            selected={value === "eft"}
-            onSelect={() => onChange("eft")}
-          />
-        )}
-        {wiseAvailable && (
-          <MethodRow
-            title={t.wise}
-            description={t.wiseDesc}
-            icon={<Wallet className="h-5 w-5" />}
-            selected={value === "wise"}
-            onSelect={() => onChange("wise")}
-          />
-        )}
-      </div>
-
-      <p className="flex items-center gap-2 text-xs text-muted-foreground">
-        <CreditCard className="h-3.5 w-3.5" />
-        Visa · Mastercard · Amex · Apple Pay · Google Pay
-      </p>
+    <div className="divide-y border-t">
+      {showInterac && (
+        <MethodRow
+          title={t.interac}
+          description={t.interacDesc}
+          icon={<Send className="h-5 w-5 text-white" />}
+          iconClassName="bg-emerald-500"
+          onSelect={() => onChange(plaidAvailable && !interacAvailable ? "plaid" : "interac")}
+        />
+      )}
+      {cardAvailable && (
+        <MethodRow
+          title={t.visaDirect}
+          description={t.visaDirectDesc}
+          icon={<CreditCard className="h-5 w-5 text-white" />}
+          iconClassName="bg-sky-500"
+          onSelect={() => onChange("card")}
+        />
+      )}
+      {eftAvailable && (
+        <MethodRow
+          title={t.eft}
+          description={t.eftDesc}
+          icon={<Send className="h-5 w-5 text-white" />}
+          iconClassName="bg-slate-500"
+          onSelect={() => onChange("eft")}
+        />
+      )}
+      {wiseAvailable && (
+        <MethodRow
+          title={t.wise}
+          description={t.wiseDesc}
+          icon={<CreditCard className="h-5 w-5 text-white" />}
+          iconClassName="bg-slate-500"
+          onSelect={() => onChange("wise")}
+        />
+      )}
     </div>
   );
 }

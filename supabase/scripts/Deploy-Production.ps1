@@ -156,6 +156,7 @@ function Deploy-Functions {
     "fincra-initialize-checkout",
     "fincra-verify-payment",
     "fincra-webhook",
+    "wise-cad-interac",
     "fincra-cad-interac",
     "fincra-payout",
     "lenhub-flutter",

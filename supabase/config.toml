@@ -259,6 +259,9 @@ verify_jwt = false
 [functions.fincra-cad-interac]
 verify_jwt = true
 
+[functions.wise-cad-interac]
+verify_jwt = true
+
 [functions.fincra-payout]
 verify_jwt = false
 
