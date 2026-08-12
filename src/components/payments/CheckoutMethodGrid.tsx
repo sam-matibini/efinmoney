@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils";
 import { Building2, ChevronRight, CreditCard, Send, Wallet } from "lucide-react";
 import { CHECKOUT_STRINGS, type Lang } from "@/components/payments/checkoutStrings";
 
-export type CheckoutMethod = "card" | "interac" | "eft" | "wise";
+export type CheckoutMethod = "card" | "interac" | "eft" | "wise" | "plaid";
 
 interface Props {
   amountLabel?: string;
@@ -12,6 +12,12 @@ interface Props {
   interacAvailable?: boolean;
   /** Hide the card row when Square does not support the collection currency. */
   cardAvailable?: boolean;
+  /** Show Plaid PAD row (Canada). */
+  plaidAvailable?: boolean;
+  /** Show Loop Bank EFT row. */
+  eftAvailable?: boolean;
+  /** Show legacy Wise Quick Pay (off for CAD Loop collection). */
+  wiseAvailable?: boolean;
   lang?: Lang;
 }
 
@@ -59,6 +65,9 @@ export default function CheckoutMethodGrid({
   onChange,
   interacAvailable = true,
   cardAvailable = true,
+  plaidAvailable = false,
+  eftAvailable = false,
+  wiseAvailable = false,
   lang = "en",
 }: Props) {
   const t = CHECKOUT_STRINGS[lang];
@@ -71,6 +80,15 @@ export default function CheckoutMethodGrid({
       </div>
 
       <div className="overflow-hidden rounded-xl border">
+        {plaidAvailable && (
+          <MethodRow
+            title={t.plaid}
+            description={t.plaidDesc}
+            icon={<Building2 className="h-5 w-5" />}
+            selected={value === "plaid"}
+            onSelect={() => onChange("plaid")}
+          />
+        )}
         {cardAvailable && (
           <MethodRow
             title={t.card}
@@ -89,21 +107,24 @@ export default function CheckoutMethodGrid({
             onSelect={() => onChange("interac")}
           />
         )}
-
-        <MethodRow
-          title={t.wise}
-          description={t.wiseDesc}
-          icon={<Wallet className="h-5 w-5" />}
-          selected={value === "wise"}
-          onSelect={() => onChange("wise")}
-        />
-        <MethodRow
-          title={t.eft}
-          description={t.eftDesc}
-          icon={<Building2 className="h-5 w-5" />}
-          selected={value === "eft"}
-          onSelect={() => onChange("eft")}
-        />
+        {eftAvailable && (
+          <MethodRow
+            title={t.eft}
+            description={t.eftDesc}
+            icon={<Building2 className="h-5 w-5" />}
+            selected={value === "eft"}
+            onSelect={() => onChange("eft")}
+          />
+        )}
+        {wiseAvailable && (
+          <MethodRow
+            title={t.wise}
+            description={t.wiseDesc}
+            icon={<Wallet className="h-5 w-5" />}
+            selected={value === "wise"}
+            onSelect={() => onChange("wise")}
+          />
+        )}
       </div>
 
       <p className="flex items-center gap-2 text-xs text-muted-foreground">

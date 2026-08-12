@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useState } from "react";
 import InteracCheckout from "@/components/payments/InteracCheckout";
-import WiseTopUpCard from "@/components/payments/WiseTopUpCard";
-import WisePayLinkCard from "@/components/payments/WisePayLinkCard";
+import WiseInteracInvoiceCheckout from "@/components/payments/WiseInteracInvoiceCheckout";
+import PlaidInvoicePayIn from "@/components/payments/PlaidInvoicePayIn";
 import SquareTopUpCard from "@/components/payments/SquareTopUpCard";
 import { productFeatures } from "@/lib/productFeatures";
+import { LOOP_CAD_EFT, LOOP_CAD_INTERAC_ALIAS } from "@/lib/loopCad";
 
 import CheckoutMethodGrid, { type CheckoutMethod } from "@/components/payments/CheckoutMethodGrid";
 import CheckoutShell from "@/components/payments/CheckoutShell";
@@ -18,48 +18,18 @@ interface Props {
 }
 
 /**
- * Hosted CAD collection checkout: pick a rail, fill one payer form, pay.
- * Both rails create a referenced intent and credit automatically once the
- * deposit arrives.
+ * Hosted CAD collection checkout via Loop Bank (Interac Autodeposit + EFT).
  */
 export default function CadCollectionPanel({ walletId, walletCurrency, initialAmount, onComplete }: Props) {
   const [method, setMethod] = useState<CheckoutMethod | null>(null);
   const [lang, setLang] = useState<Lang>("en");
-  const [eftAvailable, setEftAvailable] = useState<boolean | null>(null);
   const isCad = walletCurrency.toUpperCase() === "CAD";
   const cardAvailable = productFeatures.square
     && ["USD", "CAD", "EUR", "GBP"].includes(walletCurrency.toUpperCase());
 
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const session = (await supabase.auth.getSession()).data.session;
-        const res = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/wise-topup-intent?diagnose=1`,
-          {
-            headers: {
-              Authorization: `Bearer ${session?.access_token || ""}`,
-              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string,
-            },
-          },
-        );
-        const json = await res.json().catch(() => ({}));
-        const active = Array.isArray(json?.currencies_active)
-          ? (json.currencies_active as string[]).map((c) => String(c).toUpperCase())
-          : [];
-        if (!cancelled) setEftAvailable(Boolean(json?.ok) && active.includes("CAD"));
-      } catch {
-        if (!cancelled) setEftAvailable(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   const amount = Number(initialAmount) > 0 ? Number(initialAmount) : 0;
   const amountLabel = `CAD ${amount.toFixed(2)}`;
+  const plaidAvailable = isCad && productFeatures.plaid;
 
   return (
     <CheckoutShell
@@ -69,19 +39,36 @@ export default function CadCollectionPanel({ walletId, walletCurrency, initialAm
       summary={{
         payeeName: "eFinMoney wallet top-up",
         amountLabel,
-        description: "Funds are credited to your CAD wallet automatically once the deposit arrives.",
+        description: "Funds are credited to your CAD wallet once we match your Loop Bank deposit.",
         lineItem: `CAD wallet top-up${walletCurrency ? ` (${walletCurrency.toUpperCase()})` : ""}`,
       }}
     >
       {method === null ? (
         <CheckoutMethodGrid
           amountLabel={amount > 0 ? amountLabel : undefined}
-          value={cardAvailable ? "card" : "interac"}
+          value={plaidAvailable ? "plaid" : cardAvailable ? "card" : "interac"}
           onChange={setMethod}
           interacAvailable={isCad}
+          eftAvailable={isCad}
           cardAvailable={cardAvailable}
+          plaidAvailable={plaidAvailable}
+          wiseAvailable={false}
           lang={lang}
         />
+      ) : method === "plaid" ? (
+        amount > 0 ? (
+          <PlaidInvoicePayIn
+            walletId={walletId}
+            amount={amount}
+            purpose="topup"
+            lang={lang}
+            onComplete={onComplete}
+          />
+        ) : (
+          <div className="rounded-lg border bg-muted/40 p-4 text-sm text-muted-foreground">
+            Enter an amount first, then link your bank with Plaid.
+          </div>
+        )
       ) : method === "card" ? (
         <SquareTopUpCard
           walletId={walletId}
@@ -90,35 +77,43 @@ export default function CadCollectionPanel({ walletId, walletCurrency, initialAm
           embedded
           onComplete={onComplete}
         />
-      ) : method === "interac" ? (
-        <InteracCheckout
-          walletId={walletId}
-          purpose="topup"
-          initialAmount={initialAmount}
-          lang={lang}
-          onComplete={onComplete}
-        />
-      ) : method === "wise" ? (
-        <WisePayLinkCard
-          walletId={walletId}
-          walletCurrency={walletCurrency}
-          initialAmount={initialAmount}
-          onComplete={onComplete}
-        />
-      ) : eftAvailable === false ? (
-
-        <div className="rounded-lg border bg-muted/40 p-4 text-sm text-muted-foreground">
-          Bank EFT is not available yet for CAD. Use Interac e-Transfer in the meantime.
-        </div>
+      ) : method === "interac" || method === "eft" ? (
+        amount > 0 ? (
+          <WiseInteracInvoiceCheckout
+            walletId={walletId}
+            purpose="topup"
+            amount={amount}
+            lineItem="eFinMoney CAD wallet top-up"
+            lang={lang}
+            onComplete={onComplete}
+          />
+        ) : method === "eft" ? (
+          <div className="space-y-3 rounded-lg border p-4 text-sm">
+            <p className="font-medium">Loop Bank EFT deposit</p>
+            <p className="text-muted-foreground text-xs">
+              Enter an amount above, then continue — or send CAD EFT to:
+            </p>
+            <ul className="space-y-1 font-mono text-xs">
+              <li>Institution: {LOOP_CAD_EFT.bankNumber}</li>
+              <li>Transit: {LOOP_CAD_EFT.transitNumber}</li>
+              <li>Account: {LOOP_CAD_EFT.accountNumber}</li>
+              <li>Interac Autodeposit: {LOOP_CAD_INTERAC_ALIAS}</li>
+            </ul>
+          </div>
+        ) : (
+          <InteracCheckout
+            walletId={walletId}
+            purpose="topup"
+            initialAmount={initialAmount}
+            lang={lang}
+            onComplete={onComplete}
+          />
+        )
       ) : (
-        <WiseTopUpCard
-          walletId={walletId}
-          walletCurrency={walletCurrency}
-          initialAmount={initialAmount}
-          onComplete={onComplete}
-        />
+        <div className="rounded-lg border bg-muted/40 p-4 text-sm text-muted-foreground">
+          This payment method is not available for CAD. Use Interac, EFT, or Plaid.
+        </div>
       )}
     </CheckoutShell>
   );
 }
-

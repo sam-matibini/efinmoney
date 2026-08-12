@@ -184,9 +184,8 @@ const MethodCheckoutPanel = ({
         <div>
           <p className="text-sm font-semibold">Interac e-Transfer (CAD)</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Confirm the transfer and we'll show you the Interac details to send {symbol}{money(total)} {currency}
-            {" "}from your Canadian bank. Your payout is released automatically once the deposit arrives — usually
-            within minutes.
+            Confirm to open a Loop Bank invoice for {symbol}{money(total)} {currency}. Pay by Interac
+            e-Transfer or EFT — your payout releases once we match the Loop deposit to your reference.
           </p>
         </div>
         <ChargeSummary amount={amount} fee={fee} total={total} currency={currency} symbol={symbol} debitLabel="You send by Interac" />

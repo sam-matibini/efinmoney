@@ -6,13 +6,15 @@ export const CHECKOUT_STRINGS = {
   en: {
     selectMethod: "Select a payment method",
     interac: "Interac",
-    interacDesc: "Use bank account to make instant payments",
+    interacDesc: "Send from your Canadian bank via e-Transfer",
+    plaid: "Bank (Plaid)",
+    plaidDesc: "Link & debit securely — no bank-app login",
     card: "Card",
     cardDesc: "Use debit or credit card to make instant payments",
     eft: "Bank EFT",
     eftDesc: "Direct bank deposit — arrives in 1-2 business days",
-    wise: "Pay with Wise",
-    wiseDesc: "Bank transfer or card on our secure Wise page",
+    wise: "Bank EFT (Loop)",
+    wiseDesc: "Direct deposit to Loop Bank — 1–2 business days",
     back: "Back",
     accountType: "Account type",
     personal: "Personal",
@@ -31,26 +33,36 @@ export const CHECKOUT_STRINGS = {
     country: "Country",
     amountDue: "Amount due",
     pay: (amount: string) => `Pay ${amount}`,
-    poweredBy: "Payments powered by eFinMoney",
-    openBank: "Open your banking app",
-    detailsCopied: "Payment details copied",
-    waiting: "Waiting for your payment…",
+    poweredBy: "Collected via Loop Bank",
+    openBank: "Copy payment details",
+    openHosted: "Continue",
+    pushHint:
+      "Send an Interac Autodeposit e-Transfer to etx@efin.money (Loop Bank). Or use Bank EFT with the institution details shown. Prefer Bank (Plaid) if your bank blocks Interac.",
+    detailsCopied: "Payment details copied — paste them in your e-Transfer or EFT memo",
+    waiting: "Waiting for your deposit to Loop Bank…",
     received: "Payment received",
-    paymentDetails: "Payment details",
+    paymentDetails: "Copy payment details",
     sendTo: "Send to",
-    reference: "Reference",
-    stillNotSent: "I haven't paid yet — show me the details again",
+    reference: "Reference (message)",
+    stillNotSent: "Hide payment details",
+    showDetails: "Show payment details",
+    bankNumber: "Institution (Bank #)",
+    transitNumber: "Transit #",
+    accountNumber: "Account #",
+    eftHint: "Or pay by EFT / bank transfer to Loop Bank using these details:",
   },
   fr: {
     selectMethod: "Choisissez un mode de paiement",
     interac: "Interac",
-    interacDesc: "Utilisez votre compte bancaire pour un paiement instantané",
+    interacDesc: "Envoyez depuis votre banque canadienne par Virement Interac",
+    plaid: "Banque (Plaid)",
+    plaidDesc: "Liez et débitez en toute sécurité — sans app bancaire",
     card: "Carte",
     cardDesc: "Utilisez une carte de débit ou de crédit",
     eft: "Virement bancaire (TEF)",
     eftDesc: "Dépôt bancaire direct — 1 à 2 jours ouvrables",
-    wise: "Payer avec Wise",
-    wiseDesc: "Virement bancaire ou carte sur notre page Wise sécurisée",
+    wise: "TEF bancaire (Loop)",
+    wiseDesc: "Dépôt direct vers Loop Bank — 1 à 2 jours ouvrables",
     back: "Retour",
     accountType: "Type de compte",
     personal: "Personnel",
@@ -69,15 +81,23 @@ export const CHECKOUT_STRINGS = {
     country: "Pays",
     amountDue: "Montant dû",
     pay: (amount: string) => `Payer ${amount}`,
-    poweredBy: "Paiements par eFinMoney",
-    openBank: "Ouvrir votre application bancaire",
-    detailsCopied: "Détails du paiement copiés",
-    waiting: "En attente de votre paiement…",
+    poweredBy: "Collecté via Loop Bank",
+    openBank: "Copier les détails",
+    openHosted: "Continuer",
+    pushHint:
+      "Envoyez un Virement Interac Autodeposit à etx@efin.money (Loop Bank). Ou utilisez le TEF avec les coordonnées bancaires affichées. Préférez Banque (Plaid) si votre banque bloque Interac.",
+    detailsCopied: "Détails copiés — collez-les dans votre Virement Interac ou TEF",
+    waiting: "En attente de votre dépôt vers Loop Bank…",
     received: "Paiement reçu",
-    paymentDetails: "Détails du paiement",
+    paymentDetails: "Copier les détails",
     sendTo: "Envoyer à",
-    reference: "Référence",
-    stillNotSent: "Je n'ai pas encore payé — afficher les détails",
+    reference: "Référence (message)",
+    stillNotSent: "Masquer les détails",
+    showDetails: "Afficher les détails",
+    bankNumber: "Institution (n° de banque)",
+    transitNumber: "N° de transit",
+    accountNumber: "N° de compte",
+    eftHint: "Ou payez par TEF / virement bancaire vers Loop Bank :",
   },
 } as const;
 
@@ -97,22 +117,25 @@ export const CA_PROVINCES = [
   { code: "YT", name: "Yukon" },
 ];
 
-/** e-Transfer entry points for the major Canadian banks, used for the hand-off. */
+/**
+ * Bank names for the Interac payer form only.
+ * We intentionally do NOT deep-link to bank login pages — those URLs 404 or
+ * route to "call us" blocks (RBC dig/sign-in, Scotiabank, etc.).
+ */
 export const BANK_ETRANSFER_LINKS: Array<{ name: string; url: string }> = [
-  { name: "RBC", url: "https://www.rbcroyalbank.com/dig/sign-in.html" },
-  { name: "TD", url: "https://authentication.td.com/uap-ui/index.html" },
-  { name: "Scotiabank", url: "https://auth.scotiaonline.scotiabank.com/online" },
-  { name: "BMO", url: "https://www1.bmo.com/onlinebanking/CI/Login/authentication" },
-  { name: "CIBC", url: "https://www.cibconline.cibc.com/ebm-resources/public/banking/cibc/client/web/index.html" },
-  { name: "National Bank", url: "https://bao.bnc.ca/auth/login" },
-  { name: "Desjardins", url: "https://accesd.desjardins.com/particuliers" },
-  { name: "Tangerine", url: "https://www.tangerine.ca/en/log-in" },
-  { name: "Simplii", url: "https://online.simplii.com/ebm-resources/public/client/web/index.html" },
-  { name: "EQ Bank", url: "https://secure.eqbank.ca/" },
+  { name: "RBC", url: "" },
+  { name: "TD", url: "" },
+  { name: "Scotiabank", url: "" },
+  { name: "BMO", url: "" },
+  { name: "CIBC", url: "" },
+  { name: "National Bank", url: "" },
+  { name: "Desjardins", url: "" },
+  { name: "Tangerine", url: "" },
+  { name: "Simplii", url: "" },
+  { name: "EQ Bank", url: "" },
 ];
 
-export function bankLink(bank?: string | null): string | null {
-  if (!bank) return null;
-  const needle = bank.trim().toLowerCase();
-  return BANK_ETRANSFER_LINKS.find((b) => needle.includes(b.name.toLowerCase()))?.url ?? null;
+/** Always null — bank login deep-links are unreliable; use Plaid or copy details. */
+export function bankLink(_bank?: string | null): string | null {
+  return null;
 }

@@ -79,9 +79,8 @@ const payerSchema = z.object({
 });
 
 /**
- * Automated Interac e-Transfer checkout: one payer form, one Pay button, then a
- * status view. Deposits are reconciled by `wise-webhook`, which credits the
- * wallet and (for `purpose: "transfer"`) releases the linked payout.
+ * Loop Bank Interac / EFT checkout: one payer form, then deposit instructions.
+ * Deposits land in Loop; ops match by reference to credit the wallet / release transfers.
  */
 export default function InteracCheckout({
   walletId,
@@ -105,6 +104,7 @@ export default function InteracCheckout({
   const [form, setForm] = useState<PayerForm>(emptyPayerForm);
   const [loading, setLoading] = useState(false);
   const [alias, setAlias] = useState<string | null>(null);
+  const [eft, setEft] = useState<{ bankNumber: string; transitNumber: string; accountNumber: string } | null>(null);
   const [configured, setConfigured] = useState(true);
   const [intent, setIntent] = useState<InteracIntent | null>(null);
   const [bootstrapped, setBootstrapped] = useState(false);
@@ -152,13 +152,21 @@ export default function InteracCheckout({
     let cancelled = false;
     void (async () => {
       try {
-        const { data, error: fnError } = await supabase.functions.invoke("fincra-cad-interac", {
+        const { data, error: fnError } = await supabase.functions.invoke("wise-cad-interac", {
           method: "GET",
         });
         if (cancelled) return;
         if (fnError) return; // transient/auth hiccup — keep the form usable
         const json = (data ?? {}) as Record<string, unknown>;
         setAlias((json.alias as string | null) ?? null);
+        const eftJson = json.eft as { bankNumber?: string; transitNumber?: string; accountNumber?: string } | null;
+        if (eftJson?.bankNumber && eftJson.transitNumber && eftJson.accountNumber) {
+          setEft({
+            bankNumber: String(eftJson.bankNumber),
+            transitNumber: String(eftJson.transitNumber),
+            accountNumber: String(eftJson.accountNumber),
+          });
+        }
         // Only block when the backend explicitly says there is no deposit alias.
         if (json.configured === false) setConfigured(false);
         if (resumePending) {
@@ -186,7 +194,7 @@ export default function InteracCheckout({
     setLoading(true);
     setError(null);
     try {
-      const { data, error: fnError } = await supabase.functions.invoke("fincra-cad-interac", {
+      const { data, error: fnError } = await supabase.functions.invoke("wise-cad-interac", {
         body: {
           action: "create",
           amount: parsed.data.amount,
@@ -209,27 +217,33 @@ export default function InteracCheckout({
       if (fnError) throw new Error(await edgeErrorMessage(fnError, "Could not start the payment"));
       if (data?.error) throw new Error(data.error);
       setAlias((prev) => data.alias ?? prev);
-      const created = data.intent as InteracIntent;
-      setIntent(created);
-      onIntentCreated?.(created);
-
-      // Automated hand-off: Wise-hosted page when available, else the bank app.
-      const hosted = (data.hosted_url as string | null) || created.hosted_url || null;
-      if (hosted) window.open(hosted, "_blank", "noopener,noreferrer");
-      else {
-        await navigator.clipboard
-          .writeText(
-            [
-              `Amount: CAD ${Number(created.amount).toFixed(2)}`,
-              data.alias ? `${t.sendTo}: ${data.alias}` : null,
-              `${t.reference}: ${created.public_id || created.reference}`,
-            ]
-              .filter(Boolean)
-              .join("\n"),
-          )
-          .catch(() => undefined);
-        toast.success(t.detailsCopied);
+      const eftJson = data.eft as { bankNumber?: string; transitNumber?: string; accountNumber?: string } | null | undefined;
+      if (eftJson?.bankNumber && eftJson.transitNumber && eftJson.accountNumber) {
+        setEft({
+          bankNumber: String(eftJson.bankNumber),
+          transitNumber: String(eftJson.transitNumber),
+          accountNumber: String(eftJson.accountNumber),
+        });
       }
+      const created = data.intent as InteracIntent;
+      // Interac funds Wise via Autodeposit — never open Quick Pay (self-pay blocked).
+      const next = { ...created, hosted_url: null };
+      setIntent(next);
+      onIntentCreated?.(next);
+
+      const aliasLine = (data.alias as string | null) || alias;
+      await navigator.clipboard
+        .writeText(
+          [
+            `Amount: CAD ${Number(created.amount).toFixed(2)}`,
+            aliasLine ? `${t.sendTo}: ${aliasLine}` : null,
+            `${t.reference}: ${created.public_id || created.reference}`,
+          ]
+            .filter(Boolean)
+            .join("\n"),
+        )
+        .catch(() => undefined);
+      toast.success(t.detailsCopied);
     } catch (e) {
       const message = e instanceof Error ? e.message : "Could not start the payment";
       setError(message);
@@ -237,26 +251,29 @@ export default function InteracCheckout({
     } finally {
       setLoading(false);
     }
-  }, [amount, form, walletId, purpose, transferId, onIntentCreated, t]);
+  }, [amount, form, walletId, purpose, transferId, onIntentCreated, t, alias]);
 
-  // Poll the active intent until it settles
+  // Poll the active intent until it settles (direct table read — RLS allows own rows)
   useEffect(() => {
     if (!intent || DONE.includes(intent.status)) return;
     let cancelled = false;
     let attempts = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
 
     const poll = async () => {
-      if (cancelled || attempts > 80) return;
+      if (cancelled || attempts > 120) return;
       attempts += 1;
       try {
-        const { data } = await supabase.functions.invoke(
-          `fincra-cad-interac?intent_id=${encodeURIComponent(intent.id)}`,
-          { method: "GET" },
-        );
-        const next = (data as { intent?: InteracIntent } | null)?.intent;
+        const { data: next } = await supabase
+          .from("fincra_cad_interac_intents")
+          .select(
+            "id, public_id, amount, currency_code, reference, status, expires_at, claimed_sent_at, hosted_url, sender_name, sender_email, sender_phone, sender_bank",
+          )
+          .eq("id", intent.id)
+          .maybeSingle();
 
         if (next) {
-          setIntent(next);
+          setIntent(next as InteracIntent);
           if (DONE.includes(next.status)) {
             toast.success(
               purpose === "transfer"
@@ -270,13 +287,13 @@ export default function InteracCheckout({
       } catch {
         /* retry */
       }
-      if (!cancelled) setTimeout(poll, 5000);
+      if (!cancelled) timer = setTimeout(poll, 4000);
     };
 
-    const timer = setTimeout(poll, 5000);
+    timer = setTimeout(poll, 3000);
     return () => {
       cancelled = true;
-      clearTimeout(timer);
+      if (timer) clearTimeout(timer);
     };
   }, [intent?.id, intent?.status, onComplete, purpose]);
 
@@ -294,6 +311,7 @@ export default function InteracCheckout({
       <InteracStatusView
         intent={intent}
         alias={alias}
+        eft={eft}
         lang={lang}
         purpose={purpose}
         done={DONE.includes(intent.status)}

@@ -31,6 +31,7 @@ import WisePayLinkCard from "@/components/payments/WisePayLinkCard";
 import { isWisePayCurrency } from "@/lib/wisePayLink";
 import CadCollectionPanel from "@/components/topup/CadCollectionPanel";
 import InteracCheckout from "@/components/payments/InteracCheckout";
+import WiseInteracInvoiceCheckout from "@/components/payments/WiseInteracInvoiceCheckout";
 
 import GhanaTopUpCard from "@/components/payments/GhanaTopUpCard";
 import NombaTopUpCard from "@/components/payments/NombaTopUpCard";
@@ -887,14 +888,25 @@ const TopUpPage = () => {
         ),
       });
     } else if (productFeatures.fincraInterac && rails.has("interac")) {
+      const interacAmount = Number(amount);
       payMethods.push({
         id: "interac",
         tone: "bank",
         label: "Interac e-Transfer",
-        description: "Send from your Canadian bank",
+        description: "Pay via Loop Bank — Interac or EFT from your Canadian bank",
         content: (
           <SectionBoundary name="CadInteracTopUp">
-            <InteracCheckout walletId={walletId} purpose="topup" initialAmount={amount} onComplete={invalidateWallets} />
+            {Number.isFinite(interacAmount) && interacAmount >= 1 ? (
+              <WiseInteracInvoiceCheckout
+                walletId={walletId}
+                purpose="topup"
+                amount={interacAmount}
+                lineItem="eFinMoney CAD wallet top-up"
+                onComplete={invalidateWallets}
+              />
+            ) : (
+              <InteracCheckout walletId={walletId} purpose="topup" initialAmount={amount} onComplete={invalidateWallets} />
+            )}
           </SectionBoundary>
         ),
       });
