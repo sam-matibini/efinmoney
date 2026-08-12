@@ -81,8 +81,8 @@ export default function CheckoutMethodGrid({
       )}
       {loopBillingAvailable && (
         <MethodRow
-          title={t.loopbilling}
-          description={t.loopbillingDesc}
+          title={t.loopBilling}
+          description={t.loopBillingDesc}
           icon={<Link2 className="h-5 w-5 text-white" />}
           iconClassName="bg-teal-700"
           onSelect={() => onChange("loop_billing")}
