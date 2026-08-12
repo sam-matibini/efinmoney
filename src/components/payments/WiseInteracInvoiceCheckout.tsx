@@ -2,10 +2,11 @@ import { useMemo, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import CheckoutShell from "@/components/payments/CheckoutShell";
 import CheckoutMethodGrid, { type CheckoutMethod } from "@/components/payments/CheckoutMethodGrid";
-import VopayInteracPayIn from "@/components/payments/VopayInteracPayIn";
+import InteracCheckout from "@/components/payments/InteracCheckout";
+import LoopBillingPayPanel from "@/components/payments/LoopBillingPayPanel";
 import type { InteracIntent } from "@/components/payments/InteracCheckout";
 import { type Lang } from "@/components/payments/checkoutStrings";
-import { productFeatures } from "@/lib/productFeatures";
+import { loopBillingLinkConfigured } from "@/lib/loopCad";
 
 interface Props {
   walletId: string;
@@ -36,7 +37,7 @@ function formatInvoiceDate(d: Date, lang: Lang): string {
 
 /**
  * Zum-style CAD invoice checkout:
- * left = invoice · right = Interac Request Money (VoPay) → Loop Autodeposit.
+ * left = invoice · right = Interac Autodeposit push and optional Loop Billing link.
  */
 export default function WiseInteracInvoiceCheckout({
   walletId,
@@ -52,6 +53,7 @@ export default function WiseInteracInvoiceCheckout({
   onLangChange,
   onExit,
   onComplete,
+  onIntentCreated,
   className,
 }: Props) {
   const { user } = useAuth();
@@ -60,6 +62,7 @@ export default function WiseInteracInvoiceCheckout({
   const setLang = onLangChange ?? setLangState;
 
   const [method, setMethod] = useState<CheckoutMethod | null>(null);
+  const showLoopBilling = loopBillingLinkConfigured();
 
   const amountLabel = useMemo(() => {
     const n = Number(amount);
@@ -117,13 +120,7 @@ export default function WiseInteracInvoiceCheckout({
         lineItem,
       }}
     >
-      {!productFeatures.plaid ? (
-        <div className="rounded-lg border bg-muted/40 p-4 text-sm text-muted-foreground">
-          {lang === "fr"
-            ? "Le paiement Interac n'est pas disponible."
-            : "Interac pay-in is not available."}
-        </div>
-      ) : amount < 1 ? (
+      {amount < 1 ? (
         <div className="rounded-lg border bg-muted/40 p-4 text-sm text-muted-foreground">
           {lang === "fr"
             ? "Montant minimum : 1,00 CAD."
@@ -132,21 +129,27 @@ export default function WiseInteracInvoiceCheckout({
       ) : method === null ? (
         <CheckoutMethodGrid
           interacAvailable
-          plaidAvailable
+          loopBillingAvailable={showLoopBilling}
           cardAvailable={false}
           lang={lang}
-          onChange={(m) => setMethod(m === "plaid" ? "interac" : m)}
+          onChange={setMethod}
+        />
+      ) : method === "loop_billing" ? (
+        <LoopBillingPayPanel
+          amount={amount}
+          reference={resolvedInvoiceId}
+          lang={lang}
         />
       ) : (
-        <VopayInteracPayIn
+        <InteracCheckout
           key={`${walletId}-${amount}-${transferId || "topup"}`}
           walletId={walletId}
-          amount={amount}
-          transferId={transferId}
           purpose={purpose}
+          transferId={transferId}
+          fixedAmount={amount}
           lang={lang}
-          autoOpen
           onComplete={onComplete}
+          onIntentCreated={onIntentCreated}
         />
       )}
     </CheckoutShell>

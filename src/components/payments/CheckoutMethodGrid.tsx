@@ -1,13 +1,13 @@
 import { cn } from "@/lib/utils";
-import { ChevronRight, CreditCard, Send } from "lucide-react";
+import { Building2, ChevronRight, CreditCard, Link2, Send } from "lucide-react";
 import { CHECKOUT_STRINGS, type Lang } from "@/components/payments/checkoutStrings";
 
-export type CheckoutMethod = "card" | "interac" | "eft" | "wise" | "plaid";
+export type CheckoutMethod = "card" | "interac" | "eft" | "wise" | "plaid" | "loop_billing";
 
 interface Props {
   value?: CheckoutMethod | null;
   onChange: (method: CheckoutMethod) => void;
-  /** Interac / bank instant (Plaid → Loop). Default true. */
+  /** Interac Autodeposit push to Loop. Default true. */
   interacAvailable?: boolean;
   /** Visa Direct / debit card row. */
   cardAvailable?: boolean;
@@ -15,6 +15,8 @@ interface Props {
   plaidAvailable?: boolean;
   eftAvailable?: boolean;
   wiseAvailable?: boolean;
+  /** Loop Billing payment link (EFT pull from Loop dashboard URL). */
+  loopBillingAvailable?: boolean;
   lang?: Lang;
 }
 
@@ -46,8 +48,7 @@ function MethodRow({ title, description, icon, iconClassName, onSelect }: RowPro
 }
 
 /**
- * Zum-style method list: Interac (bank) + optional Visa Direct (card).
- * Selecting Interac opens Plaid bank login → Loop collection.
+ * Zum-style method list: Interac Autodeposit + optional Loop Billing link + card.
  */
 export default function CheckoutMethodGrid({
   onChange,
@@ -56,6 +57,7 @@ export default function CheckoutMethodGrid({
   plaidAvailable = false,
   eftAvailable = false,
   wiseAvailable = false,
+  loopBillingAvailable = false,
   lang = "en",
 }: Props) {
   const t = CHECKOUT_STRINGS[lang];
@@ -72,6 +74,15 @@ export default function CheckoutMethodGrid({
           onSelect={() => onChange(plaidAvailable && !interacAvailable ? "plaid" : "interac")}
         />
       )}
+      {loopBillingAvailable && (
+        <MethodRow
+          title={t.loopbilling}
+          description={t.loopbillingDesc}
+          icon={<Link2 className="h-5 w-5 text-white" />}
+          iconClassName="bg-teal-700"
+          onSelect={() => onChange("loop_billing")}
+        />
+      )}
       {cardAvailable && (
         <MethodRow
           title={t.visaDirect}
@@ -85,7 +96,7 @@ export default function CheckoutMethodGrid({
         <MethodRow
           title={t.eft}
           description={t.eftDesc}
-          icon={<Send className="h-5 w-5 text-white" />}
+          icon={<Building2 className="h-5 w-5 text-white" />}
           iconClassName="bg-slate-500"
           onSelect={() => onChange("eft")}
         />

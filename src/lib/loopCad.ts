@@ -14,6 +14,18 @@ export const LOOP_CAD_EFT: LoopCadEft = {
   accountNumber: "500010169796",
 };
 
+/**
+ * Loop Billing / Request Payment URL from the Loop dashboard.
+ * Set VITE_LOOP_BILLING_PAYMENT_LINK in .env (or Vercel) to show the method in checkout.
+ */
+export const LOOP_BILLING_PAYMENT_LINK = String(
+  import.meta.env.VITE_LOOP_BILLING_PAYMENT_LINK || "",
+).trim();
+
+export function loopBillingLinkConfigured(): boolean {
+  return /^https?:\/\//i.test(LOOP_BILLING_PAYMENT_LINK);
+}
+
 export function formatLoopEftLines(eft: LoopCadEft = LOOP_CAD_EFT): string[] {
   return [
     `Institution (Bank #): ${eft.bankNumber}`,
