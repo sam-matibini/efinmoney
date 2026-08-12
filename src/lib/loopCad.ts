@@ -16,10 +16,14 @@ export const LOOP_CAD_EFT: LoopCadEft = {
 
 /**
  * Loop Billing / Request Payment URL from the Loop dashboard.
- * Set VITE_LOOP_BILLING_PAYMENT_LINK in .env (or Vercel) to show the method in checkout.
+ * Override with VITE_LOOP_BILLING_PAYMENT_LINK. Default is the current Loop payor register link.
+ * Note: signed `sgid` links can expire — replace from Loop dashboard when needed.
  */
+const LOOP_BILLING_DEFAULT =
+  "https://app.bankonloop.com/payor/register?sgid=eyJfcmFpbHMiOnsibWVzc2FnZSI6IkJBaEpJajluYVdRNkx5OXNiMjl3TFdKaGJtdHBibWN2VUdGNWJXVnVkRkpsY1hWbGMzUXZNVEk0T0RNL1pYaHdhWEpsYzE5cGJqMHlOakk1TnpRMkJqb0dSVlE9IiwiZXhwIjoiMjAyNi0wOS0xMlQxNzo0MTo1Ny4xNjBaIiwicHVyIjoiZGVmYXVsdCJ9fQ==--ef6f9436aea3ea6d6bd0a9d56f6bf99ab9ae6cd0";
+
 export const LOOP_BILLING_PAYMENT_LINK = String(
-  import.meta.env.VITE_LOOP_BILLING_PAYMENT_LINK || "",
+  import.meta.env.VITE_LOOP_BILLING_PAYMENT_LINK || LOOP_BILLING_DEFAULT,
 ).trim();
 
 export function loopBillingLinkConfigured(): boolean {
