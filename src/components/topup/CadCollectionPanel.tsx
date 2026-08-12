@@ -1,4 +1,10 @@
+import { useState } from "react";
 import WiseInteracInvoiceCheckout from "@/components/payments/WiseInteracInvoiceCheckout";
+import InteracCheckout from "@/components/payments/InteracCheckout";
+import WisePayLinkCard from "@/components/payments/WisePayLinkCard";
+import CheckoutMethodGrid, { type CheckoutMethod } from "@/components/payments/CheckoutMethodGrid";
+import CheckoutShell from "@/components/payments/CheckoutShell";
+import { type Lang } from "@/components/payments/checkoutStrings";
 import { productFeatures } from "@/lib/productFeatures";
 
 interface Props {
@@ -11,30 +17,98 @@ interface Props {
 }
 
 /**
- * CAD collection — Zum-style invoice + Interac (auto-open bank login) → Loop Bank.
+ * CAD collection — prefer Flovide Interac when enabled; otherwise Zum-style
+ * invoice + Interac (Plaid → Loop Bank). Wise pay-link remains available as a rail.
  */
 export default function CadCollectionPanel({ walletId, walletCurrency, initialAmount, onComplete, onExit }: Props) {
   const isCad = walletCurrency.toUpperCase() === "CAD";
   const amount = Number(initialAmount) > 0 ? Number(initialAmount) : 0;
+  const flovideOn = productFeatures.flovide || productFeatures.flovideInterac || productFeatures.fincraInterac;
+  const wiseOn = productFeatures.wise;
+  const plaidOn = productFeatures.plaid;
 
-  if (!isCad || !productFeatures.plaid) {
+  const [method, setMethod] = useState<CheckoutMethod | null>(null);
+  const [lang, setLang] = useState<Lang>("en");
+
+  if (!isCad) {
     return (
       <div className="rounded-lg border bg-muted/40 p-4 text-sm text-muted-foreground">
-        Bank pay-in requires Plaid for CAD. Contact support if this is unavailable.
+        CAD collection is only available for CAD wallets.
       </div>
     );
   }
 
+  // Prefer Flovide / Fincra Interac when those features are on
+  if (flovideOn || wiseOn) {
+    const amountLabel = `CAD ${amount.toFixed(2)}`;
+    const interacTitle = "Interac (Flovide)";
+    const interacDescription = lang === "fr"
+      ? "Demande Interac Auto Deposit — min. 2,00 $ CAD"
+      : "Interac Auto Deposit request to your email — min. CAD 2.00";
+
+    return (
+      <CheckoutShell
+        lang={lang}
+        onLangChange={setLang}
+        onBack={method ? () => setMethod(null) : onExit}
+        summary={{
+          brandName: "eFinMoney",
+          payeeName: "eFinMoney wallet top-up",
+          amountLabel,
+          description: "Funds are credited to your CAD wallet automatically once the deposit arrives.",
+          lineItem: `CAD wallet top-up (${walletCurrency.toUpperCase()})`,
+        }}
+      >
+        {method === null ? (
+          <CheckoutMethodGrid
+            onChange={setMethod}
+            interacAvailable={flovideOn}
+            cardAvailable={false}
+            wiseAvailable={wiseOn}
+            eftAvailable={false}
+            interacTitle={interacTitle}
+            interacDescription={interacDescription}
+            lang={lang}
+          />
+        ) : method === "interac" ? (
+          <InteracCheckout
+            walletId={walletId}
+            purpose="topup"
+            initialAmount={initialAmount}
+            lang={lang}
+            onComplete={onComplete}
+          />
+        ) : (
+          <WisePayLinkCard
+            walletId={walletId}
+            walletCurrency={walletCurrency}
+            initialAmount={initialAmount}
+            onComplete={onComplete}
+          />
+        )}
+      </CheckoutShell>
+    );
+  }
+
+  // Plaid → Loop Zum-style invoice checkout
+  if (plaidOn) {
+    return (
+      <WiseInteracInvoiceCheckout
+        walletId={walletId}
+        purpose="topup"
+        amount={amount}
+        lineItem="eFinMoney CAD wallet top-up"
+        payeeName="eFinMoney"
+        comment="Thank you for your business"
+        onComplete={onComplete}
+        onExit={onExit}
+      />
+    );
+  }
+
   return (
-    <WiseInteracInvoiceCheckout
-      walletId={walletId}
-      purpose="topup"
-      amount={amount}
-      lineItem="eFinMoney CAD wallet top-up"
-      payeeName="eFinMoney"
-      comment="Thank you for your business"
-      onComplete={onComplete}
-      onExit={onExit}
-    />
+    <div className="rounded-lg border bg-muted/40 p-4 text-sm text-muted-foreground">
+      Bank pay-in requires Flovide Interac or Plaid for CAD. Contact support if this is unavailable.
+    </div>
   );
 }

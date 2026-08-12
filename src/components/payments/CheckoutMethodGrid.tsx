@@ -17,6 +17,9 @@ interface Props {
   wiseAvailable?: boolean;
   /** Loop Billing payment link (EFT pull from Loop dashboard URL). */
   loopBillingAvailable?: boolean;
+  /** Optional Interac row title override (e.g. Flovide). */
+  interacTitle?: string;
+  interacDescription?: string;
   lang?: Lang;
 }
 
@@ -58,6 +61,8 @@ export default function CheckoutMethodGrid({
   eftAvailable = false,
   wiseAvailable = false,
   loopBillingAvailable = false,
+  interacTitle,
+  interacDescription,
   lang = "en",
 }: Props) {
   const t = CHECKOUT_STRINGS[lang];
@@ -67,8 +72,8 @@ export default function CheckoutMethodGrid({
     <div className="divide-y border-t">
       {showInterac && (
         <MethodRow
-          title={t.interac}
-          description={t.interacDesc}
+          title={interacTitle ?? t.interac}
+          description={interacDescription ?? t.interacDesc}
           icon={<Send className="h-5 w-5 text-white" />}
           iconClassName="bg-emerald-500"
           onSelect={() => onChange(plaidAvailable && !interacAvailable ? "plaid" : "interac")}

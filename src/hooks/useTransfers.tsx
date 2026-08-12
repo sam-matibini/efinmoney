@@ -21,7 +21,7 @@ export interface Transfer {
   target_amount: number;
   exchange_rate: number;
   fee_amount: number;
-  status: 'initiated' | 'funded' | 'processing' | 'completed' | 'failed' | 'reversed' | 'expired' | 'pending_liquidity';
+  status: 'initiated' | 'funded' | 'processing' | 'completed' | 'failed' | 'reversed' | 'expired' | 'pending_liquidity' | 'pending_ops';
   provider_reference: string | null;
   failure_reason: string | null;
   completed_at: string | null;

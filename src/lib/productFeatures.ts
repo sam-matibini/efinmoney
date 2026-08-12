@@ -36,6 +36,10 @@ export const productFeatures = {
   fincra: envFlag("VITE_FEATURE_FINCRA", true),
   /** Fincra CAD Interac e-Transfer collections (platform alias + intent matching). */
   fincraInterac: envFlag("VITE_FEATURE_FINCRA_INTERAC", true),
+  /** Flovide (OhentPay) — banks, resolve, FX, NGN/KES/GHS/UGX/CAD payouts. */
+  flovide: envFlag("VITE_FEATURE_FLOVIDE", true),
+  /** Flovide CAD Interac Auto Deposit collect (subset of flovide). */
+  flovideInterac: envFlag("VITE_FEATURE_FLOVIDE_INTERAC", true),
   /** Wise bank-deposit top-up (shared receive account + unique payment reference). */
   wise: envFlag("VITE_FEATURE_WISE", true),
   /** Square Checkout — card top-up for USD/CAD/EUR/GBP. */
@@ -64,7 +68,7 @@ export function isLiveTopupCurrency(currency: string): boolean {
   if (productFeatures.fincra && ["NGN", "GHS", "KES", "UGX", "TZS", "ZMW", "ZAR", "XAF", "XOF", "MWK"].includes(c)) {
     return true;
   }
-  if (productFeatures.fincraInterac && c === "CAD") return true;
+  if ((productFeatures.fincraInterac || productFeatures.flovideInterac || productFeatures.flovide) && c === "CAD") return true;
   if (productFeatures.wise) return true;
   if (productFeatures.swychr && ["XAF", "KES", "XOF", "UGX"].includes(c)) return true;
   if (productFeatures.paytota && ["UGX", "KES", "RWF"].includes(c)) return true;
@@ -79,6 +83,12 @@ export function isLiveTopupCurrency(currency: string): boolean {
 
 export function isLiveSendCorridor(countryCode: string): boolean {
   const code = countryCode.toUpperCase();
+  if (
+    productFeatures.flovide
+    && ["NGN", "NG", "KES", "KE", "GHS", "GH", "UGX", "UG", "CAD", "CA"].includes(code)
+  ) {
+    return true;
+  }
   if (productFeatures.nombaNigeria && (code === "NGN" || code === "NG")) return true;
   if (productFeatures.lenhubFlutter && ["NG", "NGN", "GH", "GHS", "KE", "KES", "UG", "UGX", "TZ", "TZS", "RW", "RWF", "ZM", "ZMW"].includes(code)) {
     return true;

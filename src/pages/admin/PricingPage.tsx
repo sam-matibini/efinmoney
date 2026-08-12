@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Tags, Plus, Trash2, Loader2, Save, X, AlertTriangle, RefreshCw } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -68,9 +69,20 @@ const EMPTY: NewPricingRule = {
 };
 
 export default function PricingPage() {
+  const [params, setParams] = useSearchParams();
+  const tab = params.get("tab") === "rate-card" ? "rate-card" : "partners";
+
   return (
     <div className="max-w-[1400px] mx-auto space-y-4">
-      <Tabs defaultValue="partners" className="space-y-4">
+      <Tabs
+        value={tab}
+        onValueChange={(v) => {
+          const next = new URLSearchParams(params);
+          next.set("tab", v);
+          setParams(next, { replace: true });
+        }}
+        className="space-y-4"
+      >
         <div className="overflow-x-auto pb-2">
           <TabsList className="inline-flex w-auto">
             <TabsTrigger value="rate-card">Rate card</TabsTrigger>

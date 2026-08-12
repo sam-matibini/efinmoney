@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { fetchNombaAccountLookup, isNombaNigeriaConfigured } from "../_shared/nomba-nigeria.ts";
+import { flwV3Fetch } from "../_shared/flw-v3.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -57,34 +58,56 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (!isNombaNigeriaConfigured()) {
-      return new Response(JSON.stringify({
-        error: "Nomba Nigeria not configured (NOMBA_PAY_API_URL / NOMBA_PAY_USER)",
-        source: "nomba",
-      }), { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
+    // 1) Nomba
+    if (isNombaNigeriaConfigured()) {
+      const { accountName, result } = await fetchNombaAccountLookup(accountNumber, bankCode);
+      if (accountName) {
+        return new Response(JSON.stringify({
+          resolved: true,
+          account_name: accountName,
+          account_number: accountNumber,
+          source: "nomba",
+        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
 
-    const { accountName, result } = await fetchNombaAccountLookup(accountNumber, bankCode);
-    if (accountName) {
+      // 2) Flutterwave fallback when Nomba cannot name-match
+      try {
+        const { ok, json } = await flwV3Fetch("/accounts/resolve", {
+          method: "POST",
+          body: JSON.stringify({ account_number: accountNumber, account_bank: bankCode }),
+          timeoutMs: 10_000,
+        });
+        const flwName = ok ? String(json?.data?.account_name || "").trim() : "";
+        if (flwName) {
+          return new Response(JSON.stringify({
+            resolved: true,
+            account_name: flwName,
+            account_number: accountNumber,
+            source: "flutterwave",
+            nomba_error: result.message || null,
+          }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+      } catch {
+        /* ignore FLW errors — soft-fail below */
+      }
+
+      // Soft fail (200) so the client can keep trying other rails / continue unverified
       return new Response(JSON.stringify({
-        resolved: true,
-        account_name: accountName,
+        resolved: false,
+        unverified: true,
         account_number: accountNumber,
+        error: result.message || "Account lookup failed",
+        code: result.code,
         source: "nomba",
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     return new Response(JSON.stringify({
       resolved: false,
-      account_number: accountNumber,
-      error: result.message || "Account lookup failed",
-      code: result.code,
+      unverified: true,
+      error: "Nomba Nigeria not configured (NOMBA_PAY_API_URL / NOMBA_PAY_USER)",
       source: "nomba",
-      nomba_raw: result.json,
-    }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-
-    // Flutterwave fallback disabled while debugging Nomba:
-    // const { ok, json } = await flwV3Fetch("/accounts/resolve", ...);
+    }), { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (err) {
     return new Response(JSON.stringify({ error: err instanceof Error ? err.message : "Unknown" }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },

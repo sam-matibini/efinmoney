@@ -5,6 +5,8 @@ import { dispatchRoutedPayout } from "../_shared/routingExecute.ts";
 import { observeRoute } from "../_shared/routeResolver.ts";
 import { recordEconomics } from "../_shared/transactionEconomics.ts";
 import { assertQuotedFee } from "../_shared/pricingService.ts";
+import { payoutFnForRail, resolveCorridorRails } from "../_shared/corridor-rails.ts";
+import { explainPayoutError, notifyOpsBrief } from "../_shared/ops-alert.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -532,6 +534,18 @@ Deno.serve(async (req) => {
     };
 
     let payoutResult: any = { stub: true };
+    const railsAttempted: string[] = [];
+    const railErrors: string[] = [];
+
+    // Admin corridor board (preferred + optional failover) — takes priority over
+    // hardcoded exclusive corridors when an enabled policy exists.
+    const { policy: payoutPolicy, rails: policyRails } = await resolveCorridorRails(
+      supabase,
+      "payout",
+      targetCurrency,
+      recipientCountry || transfer.recipient_country,
+    );
+    let policyRouted = false;
 
     // Routing engine (Phase 3): only takes over when an operator has switched the
     // active rule to live AND enabled live routing on this corridor. Otherwise the
@@ -550,7 +564,8 @@ Deno.serve(async (req) => {
     let engineRouted = false;
     // Zambia/Kenya MoMo and ops force_rail skip the routing engine — the hardcoded
     // Fincra-first priority chain below owns those corridors.
-    if (!forceFincraOnly && !fincraExclusiveCorridor && !zambiaMomo) {
+    // Admin policy rails also skip the scoring engine (explicit ops choice).
+    if (!forceFincraOnly && !fincraExclusiveCorridor && !zambiaMomo && policyRails.length === 0) {
 
       try {
         const dispatch = await dispatchRoutedPayout(supabase, routeRequest, {
@@ -585,9 +600,93 @@ Deno.serve(async (req) => {
     const payoutOk = (r: any) =>
       r && r.stub !== true && r.success !== false && (r.success === true || r.queued || r.pending_liquidity);
 
+    const holdPendingOps = async (errorMsg: string, attempted: string[]) => {
+      const reason = String(errorMsg || "Payout failed").slice(0, 500);
+      const explained = explainPayoutError(reason);
+      const perRail = railErrors.length
+        ? ` Providers: ${railErrors.join(" | ")}`
+        : "";
+      const humanNote = `${explained.plain} — ${explained.tip}${perRail}`.slice(0, 900);
+      await supabase.from("transfers").update({
+        status: "pending_ops",
+        ops_status: "needs_manual_settlement",
+        ops_note: humanNote,
+        rails_attempted: attempted,
+        failure_reason: (railErrors.join(" | ") || reason).slice(0, 500),
+        ops_alerted_at: new Date().toISOString(),
+      }).eq("id", transfer_id);
+      const bankBits = [
+        transfer.recipient_bank_name,
+        transfer.recipient_bank_code ? `code ${transfer.recipient_bank_code}` : null,
+        transfer.recipient_account,
+      ].filter(Boolean).join(" · ");
+      await notifyOpsBrief({
+        subject: `[Action needed] ${transfer.source_amount} ${transfer.source_currency} payout on hold`,
+        moneyStatus: "held",
+        amount: `${transfer.source_amount} ${transfer.source_currency}`,
+        recipient: String(transfer.recipient_name || ""),
+        corridor: `${transfer.source_currency} → ${targetCurrency}`,
+        country: recipientCountry || transfer.recipient_country || "",
+        transferId: String(transfer_id),
+        providersTried: attempted,
+        policyPreferred: payoutPolicy?.preferred_partner,
+        policyBackups: payoutPolicy?.failover_partners || [],
+        rawError: (railErrors.join(" | ") || reason).slice(0, 500),
+        accountHint: bankBits || undefined,
+      });
+      return {
+        success: true,
+        queued: true,
+        pending_ops: true,
+        message: "Your payment was received. We're finishing delivery to your recipient.",
+        rail: attempted[attempted.length - 1],
+        error: reason,
+        rails_attempted: attempted,
+      };
+    };
+
     try {
       if (engineRouted) {
         // Routing engine already executed the payout.
+      } else if (!forceFincraOnly && policyRails.length > 0) {
+        // Admin corridor board: preferred first, then optional failover list only.
+        policyRouted = true;
+        for (const rail of policyRails) {
+          if (payoutOk(payoutResult)) break;
+          const fn = payoutFnForRail(rail);
+          if (!fn) {
+            railsAttempted.push(rail);
+            payoutResult = { success: false, error: `No payout function for rail ${rail}`, rail };
+            continue;
+          }
+          railsAttempted.push(rail);
+          await supabase.from("transfers").update({
+            provider_charge_id: `rail:${rail}`,
+            provider_reference: rail === "fincra"
+              ? `FINCRA-PENDING-${String(transfer_id).slice(0, 8)}`
+              : null,
+          }).eq("id", transfer_id);
+          const body = rail === "fincra"
+            ? { ...flwBody(), skip_reversal: true }
+            : { ...flwBody(), transfer_id };
+          const res = await fetch(
+            `${Deno.env.get("SUPABASE_URL")}/functions/v1/${fn}`,
+            { method: "POST", headers: internalHeaders, body: JSON.stringify(body) },
+          );
+          const rJson = await res.json().catch(() => ({
+            success: false,
+            error: `${fn} HTTP ${res.status}`,
+          }));
+          payoutResult = { ...rJson, rail, priority_chain: [...railsAttempted] };
+          if (!payoutOk(payoutResult)) {
+            const err = String(rJson?.error || rJson?.message || `${fn} failed`);
+            railErrors.push(`${rail}: ${err}`);
+            await supabase.from("transfers").update({
+              provider_charge_id: null,
+              provider_reference: null,
+            }).eq("id", transfer_id);
+          }
+        }
       } else if (forceFincraOnly || fincraExclusiveCorridor) {
         // Zambia + Kenya + Ghana MoMo (and ops force_rail): Fincra only — no FLW/Ghana Pay failover.
         // Ledger reverses inside fincra-payout when skip_reversal is false.
@@ -623,6 +722,36 @@ Deno.serve(async (req) => {
             rail: "fincra",
             force_rail: forceFincraOnly ? "fincra_only" : "fincra_exclusive",
           };
+          // Flovide failover for KE/GH/UG MoMo when Fincra declines / is down.
+          const flovideExclusiveFailover =
+            isKenya || isGhana
+            || targetCurrency === "KES"
+            || targetCurrency === "GHS"
+            || targetCurrency === "UGX";
+          if (
+            !payoutOk(payoutResult)
+            && !forceFincraOnly
+            && !zambiaMomo
+            && flovideExclusiveFailover
+            && Deno.env.get("FLOVIDE_PUBLIC_KEY")?.trim()
+            && Deno.env.get("FLOVIDE_SECRET_KEY")?.trim()
+          ) {
+            const fvRes = await fetch(
+              `${Deno.env.get("SUPABASE_URL")}/functions/v1/flovide-payout`,
+              {
+                method: "POST",
+                headers: internalHeaders,
+                body: JSON.stringify({ ...flwBody(), transfer_id }),
+              },
+            );
+            const fvJson = await fvRes.json().catch(() => ({
+              success: false,
+              error: `flovide-payout HTTP ${fvRes.status}`,
+            }));
+            if (payoutOk(fvJson)) {
+              payoutResult = { ...fvJson, rail: "flovide", priority_chain: ["fincra", "flovide"] };
+            }
+          }
         }
       } else if (usePawapay) {
         const res = await fetch(
@@ -689,21 +818,43 @@ Deno.serve(async (req) => {
         );
         payoutResult = await res.json();
       } else if (isCanada) {
-        const fnName = transfer.payout_method === "stripe_connect"
-          ? "stripe-connect-instant-payout"
-          : "paysafe-payout";
-        const res = await fetch(
-          `${Deno.env.get("SUPABASE_URL")}/functions/v1/${fnName}`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-internal-secret": Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "",
-            },
-            body: JSON.stringify({ transfer_id }),
-          },
+        const flovideReady = !!(
+          Deno.env.get("FLOVIDE_PUBLIC_KEY")?.trim()
+          && Deno.env.get("FLOVIDE_SECRET_KEY")?.trim()
         );
-        payoutResult = await res.json();
+        const wantInterac = String(transfer.payout_method || "").toLowerCase().includes("interac");
+        if (flovideReady && wantInterac) {
+          const fvRes = await fetch(
+            `${Deno.env.get("SUPABASE_URL")}/functions/v1/flovide-payout`,
+            {
+              method: "POST",
+              headers: internalHeaders,
+              body: JSON.stringify({ transfer_id }),
+            },
+          );
+          payoutResult = await fvRes.json().catch(() => ({
+            success: false,
+            error: `flovide-payout HTTP ${fvRes.status}`,
+            rail: "flovide",
+          }));
+        }
+        if (!payoutOk(payoutResult)) {
+          const fnName = transfer.payout_method === "stripe_connect"
+            ? "stripe-connect-instant-payout"
+            : "paysafe-payout";
+          const res = await fetch(
+            `${Deno.env.get("SUPABASE_URL")}/functions/v1/${fnName}`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "x-internal-secret": Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "",
+              },
+              body: JSON.stringify({ transfer_id }),
+            },
+          );
+          payoutResult = await res.json();
+        }
       } else if (fincraCapable) {
         // Fixed priority: Fincra → Elicate (ZMW) → Flutterwave → Lenhub → Nomba → Paytota → Swychr
         const attempts: string[] = [];
@@ -756,7 +907,33 @@ Deno.serve(async (req) => {
         };
 
 
-        // 1) Fincra (primary partner for Zambia ZMW mobile money)
+        // 1) Fincra (primary for Zambia ZMW + most MoMo)
+        // For NGN bank, try Flovide first when live keys exist (CAD/NGN treasury), then Fincra.
+        const flovideKeys = !!(
+          Deno.env.get("FLOVIDE_PUBLIC_KEY")?.trim()
+          && Deno.env.get("FLOVIDE_SECRET_KEY")?.trim()
+        );
+        const flovideFirstNgn = flovideKeys && isNigeriaBank && Deno.env.get("FLOVIDE_PAYOUT_FIRST") !== "false";
+
+        if (flovideFirstNgn) {
+          await tryNext("flovide", async () => {
+            const fvRes = await fetch(
+              `${Deno.env.get("SUPABASE_URL")}/functions/v1/flovide-payout`,
+              {
+                method: "POST",
+                headers: internalHeaders,
+                body: JSON.stringify({ ...flwBody(), transfer_id }),
+              },
+            );
+            return fvRes.json().catch(() => ({
+              success: false,
+              error: `flovide-payout HTTP ${fvRes.status}`,
+              rail: "flovide",
+            }));
+          });
+        }
+
+        // 1b) Fincra
         if (!fincraConfigured) {
           console.error(
             "fincra rail skipped: FINCRA_SECRET_KEY/FINCRA_BUSINESS_ID not configured",
@@ -801,6 +978,29 @@ Deno.serve(async (req) => {
               provider_reference: null,
             }).eq("id", transfer_id);
           }
+        }
+
+        // 1c) Flovide — NGN bank (if not already first) / KES-GHS-UGX MoMo when Fincra misses
+        if (
+          flovideKeys
+          && !flovideFirstNgn
+          && (isNigeriaBank || ["KES", "GHS", "UGX"].includes(targetCurrency))
+        ) {
+          await tryNext("flovide", async () => {
+            const fvRes = await fetch(
+              `${Deno.env.get("SUPABASE_URL")}/functions/v1/flovide-payout`,
+              {
+                method: "POST",
+                headers: internalHeaders,
+                body: JSON.stringify({ ...flwBody(), transfer_id }),
+              },
+            );
+            return fvRes.json().catch(() => ({
+              success: false,
+              error: `flovide-payout HTTP ${fvRes.status}`,
+              rail: "flovide",
+            }));
+          });
         }
 
         // 2) Flutterwave — never for Zambia ZMW (Fincra-only corridor).
@@ -943,47 +1143,43 @@ Deno.serve(async (req) => {
       };
     }
 
-    // Priority chain used skip_reversal on Fincra — refund wallet if every rail failed.
-    // force_rail / fincra_exclusive already reverse inside fincra-payout (skip_reversal: false).
+    // If every rail failed, HOLD funds for ops (no auto-refund).
+    // Admin refunds or retries from /admin/ops-queue.
     if (
-      !engineRouted
-      && !forceFincraOnly
-      && !fincraExclusiveCorridor
-      && fincraCapable
-      && payoutResult
+      payoutResult
       && payoutResult.success === false
       && !payoutResult.pending_liquidity
       && !payoutResult.queued
+      && !payoutResult.pending_ops
     ) {
-      try {
-        const { data: existingRev } = await supabase.from("ledger_entries").select("id")
-          .eq("reference_type", "transfer_reversal").eq("reference_id", transfer_id).limit(1);
-        if (!existingRev?.length) {
-          const { data: originals } = await supabase.from("ledger_entries")
-            .select("account_id, wallet_id, currency_code, debit_amount, credit_amount, description")
-            .eq("reference_type", "transfer").eq("reference_id", transfer_id);
-          if (originals?.length) {
-            const j = crypto.randomUUID();
-            await supabase.from("ledger_entries").insert(originals.map((o) => ({
-              journal_id: j,
-              account_id: o.account_id,
-              wallet_id: o.wallet_id,
-              currency_code: o.currency_code,
-              debit_amount: o.credit_amount,
-              credit_amount: o.debit_amount,
-              description: `REVERSAL: ${o.description ?? ""}`.slice(0, 500),
-              reference_type: "transfer_reversal",
-              reference_id: transfer_id,
-            })));
-            payoutResult = { ...payoutResult, refunded: true };
-          }
-        }
+      const attempted = Array.isArray(payoutResult.priority_chain) && payoutResult.priority_chain.length
+        ? payoutResult.priority_chain as string[]
+        : (railsAttempted.length ? railsAttempted : [String(payoutResult.rail || "unknown")]);
+      // Exclusive Fincra path may already have reversed inside fincra-payout —
+      // still surface as ops alert but mark failed if already refunded.
+      if (payoutResult.refunded === true || forceFincraOnly) {
+        await notifyOpsBrief({
+          subject: `[FYI] ${transfer.source_amount} ${transfer.source_currency} payout failed — customer refunded`,
+          moneyStatus: "refunded",
+          amount: `${transfer.source_amount} ${transfer.source_currency}`,
+          recipient: String(transfer.recipient_name || ""),
+          corridor: `${transfer.source_currency} → ${targetCurrency}`,
+          country: recipientCountry || transfer.recipient_country || "",
+          transferId: String(transfer_id),
+          providersTried: attempted,
+          policyPreferred: payoutPolicy?.preferred_partner,
+          policyBackups: payoutPolicy?.failover_partners || [],
+          rawError: String(payoutResult.error || ""),
+        });
         await supabase.from("transfers").update({
           status: "failed",
           failure_reason: String(payoutResult.error || "Payout failed").slice(0, 500),
         }).eq("id", transfer_id);
-      } catch (revErr) {
-        console.error("priority-chain reversal failed", revErr);
+      } else {
+        payoutResult = await holdPendingOps(
+          String(payoutResult.error || payoutResult.provider_message || "Payout failed"),
+          attempted,
+        );
       }
     }
 
@@ -1019,39 +1215,20 @@ Deno.serve(async (req) => {
     }
 
 
-    // Never leave the client with a fake success when no payout rail ran.
+    // Never leave the client with a fake success when no payout rail ran — hold for ops.
     if (payoutResult?.stub === true && payoutResult?.success !== true) {
       const reason = "Payout provider did not accept this transfer. Please try again or use another rail.";
-      try {
-        const { data: existingRev } = await supabase.from("ledger_entries").select("id")
-          .eq("reference_type", "transfer_reversal").eq("reference_id", transfer_id).limit(1);
-        if (!existingRev?.length) {
-          const { data: originals } = await supabase.from("ledger_entries")
-            .select("account_id, wallet_id, currency_code, debit_amount, credit_amount, description")
-            .eq("reference_type", "transfer").eq("reference_id", transfer_id);
-          if (originals?.length) {
-            const j = crypto.randomUUID();
-            await supabase.from("ledger_entries").insert(originals.map((o) => ({
-              journal_id: j,
-              account_id: o.account_id,
-              wallet_id: o.wallet_id,
-              currency_code: o.currency_code,
-              debit_amount: o.credit_amount,
-              credit_amount: o.debit_amount,
-              description: `REVERSAL: ${o.description ?? ""}`.slice(0, 500),
-              reference_type: "transfer_reversal",
-              reference_id: transfer_id,
-            })));
-          }
-        }
-      } catch (revErr) {
-        console.error("stub-path reversal failed", revErr);
-      }
-      await supabase.from("transfers").update({
-        status: "failed",
-        failure_reason: reason.slice(0, 500),
-      }).eq("id", transfer_id);
-      payoutResult = { success: false, error: reason, code: "payout_stub", refunded: true };
+      payoutResult = await holdPendingOps(reason, railsAttempted.length ? railsAttempted : ["stub"]);
+    }
+
+    if (payoutResult?.pending_ops) {
+      return new Response(JSON.stringify({
+        success: true,
+        queued: true,
+        pending_ops: true,
+        message: payoutResult.message || "Your payment was received. We're finishing delivery to your recipient.",
+        payout: payoutResult,
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     if (payoutResult && payoutResult.success === false && !payoutResult.pending_liquidity && !payoutResult.queued) {

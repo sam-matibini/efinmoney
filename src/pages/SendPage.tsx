@@ -35,11 +35,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { usePriceQuote } from "@/hooks/usePriceQuote";
 import { fetchFxRate, cardChargeCurrency, initializeFlwPayment, verifyFlwPayment } from "@/lib/flutterwave";
 import {
-  getNigeriaBanks,
-  resolveNigeriaAccount,
-  getNombaExchangeRate,
+  getCorridorBanks,
+  resolveCorridorAccount,
+  getFlovideOrNombaRate,
   isNgnPair,
-} from "@/lib/nombaNigeria";
+} from "@/lib/flovide";
 import { resolveEffectiveRate } from "@/lib/fx";
 import { currencySymbol, countryToCurrency } from "@/lib/currency";
 import { useProfile } from "@/hooks/useProfile";
@@ -432,7 +432,7 @@ const SendPage = () => {
     let cancelled = false;
     (async () => {
       try {
-        const { banks } = await getNigeriaBanks();
+        const { banks } = await getCorridorBanks("NGN");
         if (cancelled) return;
         setNgnBanks(banks.map((b) => ({ code: b.code, name: b.name })));
       } catch (e) {
@@ -479,9 +479,10 @@ const SendPage = () => {
     setNgnResolving(true);
     (async () => {
       try {
-        const data = await resolveNigeriaAccount(
+        const data = await resolveCorridorAccount(
           ngnAccountNumber.replace(/\D/g, ""),
           ngnBankCode,
+          "NGN",
         );
         if (cancelled) return;
         if (data?.resolved && data.account_name) {
@@ -519,11 +520,17 @@ const SendPage = () => {
     staleTime: 60_000,
   });
   const { data: nombaFxQuote } = useQuery({
-    queryKey: ["nomba-fx", sourceCurrency, targetCountry.code],
-    queryFn: () => getNombaExchangeRate(sourceCurrency, targetCountry.code),
+    queryKey: ["corridor-fx", sourceCurrency, targetCountry.code],
+    queryFn: () => getFlovideOrNombaRate(sourceCurrency, targetCountry.code),
     enabled:
       !isSameCurrency
-      && isNgnPair(sourceCurrency, targetCountry.code)
+      && (
+        isNgnPair(sourceCurrency, targetCountry.code)
+        || (
+          ["CAD", "USD", "GBP", "EUR", "NGN", "GHS", "KES", "UGX"].includes(sourceCurrency)
+          && ["CAD", "USD", "GBP", "EUR", "NGN", "GHS", "KES", "UGX"].includes(targetCountry.code)
+        )
+      )
       && testSendFxRate(sourceCurrency, targetCountry.code) == null,
     staleTime: 60_000,
   });
@@ -807,6 +814,18 @@ const SendPage = () => {
         ? selectedWallet!.wallet_id
         : wallets?.[0]?.wallet_id || "");
     const destCurrency = overrides?.target_currency ?? targetCountry.code;
+    // Store ISO2 country (NG), never currency (NGN) — corridor rail policies key off ISO2.
+    const isoFromCurrency: Record<string, string> = {
+      NGN: "NG", GHS: "GH", KES: "KE", UGX: "UG", TZS: "TZ", RWF: "RW",
+      ZMW: "ZM", ZAR: "ZA", CAD: "CA", USD: "US", GBP: "GB", EUR: "DE",
+      XOF: "SN", XAF: "CM", MWK: "MW",
+    };
+    const rawCountry = (overrides?.recipient_country || "").trim().toUpperCase();
+    const destCountryIso =
+      (rawCountry.length === 2 ? rawCountry : null)
+      || isoFromCurrency[rawCountry]
+      || isoFromCurrency[destCurrency]
+      || destCurrency;
     const transfer = await createTransfer.mutateAsync({
       sender_wallet_id: walletId,
       recipient_name: overrides?.recipient_name ?? recipientName,
@@ -814,7 +833,7 @@ const SendPage = () => {
       recipient_account: overrides?.recipient_account ?? (isBankPayout ? bankAcct : undefined),
       recipient_bank_code: overrides?.recipient_bank_code ?? (isBankPayout ? bankCode : undefined),
       recipient_bank_name: overrides?.recipient_bank_name ?? (isBankPayout ? (bankName || undefined) : undefined),
-      recipient_country: overrides?.recipient_country ?? destCurrency,
+      recipient_country: destCountryIso,
       transfer_type: overrides?.transfer_type ?? (isBankPayout ? "bank" : "mobile_money"),
       payout_method: overrides?.payout_method ?? (isBankPayout ? "bank" : effectivePayoutMethod),
       source_currency: overrides?.source_currency ?? sourceCurrency,
@@ -1017,7 +1036,7 @@ const SendPage = () => {
           }
         } else {
           toast.success(
-            data?.pending_liquidity || data?.queued || payout?.queued || payout?.pending_liquidity
+            data?.pending_liquidity || data?.queued || data?.pending_ops || payout?.queued || payout?.pending_liquidity || payout?.pending_ops
               ? 'Payment received — completing delivery to your recipient'
               : 'Transfer sent successfully!',
           );
@@ -1886,7 +1905,10 @@ const SendPage = () => {
           recipient_account: intent.recipientAccount,
           recipient_bank_code: intent.recipientBankCode,
           recipient_bank_name: intent.recipientBankName,
-          recipient_country: intent.targetCurrency,
+          recipient_country: ({
+            NGN: "NG", GHS: "GH", KES: "KE", UGX: "UG", TZS: "TZ", RWF: "RW",
+            ZMW: "ZM", ZAR: "ZA", CAD: "CA", USD: "US", GBP: "GB", EUR: "DE",
+          } as Record<string, string>)[intent.targetCurrency] || intent.recipientCountryHint || intent.targetCurrency,
           transfer_type: intent.transferType,
           payout_method: intent.payoutMethod,
         });
@@ -2606,10 +2628,10 @@ const SendPage = () => {
                                             className="transition-shadow focus-visible:ring-2 focus-visible:ring-primary/40"
                                           />
                                           {ngnResolving && (
-                                            <p className="text-sm text-muted-foreground inline-flex items-center gap-2">
+                                            <div className="text-sm text-muted-foreground inline-flex items-center gap-2">
                                               <LoadingSpinner size={12} />
                                               Verifying account…
-                                            </p>
+                                            </div>
                                           )}
                                           {ngnResolvedName && !ngnResolving && (
                                             <p className="text-sm text-primary inline-flex items-center gap-1">
@@ -2617,8 +2639,9 @@ const SendPage = () => {
                                             </p>
                                           )}
                                           {ngnResolveError && !ngnResolving && (
-                                            <p className="text-sm text-destructive inline-flex items-center gap-1">
-                                              <AlertCircle className="w-3.5 h-3.5" /> {ngnResolveError}
+                                            <p className="text-sm text-amber-600 dark:text-amber-500 inline-flex items-start gap-1">
+                                              <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                                              <span>{ngnResolveError}</span>
                                             </p>
                                           )}
                                           <p className="text-xs text-muted-foreground">Funds will be deposited directly to the bank account above.</p>

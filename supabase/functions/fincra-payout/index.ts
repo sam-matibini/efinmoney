@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { fincraFetch, getFincraConfig } from "../_shared/fincra.ts";
+import { ngBankCodeCandidates } from "../_shared/ng-bank-codes.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -252,6 +253,22 @@ function fundingCandidates(preferred: string, dest: string): string[] {
       : allowed;
     return list;
   }
+  // Same-currency NGN bank payouts: stay on NGN only. Wandering into USD/GHS/KES
+  // produced "Quote HTTP 404" and masked the real NGN bank failure.
+  if (dest === "NGN") {
+    const list = [preferred === "NGN" ? "NGN" : preferred, "NGN", ...extras.filter((c) => c === "USD")];
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const c of list) {
+      if (!c || seen.has(c)) continue;
+      // Only allow NGN (and optional USD if explicitly in extras / preferred)
+      if (c !== "NGN" && c !== "USD") continue;
+      if (c === "USD" && preferred !== "USD" && !extras.includes("USD")) continue;
+      seen.add(c);
+      out.push(c);
+    }
+    return out.length ? out : ["NGN"];
+  }
   // MoMo corridors: don't wander into random wallets that can't fund the quote.
   const defaults = ["KES", "GHS"].includes(dest)
     ? ["NGN", "USD", dest]
@@ -272,7 +289,10 @@ function isUnsupportedFundingError(message: string): boolean {
   const m = message.toLowerCase();
   return m.includes("no currency supported")
     || m.includes("currency not supported")
-    || m.includes("unsupported currency");
+    || m.includes("unsupported currency")
+    || m.includes("quote http 404")
+    || (m.includes("quote") && m.includes("404"))
+    || m.includes("quote") && m.includes("not found");
 }
 
 type QuoteResult = {
@@ -435,16 +455,23 @@ Deno.serve(async (req) => {
     let accountVariants: string[] = [];
 
     if (hasBankRail) {
+      const storedCode = String(bank_code);
+      const storedName = String(transfer.recipient_bank_name || "");
+      // Try primary code first, then known aliases (e.g. OPay 100004 / 305).
+      const codeVariants = ngBankCodeCandidates(storedCode, storedName);
       beneficiaryBase = {
         firstName,
         lastName,
         type: "individual",
         accountHolderName: recipient_name || transfer.recipient_name,
         accountNumber: String(account_number).replace(/\D/g, ""),
-        bankCode: String(bank_code),
+        bankCode: codeVariants[0] || storedCode,
         country: CURRENCY_TO_COUNTRY[ccy] || undefined,
       };
       accountVariants = [String(account_number).replace(/\D/g, "")];
+      // Also try alternate bank codes as separate outer attempts via networkVariants-style list
+      // by expanding bankCode on each funding attempt below when payout fails.
+      (beneficiaryBase as Record<string, unknown>)._bankCodeVariants = codeVariants;
     } else {
       mmCode = FINCRA_MM_CODE[`${ccy}:${network.toLowerCase()}`] || null;
       if (!mmCode) {
@@ -518,6 +545,11 @@ Deno.serve(async (req) => {
     let outageClass: FincraErrorClass | null = null;
 
     let attemptNo = 0;
+    const bankCodeVariants: string[] = hasBankRail
+      ? ((beneficiaryBase as Record<string, unknown>)._bankCodeVariants as string[] || [String(bank_code)])
+      : [null as unknown as string];
+    delete (beneficiaryBase as Record<string, unknown>)._bankCodeVariants;
+
     for (const sourceCurrency of candidates) {
       if (successJson || outageClass) break;
       const cross = sourceCurrency !== ccy;
@@ -525,13 +557,15 @@ Deno.serve(async (req) => {
       for (const netCode of (networkVariants.length ? networkVariants : [null])) {
         if (successJson || outageClass) break;
 
+        for (const bankCodeTry of (hasBankRail ? bankCodeVariants : [null])) {
+          if (successJson || outageClass) break;
 
         for (const accountNumber of accountVariants) {
           attemptNo += 1;
           // Unique per attempt — Fincra rejects reuse of the same customerReference after a failed create.
           const customerReference = attemptNo === 1 ? transfer_id : `${transfer_id}__${attemptNo}`;
           const beneficiary = hasBankRail
-            ? { ...beneficiaryBase, accountNumber }
+            ? { ...beneficiaryBase, accountNumber, bankCode: bankCodeTry || beneficiaryBase.bankCode }
             : {
               ...beneficiaryBase,
               accountNumber,
@@ -552,8 +586,8 @@ Deno.serve(async (req) => {
             });
             if (!q.ok) {
               attemptErrors.push(`${sourceCurrency}->${ccy} quote: ${q.error}`);
-              // Don't bury a real NGN payout failure under later "RWF not supported".
-              if (!isUnsupportedFundingError(q.error)) {
+              // Never let a later quote miss overwrite a real same-currency bank error.
+              if (!isUnsupportedFundingError(q.error) && !attemptErrors.some((a) => a.includes(`${ccy}->${ccy}`))) {
                 lastReason = q.error;
               }
               // Skip this funding currency entirely.
@@ -618,7 +652,9 @@ Deno.serve(async (req) => {
             reason = `${reason} [fincra:${outcome.status || "failed"} ref=${d.reference || outcome.data.reference || "?"}]`;
           }
 
-          attemptErrors.push(`${sourceCurrency}->${ccy} net=${netCode || mmCode} acct=${accountNumber}: ${reason}`);
+          attemptErrors.push(
+            `${sourceCurrency}->${ccy} bank=${bankCodeTry || mmCode || "—"} acct=${accountNumber}: ${reason}`,
+          );
           lastReason = reason;
 
           const cls = classifyFincraError(reason);
@@ -641,19 +677,23 @@ Deno.serve(async (req) => {
           if (isFincraBalanceError(reason) || isUnsupportedFundingError(reason)) {
             break;
           }
-          // Other hard errors — try next network once, else stop this funding wallet.
+          // Other hard errors — try next bank-code / network once, else stop this funding wallet.
           break;
 
-        }
+        } // accountNumber
+        } // bankCodeTry
         if (isFincraBalanceError(lastReason)) break;
       }
     }
 
     if (!successJson) {
-      // Prefer the most useful attempt line over a later "RWF not supported" quote error.
+      // Prefer real bank/payout failures over later cross-currency quote noise.
       const bestAttempt = [...attemptErrors].reverse().find((a) =>
         a.includes("fincra:failed") || isFincraTransientPayoutError(a) || isFincraAccountNumberError(a)
-      ) || attemptErrors[attemptErrors.length - 1] || lastReason;
+      ) || attemptErrors.find((a) => a.includes(`${ccy}->${ccy}`) && !a.includes("quote:"))
+        || attemptErrors.find((a) => !a.includes("quote:"))
+        || attemptErrors[attemptErrors.length - 1]
+        || lastReason;
       const reason = bestAttempt.includes(": ")
         ? bestAttempt.slice(bestAttempt.indexOf(": ") + 2)
         : lastReason;

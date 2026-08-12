@@ -1,6 +1,6 @@
 import { ReactNode, Suspense, useEffect, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
-import { ChevronDown, LayoutDashboard, ShieldCheck, Users, Layers, ScrollText, Settings, Bell, Search, LogOut, ChevronLeft, ChevronRight, Sun, Moon, Activity, ExternalLink, SlidersHorizontal, UserCog, Gauge, AlertCircle, FileText, Eye, ShieldAlert, Shield, ClipboardList, Ban, UserX, Building2, FileWarning, GraduationCap, Landmark, Globe, ArrowLeftRight, Banknote, RefreshCw, TrendingUp, Zap, BookOpen, BarChart2, Scale, CalendarCheck, Archive, PanelLeft, Wallet, Cog, Megaphone, Headphones, Tags, Code2, UserPlus, Briefcase, ListChecks, CircleUser } from "lucide-react";
+import { ChevronDown, LayoutDashboard, ShieldCheck, Users, Layers, ScrollText, Settings, Bell, Search, LogOut, ChevronLeft, ChevronRight, Sun, Moon, Activity, ExternalLink, SlidersHorizontal, UserCog, Gauge, AlertCircle, FileText, Eye, ShieldAlert, Shield, ClipboardList, Ban, UserX, Building2, FileWarning, GraduationCap, Landmark, Globe, ArrowLeftRight, Banknote, RefreshCw, TrendingUp, Zap, BookOpen, BarChart2, Scale, CalendarCheck, Archive, PanelLeft, Wallet, Cog, Megaphone, Headphones, Tags, Code2, UserPlus, Briefcase, ListChecks, CircleUser, Route, CreditCard } from "lucide-react";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +28,10 @@ type NavGroup = {
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   items: NavItem[];
+  /** Open by default so key ops stay visible without hunting */
+  defaultOpen?: boolean;
+  /** Slightly stronger header styling for high-traffic sections */
+  emphasize?: boolean;
 };
 
 const TOP_NAV: NavItem[] = [
@@ -37,6 +41,18 @@ const TOP_NAV: NavItem[] = [
 ];
 
 const NAV_GROUPS: NavGroup[] = [
+  {
+    label: "Payments",
+    icon: CreditCard,
+    defaultOpen: true,
+    emphasize: true,
+    items: [
+      { to: "/admin/pricing?tab=partners", label: "Corridor rails", icon: Route },
+      { to: "/admin/ops-queue", label: "Ops queue", icon: Scale },
+      { to: "/admin/pricing?tab=rate-card", label: "Rate card", icon: Tags },
+      { to: "/admin/api", label: "Payment APIs", icon: Settings },
+    ],
+  },
   {
     label: "Queue", icon: Layers, items: [
       { to: "/admin/kyc", label: "KYC Queue", icon: ShieldCheck },
@@ -54,7 +70,6 @@ const NAV_GROUPS: NavGroup[] = [
     label: "Finance", icon: Wallet, items: [
       { to: "/admin/finance", label: "Finance", icon: Wallet },
       { to: "/admin/revenue", label: "Revenue", icon: TrendingUp },
-      { to: "/admin/pricing", label: "Pricing", icon: Tags },
       { to: "/admin/payroll", label: "Payroll", icon: Banknote },
       { to: "/admin/settlement-reconciliation", label: "Settlement Rec.", icon: Scale },
       { to: "/admin/period-end-controls", label: "Period-End", icon: CalendarCheck },
@@ -140,7 +155,7 @@ const ROLE_NAV_GROUPS: Record<string, ReadonlySet<string>> = {
     "Users", "Queue", "Compliance", "Screening", "Monitoring", "Audit & Reporting",
   ]),
   finance_officer: new Set([
-    "Users", "Finance", "Audit & Reporting",
+    "Payments", "Users", "Finance", "Audit & Reporting",
   ]),
   support_agent: new Set([
     "Users", "Operations",
@@ -149,6 +164,33 @@ const ROLE_NAV_GROUPS: Record<string, ReadonlySet<string>> = {
     "Users", "Audit & Reporting",
   ]),
 };
+
+function navPath(to: string) {
+  const q = to.indexOf("?");
+  return q === -1 ? to : to.slice(0, q);
+}
+
+function navSearchParams(to: string) {
+  const q = to.indexOf("?");
+  return q === -1 ? null : new URLSearchParams(to.slice(q + 1));
+}
+
+function isNavItemActive(pathname: string, search: string, to: string) {
+  const path = navPath(to);
+  if (pathname !== path && !pathname.startsWith(path + "/")) return false;
+  const want = navSearchParams(to);
+  if (!want) return true;
+  const have = new URLSearchParams(search);
+  for (const [key, value] of want.entries()) {
+    const current = have.get(key);
+    // Pricing defaults to Partners & Routing (Corridor rails) when ?tab is omitted
+    if (path === "/admin/pricing" && key === "tab" && value === "partners" && !current) {
+      continue;
+    }
+    if (current !== value) return false;
+  }
+  return true;
+}
 
 const AdminLayout = ({ children }: { children: ReactNode }) => {
   const { admin, signOut, hasPermission } = useAdminAuth();
@@ -161,10 +203,14 @@ const AdminLayout = ({ children }: { children: ReactNode }) => {
   const [search, setSearch] = useState("");
   const [navSearch, setNavSearch] = useState("");
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>(() => {
+    const defaults: Record<string, boolean> = {};
+    for (const group of NAV_GROUPS) {
+      if (group.defaultOpen) defaults[group.label] = true;
+    }
     try {
-      return JSON.parse(localStorage.getItem("admin-nav-sections") || "{}");
+      return { ...defaults, ...JSON.parse(localStorage.getItem("admin-nav-sections") || "{}") };
     } catch {
-      return {};
+      return defaults;
     }
   });
 
@@ -176,15 +222,17 @@ const AdminLayout = ({ children }: { children: ReactNode }) => {
   // Auto-expand active section on navigation
   useEffect(() => {
     for (const group of NAV_GROUPS) {
-      const isActive = group.items.some(
-        (item) => location.pathname === item.to || location.pathname.startsWith(item.to + "/")
+      const isActive = group.items.some((item) =>
+        isNavItemActive(location.pathname, location.search, item.to)
+        || location.pathname === navPath(item.to)
+        || location.pathname.startsWith(navPath(item.to) + "/")
       );
       if (isActive && !expandedSections[group.label]) {
         setExpandedSections((prev) => ({ ...prev, [group.label]: true }));
         break;
       }
     }
-  }, [location.pathname]);
+  }, [location.pathname, location.search]);
 
   // Notifications query
   const { data: notifications = [] } = useQuery({
@@ -297,8 +345,8 @@ const AdminLayout = ({ children }: { children: ReactNode }) => {
 
   const renderNavItem = (item: NavItem) => {
     const Icon = item.icon;
-    const active = location.pathname === item.to || location.pathname.startsWith(item.to + "/");
-    const badge = item.to === "/admin/kyc" && pendingKycCount > 0 ? pendingKycCount : null;
+    const active = isNavItemActive(location.pathname, location.search, item.to);
+    const badge = navPath(item.to) === "/admin/kyc" && pendingKycCount > 0 ? pendingKycCount : null;
     const visible =
       (!item.requiresStaffMgmt || hasPermission("manage_staff")) &&
       (!item.requiresDeveloperOnboarding || hasPermission("developer_onboarding"));
@@ -342,7 +390,7 @@ const AdminLayout = ({ children }: { children: ReactNode }) => {
       : group.items;
     if (navSearch && filteredItems.length === 0) return null;
 
-    const isExpanded = navSearch ? true : (expandedSections[group.label] ?? false);
+    const isExpanded = navSearch ? true : (expandedSections[group.label] ?? group.defaultOpen ?? false);
     const GroupIcon = group.icon;
     const kycBadge = group.label === "Queue" && pendingKycCount > 0 ? pendingKycCount : null;
 
@@ -354,7 +402,7 @@ const AdminLayout = ({ children }: { children: ReactNode }) => {
     if (visibleItems.length === 0) return null;
 
     return (
-      <div key={group.label}>
+      <div key={group.label} className={cn(group.emphasize && !collapsed && "rounded-xl bg-sidebar-accent/40 p-1.5 mb-1")}>
         <button
           onClick={() => {
             if (!navSearch) {
@@ -365,7 +413,9 @@ const AdminLayout = ({ children }: { children: ReactNode }) => {
             "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors",
             collapsed
               ? "justify-center text-muted-foreground hover:text-foreground hover:bg-sidebar-accent relative"
-              : "text-muted-foreground hover:text-foreground hover:bg-sidebar-accent"
+              : group.emphasize
+                ? "text-sidebar-foreground hover:bg-sidebar-accent"
+                : "text-muted-foreground hover:text-foreground hover:bg-sidebar-accent"
           )}
         >
           <GroupIcon className="w-4 h-4 shrink-0" />

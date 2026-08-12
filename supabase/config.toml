@@ -262,6 +262,36 @@ verify_jwt = true
 [functions.wise-cad-interac]
 verify_jwt = true
 
+[functions.flovide-cad-interac]
+verify_jwt = true
+
+[functions.flovide-payout]
+verify_jwt = false
+
+[functions.flovide-webhook]
+verify_jwt = false
+
+[functions.flovide-api-smoke]
+verify_jwt = false
+
+[functions.flovide-get-banks]
+verify_jwt = true
+
+[functions.flovide-resolve-account]
+verify_jwt = true
+
+[functions.flovide-rates]
+verify_jwt = true
+
+[functions.flovide-reconcile]
+verify_jwt = false
+
+[functions.ops-settle]
+verify_jwt = false
+
+[functions.ops-alert]
+verify_jwt = false
+
 [functions.fincra-payout]
 verify_jwt = false
 

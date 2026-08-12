@@ -24,15 +24,17 @@ import PartnerScorecardsPanel from "./partners/PartnerScorecardsPanel";
 import CorridorForecastPanel from "./partners/CorridorForecastPanel";
 import LiquidityForecastPanel from "./partners/LiquidityForecastPanel";
 import PartnerIncidentsPanel from "./partners/PartnerIncidentsPanel";
+import CorridorRailsPanel from "./partners/CorridorRailsPanel";
 import ApiPartnersPanel from "./partners/ApiPartnersPanel";
 
 
 
 
 export const PartnerNetworkPanel = () => (
-  <Tabs defaultValue="partners" className="space-y-4">
+  <Tabs defaultValue="rails" className="space-y-4">
     <div className="overflow-x-auto pb-2">
       <TabsList className="inline-flex w-auto">
+        <TabsTrigger value="rails">Corridor rails</TabsTrigger>
         <TabsTrigger value="partners">Partners</TabsTrigger>
         <TabsTrigger value="corridors">Corridors</TabsTrigger>
         <TabsTrigger value="activation">Activation</TabsTrigger>
@@ -69,6 +71,9 @@ export const PartnerNetworkPanel = () => (
 
 
 
+    <TabsContent value="rails">
+      <SectionBoundary name="CorridorRailsPanel"><CorridorRailsPanel /></SectionBoundary>
+    </TabsContent>
     <TabsContent value="partners">
       <SectionBoundary name="PartnersPanel"><PartnersPanel /></SectionBoundary>
     </TabsContent>

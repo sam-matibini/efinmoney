@@ -2,11 +2,19 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 import { FunctionsHttpError } from "@supabase/supabase-js";
+import { notifyOpsCollectFailure } from "@/lib/corridorRails";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
 import InteracPayerForm, { emptyPayerForm, type PayerForm } from "@/components/payments/InteracPayerForm";
 import InteracStatusView from "@/components/payments/InteracStatusView";
 import { CHECKOUT_STRINGS, type Lang } from "@/components/payments/checkoutStrings";
+import { productFeatures } from "@/lib/productFeatures";
+
+const FLOVIDE_FN = "flovide-cad-interac";
+/** Wise/Loop CAD Interac (HEAD); fincra-cad-interac remains a legacy alias. */
+const WISE_FN = "wise-cad-interac";
+/** Legacy Fincra Interac function name used as secondary fallback. */
+const FINCRA_FN = "fincra-cad-interac";
 
 /** Supabase hides the response body on FunctionsHttpError — read the real reason out of it. */
 async function edgeErrorMessage(error: unknown, fallback: string): Promise<string> {
@@ -64,7 +72,7 @@ const DONE = ["settled", "completed"];
 const CA_PHONE_RE = /^\+?1?[2-9]\d{9}$/;
 
 const payerSchema = z.object({
-  amount: z.coerce.number().min(1, "Enter an amount of at least CAD 1.00"),
+  amount: z.coerce.number().min(2, "Enter an amount of at least CAD 2.00"),
   firstName: z.string().trim().min(1, "Enter your first name").max(60),
   lastName: z.string().trim().min(1, "Enter your last name").max(60),
   email: z.string().trim().email("Enter a valid email address").max(255),
@@ -79,8 +87,8 @@ const payerSchema = z.object({
 });
 
 /**
- * Loop Bank Interac / EFT checkout: one payer form, then deposit instructions.
- * Deposits land in Loop; ops match by reference to credit the wallet / release transfers.
+ * CAD Interac checkout: Flovide Auto Deposit when enabled, with Wise/Fincra fallback.
+ * Deposits credit the wallet and (for `purpose: "transfer"`) release the linked payout.
  */
 export default function InteracCheckout({
   walletId,
@@ -106,6 +114,9 @@ export default function InteracCheckout({
   const [alias, setAlias] = useState<string | null>(null);
   const [eft, setEft] = useState<{ bankNumber: string; transitNumber: string; accountNumber: string } | null>(null);
   const [configured, setConfigured] = useState(true);
+  const [railFn, setRailFn] = useState(
+    (productFeatures.flovide || productFeatures.flovideInterac) ? FLOVIDE_FN : WISE_FN,
+  );
   const [intent, setIntent] = useState<InteracIntent | null>(null);
   const [bootstrapped, setBootstrapped] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -152,12 +163,30 @@ export default function InteracCheckout({
     let cancelled = false;
     void (async () => {
       try {
-        const { data, error: fnError } = await supabase.functions.invoke("wise-cad-interac", {
-          method: "GET",
-        });
+        const tryFn = async (fn: string) => {
+          const { data, error: fnError } = await supabase.functions.invoke(fn, { method: "GET" });
+          if (fnError) return null;
+          return (data ?? {}) as Record<string, unknown>;
+        };
+
+        let json: Record<string, unknown> | null = null;
+        let fn = WISE_FN;
+        if (productFeatures.flovide || productFeatures.flovideInterac) {
+          json = await tryFn(FLOVIDE_FN);
+          if (json && json.configured !== false) fn = FLOVIDE_FN;
+          else json = null;
+        }
+        if (!json && productFeatures.fincraInterac) {
+          json = await tryFn(WISE_FN);
+          if (json && json.configured !== false) fn = WISE_FN;
+          else {
+            json = await tryFn(FINCRA_FN);
+            fn = FINCRA_FN;
+          }
+        }
         if (cancelled) return;
-        if (fnError) return; // transient/auth hiccup — keep the form usable
-        const json = (data ?? {}) as Record<string, unknown>;
+        if (!json) return;
+        setRailFn(fn);
         setAlias((json.alias as string | null) ?? null);
         const eftJson = json.eft as { bankNumber?: string; transitNumber?: string; accountNumber?: string } | null;
         if (eftJson?.bankNumber && eftJson.transitNumber && eftJson.accountNumber) {
@@ -169,6 +198,7 @@ export default function InteracCheckout({
         }
         // Only block when the backend explicitly says there is no deposit alias.
         if (json.configured === false) setConfigured(false);
+        else setConfigured(true);
         if (resumePending) {
           const pending = Array.isArray(json.pending) ? (json.pending[0] as InteracIntent) : null;
           if (pending) setIntent(pending);
@@ -194,29 +224,63 @@ export default function InteracCheckout({
     setLoading(true);
     setError(null);
     try {
-      const { data, error: fnError } = await supabase.functions.invoke("wise-cad-interac", {
-        body: {
-          action: "create",
-          amount: parsed.data.amount,
-          wallet_id: walletId,
-          purpose,
-          transfer_id: transferId,
-          sender_name: `${parsed.data.firstName} ${parsed.data.lastName}`.trim(),
-          sender_email: parsed.data.email,
-          sender_phone: parsed.data.phone || undefined,
-          sender_bank: form.bank || undefined,
-          sender_account_type: form.accountType,
-          sender_address_line1: parsed.data.line1,
-          sender_address_line2: form.line2 || undefined,
-          sender_city: parsed.data.city,
-          sender_region: parsed.data.region,
-          sender_postal_code: parsed.data.postalCode,
-          sender_country: "CA",
-        },
-      });
-      if (fnError) throw new Error(await edgeErrorMessage(fnError, "Could not start the payment"));
-      if (data?.error) throw new Error(data.error);
-      setAlias((prev) => data.alias ?? prev);
+      const payload = {
+        action: "create",
+        amount: parsed.data.amount,
+        wallet_id: walletId,
+        purpose,
+        transfer_id: transferId,
+        sender_name: `${parsed.data.firstName} ${parsed.data.lastName}`.trim(),
+        sender_email: parsed.data.email,
+        sender_phone: parsed.data.phone || undefined,
+        sender_bank: form.bank || undefined,
+        sender_account_type: form.accountType,
+        sender_address_line1: parsed.data.line1,
+        sender_address_line2: form.line2 || undefined,
+        sender_city: parsed.data.city,
+        sender_region: parsed.data.region,
+        sender_postal_code: parsed.data.postalCode,
+        sender_country: "CA",
+      };
+
+      const invokeCreate = async (fn: string) => {
+        const { data, error: fnError } = await supabase.functions.invoke(fn, { body: payload });
+        if (fnError) throw new Error(await edgeErrorMessage(fnError, "Could not start the payment"));
+        return data as Record<string, unknown>;
+      };
+
+      const canFallback =
+        productFeatures.fincraInterac &&
+        (railFn === FLOVIDE_FN);
+
+      let data: Record<string, unknown>;
+      let usedFn = railFn;
+      try {
+        data = await invokeCreate(usedFn);
+        if (data?.error && canFallback) {
+          usedFn = WISE_FN;
+          data = await invokeCreate(usedFn);
+          if (data?.error) {
+            usedFn = FINCRA_FN;
+            data = await invokeCreate(usedFn);
+          }
+        }
+      } catch (first) {
+        if (canFallback) {
+          try {
+            usedFn = WISE_FN;
+            data = await invokeCreate(usedFn);
+          } catch {
+            usedFn = FINCRA_FN;
+            data = await invokeCreate(usedFn);
+          }
+        } else {
+          throw first;
+        }
+      }
+      if (data?.error) throw new Error(String(data.error));
+      setRailFn(usedFn);
+      setAlias((prev) => (data.alias as string | null) ?? prev);
       const eftJson = data.eft as { bankNumber?: string; transitNumber?: string; accountNumber?: string } | null | undefined;
       if (eftJson?.bankNumber && eftJson.transitNumber && eftJson.accountNumber) {
         setEft({
@@ -225,35 +289,59 @@ export default function InteracCheckout({
           accountNumber: String(eftJson.accountNumber),
         });
       }
-      const created = data.intent as InteracIntent;
-      // Interac funds Wise via Autodeposit — never open Quick Pay (self-pay blocked).
-      const next = { ...created, hosted_url: null };
-      setIntent(next);
-      onIntentCreated?.(next);
 
-      const aliasLine = (data.alias as string | null) || alias;
-      await navigator.clipboard
-        .writeText(
-          [
-            `Amount: CAD ${Number(created.amount).toFixed(2)}`,
-            aliasLine ? `${t.sendTo}: ${aliasLine}` : null,
-            `${t.reference}: ${created.public_id || created.reference}`,
-          ]
-            .filter(Boolean)
-            .join("\n"),
-        )
-        .catch(() => undefined);
-      toast.success(t.detailsCopied);
+      const created = data.intent as InteracIntent;
+
+      if (usedFn === FLOVIDE_FN) {
+        setIntent(created);
+        onIntentCreated?.(created);
+        const hosted = (data.hosted_url as string | null) || created.hosted_url || null;
+        if (hosted) window.open(hosted, "_blank", "noopener,noreferrer");
+        else {
+          toast.success("Interac request sent", {
+            description: Array.isArray(data.instructions)
+              ? String((data.instructions as string[])[0])
+              : `Approve the CAD ${Number(created.amount).toFixed(2)} request in your banking app.`,
+          });
+        }
+      } else {
+        // Interac funds Wise via Autodeposit — never open Quick Pay (self-pay blocked).
+        const next = { ...created, hosted_url: null };
+        setIntent(next);
+        onIntentCreated?.(next);
+
+        const aliasLine = (data.alias as string | null) || alias;
+        await navigator.clipboard
+          .writeText(
+            [
+              `Amount: CAD ${Number(created.amount).toFixed(2)}`,
+              aliasLine ? `${t.sendTo}: ${aliasLine}` : null,
+              `${t.reference}: ${created.public_id || created.reference}`,
+            ]
+              .filter(Boolean)
+              .join("\n"),
+          )
+          .catch(() => undefined);
+        toast.success(t.detailsCopied);
+      }
     } catch (e) {
       const message = e instanceof Error ? e.message : "Could not start the payment";
       setError(message);
       toast.error(message);
+      void notifyOpsCollectFailure({
+        rail: railFn,
+        currency: "CAD",
+        amount,
+        wallet_id: walletId,
+        error: message,
+        stage: "create_intent",
+      });
     } finally {
       setLoading(false);
     }
-  }, [amount, form, walletId, purpose, transferId, onIntentCreated, t, alias]);
+  }, [amount, form, walletId, purpose, transferId, onIntentCreated, t, railFn, alias]);
 
-  // Poll the active intent until it settles (direct table read — RLS allows own rows)
+  // Poll the active intent until it settles
   useEffect(() => {
     if (!intent || DONE.includes(intent.status)) return;
     let cancelled = false;
@@ -264,13 +352,23 @@ export default function InteracCheckout({
       if (cancelled || attempts > 120) return;
       attempts += 1;
       try {
-        const { data: next } = await supabase
-          .from("fincra_cad_interac_intents")
-          .select(
-            "id, public_id, amount, currency_code, reference, status, expires_at, claimed_sent_at, hosted_url, sender_name, sender_email, sender_phone, sender_bank",
-          )
-          .eq("id", intent.id)
-          .maybeSingle();
+        let next: InteracIntent | null = null;
+        if (railFn === FLOVIDE_FN) {
+          const { data } = await supabase.functions.invoke(
+            `${railFn}?intent_id=${encodeURIComponent(intent.id)}`,
+            { method: "GET" },
+          );
+          next = (data as { intent?: InteracIntent } | null)?.intent ?? null;
+        } else {
+          const { data } = await supabase
+            .from("fincra_cad_interac_intents")
+            .select(
+              "id, public_id, amount, currency_code, reference, status, expires_at, claimed_sent_at, hosted_url, sender_name, sender_email, sender_phone, sender_bank",
+            )
+            .eq("id", intent.id)
+            .maybeSingle();
+          next = data as InteracIntent | null;
+        }
 
         if (next) {
           setIntent(next as InteracIntent);
@@ -295,7 +393,7 @@ export default function InteracCheckout({
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [intent?.id, intent?.status, onComplete, purpose]);
+  }, [intent?.id, intent?.status, onComplete, purpose, railFn]);
 
   if (!bootstrapped) {
     return (

@@ -10,7 +10,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { WORLD_CURRENCIES, WORLD_CURRENCY_MAP } from "@/lib/worldCurrencies";
 import { CurrencyFlag } from "@/components/ui/FlagImage";
 
-import { getNombaExchangeRate, isNgnPair } from "@/lib/nombaNigeria";
+import { getFlovideOrNombaRate, isNgnPair } from "@/lib/flovide";
 import {
   BENCHMARK_A_FLAT_FEE_USD,
   BENCHMARK_A_MARGIN,
@@ -152,7 +152,7 @@ const LiveFxCalculator = ({
 
   const { data: nombaQuote } = useQuery({
     queryKey: ["nomba-fx-calc", from, to],
-    queryFn: () => getNombaExchangeRate(from, to),
+    queryFn: () => getFlovideOrNombaRate(from, to),
     enabled: from !== to && isNgnPair(from, to) && !(displayRate != null && displayRate > 0),
     staleTime: 60_000,
   });

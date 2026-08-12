@@ -148,6 +148,7 @@ const ZambiaFincraTestPage = lazyImport(() => import("./pages/ops/ZambiaFincraTe
 const CommunicationHubPage = lazyImport(() => import("./pages/admin/CommunicationHubPage"));
 const SupportInboxPage = lazyImport(() => import("./pages/admin/SupportInboxPage"));
 const PricingPage = lazyImport(() => import("./pages/admin/PricingPage"));
+const OpsQueuePage = lazyImport(() => import("./pages/admin/OpsQueuePage"));
 const RevenuePage = lazyImport(() => import("./pages/admin/RevenuePage"));
 const SupportPage = lazyImport(() => import("./pages/SupportPage"));
 const ResetPinPage = lazyImport(() => import("./pages/ResetPinPage"));
@@ -405,6 +406,7 @@ const AppRoutes = () => {
           <Route path="/admin/wire-transfers" element={<WireTransfersPage />} />
           <Route path="/admin/regulatory-changes" element={<RegulatoryChangesPage />} />
           <Route path="/admin/settlement-reconciliation" element={<SettlementReconciliationPage />} />
+          <Route path="/admin/ops-queue" element={<OpsQueuePage />} />
           <Route path="/admin/period-end-controls" element={<PeriodEndControlsPage />} />
           <Route path="/admin/evidence-repository" element={<EvidenceRepositoryPage />} />
           <Route path="/admin/payments/adyen" element={<AdminAdyenLinksPage />} />

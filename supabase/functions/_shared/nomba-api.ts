@@ -120,7 +120,12 @@ export async function createNombaCheckoutOrder(params: {
     body: JSON.stringify({ order }),
   });
   if (!ok) {
-    return { ok: false, error: String(json?.description || json?.message || `Nomba checkout HTTP ${status}`) };
+    return {
+      ok: false,
+      error: String(json?.description || json?.message || `Nomba checkout HTTP ${status}`),
+      status,
+      raw: json,
+    };
   }
   const checkoutLink = String(json?.data?.checkoutLink || "");
   const orderReference = String(json?.data?.orderReference || "");

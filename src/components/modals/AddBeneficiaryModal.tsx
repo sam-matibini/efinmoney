@@ -14,7 +14,7 @@ import { COUNTRIES, findCountryById, findCountryByCode, LIVE_SEND_COUNTRIES, isL
 import { ISO_COUNTRIES, findIsoCountry } from "@/lib/isoCountries";
 import { COUNTRY_ISO2 } from "@/lib/countryIso";
 import { ChevronDown, ChevronUp } from "lucide-react";
-import { getNigeriaBanks, resolveNigeriaAccount } from "@/lib/nombaNigeria";
+import { getCorridorBanks, resolveCorridorAccount } from "@/lib/flovide";
 
 interface Props {
   open: boolean;
@@ -171,7 +171,7 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
     let cancelled = false;
     (async () => {
       try {
-        const { banks } = await getNigeriaBanks();
+        const { banks } = await getCorridorBanks("NGN");
         if (!cancelled) setNgnBanks(banks.map((b) => ({ code: b.code, name: b.name })));
       } catch {
         /* non-fatal */
@@ -194,7 +194,7 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
     setResolvingAccount(true);
     (async () => {
       try {
-        const data = await resolveNigeriaAccount(acct, bankCode);
+        const data = await resolveCorridorAccount(acct, bankCode, "NGN");
         if (cancelled) return;
         if (data?.resolved && data.account_name) {
           setResolvedAccountName(data.account_name);

@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { useWallets } from "@/hooks/useWallets";
 import { useFxRates } from "@/hooks/useFxRates";
 import { resolveEffectiveRate } from "@/lib/fx";
-import { getNombaExchangeRate, isNgnPair } from "@/lib/nombaNigeria";
+import { getFlovideOrNombaRate, isNgnPair } from "@/lib/flovide";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -74,7 +74,7 @@ const ExchangeModal = ({ children }: ExchangeModalProps) => {
   const toCode = toWallet?.currency_code ?? "";
   const { data: nombaQuote } = useQuery({
     queryKey: ["exchange-modal-nomba", fromCode, toCode],
-    queryFn: () => getNombaExchangeRate(fromCode, toCode),
+    queryFn: () => getFlovideOrNombaRate(fromCode, toCode),
     enabled: !!fromCode && !!toCode && fromCode !== toCode && isNgnPair(fromCode, toCode),
     staleTime: 60_000,
   });

@@ -94,6 +94,7 @@ const statusMeta = (status: string) => {
     case "processing":
     case "funded":
     case "pending_liquidity":
+    case "pending_ops":
       return { label: "Processing", className: "bg-yellow-500/20 text-yellow-500 border-yellow-500/40" };
     default:
       return { label: "Initiated", className: "bg-amber-500/20 text-amber-600 border-amber-500/40" };
@@ -127,7 +128,7 @@ const buildTimeline = (t: Transfer): TimelineStep[] => {
   } else if (status === "funded") {
     steps[1].state = "done"; steps[1].timestamp = updated;
     steps[2].state = "current";
-  } else if (status === "pending_liquidity") {
+  } else if (status === "pending_liquidity" || status === "pending_ops") {
     steps[1].state = "done"; steps[1].timestamp = updated;
     steps[2].label = "Delivering to recipient";
     steps[2].state = "current";
@@ -163,7 +164,7 @@ const TransferTrackingPage = () => {
   const [verifying, setVerifying] = useState(false);
   const cancelTransfer = useCancelTransfer();
   const canCancel = transfer && ["initiated", "funded", "processing", "pending_liquidity"].includes(transfer.status);
-  const isPending = transfer && ["initiated", "funded", "processing", "pending_liquidity"].includes(transfer.status);
+  const isPending = transfer && ["initiated", "funded", "processing", "pending_liquidity", "pending_ops"].includes(transfer.status);
 
   // Poll Paysafe for the latest standalone credit status and update our DB.
   const verifyStatus = useCallback(async (silent = false) => {
@@ -571,9 +572,9 @@ const TransferTrackingPage = () => {
                     </motion.li>
                   ))}
                 </ol>
-                {transfer.status === "pending_liquidity" && (
+                {(transfer.status === "pending_liquidity" || transfer.status === "pending_ops") && (
                   <div className="mt-4 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-sm text-foreground">
-                    Your payment was received. We're completing delivery to your recipient — this usually takes a few minutes.
+                    Your payment was received. We&apos;re finishing delivery to your recipient — this usually takes a few minutes.
                   </div>
                 )}
                 {["funded", "processing"].includes(transfer.status) && !transfer.provider_reference && (
@@ -583,7 +584,7 @@ const TransferTrackingPage = () => {
                     </p>
                   </div>
                 )}
-                {transfer.failure_reason && (
+                {transfer.failure_reason && transfer.status !== "pending_ops" && (
                   <div className={`mt-4 p-3 rounded-lg text-sm border ${
                     ["failed", "reversed", "expired"].includes(transfer.status)
                       ? "bg-destructive/10 border-destructive/30 text-destructive"

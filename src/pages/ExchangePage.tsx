@@ -14,7 +14,7 @@ import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { RefreshCw, ArrowUpDown, TrendingUp, CheckCircle, Bitcoin, DollarSign, Sparkles } from "lucide-react";
 import { CryptoTradingPanel } from "@/components/crypto/CryptoTradingPanel";
 import { resolveEffectiveRate } from "@/lib/fx";
-import { getNombaExchangeRate, isNgnPair } from "@/lib/nombaNigeria";
+import { getFlovideOrNombaRate, isNgnPair } from "@/lib/flovide";
 import { CurrencyFlag } from "@/components/ui/FlagImage";
 import FeatureGate from "@/components/common/FeatureGate";
 import PageHeroBanner from "@/components/common/PageHeroBanner";
@@ -76,7 +76,7 @@ const FxTradingPanel = () => {
   const toCode = toWallet?.currency_code ?? "";
   const { data: nombaQuote } = useQuery({
     queryKey: ["exchange-page-nomba", fromCode, toCode],
-    queryFn: () => getNombaExchangeRate(fromCode, toCode),
+    queryFn: () => getFlovideOrNombaRate(fromCode, toCode),
     enabled: !!fromCode && !!toCode && fromCode !== toCode && isNgnPair(fromCode, toCode),
     staleTime: 60_000,
   });
@@ -424,7 +424,7 @@ const LiveFxRatesCard = () => {
   const { data: lastUpdated } = useFxRatesLastUpdated();
   const { data: nombaUsdNgn } = useQuery({
     queryKey: ["exchange-live-nomba-usd-ngn"],
-    queryFn: () => getNombaExchangeRate("USD", "NGN"),
+    queryFn: () => getFlovideOrNombaRate("USD", "NGN"),
     staleTime: 60_000,
   });
   return (

@@ -29,6 +29,7 @@ import LinkBankPanel from "@/components/payments/LinkBankPanel";
 import WiseTopUpCard from "@/components/payments/WiseTopUpCard";
 import WisePayLinkCard from "@/components/payments/WisePayLinkCard";
 import { isWisePayCurrency } from "@/lib/wisePayLink";
+import { resolveCollectMethodPreference } from "@/lib/corridorRails";
 import CadCollectionPanel from "@/components/topup/CadCollectionPanel";
 import WiseInteracInvoiceCheckout from "@/components/payments/WiseInteracInvoiceCheckout";
 
@@ -105,11 +106,18 @@ function availableIntlMethods(currency: string): IntlTopupMethod[] {
     if (productFeatures.fincra && ["EUR", "GBP"].includes(c)) methods.push("fincra");
     if (productFeatures.paytota) methods.push("paytota");
     if (productFeatures.dodo) methods.push("dodo");
-    // CAD cards/Stripe micro-deposit paths disabled — use Plaid → Loop instead
+    // CAD cards/Stripe micro-deposit paths disabled — use Plaid / Flovide Interac instead
     if (productFeatures.square && c !== "CAD") methods.push("square");
     if (productFeatures.paypal && c !== "CAD") methods.push("paypal");
-    if (c === "CAD" && productFeatures.plaid) methods.push("interac");
-    else if (c === "CAD" && productFeatures.fincraInterac) methods.push("interac");
+    if (
+      c === "CAD" &&
+      (productFeatures.plaid ||
+        productFeatures.fincraInterac ||
+        productFeatures.flovideInterac ||
+        productFeatures.flovide)
+    ) {
+      methods.push("interac");
+    }
     if (productFeatures.wise && c !== "CAD") methods.push("wise");
     if (productFeatures.flutterwave && FLW_WESTERN_TOPUP_CURRENCIES.includes(c) && c !== "CAD") {
       methods.push("flutterwave");
@@ -279,14 +287,46 @@ const TopUpPage = () => {
   const currency = selectedWallet?.currency_code || SYSTEM_DEFAULT_CURRENCY;
   const intlMethods = useMemo(() => availableIntlMethods(currency), [currency]);
   const africaMomoMethods = useMemo(() => availableAfricaMomoMethods(currency), [currency]);
-  const intlMethod = useMemo(
-    () => (intlMethods.length === 0 ? null : initialIntlMethod(params, currency)),
-    [currency, intlMethods, params],
-  );
-  const africaMomoMethod = useMemo(
-    () => (africaMomoMethods.length === 0 ? null : initialAfricaMomoMethod(params, currency)),
-    [currency, africaMomoMethods, params],
-  );
+  const [policyIntlOverride, setPolicyIntlOverride] = useState<IntlTopupMethod | null>(null);
+  const [policyAfricaOverride, setPolicyAfricaOverride] = useState<AfricaMomoTopupMethod | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setPolicyIntlOverride(null);
+    setPolicyAfricaOverride(null);
+    const fromQuery = params.get("method") || params.get("provider") || params.get("rail");
+    if (fromQuery) return;
+    void (async () => {
+      try {
+        const pref = await resolveCollectMethodPreference(currency);
+        if (cancelled || pref.source !== "policy" || !pref.method) return;
+        const m = pref.method as string;
+        if (intlMethods.includes(m as IntlTopupMethod)) {
+          setPolicyIntlOverride(m as IntlTopupMethod);
+        }
+        const africa = availableAfricaMomoMethods(currency);
+        if (africa.includes(m as AfricaMomoTopupMethod)) {
+          setPolicyAfricaOverride(m as AfricaMomoTopupMethod);
+        }
+      } catch {
+        /* keep auto-pick */
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [currency, intlMethods, params]);
+
+  const intlMethod = useMemo(() => {
+    if (intlMethods.length === 0) return null;
+    if (policyIntlOverride && intlMethods.includes(policyIntlOverride)) return policyIntlOverride;
+    return initialIntlMethod(params, currency);
+  }, [currency, intlMethods, params, policyIntlOverride]);
+  const africaMomoMethod = useMemo(() => {
+    if (africaMomoMethods.length === 0) return null;
+    if (policyAfricaOverride && africaMomoMethods.includes(policyAfricaOverride)) {
+      return policyAfricaOverride;
+    }
+    return initialAfricaMomoMethod(params, currency);
+  }, [currency, africaMomoMethods, params, policyAfricaOverride]);
 
   // Rare dual-provider corridors: prefer Fincra over Flutterwave when collect is live
   useEffect(() => {
@@ -896,9 +936,18 @@ const TopUpPage = () => {
           </SectionBoundary>
         ),
       });
-    } else if (isCadWallet && (rails.has("interac") || rails.has("wise") || productFeatures.fincraInterac)) {
-      // Fallback only if Plaid is disabled — still uses Plaid-first invoice shell when amount set
+    } else if (
+      isCadWallet &&
+      (rails.has("interac") ||
+        rails.has("wise") ||
+        productFeatures.fincraInterac ||
+        productFeatures.flovideInterac ||
+        productFeatures.flovide)
+    ) {
+      // Fallback when Plaid is off — Flovide/Fincra via CadCollectionPanel, or invoice shell when amount set
       const interacAmount = Number(amount);
+      const useFlovide =
+        productFeatures.flovide || productFeatures.flovideInterac || productFeatures.fincraInterac;
       payMethods.push({
         id: "interac",
         tone: "bank",
@@ -906,20 +955,20 @@ const TopUpPage = () => {
         description: "Use bank account to make instant payments",
         content: (
           <SectionBoundary name="CadInteracTopUp">
-            {Number.isFinite(interacAmount) && interacAmount >= 1 ? (
+            {useFlovide || !(Number.isFinite(interacAmount) && interacAmount >= 1) ? (
+              <CadCollectionPanel
+                walletId={walletId}
+                walletCurrency={currency}
+                initialAmount={amount}
+                onComplete={invalidateWallets}
+                onExit={() => setSelectedMethodId("")}
+              />
+            ) : (
               <WiseInteracInvoiceCheckout
                 walletId={walletId}
                 purpose="topup"
                 amount={interacAmount}
                 lineItem="eFinMoney CAD wallet top-up"
-                onComplete={invalidateWallets}
-                onExit={() => setSelectedMethodId("")}
-              />
-            ) : (
-              <CadCollectionPanel
-                walletId={walletId}
-                walletCurrency={currency}
-                initialAmount={amount}
                 onComplete={invalidateWallets}
                 onExit={() => setSelectedMethodId("")}
               />
