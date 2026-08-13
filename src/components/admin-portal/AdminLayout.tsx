@@ -42,7 +42,7 @@ const TOP_NAV: NavItem[] = [
 
 const NAV_GROUPS: NavGroup[] = [
   {
-    label: "Payments",
+    label: "Partners & Pricing",
     icon: CreditCard,
     defaultOpen: true,
     emphasize: true,
