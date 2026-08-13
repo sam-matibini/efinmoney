@@ -270,7 +270,7 @@ export function intlMethodBenefit(method: IntlTopupMethod): string {
   if (method === "paytota") return "Invoice";
   if (method === "dodo") return "Global";
   if (method === "square") return "Card";
-  if (method === "paypal") return "PayPal";
+  if (method === "paypal") return "Card";
   if (method === "interac") return "Bank send";
   if (method === "wise") return "Bank send";
   if (method === "fincra") return "Flexible";
@@ -334,8 +334,8 @@ export function gatewayProviderLabel(gateway: WalletTopupGateway): string | null
 
 /**
  * Auto-pick top-up rail (customer never chooses).
- * Aligns with send priority: Fincra → Flutterwave → Nomba → Paytota → Swychr.
- * Lenhub is skipped (Flutterwave wrapper). CAD/USD skip Fincra (partner confirmed).
+ * Western: Square card first (PayPal only if Square checkout fails to open).
+ * Africa/NGN: Fincra first where it collects.
  */
 export function pickBestIntlTopupMethod(
   currency: string,
@@ -347,13 +347,8 @@ export function pickBestIntlTopupMethod(
   const pool = live.length > 0 ? live : available;
 
   let priority: IntlTopupMethod[];
-  if (c === "CAD") {
-    // Zero-cost Interac/Wise pay-ins first; card rails after (Square/PayPal charge both sides)
-    priority = ["interac", "wise", "square", "paytota", "dodo", "paypal", "nomba", "flutterwave", "fincra"];
-  } else if (c === "USD" || c === "GBP" || c === "EUR") {
-    // Wise bank deposit before paid card rails
-    priority = ["wise", "square", "paytota", "dodo", "paypal", "interac", "nomba", "flutterwave", "fincra"];
-
+  if (c === "CAD" || c === "USD" || c === "GBP" || c === "EUR") {
+    priority = ["square", "paypal", "interac", "wise", "paytota", "dodo", "nomba", "flutterwave", "fincra"];
   } else if (c === "NGN") {
     priority = ["fincra", "flutterwave", "nomba", "wise"];
   } else {
@@ -396,7 +391,7 @@ export function intlMethodLabel(method: IntlTopupMethod, currency?: string): str
   if (method === "fincra") return fincraGatewayLabel(currency || "");
   if (method === "dodo") return "Global card checkout";
   if (method === "square") return "Card";
-  if (method === "paypal") return "PayPal";
+  if (method === "paypal") return "Card";
   if (method === "lenhub") {
     return currency?.toUpperCase() === "NGN" ? "NGN card or bank" : "Card (direct)";
   }
@@ -416,10 +411,10 @@ export function intlMethodDescription(method: IntlTopupMethod, currency: string)
     return `Pay with card on a global checkout page — your ${c} wallet credits after confirmation.`;
   }
   if (method === "square") {
-    return `Pay with card on Square’s secure page — your ${c} wallet credits after payment.`;
+    return `Pay with card on a secure page — your ${c} wallet credits after payment.`;
   }
   if (method === "paypal") {
-    return `Pay with PayPal — your ${c} wallet credits after you approve.`;
+    return `Pay with card on a secure page — your ${c} wallet credits after you approve.`;
   }
   if (method === "interac") {
     return "Send CAD from your Canadian bank with Interac e-Transfer.";

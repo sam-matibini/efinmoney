@@ -918,7 +918,7 @@ const SendPage = () => {
     setConfirming(true);
     const funding = fundingOverride ?? fundingSource;
 
-    // CAD bank pay-in: park the transfer, then open Plaid → Loop authorization.
+    // CAD Interac pay-in: park the transfer, then open Flovide/Loop Interac checkout.
     if (funding === 'interac') {
       if (!cadWallet) {
         toast.error('You need a CAD wallet to pay from your Canadian bank.');
@@ -2033,7 +2033,13 @@ const SendPage = () => {
   const cardFundingAvailable = productFeatures.nombaNigeria || productFeatures.lenhubFlutter
     || productFeatures.paytota || productFeatures.swychr || productFeatures.flutterwave;
 
-  const interacFundingAvailable = !!cadWallet;
+  const interacFundingAvailable = !!cadWallet && (
+    productFeatures.flovide
+    || productFeatures.flovideInterac
+    || productFeatures.fincraInterac
+    || productFeatures.plaid
+  );
+  const interacUsesFlovide = productFeatures.flovide || productFeatures.flovideInterac;
   const wisePayWallet = wallets?.find((w) => isWisePayCurrency(w.currency_code));
 
   const fundingMethodOptions: PaymentMethodOption<FundingSource>[] = [
@@ -2043,8 +2049,14 @@ const SendPage = () => {
     ...(productFeatures.plaid
       ? [{ id: "bank" as const, label: "Bank", sublabel: "Linked account", icon: Landmark, tone: "bank" as const }]
       : []),
-    ...(interacFundingAvailable && productFeatures.plaid
-      ? [{ id: "interac" as const, label: "Interac", sublabel: "Bank account · instant", icon: Landmark, tone: "bank" as const }]
+    ...(interacFundingAvailable
+      ? [{
+          id: "interac" as const,
+          label: "Interac",
+          sublabel: interacUsesFlovide ? "Email request · approve in app" : "Bank account · instant",
+          icon: Landmark,
+          tone: "bank" as const,
+        }]
       : []),
     ...(wisePayWallet
       ? [{ id: "wise" as const, label: "Wise", sublabel: "Bank or card via Wise", icon: Wallet, tone: "bank" as const }]

@@ -41,7 +41,7 @@ export default function CadCollectionPanel({ walletId, walletCurrency, initialAm
   // Prefer Flovide / Fincra Interac when those features are on
   if (flovideOn || wiseOn) {
     const amountLabel = `CAD ${amount.toFixed(2)}`;
-    const interacTitle = "Interac (Flovide)";
+    const interacTitle = "Interac";
     const interacDescription = lang === "fr"
       ? "Demande Interac à votre courriel — approuvez dans votre app bancaire (min. 2,00 $)"
       : "Interac request to your email — approve in your banking app (min. CAD 2.00)";

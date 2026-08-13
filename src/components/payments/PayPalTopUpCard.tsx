@@ -88,7 +88,7 @@ export default function PayPalTopUpCard({
       setReady(false);
       setBootError(null);
       if (!SUPPORTED.has(ccy)) {
-        setBootError(`PayPal top-up is not available for ${ccy}`);
+        setBootError(`Card top-up is not available for ${ccy}`);
         return;
       }
 
@@ -98,7 +98,7 @@ export default function PayPalTopUpCard({
       try {
         const { data, error } = await supabase.functions.invoke("paypal-public-config");
         if (error || !data?.configured || !data?.clientId) {
-          throw new Error(data?.error || error?.message || "PayPal is not configured");
+          throw new Error(data?.error || error?.message || "Card checkout is not configured");
         }
 
         await loadPayPalSdk(String(data.clientId), ccy, String(data.environment || "sandbox"));
@@ -113,7 +113,7 @@ export default function PayPalTopUpCard({
             });
             const errMsg = (order as { error?: string } | null)?.error || orderErr?.message;
             if (orderErr || (order as { error?: string } | null)?.error) {
-              throw new Error(errMsg || "Could not create PayPal order");
+              throw new Error(errMsg || "Could not create card checkout");
             }
             const id = String(order?.orderID || order?.orderId || "");
             if (!id) throw new Error("No PayPal order id");
@@ -145,15 +145,15 @@ export default function PayPalTopUpCard({
           },
           onError: (err: unknown) => {
             console.error("[PayPalTopUpCard]", err);
-            toast.error("PayPal checkout error — try again");
+            toast.error("Card checkout error — try again");
           },
-          onCancel: () => toast.message("PayPal checkout cancelled"),
+          onCancel: () => toast.message("Checkout cancelled"),
         }).render(buttonHostRef.current);
 
         if (!cancelled) setReady(true);
       } catch (e) {
         console.error("[PayPalTopUpCard]", e);
-        if (!cancelled) setBootError(e instanceof Error ? e.message : "Could not load PayPal");
+        if (!cancelled) setBootError(e instanceof Error ? e.message : "Could not load card checkout");
       }
     })();
 
@@ -164,7 +164,7 @@ export default function PayPalTopUpCard({
   }, [ccy, stableAmount, walletId, retryKey, user?.id, queryClient, onComplete]);
 
   if (!SUPPORTED.has(ccy)) {
-    return <p className="text-sm text-destructive">PayPal top-up is not available for {ccy}</p>;
+    return <p className="text-sm text-destructive">Card top-up is not available for {ccy}</p>;
   }
 
   const amtNum = Number(String(amount).replace(/,/g, ""));
@@ -191,21 +191,21 @@ export default function PayPalTopUpCard({
       )}
 
       {!amountOk && (
-        <p className="text-xs text-muted-foreground">Enter an amount of at least 1 to show PayPal.</p>
+        <p className="text-xs text-muted-foreground">Enter an amount of at least 1 to continue.</p>
       )}
 
       <div ref={buttonHostRef} className="min-h-[45px]" />
 
       {amountOk && !ready && !bootError && (
         <p className="text-xs text-muted-foreground inline-flex items-center gap-1.5">
-          <Loader2 className="w-3 h-3 animate-spin" /> Loading PayPal…
+          <Loader2 className="w-3 h-3 animate-spin" /> Loading checkout…
         </p>
       )}
       {bootError && (
         <div className="space-y-2">
           <p className="text-sm text-destructive">{bootError}</p>
           <Button type="button" variant="outline" size="sm" onClick={() => setRetryKey((k) => k + 1)}>
-            Retry PayPal
+            Retry checkout
           </Button>
         </div>
       )}
@@ -215,7 +215,7 @@ export default function PayPalTopUpCard({
         </p>
       )}
       <p className="text-[11px] text-muted-foreground text-center">
-        You’ll approve with PayPal — we never see your PayPal password.
+        You’ll approve on a secure page — we never see your password.
       </p>
     </div>
   );
@@ -225,7 +225,7 @@ export default function PayPalTopUpCard({
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base">PayPal</CardTitle>
+        <CardTitle className="text-base">Card checkout</CardTitle>
       </CardHeader>
       <CardContent>{body}</CardContent>
     </Card>

@@ -18,13 +18,14 @@ type Props = {
   initialAmount?: string;
   embedded?: boolean;
   onComplete?: () => void;
+  /** Checkout link could not be created — parent may switch to a backup rail. */
+  onCheckoutUnavailable?: () => void;
 };
 
 const SUPPORTED = new Set(["USD", "CAD", "EUR", "GBP"]);
 
 function buildSquareRedirectUrl(): string {
   const path = "/wallet/topup";
-  // Stay on current origin so local verify works after Square redirects back
   return `${window.location.origin}${path}`;
 }
 
@@ -33,6 +34,7 @@ export default function SquareTopUpCard({
   walletCurrency,
   initialAmount = "",
   embedded = false,
+  onCheckoutUnavailable,
 }: Props) {
   const [amount, setAmount] = useState(initialAmount);
   const [busy, setBusy] = useState(false);
@@ -43,7 +45,7 @@ export default function SquareTopUpCard({
   }, [initialAmount]);
 
   if (!SUPPORTED.has(ccy)) {
-    return <p className="text-sm text-destructive">Square top-up is not available for {ccy}</p>;
+    return <p className="text-sm text-destructive">Card top-up is not available for {ccy}</p>;
   }
 
   const pay = async () => {
@@ -63,12 +65,11 @@ export default function SquareTopUpCard({
           redirectUrl: buildSquareRedirectUrl(),
         },
       });
-      // Non-2xx: supabase sets error; body often still in data
       const errMsg = (data as { error?: string } | null)?.error
         || (typeof data === "string" ? data : null)
         || error?.message;
       if (error || (data as { error?: string } | null)?.error) {
-        throw new Error(errMsg || "Could not start Square checkout");
+        throw new Error(errMsg || "Could not start card checkout");
       }
       const url = String(data?.checkout_url || "");
       if (!url) throw new Error("No checkout URL returned");
@@ -78,10 +79,14 @@ export default function SquareTopUpCard({
         sessionStorage.setItem("efm_square_pending_intent", String(data.intent_id || ""));
       } catch { /* ignore */ }
 
-      toast.info("Opening secure Square checkout…");
+      toast.info("Opening secure checkout…");
       window.location.href = url;
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Checkout failed");
+      if (onCheckoutUnavailable) {
+        onCheckoutUnavailable();
+      } else {
+        toast.error(e instanceof Error ? e.message : "Checkout failed");
+      }
       setBusy(false);
     }
   };
@@ -111,7 +116,7 @@ export default function SquareTopUpCard({
         {!busy && <ExternalLink className="w-3.5 h-3.5 ml-2 opacity-70" />}
       </Button>
       <p className="text-[11px] text-muted-foreground text-center">
-        You’ll complete payment on Square’s secure page, then return here automatically.
+        You’ll complete payment on a secure page, then return here automatically.
       </p>
     </div>
   );
@@ -140,6 +145,6 @@ export async function verifySquareCheckout(orderId: string): Promise<{
   const { data, error } = await supabase.functions.invoke("square-verify-checkout", {
     body: { orderId },
   });
-  if (error) throw new Error(error.message || "Square verify failed");
+  if (error) throw new Error(error.message || "Could not confirm payment");
   return data || { success: false };
 }

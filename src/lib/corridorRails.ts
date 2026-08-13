@@ -55,6 +55,43 @@ export function collectMethodForPartner(partner: string): string | null {
   return COLLECT_METHOD[partner.trim().toLowerCase()] || null;
 }
 
+/** Code default when no collect policy is saved. */
+export const DEFAULT_COLLECT_PARTNER: Record<string, string> = {
+  CAD: "square",
+  USD: "square",
+  EUR: "square",
+  GBP: "square",
+  NGN: "fincra",
+  GHS: "fincra",
+  KES: "fincra",
+  UGX: "fincra",
+  TZS: "fincra",
+  ZMW: "fincra",
+  ZAR: "fincra",
+  XAF: "fincra",
+  XOF: "fincra",
+  MWK: "fincra",
+  RWF: "paytota",
+};
+
+export function defaultCollectPartner(currency: string): string | null {
+  return DEFAULT_COLLECT_PARTNER[currency.toUpperCase()] || null;
+}
+
+/** Map a collect partner / method onto TopUpPage method ids. */
+export function collectPayMethodIds(partnerOrMethod: string): string[] {
+  const raw = partnerOrMethod.trim().toLowerCase();
+  const method = collectMethodForPartner(raw) || raw;
+  if (method === "square" || method === "paypal") return ["square"];
+  if (method === "interac") return ["interac", "plaid"];
+  if (method === "flutterwave") return ["flw_hosted", "flw_momo"];
+  if (method === "wise") return ["wise", "wise_link"];
+  if (method === "ghana") return ["ghana"];
+  if (method === "elicate") return ["elicate"];
+  if (method === "lenhub") return ["lenhub"];
+  return [method];
+}
+
 export function useCorridorRailPolicies() {
   return useQuery({
     queryKey: ["corridor_rail_policies"],
@@ -90,23 +127,27 @@ export function useSaveCorridorRailPolicy() {
         updated_by: user?.id || null,
         updated_at: new Date().toISOString(),
       };
+      // Never use .single() here — PostgREST returns 406 when RETURNING is empty.
       if (row.id) {
         const { data, error } = await supabase
           .from("corridor_rail_policies" as never)
           .update(payload as never)
           .eq("id", row.id)
-          .select("*")
-          .single();
+          .select("*");
         if (error) throw new Error(error.message || error.code || "Update blocked");
-        return data as CorridorRailPolicy;
+        const updated = Array.isArray(data) ? data[0] : data;
+        if (updated) return updated as CorridorRailPolicy;
       }
+
       const { data, error } = await supabase
         .from("corridor_rail_policies" as never)
-        .insert(payload as never)
-        .select("*")
-        .single();
-      if (error) throw new Error(error.message || error.code || "Insert blocked");
-      return data as CorridorRailPolicy;
+        .upsert(payload as never, { onConflict: "direction,country_code,currency_code" })
+        .select("*");
+      if (error) throw new Error(error.message || error.code || "Save blocked");
+      const saved = Array.isArray(data) ? data[0] : data;
+      if (saved) return saved as CorridorRailPolicy;
+      if (row.id) return { ...payload, id: row.id } as CorridorRailPolicy;
+      throw new Error("Save did not return a row — try again, or check you are still signed in as admin.");
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["corridor_rail_policies"] }),
   });
@@ -127,17 +168,18 @@ export function useDeleteCorridorRailPolicy() {
 export async function resolveCollectMethodPreference(
   currency: string,
   country?: string,
-): Promise<{ method: string | null; rails: string[]; source: "policy" | "none" }> {
+): Promise<{ method: string | null; rails: string[]; source: "policy" | "default" | "none" }> {
   const ccy = currency.toUpperCase();
   const cc = (country || "").toUpperCase();
-  let q = supabase
-    .from("corridor_rail_policies" as never)
-    .select("*")
-    .eq("direction", "collect")
-    .eq("currency_code", ccy)
-    .eq("enabled", true);
   const { data: exact } = cc
-    ? await q.eq("country_code", cc).maybeSingle()
+    ? await supabase
+      .from("corridor_rail_policies" as never)
+      .select("*")
+      .eq("direction", "collect")
+      .eq("currency_code", ccy)
+      .eq("country_code", cc)
+      .eq("enabled", true)
+      .maybeSingle()
     : { data: null };
   let row = exact as CorridorRailPolicy | null;
   if (!row) {
@@ -151,12 +193,29 @@ export async function resolveCollectMethodPreference(
       .maybeSingle();
     row = data as CorridorRailPolicy | null;
   }
-  if (!row) return { method: null, rails: [], source: "none" };
-  const rails = [row.preferred_partner, ...(row.failover_partners || [])]
-    .map((r) => r.toLowerCase())
-    .filter(Boolean);
-  const method = collectMethodForPartner(rails[0] || "");
-  return { method, rails, source: "policy" };
+  if (!row) {
+    const { data: anyRow } = await supabase
+      .from("corridor_rail_policies" as never)
+      .select("*")
+      .eq("direction", "collect")
+      .eq("currency_code", ccy)
+      .eq("enabled", true)
+      .limit(1)
+      .maybeSingle();
+    row = anyRow as CorridorRailPolicy | null;
+  }
+  if (row) {
+    const rails = [row.preferred_partner, ...(row.failover_partners || [])]
+      .map((r) => r.toLowerCase())
+      .filter(Boolean);
+    const method = collectMethodForPartner(rails[0] || "");
+    return { method, rails, source: "policy" };
+  }
+  const fallback = defaultCollectPartner(ccy);
+  if (fallback) {
+    return { method: collectMethodForPartner(fallback) || fallback, rails: [fallback], source: "default" };
+  }
+  return { method: null, rails: [], source: "none" };
 }
 
 /** Best-effort ops email for collect/top-up failures. */

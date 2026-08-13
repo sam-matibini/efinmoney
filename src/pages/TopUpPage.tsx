@@ -29,7 +29,12 @@ import LinkBankPanel from "@/components/payments/LinkBankPanel";
 import WiseTopUpCard from "@/components/payments/WiseTopUpCard";
 import WisePayLinkCard from "@/components/payments/WisePayLinkCard";
 import { isWisePayCurrency } from "@/lib/wisePayLink";
-import { resolveCollectMethodPreference } from "@/lib/corridorRails";
+import {
+  collectMethodForPartner,
+  collectPayMethodIds,
+  defaultCollectPartner,
+  resolveCollectMethodPreference,
+} from "@/lib/corridorRails";
 import CadCollectionPanel from "@/components/topup/CadCollectionPanel";
 import WiseInteracInvoiceCheckout from "@/components/payments/WiseInteracInvoiceCheckout";
 
@@ -66,6 +71,7 @@ import {
   pickBestAfricaTopupMethod,
   isFincraTopupCurrency,
   isNombaTopupLive,
+  fincraGatewayLabel,
 
 } from "@/lib/walletTopupGateway";
 import { clearPendingSwychrTxn } from "@/lib/swychrPay";
@@ -106,9 +112,8 @@ function availableIntlMethods(currency: string): IntlTopupMethod[] {
     if (productFeatures.fincra && ["EUR", "GBP"].includes(c)) methods.push("fincra");
     if (productFeatures.paytota) methods.push("paytota");
     if (productFeatures.dodo) methods.push("dodo");
-    // CAD cards/Stripe micro-deposit paths disabled — use Plaid / Flovide Interac instead
-    if (productFeatures.square && c !== "CAD") methods.push("square");
-    if (productFeatures.paypal && c !== "CAD") methods.push("paypal");
+    if (productFeatures.square) methods.push("square");
+    if (productFeatures.paypal) methods.push("paypal");
     if (
       c === "CAD" &&
       (productFeatures.plaid ||
@@ -238,7 +243,10 @@ const TopUpPage = () => {
   const [network, setNetwork] = useState<string>("");
   const [phone, setPhone] = useState<string>("");
   const [loading, setLoading] = useState(false);
-  
+  const [westernCardRail, setWesternCardRail] = useState<"square" | "paypal">("square");
+  const [africaBackupId, setAfricaBackupId] = useState<string | null>(null);
+  const [selectedMethodId, setSelectedMethodId] = useState<string>("");
+
   const [westernProvider, setWesternProvider] = useState<WesternTopupProvider>(() => initialWesternProvider(params));
   const [africanProvider, setAfricanProvider] = useState<AfricanTopupProvider>(() => initialAfricanProvider(params));
   const [verifyState, setVerifyState] = useState<{ status: "verifying" | "success" | "failed"; message: string } | null>(null);
@@ -285,21 +293,28 @@ const TopUpPage = () => {
 
   const selectedWallet = wallets?.find((w) => w.wallet_id === selectedWalletId);
   const currency = selectedWallet?.currency_code || SYSTEM_DEFAULT_CURRENCY;
+
+  useEffect(() => {
+    setWesternCardRail("square");
+    setAfricaBackupId(null);
+  }, [currency]);
   const intlMethods = useMemo(() => availableIntlMethods(currency), [currency]);
   const africaMomoMethods = useMemo(() => availableAfricaMomoMethods(currency), [currency]);
   const [policyIntlOverride, setPolicyIntlOverride] = useState<IntlTopupMethod | null>(null);
   const [policyAfricaOverride, setPolicyAfricaOverride] = useState<AfricaMomoTopupMethod | null>(null);
+  const [policyFailoverPartners, setPolicyFailoverPartners] = useState<string[]>([]);
 
   useEffect(() => {
     let cancelled = false;
     setPolicyIntlOverride(null);
     setPolicyAfricaOverride(null);
+    setPolicyFailoverPartners([]);
     const fromQuery = params.get("method") || params.get("provider") || params.get("rail");
     if (fromQuery) return;
     void (async () => {
       try {
         const pref = await resolveCollectMethodPreference(currency);
-        if (cancelled || pref.source !== "policy" || !pref.method) return;
+        if (cancelled || !pref.method) return;
         const m = pref.method as string;
         if (intlMethods.includes(m as IntlTopupMethod)) {
           setPolicyIntlOverride(m as IntlTopupMethod);
@@ -308,6 +323,9 @@ const TopUpPage = () => {
         if (africa.includes(m as AfricaMomoTopupMethod)) {
           setPolicyAfricaOverride(m as AfricaMomoTopupMethod);
         }
+        setPolicyFailoverPartners(pref.rails.slice(1));
+        if (m === "paypal") setWesternCardRail("paypal");
+        else setWesternCardRail("square");
       } catch {
         /* keep auto-pick */
       }
@@ -513,7 +531,7 @@ const TopUpPage = () => {
       })();
     if (squareFlag === "1") {
       if (squareOrderId) {
-        setVerifyState({ status: "verifying", message: "Confirming your Square payment…" });
+        setVerifyState({ status: "verifying", message: "Confirming your payment…" });
         (async () => {
           try {
             const result = await verifySquareCheckout(squareOrderId);
@@ -533,13 +551,13 @@ const TopUpPage = () => {
             } else {
               setVerifyState({
                 status: "verifying",
-                message: result.message || "Waiting for Square confirmation…",
+                message: result.message || "Waiting for payment confirmation…",
               });
             }
           } catch (e) {
             setVerifyState({
               status: "failed",
-              message: e instanceof Error ? e.message : "Could not confirm Square payment",
+              message: e instanceof Error ? e.message : "Could not confirm payment",
             });
           }
         })();
@@ -547,7 +565,7 @@ const TopUpPage = () => {
       }
       setVerifyState({
         status: "failed",
-        message: "Missing Square order reference — if you paid, contact support with your receipt.",
+        message: "Missing payment reference — if you paid, contact support with your receipt.",
       });
       return;
     }
@@ -741,7 +759,29 @@ const TopUpPage = () => {
       }
       window.location.href = link;
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not start checkout");
+      const flwMethods = FLW_METHODS_BY_CCY[currency] || ["card"];
+      const hosted = flwMethods.filter((m) => ["card", "banktransfer", "ussd"].includes(m));
+      const fromPolicy = policyFailoverPartners
+        .map((p) => collectPayMethodIds(collectMethodForPartner(p) || p)[0])
+        .find((id) => id && id !== "fincra");
+      const backup =
+        fromPolicy
+        || (productFeatures.flutterwave && hosted.length > 0 && "flw_hosted")
+        || (productFeatures.flutterwave && (flwMethods.includes("mobilemoney") || currency === "TZS") && "flw_momo")
+        || (productFeatures.nombaNigeria && isNombaTopupLive(currency) && intlMethods.includes("nomba") && "nomba")
+        || (productFeatures.paytota && (intlMethods.includes("paytota") || africaMomoMethods.includes("paytota")) && "paytota")
+        || (productFeatures.swychr && africaMomoMethods.includes("swychr") && "swychr")
+        || (productFeatures.ghanaPay && africaMomoMethods.includes("ghana") && "ghana")
+        || (productFeatures.elicate && africaMomoMethods.includes("elicate") && "elicate")
+        || (productFeatures.wise && (intlMethods.includes("wise") || africaMomoMethods.includes("wise")) && "wise")
+        || null;
+      if (backup) {
+        toast.message("Card checkout is busy — try the option below.");
+        setAfricaBackupId(backup);
+        setSelectedMethodId(backup);
+      } else {
+        toast.error(e instanceof Error ? e.message : "Could not start checkout");
+      }
     } finally {
       setLoading(false);
     }
@@ -757,14 +797,32 @@ const TopUpPage = () => {
     void queryClient.invalidateQueries({ queryKey: ["wallets"] });
   };
 
-  const [selectedMethodId, setSelectedMethodId] = useState<string>("");
-
   type PayMethod = CheckoutMethod & { tone: PayTone };
   const payMethods: PayMethod[] = [];
 
   if (selectedWallet && liveTopup) {
     const walletId = selectedWallet.wallet_id;
     const rails = new Set<string>([...intlMethods, ...africaMomoMethods]);
+    const ccyUpper = currency.toUpperCase();
+    const collectPrimary =
+      (policyIntlOverride && intlMethods.includes(policyIntlOverride) && policyIntlOverride)
+      || (policyAfricaOverride && africaMomoMethods.includes(policyAfricaOverride) && policyAfricaOverride)
+      || defaultCollectPartner(ccyUpper)
+      || null;
+    const primaryIds = collectPrimary ? collectPayMethodIds(collectPrimary) : [];
+    const showRail = (id: string) => {
+      if (id === "link_bank") return true;
+      if (africaBackupId) {
+        return id === africaBackupId || id === "interac" || id === "plaid";
+      }
+      if (primaryIds.length === 0) return true;
+      if (primaryIds.includes(id)) return true;
+      // CAD: keep Interac on the Bank tab even when Card (Square) is primary.
+      if (ccyUpper === "CAD" && (id === "interac" || id === "plaid") && !primaryIds.includes("interac")) {
+        return true;
+      }
+      return false;
+    };
 
     payMethods.push({
       id: "link_bank",
@@ -778,31 +836,43 @@ const TopUpPage = () => {
       ),
     });
 
-    const isCadWalletEarly = currency.toUpperCase() === "CAD";
-    // CAD pay-in is Plaid → Loop only (no Square/Stripe card micro-deposit rails).
-    if (productFeatures.square && rails.has("square") && !isCadWalletEarly) {
+    const usePaypalCard =
+      westernCardRail === "paypal"
+      || (!productFeatures.square && productFeatures.paypal && rails.has("paypal"));
+    if (showRail("square") && (productFeatures.square || productFeatures.paypal)) {
       payMethods.push({
         id: "square",
         tone: "card",
         label: "Card",
-        description: "Visa, Mastercard, Amex — powered by Square",
-        content: (
-          <SectionBoundary name="SquareTopUp">
-            <SquareTopUpCard walletId={walletId} walletCurrency={currency} initialAmount={amount} embedded onComplete={invalidateWallets} />
-          </SectionBoundary>
-        ),
-      });
-    }
-
-    if (productFeatures.paypal && rails.has("paypal")) {
-      payMethods.push({
-        id: "paypal",
-        tone: "card",
-        label: "PayPal",
-        description: "Pay with PayPal",
-        content: (
+        description: "Visa, Mastercard, Amex",
+        content: usePaypalCard && productFeatures.paypal ? (
           <SectionBoundary name="PayPalTopUp">
             <PayPalTopUpCard walletId={walletId} walletCurrency={currency} initialAmount={amount} embedded onComplete={invalidateWallets} />
+          </SectionBoundary>
+        ) : (
+          <SectionBoundary name="SquareTopUp">
+            <SquareTopUpCard
+              walletId={walletId}
+              walletCurrency={currency}
+              initialAmount={amount}
+              embedded
+              onComplete={invalidateWallets}
+              onCheckoutUnavailable={() => {
+                const next = policyFailoverPartners
+                  .map((p) => (collectMethodForPartner(p) || p).toLowerCase())
+                  .find((m) => m === "paypal" || m === "dodo" || m === "paytota" || m === "fincra");
+                if (next === "paypal" || (!next && productFeatures.paypal)) {
+                  toast.message("Card checkout is busy — try the option below.");
+                  setWesternCardRail("paypal");
+                } else if (next) {
+                  toast.message("Card checkout is busy — try the option below.");
+                  setAfricaBackupId(collectPayMethodIds(next)[0] || next);
+                  setSelectedMethodId(collectPayMethodIds(next)[0] || next);
+                } else {
+                  toast.error("Card checkout is unavailable right now.");
+                }
+              }}
+            />
           </SectionBoundary>
         ),
       });
@@ -810,12 +880,12 @@ const TopUpPage = () => {
 
     if (productFeatures.flutterwave && rails.has("flutterwave")) {
       const hosted = availableFlwMethods.filter((m) => ["card", "banktransfer", "ussd"].includes(m));
-      if (hosted.length > 0) {
+      if (showRail("flw_hosted") && hosted.length > 0) {
         payMethods.push({
           id: "flw_hosted",
           tone: hosted.includes("card") ? "card" : "bank",
           label: hosted.includes("card") ? "Card" : "Bank transfer",
-          description: "Powered by Flutterwave",
+          description: "Pay on a secure checkout page",
           content: (
             <SectionBoundary name="FlutterwaveHostedTopUp">
               <FlutterwaveHostedTopUpCard
@@ -830,12 +900,12 @@ const TopUpPage = () => {
           ),
         });
       }
-      if (availableFlwMethods.includes("mobilemoney") || currency === "TZS") {
+      if (showRail("flw_momo") && (availableFlwMethods.includes("mobilemoney") || currency === "TZS")) {
         payMethods.push({
           id: "flw_momo",
           tone: "mobile",
           label: "Mobile money",
-          description: "Powered by Flutterwave",
+          description: "Pay with mobile money",
           content: (
             <SectionBoundary name="FlutterwaveMomoTopUp">
               <FlutterwaveMomoTopUpCard walletId={walletId} walletCurrency={currency} initialAmount={amount} onComplete={invalidateWallets} />
@@ -845,12 +915,12 @@ const TopUpPage = () => {
       }
     }
 
-    if (productFeatures.swychr && rails.has("swychr")) {
+    if (showRail("swychr") && productFeatures.swychr && rails.has("swychr")) {
       payMethods.push({
         id: "swychr",
         tone: "mobile",
         label: "Mobile money & card",
-        description: "Powered by Swychr",
+        description: "Pay with mobile money or card",
         content: (
           <SectionBoundary name="SwychrTopUp">
             <SwychrTopUpCard walletId={walletId} walletCurrency={currency} initialAmount={amount} onComplete={invalidateWallets} />
@@ -859,13 +929,13 @@ const TopUpPage = () => {
       });
     }
 
-    if (productFeatures.paytota && rails.has("paytota")) {
+    if (showRail("paytota") && productFeatures.paytota && rails.has("paytota")) {
       const africaMomo = PAYTOTA_AFRICA_TOPUP_CURRENCIES.includes(currency.toUpperCase());
       payMethods.push({
         id: "paytota",
         tone: africaMomo ? "mobile" : "card",
         label: africaMomo ? "Mobile money" : "Card or hosted invoice",
-        description: "Powered by Paytota",
+        description: africaMomo ? "Pay with mobile money" : "Pay from a secure invoice link",
         content: (
           <SectionBoundary name="PaytotaTopUp">
             <PaytotaTopUpCard walletId={walletId} walletCurrency={currency} initialAmount={amount} onComplete={invalidateWallets} />
@@ -874,12 +944,12 @@ const TopUpPage = () => {
       });
     }
 
-    if (productFeatures.dodo && rails.has("dodo")) {
+    if (showRail("dodo") && productFeatures.dodo && rails.has("dodo")) {
       payMethods.push({
         id: "dodo",
         tone: "card",
         label: "Card",
-        description: "Visa, Mastercard, Amex — powered by Dodo",
+        description: "Visa, Mastercard, Amex",
         content: (
           <SectionBoundary name="DodoTopUp">
             <DodoTopUpCard walletId={walletId} walletCurrency={currency} initialAmount={amount} embedded onComplete={invalidateWallets} />
@@ -888,12 +958,12 @@ const TopUpPage = () => {
       });
     }
 
-    if (productFeatures.nombaNigeria && rails.has("nomba") && isNombaTopupLive(currency)) {
+    if (showRail("nomba") && productFeatures.nombaNigeria && rails.has("nomba") && isNombaTopupLive(currency)) {
       payMethods.push({
         id: "nomba",
         tone: "card",
         label: "Card or bank transfer",
-        description: "Powered by Nomba Checkout",
+        description: "Pay with card or bank transfer",
         content: (
           <SectionBoundary name="NombaTopUp">
             <NombaTopUpCard walletId={walletId} walletCurrency={currency} initialAmount={amount} embedded onComplete={invalidateWallets} />
@@ -902,12 +972,12 @@ const TopUpPage = () => {
       });
     }
 
-    if (rails.has("lenhub")) {
+    if (showRail("lenhub") && rails.has("lenhub")) {
       payMethods.push({
         id: "lenhub",
         tone: "card",
         label: "Card or bank transfer",
-        description: "Powered by Lenhub",
+        description: "Pay with card or bank transfer",
         content: (
           <SectionBoundary name="LenhubTopUp">
             <LenhubFlutterTopUpCard walletId={walletId} walletCurrency={currency} initialAmount={amount} onComplete={invalidateWallets} />
@@ -918,7 +988,7 @@ const TopUpPage = () => {
 
     const isCadWallet = currency.toUpperCase() === "CAD";
 
-    if (isCadWallet && productFeatures.plaid) {
+    if (showRail("plaid") && isCadWallet && productFeatures.plaid) {
       payMethods.push({
         id: "plaid",
         tone: "bank",
@@ -937,6 +1007,7 @@ const TopUpPage = () => {
         ),
       });
     } else if (
+      showRail("interac") &&
       isCadWallet &&
       (rails.has("interac") ||
         rails.has("wise") ||
@@ -979,18 +1050,22 @@ const TopUpPage = () => {
     }
 
 
-    if (productFeatures.fincra && rails.has("fincra")) {
+    if (showRail("fincra") && productFeatures.fincra && rails.has("fincra")) {
       const isCadViaUsd = currency.toUpperCase() === "CAD";
       const cadQuote = isCadViaUsd ? quoteCadNombaTopup(amountNum || 0, fxRates) : null;
+      const fincraTone: PayTone =
+        ["KES", "UGX", "TZS", "XAF", "XOF", "MWK", "GHS", "ZMW"].includes(currency.toUpperCase())
+          ? "mobile"
+          : "card";
       payMethods.push({
         id: "fincra",
-        tone: "bank",
-        label: "Bank transfer or card checkout",
-        description: "Powered by Fincra",
+        tone: isCadViaUsd ? "bank" : fincraTone,
+        label: fincraGatewayLabel(currency),
+        description: "Pay on a secure checkout page",
         content: (
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              You will be redirected to Fincra's secure checkout to complete this payment.
+              You’ll be redirected to a secure checkout to complete this payment.
             </p>
             {isCadViaUsd && amountNum > 0 && (
               cadQuote ? (
@@ -1028,12 +1103,12 @@ const TopUpPage = () => {
       });
     }
 
-    if (productFeatures.wise && isWisePayCurrency(currency)) {
+    if (showRail("wise_link") && productFeatures.wise && isWisePayCurrency(currency)) {
       payMethods.push({
         id: "wise_link",
         tone: "bank",
-        label: "Pay with Wise",
-        description: "Bank transfer or card via Wise",
+        label: "Pay with bank or card",
+        description: "Bank transfer or card",
         content: (
           <SectionBoundary name="WisePayLink">
             <WisePayLinkCard walletId={walletId} walletCurrency={currency} initialAmount={amount} onComplete={invalidateWallets} />
@@ -1042,12 +1117,12 @@ const TopUpPage = () => {
       });
     }
 
-    if (productFeatures.wise && rails.has("wise") && !isCadWallet) {
+    if (showRail("wise") && productFeatures.wise && rails.has("wise") && !isCadWallet) {
       payMethods.push({
         id: "wise",
         tone: "bank",
         label: "Bank transfer",
-        description: "Powered by Wise",
+        description: "Send a bank transfer with your payment reference",
         content: (
           <SectionBoundary name="WiseTopUp">
             <WiseTopUpCard walletId={walletId} walletCurrency={currency} initialAmount={amount} onComplete={invalidateWallets} />
@@ -1056,7 +1131,7 @@ const TopUpPage = () => {
       });
     }
 
-    if (productFeatures.ghanaPay && rails.has("ghana")) {
+    if (showRail("ghana") && productFeatures.ghanaPay && rails.has("ghana")) {
       payMethods.push({
         id: "ghana",
         tone: "mobile",
@@ -1070,12 +1145,12 @@ const TopUpPage = () => {
       });
     }
 
-    if (productFeatures.elicate && rails.has("elicate")) {
+    if (showRail("elicate") && productFeatures.elicate && rails.has("elicate")) {
       payMethods.push({
         id: "elicate",
         tone: "card",
         label: "Card",
-        description: "Powered by Elicate",
+        description: "Pay with card",
         content: (
           <SectionBoundary name="ElicateTopUp">
             <ElicateTopUpCard walletId={walletId} walletCurrency={currency} initialAmount={amount} />
@@ -1092,7 +1167,7 @@ const TopUpPage = () => {
     paytota_pay: "paytota",
     dodo_pay: "dodo",
     square_pay: "square",
-    paypal_pay: "paypal",
+    paypal_pay: "square",
     nomba_pay: "nomba",
     lenhub_flutter: "lenhub",
     fincra_interac: "interac",
@@ -1101,8 +1176,17 @@ const TopUpPage = () => {
     ghana_pay: "ghana",
     elicate: "elicate",
   };
+  const collectPrimaryIds = collectPayMethodIds(
+    policyIntlOverride
+    || policyAfricaOverride
+    || defaultCollectPartner(currency)
+    || "",
+  );
   const defaultMethodId =
-    payMethods.find((m) => m.id === GATEWAY_DEFAULT_METHOD[gateway])?.id || payMethods[0]?.id || "";
+    payMethods.find((m) => collectPrimaryIds.includes(m.id))?.id
+    || payMethods.find((m) => m.id === GATEWAY_DEFAULT_METHOD[gateway])?.id
+    || payMethods[0]?.id
+    || "";
 
   const payCategoryMeta: Record<PayTone, { label: string; sublabel: string; icon: typeof PayCardIcon }> = {
     card: { label: "Card", sublabel: "Debit or credit", icon: PayCardIcon },

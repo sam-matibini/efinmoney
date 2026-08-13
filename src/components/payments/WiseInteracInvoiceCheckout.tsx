@@ -7,6 +7,7 @@ import LoopBillingPayPanel from "@/components/payments/LoopBillingPayPanel";
 import type { InteracIntent } from "@/components/payments/InteracCheckout";
 import { type Lang } from "@/components/payments/checkoutStrings";
 import { loopBillingLinkConfigured } from "@/lib/loopCad";
+import { productFeatures } from "@/lib/productFeatures";
 
 interface Props {
   walletId: string;
@@ -63,6 +64,13 @@ export default function WiseInteracInvoiceCheckout({
 
   const [method, setMethod] = useState<CheckoutMethod | null>(null);
   const showLoopBilling = loopBillingLinkConfigured();
+  const flovideOn = productFeatures.flovide || productFeatures.flovideInterac;
+  const interacTitle = flovideOn ? "Interac" : undefined;
+  const interacDescription = flovideOn
+    ? lang === "fr"
+      ? "Demande Interac à votre courriel — approuvez dans votre app bancaire"
+      : "Interac request to your email — approve in your banking app"
+    : undefined;
 
   const amountLabel = useMemo(() => {
     const n = Number(amount);
@@ -133,6 +141,8 @@ export default function WiseInteracInvoiceCheckout({
           cardAvailable={false}
           lang={lang}
           onChange={setMethod}
+          interacTitle={interacTitle}
+          interacDescription={interacDescription}
         />
       ) : method === "loop_billing" ? (
         <LoopBillingPayPanel

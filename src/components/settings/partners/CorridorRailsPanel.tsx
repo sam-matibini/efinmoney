@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import {
   RAIL_OPTIONS,
+  defaultCollectPartner,
   useCorridorRailPolicies,
   useDeleteCorridorRailPolicy,
   useSaveCorridorRailPolicy,
@@ -73,10 +74,40 @@ const PARTNERS: PartnerMeta[] = [
 ];
 
 function partnersFor(direction: RailDirection, currency: string): PartnerMeta[] {
-  return PARTNERS.filter((p) => {
-    const list = direction === "collect" ? p.collect : p.payout;
-    return list.includes(currency) || list.includes("*");
+  const list = PARTNERS.filter((p) => {
+    const allowed = direction === "collect" ? p.collect : p.payout;
+    return allowed.includes(currency) || allowed.includes("*");
   });
+  if (direction !== "collect") return list;
+  const preferred = defaultCollectPartner(currency);
+  if (!preferred) return list;
+  return [...list].sort((a, b) => {
+    if (a.id === preferred) return -1;
+    if (b.id === preferred) return 1;
+    return 0;
+  });
+}
+
+function findPolicy(
+  rows: CorridorRailPolicy[],
+  direction: RailDirection,
+  currency: string,
+  country: string,
+): CorridorRailPolicy | undefined {
+  return (
+    rows.find(
+      (r) =>
+        r.direction === direction
+        && r.currency_code === currency
+        && (r.country_code || "") === (country || ""),
+    )
+    || rows.find(
+      (r) =>
+        r.direction === direction
+        && r.currency_code === currency
+        && !r.country_code,
+    )
+  );
 }
 
 function partnerName(id: string) {
@@ -157,33 +188,35 @@ export default function CorridorRailsPanel() {
     });
   };
 
-  const setDirection = (direction: RailDirection) => {
-    const nextAvailable = partnersFor(direction, currency);
+  const applyContext = (direction: RailDirection, key: string) => {
+    const { currency: ccy, country: cc } = parseCorridor(key);
+    const nextAvailable = partnersFor(direction, ccy);
+    const existing = findPolicy(rows, direction, ccy, cc);
+    const fallback =
+      (direction === "collect" ? defaultCollectPartner(ccy) : "") ||
+      nextAvailable[0]?.id ||
+      "";
+    const preferred =
+      existing?.preferred_partner
+      || (nextAvailable.some((p) => p.id === fallback) ? fallback : nextAvailable[0]?.id || "");
     setForm((f) => ({
       ...f,
+      id: existing?.id || "",
       direction,
-      preferred_partner: nextAvailable.some((p) => p.id === f.preferred_partner)
-        ? f.preferred_partner
-        : nextAvailable[0]?.id || "",
-      failover_partners: f.failover_partners.filter((id) =>
-        nextAvailable.some((p) => p.id === id && p.id !== f.preferred_partner),
-      ),
+      corridorKey: key,
+      preferred_partner: preferred,
+      failover_partners: existing?.failover_partners || [],
+      enabled: existing ? existing.enabled : true,
+      notes: existing?.notes || "",
     }));
   };
 
+  const setDirection = (direction: RailDirection) => {
+    applyContext(direction, form.corridorKey);
+  };
+
   const setCorridor = (key: string) => {
-    const { currency: ccy } = parseCorridor(key);
-    const nextAvailable = partnersFor(form.direction, ccy);
-    setForm((f) => ({
-      ...f,
-      corridorKey: key,
-      preferred_partner: nextAvailable.some((p) => p.id === f.preferred_partner)
-        ? f.preferred_partner
-        : nextAvailable[0]?.id || "",
-      failover_partners: f.failover_partners.filter((id) =>
-        nextAvailable.some((p) => p.id === id),
-      ),
-    }));
+    applyContext(form.direction, key);
   };
 
   const toggleBackup = (id: string) => {
@@ -251,12 +284,11 @@ export default function CorridorRailsPanel() {
           <div className="text-sm text-muted-foreground space-y-2">
             <p>
               This page decides <strong className="text-foreground">which payment company</strong> we use for a currency —
-              like “for Nigeria sends, use Fincra first.”
+              for <em>sends</em> and for <em>wallet top-ups</em>.
             </p>
             <p>
-              <strong className="text-foreground">Example:</strong> Send money in naira → main provider <em>Fincra</em> →
-              backup <em>Nomba</em>. If both fail, we hold the customer’s funds and email ops
-              so you can fix it by hand.
+              <strong className="text-foreground">Top-up:</strong> pick “Customers topping up a wallet”, choose CAD or NGN,
+              set the main provider (Square for CAD, Fincra for NGN by default), then save. The top-up page follows that rule.
             </p>
           </div>
         </CardHeader>
@@ -461,10 +493,57 @@ export default function CorridorRailsPanel() {
       </Card>
 
       <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Top-up primaries in effect</CardTitle>
+          <CardDescription>
+            What the wallet top-up page uses right now. Saved rules override the built-in default. Click a row to edit.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Wallet</TableHead>
+                <TableHead>Main provider</TableHead>
+                <TableHead>Source</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {(["CAD", "USD", "EUR", "GBP", "NGN", "GHS", "KES", "UGX", "TZS", "RWF", "ZMW", "ZAR", "XOF", "XAF"] as const).map((ccy) => {
+                const saved = rows.find((r) => r.direction === "collect" && r.currency_code === ccy && r.enabled);
+                const partner = saved?.preferred_partner || defaultCollectPartner(ccy);
+                if (!partner) return null;
+                return (
+                  <TableRow
+                    key={ccy}
+                    className="cursor-pointer"
+                    onClick={() => {
+                      const key = saved
+                        ? corridorKey(saved.currency_code, saved.country_code || "")
+                        : corridorKey(ccy, CORRIDORS.find((c) => c.currency === ccy)?.country || "");
+                      applyContext("collect", key);
+                    }}
+                  >
+                    <TableCell className="font-medium">{ccy}</TableCell>
+                    <TableCell>{partnerName(partner)}</TableCell>
+                    <TableCell>
+                      <Badge variant={saved ? "default" : "outline"}>
+                        {saved ? "Saved rule" : "Built-in default"}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle className="text-base">Rules you already saved</CardTitle>
-            <CardDescription>Edit or delete anytime. Empty list = we keep the old automatic order.</CardDescription>
+            <CardDescription>Edit or delete anytime. No saved top-up rule = built-in default (Square west, Fincra Africa).</CardDescription>
           </div>
           <Button variant="ghost" size="sm" onClick={() => refetch()}>Refresh</Button>
         </CardHeader>
