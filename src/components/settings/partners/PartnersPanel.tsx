@@ -212,6 +212,7 @@ export const PartnersPanel = () => {
   const remove = useDeletePartner();
 
   const [open, setOpen] = useState(false);
+  const [viewPartner, setViewPartner] = useState<PaymentPartner | null>(null);
   const [draft, setDraft] = useState<Partial<PaymentPartner>>(emptyPartner);
   const [viewing, setViewing] = useState<PaymentPartner | null>(null);
   const [importOpen, setImportOpen] = useState(false);
@@ -490,6 +491,78 @@ export const PartnersPanel = () => {
           </div>
         )}
       </CardContent>
+
+      {/* View dialog */}
+      <Dialog open={!!viewPartner} onOpenChange={(o) => !o && setViewPartner(null)}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Network className="h-5 w-5" /> {viewPartner?.name}
+              <Badge variant={statusVariant(viewPartner?.status ?? "")} className="capitalize ml-1">
+                {viewPartner?.status}
+              </Badge>
+            </DialogTitle>
+            <DialogDescription>{viewPartner?.code}</DialogDescription>
+          </DialogHeader>
+          {viewPartner && (
+            <div className="grid gap-3 sm:grid-cols-2 text-sm">
+              {[
+                ["Direction", viewPartner.direction],
+                ["Country", viewPartner.country || "—"],
+                ["Regulatory status", viewPartner.regulatory_status || "—"],
+                ["Settlement currency", viewPartner.settlement_currency || "—"],
+                ["Settlement time", viewPartner.settlement_time || "—"],
+                ["API status", viewPartner.api_status],
+                ["Integration status", viewPartner.integration_status],
+                ["Compliance risk", viewPartner.compliance_risk],
+                ["Reliability score", String(viewPartner.reliability_score)],
+                ["Routing priority", String(viewPartner.priority)],
+                ["Min transaction", viewPartner.min_transaction != null ? String(viewPartner.min_transaction) : "—"],
+                ["Max transaction", viewPartner.max_transaction != null ? String(viewPartner.max_transaction) : "—"],
+                ["Daily limit", viewPartner.daily_limit != null ? String(viewPartner.daily_limit) : "—"],
+                ["Monthly limit", viewPartner.monthly_limit != null ? String(viewPartner.monthly_limit) : "—"],
+              ].map(([label, value]) => (
+                <div key={label}>
+                  <p className="text-xs text-muted-foreground">{label}</p>
+                  <p className="font-medium capitalize">{value}</p>
+                </div>
+              ))}
+              <div className="sm:col-span-2">
+                <p className="text-xs text-muted-foreground">Supported currencies</p>
+                <p className="font-medium">{viewPartner.supported_currencies?.join(", ") || "—"}</p>
+              </div>
+              <div className="sm:col-span-2">
+                <p className="text-xs text-muted-foreground">Supported countries</p>
+                <p className="font-medium">{viewPartner.supported_countries?.join(", ") || "—"}</p>
+              </div>
+              <div className="sm:col-span-2">
+                <p className="text-xs text-muted-foreground">Payment methods</p>
+                <p className="font-medium">{viewPartner.payment_methods?.join(", ") || "—"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Pay-in function</p>
+                <p className="font-mono text-xs">{viewPartner.payin_function_slug || "—"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Pay-out function</p>
+                <p className="font-mono text-xs">{viewPartner.payout_function_slug || "—"}</p>
+              </div>
+              {viewPartner.notes && (
+                <div className="sm:col-span-2">
+                  <p className="text-xs text-muted-foreground">Notes</p>
+                  <p>{viewPartner.notes}</p>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setViewPartner(null)}>Close</Button>
+            <Button onClick={() => { setDraft(viewPartner!); setViewPartner(null); setOpen(true); }}>
+              <Pencil className="h-4 w-4 mr-1" /> Edit
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">

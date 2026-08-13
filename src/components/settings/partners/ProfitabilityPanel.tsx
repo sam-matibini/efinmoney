@@ -11,7 +11,9 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { AlertTriangle, TrendingUp } from "lucide-react";
+import { AlertTriangle, TrendingUp, Target } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 
 const money = (n: number) =>
@@ -23,9 +25,19 @@ const PERIODS = [
   { label: "90 days", value: 90 },
 ];
 
+const INDUSTRY_BENCHMARKS: Record<string, number> = {
+  "Remittance (global avg)": 5.4,
+  "Africa corridors": 8.2,
+  "Canada outbound": 3.5,
+  "Mobile money": 4.0,
+  "Bank transfer": 2.8,
+};
+
 export const ProfitabilityPanel = () => {
   const [days, setDays] = useState(30);
   const [groupBy, setGroupBy] = useState<ProfitGroupBy>("partner");
+  const [benchmarkTarget, setBenchmarkTarget] = useState(5.0);
+  const [scenarioFeeAdj, setScenarioFeeAdj] = useState(0);
 
   const { data: rows, isLoading, error } = useProfitabilitySummary(days, groupBy);
   const { data: variance } = useRoutingVariance(days);
@@ -218,6 +230,107 @@ export const ProfitabilityPanel = () => {
                     </TableCell>
                   </TableRow>
                 ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Industry benchmark scenario */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Target className="h-4 w-4 text-blue-500" /> Industry scenario
+          </CardTitle>
+          <CardDescription>
+            Set an industry margin benchmark to see how each group compares. Adjust fee to model the impact.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap gap-6">
+            <div className="flex flex-col gap-1 min-w-[200px]">
+              <Label className="text-xs">Industry benchmark preset</Label>
+              <select
+                className="rounded-md border bg-background px-3 py-1.5 text-sm"
+                onChange={(e) => setBenchmarkTarget(Number(e.target.value))}
+              >
+                {Object.entries(INDUSTRY_BENCHMARKS).map(([label, val]) => (
+                  <option key={label} value={val}>{label} — {val}%</option>
+                ))}
+                <option value={benchmarkTarget}>Custom</option>
+              </select>
+            </div>
+            <div className="flex flex-col gap-1 min-w-[160px]">
+              <Label className="text-xs">Target margin (%)</Label>
+              <Input
+                type="number"
+                step="0.1"
+                value={benchmarkTarget}
+                onChange={(e) => setBenchmarkTarget(Number(e.target.value))}
+                className="w-36"
+              />
+            </div>
+            <div className="flex flex-col gap-1 min-w-[160px]">
+              <Label className="text-xs">Fee scenario adjustment (%)</Label>
+              <Input
+                type="number"
+                step="0.1"
+                value={scenarioFeeAdj}
+                onChange={(e) => setScenarioFeeAdj(Number(e.target.value))}
+                className="w-36"
+                placeholder="e.g. +0.5"
+              />
+              <p className="text-xs text-muted-foreground">Applied to revenue to model a fee change.</p>
+            </div>
+          </div>
+          {rows && rows.length > 0 && (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Group</TableHead>
+                  <TableHead className="text-right">Actual margin</TableHead>
+                  <TableHead className="text-right">Scenario margin</TableHead>
+                  <TableHead className="text-right">vs Industry ({benchmarkTarget}%)</TableHead>
+                  <TableHead className="text-right">Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rows.map((r) => {
+                  const scenarioRevenue = r.revenue * (1 + scenarioFeeAdj / 100);
+                  const scenarioProfit = scenarioRevenue - r.cost;
+                  const scenarioMargin = scenarioRevenue > 0 ? (scenarioProfit / scenarioRevenue) * 100 : 0;
+                  const gap = r.margin_percent - benchmarkTarget;
+                  const scenarioGap = scenarioMargin - benchmarkTarget;
+                  return (
+                    <TableRow key={r.group_key}>
+                      <TableCell className="font-medium">{r.group_label}</TableCell>
+                      <TableCell className="text-right">
+                        <Badge variant={r.margin_percent >= benchmarkTarget ? "secondary" : "destructive"}>
+                          {r.margin_percent.toFixed(1)}%
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Badge variant={scenarioMargin >= benchmarkTarget ? "secondary" : "destructive"}>
+                          {scenarioMargin.toFixed(1)}%
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        <span className={gap >= 0 ? "text-green-600" : "text-destructive"}>
+                          {gap >= 0 ? "+" : ""}{gap.toFixed(1)}pp
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {r.margin_percent >= benchmarkTarget ? (
+                          <Badge variant="default">Above target</Badge>
+                        ) : scenarioMargin >= benchmarkTarget ? (
+                          <Badge variant="secondary">Reachable</Badge>
+                        ) : (
+                          <Badge variant="destructive">Below target</Badge>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           )}

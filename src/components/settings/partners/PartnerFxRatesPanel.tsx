@@ -28,7 +28,9 @@ const empty: Partial<PartnerFxRate> = {
 export const PartnerFxRatesPanel = () => {
   const { data: partners } = usePaymentPartners();
   const [partnerId, setPartnerId] = useState("");
-  const { data: rates, isLoading } = usePartnerFxRates(partnerId || undefined);
+  const [sourceFilter, setSourceFilter] = useState<string>("api");
+  const { data: allRates, isLoading, refetch, isFetching } = usePartnerFxRates(partnerId || undefined);
+  const rates = sourceFilter === "all" ? allRates : allRates?.filter((r) => r.source === sourceFilter);
   const add = useAddPartnerFxRate();
   const refreshLive = useRefreshPartnerLiveRates();
   const selectedCode = partners?.find((p) => p.id === partnerId)?.code;
@@ -73,9 +75,9 @@ export const PartnerFxRatesPanel = () => {
               Partner quotes stored against the mid-market reference, so FX cost is separated from transaction fees. Live rates are pulled from partners with a rate API (Wise, Flutterwave, Nomba) and expire after 15 minutes.
             </CardDescription>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Select value={partnerId || "all"} onValueChange={(v) => setPartnerId(v === "all" ? "" : v)}>
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-[160px]">
                 <SelectValue placeholder="All partners" />
               </SelectTrigger>
               <SelectContent>
@@ -87,6 +89,21 @@ export const PartnerFxRatesPanel = () => {
                 ))}
               </SelectContent>
             </Select>
+            <Select value={sourceFilter} onValueChange={setSourceFilter}>
+              <SelectTrigger className="w-[130px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="api">Live (API)</SelectItem>
+                <SelectItem value="manual">Manual</SelectItem>
+                <SelectItem value="partner_portal">Partner portal</SelectItem>
+                <SelectItem value="file">File</SelectItem>
+                <SelectItem value="all">All sources</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
+              <RefreshCw className={`h-4 w-4 mr-1 ${isFetching ? "animate-spin" : ""}`} /> Refresh live rates
+            </Button>
             <Button
               size="sm"
               variant="outline"

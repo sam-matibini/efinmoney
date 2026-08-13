@@ -10,7 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Archive, Receipt, History, Pencil, Upload, FileDown } from "lucide-react";
+import { Plus, Archive, Receipt, History, Pencil, Upload, FileDown, Eye } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { useTableQuery, type Col } from "./tableToolkit";
@@ -48,6 +48,7 @@ export const EfinPricingPanel = () => {
   const add = useAddEfinPricing();
   const retire = useRetireEfinPricing();
   const [open, setOpen] = useState(false);
+  const [viewRow, setViewRow] = useState<EfinPricing | null>(null);
   const [draft, setDraft] = useState<Partial<EfinPricing>>(empty);
   /** Row being superseded — retired once the new version saves. */
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -202,6 +203,9 @@ export const EfinPricingPanel = () => {
                       )}
                     </TableCell>
                     <TableCell className="text-right whitespace-nowrap">
+                      <Button variant="ghost" size="icon" onClick={() => setViewRow(p)} title="View">
+                        <Eye className="h-4 w-4" />
+                      </Button>
                       {!p.effective_to && (
                         <>
                           <Button variant="ghost" size="icon" onClick={() => openEdit(p)} title="Edit">
@@ -221,6 +225,45 @@ export const EfinPricingPanel = () => {
           </div>
         )}
       </CardContent>
+
+      {/* View dialog */}
+      <Dialog open={!!viewRow} onOpenChange={(o) => !o && setViewRow(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Receipt className="h-4 w-4" /> Pricing detail
+              {viewRow && !viewRow.effective_to && <Badge className="ml-1">current</Badge>}
+            </DialogTitle>
+            <DialogDescription>
+              {viewRow && (
+                <span className="capitalize">{viewRow.customer_type} · {viewRow.direction} · {viewRow.source_currency}→{viewRow.dest_currency}{viewRow.dest_country ? ` (${viewRow.dest_country})` : ""}</span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          {viewRow && (
+            <div className="grid gap-3 sm:grid-cols-2 text-sm">
+              {[
+                ["Fixed fee", viewRow.fixed_fee.toFixed(2)],
+                ["Percentage fee", `${viewRow.percentage_fee}%`],
+                ["FX margin", `${viewRow.fx_margin_bps} bps`],
+                ["Min fee", viewRow.min_fee != null ? viewRow.min_fee.toFixed(2) : "—"],
+                ["Max fee", viewRow.max_fee != null ? viewRow.max_fee.toFixed(2) : "—"],
+                ["Payment method", viewRow.payment_method || "All"],
+                ["Effective from", format(new Date(viewRow.effective_from), "dd MMM yyyy")],
+                ["Effective to", viewRow.effective_to ? format(new Date(viewRow.effective_to), "dd MMM yyyy") : "Current"],
+              ].map(([label, value]) => (
+                <div key={label}>
+                  <p className="text-xs text-muted-foreground">{label}</p>
+                  <p className="font-medium">{value}</p>
+                </div>
+              ))}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setViewRow(null)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-xl">
