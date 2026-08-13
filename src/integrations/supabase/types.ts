@@ -2921,6 +2921,86 @@ export type Database = {
         }
         Relationships: []
       }
+      corridor_rail_policies: {
+        Row: {
+          country_code: string
+          created_at: string
+          currency_code: string
+          direction: string
+          enabled: boolean
+          failover_partners: string[]
+          id: string
+          notes: string | null
+          preferred_partner: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          country_code?: string
+          created_at?: string
+          currency_code: string
+          direction: string
+          enabled?: boolean
+          failover_partners?: string[]
+          id?: string
+          notes?: string | null
+          preferred_partner: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          country_code?: string
+          created_at?: string
+          currency_code?: string
+          direction?: string
+          enabled?: boolean
+          failover_partners?: string[]
+          id?: string
+          notes?: string | null
+          preferred_partner?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      corridor_rail_policy_audit: {
+        Row: {
+          action: string
+          actor_id: string | null
+          after_row: Json | null
+          before_row: Json | null
+          created_at: string
+          id: string
+          policy_id: string | null
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          after_row?: Json | null
+          before_row?: Json | null
+          created_at?: string
+          id?: string
+          policy_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          after_row?: Json | null
+          before_row?: Json | null
+          created_at?: string
+          id?: string
+          policy_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "corridor_rail_policy_audit_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "corridor_rail_policies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cpn_corridors: {
         Row: {
           created_at: string
@@ -12433,10 +12513,16 @@ export type Database = {
           id: string
           interac_security_answer: string | null
           interac_security_question: string | null
+          ops_alerted_at: string | null
+          ops_note: string | null
+          ops_resolved_at: string | null
+          ops_resolved_by: string | null
+          ops_status: string | null
           payout_method: string | null
           paysafe_payment_id: string | null
           provider_charge_id: string | null
           provider_reference: string | null
+          rails_attempted: string[] | null
           recipient_account: string | null
           recipient_bank_code: string | null
           recipient_bank_name: string | null
@@ -12470,10 +12556,16 @@ export type Database = {
           id?: string
           interac_security_answer?: string | null
           interac_security_question?: string | null
+          ops_alerted_at?: string | null
+          ops_note?: string | null
+          ops_resolved_at?: string | null
+          ops_resolved_by?: string | null
+          ops_status?: string | null
           payout_method?: string | null
           paysafe_payment_id?: string | null
           provider_charge_id?: string | null
           provider_reference?: string | null
+          rails_attempted?: string[] | null
           recipient_account?: string | null
           recipient_bank_code?: string | null
           recipient_bank_name?: string | null
@@ -12507,10 +12599,16 @@ export type Database = {
           id?: string
           interac_security_answer?: string | null
           interac_security_question?: string | null
+          ops_alerted_at?: string | null
+          ops_note?: string | null
+          ops_resolved_at?: string | null
+          ops_resolved_by?: string | null
+          ops_status?: string | null
           payout_method?: string | null
           paysafe_payment_id?: string | null
           provider_charge_id?: string | null
           provider_reference?: string | null
+          rails_attempted?: string[] | null
           recipient_account?: string | null
           recipient_bank_code?: string | null
           recipient_bank_name?: string | null
@@ -14489,6 +14587,7 @@ export type Database = {
         | "reversed"
         | "expired"
         | "pending_liquidity"
+        | "pending_ops"
       transfer_type:
         | "internal"
         | "mobile_money"
@@ -14845,6 +14944,7 @@ export const Constants = {
         "reversed",
         "expired",
         "pending_liquidity",
+        "pending_ops",
       ],
       transfer_type: [
         "internal",
