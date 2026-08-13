@@ -26,6 +26,7 @@ import LiquidityForecastPanel from "./partners/LiquidityForecastPanel";
 import PartnerIncidentsPanel from "./partners/PartnerIncidentsPanel";
 import CorridorRailsPanel from "./partners/CorridorRailsPanel";
 import ApiPartnersPanel from "./partners/ApiPartnersPanel";
+import PartnerRelationshipsPanel from "./partners/crm/PartnerRelationshipsPanel";
 
 
 
@@ -36,6 +37,7 @@ export const PartnerNetworkPanel = () => (
       <TabsList className="inline-flex w-auto">
         <TabsTrigger value="rails">Corridor rails</TabsTrigger>
         <TabsTrigger value="partners">Partners</TabsTrigger>
+        <TabsTrigger value="relationships">Relationships</TabsTrigger>
         <TabsTrigger value="corridors">Corridors</TabsTrigger>
         <TabsTrigger value="activation">Activation</TabsTrigger>
         <TabsTrigger value="pricing">Partner pricing</TabsTrigger>
@@ -76,6 +78,9 @@ export const PartnerNetworkPanel = () => (
     </TabsContent>
     <TabsContent value="partners">
       <SectionBoundary name="PartnersPanel"><PartnersPanel /></SectionBoundary>
+    </TabsContent>
+    <TabsContent value="relationships">
+      <SectionBoundary name="PartnerRelationshipsPanel"><PartnerRelationshipsPanel /></SectionBoundary>
     </TabsContent>
     <TabsContent value="corridors">
       <SectionBoundary name="PartnerCorridorsPanel"><PartnerCorridorsPanel /></SectionBoundary>

@@ -6792,6 +6792,65 @@ export type Database = {
         }
         Relationships: []
       }
+      partner_addresses: {
+        Row: {
+          address_type: string
+          city: string | null
+          country: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          is_primary: boolean
+          line1: string | null
+          line2: string | null
+          notes: string | null
+          partner_id: string
+          postal_code: string | null
+          region: string | null
+          updated_at: string
+        }
+        Insert: {
+          address_type?: string
+          city?: string | null
+          country?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_primary?: boolean
+          line1?: string | null
+          line2?: string | null
+          notes?: string | null
+          partner_id: string
+          postal_code?: string | null
+          region?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address_type?: string
+          city?: string | null
+          country?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_primary?: boolean
+          line1?: string | null
+          line2?: string | null
+          notes?: string | null
+          partner_id?: string
+          postal_code?: string | null
+          region?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_addresses_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "payment_partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       partner_alerts: {
         Row: {
           acknowledged_at: string | null
@@ -6934,6 +6993,74 @@ export type Database = {
           },
         ]
       }
+      partner_contacts: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          email: string | null
+          escalation_order: number | null
+          full_name: string
+          id: string
+          is_active: boolean
+          is_primary: boolean
+          notes: string | null
+          partner_id: string
+          phone: string | null
+          phone_alt: string | null
+          preferred_channel: string | null
+          role_type: string
+          timezone: string | null
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          escalation_order?: number | null
+          full_name: string
+          id?: string
+          is_active?: boolean
+          is_primary?: boolean
+          notes?: string | null
+          partner_id: string
+          phone?: string | null
+          phone_alt?: string | null
+          preferred_channel?: string | null
+          role_type?: string
+          timezone?: string | null
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          escalation_order?: number | null
+          full_name?: string
+          id?: string
+          is_active?: boolean
+          is_primary?: boolean
+          notes?: string | null
+          partner_id?: string
+          phone?: string | null
+          phone_alt?: string | null
+          preferred_channel?: string | null
+          role_type?: string
+          timezone?: string | null
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_contacts_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "payment_partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       partner_corridors: {
         Row: {
           created_at: string
@@ -6986,6 +7113,160 @@ export type Database = {
             columns: ["partner_id"]
             isOneToOne: false
             referencedRelation: "payment_partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      partner_crm_activities: {
+        Row: {
+          activity_type: string
+          body: string | null
+          contact_id: string | null
+          created_at: string
+          created_by: string | null
+          document_id: string | null
+          follow_up_at: string | null
+          follow_up_done: boolean
+          follow_up_owner: string | null
+          id: string
+          occurred_at: string
+          partner_id: string
+          subject: string
+          updated_at: string
+        }
+        Insert: {
+          activity_type?: string
+          body?: string | null
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          document_id?: string | null
+          follow_up_at?: string | null
+          follow_up_done?: boolean
+          follow_up_owner?: string | null
+          id?: string
+          occurred_at?: string
+          partner_id: string
+          subject: string
+          updated_at?: string
+        }
+        Update: {
+          activity_type?: string
+          body?: string | null
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          document_id?: string | null
+          follow_up_at?: string | null
+          follow_up_done?: boolean
+          follow_up_owner?: string | null
+          id?: string
+          occurred_at?: string
+          partner_id?: string
+          subject?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_crm_activities_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "partner_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "partner_crm_activities_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "partner_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "partner_crm_activities_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "payment_partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      partner_documents: {
+        Row: {
+          counterparty_signer: string | null
+          created_at: string
+          doc_type: string
+          effective_date: string | null
+          expiry_date: string | null
+          file_name: string
+          file_path: string
+          id: string
+          mime_type: string | null
+          notes: string | null
+          partner_id: string
+          signed_date: string | null
+          size_bytes: number | null
+          status: string
+          superseded_by: string | null
+          title: string
+          updated_at: string
+          uploaded_by: string | null
+          version: string | null
+        }
+        Insert: {
+          counterparty_signer?: string | null
+          created_at?: string
+          doc_type?: string
+          effective_date?: string | null
+          expiry_date?: string | null
+          file_name: string
+          file_path: string
+          id?: string
+          mime_type?: string | null
+          notes?: string | null
+          partner_id: string
+          signed_date?: string | null
+          size_bytes?: number | null
+          status?: string
+          superseded_by?: string | null
+          title: string
+          updated_at?: string
+          uploaded_by?: string | null
+          version?: string | null
+        }
+        Update: {
+          counterparty_signer?: string | null
+          created_at?: string
+          doc_type?: string
+          effective_date?: string | null
+          expiry_date?: string | null
+          file_name?: string
+          file_path?: string
+          id?: string
+          mime_type?: string | null
+          notes?: string | null
+          partner_id?: string
+          signed_date?: string | null
+          size_bytes?: number | null
+          status?: string
+          superseded_by?: string | null
+          title?: string
+          updated_at?: string
+          uploaded_by?: string | null
+          version?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_documents_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "payment_partners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "partner_documents_superseded_by_fkey"
+            columns: ["superseded_by"]
+            isOneToOne: false
+            referencedRelation: "partner_documents"
             referencedColumns: ["id"]
           },
         ]

@@ -37,6 +37,10 @@ import {
   useReauthenticate,
   type PartnerBankAccount,
 } from "@/hooks/usePartnerBankAccounts";
+import PartnerContactsTab from "./crm/PartnerContactsTab";
+import PartnerAddressesTab from "./crm/PartnerAddressesTab";
+import PartnerDocumentsTab from "./crm/PartnerDocumentsTab";
+import PartnerActivityTab from "./crm/PartnerActivityTab";
 
 const mask = (v: string | null) => (v ? `•••• ${v.slice(-4)}` : "—");
 
@@ -141,11 +145,36 @@ export const PartnerDetailSheet = ({ partner, open, onOpenChange, onEdit, onTogg
         <Tabs defaultValue="overview" className="mt-5">
           <TabsList className="flex w-full flex-wrap">
             <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="crm">Contacts &amp; CRM</TabsTrigger>
             <TabsTrigger value="corridors">Corridors ({corridors?.length ?? 0})</TabsTrigger>
             <TabsTrigger value="rates">Rate card ({pricing?.length ?? 0})</TabsTrigger>
             <TabsTrigger value="liquidity">Liquidity</TabsTrigger>
             <TabsTrigger value="financial">Financial</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="crm" className="mt-4">
+            <Tabs defaultValue="contacts">
+              <TabsList className="flex w-full flex-wrap">
+                <TabsTrigger value="contacts">Contacts</TabsTrigger>
+                <TabsTrigger value="addresses">Addresses</TabsTrigger>
+                <TabsTrigger value="documents">Documents</TabsTrigger>
+                <TabsTrigger value="activity">Activity</TabsTrigger>
+              </TabsList>
+              <TabsContent value="contacts" className="mt-4">
+                <PartnerContactsTab partnerId={partner.id} />
+              </TabsContent>
+              <TabsContent value="addresses" className="mt-4">
+                <PartnerAddressesTab partnerId={partner.id} />
+              </TabsContent>
+              <TabsContent value="documents" className="mt-4">
+                <PartnerDocumentsTab partnerId={partner.id} />
+              </TabsContent>
+              <TabsContent value="activity" className="mt-4">
+                <PartnerActivityTab partnerId={partner.id} />
+              </TabsContent>
+            </Tabs>
+          </TabsContent>
+
 
           <TabsContent value="overview" className="mt-4 grid gap-4 sm:grid-cols-2">
             <Field label="Headquarters" value={partner.country} />
