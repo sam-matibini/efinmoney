@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { Table, TableBody, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertTriangle, Mail, Phone, Users } from "lucide-react";
+import { AlertTriangle, Mail, Phone, Plus, Users } from "lucide-react";
 import { usePaymentPartners } from "@/hooks/usePartnerNetwork";
 import { useTableQuery, type Col } from "../tableToolkit";
 import { countryLabel } from "../CountryCombobox";
@@ -97,8 +97,13 @@ export const PartnerRelationshipsPanel = () => {
       is_active: true,
     });
   };
+  const openNewContact = () => {
+    setContactPartnerId("__new__");
+    setContactDraft({ role_type: "commercial", preferred_channel: "email", is_primary: true, is_active: true });
+  };
   const submitContact = () => {
     if (!contactDraft.full_name?.trim()) return;
+    if (contactPartnerId === "__new__" && !contactDraft.partner_id) return;
     saveContact.mutate(contactDraft, { onSuccess: () => setContactPartnerId(null) });
   };
 
@@ -235,14 +240,18 @@ export const PartnerRelationshipsPanel = () => {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Users className="h-5 w-5" /> All partner contacts
-          </CardTitle>
-          <CardDescription>
-            Search, filter, sort and export every contact across the partner network. Edit them from a partner's
-            detail view.
-          </CardDescription>
+        <CardHeader className="flex flex-row items-start justify-between gap-2">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" /> All partner contacts
+            </CardTitle>
+            <CardDescription className="mt-1">
+              Add, search, filter, sort and export every contact across the partner network.
+            </CardDescription>
+          </div>
+          <Button size="sm" className="shrink-0" onClick={openNewContact}>
+            <Plus className="mr-1.5 h-4 w-4" /> Add contact
+          </Button>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -253,7 +262,7 @@ export const PartnerRelationshipsPanel = () => {
             </div>
           ) : !rows.length ? (
             <p className="py-8 text-center text-sm text-muted-foreground">
-              No partner contacts yet — open a partner and add one under Contacts &amp; CRM.
+              No partner contacts yet — click &ldquo;Add contact&rdquo; above to add one.
             </p>
           ) : (
             <div>
@@ -391,16 +400,35 @@ export const PartnerRelationshipsPanel = () => {
         </DialogContent>
       </Dialog>
 
-      {/* ── Add primary contact dialog ── */}
+      {/* ── Add contact dialog ── */}
       <Dialog open={!!contactPartnerId} onOpenChange={(v) => !v && setContactPartnerId(null)}>
         <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Add primary contact</DialogTitle>
+            <DialogTitle>{contactPartnerId === "__new__" ? "Add contact" : "Add primary contact"}</DialogTitle>
             <DialogDescription>
-              {partners?.find((p) => p.id === contactPartnerId)?.name} · Commercial owner / primary contact.
+              {contactPartnerId === "__new__"
+                ? "Add a contact for any partner in the network."
+                : `${partners?.find((p) => p.id === contactPartnerId)?.name} · Commercial owner / primary contact.`}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-3 sm:grid-cols-2">
+            {contactPartnerId === "__new__" && (
+              <div className="sm:col-span-2">
+                <Label>Partner</Label>
+                <Select
+                  value={contactDraft.partner_id ?? ""}
+                  onValueChange={(v) => setContact({ partner_id: v })}
+                >
+                  <SelectTrigger><SelectValue placeholder="Select partner…" /></SelectTrigger>
+                  <SelectContent>
+                    {(partners ?? [])
+                      .slice()
+                      .sort((a, b) => a.name.localeCompare(b.name))
+                      .map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="sm:col-span-2">
               <Label>Full name</Label>
               <Input value={contactDraft.full_name ?? ""} onChange={(e) => setContact({ full_name: e.target.value })} />
@@ -460,7 +488,14 @@ export const PartnerRelationshipsPanel = () => {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setContactPartnerId(null)}>Cancel</Button>
-            <Button onClick={submitContact} disabled={!contactDraft.full_name?.trim() || saveContact.isPending}>
+            <Button
+              onClick={submitContact}
+              disabled={
+                !contactDraft.full_name?.trim() ||
+                (contactPartnerId === "__new__" && !contactDraft.partner_id) ||
+                saveContact.isPending
+              }
+            >
               {saveContact.isPending ? "Saving…" : "Save contact"}
             </Button>
           </DialogFooter>
