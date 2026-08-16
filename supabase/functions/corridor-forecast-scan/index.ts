@@ -221,6 +221,27 @@ Deno.serve(async (req) => {
       burn.set(k, (burn.get(k) ?? 0) + num(r.amount));
     }
 
+    // Seed any missing partner_liquidity rows from enabled corridors so all
+    // partners always appear in the runway table, even before first API refresh.
+    const { data: corridors } = await supabase
+      .from("partner_corridors")
+      .select("partner_id, dest_currency")
+      .eq("enabled", true);
+    if (corridors?.length) {
+      const seedRows = corridors.map((c: { partner_id: string; dest_currency: string }) => ({
+        partner_id: c.partner_id,
+        currency_code: c.dest_currency,
+        available_balance: 0,
+        required_reserve: 0,
+        daily_utilized: 0,
+        source: "manual",
+        as_of: new Date().toISOString(),
+      }));
+      await supabase
+        .from("partner_liquidity")
+        .upsert(seedRows, { onConflict: "partner_id,currency_code", ignoreDuplicates: true });
+    }
+
     const { data: liq } = await supabase
       .from("partner_liquidity")
       .select("partner_id, currency_code, available_balance, required_reserve");
