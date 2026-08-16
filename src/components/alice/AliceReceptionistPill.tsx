@@ -11,7 +11,7 @@ interface Props extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, "onC
   onClick?: () => void;
 }
 
-const STORAGE_KEY = "efm_alice_pill_pos";
+const STORAGE_KEY = "efm_alice_pill_pos_v2";
 /** Keep clear of mobile bottom nav (~5.5rem) + safe area + gap. */
 const DEFAULT_BOTTOM_CLEARANCE = 96;
 const EDGE_PAD = 12;
@@ -23,13 +23,22 @@ function clamp(n: number, min: number, max: number) {
   return Math.min(max, Math.max(min, n));
 }
 
-function defaultPos(w: number, h: number): Pos {
+/** Always dock to far left or far right — never leave Alice in the middle. */
+function snapToSide(x: number, y: number, w: number, h: number): Pos {
   const vw = typeof window !== "undefined" ? window.innerWidth : 390;
   const vh = typeof window !== "undefined" ? window.innerHeight : 800;
+  const leftX = EDGE_PAD;
+  const rightX = Math.max(EDGE_PAD, vw - w - EDGE_PAD);
+  const centerX = x + w / 2;
   return {
-    x: clamp(vw - w - EDGE_PAD, EDGE_PAD, Math.max(EDGE_PAD, vw - w - EDGE_PAD)),
-    y: clamp(vh - h - DEFAULT_BOTTOM_CLEARANCE, EDGE_PAD, Math.max(EDGE_PAD, vh - h - EDGE_PAD)),
+    x: centerX < vw / 2 ? leftX : rightX,
+    y: clamp(y, EDGE_PAD, Math.max(EDGE_PAD, vh - h - EDGE_PAD)),
   };
+}
+
+function defaultPos(w: number, h: number): Pos {
+  const vh = typeof window !== "undefined" ? window.innerHeight : 800;
+  return snapToSide(1e9, vh - h - DEFAULT_BOTTOM_CLEARANCE, w, h);
 }
 
 function readStoredPos(w: number, h: number): Pos | null {
@@ -38,12 +47,7 @@ function readStoredPos(w: number, h: number): Pos | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Pos;
     if (!Number.isFinite(parsed?.x) || !Number.isFinite(parsed?.y)) return null;
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    return {
-      x: clamp(parsed.x, EDGE_PAD, Math.max(EDGE_PAD, vw - w - EDGE_PAD)),
-      y: clamp(parsed.y, EDGE_PAD, Math.max(EDGE_PAD, vh - h - EDGE_PAD)),
-    };
+    return snapToSide(parsed.x, parsed.y, w, h);
   } catch {
     return null;
   }
@@ -108,14 +112,9 @@ const AliceReceptionistPill = forwardRef<HTMLButtonElement, Props>(function Alic
       const { width, height } = el.getBoundingClientRect();
       const w = width || 200;
       const h = height || 56;
-      const vw = window.innerWidth;
-      const vh = window.innerHeight;
       const prev = posRef.current;
       const next = prev
-        ? {
-            x: clamp(prev.x, EDGE_PAD, Math.max(EDGE_PAD, vw - w - EDGE_PAD)),
-            y: clamp(prev.y, EDGE_PAD, Math.max(EDGE_PAD, vh - h - EDGE_PAD)),
-          }
+        ? snapToSide(prev.x, prev.y, w, h)
         : defaultPos(w, h);
       updatePos(next);
     };
@@ -177,7 +176,15 @@ const AliceReceptionistPill = forwardRef<HTMLButtonElement, Props>(function Alic
       /* ignore */
     }
     if (moved) {
-      if (posRef.current) persist(posRef.current);
+      const el = btnRef.current;
+      const w = el?.offsetWidth || 200;
+      const h = el?.offsetHeight || 56;
+      const current = posRef.current;
+      if (current) {
+        const snapped = snapToSide(current.x, current.y, w, h);
+        updatePos(snapped);
+        persist(snapped);
+      }
       return;
     }
     onClick?.();
@@ -198,11 +205,11 @@ const AliceReceptionistPill = forwardRef<HTMLButtonElement, Props>(function Alic
         "shadow-[0_8px_28px_rgba(26,15,60,0.14)] touch-none select-none",
         "hover:shadow-[0_12px_32px_rgba(26,15,60,0.2)]",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(255,184,0,0.55)]",
-        "cursor-grab active:cursor-grabbing",
+        "cursor-grab active:cursor-grabbing transition-[left,top] duration-150 ease-out",
         !pos && "right-4 bottom-[calc(5.5rem+env(safe-area-inset-bottom)+0.75rem)] lg:bottom-6",
         className,
       )}
-      style={pos ? { left: pos.x, top: pos.y, right: "auto", bottom: "auto" } : undefined}
+      style={pos ? { left: pos.x, top: pos.y, right: "auto", bottom: "auto", transition: drag.current?.moved ? "none" : undefined } : undefined}
       {...rest}
     >
       <span
