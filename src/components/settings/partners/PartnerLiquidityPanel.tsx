@@ -15,9 +15,30 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, Droplets, RefreshCw, AlertTriangle } from "lucide-react";
+import { Pencil, Plus, Trash2, Droplets, RefreshCw, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
 import { useRefreshLiquidity } from "@/hooks/useCostAssurance";
+
+const SOURCE_LABELS: Record<string, string> = {
+  api: "API",
+  manual: "Manual",
+  file: "File",
+  partner_portal: "Portal",
+};
+
+const SourceBadge = ({ source }: { source: string }) => {
+  const variant =
+    source === "api"
+      ? "default"
+      : source === "file"
+        ? "secondary"
+        : "outline";
+  return (
+    <Badge variant={variant} className="text-[10px]">
+      {SOURCE_LABELS[source] ?? source}
+    </Badge>
+  );
+};
 
 export const PartnerLiquidityPanel = () => {
   const { data: partners } = usePaymentPartners();
@@ -35,6 +56,16 @@ export const PartnerLiquidityPanel = () => {
   const set = (patch: Partial<PartnerLiquidity>) => setDraft((d) => ({ ...d, ...patch }));
 
   const nameOf = (id: string) => partners?.find((p) => p.id === id)?.name || "—";
+
+  const openNew = () => {
+    setDraft({ partner_id: partners?.[0]?.id, currency_code: "", available_balance: 0, required_reserve: 0, daily_utilized: 0 });
+    setOpen(true);
+  };
+
+  const openEdit = (l: PartnerLiquidity) => {
+    setDraft({ ...l });
+    setOpen(true);
+  };
 
   return (
     <Card>
@@ -56,14 +87,7 @@ export const PartnerLiquidityPanel = () => {
           >
             <RefreshCw className={`h-4 w-4 mr-1 ${refresh.isPending ? "animate-spin" : ""}`} /> Refresh from partners
           </Button>
-          <Button
-            size="sm"
-            onClick={() => {
-              setDraft({ partner_id: partners?.[0]?.id, currency_code: "", available_balance: 0, required_reserve: 0, daily_utilized: 0 });
-              setOpen(true);
-            }}
-            disabled={!partners?.length}
-          >
+          <Button size="sm" onClick={openNew} disabled={!partners?.length}>
             <Plus className="h-4 w-4 mr-1" /> Update balance
           </Button>
         </div>
@@ -84,6 +108,7 @@ export const PartnerLiquidityPanel = () => {
                   <TableHead className="text-right">Reserve</TableHead>
                   <TableHead className="text-right">Used today</TableHead>
                   <TableHead className="text-right">Capacity</TableHead>
+                  <TableHead>Source</TableHead>
                   <TableHead>As of</TableHead>
                   <TableHead />
                 </TableRow>
@@ -102,6 +127,9 @@ export const PartnerLiquidityPanel = () => {
                       <TableCell className="text-right tabular-nums">
                         <Badge variant={capacity > 0 ? "secondary" : "destructive"}>{capacity.toLocaleString()}</Badge>
                       </TableCell>
+                      <TableCell>
+                        <SourceBadge source={l.source} />
+                      </TableCell>
                       <TableCell className="text-xs">
                         <span className={stale ? "text-amber-500" : ""}>
                           {format(new Date(l.as_of), "dd MMM yy HH:mm")}
@@ -113,9 +141,14 @@ export const PartnerLiquidityPanel = () => {
                         )}
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button variant="ghost" size="icon" onClick={() => remove.mutate(l.id)}>
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
+                        <div className="flex justify-end gap-1">
+                          <Button variant="ghost" size="icon" onClick={() => openEdit(l)} aria-label="Edit balance">
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => remove.mutate(l.id)} aria-label="Delete">
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
@@ -129,26 +162,32 @@ export const PartnerLiquidityPanel = () => {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Update liquidity</DialogTitle>
-            <DialogDescription>One balance per partner and currency.</DialogDescription>
+            <DialogTitle>{draft.id ? "Edit liquidity balance" : "Add liquidity balance"}</DialogTitle>
+            <DialogDescription>One balance row per partner and currency.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="sm:col-span-2">
               <Label>Partner</Label>
-              <Select value={draft.partner_id} onValueChange={(v) => set({ partner_id: v })}>
-                <SelectTrigger><SelectValue placeholder="Select partner" /></SelectTrigger>
-                <SelectContent>
-                  {partners?.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {draft.id ? (
+                <p className="mt-1 text-sm font-medium">{nameOf(draft.partner_id ?? "")}</p>
+              ) : (
+                <Select value={draft.partner_id} onValueChange={(v) => set({ partner_id: v })}>
+                  <SelectTrigger><SelectValue placeholder="Select partner" /></SelectTrigger>
+                  <SelectContent>
+                    {partners?.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
             <div>
               <Label>Currency</Label>
-              <Input value={draft.currency_code || ""} onChange={(e) => set({ currency_code: e.target.value.toUpperCase() })} />
+              {draft.id ? (
+                <p className="mt-1 text-sm font-medium">{draft.currency_code}</p>
+              ) : (
+                <Input value={draft.currency_code || ""} onChange={(e) => set({ currency_code: e.target.value.toUpperCase() })} />
+              )}
             </div>
             <div>
               <Label>Available balance</Label>

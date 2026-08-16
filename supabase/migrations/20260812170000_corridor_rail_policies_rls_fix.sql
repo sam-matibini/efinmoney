@@ -19,6 +19,7 @@ CREATE POLICY corridor_rail_policies_select
   );
 
 DROP POLICY IF EXISTS corridor_rail_policies_write ON public.corridor_rail_policies;
+DROP POLICY IF EXISTS corridor_rail_policies_insert ON public.corridor_rail_policies;
 CREATE POLICY corridor_rail_policies_insert
   ON public.corridor_rail_policies FOR INSERT TO authenticated
   WITH CHECK (
@@ -29,6 +30,7 @@ CREATE POLICY corridor_rail_policies_insert
     OR public.has_role(auth.uid(), 'finance'::public.app_role)
   );
 
+DROP POLICY IF EXISTS corridor_rail_policies_update ON public.corridor_rail_policies;
 CREATE POLICY corridor_rail_policies_update
   ON public.corridor_rail_policies FOR UPDATE TO authenticated
   USING (
@@ -46,6 +48,7 @@ CREATE POLICY corridor_rail_policies_update
     OR public.has_role(auth.uid(), 'finance'::public.app_role)
   );
 
+DROP POLICY IF EXISTS corridor_rail_policies_delete ON public.corridor_rail_policies;
 CREATE POLICY corridor_rail_policies_delete
   ON public.corridor_rail_policies FOR DELETE TO authenticated
   USING (
@@ -68,6 +71,7 @@ CREATE POLICY corridor_rail_policy_audit_select
   );
 
 DROP POLICY IF EXISTS corridor_rail_policy_audit_write ON public.corridor_rail_policy_audit;
+DROP POLICY IF EXISTS corridor_rail_policy_audit_insert ON public.corridor_rail_policy_audit;
 CREATE POLICY corridor_rail_policy_audit_insert
   ON public.corridor_rail_policy_audit FOR INSERT TO authenticated
   WITH CHECK (

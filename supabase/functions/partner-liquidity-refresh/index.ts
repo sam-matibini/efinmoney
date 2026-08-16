@@ -25,6 +25,28 @@ Deno.serve(async (req) => {
       .eq("status", "active");
     if (error) throw error;
 
+    // Seed a zero-balance slot for any (partner_id, dest_currency) from
+    // enabled corridors that doesn't yet have a liquidity row.
+    const { data: corridors } = await supabase
+      .from("partner_corridors")
+      .select("partner_id, dest_currency")
+      .eq("enabled", true);
+
+    if (corridors?.length) {
+      const seedRows = corridors.map((c) => ({
+        partner_id: c.partner_id,
+        currency_code: c.dest_currency,
+        available_balance: 0,
+        required_reserve: 0,
+        daily_utilized: 0,
+        source: "manual",
+        as_of: new Date().toISOString(),
+      }));
+      await supabase
+        .from("partner_liquidity")
+        .upsert(seedRows, { onConflict: "partner_id,currency_code", ignoreDuplicates: true });
+    }
+
     let refreshed = 0;
     let failed = 0;
     const stale: string[] = [];

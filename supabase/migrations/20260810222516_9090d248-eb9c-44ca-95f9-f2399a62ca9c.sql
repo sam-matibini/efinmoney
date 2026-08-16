@@ -25,13 +25,31 @@ GRANT ALL ON public.partner_bank_accounts TO service_role;
 
 ALTER TABLE public.partner_bank_accounts ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Finance and super admins manage partner bank accounts"
-ON public.partner_bank_accounts
-FOR ALL
-TO authenticated
-USING (public.is_super_admin(auth.uid()) OR public.has_role(auth.uid(), 'finance'))
-WITH CHECK (public.is_super_admin(auth.uid()) OR public.has_role(auth.uid(), 'finance'));
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename  = 'partner_bank_accounts'
+      AND policyname = 'Finance and super admins manage partner bank accounts'
+  ) THEN
+    CREATE POLICY "Finance and super admins manage partner bank accounts"
+    ON public.partner_bank_accounts
+    FOR ALL
+    TO authenticated
+    USING (public.is_super_admin(auth.uid()) OR public.has_role(auth.uid(), 'finance'))
+    WITH CHECK (public.is_super_admin(auth.uid()) OR public.has_role(auth.uid(), 'finance'));
+  END IF;
+END $$;
 
-CREATE TRIGGER partner_bank_accounts_set_updated_at
-BEFORE UPDATE ON public.partner_bank_accounts
-FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_trigger
+    WHERE tgname = 'partner_bank_accounts_set_updated_at'
+  ) THEN
+    CREATE TRIGGER partner_bank_accounts_set_updated_at
+    BEFORE UPDATE ON public.partner_bank_accounts
+    FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+  END IF;
+END $$;
