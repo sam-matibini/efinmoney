@@ -7,21 +7,21 @@ import MarketingHeader from "@/components/marketing/MarketingHeader";
 import MarketingFooter from "@/components/marketing/MarketingFooter";
 import { openAlice } from "@/components/alice/aliceBus";
 import { CountryFlag, CurrencyFlag } from "@/components/ui/FlagImage";
-import africaHero from "@/assets/landing-africa-hero.jpg";
-import africaBand from "@/assets/landing-africa-band.jpg";
-import b2bPhone from "@/assets/landing-b2b-phone.jpg";
-import efinConnectIntro from "@/assets/Efinconnect.jpeg";
-import tourismKenya from "@/assets/landing-tourism-kenya.jpg";
-import tourismVicFalls from "@/assets/landing-tourism-victoria-falls.jpg";
-import tourismZanzibar from "@/assets/landing-tourism-zanzibar.jpg";
-import featureSecurity from "@/assets/landing-feature-security.jpg";
-import featureInstant from "@/assets/landing-feature-instant.jpg";
-import featureCorridors from "@/assets/landing-feature-corridors.jpg";
+import africaHero from "@/assets/landing-africa-hero.webp";
+import africaBand from "@/assets/landing-africa-band.webp";
+import b2bPhone from "@/assets/landing-b2b-phone.webp";
+import efinConnectIntro from "@/assets/Efinconnect.webp";
+import tourismKenya from "@/assets/landing-tourism-kenya.webp";
+import tourismVicFalls from "@/assets/landing-tourism-victoria-falls.webp";
+import tourismZanzibar from "@/assets/landing-tourism-zanzibar.webp";
+import featureSecurity from "@/assets/landing-feature-security.webp";
+import featureInstant from "@/assets/landing-feature-instant.webp";
+import featureCorridors from "@/assets/landing-feature-corridors.webp";
 import MarketTicker from "@/components/landing/MarketTicker";
 import FxCalculator from "@/components/landing/FxCalculator";
 import GlobalCorridors from "@/components/GlobalCorridors";
-import senders from "@/assets/landing-senders.jpg";
-import receivers from "@/assets/landing-receivers.jpg";
+import senders from "@/assets/landing-senders.webp";
+import receivers from "@/assets/landing-receivers.webp";
 
 const FEATURES = [
   { icon: Shield, title: "Bank-Grade Security", desc: "Your funds are protected with 256-bit encryption and multi-factor authentication.", image: featureSecurity },
@@ -171,6 +171,8 @@ const Landing = () => {
           src={africaHero}
           alt=""
           aria-hidden
+          fetchPriority="high"
+          decoding="async"
           className="absolute inset-0 w-full h-full object-cover opacity-40 mix-blend-screen pointer-events-none"
           width={1920}
           height={1080}

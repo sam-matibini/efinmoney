@@ -13,7 +13,7 @@ import {
   CommandSeparator,
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import africaHero from "@/assets/landing-africa-hero.jpg";
+import africaHero from "@/assets/landing-africa-hero.webp";
 
 // Featured corridors — marquee chips only. The searchable picker below is the
 // full product list; these just sample breadth (multi-origin + Africa + West).
