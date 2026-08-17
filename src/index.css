@@ -47,6 +47,8 @@
     --pay-wallet-foreground: 0 0% 100%;
     --pay-mobile: 36 100% 45%;
     --pay-mobile-foreground: 0 0% 100%;
+    --pay-wise: 88 62% 38%;
+    --pay-wise-foreground: 0 0% 100%;
 
     /* Per-user avatar palette (light): tinted bg + readable ink */
     --avatar-1: 244 70% 92%; --avatar-1-foreground: 244 60% 35%;
@@ -131,6 +133,8 @@
     --pay-wallet-foreground: 232 45% 7%;
     --pay-mobile: 41 100% 58%;
     --pay-mobile-foreground: 232 45% 7%;
+    --pay-wise: 88 70% 48%;
+    --pay-wise-foreground: 232 45% 7%;
 
     /* Per-user avatar palette (dark) */
     --avatar-1: 244 45% 26%; --avatar-1-foreground: 244 90% 86%;

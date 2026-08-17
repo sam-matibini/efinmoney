@@ -1,7 +1,6 @@
 import { useState } from "react";
 import WiseInteracInvoiceCheckout from "@/components/payments/WiseInteracInvoiceCheckout";
 import InteracCheckout from "@/components/payments/InteracCheckout";
-import WisePayLinkCard from "@/components/payments/WisePayLinkCard";
 import CheckoutMethodGrid, { type CheckoutMethod } from "@/components/payments/CheckoutMethodGrid";
 import CheckoutShell from "@/components/payments/CheckoutShell";
 import { type Lang } from "@/components/payments/checkoutStrings";
@@ -18,14 +17,13 @@ interface Props {
 
 /**
  * CAD collection — prefer Fincra Interac when enabled; Flovide / Loop as fallbacks.
- * Wise pay-link remains available as a rail.
+ * Wise is offered as a separate top-level Top Up category (not nested here).
  */
 export default function CadCollectionPanel({ walletId, walletCurrency, initialAmount, onComplete, onExit }: Props) {
   const isCad = walletCurrency.toUpperCase() === "CAD";
   const amount = Number(initialAmount) > 0 ? Number(initialAmount) : 0;
   const interacOn =
     productFeatures.fincraInterac || productFeatures.flovide || productFeatures.flovideInterac;
-  const wiseOn = productFeatures.wise;
   const plaidOn = productFeatures.plaid;
 
   const [method, setMethod] = useState<CheckoutMethod | null>(null);
@@ -39,8 +37,7 @@ export default function CadCollectionPanel({ walletId, walletCurrency, initialAm
     );
   }
 
-  // Prefer Fincra / Flovide Interac when those features are on
-  if (interacOn || wiseOn) {
+  if (interacOn) {
     const amountLabel = `CAD ${amount.toFixed(2)}`;
     const interacTitle = "Interac";
     const interacDescription = lang === "fr"
@@ -65,25 +62,18 @@ export default function CadCollectionPanel({ walletId, walletCurrency, initialAm
             onChange={setMethod}
             interacAvailable={interacOn}
             cardAvailable={false}
-            wiseAvailable={wiseOn}
+            wiseAvailable={false}
             eftAvailable={false}
             interacTitle={interacTitle}
             interacDescription={interacDescription}
             lang={lang}
           />
-        ) : method === "interac" ? (
+        ) : (
           <InteracCheckout
             walletId={walletId}
             purpose="topup"
             initialAmount={initialAmount}
             lang={lang}
-            onComplete={onComplete}
-          />
-        ) : (
-          <WisePayLinkCard
-            walletId={walletId}
-            walletCurrency={walletCurrency}
-            initialAmount={initialAmount}
             onComplete={onComplete}
           />
         )}

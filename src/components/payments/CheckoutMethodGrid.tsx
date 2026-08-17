@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { Building2, ChevronRight, CreditCard, Link2, Send } from "lucide-react";
+import { Building2, ChevronRight, CreditCard, Link2, Send, Wallet } from "lucide-react";
 import { CHECKOUT_STRINGS, type Lang } from "@/components/payments/checkoutStrings";
 
 export type CheckoutMethod = "card" | "interac" | "eft" | "wise" | "plaid" | "loop_billing";
@@ -110,8 +110,8 @@ export default function CheckoutMethodGrid({
         <MethodRow
           title={t.wise}
           description={t.wiseDesc}
-          icon={<CreditCard className="h-5 w-5 text-white" />}
-          iconClassName="bg-slate-500"
+          icon={<Wallet className="h-5 w-5 text-white" />}
+          iconClassName="bg-[hsl(var(--pay-wise))]"
           onSelect={() => onChange("wise")}
         />
       )}

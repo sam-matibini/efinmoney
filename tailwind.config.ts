@@ -60,6 +60,8 @@ export default {
           "wallet-foreground": "hsl(var(--pay-wallet-foreground))",
           mobile: "hsl(var(--pay-mobile))",
           "mobile-foreground": "hsl(var(--pay-mobile-foreground))",
+          wise: "hsl(var(--pay-wise))",
+          "wise-foreground": "hsl(var(--pay-wise-foreground))",
         },
         avatar: {
           1: "hsl(var(--avatar-1))",

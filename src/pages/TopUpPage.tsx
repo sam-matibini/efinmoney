@@ -123,7 +123,7 @@ function availableIntlMethods(currency: string): IntlTopupMethod[] {
     ) {
       methods.push("interac");
     }
-    if (productFeatures.wise && c !== "CAD") methods.push("wise");
+    if (productFeatures.wise) methods.push("wise");
     if (productFeatures.flutterwave && FLW_WESTERN_TOPUP_CURRENCIES.includes(c) && c !== "CAD") {
       methods.push("flutterwave");
     }
@@ -812,6 +812,8 @@ const TopUpPage = () => {
     const primaryIds = collectPrimary ? collectPayMethodIds(collectPrimary) : [];
     const showRail = (id: string) => {
       if (id === "link_bank") return true;
+      // Always offer Wise as its own top-level rail when the feature is on.
+      if ((id === "wise" || id === "wise_link") && productFeatures.wise) return true;
       if (africaBackupId) {
         return id === africaBackupId || id === "interac" || id === "plaid";
       }
@@ -1010,7 +1012,6 @@ const TopUpPage = () => {
       showRail("interac") &&
       isCadWallet &&
       (rails.has("interac") ||
-        rails.has("wise") ||
         productFeatures.fincraInterac ||
         productFeatures.flovideInterac ||
         productFeatures.flovide)
@@ -1103,26 +1104,25 @@ const TopUpPage = () => {
       });
     }
 
+    // Wise — own top-level category (CAD/USD/EUR/GBP pay link; bank deposit elsewhere)
     if (showRail("wise_link") && productFeatures.wise && isWisePayCurrency(currency)) {
       payMethods.push({
         id: "wise_link",
-        tone: "bank",
-        label: "Pay with bank or card",
-        description: "Bank transfer or card",
+        tone: "wise",
+        label: "Wise",
+        description: "Bank transfer or card via Wise",
         content: (
           <SectionBoundary name="WisePayLink">
             <WisePayLinkCard walletId={walletId} walletCurrency={currency} initialAmount={amount} onComplete={invalidateWallets} />
           </SectionBoundary>
         ),
       });
-    }
-
-    if (showRail("wise") && productFeatures.wise && rails.has("wise") && !isCadWallet) {
+    } else if (showRail("wise") && productFeatures.wise && rails.has("wise") && !isCadWallet) {
       payMethods.push({
         id: "wise",
-        tone: "bank",
-        label: "Bank transfer",
-        description: "Send a bank transfer with your payment reference",
+        tone: "wise",
+        label: "Wise",
+        description: "Bank transfer with your payment reference",
         content: (
           <SectionBoundary name="WiseTopUp">
             <WiseTopUpCard walletId={walletId} walletCurrency={currency} initialAmount={amount} onComplete={invalidateWallets} />
@@ -1172,7 +1172,7 @@ const TopUpPage = () => {
     lenhub_flutter: "lenhub",
     fincra_interac: "interac",
     fincra: "fincra",
-    wise_pay: "wise",
+    wise_pay: isWisePayCurrency(currency) ? "wise_link" : "wise",
     ghana_pay: "ghana",
     elicate: "elicate",
   };
@@ -1193,8 +1193,9 @@ const TopUpPage = () => {
     bank: { label: "Bank", sublabel: "Transfer or Interac", icon: PayBankIcon },
     mobile: { label: "Mobile", sublabel: "Mobile money", icon: PayMobileIcon },
     wallet: { label: "Wallet", sublabel: "Other methods", icon: PayWalletIcon },
+    wise: { label: "Wise", sublabel: "Bank or card", icon: PayWalletIcon },
   };
-  const payCategories: PaymentMethodOption<PayTone>[] = (["card", "bank", "mobile", "wallet"] as PayTone[])
+  const payCategories: PaymentMethodOption<PayTone>[] = (["card", "bank", "wise", "mobile", "wallet"] as PayTone[])
     .filter((tone) => payMethods.some((m) => m.tone === tone))
     .map((tone) => ({ id: tone, tone, ...payCategoryMeta[tone] }));
 

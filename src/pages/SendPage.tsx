@@ -2069,7 +2069,7 @@ const SendPage = () => {
         }]
       : []),
     ...(wisePayWallet
-      ? [{ id: "wise" as const, label: "Wise", sublabel: "Bank or card via Wise", icon: Wallet, tone: "bank" as const }]
+      ? [{ id: "wise" as const, label: "Wise", sublabel: "Bank or card via Wise", icon: Wallet, tone: "wise" as const }]
       : []),
     { id: "wallet" as const, label: "Wallet", sublabel: "eFinMoney balance", icon: Wallet, tone: "wallet" as const },
   ];
