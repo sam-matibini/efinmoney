@@ -138,7 +138,9 @@ export const EfinPricingPanel = () => {
             <CardTitle className="flex items-center gap-2">
               <Receipt className="h-5 w-5" /> eFinMoney Customer Pricing
             </CardTitle>
-            <CardDescription>What we charge the customer — the revenue side of every profitability calculation</CardDescription>
+            <CardDescription>
+              What we charge the customer — connected to each corridor. Partner charges + this margin = the total the customer sees.
+            </CardDescription>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">

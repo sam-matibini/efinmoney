@@ -16,6 +16,7 @@ import CountrySelect from "@/components/inputs/CountrySelect";
 import { useLoginLockout } from "@/hooks/useLoginLockout";
 import { LoginLockoutBanners } from "@/components/auth/LoginLockoutBanners";
 import { BrandedScreen, BrandIconBadge, BrandPrimaryButton } from "@/components/brand/BrandedScreen";
+import { passwordPolicyMessage, PASSWORD_MIN_LENGTH } from "@/lib/passwordPolicy";
 
 const isSafeRedirect = (path: string | null): path is string =>
   !!path && path.startsWith("/") && !path.startsWith("//");
@@ -86,6 +87,11 @@ const Auth = () => {
       if (isSignUp) {
         if (password !== confirmPassword) {
           toast.error("Passwords do not match.");
+          return;
+        }
+        const pwIssue = passwordPolicyMessage(password);
+        if (pwIssue) {
+          toast.error(pwIssue);
           return;
         }
         if (emailCheck === "checking") {
@@ -636,7 +642,7 @@ const Auth = () => {
                   onChange={(e) => setPassword(e.target.value)}
                   className="h-12 pr-12 bg-white border-neutral-200 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
                   required
-                  minLength={6}
+                  minLength={isSignUp ? PASSWORD_MIN_LENGTH : 6}
                   disabled={!isSignUp && lockout.isLocked}
                 />
                 <button
@@ -648,6 +654,11 @@ const Auth = () => {
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
+              {isSignUp && (
+                <p className="text-xs text-muted-foreground">
+                  At least 8 characters, with one uppercase, one lowercase, and one number.
+                </p>
+              )}
             </div>
 
             {isSignUp && (
@@ -662,7 +673,7 @@ const Auth = () => {
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     className="h-12 pr-12 bg-white border-neutral-200 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
                     required
-                    minLength={6}
+                    minLength={PASSWORD_MIN_LENGTH}
                   />
                   <button
                     type="button"

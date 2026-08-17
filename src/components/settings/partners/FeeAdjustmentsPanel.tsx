@@ -68,8 +68,7 @@ export const FeeAdjustmentsPanel = () => {
             <Wand2 className="h-4 w-4" /> Automated fee adjustments
           </CardTitle>
           <CardDescription>
-            Turns pricing recommendations into reviewable proposals. Approved proposals write a new
-            versioned customer pricing row — nothing is overwritten.
+            Turns pricing recommendations into reviewable proposals. Use this for volume or discount overrides — approved proposals write a new versioned customer pricing row.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

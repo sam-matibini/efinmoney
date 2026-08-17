@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { ArrowLeft, Lock, ShieldCheck } from "lucide-react";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { BrandedScreen, BrandIconBadge, BrandPrimaryButton } from "@/components/brand/BrandedScreen";
+import { passwordPolicyMessage, PASSWORD_MIN_LENGTH } from "@/lib/passwordPolicy";
 
 const isSafeRedirect = (path: string | null): path is string =>
   !!path && path.startsWith("/") && !path.startsWith("//");
@@ -54,8 +55,8 @@ const ResetPasswordPage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password.length < 8) {
-      toast.error("Password must be at least 8 characters");
+    if (passwordPolicyMessage(password)) {
+      toast.error(passwordPolicyMessage(password)!);
       return;
     }
     if (password !== confirmPassword) {
@@ -109,10 +110,10 @@ const ResetPasswordPage = () => {
             type="password"
             autoComplete="new-password"
             required
-            minLength={8}
+            minLength={PASSWORD_MIN_LENGTH}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder="At least 8 characters"
+            placeholder="8+ chars, upper, lower, number"
             className="h-12 rounded-xl"
           />
         </div>
@@ -123,7 +124,7 @@ const ResetPasswordPage = () => {
             type="password"
             autoComplete="new-password"
             required
-            minLength={8}
+            minLength={PASSWORD_MIN_LENGTH}
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             className="h-12 rounded-xl"
@@ -132,7 +133,7 @@ const ResetPasswordPage = () => {
 
         <div className="flex items-start gap-2 rounded-xl bg-emerald-500/5 border border-emerald-500/20 p-3 text-xs text-emerald-700 dark:text-emerald-300">
           <ShieldCheck className="h-4 w-4 flex-shrink-0 mt-0.5" />
-          <span>Use at least 8 characters. Mix in a number or symbol for a stronger password.</span>
+          <span>Use at least 8 characters with one uppercase, one lowercase, and one number.</span>
         </div>
 
         <BrandPrimaryButton type="submit" disabled={submitting || !password}>

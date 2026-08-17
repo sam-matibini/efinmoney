@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useTableQuery, type Col } from "./tableToolkit";
 import {
   usePaymentPartners,
+  isPartnerActive,
   usePartnerCorridors,
   useCreateCorridor,
   useUpdateCorridor,
@@ -84,7 +85,7 @@ export const PartnerCorridorsPanel = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All partners</SelectItem>
-                {partners?.map((p) => (
+                {partners?.filter(isPartnerActive).map((p) => (
                   <SelectItem key={p.id} value={p.id}>
                     {p.name}
                   </SelectItem>
@@ -94,7 +95,7 @@ export const PartnerCorridorsPanel = () => {
             <Button
               size="sm"
               onClick={() => {
-                setDraft({ ...empty, partner_id: partnerId || partners?.[0]?.id });
+                setDraft({ ...empty, partner_id: partnerId || partners?.find(isPartnerActive)?.id });
                 setOpen(true);
               }}
               disabled={!partners?.length}
@@ -159,7 +160,7 @@ export const PartnerCorridorsPanel = () => {
               <Select value={draft.partner_id} onValueChange={(v) => set({ partner_id: v })}>
                 <SelectTrigger><SelectValue placeholder="Select partner" /></SelectTrigger>
                 <SelectContent>
-                  {partners?.map((p) => (
+                  {partners?.filter(isPartnerActive).map((p) => (
                     <SelectItem key={p.id} value={p.id}>
                       {p.name}
                     </SelectItem>

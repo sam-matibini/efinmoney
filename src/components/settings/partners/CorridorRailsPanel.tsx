@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import {
   RAIL_OPTIONS,
+  activeRailSetFromPartners,
   defaultCollectPartner,
   useCorridorRailPolicies,
   useDeleteCorridorRailPolicy,
@@ -8,6 +9,7 @@ import {
   type CorridorRailPolicy,
   type RailDirection,
 } from "@/lib/corridorRails";
+import { usePaymentPartners } from "@/hooks/usePartnerNetwork";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -135,9 +137,16 @@ function parseCorridor(key: string): { currency: string; country: string } {
 
 export default function CorridorRailsPanel() {
   const { data: rows = [], isLoading, refetch } = useCorridorRailPolicies();
+  const { data: paymentPartners = [] } = usePaymentPartners();
   const save = useSaveCorridorRailPolicy();
   const del = useDeleteCorridorRailPolicy();
   const [form, setForm] = useState(emptyForm);
+
+  const activeRails = useMemo(
+    () => activeRailSetFromPartners(paymentPartners),
+    [paymentPartners],
+  );
+  const railOff = (id: string) => !activeRails.has((id || "").toLowerCase());
 
   const editing = !!form.id;
   const { currency, country } = parseCorridor(form.corridorKey);
@@ -145,10 +154,10 @@ export default function CorridorRailsPanel() {
   const preferredMeta = available.find((p) => p.id === form.preferred_partner);
   const backups = available.filter((p) => p.id !== form.preferred_partner);
 
-  // Keep preferred valid when direction/corridor changes
+  // Keep preferred valid when direction/corridor changes; skip inactive for auto-pick
   const effectivePreferred =
     preferredMeta?.id ||
-    (available[0]?.id ?? "");
+    (available.find((p) => !railOff(p.id))?.id ?? available[0]?.id ?? "");
 
   const corridorLabel = useMemo(() => {
     const hit = CORRIDORS.find((c) => corridorKey(c.currency, c.country) === form.corridorKey);
@@ -246,6 +255,10 @@ export default function CorridorRailsPanel() {
       toast.error("No provider works for this currency + direction. Pick another corridor.");
       return;
     }
+    if (railOff(preferred)) {
+      toast.error("That provider is inactive on the Partners tab. Turn it back on there, or pick another.");
+      return;
+    }
     try {
       await save.mutateAsync({
         id: form.id,
@@ -289,6 +302,10 @@ export default function CorridorRailsPanel() {
             <p>
               <strong className="text-foreground">Top-up:</strong> pick “Customers topping up a wallet”, choose CAD or NGN,
               set the main provider (Square for CAD, Fincra for NGN by default), then save. The top-up page follows that rule.
+            </p>
+            <p>
+              Turn a partner off on the <strong className="text-foreground">Partners</strong> tab and their rules
+              here show as <strong className="text-foreground">Inactive</strong> — we stop using them for top-up and send.
             </p>
           </div>
         </CardHeader>
@@ -373,10 +390,12 @@ export default function CorridorRailsPanel() {
               <div className="grid gap-2 sm:grid-cols-2">
                 {available.map((p) => {
                   const selected = (form.preferred_partner || effectivePreferred) === p.id;
+                  const inactive = railOff(p.id);
                   return (
                     <button
                       key={p.id}
                       type="button"
+                      disabled={inactive && !selected}
                       onClick={() =>
                         setForm((f) => ({
                           ...f,
@@ -389,9 +408,13 @@ export default function CorridorRailsPanel() {
                         selected
                           ? "border-primary bg-primary/10 ring-2 ring-primary/30"
                           : "border-border hover:bg-muted/50",
+                        inactive && "opacity-60",
                       )}
                     >
-                      <div className="font-medium">{p.name}</div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{p.name}</span>
+                        {inactive && <Badge variant="outline">Inactive</Badge>}
+                      </div>
                       <p className="text-xs text-muted-foreground mt-1">{p.blurb}</p>
                     </button>
                   );
@@ -428,16 +451,21 @@ export default function CorridorRailsPanel() {
                       <button
                         type="button"
                         onClick={() => toggleBackup(p.id)}
+                        disabled={railOff(p.id) && !on}
                         className={cn(
                           "mt-0.5 h-5 w-5 shrink-0 rounded border flex items-center justify-center text-xs font-bold",
                           on ? "bg-primary text-primary-foreground border-primary" : "border-muted-foreground/40",
+                          railOff(p.id) && !on && "opacity-40",
                         )}
                         aria-pressed={on}
                       >
                         {on ? order + 1 : ""}
                       </button>
                       <div className="flex-1 min-w-0">
-                        <div className="font-medium text-sm">{p.name}</div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-sm">{p.name}</span>
+                          {railOff(p.id) && <Badge variant="outline">Inactive</Badge>}
+                        </div>
                         <p className="text-xs text-muted-foreground">{p.blurb}</p>
                       </div>
                       {on && (
@@ -511,8 +539,10 @@ export default function CorridorRailsPanel() {
             <TableBody>
               {(["CAD", "USD", "EUR", "GBP", "NGN", "GHS", "KES", "UGX", "TZS", "RWF", "ZMW", "ZAR", "XOF", "XAF"] as const).map((ccy) => {
                 const saved = rows.find((r) => r.direction === "collect" && r.currency_code === ccy && r.enabled);
-                const partner = saved?.preferred_partner || defaultCollectPartner(ccy);
+                const liveSaved = saved && !railOff(saved.preferred_partner) ? saved : undefined;
+                const partner = liveSaved?.preferred_partner || defaultCollectPartner(ccy);
                 if (!partner) return null;
+                const inactive = railOff(partner);
                 return (
                   <TableRow
                     key={ccy}
@@ -525,10 +555,15 @@ export default function CorridorRailsPanel() {
                     }}
                   >
                     <TableCell className="font-medium">{ccy}</TableCell>
-                    <TableCell>{partnerName(partner)}</TableCell>
                     <TableCell>
-                      <Badge variant={saved ? "default" : "outline"}>
-                        {saved ? "Saved rule" : "Built-in default"}
+                      <span className="inline-flex items-center gap-2">
+                        {partnerName(partner)}
+                        {inactive && <Badge variant="outline">Inactive</Badge>}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={liveSaved ? "default" : "outline"}>
+                        {liveSaved ? "Saved rule" : "Built-in default"}
                       </Badge>
                     </TableCell>
                   </TableRow>
@@ -574,11 +609,20 @@ export default function CorridorRailsPanel() {
                       {r.currency_code}
                       {r.country_code ? ` → ${r.country_code}` : " (anywhere)"}
                     </TableCell>
-                    <TableCell>{partnerName(r.preferred_partner)}</TableCell>
-                    <TableCell className="text-xs">
-                      {(r.failover_partners || []).map(partnerName).join(" → ") || "None"}
+                    <TableCell>
+                      <span className="inline-flex items-center gap-2">
+                        {partnerName(r.preferred_partner)}
+                        {railOff(r.preferred_partner) && <Badge variant="outline">Inactive</Badge>}
+                      </span>
                     </TableCell>
-                    <TableCell>{r.enabled ? "Yes" : "No"}</TableCell>
+                    <TableCell className="text-xs">
+                      {(r.failover_partners || []).map((id) =>
+                        railOff(id) ? `${partnerName(id)} (inactive)` : partnerName(id),
+                      ).join(" → ") || "None"}
+                    </TableCell>
+                    <TableCell>
+                      {railOff(r.preferred_partner) ? "No" : r.enabled ? "Yes" : "No"}
+                    </TableCell>
                     <TableCell className="space-x-1 text-right">
                       <Button size="sm" variant="ghost" onClick={() => onEdit(r)}>
                         <Pencil className="h-3.5 w-3.5" />

@@ -34,6 +34,115 @@ export const RAIL_OPTIONS = [
   "interac",
 ] as const;
 
+/** Notes tag so we only re-enable rules we turned off with the Partners toggle. */
+export const PARTNER_AUTO_OFF_TAG = "[auto-off:partner]";
+
+/**
+ * payment_partners.code → corridor rail ids stored on corridor_rail_policies.
+ * Codes don't always match (ghana vs ghana_pay, lenhub vs lenhub_flutter).
+ */
+export function partnerCodeToRailIds(code: string): string[] {
+  const c = code.trim().toLowerCase().replace(/-/g, "_");
+  const map: Record<string, string[]> = {
+    fincra: ["fincra"],
+    nomba: ["nomba"],
+    flovide: ["flovide"],
+    flutterwave: ["flutterwave"],
+    flw: ["flutterwave"],
+    lenhub: ["lenhub_flutter"],
+    lenhub_flutter: ["lenhub_flutter"],
+    paytota: ["paytota"],
+    swychr: ["swychr"],
+    ghana: ["ghana_pay"],
+    ghana_pay: ["ghana_pay"],
+    elicate: ["elicate"],
+    dodo: ["dodo"],
+    square: ["square"],
+    paypal: ["paypal"],
+    wise: ["wise"],
+    interac: ["interac"],
+  };
+  if (map[c]) return map[c];
+  if ((RAIL_OPTIONS as readonly string[]).includes(c)) return [c];
+  return [];
+}
+
+export type PartnerRailStatus = { code: string; status?: string | null };
+
+/** Rails with no partner row stay usable so unknown/legacy ids are not hidden. */
+export function activeRailSetFromPartners(partners: PartnerRailStatus[]): Set<string> {
+  const known = new Set<string>();
+  const active = new Set<string>();
+  for (const p of partners) {
+    for (const rail of partnerCodeToRailIds(p.code || "")) {
+      known.add(rail);
+      if (p.status === "active") active.add(rail);
+    }
+  }
+  for (const r of RAIL_OPTIONS) {
+    if (!known.has(r)) active.add(r);
+  }
+  return active;
+}
+
+export function isRailActiveForPartners(railId: string, partners: PartnerRailStatus[]): boolean {
+  return activeRailSetFromPartners(partners).has(railId.trim().toLowerCase());
+}
+
+async function loadPartnerRailStatuses(): Promise<PartnerRailStatus[]> {
+  const { data, error } = await supabase
+    .from("payment_partners" as never)
+    .select("code,status");
+  if (error) throw error;
+  return (data || []) as PartnerRailStatus[];
+}
+
+/** Turn matching corridor rules off/on when a partner is toggled on the Partners tab. */
+export async function syncCorridorRailsForPartnerStatus(partnerCode: string, active: boolean) {
+  const rails = partnerCodeToRailIds(partnerCode);
+  if (!rails.length) return 0;
+  const railSet = new Set(rails);
+  const { data, error } = await supabase.from("corridor_rail_policies" as never).select("*");
+  if (error) throw error;
+  const rows = (data || []) as CorridorRailPolicy[];
+  let changed = 0;
+
+  for (const row of rows) {
+    const preferred = (row.preferred_partner || "").toLowerCase();
+    if (!railSet.has(preferred)) continue;
+    const notes = row.notes || "";
+    const tagged = notes.includes(PARTNER_AUTO_OFF_TAG);
+
+    if (!active) {
+      if (!row.enabled && tagged) continue;
+      const nextNotes = tagged ? notes : `${PARTNER_AUTO_OFF_TAG} ${notes}`.trim();
+      const { error: upErr } = await supabase
+        .from("corridor_rail_policies" as never)
+        .update({
+          enabled: false,
+          notes: nextNotes,
+          updated_at: new Date().toISOString(),
+        } as never)
+        .eq("id", row.id);
+      if (upErr) throw upErr;
+      changed += 1;
+    } else if (tagged) {
+      const nextNotes = notes.replace(PARTNER_AUTO_OFF_TAG, "").trim() || null;
+      const { error: upErr } = await supabase
+        .from("corridor_rail_policies" as never)
+        .update({
+          enabled: true,
+          notes: nextNotes,
+          updated_at: new Date().toISOString(),
+        } as never)
+        .eq("id", row.id);
+      if (upErr) throw upErr;
+      changed += 1;
+    }
+  }
+  return changed;
+}
+
 const COLLECT_METHOD: Record<string, string> = {
   fincra: "fincra",
   nomba: "nomba",
@@ -204,15 +313,27 @@ export async function resolveCollectMethodPreference(
       .maybeSingle();
     row = anyRow as CorridorRailPolicy | null;
   }
+  let partners: PartnerRailStatus[] = [];
+  try {
+    partners = await loadPartnerRailStatuses();
+  } catch {
+    partners = [];
+  }
+  const activeRails = activeRailSetFromPartners(partners);
+  const keepActive = (id: string) => activeRails.has(id);
+
   if (row) {
     const rails = [row.preferred_partner, ...(row.failover_partners || [])]
       .map((r) => r.toLowerCase())
-      .filter(Boolean);
-    const method = collectMethodForPartner(rails[0] || "");
-    return { method, rails, source: "policy" };
+      .filter(Boolean)
+      .filter(keepActive);
+    if (rails.length) {
+      const method = collectMethodForPartner(rails[0] || "");
+      return { method, rails, source: "policy" };
+    }
   }
   const fallback = defaultCollectPartner(ccy);
-  if (fallback) {
+  if (fallback && keepActive(fallback)) {
     return { method: collectMethodForPartner(fallback) || fallback, rails: [fallback], source: "default" };
   }
   return { method: null, rails: [], source: "none" };

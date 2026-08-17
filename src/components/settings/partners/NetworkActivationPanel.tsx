@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useTableQuery, type Col } from "./tableToolkit";
 import { downloadXlsx } from "@/lib/tableExport";
 import {
-  usePaymentPartners,
+  useActivePaymentPartners,
   useSeedPartnerNetwork,
   type SeedResult,
   type SeedScope,
@@ -26,7 +26,7 @@ const SCOPES: { value: SeedScope; label: string; hint: string }[] = [
 const num = (v: unknown) => (typeof v === "number" ? v : Number(v ?? 0));
 
 export const NetworkActivationPanel = () => {
-  const { data: partners } = usePaymentPartners();
+  const { data: partners } = useActivePaymentPartners();
   const seed = useSeedPartnerNetwork();
   const [partnerId, setPartnerId] = useState("");
   const [scopes, setScopes] = useState<SeedScope[]>(["pricing", "fx", "retail"]);
@@ -133,8 +133,9 @@ export const NetworkActivationPanel = () => {
               <Rocket className="h-5 w-5" /> Network Activation
             </CardTitle>
             <CardDescription>
-              Seed pricing, FX and the customer price book from published partner rate cards. Routes that already have a
-              current version are never touched — preview first, then apply.
+              Seed pricing, FX and the customer price book from published partner rate cards. Only{" "}
+              <strong>active</strong> partners appear here — inactive rails (e.g. Circle, Stripe) stay hidden.
+              Routes that already have a current version are never touched — preview first, then apply.
             </CardDescription>
           </div>
           <Select value={partnerId || "all"} onValueChange={(v) => setPartnerId(v === "all" ? "" : v)}>

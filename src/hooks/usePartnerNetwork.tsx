@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { syncCorridorRailsForPartnerStatus } from "@/lib/corridorRails";
 
 // The partner network schema is broad; use a loose accessor to keep generated
 // type instantiation shallow (the project schema is very large).
@@ -162,6 +163,8 @@ const numeric = <T,>(row: T, keys: (keyof T)[]): T => {
 
 /* ------------------------------- partners ------------------------------- */
 
+export const isPartnerActive = (p: { status?: string | null }) => p.status === "active";
+
 export const usePaymentPartners = () =>
   useQuery({
     queryKey: ["payment_partners"],
@@ -175,6 +178,26 @@ export const usePaymentPartners = () =>
       return (data || []).map((r: PaymentPartner) =>
         numeric(r, ["reliability_score", "priority", "min_transaction", "max_transaction", "daily_limit", "monthly_limit"]),
       );
+    },
+  });
+
+/** Operational pickers — inactive partners (Circle, Stripe, …) stay off Tab 2 tools. */
+export const useActivePaymentPartners = () => {
+  const q = usePaymentPartners();
+  return { ...q, data: (q.data ?? []).filter(isPartnerActive) };
+};
+
+/** Partner IDs that already have a mailing address on file. */
+export const usePartnerMailingCoverage = () =>
+  useQuery({
+    queryKey: ["partner_mailing_coverage"],
+    queryFn: async (): Promise<Set<string>> => {
+      const { data, error } = await db
+        .from("partner_addresses")
+        .select("partner_id")
+        .eq("address_type", "mailing");
+      if (error) throw error;
+      return new Set((data ?? []).map((r: { partner_id: string }) => r.partner_id));
     },
   });
 
@@ -224,8 +247,48 @@ function crud<T extends { id: string }>(table: string, key: string) {
   return { useCreate, useUpdate, useRemove };
 }
 
-export const { useCreate: useCreatePartner, useUpdate: useUpdatePartner, useRemove: useDeletePartner } =
-  crud<PaymentPartner>("payment_partners", "payment_partners");
+const partnerCrud = crud<PaymentPartner>("payment_partners", "payment_partners");
+export const useCreatePartner = partnerCrud.useCreate;
+export const useDeletePartner = partnerCrud.useRemove;
+
+/** Status changes also disable/restore matching Corridor rails rules. */
+export const useUpdatePartner = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, patch }: { id: string; patch: Partial<PaymentPartner> }) => {
+      const { error } = await db.from("payment_partners").update(patch).eq("id", id);
+      if (error) throw error;
+      if (patch.status === undefined) return { railsSynced: 0 };
+      const { data: row } = await db.from("payment_partners").select("code").eq("id", id).maybeSingle();
+      const code = row?.code as string | undefined;
+      if (!code) return { railsSynced: 0 };
+      const railsSynced = await syncCorridorRailsForPartnerStatus(code, patch.status === "active");
+      return { railsSynced };
+    },
+    onSuccess: (result, vars) => {
+      qc.invalidateQueries({ queryKey: ["payment_partners"] });
+      if (vars.patch.status !== undefined) {
+        qc.invalidateQueries({ queryKey: ["corridor_rail_policies"] });
+      }
+      if (vars.patch.status === "inactive") {
+        toast.success(
+          result.railsSynced
+            ? "Partner off — matching corridor rails marked inactive"
+            : "Partner off",
+        );
+      } else if (vars.patch.status === "active") {
+        toast.success(
+          result.railsSynced
+            ? "Partner on — matching corridor rails restored"
+            : "Partner on",
+        );
+      } else {
+        toast.success("Updated");
+      }
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+};
 
 /* ------------------------------- corridors ------------------------------ */
 
@@ -271,6 +334,20 @@ export const usePartnerPricing = (opts?: { partnerId?: string; includeHistory?: 
   });
 
 // Pricing is append-only: a new row supersedes the previous version via trigger.
+async function logPartnerAudit(action: string, tableName: string, newData: unknown) {
+  try {
+    const { data: auth } = await supabase.auth.getUser();
+    await db.from("audit_logs").insert({
+      action,
+      table_name: tableName,
+      user_id: auth?.user?.id ?? null,
+      new_data: newData,
+    });
+  } catch {
+    /* audit must never block the write */
+  }
+}
+
 export const useAddPartnerPricing = () => {
   const qc = useQueryClient();
   return useMutation({
@@ -280,6 +357,7 @@ export const useAddPartnerPricing = () => {
         .from("partner_pricing")
         .insert({ ...row, updated_by: auth?.user?.id ?? null });
       if (error) throw error;
+      await logPartnerAudit("partner_pricing.create", "partner_pricing", row);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["partner_pricing"] });
@@ -297,6 +375,7 @@ export const useBulkAddPartnerPricing = () => {
       const payload = rows.map((r) => ({ ...r, source: "file" as const, updated_by: auth?.user?.id ?? null }));
       const { error } = await db.from("partner_pricing").insert(payload);
       if (error) throw error;
+      await logPartnerAudit("partner_pricing.import", "partner_pricing", { count: payload.length });
       return payload.length;
     },
     onSuccess: (n) => {
@@ -340,7 +419,7 @@ export const useAddPartnerFxRate = () => {
 
 /**
  * Pulls LIVE rates from the partners that expose a rate API (Wise,
- * Flutterwave, Nomba today) and appends them to partner_fx_rates.
+ * Flutterwave, Nomba, Fincra) and appends them to partner_fx_rates.
  * Partners without an adapter are reported back as skipped.
  */
 export const useRefreshPartnerLiveRates = () => {

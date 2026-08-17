@@ -60,9 +60,13 @@ Deno.serve(async (req) => {
 
     const { data: partners, error: pErr } = await supabase
       .from("payment_partners")
-      .select("id, code, name, status");
+      .select("id, code, name, status")
+      .eq("status", "active");
     if (pErr) throw pErr;
     const partnerById = new Map((partners ?? []).map((p) => [p.id, p]));
+    if (partner_id && !partnerById.has(partner_id)) {
+      return json({ error: "Partner is not active — activate it before seeding." }, 400);
+    }
 
     let corridorQuery = supabase
       .from("partner_corridors")

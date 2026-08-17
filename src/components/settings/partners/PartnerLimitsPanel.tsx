@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { usePaymentPartners, usePartnerCorridors } from "@/hooks/usePartnerNetwork";
+import { usePaymentPartners, isPartnerActive, usePartnerCorridors } from "@/hooks/usePartnerNetwork";
 import {
   usePartnerLimits,
   usePartnerLimitUsage,
@@ -230,7 +230,7 @@ export const PartnerLimitsPanel = () => {
                   <SelectValue placeholder="Select partner" />
                 </SelectTrigger>
                 <SelectContent>
-                  {partners?.map((p) => (
+                  {partners?.filter(isPartnerActive).map((p) => (
                     <SelectItem key={p.id} value={p.id}>
                       {p.name}
                     </SelectItem>

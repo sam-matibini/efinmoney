@@ -11,6 +11,7 @@
 import { wiseFetch } from "./wise.ts";
 import { flwV3Fetch } from "./flw-v3.ts";
 import { fetchNombaExchangeRate, isNombaNigeriaConfigured } from "./nomba-nigeria.ts";
+import { fincraFetch, getFincraConfig } from "./fincra.ts";
 
 export interface PartnerQuote {
   ok: boolean;
@@ -84,6 +85,41 @@ const nombaQuote: PartnerQuoteAdapter = async (base, quote) => {
   }
 };
 
+/* -------------------------------- Fincra -------------------------------- */
+
+const fincraQuote: PartnerQuoteAdapter = async (base, quote) => {
+  try {
+    const cfg = getFincraConfig();
+    if (!cfg.secretKey) return { ok: false, error: "fincra not configured" };
+    if (!cfg.businessId) return { ok: false, error: "FINCRA_BUSINESS_ID missing" };
+    const { ok, status, json } = await fincraFetch("/quotes/generate", {
+      method: "POST",
+      body: JSON.stringify({
+        sourceCurrency: base.toUpperCase(),
+        destinationCurrency: quote.toUpperCase(),
+        amount: "100",
+        action: "receive",
+        transactionType: "disbursement",
+        business: cfg.businessId,
+        feeBearer: "business",
+        paymentDestination: "bank_account",
+        beneficiaryType: "individual",
+      }),
+    });
+    const data = (json?.data ?? json ?? {}) as Record<string, unknown>;
+    let rate = num(data.rate);
+    const sourceAmount = num(data.sourceAmount ?? data.quotedAmount);
+    const destAmount = num(data.destinationAmount ?? data.amountToReceive) || 100;
+    if (!rate && sourceAmount) rate = destAmount / sourceAmount;
+    if (!ok || !rate) {
+      return { ok: false, error: String(json?.message || json?.error || `fincra ${status}`) };
+    }
+    return { ok: true, rate };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+};
+
 /* ------------------------------- registry ------------------------------- */
 
 /** Partner `code` -> live quote adapter. Partners absent here have no rate API. */
@@ -91,6 +127,7 @@ export const PARTNER_QUOTE_ADAPTERS: Record<string, PartnerQuoteAdapter> = {
   wise: wiseQuote,
   flutterwave: flutterwaveQuote,
   nomba: nombaQuote,
+  fincra: fincraQuote,
 };
 
 export const hasLiveQuotes = (partnerCode: string) =>

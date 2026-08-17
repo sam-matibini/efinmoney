@@ -97,6 +97,60 @@ async function testResend(): Promise<TestResult> {
   return { ok: false, message: `Resend error ${r.status}` };
 }
 
+async function testPayPal(): Promise<TestResult> {
+  const clientId = Deno.env.get("PAYPAL_CLIENT_ID")!;
+  const clientSecret = Deno.env.get("PAYPAL_CLIENT_SECRET")!;
+  const live = (Deno.env.get("PAYPAL_ENVIRONMENT") || "sandbox").trim().toLowerCase() === "live";
+  const host = live ? "https://api-m.paypal.com" : "https://api-m.sandbox.paypal.com";
+  const r = await fetch(`${host}/v1/oauth2/token`, {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${btoa(`${clientId}:${clientSecret}`)}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: "grant_type=client_credentials",
+  });
+  if (r.ok) return { ok: true, message: `Connected — PayPal OAuth reachable (${live ? "live" : "sandbox"})` };
+  return { ok: false, message: `PayPal OAuth error ${r.status}`, detail: (await r.text()).slice(0, 200) };
+}
+
+async function testSquare(): Promise<TestResult> {
+  const token = Deno.env.get("SQUARE_ACCESS_TOKEN")!;
+  const sandbox = (Deno.env.get("SQUARE_ENVIRONMENT") || "production").trim().toLowerCase() === "sandbox";
+  const host = sandbox ? "https://connect.squareupsandbox.com" : "https://connect.squareup.com";
+  const r = await fetch(`${host}/v2/locations`, {
+    headers: { Authorization: `Bearer ${token}`, "Square-Version": "2025-01-23" },
+  });
+  if (r.ok) return { ok: true, message: "Connected — Square locations endpoint reachable" };
+  return { ok: false, message: `Square error ${r.status}`, detail: (await r.text()).slice(0, 200) };
+}
+
+async function testFlovide(): Promise<TestResult> {
+  const pk = Deno.env.get("FLOVIDE_PUBLIC_KEY")!;
+  const sk = Deno.env.get("FLOVIDE_SECRET_KEY")!;
+  const base = (Deno.env.get("FLOVIDE_API_BASE") || "https://flovide.com").replace(/\/+$/, "");
+  const r = await fetch(`${base}/api/v1/reference-data/currencies`, {
+    headers: { Accept: "application/json", "X-Public-Key": pk, "X-Secret-Key": sk },
+  });
+  if (r.ok) return { ok: true, message: "Connected — Flovide currencies endpoint reachable" };
+  return { ok: false, message: `Flovide error ${r.status}`, detail: (await r.text()).slice(0, 200) };
+}
+
+async function testFincra(): Promise<TestResult> {
+  const key = Deno.env.get("FINCRA_SECRET_KEY")!;
+  const envRaw = (Deno.env.get("FINCRA_ENV") ?? "sandbox").trim().toLowerCase();
+  const isLive = ["live", "production", "prod", "1", "true"].includes(envRaw);
+  const host = isLive ? "https://api.fincra.com" : "https://sandboxapi.fincra.com";
+  const r = await fetch(`${host}/profile`, {
+    headers: { Accept: "application/json", "api-key": key },
+  });
+  if (r.status === 401 || r.status === 403) {
+    return { ok: false, message: `Fincra auth failed (HTTP ${r.status})`, detail: (await r.text()).slice(0, 200) };
+  }
+  if (r.status < 500) return { ok: true, message: `Connected — Fincra reachable (HTTP ${r.status})` };
+  return { ok: false, message: `Fincra error ${r.status}` };
+}
+
 // ── Provider registry: required env vars (+ optional live probe) ─────────────
 // A provider with no `live` probe reports "configured" when its secrets are
 // present — an honest signal (missing credentials is the #1 cause of a dead
@@ -105,7 +159,7 @@ const PROVIDERS: Record<string, { required: string[]; live?: () => Promise<TestR
   // Payments — Africa
   nomba:       { required: ["NOMBA_PAY_API_URL", "NOMBA_PAY_USER"] },
   ghana:       { required: ["GHANA_PAY_API_URL", "GHANA_PAY_USER"] },
-  fincra:      { required: ["FINCRA_SECRET_KEY", "FINCRA_BUSINESS_ID"] },
+  fincra:      { required: ["FINCRA_SECRET_KEY", "FINCRA_BUSINESS_ID"], live: testFincra },
   flutterwave: { required: ["FLW_SECRET_KEY"], live: testFlutterwave },
   swychr:      { required: ["SWYCHR_EMAIL", "SWYCHR_PASSWORD"] },
   elicate:     { required: ["ELICATE_SECRET_KEY"] },
@@ -119,6 +173,11 @@ const PROVIDERS: Record<string, { required: string[]; live?: () => Promise<TestR
   stripe:      { required: ["STRIPE_SECRET_KEY"], live: testStripe },
   adyen:       { required: ["ADYEN_API_KEY", "ADYEN_MERCHANT_ACCOUNT"] },
   paysafe:     { required: ["PAYSAFE_API_KEY"], live: testPaysafe },
+  paypal:      { required: ["PAYPAL_CLIENT_ID", "PAYPAL_CLIENT_SECRET"], live: testPayPal },
+  square:      { required: ["SQUARE_ACCESS_TOKEN", "SQUARE_APPLICATION_ID", "SQUARE_LOCATION_ID"], live: testSquare },
+  flovide:     { required: ["FLOVIDE_PUBLIC_KEY", "FLOVIDE_SECRET_KEY"], live: testFlovide },
+  dodo:        { required: ["DODO_PAYMENTS_API_KEY"] },
+  wise:        { required: ["WISE_API_TOKEN"] },
   // Banking
   plaid:       { required: ["PLAID_CLIENT_ID", "PLAID_SECRET"], live: testPlaid },
   interac:     { required: ["INTERAC_CLIENT_ID", "INTERAC_PRIVATE_JWK"] },

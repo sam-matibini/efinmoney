@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import {
-  usePaymentPartners,
+  useActivePaymentPartners,
   usePartnerFxRates,
   useAddPartnerFxRate,
   useRefreshPartnerLiveRates,
@@ -26,7 +26,7 @@ const empty: Partial<PartnerFxRate> = {
 };
 
 export const PartnerFxRatesPanel = () => {
-  const { data: partners } = usePaymentPartners();
+  const { data: partners } = useActivePaymentPartners();
   const [partnerId, setPartnerId] = useState("");
   const [sourceFilter, setSourceFilter] = useState<string>("api");
   const { data: allRates, isLoading, refetch, isFetching } = usePartnerFxRates(partnerId || undefined);
@@ -72,7 +72,7 @@ export const PartnerFxRatesPanel = () => {
               <TrendingUp className="h-5 w-5" /> Partner FX Rates
             </CardTitle>
             <CardDescription>
-              Partner quotes stored against the mid-market reference, so FX cost is separated from transaction fees. Live rates are pulled from partners with a rate API (Wise, Flutterwave, Nomba) and expire after 15 minutes.
+              Partner quotes stored against the mid-market reference, so FX cost is separated from transaction fees. Live rates are pulled from partners with a rate API (Wise, Flutterwave, Nomba, Fincra) and expire after 15 minutes. Switch the source filter between Live (API) and Manual.
             </CardDescription>
           </div>
           <div className="flex flex-wrap items-center gap-2">

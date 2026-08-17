@@ -1,6 +1,7 @@
 import { useState } from "react";
 import {
   usePaymentPartners,
+  isPartnerActive,
   usePartnerLiquidity,
   useUpsertLiquidity,
   useDeleteLiquidity,
@@ -174,7 +175,7 @@ export const PartnerLiquidityPanel = () => {
                 <Select value={draft.partner_id} onValueChange={(v) => set({ partner_id: v })}>
                   <SelectTrigger><SelectValue placeholder="Select partner" /></SelectTrigger>
                   <SelectContent>
-                    {partners?.map((p) => (
+                    {partners?.filter(isPartnerActive).map((p) => (
                       <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
                     ))}
                   </SelectContent>

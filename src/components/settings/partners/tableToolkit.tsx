@@ -259,13 +259,15 @@ export interface TableQueryOptions {
   /** File name stem for CSV / Excel exports. */
   exportName?: string;
   searchPlaceholder?: string;
+  /** Initial column filters, e.g. `{ status: "active" }`. */
+  defaultFilters?: Record<string, string>;
 }
 
 export function useTableQuery<T>(rows: T[] | undefined, cols: Col<T>[], opts: TableQueryOptions = {}) {
   const { defaultSort, defaultDir = "desc", exportName = "export", searchPlaceholder = "Search…" } = opts;
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
-  const [filters, setFilters] = useState<Record<string, string>>({});
+  const [filters, setFilters] = useState<Record<string, string>>(opts.defaultFilters ?? {});
   const [sortKey, setSortKey] = useState<string | null>(defaultSort ?? null);
   const [sortDir, setSortDir] = useState<SortDir>(defaultDir);
 

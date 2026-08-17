@@ -8,7 +8,7 @@ import {
   useCreateRoutingOverride,
   useDeleteRoutingOverride,
 } from "@/hooks/useRoutingEngine";
-import { usePaymentPartners } from "@/hooks/usePartnerNetwork";
+import { usePaymentPartners, isPartnerActive } from "@/hooks/usePartnerNetwork";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -71,8 +71,7 @@ export const LiveRoutingControlPanel = () => {
             <Radio className="h-4 w-4" /> Execution mode
           </CardTitle>
           <CardDescription>
-            In shadow mode the engine only records what it would have chosen. In live mode it
-            selects and executes the rail for corridors enabled below.
+            In shadow mode the engine only records what it would have chosen. Switch with Live to select and execute the rail for corridors enabled below.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -88,7 +87,7 @@ export const LiveRoutingControlPanel = () => {
                   rule && setMode.mutate({ id: rule.id, patch: { execution_mode: v ? "live" : "shadow" } })
                 }
               />
-              <span className="text-sm text-muted-foreground">Enable live routing</span>
+              <span className="text-sm text-muted-foreground">Switch with Live</span>
             </div>
             <span className="text-sm text-muted-foreground">
               {liveCount} corridor{liveCount === 1 ? "" : "s"} enabled
@@ -174,7 +173,7 @@ export const LiveRoutingControlPanel = () => {
               <Select value={draft.partner_id} onValueChange={(v) => setDraft({ ...draft, partner_id: v })}>
                 <SelectTrigger><SelectValue placeholder="Select partner" /></SelectTrigger>
                 <SelectContent>
-                  {(partners ?? []).map((p: any) => (
+                  {(partners ?? []).filter(isPartnerActive).map((p: any) => (
                     <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
                   ))}
                 </SelectContent>

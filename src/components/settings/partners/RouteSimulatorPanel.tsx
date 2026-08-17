@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouteQuote, type RouteQuote } from "@/hooks/useRoutingEngine";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,15 @@ const money = (n: number) => n.toLocaleString(undefined, { maximumFractionDigits
 export const RouteSimulatorPanel = () => {
   const quote = useRouteQuote();
   const [result, setResult] = useState<RouteQuote | null>(null);
+  const [rankBy, setRankBy] = useState<"score" | "cost">("cost");
+
+  const ranked = useMemo(() => {
+    if (!result) return [];
+    const list = [...result.candidates];
+    if (rankBy === "cost") list.sort((a, b) => a.total_cost - b.total_cost);
+    return list;
+  }, [result, rankBy]);
+  const cheapestId = ranked.length ? ranked.reduce((best, c) => (c.total_cost < best.total_cost ? c : best)).partner_id : null;
   const [form, setForm] = useState({
     source_currency: "CAD",
     dest_currency: "NGN",
@@ -24,7 +33,9 @@ export const RouteSimulatorPanel = () => {
       <Card>
         <CardHeader>
           <CardTitle>Route simulator</CardTitle>
-          <CardDescription>Score every eligible partner for a hypothetical transfer.</CardDescription>
+          <CardDescription>
+            Score every eligible partner. Default ranking is least cost base — switch to engine score if needed.
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-3 md:grid-cols-5">
@@ -74,12 +85,28 @@ export const RouteSimulatorPanel = () => {
               </Badge>
               {result.live_corridor && <Badge>live corridor</Badge>}
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="flex flex-wrap items-center gap-2">
               Rule: {result.rule?.name ?? "default weights"}
+              <Button
+                type="button"
+                size="sm"
+                variant={rankBy === "cost" ? "default" : "outline"}
+                onClick={() => setRankBy("cost")}
+              >
+                Least cost
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={rankBy === "score" ? "default" : "outline"}
+                onClick={() => setRankBy("score")}
+              >
+                Engine score
+              </Button>
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {result.candidates.map((c, i) => (
+            {ranked.map((c, i) => (
               <div
                 key={c.partner_id}
                 className={`rounded-lg border p-3 ${i === 0 ? "border-primary bg-primary/5" : ""}`}
@@ -87,7 +114,10 @@ export const RouteSimulatorPanel = () => {
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="text-sm font-medium">
                     {i + 1}. {c.partner_name}
-                    {i === 0 && <Badge className="ml-2">recommended</Badge>}
+                    {i === 0 && <Badge className="ml-2">{rankBy === "cost" ? "least cost" : "recommended"}</Badge>}
+                    {cheapestId === c.partner_id && rankBy !== "cost" && (
+                      <Badge variant="secondary" className="ml-2">least cost</Badge>
+                    )}
                     {c.pricing_missing && (
                       <Badge variant="destructive" className="ml-2">pricing missing</Badge>
                     )}

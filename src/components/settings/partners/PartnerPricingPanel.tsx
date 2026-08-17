@@ -2,6 +2,7 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { useTableQuery, type Col } from "./tableToolkit";
 import {
   usePaymentPartners,
+  isPartnerActive,
   usePartnerPricing,
   useAddPartnerPricing,
   useBulkAddPartnerPricing,
@@ -232,7 +233,7 @@ export const PartnerPricingPanel = () => {
               <Tags className="h-5 w-5" /> Partner Pricing
             </CardTitle>
             <CardDescription>
-              Versioned partner fee schedules. Saving a new price supersedes the previous version — nothing is overwritten.
+              Versioned partner fee schedules. Saving a new price is audited and supersedes the previous version. Customer-facing discounts go through Fee adjustments for approval.
             </CardDescription>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -247,7 +248,7 @@ export const PartnerPricingPanel = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All partners</SelectItem>
-                {partners?.map((p) => (
+                {partners?.filter(isPartnerActive).map((p) => (
                   <SelectItem key={p.id} value={p.id}>
                     {p.name}
                   </SelectItem>
@@ -362,7 +363,7 @@ export const PartnerPricingPanel = () => {
               <Select value={draft.partner_id} onValueChange={(v) => set({ partner_id: v })}>
                 <SelectTrigger><SelectValue placeholder="Select partner" /></SelectTrigger>
                 <SelectContent>
-                  {partners?.map((p) => (
+                  {partners?.filter(isPartnerActive).map((p) => (
                     <SelectItem key={p.id} value={p.id}>
                       {p.name}
                     </SelectItem>

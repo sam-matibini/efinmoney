@@ -56,6 +56,8 @@ const INTEGRATIONS: Array<{
   { key: "stripe", name: "Stripe", description: "Card charges, Connect, Issuing & Treasury", category: "Payments — Global & Cards", envHints: ["STRIPE_SECRET_KEY"] },
   { key: "adyen", name: "Adyen", description: "Global card drop-in & payment links", category: "Payments — Global & Cards", envHints: ["ADYEN_API_KEY", "ADYEN_MERCHANT_ACCOUNT"] },
   { key: "dodo", name: "Dodo Payments", description: "MoR global card checkout for USD/CAD/EUR/GBP wallet top-up", category: "Payments — Global & Cards", envHints: ["DODO_PAYMENTS_API_KEY", "DODO_PAYMENTS_WEBHOOK_KEY"] },
+  { key: "paypal", name: "PayPal", description: "Orders API wallet top-up for USD/CAD/EUR/GBP", category: "Payments — Global & Cards", envHints: ["PAYPAL_CLIENT_ID", "PAYPAL_CLIENT_SECRET"] },
+  { key: "square", name: "Square", description: "Card checkout for USD/CAD/EUR/GBP wallet top-up", category: "Payments — Global & Cards", envHints: ["SQUARE_ACCESS_TOKEN", "SQUARE_APPLICATION_ID", "SQUARE_LOCATION_ID"] },
   { key: "paysafe", name: "Paysafe", description: "Canadian Interac & EFT payouts", category: "Payments — Global & Cards", envHints: ["PAYSAFE_API_KEY"] },
   // Banking
   { key: "plaid", name: "Plaid", description: "Bank account linking & balances (Canada domestic)", category: "Banking", envHints: ["PLAID_CLIENT_ID", "PLAID_SECRET"] },
@@ -146,6 +148,13 @@ const EDGE_FUNCTIONS: Array<{ name: string; description: string; jwt: boolean; c
   { name: "dodo-initialize-checkout", description: "Create Dodo checkout for wallet top-up", jwt: true, category: "Dodo" },
   { name: "dodo-verify-payment", description: "Verify Dodo payment on return URL", jwt: true, category: "Dodo" },
   { name: "dodo-webhook", description: "Receives Dodo payment.succeeded events", jwt: false, category: "Dodo" },
+  { name: "paypal-public-config", description: "PayPal client id for hosted buttons", jwt: true, category: "PayPal" },
+  { name: "paypal-create-order", description: "Create PayPal order for wallet top-up", jwt: true, category: "PayPal" },
+  { name: "paypal-capture-order", description: "Capture PayPal order and credit wallet", jwt: true, category: "PayPal" },
+  { name: "square-public-config", description: "Square application id / location for Web Payments", jwt: true, category: "Square" },
+  { name: "square-create-checkout", description: "Create Square Checkout payment link", jwt: true, category: "Square" },
+  { name: "square-create-payment", description: "Charge a Square Web Payments token", jwt: true, category: "Square" },
+  { name: "square-verify-checkout", description: "Verify Square Checkout and credit wallet", jwt: true, category: "Square" },
   // Yellowcard
   { name: "yellowcard-payout",         description: "Initiates Yellowcard Africa payouts",      jwt: false, category: "Yellowcard" },
   { name: "yellowcard-webhook",        description: "Receives Yellowcard events",               jwt: false, category: "Yellowcard" },

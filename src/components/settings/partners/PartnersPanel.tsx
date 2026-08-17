@@ -5,6 +5,7 @@ import { ISO_COUNTRIES } from "@/lib/isoCountries";
 import {
   usePaymentPartners,
   usePartnerCorridors,
+  usePartnerMailingCoverage,
   useCreatePartner,
   useUpdatePartner,
   useDeletePartner,
@@ -207,6 +208,7 @@ const ServesCell = ({ codes }: { codes: string[] }) => {
 export const PartnersPanel = () => {
   const { data: partners, isLoading, isError, error, refetch, isFetching } = usePaymentPartners();
   const { data: corridors } = usePartnerCorridors();
+  const { data: mailingIds } = usePartnerMailingCoverage();
   const create = useCreatePartner();
   const update = useUpdatePartner();
   const remove = useDeletePartner();
@@ -276,9 +278,14 @@ export const PartnersPanel = () => {
   const { view, Controls, HeadRow } = useTableQuery(partners, cols, {
     defaultSort: "partner_ref",
     defaultDir: "asc",
+    defaultFilters: { status: "active" },
     exportName: "payment-partners",
     searchPlaceholder: "Search ref, partner, code, country…",
   });
+
+  const missingMailing = (partners ?? []).filter(
+    (p) => p.status === "active" && mailingIds && !mailingIds.has(p.id),
+  );
 
   const save = () => {
     if (!draft.code || !draft.name || codeTaken) return;
@@ -367,7 +374,9 @@ export const PartnersPanel = () => {
           <CardTitle className="flex items-center gap-2">
             <Network className="h-5 w-5" /> Payment Partners
           </CardTitle>
-          <CardDescription>Pay-in and pay-out providers available to the routing engine</CardDescription>
+          <CardDescription>
+            Pay-in and pay-out providers. Table defaults to active partners — clear the Status filter to see inactive rails (Circle, Stripe, …).
+          </CardDescription>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <input
@@ -400,6 +409,16 @@ export const PartnersPanel = () => {
       </CardHeader>
 
       <CardContent>
+        {missingMailing.length > 0 && (
+          <div className="mb-3 rounded-md border border-amber-500/40 bg-amber-500/5 p-3 text-sm">
+            <p className="font-medium text-amber-700 dark:text-amber-400">
+              {missingMailing.length} active partner{missingMailing.length === 1 ? "" : "s"} missing a mailing address
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {missingMailing.map((p) => p.name).join(", ")}. Add one under Relationships → partner → Addresses.
+            </p>
+          </div>
+        )}
         {isLoading ? (
           <div className="space-y-2">
             {[0, 1, 2].map((i) => (

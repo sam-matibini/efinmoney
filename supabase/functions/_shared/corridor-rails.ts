@@ -117,7 +117,56 @@ export async function resolveCorridorRails(
     row = (data as CorridorRailPolicy | null) ?? null;
   }
   if (!row) return { policy: null, rails: [] };
-  return { policy: row, rails: railsFromPolicy(row) };
+  const rails = await filterActivePartnerRails(admin, railsFromPolicy(row));
+  if (!rails.length) return { policy: null, rails: [] };
+  return { policy: row, rails };
+}
+
+/** payment_partners.code → corridor rail ids (ghana vs ghana_pay, etc.). */
+function partnerCodeToRailIds(code: string): string[] {
+  const c = code.trim().toLowerCase().replace(/-/g, "_");
+  const map: Record<string, string[]> = {
+    fincra: ["fincra"],
+    nomba: ["nomba"],
+    flovide: ["flovide"],
+    flutterwave: ["flutterwave"],
+    flw: ["flutterwave"],
+    lenhub: ["lenhub_flutter"],
+    lenhub_flutter: ["lenhub_flutter"],
+    paytota: ["paytota"],
+    swychr: ["swychr"],
+    ghana: ["ghana_pay"],
+    ghana_pay: ["ghana_pay"],
+    elicate: ["elicate"],
+    dodo: ["dodo"],
+    square: ["square"],
+    paypal: ["paypal"],
+    wise: ["wise"],
+    interac: ["interac"],
+  };
+  return map[c] ?? (c ? [c] : []);
+}
+
+async function filterActivePartnerRails(
+  admin: SupabaseClient,
+  rails: string[],
+): Promise<string[]> {
+  if (!rails.length) return [];
+  try {
+    const { data } = await admin.from("payment_partners").select("code,status");
+    const partners = (data || []) as { code: string; status: string | null }[];
+    const known = new Set<string>();
+    const active = new Set<string>();
+    for (const p of partners) {
+      for (const rail of partnerCodeToRailIds(p.code || "")) {
+        known.add(rail);
+        if (p.status === "active") active.add(rail);
+      }
+    }
+    return rails.filter((r) => !known.has(r) || active.has(r));
+  } catch {
+    return rails;
+  }
 }
 
 /** Map partner code → edge function slug for payout. */

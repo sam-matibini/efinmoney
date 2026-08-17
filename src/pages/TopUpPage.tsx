@@ -30,11 +30,13 @@ import WiseTopUpCard from "@/components/payments/WiseTopUpCard";
 import WisePayLinkCard from "@/components/payments/WisePayLinkCard";
 import { isWisePayCurrency } from "@/lib/wisePayLink";
 import {
+  activeRailSetFromPartners,
   collectMethodForPartner,
   collectPayMethodIds,
   defaultCollectPartner,
   resolveCollectMethodPreference,
 } from "@/lib/corridorRails";
+import { usePaymentPartners } from "@/hooks/usePartnerNetwork";
 import CadCollectionPanel from "@/components/topup/CadCollectionPanel";
 import WiseInteracInvoiceCheckout from "@/components/payments/WiseInteracInvoiceCheckout";
 
@@ -236,6 +238,11 @@ const TopUpPage = () => {
   const { user } = useAuth();
   const { data: wallets, isLoading: walletsLoading } = useWallets();
   const { data: fxRates = [] } = useFxRates();
+  const { data: paymentPartners = [] } = usePaymentPartners();
+  const activeRails = useMemo(
+    () => activeRailSetFromPartners(paymentPartners),
+    [paymentPartners],
+  );
 
   const [selectedWalletId, setSelectedWalletId] = useState<string>("");
   const [amount, setAmount] = useState("");
@@ -804,10 +811,11 @@ const TopUpPage = () => {
     const walletId = selectedWallet.wallet_id;
     const rails = new Set<string>([...intlMethods, ...africaMomoMethods]);
     const ccyUpper = currency.toUpperCase();
+    const defaultRail = defaultCollectPartner(ccyUpper);
     const collectPrimary =
       (policyIntlOverride && intlMethods.includes(policyIntlOverride) && policyIntlOverride)
       || (policyAfricaOverride && africaMomoMethods.includes(policyAfricaOverride) && policyAfricaOverride)
-      || defaultCollectPartner(ccyUpper)
+      || (defaultRail && activeRails.has(defaultRail) ? defaultRail : null)
       || null;
     const primaryIds = collectPrimary ? collectPayMethodIds(collectPrimary) : [];
     const showRail = (id: string) => {
@@ -1176,10 +1184,11 @@ const TopUpPage = () => {
     ghana_pay: "ghana",
     elicate: "elicate",
   };
+  const defaultRail = defaultCollectPartner(currency);
   const collectPrimaryIds = collectPayMethodIds(
     policyIntlOverride
     || policyAfricaOverride
-    || defaultCollectPartner(currency)
+    || (defaultRail && activeRails.has(defaultRail) ? defaultRail : "")
     || "",
   );
   const defaultMethodId =
