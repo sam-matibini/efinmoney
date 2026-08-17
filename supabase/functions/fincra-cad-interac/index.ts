@@ -1,17 +1,25 @@
+/**
+ * Fincra CAD Interac e-Transfer pay-in.
+ * Creates a referenced intent; collection.successful webhooks match amount/reference
+ * and credit the user's CAD wallet.
+ *
+ * Alias: FINCRA_CAD_INTERAC_ALIAS secret, or live GET /profile/virtual-accounts/?currency=cad
+ */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import {
-  buildLoopInteracInstructions,
-  getLoopCadConfig,
-  loopEftConfigured,
-} from "../_shared/loopCad.ts";
+  buildFincraInteracInstructions,
+  resolveFincraCadAlias,
+} from "../_shared/fincraCad.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const LOG = "fincra-cad-interac";
+
 function fail(branch: string, message: string, status: number, extra: Record<string, unknown> = {}) {
-  console.warn(`fincra-cad-interac: rejected [${branch}] ${status} ${message}`, JSON.stringify(extra));
+  console.warn(`${LOG}: rejected [${branch}] ${status} ${message}`, JSON.stringify(extra));
   return json({ error: message, branch }, status);
 }
 
@@ -24,27 +32,11 @@ function json(body: unknown, status = 200) {
 
 const EMAIL_RE = /[\w.+-]+@[\w-]+\.[\w.-]+/;
 const CA_PHONE_RE = /^\+?1?[2-9]\d{9}$/;
-
-/** Statuses where the customer can still pay and the deposit can still be allocated. */
 const OPEN_STATUSES = ["pending", "awaiting_payment"];
+const INTENT_TABLE = "fincra_cad_interac_intents";
 
 const INTENT_COLUMNS =
   "id, public_id, amount, currency_code, reference, status, created_at, expires_at, credited_at, claimed_sent_at, sender_name, sender_email, sender_bank, sender_phone, purpose, transfer_id, hosted_url, sender_account_type, sender_address_line1, sender_address_line2, sender_city, sender_region, sender_postal_code, sender_country";
-
-/** Legacy alias of wise-cad-interac — Loop Bank CAD Autodeposit + EFT. */
-function resolveInteracAlias(): string {
-  return getLoopCadConfig().alias;
-}
-
-function buildInstructions(
-  amount: number,
-  alias: string,
-  reference: string,
-  contact: string,
-  purpose: string,
-): string[] {
-  return buildLoopInteracInstructions(amount, alias, reference, contact, purpose);
-}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -62,34 +54,35 @@ Deno.serve(async (req) => {
     if (userErr || !user) return json({ error: "Unauthorized" }, 401);
 
     const admin = createClient(supabaseUrl, service);
-    const alias = resolveInteracAlias();
-    const cfg = getLoopCadConfig();
-    const eft = loopEftConfigured(cfg.eft) ? cfg.eft : null;
+    const cad = await resolveFincraCadAlias();
+    const alias = cad.alias;
+    const railMeta = {
+      provider: "fincra" as const,
+      alias: alias || null,
+      configured: Boolean(alias),
+      virtual_account_id: cad.virtualAccountId,
+      alias_source: cad.source,
+      eft: null,
+      eft_configured: false,
+    };
 
     if (req.method === "GET") {
       const url = new URL(req.url);
       const intentId = url.searchParams.get("intent_id");
       if (intentId) {
         const { data, error } = await admin
-          .from("fincra_cad_interac_intents")
+          .from(INTENT_TABLE)
           .select(INTENT_COLUMNS)
           .eq("id", intentId)
           .eq("user_id", user.id)
           .maybeSingle();
         if (error) return json({ error: error.message }, 500);
         if (!data) return json({ error: "Intent not found" }, 404);
-        return json({
-          intent: data,
-          alias: alias || null,
-          configured: Boolean(alias),
-          provider: "loop",
-          eft,
-          eft_configured: Boolean(eft),
-        });
+        return json({ intent: data, ...railMeta });
       }
 
       const { data: pending } = await admin
-        .from("fincra_cad_interac_intents")
+        .from(INTENT_TABLE)
         .select(INTENT_COLUMNS)
         .eq("user_id", user.id)
         .in("status", OPEN_STATUSES)
@@ -98,12 +91,8 @@ Deno.serve(async (req) => {
         .limit(5);
 
       return json({
-        alias: alias || null,
-        configured: Boolean(alias),
         pending: pending ?? [],
-        provider: "loop",
-        eft,
-        eft_configured: Boolean(eft),
+        ...railMeta,
       });
     }
 
@@ -139,7 +128,7 @@ Deno.serve(async (req) => {
       const intentId = String(body.intent_id || "");
       if (!intentId) return json({ error: "intent_id required" }, 400);
       const { data, error } = await admin
-        .from("fincra_cad_interac_intents")
+        .from(INTENT_TABLE)
         .update({ status: "cancelled" })
         .eq("id", intentId)
         .eq("user_id", user.id)
@@ -151,12 +140,11 @@ Deno.serve(async (req) => {
       return json({ ok: true, intent: data });
     }
 
-    // The customer says they have sent the e-Transfer. This is a claim only — never a payment.
     if (action === "claim_sent") {
       const intentId = String(body.intent_id || "");
       if (!intentId) return json({ error: "intent_id required" }, 400);
       const { data, error } = await admin
-        .from("fincra_cad_interac_intents")
+        .from(INTENT_TABLE)
         .update({ status: "awaiting_payment", claimed_sent_at: new Date().toISOString() })
         .eq("id", intentId)
         .eq("user_id", user.id)
@@ -166,9 +154,8 @@ Deno.serve(async (req) => {
       if (error) return json({ error: error.message }, 500);
       if (data) return json({ ok: true, intent: data });
 
-      // Already claimed or further along — return the current row instead of failing
       const { data: current } = await admin
-        .from("fincra_cad_interac_intents")
+        .from(INTENT_TABLE)
         .select(INTENT_COLUMNS)
         .eq("id", intentId)
         .eq("user_id", user.id)
@@ -178,7 +165,12 @@ Deno.serve(async (req) => {
     }
 
     if (!alias) {
-      return fail("alias_missing", "Interac details are being prepared. Please try again in a moment.", 503);
+      return fail(
+        "alias_missing",
+        "Fincra CAD Interac is not ready yet. Ask ops to confirm the @fincra.ca alias in the Merchant Portal (or set FINCRA_CAD_INTERAC_ALIAS).",
+        503,
+        { source: cad.source },
+      );
     }
 
     const amount = Number(body.amount);
@@ -255,30 +247,25 @@ Deno.serve(async (req) => {
       return fail("wallet_currency", "Interac e-Transfer only funds CAD wallets", 400, { currency: wallet.currency_code });
     }
 
-    // Expire stale open intents for this user
     await admin
-      .from("fincra_cad_interac_intents")
+      .from(INTENT_TABLE)
       .update({ status: "expired" })
       .eq("user_id", user.id)
       .in("status", OPEN_STATUSES)
       .lt("expires_at", new Date().toISOString());
 
-    // EFM-YYYYMMDD-00000000 reference, generated by the database sequence
     let reference = "";
     const { data: generated, error: refErr } = await admin.rpc("next_interac_public_id");
     if (!refErr && typeof generated === "string" && generated) {
       reference = generated;
     } else {
-      console.warn("fincra-cad-interac: reference generator unavailable", refErr?.message);
+      console.warn(`${LOG}: reference generator unavailable`, refErr?.message);
       const day = new Date().toISOString().slice(0, 10).replace(/-/g, "");
       reference = `EFM-${day}-${String(Date.now() % 100000000).padStart(8, "0")}`;
     }
 
-    // The payer pressed "Pay", so the intent is already awaiting the deposit.
-    const hostedUrl = null;
-
     const { data: intent, error: insErr } = await admin
-      .from("fincra_cad_interac_intents")
+      .from(INTENT_TABLE)
       .insert({
         user_id: user.id,
         wallet_id: walletId,
@@ -288,7 +275,7 @@ Deno.serve(async (req) => {
         public_id: reference,
         status: "awaiting_payment",
         claimed_sent_at: new Date().toISOString(),
-        hosted_url: hostedUrl,
+        hosted_url: null,
         sender_name: senderName,
         sender_email: senderEmail || null,
         sender_phone: senderPhone || null,
@@ -311,19 +298,18 @@ Deno.serve(async (req) => {
       .single();
 
     if (insErr || !intent) {
-      return fail("insert", insErr?.message || "Could not create Interac intent", 500, { code: insErr?.code, details: insErr?.details });
+      return fail("insert", insErr?.message || "Could not create Interac intent", 500, {
+        code: insErr?.code,
+        details: insErr?.details,
+      });
     }
 
     return json({
       ok: true,
-      provider: "loop",
-      alias,
-      eft,
-      eft_configured: Boolean(eft),
-      configured: Boolean(alias),
-      hosted_url: hostedUrl,
+      ...railMeta,
+      hosted_url: null,
       intent,
-      instructions: buildInstructions(
+      instructions: buildFincraInteracInstructions(
         Number(intent.amount),
         alias,
         intent.reference,
@@ -332,7 +318,7 @@ Deno.serve(async (req) => {
       ),
     });
   } catch (err) {
-    console.error("fincra-cad-interac error:", err);
+    console.error(`${LOG} error:`, err);
     return json({ error: err instanceof Error ? err.message : "Server error" }, 500);
   }
 });

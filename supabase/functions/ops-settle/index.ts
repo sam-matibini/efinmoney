@@ -4,6 +4,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { explainPayoutError, notifyOpsBrief } from "../_shared/ops-alert.ts";
 import { payoutFnForRail } from "../_shared/corridor-rails.ts";
+import { payoutMinAmount } from "../_shared/payoutMins.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -107,8 +108,41 @@ Deno.serve(async (req) => {
     const note = String(body.note || "").trim();
     const rail = String(body.rail || "").trim().toLowerCase();
 
-    if (!transferId || !["retry", "complete", "refund"].includes(action)) {
-      return json({ error: "transfer_id and action (retry|complete|refund) required" }, 400);
+    if (!transferId && action !== "refund_all") {
+      return json({ error: "transfer_id and action (retry|boost_min|complete|refund|refund_all) required" }, 400);
+    }
+    if (!["retry", "boost_min", "complete", "refund", "refund_all"].includes(action)) {
+      return json({ error: "transfer_id and action (retry|boost_min|complete|refund|refund_all) required" }, 400);
+    }
+
+    if (action === "refund_all") {
+      const { data: held } = await admin.from("transfers").select("id")
+        .eq("status", "pending_ops")
+        .order("created_at", { ascending: true })
+        .limit(100);
+      const ids = (held || []).map((t: { id: string }) => t.id);
+      const results: { id: string; ok: boolean; already?: boolean }[] = [];
+      for (const id of ids) {
+        try {
+          const r = await refundTransfer(
+            admin,
+            id,
+            note || "Bulk refund by ops — payout could not be completed",
+          );
+          await admin.from("transfers").update({ ops_resolved_by: user.id }).eq("id", id);
+          results.push({ id, ok: true, already: r.already });
+        } catch (e) {
+          console.error("ops-settle refund_all item failed", id, e);
+          results.push({ id, ok: false });
+        }
+      }
+      return json({
+        success: true,
+        action: "refund_all",
+        count: results.filter((r) => r.ok).length,
+        failed: results.filter((r) => !r.ok).length,
+        results,
+      });
     }
 
     const { data: transfer, error: tErr } = await admin.from("transfers").select("*")
@@ -137,15 +171,33 @@ Deno.serve(async (req) => {
       return json({ success: true, action: "complete" });
     }
 
-    // retry
+    // boost_min: raise destination amount to provider floor (company covers shortfall), then retry
+    let payoutAmount = Number(transfer.target_amount ?? transfer.source_amount);
+    let boostNote = "";
+    if (action === "boost_min") {
+      const ccy = String(transfer.target_currency || transfer.source_currency || "").toUpperCase();
+      const floor = payoutMinAmount(ccy);
+      const before = payoutAmount;
+      if (!Number.isFinite(before) || before < floor) {
+        payoutAmount = floor;
+        boostNote = `Ops boosted destination ${before || 0} → ${floor} ${ccy} (company covered shortfall). `;
+        await admin.from("transfers").update({
+          target_amount: floor,
+          ops_note: (boostNote + (note || "")).trim().slice(0, 500),
+        }).eq("id", transferId);
+        transfer.target_amount = floor;
+      }
+    }
+
+    // retry (also used after boost_min)
     const fn = payoutFnForRail(rail);
     if (!fn) return json({ error: `Unknown rail: ${rail || "(empty)"}` }, 400);
 
     await admin.from("transfers").update({
       status: "processing",
-      ops_status: "retrying",
+      ops_status: action === "boost_min" ? "boost_retrying" : "retrying",
       provider_charge_id: `rail:${rail}`,
-      ops_note: note || `Retry via ${rail}`,
+      ops_note: (boostNote + (note || `Retry via ${rail}`)).trim().slice(0, 500),
     }).eq("id", transferId);
 
     const service = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
@@ -155,7 +207,7 @@ Deno.serve(async (req) => {
       phone_number: transfer.recipient_phone,
       account_number: transfer.recipient_account,
       bank_code: transfer.recipient_bank_code,
-      amount: Number(transfer.target_amount ?? transfer.source_amount),
+      amount: payoutAmount,
       currency: transfer.target_currency ?? transfer.source_currency,
       network: transfer.payout_method,
       recipient_name: transfer.recipient_name,
@@ -183,12 +235,19 @@ Deno.serve(async (req) => {
     if (ok) {
       await admin.from("transfers").update({
         status: payout.queued || payout.pending_liquidity ? "pending_liquidity" : "processing",
-        ops_status: "retry_accepted",
+        ops_status: action === "boost_min" ? "boost_retry_accepted" : "retry_accepted",
         ops_resolved_by: user.id,
         rails_attempted: attempted,
         failure_reason: null,
+        ops_note: (boostNote + (note || `Paid via ${rail}`)).trim().slice(0, 500),
       }).eq("id", transferId);
-      return json({ success: true, action: "retry", rail, payout });
+      return json({
+        success: true,
+        action,
+        rail,
+        boosted_to: action === "boost_min" ? payoutAmount : undefined,
+        payout,
+      });
     }
 
     const retryErr = String(payout.error || "Retry failed");
@@ -198,7 +257,7 @@ Deno.serve(async (req) => {
       ops_status: "needs_manual_settlement",
       rails_attempted: attempted,
       failure_reason: retryErr.slice(0, 500),
-      ops_note: `${explained.plain} — ${explained.tip}`.slice(0, 500),
+      ops_note: `${boostNote}${explained.plain} — ${explained.tip}`.slice(0, 500),
     }).eq("id", transferId);
 
     await notifyOpsBrief({
@@ -213,7 +272,7 @@ Deno.serve(async (req) => {
       rawError: retryErr,
     });
 
-    return json({ success: false, action: "retry", rail, payout });
+    return json({ success: false, action, rail, payout, boosted_to: action === "boost_min" ? payoutAmount : undefined });
   } catch (err) {
     console.error("ops-settle error:", err);
     return json({ error: err instanceof Error ? err.message : "Unknown error" }, 500);

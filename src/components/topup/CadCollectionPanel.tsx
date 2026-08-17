@@ -17,13 +17,14 @@ interface Props {
 }
 
 /**
- * CAD collection — prefer Flovide Interac when enabled; otherwise Zum-style
- * invoice + Interac (Plaid → Loop Bank). Wise pay-link remains available as a rail.
+ * CAD collection — prefer Fincra Interac when enabled; Flovide / Loop as fallbacks.
+ * Wise pay-link remains available as a rail.
  */
 export default function CadCollectionPanel({ walletId, walletCurrency, initialAmount, onComplete, onExit }: Props) {
   const isCad = walletCurrency.toUpperCase() === "CAD";
   const amount = Number(initialAmount) > 0 ? Number(initialAmount) : 0;
-  const flovideOn = productFeatures.flovide || productFeatures.flovideInterac || productFeatures.fincraInterac;
+  const interacOn =
+    productFeatures.fincraInterac || productFeatures.flovide || productFeatures.flovideInterac;
   const wiseOn = productFeatures.wise;
   const plaidOn = productFeatures.plaid;
 
@@ -38,13 +39,13 @@ export default function CadCollectionPanel({ walletId, walletCurrency, initialAm
     );
   }
 
-  // Prefer Flovide / Fincra Interac when those features are on
-  if (flovideOn || wiseOn) {
+  // Prefer Fincra / Flovide Interac when those features are on
+  if (interacOn || wiseOn) {
     const amountLabel = `CAD ${amount.toFixed(2)}`;
     const interacTitle = "Interac";
     const interacDescription = lang === "fr"
-      ? "Demande Interac à votre courriel — approuvez dans votre app bancaire (min. 2,00 $)"
-      : "Interac request to your email — approve in your banking app (min. CAD 2.00)";
+      ? "Virement Interac Autodeposit — min. 2,00 $"
+      : "Interac Autodeposit e-Transfer — min. CAD 2.00";
 
     return (
       <CheckoutShell
@@ -62,7 +63,7 @@ export default function CadCollectionPanel({ walletId, walletCurrency, initialAm
         {method === null ? (
           <CheckoutMethodGrid
             onChange={setMethod}
-            interacAvailable={flovideOn}
+            interacAvailable={interacOn}
             cardAvailable={false}
             wiseAvailable={wiseOn}
             eftAvailable={false}
@@ -108,7 +109,7 @@ export default function CadCollectionPanel({ walletId, walletCurrency, initialAm
 
   return (
     <div className="rounded-lg border bg-muted/40 p-4 text-sm text-muted-foreground">
-      Bank pay-in requires Flovide Interac or Plaid for CAD. Contact support if this is unavailable.
+      Bank pay-in requires Interac or Plaid for CAD. Contact support if this is unavailable.
     </div>
   );
 }

@@ -35,6 +35,9 @@ function partnerName(code: string) {
 function explainError(raw: string | null | undefined): string {
   const e = (raw || "").toLowerCase();
   if (!e) return "We could not finish paying the recipient automatically.";
+  if (e.includes("minimum destination") || e.includes("not be less than") || e.includes("below_payout_minimum") || e.includes("minimum send to")) {
+    return "Below provider minimum (NGN needs ≥ ₦100). Use “Boost to min & pay” to top up from company float and send, or refund.";
+  }
   if (e.includes("quote http 404") || (e.includes("quote") && e.includes("404"))) {
     return "Fincra could not price this payout route (quote not found). Try Nomba or Flovide, or pay manually then mark completed.";
   }
@@ -97,7 +100,7 @@ async function opsAction(body: Record<string, unknown>) {
     },
   );
   const json = await res.json().catch(() => ({}));
-  if (!res.ok || (json?.success === false && body.action === "retry")) {
+  if (!res.ok || (json?.success === false && (body.action === "retry" || body.action === "boost_min"))) {
     throw new Error(json?.error || json?.payout?.error || `HTTP ${res.status}`);
   }
   return json;
@@ -116,28 +119,45 @@ export default function OpsQueuePage() {
   const [busy, setBusy] = useState(false);
 
   const selectedRow = useMemo(() => rows.find((r) => r.id === selected) || null, [rows, selected]);
+  const belowMin =
+    !!selectedRow &&
+    String(selectedRow.target_currency || "").toUpperCase() === "NGN" &&
+    Number(selectedRow.target_amount ?? 0) < 100;
 
-  const run = async (action: "retry" | "complete" | "refund") => {
-    if (!selected) {
+  const run = async (
+    action: "retry" | "boost_min" | "complete" | "refund" | "refund_all",
+    railOverride?: string,
+  ) => {
+    if (action !== "refund_all" && !selected) {
       toast.error("Select a transfer first");
       return;
     }
+    const useRail = railOverride || rail;
     setBusy(true);
     try {
-      await opsAction({
-        transfer_id: selected,
+      const json = await opsAction({
+        transfer_id: action === "refund_all" ? undefined : selected,
         action,
-        rail: action === "retry" ? rail : undefined,
+        rail: action === "retry" || action === "boost_min" ? useRail : undefined,
         note,
       });
-      toast.success(
-        action === "retry"
-          ? "Retry sent — check if status clears from this list"
-          : action === "complete"
-          ? "Marked as paid"
-          : "Refunded to customer wallet",
-      );
+      if (action === "refund_all") {
+        toast.success(`Refunded ${json?.count ?? 0} customer wallet(s)`);
+      } else if (action === "boost_min") {
+        toast.success(
+          `Boosted to ${json?.boosted_to ?? 100} NGN and sent via ${partnerName(useRail)} — watch the queue`,
+        );
+      } else {
+        toast.success(
+          action === "retry"
+            ? "Retry sent — check if status clears from this list"
+            : action === "complete"
+            ? "Marked as paid"
+            : "Refunded to customer wallet",
+        );
+      }
       setNote("");
+      setSelected(null);
       await qc.invalidateQueries({ queryKey: ["ops-queue"] });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Action failed");
@@ -172,8 +192,9 @@ export default function OpsQueuePage() {
           <CardContent className="text-sm text-muted-foreground space-y-1">
             <p>1. Click a row to select it.</p>
             <p>2. Pick a payment company and tap <strong>Retry this provider</strong>.</p>
-            <p>3. If you already sent the money outside the app → <strong>I paid them manually</strong>.</p>
-            <p>4. If you cannot pay them → <strong>Refund customer</strong>.</p>
+            <p>3. Below NGN min → <strong>Boost to ₦100 &amp; pay</strong> (company covers the shortfall).</p>
+            <p>4. If you already sent the money outside the app → <strong>I paid them manually</strong>.</p>
+            <p>5. If you cannot pay them → <strong>Refund customer</strong>.</p>
           </CardContent>
         </Card>
 
@@ -284,6 +305,24 @@ export default function OpsQueuePage() {
               <Button disabled={busy || !selected} onClick={() => run("retry")}>
                 Retry this provider
               </Button>
+              {belowMin && (
+                <Button
+                  disabled={busy || !selected}
+                  className="bg-amber-600 hover:bg-amber-700 text-white"
+                  onClick={() => {
+                    if (
+                      confirm(
+                        "Boost this payout to ₦100 (company covers the shortfall) and pay via Fincra?",
+                      )
+                    ) {
+                      setRail("fincra");
+                      void run("boost_min", "fincra");
+                    }
+                  }}
+                >
+                  Boost to ₦100 &amp; pay
+                </Button>
+              )}
               <Button disabled={busy || !selected} variant="secondary" onClick={() => run("complete")}>
                 I paid them manually
               </Button>
@@ -295,6 +334,22 @@ export default function OpsQueuePage() {
                 }}
               >
                 Refund customer
+              </Button>
+              <Button
+                disabled={busy || rows.length === 0}
+                variant="outline"
+                className="border-destructive/40 text-destructive"
+                onClick={() => {
+                  if (
+                    confirm(
+                      `Refund ALL ${rows.length} held transfer(s) back to customer wallets? Use this when none were paid out (e.g. below NGN 100 min).`,
+                    )
+                  ) {
+                    run("refund_all");
+                  }
+                }}
+              >
+                Refund all ({rows.length})
               </Button>
             </div>
           </CardContent>

@@ -24,6 +24,7 @@ Deno.serve(async (req) => {
       kyc_approved: "Verification approved",
       kyc_rejected: "Verification rejected",
       kyc_info_requested: "More information needed",
+      support_reply: "Support replied to your ticket",
     };
     const messages: Record<string, string> = {
       kyc_approved: scope === "id_and_address"
@@ -31,13 +32,14 @@ Deno.serve(async (req) => {
         : "Your identity has been verified. You can now use the platform (Tier 2).",
       kyc_rejected: `Your verification was rejected: ${reason || "Please review your submission."}`,
       kyc_info_requested: message || "An administrator has requested more information for your verification.",
+      support_reply: message || "Our support team replied to your conversation. Open Support in the app to read it.",
     };
 
     await admin.from("notifications").insert({
       user_id,
       title: titles[type] || "Update from eFin Money",
       message: messages[type] || message || "",
-      type: "kyc",
+      type: type === "support_reply" ? "support" : "kyc",
       is_read: false,
     });
 

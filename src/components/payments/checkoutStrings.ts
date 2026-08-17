@@ -61,6 +61,9 @@ export const CHECKOUT_STRINGS = {
     flovidePoweredBy: "Powered by eFinMoney",
     flovideCopyHint: "Open your banking app and approve the Interac request.",
     flovideDetailsCopied: "Reminder copied",
+    fincraWaiting: "Waiting for your Interac e-Transfer…",
+    fincraPushHint:
+      "Send an Interac Autodeposit e-Transfer to the address shown. Put the reference in the message field so we can match your deposit.",
   },
   fr: {
     selectMethod: "Choisissez un mode de paiement",
@@ -120,6 +123,9 @@ export const CHECKOUT_STRINGS = {
     flovidePoweredBy: "Propulsé par eFinMoney",
     flovideCopyHint: "Ouvrez votre app bancaire et approuvez la demande Interac.",
     flovideDetailsCopied: "Rappel copié",
+    fincraWaiting: "En attente de votre Virement Interac…",
+    fincraPushHint:
+      "Envoyez un Virement Autodeposit à l'adresse indiquée. Mettez la référence dans le message pour que nous puissions apparier le dépôt.",
   },
 } as const;
 

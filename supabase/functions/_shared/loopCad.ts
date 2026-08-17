@@ -27,7 +27,6 @@ export function getLoopCadConfig(): LoopCadConfig {
   const alias =
     Deno.env.get("LOOP_CAD_INTERAC_ALIAS")?.trim() ||
     Deno.env.get("WISE_CAD_INTERAC_ALIAS")?.trim() ||
-    Deno.env.get("FINCRA_CAD_INTERAC_ALIAS")?.trim() ||
     DEFAULT_ALIAS;
 
   const eft: LoopCadEft = {

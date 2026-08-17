@@ -42,11 +42,26 @@ async function reverseTransferLedger(supabase: SbAdmin, transferId: string): Pro
 }
 
 function settleAmount(data: Record<string, unknown>): number {
-  for (const key of ["amountToSettle", "amountReceived", "amount", "amountExpected"]) {
+  for (const key of [
+    "amountToSettle",
+    "amountReceived",
+    "destinationAmount",
+    "sourceAmount",
+    "amount",
+    "amountExpected",
+  ]) {
     const n = Number(data[key]);
     if (Number.isFinite(n) && n > 0) return n;
   }
   return 0;
+}
+
+function eventCurrency(data: Record<string, unknown>): string {
+  for (const key of ["currency", "destinationCurrency", "sourceCurrency"]) {
+    const c = String(data[key] || "").toUpperCase();
+    if (c) return c;
+  }
+  return "";
 }
 
 function extractMeta(data: Record<string, unknown>): Record<string, unknown> {
@@ -113,9 +128,10 @@ Deno.serve(async (req) => {
       }
     }
 
-    // CAD Interac / collection deposits → match pending user intents by amount
+    // CAD Interac / collection deposits → match open user intents by reference, then amount
+    const cadCcy = eventCurrency(data) === "CAD";
     const isCadCollection =
-      String(data.currency || "").toUpperCase() === "CAD"
+      cadCcy
       && (
         eventName.includes("collection")
         || eventName.includes("virtualaccount")
@@ -124,24 +140,32 @@ Deno.serve(async (req) => {
         || (eventName.includes("successful") && !eventName.includes("payout") && !eventName.includes("charge"))
       );
 
-    if (isCadCollection || (eventName === "charge.successful" && String(data.currency || "").toUpperCase() === "CAD" && !extractMeta(data).user_id)) {
+    if (isCadCollection || (eventName === "charge.successful" && cadCcy && !extractMeta(data).user_id)) {
       const amount = settleAmount(data);
-      const providerRef = String(data.chargeReference || data.reference || data.id || "");
+      const providerRef = String(data.chargeReference || data.reference || data.sessionId || data.id || "");
+      const description = String(data.description || data.narration || data.memo || "");
       if (amount > 0) {
         const nowIso = new Date().toISOString();
+        const openStatuses = ["pending", "awaiting_payment"];
         const { data: candidates } = await supabase
           .from("fincra_cad_interac_intents")
-          .select("id, user_id, wallet_id, amount, reference")
-          .eq("status", "pending")
+          .select("id, user_id, wallet_id, amount, reference, public_id, status")
+          .in("status", openStatuses)
           .eq("currency_code", "CAD")
           .gt("expires_at", nowIso)
           .order("created_at", { ascending: true })
-          .limit(20);
+          .limit(40);
 
-        const match = (candidates ?? []).find((row) => {
+        const haystack = `${description} ${providerRef}`.toUpperCase();
+        const byRef = (candidates ?? []).find((row) => {
+          const refs = [row.reference, row.public_id].filter(Boolean).map((r) => String(r).toUpperCase());
+          return refs.some((r) => r.length >= 8 && haystack.includes(r));
+        });
+        const byAmount = (candidates ?? []).find((row) => {
           const expected = Number(row.amount);
           return Number.isFinite(expected) && Math.abs(expected - amount) < 0.02;
         });
+        const match = byRef || byAmount;
 
         if (match) {
           const idempotencyRef = providerRef || `interac-${match.id}`;
@@ -159,7 +183,7 @@ Deno.serve(async (req) => {
               status: "completed",
               provider_reference: providerRef || null,
               credited_at: nowIso,
-            }).eq("id", match.id).eq("status", "pending");
+            }).eq("id", match.id).in("status", openStatuses);
           } catch (creditErr) {
             console.error("fincra-webhook CAD Interac credit failed", creditErr);
           }

@@ -179,18 +179,36 @@ export const useSendMessage = () => {
           },
         }).catch(() => { /* non-blocking */ });
       } else {
-        // Staff replied. A guest thread (no account) has no in-app bell, so
-        // email the reply back to the customer to close the loop.
+        // Staff replied — email the customer (guest contact form OR signed-in user).
         const { data } = await db.from("support_threads")
           .select("subject, guest_email, guest_name, user_id").eq("id", threadId).single();
         const thread = data as Pick<SupportThread, "subject" | "guest_email" | "guest_name" | "user_id"> | null;
-        if (thread?.guest_email && !thread.user_id) {
+        let toEmail = thread?.guest_email || null;
+        let toName = thread?.guest_name || null;
+        if (thread?.user_id) {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("email, full_name")
+            .eq("user_id", thread.user_id)
+            .maybeSingle();
+          toEmail = toEmail || (profile as { email?: string } | null)?.email || null;
+          toName = toName || (profile as { full_name?: string } | null)?.full_name || null;
+          // In-app bell for signed-in users
+          supabase.functions.invoke("notify-user", {
+            body: {
+              user_id: thread.user_id,
+              type: "support_reply",
+              message: body.slice(0, 500),
+            },
+          }).catch(() => { /* non-blocking */ });
+        }
+        if (toEmail) {
           supabase.functions.invoke("notify-guest-reply", {
             body: {
               thread_id: threadId,
-              guest_email: thread.guest_email,
-              guest_name: thread.guest_name,
-              subject: thread.subject || "your support request",
+              guest_email: toEmail,
+              guest_name: toName,
+              subject: thread?.subject || "your support request",
               preview: body.slice(0, 1000),
             },
           }).catch(() => { /* non-blocking */ });

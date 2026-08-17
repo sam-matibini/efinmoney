@@ -57,7 +57,7 @@ export function collectMethodForPartner(partner: string): string | null {
 
 /** Code default when no collect policy is saved. */
 export const DEFAULT_COLLECT_PARTNER: Record<string, string> = {
-  CAD: "square",
+  CAD: "interac",
   USD: "square",
   EUR: "square",
   GBP: "square",

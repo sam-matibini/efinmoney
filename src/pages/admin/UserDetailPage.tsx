@@ -361,9 +361,43 @@ const UserDetailPage = () => {
         .from("support_messages")
         .insert({ thread_id: threadId, sender_role: "staff", sender_id: uid, body, attachments: [] });
       if (error) throw error;
+
+      // Same email + in-app notify path as Support Inbox
+      const { data: thread } = await db
+        .from("support_threads")
+        .select("subject, guest_email, guest_name, user_id")
+        .eq("id", threadId)
+        .maybeSingle();
+      let toEmail = (thread as { guest_email?: string } | null)?.guest_email || null;
+      let toName = (thread as { guest_name?: string } | null)?.guest_name || null;
+      const threadUserId = (thread as { user_id?: string } | null)?.user_id;
+      if (threadUserId) {
+        const { data: p } = await supabase
+          .from("profiles")
+          .select("email, full_name")
+          .eq("user_id", threadUserId)
+          .maybeSingle();
+        toEmail = toEmail || p?.email || null;
+        toName = toName || p?.full_name || null;
+        void supabase.functions.invoke("notify-user", {
+          body: { user_id: threadUserId, type: "support_reply", message: body.slice(0, 500) },
+        });
+      }
+      if (toEmail) {
+        void supabase.functions.invoke("notify-guest-reply", {
+          body: {
+            thread_id: threadId,
+            guest_email: toEmail,
+            guest_name: toName,
+            subject: (thread as { subject?: string } | null)?.subject || "your support request",
+            preview: body.slice(0, 1000),
+          },
+        });
+      }
+
       setReplyText((s) => ({ ...s, [threadId]: "" }));
       queryClient.invalidateQueries({ queryKey: ["admin-user-comms", id] });
-      toast.success("Reply sent");
+      toast.success(toEmail ? "Reply sent — customer emailed" : "Reply sent");
     } catch (e) {
       toast.error((e as Error).message);
     } finally {

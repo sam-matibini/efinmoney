@@ -5,7 +5,7 @@ import { CHECKOUT_STRINGS, type Lang } from "@/components/payments/checkoutStrin
 import type { InteracIntent } from "@/components/payments/InteracCheckout";
 import { LOOP_CAD_EFT, type LoopCadEft } from "@/lib/loopCad";
 
-export type InteracRailVariant = "flovide" | "loop";
+export type InteracRailVariant = "flovide" | "loop" | "fincra";
 
 interface Props {
   intent: InteracIntent;
@@ -14,7 +14,7 @@ interface Props {
   lang: Lang;
   purpose: "topup" | "transfer" | "merchant_collection";
   done: boolean;
-  /** Flovide = email money-request; Loop = Autodeposit/EFT to etx@efin.money */
+  /** Flovide = email money-request; Loop = Autodeposit/EFT; Fincra = @fincra.ca Autodeposit */
   variant?: InteracRailVariant;
 }
 
@@ -47,12 +47,12 @@ function waitingCopy(
     case "pending":
     case "processing":
     default:
-      return variant === "flovide" ? t.flovideWaiting : t.waiting;
+      return variant === "flovide" ? t.flovideWaiting : variant === "fincra" ? t.fincraWaiting : t.waiting;
   }
 }
 
 /**
- * Interac status: Flovide (approve email request) or Loop Bank (Autodeposit + EFT).
+ * Interac status: Flovide (approve email request), Fincra Autodeposit, or Loop Bank.
  */
 export default function InteracStatusView({
   intent,
@@ -69,16 +69,22 @@ export default function InteracStatusView({
   const eftDetails = eft ?? LOOP_CAD_EFT;
   const payerEmail = (intent.payer_email || intent.sender_email || "").trim();
   const isFlovide = variant === "flovide";
+  const isFincra = variant === "fincra";
+  const showEft = !isFlovide && !isFincra;
 
   const loopDetailsText = [
     `Amount: ${amountLabel}`,
     alias ? `${t.sendTo}: ${alias}` : null,
     `${t.reference}: ${reference}`,
     "",
-    "EFT / bank transfer (Loop Bank):",
-    `${t.bankNumber}: ${eftDetails.bankNumber}`,
-    `${t.transitNumber}: ${eftDetails.transitNumber}`,
-    `${t.accountNumber}: ${eftDetails.accountNumber}`,
+    ...(showEft
+      ? [
+          "EFT / bank transfer (Loop Bank):",
+          `${t.bankNumber}: ${eftDetails.bankNumber}`,
+          `${t.transitNumber}: ${eftDetails.transitNumber}`,
+          `${t.accountNumber}: ${eftDetails.accountNumber}`,
+        ]
+      : []),
   ]
     .filter((line) => line !== null)
     .join("\n");
@@ -159,10 +165,12 @@ export default function InteracStatusView({
     <div className="space-y-4">
       <div className="flex items-center gap-2 rounded-lg border bg-muted/40 p-3 text-sm text-muted-foreground">
         <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-        {waitingCopy(intent.status, purpose, lang, "loop")}
+        {waitingCopy(intent.status, purpose, lang, variant)}
       </div>
 
-      <p className="text-xs text-muted-foreground leading-relaxed">{t.pushHint}</p>
+      <p className="text-xs text-muted-foreground leading-relaxed">
+        {isFincra ? t.fincraPushHint : t.pushHint}
+      </p>
 
       <div className="space-y-2 rounded-lg border p-3 text-sm">
         <div className="flex justify-between gap-2">
@@ -180,27 +188,33 @@ export default function InteracStatusView({
           <code className="break-all text-right font-medium">{reference}</code>
         </div>
         <p className="text-[11px] text-muted-foreground">
-          {lang === "fr"
+          {isFincra
+            ? lang === "fr"
+              ? "Autodeposit activé — aucune question de sécurité. Mettez la référence dans le message."
+              : "Autodeposit is on — no security question. Put the reference in the message field."
+            : lang === "fr"
             ? "Autodeposit Loop activé — aucune question de sécurité. Mettez la référence dans le message."
             : "Loop Autodeposit is on — no security question. Put the reference in the message field."}
         </p>
       </div>
 
-      <div className="space-y-2 rounded-lg border p-3 text-sm">
-        <p className="text-xs font-medium text-foreground">{t.eftHint}</p>
-        <div className="flex justify-between gap-2">
-          <span className="text-muted-foreground">{t.bankNumber}</span>
-          <code className="font-medium">{eftDetails.bankNumber}</code>
+      {showEft && (
+        <div className="space-y-2 rounded-lg border p-3 text-sm">
+          <p className="text-xs font-medium text-foreground">{t.eftHint}</p>
+          <div className="flex justify-between gap-2">
+            <span className="text-muted-foreground">{t.bankNumber}</span>
+            <code className="font-medium">{eftDetails.bankNumber}</code>
+          </div>
+          <div className="flex justify-between gap-2">
+            <span className="text-muted-foreground">{t.transitNumber}</span>
+            <code className="font-medium">{eftDetails.transitNumber}</code>
+          </div>
+          <div className="flex justify-between gap-2">
+            <span className="text-muted-foreground">{t.accountNumber}</span>
+            <code className="font-medium">{eftDetails.accountNumber}</code>
+          </div>
         </div>
-        <div className="flex justify-between gap-2">
-          <span className="text-muted-foreground">{t.transitNumber}</span>
-          <code className="font-medium">{eftDetails.transitNumber}</code>
-        </div>
-        <div className="flex justify-between gap-2">
-          <span className="text-muted-foreground">{t.accountNumber}</span>
-          <code className="font-medium">{eftDetails.accountNumber}</code>
-        </div>
-      </div>
+      )}
 
       <Button type="button" className="w-full" onClick={() => void copyDetails()}>
         <Copy className="mr-2 h-4 w-4" />

@@ -34,6 +34,7 @@ import { usePricingConfig } from "@/hooks/usePricingConfig";
 import { supabase } from "@/integrations/supabase/client";
 import { usePriceQuote } from "@/hooks/usePriceQuote";
 import { fetchFxRate, cardChargeCurrency, initializeFlwPayment, verifyFlwPayment } from "@/lib/flutterwave";
+import { payoutMinAmount, validatePayoutMin } from "@/lib/payoutMins";
 import {
   getCorridorBanks,
   resolveCorridorAccount,
@@ -586,6 +587,9 @@ const SendPage = () => {
   const receivedAmount = parsedAmount > 0 && rateAvailable
     ? Math.max(0, parsedAmount * effectiveRate)
     : 0;
+  const payoutMinError = receivedAmount > 0
+    ? validatePayoutMin(targetCountry.code, receivedAmount)
+    : null;
   /** What the customer actually pays / is debited: amount + fee. */
   const totalCharge = parsedAmount > 0 ? parsedAmount + fee : 0;
 
@@ -943,6 +947,11 @@ const SendPage = () => {
     // ── Wallet: create + execute payout immediately ──────────────────────
     if (funding === 'wallet') {
       if (!selectedWallet) { setConfirming(false); return; }
+      if (payoutMinError) {
+        toast.error(payoutMinError);
+        setConfirming(false);
+        return;
+      }
       try {
         const tid = await createTransferRecord({ funding_source: "wallet" });
 
@@ -2001,6 +2010,7 @@ const SendPage = () => {
   const isStep1Valid =
     parsedAmount > 0
     && receivedAmount > 0
+    && !payoutMinError
     && rateAvailable
     && !noLinkedSource
     && !insufficientFunds
@@ -2831,6 +2841,16 @@ const SendPage = () => {
                                         className="text-sm font-medium text-destructive flex items-center justify-center gap-1"
                                       >
                                         <AlertCircle className="w-3.5 h-3.5" /> Insufficient wallet balance
+                                      </motion.p>
+                                    )}
+
+                                    {payoutMinError && (
+                                      <motion.p
+                                        initial={{ opacity: 0, x: -6 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        className="text-sm font-medium text-destructive flex items-center justify-center gap-1"
+                                      >
+                                        <AlertCircle className="w-3.5 h-3.5" /> {payoutMinError}
                                       </motion.p>
                                     )}
 

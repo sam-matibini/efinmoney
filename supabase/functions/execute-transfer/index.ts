@@ -7,6 +7,7 @@ import { recordEconomics } from "../_shared/transactionEconomics.ts";
 import { assertQuotedFee } from "../_shared/pricingService.ts";
 import { payoutFnForRail, resolveCorridorRails } from "../_shared/corridor-rails.ts";
 import { explainPayoutError, notifyOpsBrief, notifyOpsFailoverPing } from "../_shared/ops-alert.ts";
+import { validatePayoutMin } from "../_shared/payoutMins.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -229,6 +230,21 @@ Deno.serve(async (req) => {
       }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    {
+      const destCcy = String(transfer.target_currency || transfer.source_currency || "").toUpperCase();
+      const destAmt = Number(transfer.target_amount);
+      const minErr = validatePayoutMin(destCcy, destAmt);
+      if (minErr) {
+        await supabase.from("transfers").update({
+          status: "failed",
+          failure_reason: minErr.slice(0, 500),
+        }).eq("id", transfer_id);
+        return new Response(JSON.stringify({ error: minErr, code: "below_payout_minimum" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
     const isCardFunded = (payload.funding_source || transfer.funding_source) === "card";

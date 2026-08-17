@@ -105,10 +105,10 @@ type Gateway = WalletTopupGateway;
 function availableIntlMethods(currency: string): IntlTopupMethod[] {
   const c = currency.toUpperCase();
   const methods: IntlTopupMethod[] = [];
-  // Western multi-rail (USD/EUR/GBP/CAD) — auto-picked; Lenhub skipped (Flutterwave wrapper)
+    // Western multi-rail (USD/EUR/GBP/CAD) — auto-picked; Lenhub skipped (Flutterwave wrapper)
   if (MULTI_RAIL_TOPUP_CURRENCIES.includes(c)) {
     if (productFeatures.nombaNigeria) methods.push("nomba");
-    // Fincra confirmed no CAD/USD collect — still list EUR/GBP
+    // Fincra hosted checkout for EUR/GBP; CAD Interac is a separate rail below
     if (productFeatures.fincra && ["EUR", "GBP"].includes(c)) methods.push("fincra");
     if (productFeatures.paytota) methods.push("paytota");
     if (productFeatures.dodo) methods.push("dodo");

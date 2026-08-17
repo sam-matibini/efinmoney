@@ -11,9 +11,9 @@ import { CHECKOUT_STRINGS, type Lang } from "@/components/payments/checkoutStrin
 import { productFeatures } from "@/lib/productFeatures";
 
 const FLOVIDE_FN = "flovide-cad-interac";
-/** Wise/Loop CAD Interac (HEAD); fincra-cad-interac remains a legacy alias. */
+/** Loop Bank CAD Interac Autodeposit. */
 const WISE_FN = "wise-cad-interac";
-/** Legacy Fincra Interac function name used as secondary fallback. */
+/** Fincra CAD Interac (@fincra.ca Autodeposit). */
 const FINCRA_FN = "fincra-cad-interac";
 
 /** Supabase hides the response body on FunctionsHttpError — read the real reason out of it. */
@@ -90,7 +90,7 @@ const payerSchema = z.object({
 });
 
 /**
- * CAD Interac checkout: Flovide Auto Deposit when enabled, with Wise/Fincra fallback.
+ * CAD Interac checkout: prefer Fincra (@fincra.ca) when enabled, then Flovide, then Loop.
  * Deposits credit the wallet and (for `purpose: "transfer"`) release the linked payout.
  */
 export default function InteracCheckout({
@@ -118,7 +118,11 @@ export default function InteracCheckout({
   const [eft, setEft] = useState<{ bankNumber: string; transitNumber: string; accountNumber: string } | null>(null);
   const [configured, setConfigured] = useState(true);
   const [railFn, setRailFn] = useState(
-    (productFeatures.flovide || productFeatures.flovideInterac) ? FLOVIDE_FN : WISE_FN,
+    productFeatures.fincraInterac
+      ? FINCRA_FN
+      : (productFeatures.flovide || productFeatures.flovideInterac)
+      ? FLOVIDE_FN
+      : WISE_FN,
   );
   const [intent, setIntent] = useState<InteracIntent | null>(null);
   const [bootstrapped, setBootstrapped] = useState(false);
@@ -174,17 +178,28 @@ export default function InteracCheckout({
 
         let json: Record<string, unknown> | null = null;
         let fn = WISE_FN;
-        if (productFeatures.flovide || productFeatures.flovideInterac) {
+
+        // Prefer Fincra CAD Interac when the feature is on and an alias is configured.
+        if (productFeatures.fincraInterac) {
+          json = await tryFn(FINCRA_FN);
+          if (json && json.configured !== false) fn = FINCRA_FN;
+          else json = null;
+        }
+        if (!json && (productFeatures.flovide || productFeatures.flovideInterac)) {
           json = await tryFn(FLOVIDE_FN);
           if (json && json.configured !== false) fn = FLOVIDE_FN;
           else json = null;
         }
-        if (!json && productFeatures.fincraInterac) {
+        if (!json) {
           json = await tryFn(WISE_FN);
           if (json && json.configured !== false) fn = WISE_FN;
-          else {
-            json = await tryFn(FINCRA_FN);
-            fn = FINCRA_FN;
+          else if (productFeatures.fincraInterac) {
+            // Surface Fincra's configured:false rather than silently looking configured.
+            const fincra = await tryFn(FINCRA_FN);
+            if (fincra) {
+              json = fincra;
+              fn = FINCRA_FN;
+            }
           }
         }
         if (cancelled) return;
@@ -252,34 +267,34 @@ export default function InteracCheckout({
         return data as Record<string, unknown>;
       };
 
-      const canFallback =
-        productFeatures.fincraInterac &&
-        (railFn === FLOVIDE_FN);
+      const fallbackOrder = [FINCRA_FN, FLOVIDE_FN, WISE_FN].filter(
+        (fn, i, arr) => fn !== railFn && arr.indexOf(fn) === i,
+      );
 
       let data: Record<string, unknown>;
       let usedFn = railFn;
       try {
         data = await invokeCreate(usedFn);
-        if (data?.error && canFallback) {
-          usedFn = WISE_FN;
-          data = await invokeCreate(usedFn);
-          if (data?.error) {
-            usedFn = FINCRA_FN;
+        if (data?.error) {
+          for (const fn of fallbackOrder) {
+            usedFn = fn;
             data = await invokeCreate(usedFn);
+            if (!data?.error) break;
           }
         }
       } catch (first) {
-        if (canFallback) {
+        let recovered: Record<string, unknown> | null = null;
+        for (const fn of fallbackOrder) {
           try {
-            usedFn = WISE_FN;
-            data = await invokeCreate(usedFn);
+            usedFn = fn;
+            recovered = await invokeCreate(usedFn);
+            if (!recovered?.error) break;
           } catch {
-            usedFn = FINCRA_FN;
-            data = await invokeCreate(usedFn);
+            recovered = null;
           }
-        } else {
-          throw first;
         }
+        if (!recovered || recovered.error) throw first;
+        data = recovered;
       }
       if (data?.error) throw new Error(String(data.error));
       setRailFn(usedFn);
@@ -414,15 +429,16 @@ export default function InteracCheckout({
 
   if (intent) {
     const isFlovide = railFn === FLOVIDE_FN;
+    const isFincra = railFn === FINCRA_FN;
     return (
       <InteracStatusView
         intent={intent}
         alias={isFlovide ? null : alias}
-        eft={isFlovide ? null : eft}
+        eft={isFlovide || isFincra ? null : eft}
         lang={lang}
         purpose={purpose}
         done={DONE.includes(intent.status)}
-        variant={isFlovide ? "flovide" : "loop"}
+        variant={isFlovide ? "flovide" : isFincra ? "fincra" : "loop"}
       />
     );
   }
