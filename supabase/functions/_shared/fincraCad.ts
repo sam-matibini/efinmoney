@@ -29,13 +29,46 @@ function pickInteracEmail(row: Record<string, unknown>): string {
   return "";
 }
 
-function isApprovedCad(row: Record<string, unknown>): boolean {
+function isApprovedCad(row: Record<string, unknown>, allowMissingCurrency = false): boolean {
   const currency = String(row.currency ?? "").toUpperCase();
   if (currency && currency !== "CAD") return false;
+  if (!currency && !allowMissingCurrency) return false;
   const status = String(row.status ?? "").toLowerCase();
   if (status && !["approved", "active", "issued"].includes(status)) return false;
   if (row.isActive === false || row.is_active === false) return false;
   return true;
+}
+
+function rowsFromList(json: Record<string, unknown> | undefined): Record<string, unknown>[] {
+  const data = json?.data as Record<string, unknown> | unknown[] | undefined;
+  if (Array.isArray(data)) return data as Record<string, unknown>[];
+  if (Array.isArray((data as Record<string, unknown> | undefined)?.results)) {
+    return (data as Record<string, unknown>).results as Record<string, unknown>[];
+  }
+  if (Array.isArray(json?.results)) return json!.results as Record<string, unknown>[];
+  return [];
+}
+
+function pickApprovedCad(
+  json: Record<string, unknown> | undefined,
+  allowMissingCurrency = false,
+): FincraCadConfig | null {
+  for (const raw of rowsFromList(json)) {
+    if (!raw || typeof raw !== "object") continue;
+    if (!isApprovedCad(raw, allowMissingCurrency)) continue;
+    const email = pickInteracEmail(raw);
+    if (!email) continue;
+    if (allowMissingCurrency && !email.includes("@fincra.ca") && String(raw.currency ?? "").toUpperCase() !== "CAD") {
+      continue;
+    }
+    return {
+      alias: email,
+      virtualAccountId: String(raw._id ?? raw.id ?? "").trim() || null,
+      provider: "fincra",
+      source: "api",
+    };
+  }
+  return null;
 }
 
 /** Resolve platform CAD Interac alias: secret first, then Fincra virtual-accounts API. */
@@ -54,31 +87,16 @@ export async function resolveFincraCadAlias(): Promise<FincraCadConfig> {
     const res = await fincraFetch("/profile/virtual-accounts/?currency=cad", { method: "GET" });
     if (!res.ok) {
       console.warn("fincraCad: list CAD VAs failed", res.status, JSON.stringify(res.json).slice(0, 300));
-      return { alias: "", virtualAccountId: null, provider: "fincra", source: "none" };
+    } else {
+      const picked = pickApprovedCad(res.json);
+      if (picked) return picked;
     }
 
-    const data = res.json?.data as Record<string, unknown> | unknown[] | undefined;
-    const results: unknown[] = Array.isArray(data)
-      ? data
-      : Array.isArray((data as Record<string, unknown> | undefined)?.results)
-      ? ((data as Record<string, unknown>).results as unknown[])
-      : Array.isArray(res.json?.results)
-      ? (res.json.results as unknown[])
-      : [];
-
-    for (const raw of results) {
-      if (!raw || typeof raw !== "object") continue;
-      const row = raw as Record<string, unknown>;
-      if (!isApprovedCad(row)) continue;
-      const email = pickInteracEmail(row);
-      if (!email) continue;
-      const id = String(row._id ?? row.id ?? "").trim() || null;
-      return { alias: email, virtualAccountId: id, provider: "fincra", source: "api" };
+    const all = await fincraFetch("/profile/virtual-accounts/", { method: "GET" });
+    if (all.ok) {
+      const picked = pickApprovedCad(all.json, true);
+      if (picked) return picked;
     }
-
-    console.warn("fincraCad: no approved CAD Interac alias on merchant account", {
-      count: results.length,
-    });
   } catch (err) {
     console.warn("fincraCad: alias resolve error", err instanceof Error ? err.message : err);
   }

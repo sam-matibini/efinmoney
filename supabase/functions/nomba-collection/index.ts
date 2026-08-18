@@ -1,10 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import {
-  buildNombaCallbackUrl,
-  collectionUrlForCorridor,
-  getNombaPayConfig,
   isNombaPayConfigured,
-  nombaCollectionFetch,
   type NombaCorridor,
 } from "../_shared/nomba-pay.ts";
 import {
@@ -272,58 +268,14 @@ Deno.serve(async (req) => {
       });
     }
 
-    const cfg = getNombaPayConfig();
-    const payload = {
-      currency: checkoutCurrency,
-      amount: String(amountRounded),
-      user: cfg.merchantUser,
-      callback: buildNombaCallbackUrl(),
-      email: customerEmail,
-    };
-
-    const url = collectionUrlForCorridor(corridor);
-    console.log("Nomba COLLECTION (lenhub):", { corridor, url, payload, walletCurrency, creditAmount, creditCurrency });
-
-    const result = await nombaCollectionFetch(url, payload);
-
-    if (!result.ok) {
-      await admin.from("nomba_pay_transactions").update({
-        status: "failed",
-        failure_reason: result.message,
-        raw_response: result.json,
-      }).eq("id", txn.id);
-      return json({
-        error: result.message,
-        provider_response: result.json,
-      }, 200);
-    }
-
     await admin.from("nomba_pay_transactions").update({
-      status: "processing",
-      order_id: result.orderId,
-      checkout_url: result.checkoutUrl,
-      provider_reference: result.orderId,
-      raw_response: result.json,
+      status: "failed",
+      failure_reason: "Lenhub /api/efin Nomba checkout is retired",
     }).eq("id", txn.id);
-
     return json({
-      success: true,
-      transaction_id: txn.id,
-      order_id: result.orderId,
-      payment_link: result.checkoutUrl,
-      message: walletCurrency === "CAD"
-        ? `Pay $${amountRounded.toFixed(2)} USD at checkout — your CAD wallet will be credited C$${creditAmount.toFixed(2)}`
-        : "Redirecting to secure checkout…",
-      quote: {
-        credit_amount: creditAmount,
-        credit_currency: creditCurrency,
-        checkout_amount: amountRounded,
-        checkout_currency: checkoutCurrency,
-        platform_fee: platformFee,
-        fx_rate: fxRate,
-      },
-      provider_response: result.json,
-    });
+      error: "Lenhub /api/efin Nomba checkout is retired. Use Fincra or Flutterwave.",
+      code: "lenhub_retired",
+    }, 410);
   } catch (err) {
     console.error("nomba-collection error:", err);
     return json({ error: err instanceof Error ? err.message : "Unknown error" }, 500);

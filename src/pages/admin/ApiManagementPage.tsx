@@ -87,8 +87,8 @@ const EDGE_FUNCTIONS: Array<{ name: string; description: string; jwt: boolean; c
   // Flutterwave
   { name: "flutterwave-payout",        description: "Initiates Flutterwave NGN payouts",         jwt: true,  category: "Flutterwave" },
   { name: "flutterwave-webhook",       description: "Receives Flutterwave events",               jwt: false, category: "Flutterwave" },
-  { name: "flw-corridor-probe",        description: "Tests CAD/USD/NGN collect on FLW account",  jwt: true,  category: "Flutterwave" },
-  { name: "flw-create-virtual-account",description: "Create FLW virtual bank account",           jwt: true,  category: "Flutterwave" },
+  { name: "flw-va-usdc-probe",         description: "Probe FLW USD VA + USDC wallet APIs",      jwt: true,  category: "Flutterwave" },
+  { name: "flw-create-virtual-account",description: "Create FLW virtual bank account",           jwt: false, category: "Flutterwave" },
   { name: "flw-get-banks",             description: "Fetch bank list via Flutterwave",           jwt: true,  category: "Flutterwave" },
   { name: "flw-get-billers",           description: "Fetch biller categories via Flutterwave",   jwt: false, category: "Flutterwave" },
   { name: "flw-initialize-payment",    description: "Initialize FLW payment session",            jwt: true,  category: "Flutterwave" },
@@ -180,6 +180,7 @@ const EDGE_FUNCTIONS: Array<{ name: string; description: string; jwt: boolean; c
   { name: "fincra-webhook",            description: "Receives Fincra events",                  jwt: false, category: "Fincra" },
   { name: "wise-cad-interac",           description: "CAD Interac e-Transfer pay-in (Loop)",    jwt: true,  category: "Wise" },
   { name: "fincra-cad-interac",         description: "Fincra CAD Interac (@fincra.ca Autodeposit)", jwt: true,  category: "Fincra" },
+  { name: "fincra-cad-va-probe",        description: "List/request Fincra CAD Interac virtual account", jwt: true,  category: "Fincra" },
   { name: "flovide-cad-interac",        description: "Flovide CAD Interac Auto Deposit collect", jwt: true,  category: "Flovide" },
   { name: "flovide-payout",             description: "Flovide NGN/KES/GHS/UGX/CAD payouts",     jwt: false, category: "Flovide" },
   { name: "flovide-webhook",            description: "Receives Flovide payment events",         jwt: false, category: "Flovide" },
@@ -280,6 +281,8 @@ const EDGE_FUNCTIONS: Array<{ name: string; description: string; jwt: boolean; c
   { name: "test-integration",          description: "Test provider API connectivity",          jwt: false, category: "Diagnostics" },
   { name: "test-integrations",         description: "Bulk integration health check",           jwt: false, category: "Diagnostics" },
   { name: "flw-corridor-probe",        description: "Tests CAD/USD/NGN collect on FLW",        jwt: true,  category: "Diagnostics" },
+  { name: "flw-va-usdc-probe",         description: "Tests FLW USD virtual account + USDC",    jwt: true,  category: "Diagnostics" },
+  { name: "fincra-cad-va-probe",        description: "Tests Fincra CAD VA list + API request",  jwt: true,  category: "Diagnostics" },
 ];
 
 export default function ApiManagementPage() {
@@ -309,6 +312,56 @@ export default function ApiManagementPage() {
       const msg = e instanceof Error ? e.message : "Probe failed";
       setProbeResult({ error: msg, hint: "Deploy flw-corridor-probe edge function, or run scripts/probe-flutterwave-corridors.mjs locally with FLW_SECRET_KEY." });
       toast.error("Corridor probe failed", { description: msg });
+    } finally {
+      setProbeLoading(false);
+    }
+  };
+
+  const runFlutterwaveVaUsdcProbe = async () => {
+    setProbeLoading(true);
+    setProbeResult(null);
+    setProbeTitle("Flutterwave USD virtual account + USDC");
+    setProbeOpen(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("flw-va-usdc-probe", { body: {} });
+      if (error) throw error;
+      setProbeResult(data);
+      const interp = (data as { interpretation?: { usd_virtual_account?: string; usdc?: string } })?.interpretation;
+      toast.message(interp?.usd_virtual_account || "USD VA probe done", {
+        description: interp?.usdc,
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Probe failed";
+      setProbeResult({ error: msg, hint: "Deploy flw-va-usdc-probe, then retry." });
+      toast.error("USD VA / USDC probe failed", { description: msg });
+    } finally {
+      setProbeLoading(false);
+    }
+  };
+
+  const runFincraCadVa = async (action: "probe" | "request") => {
+    setProbeLoading(true);
+    setProbeResult(null);
+    setProbeTitle(action === "request" ? "Request Fincra CAD virtual account" : "Fincra CAD virtual account");
+    setProbeOpen(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("fincra-cad-va-probe", {
+        body: { action },
+      });
+      if (error) throw error;
+      setProbeResult(data);
+      const alias = (data as { interac_alias?: string | null })?.interac_alias;
+      const requested = (data as { request?: { ok?: boolean; message?: string } })?.request;
+      if (action === "request" && requested?.ok) toast.success("CAD account requested via Fincra API");
+      else if (alias) toast.success(`CAD Interac alias: ${alias}`);
+      else toast.message((data as { reply_to_fincra?: string })?.reply_to_fincra || "CAD VA probe done");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Probe failed";
+      setProbeResult({
+        error: msg,
+        hint: "Deploy fincra-cad-va-probe, then retry. Fincra asked us to request CAD via POST /profile/virtual-accounts/requests.",
+      });
+      toast.error("Fincra CAD VA probe failed", { description: msg });
     } finally {
       setProbeLoading(false);
     }
@@ -525,6 +578,7 @@ export default function ApiManagementPage() {
                         />
                         <span className="text-xs text-muted-foreground">{enabled ? "Enabled" : "Disabled"}</span>
                     </div>
+                    <div className="flex flex-wrap items-center justify-end gap-2">
                     <Button
                         size="sm" variant="secondary"
                         disabled={probeLoading}
@@ -538,6 +592,36 @@ export default function ApiManagementPage() {
                     >
                       {integ.key === "flutterwave" ? "Probe CAD/USD Collect" : "Test Connection"}
                     </Button>
+                    {integ.key === "flutterwave" && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={probeLoading}
+                        onClick={() => void runFlutterwaveVaUsdcProbe()}
+                      >
+                        Probe USD VA + USDC
+                      </Button>
+                    )}
+                    {integ.key === "fincra" && (
+                      <>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={probeLoading}
+                          onClick={() => void runFincraCadVa("probe")}
+                        >
+                          Check CAD VA
+                        </Button>
+                        <Button
+                          size="sm"
+                          disabled={probeLoading}
+                          onClick={() => void runFincraCadVa("request")}
+                        >
+                          Request CAD VA
+                        </Button>
+                      </>
+                    )}
+                    </div>
                     </div>
                     {isPlaid && (
                       <p className="text-[11px] text-amber-600 bg-amber-500/10 rounded-md px-2.5 py-1.5 mt-1">

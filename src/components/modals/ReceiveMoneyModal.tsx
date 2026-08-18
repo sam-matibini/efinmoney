@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Copy, Check, Download, AtSign, Hash, Mail } from "lucide-react";
 import { QRCodeCanvas } from "qrcode.react";
@@ -6,6 +7,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { toast } from "sonner";
 import { useProfile } from "@/hooks/useProfile";
 import { CurrencyFlag } from "@/components/ui/FlagImage";
+import BankVirtualAccountCard from "@/components/payments/BankVirtualAccountCard";
+import { isBankVaCurrency } from "@/lib/bankVirtualAccounts";
 
 interface ReceiveMoneyModalProps {
   isOpen: boolean;
@@ -88,6 +91,20 @@ const ReceiveMoneyModal = ({ isOpen, onClose, wallet }: ReceiveMoneyModalProps) 
               })}
             </p>
           </div>
+
+          {isBankVaCurrency(wallet.currency) && (
+            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4 space-y-3">
+              <p className="text-sm font-medium">Bank transfer ({wallet.currency})</p>
+              <BankVirtualAccountCard lockedCurrency={wallet.currency} compact />
+              <Link
+                to={`/wallet/receive?currency=${wallet.currency}&walletId=${wallet.walletId}`}
+                className="block text-xs text-primary font-medium"
+                onClick={onClose}
+              >
+                Open full Receive page →
+              </Link>
+            </div>
+          )}
 
           <div className="flex flex-col items-center gap-3">
             <div className="p-4 bg-white rounded-2xl shadow-card">

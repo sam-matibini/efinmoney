@@ -91,6 +91,7 @@ export function cardSendProvidersForCorridor(
 
   if (
     productFeatures.nombaNigeria &&
+    false &&
     s === "NGN" &&
     d === "NGN" &&
     transferType === "bank"
@@ -98,7 +99,7 @@ export function cardSendProvidersForCorridor(
     out.push("nomba");
   }
 
-  if (productFeatures.lenhubFlutter && (LENHUB_COLLECT as readonly string[]).includes(s)) {
+  if (productFeatures.lenhubFlutter && false && (LENHUB_COLLECT as readonly string[]).includes(s)) {
     if (d === "NGN" && transferType === "bank" && LENHUB_NGN_BANK_SOURCES.includes(s)) {
       out.push("lenhub");
     }

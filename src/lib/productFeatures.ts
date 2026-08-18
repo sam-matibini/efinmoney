@@ -2,6 +2,7 @@
  * Product feature flags — UI visibility only (backend edge functions remain).
  * Override via VITE_FEATURE_<FLAG>=true|false in .env
  */
+import { isLivePayinCurrency, isLivePayoutCurrency } from "@/lib/retailPayoutFees";
 
 function envFlag(name: string, defaultValue: boolean): boolean {
   const raw = import.meta.env[name];
@@ -12,7 +13,7 @@ function envFlag(name: string, defaultValue: boolean): boolean {
 
 export const productFeatures = {
   nombaNigeria: envFlag("VITE_FEATURE_NOMBA_NIGERIA", true),
-  ghanaPay: envFlag("VITE_FEATURE_GHANA_PAY", true),
+  ghanaPay: envFlag("VITE_FEATURE_GHANA_PAY", false),
   plaid: envFlag("VITE_FEATURE_PLAID", true),
   canadaDomestic: envFlag("VITE_FEATURE_CANADA_DOMESTIC", false),
   stripe: false,
@@ -47,7 +48,7 @@ export const productFeatures = {
   /** PayPal Orders API — wallet top-up for USD/CAD/EUR/GBP. */
   paypal: envFlag("VITE_FEATURE_PAYPAL", true),
   /** Lenhub Flutter wrapper — card collect (USD/CAD/…) + FX bank/MoMo payouts. */
-  lenhubFlutter: envFlag("VITE_FEATURE_LENHUB_FLUTTER", true),
+  lenhubFlutter: envFlag("VITE_FEATURE_LENHUB_FLUTTER", false),
   adyen: envFlag("VITE_FEATURE_ADYEN", false),
 } as const;
 
@@ -57,55 +58,11 @@ export function isFeatureEnabled(key: ProductFeatureKey): boolean {
   return productFeatures[key];
 }
 
-/** Live top-up corridors — Nomba NGN + Paytota/Nomba intl + Swychr + Ghana Pay + Elicate ZMW + Fincra Africa */
+/** Live top-up: Nigeria, Ghana, Kenya, Zambia, Canada, USA. */
 export function isLiveTopupCurrency(currency: string): boolean {
-  const c = currency.toUpperCase();
-  if (productFeatures.nombaNigeria && c === "NGN") return true;
-  if ((productFeatures.paytota || productFeatures.nombaNigeria || productFeatures.fincra || productFeatures.lenhubFlutter || productFeatures.dodo || productFeatures.square || productFeatures.paypal) && ["USD", "EUR", "GBP", "CAD"].includes(c)) {
-    return true;
-  }
-  if (productFeatures.lenhubFlutter && ["NGN", "GHS", "KES", "UGX", "RWF", "TZS"].includes(c)) return true;
-  if (productFeatures.fincra && ["NGN", "GHS", "KES", "UGX", "TZS", "ZMW", "ZAR", "XAF", "XOF", "MWK"].includes(c)) {
-    return true;
-  }
-  if ((productFeatures.fincraInterac || productFeatures.flovideInterac || productFeatures.flovide) && c === "CAD") return true;
-  if (productFeatures.wise) return true;
-  if (productFeatures.swychr && ["XAF", "KES", "XOF", "UGX"].includes(c)) return true;
-  if (productFeatures.paytota && ["UGX", "KES", "RWF"].includes(c)) return true;
-  if (productFeatures.ghanaPay && c === "GHS") return true;
-  if (productFeatures.elicate && c === "ZMW") return true;
-  // Company Flutterwave Africa + western card top-up
-  if (productFeatures.flutterwave && ["NGN", "GHS", "KES", "UGX", "RWF", "TZS", "ZMW", "USD", "CAD"].includes(c)) {
-    return true;
-  }
-  return false;
+  return isLivePayinCurrency(currency);
 }
 
 export function isLiveSendCorridor(countryCode: string): boolean {
-  const code = countryCode.toUpperCase();
-  if (
-    productFeatures.flovide
-    && ["NGN", "NG", "KES", "KE", "GHS", "GH", "UGX", "UG", "CAD", "CA"].includes(code)
-  ) {
-    return true;
-  }
-  if (productFeatures.nombaNigeria && (code === "NGN" || code === "NG")) return true;
-  if (productFeatures.lenhubFlutter && ["NG", "NGN", "GH", "GHS", "KE", "KES", "UG", "UGX", "TZ", "TZS", "RW", "RWF", "ZM", "ZMW"].includes(code)) {
-    return true;
-  }
-  if (productFeatures.ghanaPay && (code === "GHS" || code === "GH")) return true;
-  if (productFeatures.elicate && (code === "ZMW" || code === "ZM")) return true;
-  if (productFeatures.paytotaPayout && ["UGX", "UG", "KES", "KE", "RWF", "RW"].includes(code)) {
-    return true;
-  }
-  if (
-    productFeatures.flutterwave &&
-    ["NGN", "NG", "GHS", "GH", "KES", "KE", "UGX", "UG", "RWF", "RW", "TZS", "TZ", "ZMW", "ZM"].includes(code)
-  ) {
-    return true;
-  }
-  if (productFeatures.otherAfricanCorridors) {
-    return ["KES", "UGX", "TZS", "RWF", "ZMW", "KE", "UG", "TZ", "RW", "ZM"].includes(code);
-  }
-  return false;
+  return isLivePayoutCurrency(countryCode);
 }

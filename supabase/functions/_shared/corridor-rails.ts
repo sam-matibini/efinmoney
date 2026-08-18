@@ -2,6 +2,7 @@
  * Admin-configured corridor rail policies (preferred + optional failover).
  */
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { filterLiveRails, isRetiredRail } from "./retiredPartners.ts";
 
 export type RailDirection = "collect" | "payout";
 
@@ -56,7 +57,7 @@ export function railsFromPolicy(policy: CorridorRailPolicy): string[] {
   const out: string[] = [];
   const push = (code: string) => {
     const c = code.trim().toLowerCase();
-    if (c && !out.includes(c)) out.push(c);
+    if (c && !out.includes(c) && !isRetiredRail(c)) out.push(c);
   };
   push(policy.preferred_partner);
   for (const f of policy.failover_partners || []) push(f);
@@ -117,7 +118,7 @@ export async function resolveCorridorRails(
     row = (data as CorridorRailPolicy | null) ?? null;
   }
   if (!row) return { policy: null, rails: [] };
-  const rails = await filterActivePartnerRails(admin, railsFromPolicy(row));
+  const rails = await filterActivePartnerRails(admin, filterLiveRails(railsFromPolicy(row)));
   if (!rails.length) return { policy: null, rails: [] };
   return { policy: row, rails };
 }

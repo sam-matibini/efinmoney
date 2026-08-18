@@ -37,17 +37,14 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 /** Best-effort account-activity log for the CRM timeline — never blocks auth. */
 const logAccountActivity = (userId: string, eventType: string, description: string) => {
   void supabase
-    .from('account_activity')
-    .insert({
-      user_id: userId,
-      event_type: eventType,
-      description,
-      actor_type: 'user',
-      actor_id: userId,
-      user_agent: typeof navigator !== 'undefined' ? navigator.userAgent.slice(0, 400) : null,
+    .rpc("log_account_activity", {
+      p_user_id: userId,
+      p_event_type: eventType,
+      p_description: description,
+      p_metadata: {},
     })
     .then(({ error }) => {
-      if (error) console.warn('activity log failed:', error.message);
+      if (error) console.warn("activity log failed:", error.message);
     });
 };
 

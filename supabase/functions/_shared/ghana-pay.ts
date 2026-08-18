@@ -88,8 +88,8 @@ export function getGhanaPayConfig(): GhanaPayConfig {
 }
 
 export function isGhanaPayConfigured(): boolean {
-  const cfg = getGhanaPayConfig();
-  return Boolean(cfg.baseUrl && cfg.merchantUser && cfg.collectionUrl && cfg.payoutUrl);
+  // Lenhub /api/efin Ghana Pay is retired — never treat as live.
+  return false;
 }
 
 /** Unique provider transaction_id — reuse triggers response_code 219. */
@@ -150,31 +150,17 @@ export function parseGhanaPayResponse(
 }
 
 export async function ghanaPayFetch(
-  url: string,
-  payload: GhanaPayPayload,
-  opts: { timeoutMs?: number } = {},
+  _url: string,
+  _payload: GhanaPayPayload,
+  _opts: { timeoutMs?: number } = {},
 ): Promise<GhanaPayApiResult> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), opts.timeoutMs ?? 45_000);
-  try {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-      signal: controller.signal,
-    });
-    const raw = await res.text();
-    let json: Record<string, unknown> = {};
-    try {
-      json = raw ? JSON.parse(raw) : {};
-    } catch {
-      json = { raw };
-    }
-    return parseGhanaPayResponse(res.status, json, raw);
-  } finally {
-    clearTimeout(timer);
-  }
+  return {
+    ok: false,
+    httpStatus: 410,
+    response_code: "410",
+    response_message: "Ghana Pay (Lenhub /api/efin) is retired. Use Fincra or Flutterwave.",
+    duplicate: false,
+    json: { error: "retired" },
+    raw: "retired",
+  };
 }

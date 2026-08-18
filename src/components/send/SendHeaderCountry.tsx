@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Check, ChevronDown, Search } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { COUNTRIES, type CountryInfo } from "@/lib/countries";
+import { COUNTRIES, isLiveSendCountryId, type CountryInfo } from "@/lib/countries";
 import { CountryFlag } from "@/components/ui/FlagImage";
 
 type Props = {
@@ -53,6 +53,11 @@ export default function SendHeaderCountry({ value, onChange, filterIds }: Props)
                 >
                   <CountryFlag country={c.country} size="sm" />
                   <span className="flex-1 min-w-0 truncate">{c.country}</span>
+                  {!isLiveSendCountryId(c.id) && (
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400">
+                      Coming soon
+                    </span>
+                  )}
                   <span className="text-[10px] font-semibold text-muted-foreground">{c.code}</span>
                   {c.id === value && <Check className="w-4 h-4 text-primary" />}
                 </CommandItem>

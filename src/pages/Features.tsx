@@ -42,7 +42,7 @@ const FEATURES = [
     id: "receive",
     icon: Globe,
     title: "Receive & bank link",
-    desc: "Get account details to receive money. Link external banks with Plaid.",
+    desc: "Get a permanent NGN or GHS bank account number. Link external banks with Plaid.",
     accent: "from-fuchsia-500/15 to-pink-500/5",
   },
   {

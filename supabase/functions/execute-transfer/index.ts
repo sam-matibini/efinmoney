@@ -1,10 +1,10 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { isGhanaPayConfigured } from "../_shared/ghana-pay.ts";
 import { isNombaNigeriaConfigured } from "../_shared/nomba-nigeria.ts";
 import { dispatchRoutedPayout } from "../_shared/routingExecute.ts";
 import { observeRoute } from "../_shared/routeResolver.ts";
 import { recordEconomics } from "../_shared/transactionEconomics.ts";
 import { assertQuotedFee } from "../_shared/pricingService.ts";
+import { isLivePayoutCurrency } from "../_shared/retailPayoutFees.ts";
 import { payoutFnForRail, resolveCorridorRails } from "../_shared/corridor-rails.ts";
 import { explainPayoutError, notifyOpsBrief, notifyOpsFailoverPing } from "../_shared/ops-alert.ts";
 import { validatePayoutMin } from "../_shared/payoutMins.ts";
@@ -218,6 +218,23 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: `Transfer already ${transfer.status}` }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    {
+      const destCcy = String(transfer.target_currency || "").toUpperCase();
+      const destCountry = String(transfer.recipient_country || "").toUpperCase();
+      if (!isLivePayoutCurrency(destCcy) && !isLivePayoutCurrency(destCountry)) {
+        await supabase.from("transfers").update({
+          status: "failed",
+          failure_reason: "Payouts to this country are coming soon",
+        }).eq("id", transfer_id);
+        return new Response(JSON.stringify({
+          error: "Payouts to this country are coming soon. Live corridors: Ghana, Kenya, Zambia, Nigeria, Canada, and the United States.",
+          code: "corridor_coming_soon",
+        }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
     if (!Number(transfer.target_amount) || Number(transfer.target_amount) <= 0) {
@@ -480,11 +497,7 @@ Deno.serve(async (req) => {
       (payload.use_pawapay === true || transfer.use_pawapay === true) &&
       isMobileMoneyMethod &&
       isPawapayEligible(recipientCountry, targetCurrency, transfer.payout_method, recipientCountryHint);
-    const useMtnMomo =
-      !usePawapay &&
-      (payload.use_mtn_momo === true || transfer.use_mtn_momo === true) &&
-      isMobileMoneyMethod &&
-      MTN_COUNTRIES.has(recipientCountry);
+    const useMtnMomo = false;
 
     const useStellar =
       !useMtnMomo && !isZambia &&
@@ -497,7 +510,6 @@ Deno.serve(async (req) => {
       recipientCountry === "GH" ||
       recipientCountry === "GHANA" ||
       (recipientCountryHint ?? "").trim().toUpperCase() === "GHANA";
-    const ghanaPayConfigured = isGhanaPayConfigured();
 
     const fincraConfigured = !!(
       Deno.env.get("FINCRA_SECRET_KEY")?.trim()
@@ -533,13 +545,6 @@ Deno.serve(async (req) => {
       );
 
 
-    const lenhubFlutterEnvOn = Deno.env.get("LENHUB_FLUTTER_ENABLED") !== "false"
-      && Deno.env.get("LENHUB_FLUTTER_PAYOUT") !== "false";
-    const LENHUB_FLUTTER_BANK = new Set(["NGN"]);
-    const LENHUB_FLUTTER_MOMO = new Set(["GHS", "KES", "UGX"]);
-    const hasLenhubBankRail = isNigeriaBank && LENHUB_FLUTTER_BANK.has(targetCurrency);
-    const hasLenhubMomoRail = isMobileMoneyMethod && LENHUB_FLUTTER_MOMO.has(targetCurrency)
-      && !(transfer.recipient_account && transfer.recipient_bank_code);
     const paytotaMomoCurrencies = new Set(["UGX", "KES", "RWF"]);
     const paytotaCapable = isMobileMoneyMethod && paytotaMomoCurrencies.has(targetCurrency);
     const swychrEnabled = Deno.env.get("SWYCHR_ENABLED") === "true";
@@ -1036,22 +1041,9 @@ Deno.serve(async (req) => {
           });
         }
 
-        // 3) Lenhub (NGN bank or GHS/KES/UGX MoMo)
-        if (lenhubFlutterEnvOn && (hasLenhubBankRail || hasLenhubMomoRail)) {
-          await tryNext("lenhub_flutter", async () => {
-            const lfRes = await fetch(
-              `${Deno.env.get("SUPABASE_URL")}/functions/v1/lenhub-flutter-payout`,
-              { method: "POST", headers: internalHeaders, body: JSON.stringify({ transfer_id }) },
-            );
-            return lfRes.json().catch(() => ({
-              success: false,
-              error: `lenhub-flutter-payout HTTP ${lfRes.status}`,
-              rail: "lenhub_flutter",
-            }));
-          });
-        }
+        // Lenhub retired — skipped.
 
-        // 4) Nomba (NGN bank)
+        // 4) Nomba (official api.nomba.com only; Lenhub /api/efin Nigeria payout is off)
         if (isNigeriaBank && isNombaNigeriaConfigured()) {
           await tryNext("nomba", async () => {
             const nombaRes = await fetch(
@@ -1096,20 +1088,7 @@ Deno.serve(async (req) => {
           });
         }
 
-        // Ghana Pay as last MoMo safety for GHS if everything above failed
-        if (!payoutOk(payoutResult) && isGhana && isMobileMoneyMethod && ghanaPayConfigured) {
-          await tryNext("ghana_pay", async () => {
-            const ghRes = await fetch(
-              `${Deno.env.get("SUPABASE_URL")}/functions/v1/ghana-payout`,
-              { method: "POST", headers: internalHeaders, body: JSON.stringify({ transfer_id }) },
-            );
-            return ghRes.json().catch(() => ({
-              success: false,
-              error: `ghana-payout HTTP ${ghRes.status}`,
-              rail: "ghana_pay",
-            }));
-          });
-        }
+        // Ghana Pay (Lenhub /api/efin) retired — skipped.
 
         console.log("priority payout chain", attempts, "final", payoutResult?.rail, payoutResult?.success);
       } else if (isZambia) {
@@ -1127,19 +1106,6 @@ Deno.serve(async (req) => {
           error: `fincra-payout HTTP ${res.status}`,
           rail: "fincra",
         }));
-      } else if (ghanaPayConfigured && isGhana && isMobileMoneyMethod) {
-        const res = await fetch(
-          `${Deno.env.get("SUPABASE_URL")}/functions/v1/ghana-payout`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-internal-secret": Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "",
-            },
-            body: JSON.stringify({ transfer_id }),
-          },
-        );
-        payoutResult = await res.json();
       } else {
         // Other corridors → Flutterwave default
         const res = await fetch(

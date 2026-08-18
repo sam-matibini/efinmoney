@@ -10,6 +10,7 @@ import {
   REGION_ORDER,
   filterCountries,
   findCountryById,
+  isLiveSendCountryId,
   type CountryInfo,
 } from "@/lib/countries";
 
@@ -151,6 +152,11 @@ const CountryGroup = ({
             >
               <span className="text-lg leading-none">{c.flag}</span>
               <span className="flex-1 truncate">{c.country}</span>
+              {!isLiveSendCountryId(c.id) && (
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400">
+                  Coming soon
+                </span>
+              )}
               <span className="text-xs text-muted-foreground">{c.code}</span>
               {active && <Check className="w-4 h-4 text-primary" />}
             </button>

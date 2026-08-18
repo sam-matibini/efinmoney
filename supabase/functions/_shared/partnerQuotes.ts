@@ -10,7 +10,6 @@
  */
 import { wiseFetch } from "./wise.ts";
 import { flwV3Fetch } from "./flw-v3.ts";
-import { fetchNombaExchangeRate, isNombaNigeriaConfigured } from "./nomba-nigeria.ts";
 import { fincraFetch, getFincraConfig } from "./fincra.ts";
 
 export interface PartnerQuote {
@@ -70,19 +69,8 @@ const flutterwaveQuote: PartnerQuoteAdapter = async (base, quote) => {
 
 /* -------------------------------- Nomba --------------------------------- */
 
-const nombaQuote: PartnerQuoteAdapter = async (base, quote) => {
-  try {
-    if (!isNombaNigeriaConfigured()) return { ok: false, error: "nomba not configured" };
-    // Nomba only quotes NGN pairs.
-    if (base !== "NGN" && quote !== "NGN") return { ok: false, error: "nomba quotes NGN pairs only" };
-    const { rates, result } = await fetchNombaExchangeRate(base, quote);
-    const primary = rates[0];
-    const rate = num(primary?.midRateNumeric);
-    if (!rate) return { ok: false, error: result.message || "nomba returned no rate" };
-    return { ok: true, rate };
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : String(e) };
-  }
+const nombaQuote: PartnerQuoteAdapter = async () => {
+  return { ok: false, error: "nomba Lenhub /api/efin exchange is retired" };
 };
 
 /* -------------------------------- Fincra -------------------------------- */

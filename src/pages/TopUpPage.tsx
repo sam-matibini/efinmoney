@@ -78,6 +78,7 @@ import {
 } from "@/lib/walletTopupGateway";
 import { clearPendingSwychrTxn } from "@/lib/swychrPay";
 import FlutterwaveWesternTopUpHints from "@/components/wallets/FlutterwaveWesternTopUpHints";
+import BankVirtualAccountCard from "@/components/payments/BankVirtualAccountCard";
 import { buildFincraTopupRedirectUrl, parseFincraReturnReference, isFincraCheckoutCurrency } from "@/lib/fincraTopup";
 import { clearPendingNombaTxn } from "@/lib/nombaPay";
 import { clearPendingPaytotaTxn, confirmPaytotaPayment, readPendingPaytotaTxn } from "@/lib/paytotaPay";
@@ -107,10 +108,7 @@ type Gateway = WalletTopupGateway;
 function availableIntlMethods(currency: string): IntlTopupMethod[] {
   const c = currency.toUpperCase();
   const methods: IntlTopupMethod[] = [];
-    // Western multi-rail (USD/EUR/GBP/CAD) — auto-picked; Lenhub skipped (Flutterwave wrapper)
   if (MULTI_RAIL_TOPUP_CURRENCIES.includes(c)) {
-    if (productFeatures.nombaNigeria) methods.push("nomba");
-    // Fincra hosted checkout for EUR/GBP; CAD Interac is a separate rail below
     if (productFeatures.fincra && ["EUR", "GBP"].includes(c)) methods.push("fincra");
     if (productFeatures.paytota) methods.push("paytota");
     if (productFeatures.dodo) methods.push("dodo");
@@ -135,7 +133,6 @@ function availableIntlMethods(currency: string): IntlTopupMethod[] {
   if (c === "NGN") {
     if (productFeatures.fincra) methods.push("fincra");
     if (productFeatures.flutterwave) methods.push("flutterwave");
-    if (productFeatures.nombaNigeria) methods.push("nomba");
     if (productFeatures.wise) methods.push("wise");
     return methods;
   }
@@ -157,7 +154,6 @@ function availableAfricaMomoMethods(currency: string): AfricaMomoTopupMethod[] {
   }
   if (productFeatures.paytota && PAYTOTA_AFRICA_TOPUP_CURRENCIES.includes(c)) methods.push("paytota");
   if (productFeatures.swychr && SWYCHR_TOPUP_CURRENCIES.includes(c)) methods.push("swychr");
-  if (c === "GHS" && productFeatures.ghanaPay) methods.push("ghana");
   if (c === "ZMW" && productFeatures.elicate) methods.push("elicate");
   if (productFeatures.wise) methods.push("wise");
   return methods;
@@ -820,6 +816,7 @@ const TopUpPage = () => {
     const primaryIds = collectPrimary ? collectPayMethodIds(collectPrimary) : [];
     const showRail = (id: string) => {
       if (id === "link_bank") return true;
+      if (id === "bank_va" && (ccyUpper === "NGN" || ccyUpper === "GHS") && productFeatures.flutterwave) return true;
       // Always offer Wise as its own top-level rail when the feature is on.
       if ((id === "wise" || id === "wise_link") && productFeatures.wise) return true;
       if (africaBackupId) {
@@ -845,6 +842,25 @@ const TopUpPage = () => {
         </SectionBoundary>
       ),
     });
+
+    if (showRail("bank_va") && productFeatures.flutterwave && (ccyUpper === "NGN" || ccyUpper === "GHS")) {
+      payMethods.push({
+        id: "bank_va",
+        tone: "bank",
+        label: "Your bank account number",
+        description: `Permanent ${ccyUpper} account for bank transfers`,
+        content: (
+          <SectionBoundary name="BankVirtualAccount">
+            <div className="rounded-xl border p-4 space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Generate a permanent {ccyUpper} account. Send from any bank — funds credit this wallet.
+              </p>
+              <BankVirtualAccountCard lockedCurrency={ccyUpper} compact />
+            </div>
+          </SectionBoundary>
+        ),
+      });
+    }
 
     const usePaypalCard =
       westernCardRail === "paypal"
@@ -982,7 +998,7 @@ const TopUpPage = () => {
       });
     }
 
-    if (showRail("lenhub") && rails.has("lenhub")) {
+    if (showRail("lenhub") && false && rails.has("lenhub")) {
       payMethods.push({
         id: "lenhub",
         tone: "card",
@@ -1139,7 +1155,7 @@ const TopUpPage = () => {
       });
     }
 
-    if (showRail("ghana") && productFeatures.ghanaPay && rails.has("ghana")) {
+    if (showRail("ghana") && false && productFeatures.ghanaPay && rails.has("ghana")) {
       payMethods.push({
         id: "ghana",
         tone: "mobile",
@@ -1325,7 +1341,7 @@ const TopUpPage = () => {
                   title="Top-up not available for this currency"
                   description={
                     currency +
-                    " wallet funding is not available. Try NGN, GHS, ZMW, KES, UGX, RWF, TZS, ZAR, XAF, XOF, MWK, USD, EUR, GBP, or CAD."
+                    " wallet funding is coming soon. Live top-up currencies: NGN, GHS, KES, ZMW, CAD, and USD."
                   }
                   backHref="/wallets"
                   backLabel="View wallets"

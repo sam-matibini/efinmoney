@@ -22,7 +22,10 @@ export const useCreateWallet = () => {
 
       if (error) {
         console.error('Error creating wallet:', error);
-        throw error;
+        if (error.code === '23505') {
+          throw new Error(`You already have a ${currencyCode} wallet.`);
+        }
+        throw new Error(error.message || 'Failed to create wallet');
       }
 
       return data;

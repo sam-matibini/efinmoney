@@ -89,6 +89,7 @@ const Header = () => {
     buildNavItem("Send", "/send"),
     ...(productFeatures.paymentLinks ? [buildNavItem("Payment Links", "/payment-links")] : []),
     buildNavItem("Top up", "/wallet/topup"),
+    buildNavItem("Receive", "/wallet/receive"),
     buildNavItem("Contacts", "/contacts"),
     buildNavItem("Foreign Currency Exchange", "/exchange"),
     buildNavItem("Wallets", "/wallets"),

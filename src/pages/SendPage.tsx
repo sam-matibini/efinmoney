@@ -126,7 +126,9 @@ import LenhubFlutterTopUpCard from "@/components/payments/LenhubFlutterTopUpCard
 import { cn } from "@/lib/utils";
 import AppPage from "@/components/layout/AppPage";
 import TransferSuccess from "@/components/send/TransferSuccess";
-import { findCountryById, findCountryByCode, COUNTRIES, LIVE_SEND_COUNTRY_IDS, isLiveSendCountryId } from "@/lib/countries";
+import ComingSoon from "@/components/common/ComingSoon";
+import { findCountryById, findCountryByCode, COUNTRIES, isLiveSendCountryId } from "@/lib/countries";
+import { LIVE_PAYOUT_CURRENCIES, isLivePayinCurrency } from "@/lib/retailPayoutFees";
 import { MM_COUNTRIES } from "@/lib/mobileMoneyNetworks";
 
 import { PRIORITY_SEND_CURRENCIES } from "@/lib/currencyPriority";
@@ -195,13 +197,6 @@ const SendPage = () => {
   const [amount, setAmount] = useState("");
   const [selectedWalletId, setSelectedWalletId] = useState("");
   const [targetCountryId, setTargetCountryId] = useState<string>("Kenya");
-
-  // Drop destinations that are no longer live (e.g. deep-link / stale state).
-  useEffect(() => {
-    if (!isLiveSendCountryId(targetCountryId)) {
-      setTargetCountryId(LIVE_SEND_COUNTRY_IDS[0]);
-    }
-  }, [targetCountryId]);
   const [recipientName, setRecipientName] = useState("");
   const [recipientPhone, setRecipientPhone] = useState("");
   const [selectedSourceId, setSelectedSourceId] = useState<string>("");
@@ -604,6 +599,7 @@ const SendPage = () => {
       (wallets ?? []).filter((w) => {
         const c = w.currency_code.toUpperCase();
         if (!isCardSendCollectCurrency(c)) return false;
+        if (!isLivePayinCurrency(c)) return false;
         if (c === "NGN") {
           return productFeatures.nombaNigeria || productFeatures.lenhubFlutter || productFeatures.flutterwave;
         }
@@ -629,7 +625,9 @@ const SendPage = () => {
     [cardWallets],
   );
   const cardPayoutCodes = useMemo(
-    () => cardSendDestCurrencies(sourceCurrency),
+    () => cardSendDestCurrencies(sourceCurrency).filter((c) =>
+      (LIVE_PAYOUT_CURRENCIES as readonly string[]).includes(c.toUpperCase()),
+    ),
     [sourceCurrency],
   );
   const cardTransferTypeForDest = useMemo((): "bank" | "mobile_money" => {
@@ -701,7 +699,7 @@ const SendPage = () => {
     () => [...new Set((wallets ?? []).map((w) => w.currency_code))],
     [wallets],
   );
-  const payoutCurrencyCodes = useMemo(() => COUNTRIES.map((c) => c.code), []);
+  const payoutCurrencyCodes = useMemo(() => [...LIVE_PAYOUT_CURRENCIES], []);
 
   const calcQuoteRecipient = useCallback(
     (sendInFrom: number) => {
@@ -2401,7 +2399,6 @@ const SendPage = () => {
                                     <SendHeaderCountry
                                       value={targetCountryId}
                                       onChange={setTargetCountryId}
-                                      filterIds={[...LIVE_SEND_COUNTRY_IDS]}
                                     />
                                   }
 
@@ -2409,19 +2406,19 @@ const SendPage = () => {
                                     <div className="space-y-3">
                                       <motion.div
                                         whileTap={{ scale: 0.97 }}
-                                        animate={isStep1Valid && isStep2Valid ? { boxShadow: [
+                                        animate={isStep1Valid && isStep2Valid && isLiveSendCountryId(targetCountryId) ? { boxShadow: [
                                           "0 0 0 0 hsl(var(--primary) / 0)",
                                           "0 0 0 6px hsl(var(--primary) / 0.15)",
                                           "0 0 0 0 hsl(var(--primary) / 0)",
                                         ] } : { boxShadow: "0 0 0 0 hsl(var(--primary) / 0)" }}
-                                        transition={isStep1Valid && isStep2Valid ? { duration: 1.8, repeat: Infinity, ease: "easeInOut" } : { duration: 0.2 }}
+                                        transition={isStep1Valid && isStep2Valid && isLiveSendCountryId(targetCountryId) ? { duration: 1.8, repeat: Infinity, ease: "easeInOut" } : { duration: 0.2 }}
                                         className="rounded-md"
                                       >
                                         <Button
                                           className="w-full"
                                           size="lg"
                                           onClick={() => goToStep(3)}
-                                          disabled={!isStep1Valid || !isStep2Valid}
+                                          disabled={!isStep1Valid || !isStep2Valid || !isLiveSendCountryId(targetCountryId)}
                                         >
                                           Continue
                                         </Button>
@@ -2437,6 +2434,14 @@ const SendPage = () => {
                                   }
                                 >
 
+                                    {!isLiveSendCountryId(targetCountryId) ? (
+                                      <ComingSoon
+                                        title={`${targetCountry.country} is coming soon`}
+                                        description="Pay-in and payout for this country are not live yet. Live corridors: Ghana, Kenya, Zambia, Nigeria, Canada, and the United States."
+                                        backHref=""
+                                      />
+                                    ) : (
+                                    <>
                                     <motion.div custom={0} variants={fieldVariants} initial="hidden" animate="show" className="space-y-2">
                                       <RecipientQuickBox
                                         value={recipientName}
@@ -2858,6 +2863,8 @@ const SendPage = () => {
                                       <p className="text-sm text-center text-muted-foreground">
                                         No FX rate for {sourceCurrency} → {targetCountry.code}. Try another pair or funding source.
                                       </p>
+                                    )}
+                                    </>
                                     )}
                                 </MoneyFlowShell>
                               </motion.div>

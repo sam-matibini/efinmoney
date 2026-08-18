@@ -4,7 +4,6 @@ import { productFeatures } from "@/lib/productFeatures";
 import type { NigeriaBank, NombaExchangeQuote } from "@/lib/nombaNigeria";
 import {
   getNigeriaBanks as getNombaBanks,
-  getNombaExchangeRate,
   isNgnPair,
 } from "@/lib/nombaNigeria";
 
@@ -186,7 +185,7 @@ export async function getFlovideOrNombaRate(
   }
 
   if (f === "NGN" || t === "NGN") {
-    return getNombaExchangeRate(f, t);
+    return null;
   }
   return null;
 }

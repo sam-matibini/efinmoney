@@ -1,5 +1,4 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { fetchNombaExchangeRate, isNombaNigeriaConfigured } from "../_shared/nomba-nigeria.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -112,41 +111,9 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (isNombaNigeriaConfigured()) {
-      for (const pair of [["USD", "NGN"], ["CAD", "NGN"], ["GBP", "NGN"], ["EUR", "NGN"]] as const) {
-        const [from, to] = pair;
-        const { rates: nombaRates } = await fetchNombaExchangeRate(from, to);
-        const mid = nombaRates[0]?.midRateNumeric;
-        if (!mid || mid <= 0) continue;
-        rows.push({
-          from_currency: from,
-          to_currency: to,
-          rate: mid,
-          markup_rate: 0,
-          effective_rate: mid,
-          source: "nomba",
-          valid_from: now.toISOString(),
-          valid_until: validUntil,
-        });
-        rows.push({
-          from_currency: to,
-          to_currency: from,
-          rate: 1 / mid,
-          markup_rate: 0,
-          effective_rate: 1 / mid,
-          source: "nomba",
-          valid_from: now.toISOString(),
-          valid_until: validUntil,
-        });
-      }
-    }
-
     // fx_rates is UNIQUE (from_currency, to_currency, valid_from) and every row
     // in a run shares valid_from, so the same pair must not appear twice. The
-    // cross-rate loop already emits CAD->NGN etc., and the Nomba block re-emits
-    // those pairs -- inserting both violates the constraint and fails the whole
-    // batch. Deduplicate by pair, keeping the last writer: Nomba's live corridor
-    // rate is more accurate than a USD cross-rate and is pushed after it.
+    // batch. Deduplicate by pair, keeping the last writer.
     const byPair = new Map<string, any>();
     for (const row of rows) {
       byPair.set(`${row.from_currency}|${row.to_currency}`, row);

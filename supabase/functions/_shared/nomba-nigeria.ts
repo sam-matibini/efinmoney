@@ -80,8 +80,8 @@ export function getNombaNigeriaConfig(): NombaNigeriaConfig {
 }
 
 export function isNombaNigeriaConfigured(): boolean {
-  const cfg = getNombaNigeriaConfig();
-  return Boolean(cfg.baseUrl && cfg.merchantUser && cfg.bankcodeUrl && cfg.transferUrl);
+  // Bank/FX/payout paths were /api/efin on mtn.lenhub.net — retired.
+  return false;
 }
 
 function parseEnvelope(httpStatus: number, json: Record<string, unknown>, raw: string): NombaApiResult {
@@ -99,22 +99,15 @@ function parseMidRateNumeric(midRate: string): number | null {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
-async function nombaFetch(url: string, init?: RequestInit, timeoutMs = 45_000): Promise<NombaApiResult> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const res = await fetch(url, { ...init, signal: controller.signal });
-    const raw = await res.text();
-    let json: Record<string, unknown> = {};
-    try {
-      json = raw ? JSON.parse(raw) : {};
-    } catch {
-      json = { raw };
-    }
-    return parseEnvelope(res.status, json, raw);
-  } finally {
-    clearTimeout(timer);
-  }
+async function nombaFetch(url: string, _init?: RequestInit, _timeoutMs = 45_000): Promise<NombaApiResult> {
+  return {
+    ok: false,
+    httpStatus: 410,
+    code: "410",
+    message: "Lenhub /api/efin Nigeria rails are retired (including /api/efin/exchange/).",
+    json: { error: "retired", url },
+    raw: "retired",
+  };
 }
 
 export function normalizeNombaBanks(json: Record<string, unknown>): NombaBank[] {

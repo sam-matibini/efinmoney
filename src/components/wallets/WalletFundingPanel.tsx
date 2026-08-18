@@ -9,6 +9,7 @@ import { isLiveTopupCurrency, productFeatures } from "@/lib/productFeatures";
 import { routeWalletTopupGateway } from "@/lib/walletTopupGateway";
 import { cn } from "@/lib/utils";
 import { CurrencyFlag } from "@/components/ui/FlagImage";
+import { isBankVaCurrency } from "@/lib/bankVirtualAccounts";
 
 
 interface WalletFundingPanelProps {
@@ -92,7 +93,7 @@ const WalletFundingPanel = ({
       ) : (
         <ComingSoon
           title={`${currency} top-up is not available`}
-          description="Choose an NGN, GHS, USD, EUR, GBP, or CAD wallet to add money."
+          description="Coming soon. Live top-up currencies: NGN, GHS, KES, ZMW, CAD, and USD."
           backHref={returnPath}
           backLabel="Back"
           className="border-solid"
@@ -111,6 +112,22 @@ const WalletFundingPanel = ({
           Show receive details
         </Button>
       </div>
+
+      {isBankVaCurrency(currency) && (
+        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4 space-y-3">
+          <p className="text-sm font-medium">Bank transfer ({currency})</p>
+          <p className="text-xs text-muted-foreground">
+            Get a permanent {currency} account number. Anyone can send from their bank app.
+          </p>
+          <Button
+            type="button"
+            className="w-full"
+            onClick={() => navigate(`/wallet/receive?currency=${currency}&walletId=${walletId}`)}
+          >
+            Get {currency} bank account
+          </Button>
+        </div>
+      )}
 
       {productFeatures.paymentLinks ? (
         <div className="rounded-xl border p-4 space-y-3">

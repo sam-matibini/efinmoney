@@ -10,6 +10,8 @@
  * `computeFee` / `computeCustomerRevenue` in routingEngine.ts.
  */
 import { computeCustomerRevenue, type CustomerPricingRow } from "./routingEngine.ts";
+import { resolveEffectiveRate, type RateRow } from "./fxRatesCore.ts";
+import { retailPayoutFeeUsd } from "./retailPayoutFees.ts";
 
 export type PriceDirection = "payin" | "payout";
 
@@ -36,14 +38,46 @@ export interface PriceQuote {
   pricingId: string | null;
   /** True when no rate-card row matched — fee falls back to 0. */
   pricingMissing: boolean;
-  source: "rate_card" | "none";
+  source: "rate_card" | "retail_override" | "none";
+}
+
+type PricingClient = {
+  rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>;
+  // deno-lint-ignore no-explicit-any
+  from?: (table: string) => any;
+};
+
+async function usdFeeInSource(
+  supabase: PricingClient,
+  usd: number,
+  sourceCurrency: string,
+): Promise<number | null> {
+  const src = sourceCurrency.toUpperCase();
+  if (src === "USD") return r2(usd);
+  if (!supabase.from) return null;
+  const { data, error } = await supabase
+    .from("fx_rates")
+    .select("from_currency, to_currency, effective_rate")
+    .order("valid_from", { ascending: false })
+    .limit(400);
+  if (error) {
+    console.error("[pricingService] fx_rates lookup failed", error);
+    return null;
+  }
+  const rows = (Array.isArray(data) ? data : []) as RateRow[];
+  const rate = resolveEffectiveRate("USD", src, rows);
+  if (!rate || rate <= 0) {
+    console.warn(`[pricingService] no USD→${src} rate for retail fee`);
+    return null;
+  }
+  return r2(usd * rate);
 }
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
 /** Resolve the most specific active rate-card row and price the amount. */
 export async function quotePrice(
-  supabase: { rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }> },
+  supabase: PricingClient,
   req: QuotePriceRequest,
 ): Promise<PriceQuote> {
   const amount = Number(req.amount) || 0;
@@ -63,8 +97,9 @@ export async function quotePrice(
 
   const row = Array.isArray(data) ? (data[0] as Record<string, unknown> | undefined) : undefined;
 
+  let quote: PriceQuote;
   if (!row) {
-    return {
+    quote = {
       fee: 0,
       fxRevenue: 0,
       total: 0,
@@ -73,26 +108,42 @@ export async function quotePrice(
       pricingMissing: true,
       source: "none",
     };
+  } else {
+    const pricing: CustomerPricingRow = {
+      fixed_fee: Number(row.fixed_fee ?? 0),
+      percentage_fee: Number(row.percentage_fee ?? 0),
+      min_fee: row.min_fee == null ? null : Number(row.min_fee),
+      max_fee: row.max_fee == null ? null : Number(row.max_fee),
+      fx_markup_bps: Number(row.fx_margin_bps ?? 0),
+    } as CustomerPricingRow;
+
+    const revenue = computeCustomerRevenue(pricing, amount);
+
+    quote = {
+      fee: r2(revenue.fee),
+      fxRevenue: r2(revenue.fx),
+      total: r2(revenue.total),
+      fxMarginBps: Number(row.fx_margin_bps ?? 0),
+      pricingId: (row.id as string) ?? null,
+      pricingMissing: false,
+      source: "rate_card",
+    };
   }
 
-  const pricing: CustomerPricingRow = {
-    fixed_fee: Number(row.fixed_fee ?? 0),
-    percentage_fee: Number(row.percentage_fee ?? 0),
-    min_fee: row.min_fee == null ? null : Number(row.min_fee),
-    max_fee: row.max_fee == null ? null : Number(row.max_fee),
-    fx_markup_bps: Number(row.fx_margin_bps ?? 0),
-  } as CustomerPricingRow;
+  if (req.direction !== "payout") return quote;
 
-  const revenue = computeCustomerRevenue(pricing, amount);
+  const usdFee = retailPayoutFeeUsd(dst) ?? retailPayoutFeeUsd(req.destCountry);
+  if (usdFee == null) return quote;
+
+  const converted = await usdFeeInSource(supabase, usdFee, src);
+  if (converted == null) return quote;
 
   return {
-    fee: r2(revenue.fee),
-    fxRevenue: r2(revenue.fx),
-    total: r2(revenue.total),
-    fxMarginBps: Number(row.fx_margin_bps ?? 0),
-    pricingId: (row.id as string) ?? null,
+    ...quote,
+    fee: converted,
+    total: r2(converted + quote.fxRevenue),
     pricingMissing: false,
-    source: "rate_card",
+    source: "retail_override",
   };
 }
 

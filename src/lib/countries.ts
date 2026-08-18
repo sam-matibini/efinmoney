@@ -142,12 +142,11 @@ export const COUNTRIES: CountryInfo[] = [
 ];
 
 export const POPULAR_COUNTRY_IDS = [
-  "Canada", "United States", "Nigeria", "Ghana", "Kenya", "Zambia", "Uganda",
+  "Canada", "United States", "Nigeria", "Ghana", "Kenya", "Zambia",
 ];
 
 /**
- * Destinations shown on Send / Add Contact.
- * Keep the full COUNTRIES catalog for admin/legacy lookups — UI pickers use this allowlist.
+ * Live pay-in / payout destinations. Every other country is shown as Coming soon.
  */
 export const LIVE_SEND_COUNTRY_IDS = [
   "Canada",
@@ -156,11 +155,6 @@ export const LIVE_SEND_COUNTRY_IDS = [
   "Ghana",
   "Kenya",
   "Zambia",
-  "Uganda",
-  "Tanzania",
-  "Rwanda",
-  "Ethiopia",
-  "Senegal",
 ] as const;
 
 export const LIVE_SEND_COUNTRIES: CountryInfo[] = LIVE_SEND_COUNTRY_IDS

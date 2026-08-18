@@ -365,47 +365,11 @@ async function lenhubFlutterFetchRaw(
     timeoutMs?: number;
   } = {},
 ): Promise<LenhubFlutterResult> {
-  const base = getLenhubFlutterBaseUrl();
-  const url = new URL(path.startsWith("http") ? path : `${base}${path.startsWith("/") ? "" : "/"}${path}`);
-  if (opts.query) {
-    for (const [k, v] of Object.entries(opts.query)) {
-      if (v === undefined || v === null || v === "") continue;
-      url.searchParams.set(k, String(v));
-    }
-  }
-
-  const headers: Record<string, string> = { Accept: "application/json" };
-  const init: RequestInit = { method: method.toUpperCase(), headers };
-  if (opts.body) {
-    headers["Content-Type"] = "application/json";
-    init.body = JSON.stringify(opts.body);
-  }
-
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), Math.max(1000, opts.timeoutMs ?? 30_000));
-  try {
-    const res = await fetch(url.toString(), { ...init, signal: ctrl.signal });
-    clearTimeout(t);
-    const raw = await res.text();
-    let json: Record<string, unknown> = {};
-    try {
-      json = raw ? JSON.parse(raw) as Record<string, unknown> : {};
-    } catch {
-      json = { raw };
-    }
-    const ok = isSuccessEnvelope(json, res.status);
-    return {
-      ok,
-      httpStatus: res.status,
-      message: extractMessage(json, ok ? "OK" : `HTTP ${res.status}`),
-      json,
-      raw,
-    };
-  } catch (err) {
-    clearTimeout(t);
-    const msg = err instanceof Error ? err.message : String(err);
-    return { ok: false, httpStatus: 0, message: msg, json: { error: msg }, raw: msg };
-  }
+  void method;
+  void path;
+  void opts;
+  const msg = "Lenhub Flutter (efincash.lenhub.net) is retired. Use Fincra or Flutterwave.";
+  return { ok: false, httpStatus: 410, message: msg, json: { error: "retired" }, raw: msg };
 }
 
 /**

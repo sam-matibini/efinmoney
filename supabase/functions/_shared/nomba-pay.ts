@@ -79,8 +79,8 @@ export function getNombaPayConfig(): NombaPayConfig {
 }
 
 export function isNombaPayConfigured(): boolean {
-  const cfg = getNombaPayConfig();
-  return Boolean(cfg.baseUrl && cfg.merchantUser && cfg.nigeriaCollectionUrl);
+  // Hosted Nomba checkout ran through mtn.lenhub.net /api/efin — retired.
+  return false;
 }
 
 export function buildNombaCallbackUrl(): string {
@@ -133,30 +133,10 @@ export function parseNombaCollectionResponse(
 }
 
 export async function nombaCollectionFetch(
-  url: string,
-  payload: NombaCollectionPayload,
+  _url: string,
+  _payload: NombaCollectionPayload,
 ): Promise<NombaCollectionResult> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 45_000);
-  try {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-      signal: controller.signal,
-    });
-    const raw = await res.text();
-    let json: Record<string, unknown> = {};
-    try {
-      json = raw ? JSON.parse(raw) : {};
-    } catch {
-      json = { raw };
-    }
-    return parseNombaCollectionResponse(res.status, json, raw);
-  } finally {
-    clearTimeout(timer);
-  }
+  return parseNombaCollectionResponse(410, {
+    message: "Nomba hosted checkout via Lenhub /api/efin is retired. Use Fincra or Flutterwave.",
+  }, "retired");
 }

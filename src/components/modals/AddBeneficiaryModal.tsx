@@ -136,11 +136,8 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
   }, [open, editing, defaultCategory, defaultMethod]);
 
   const country = findCountryById(countryId) || LIVE_SEND_COUNTRIES[0] || COUNTRIES[0];
-  const pickerCountries = useMemo(() => {
-    const base = [...LIVE_SEND_COUNTRIES];
-    if (country && !base.some((c) => c.id === country.id)) base.push(country);
-    return base;
-  }, [country]);
+  const pickerCountries = COUNTRIES;
+  const destComingSoon = !isLiveSendCountryId(countryId);
   const isNigeriaBank = method === "bank" && country.code === "NGN";
   const countryNetworks = country.networks || [];
   const activeNetwork = countryNetworks.find((n) => n.id === networkId) || null;
@@ -217,6 +214,10 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
   }, [isNigeriaBank, bankCode, bankName, ngnBanks]);
 
   const handleSave = async () => {
+    if (!isLiveSendCountryId(countryId)) {
+      toast.error(`Payouts to ${country.country} are coming soon`);
+      return;
+    }
     if (!name.trim()) { toast.error("Please enter a name"); return; }
     if (!email.trim()) { toast.error("Please enter an email"); return; }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { toast.error("Please enter a valid email"); return; }
@@ -313,6 +314,11 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
                 onChange={(c) => setCountryId(c.id)}
                 countries={pickerCountries}
               />
+              {destComingSoon && (
+                <p className="text-xs font-medium text-amber-600 dark:text-amber-400">
+                  Coming soon — pay-in and payout for this country are not live yet.
+                </p>
+              )}
             </div>
           </div>
 
@@ -566,8 +572,8 @@ const AddBeneficiaryModal = ({ open, onOpenChange, editing, onSaved, defaultCate
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={handleSave} disabled={isPending}>
-            {isPending ? "Saving..." : editing?.id ? "Save Changes" : "Add Payee"}
+          <Button onClick={handleSave} disabled={isPending || destComingSoon}>
+            {isPending ? "Saving..." : destComingSoon ? "Coming soon" : editing?.id ? "Save Changes" : "Add Payee"}
           </Button>
         </DialogFooter>
       </DialogContent>

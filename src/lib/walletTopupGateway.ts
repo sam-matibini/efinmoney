@@ -19,9 +19,9 @@ export const SWYCHR_TOPUP_CURRENCIES = ["XAF", "KES", "XOF", "UGX"];
 /** All Nomba pay-in currencies (including Coming soon international). */
 export const NOMBA_PAY_CURRENCIES = [...NOMBA_NIGERIA_CURRENCIES, ...NOMBA_INTERNATIONAL_CURRENCIES, ...NOMBA_CAD_VIA_USD_CURRENCIES];
 
-/** Live Nomba collect today — NGN only (intl checkout returns empty links). */
-export function isNombaTopupLive(currency: string): boolean {
-  return NOMBA_NIGERIA_CURRENCIES.includes(currency.toUpperCase());
+/** Live Nomba collect today — retired (was Lenhub /api/efin). */
+export function isNombaTopupLive(_currency: string): boolean {
+  return false;
 }
 
 /** Show Express card for these wallets but greyed as Coming soon. */
@@ -175,8 +175,10 @@ export function routeWalletTopupGateway(
   if (preferSquare && SQUARE_TOPUP_CURRENCIES.includes(c)) return "square_pay";
   // Explicit PayPal
   if (preferPaypal && PAYPAL_TOPUP_CURRENCIES.includes(c)) return "paypal_pay";
-  // Explicit Lenhub Flutter card rail
-  if (preferLenhubFlutter && LENHUB_FLUTTER_TOPUP_CURRENCIES.includes(c)) return "lenhub_flutter";
+  // Lenhub Flutter card rail is retired.
+  if (preferLenhubFlutter) {
+    /* skip */
+  }
   // Explicit Dodo MoR checkout (western)
   if (preferDodo && DODO_TOPUP_CURRENCIES.includes(c)) return "dodo_pay";
   // Explicit Interac (CAD) when user picked that method
@@ -194,10 +196,11 @@ export function routeWalletTopupGateway(
   if (preferPaytota && PAYTOTA_TOPUP_CURRENCIES.includes(c)) return "paytota_pay";
   // Explicit Swychr
   if (preferSwychr && SWYCHR_TOPUP_CURRENCIES.includes(c)) return "swychr_pay";
-  // Ghana MoMo (default GHS rail unless another rail selected above)
-  if (GHANA_PAY_CURRENCIES.includes(c)) return "ghana_pay";
-  // NGN fallback: Nomba (Fincra/Flutterwave already returned when preferred by auto-pick)
-  if (c === "NGN") return "nomba_pay";
+  // Ghana MoMo collect is Fincra / Flutterwave (Lenhub Ghana Pay retired)
+  if (GHANA_PAY_CURRENCIES.includes(c) && isFincraTopupCurrency(c)) return "fincra";
+  if (GHANA_PAY_CURRENCIES.includes(c)) return "flutterwave";
+  // NGN fallback: Fincra (Lenhub/Nomba hosted checkout retired)
+  if (c === "NGN") return "fincra";
   if (
     isNombaTopupLive(c) &&
     !preferPaytota &&

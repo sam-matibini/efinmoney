@@ -60,8 +60,9 @@ const CreateWalletModal = ({ children }: CreateWalletModalProps) => {
       setIsOpen(false);
       setSelectedCurrency(null);
       setSearch("");
-    } catch {
-      toast.error("Failed to create wallet. Please try again.");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed to create wallet. Please try again.";
+      toast.error(msg);
     }
   };
 

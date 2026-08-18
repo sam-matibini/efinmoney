@@ -44,27 +44,10 @@ const TopUpModal = ({ children, open: openProp, onOpenChange, defaultWalletId, t
           </DialogTitle>
         </DialogHeader>
         <div className="overflow-y-auto px-6 pb-6 flex-1">
-          {isFlutterwave ? (
-            <div className="pt-2">
-              <FlutterwaveCardForm defaultWalletId={defaultWalletId} showWalletSelect />
-            </div>
-          ) : isLiveTopupCurrency(currency) ? (
-            <div className="space-y-4 pt-2">
-              <p className="text-sm text-muted-foreground">{STRIPE_DISABLED_MESSAGE}</p>
-              <Button
-                className="w-full"
-                onClick={() => {
-                  setOpen(false);
-                  navigate(`/wallet/topup?walletId=${defaultWalletId || ""}&currency=${currency}`);
-                }}
-              >
-                Go to top-up page
-              </Button>
-            </div>
-          ) : (
+          {!isLiveTopupCurrency(currency) ? (
             <div className="space-y-4 pt-2">
               <p className="text-sm text-muted-foreground">
-                Top-up for {currency} is not available in this modal. Open the top-up page for supported currencies.
+                {currency} top-up is coming soon. Live currencies: NGN, GHS, KES, ZMW, CAD, and USD.
               </p>
               <Button
                 className="w-full"
@@ -75,6 +58,23 @@ const TopUpModal = ({ children, open: openProp, onOpenChange, defaultWalletId, t
                 }}
               >
                 Open top-up page
+              </Button>
+            </div>
+          ) : isFlutterwave ? (
+            <div className="pt-2">
+              <FlutterwaveCardForm defaultWalletId={defaultWalletId} showWalletSelect />
+            </div>
+          ) : (
+            <div className="space-y-4 pt-2">
+              <p className="text-sm text-muted-foreground">{STRIPE_DISABLED_MESSAGE}</p>
+              <Button
+                className="w-full"
+                onClick={() => {
+                  setOpen(false);
+                  navigate(`/wallet/topup?walletId=${defaultWalletId || ""}&currency=${currency}`);
+                }}
+              >
+                Go to top-up page
               </Button>
             </div>
           )}
