@@ -3,7 +3,6 @@ import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { ChevronDown, LayoutDashboard, ShieldCheck, Users, Layers, ScrollText, Settings, Bell, Search, LogOut, ChevronLeft, ChevronRight, Sun, Moon, Activity, ExternalLink, SlidersHorizontal, UserCog, Gauge, AlertCircle, FileText, Eye, ShieldAlert, Shield, ClipboardList, Ban, UserX, Building2, FileWarning, GraduationCap, Landmark, Globe, ArrowLeftRight, Banknote, RefreshCw, TrendingUp, Zap, BookOpen, BarChart2, Scale, CalendarCheck, Archive, PanelLeft, Wallet, Cog, Megaphone, Headphones, Tags, Code2, UserPlus, Briefcase, ListChecks, CircleUser, Route, CreditCard } from "lucide-react";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { RoleBadge } from "./Badges";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,6 +14,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { DeferredAliceWidget } from "@/components/layout/DeferredShellWidgets";
 import AdminPageSkeleton from "@/components/admin-portal/AdminPageSkeleton";
+import AdminGlobalSearch from "@/components/admin-portal/AdminGlobalSearch";
 
 type NavItem = {
   to: string;
@@ -200,8 +200,6 @@ const AdminLayout = ({ children }: { children: ReactNode }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { theme, setTheme } = useTheme();
   const queryClient = useQueryClient();
-  const [search, setSearch] = useState("");
-  const [navSearch, setNavSearch] = useState("");
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>(() => {
     const defaults: Record<string, boolean> = {};
     for (const group of NAV_GROUPS) {
@@ -324,11 +322,6 @@ const AdminLayout = ({ children }: { children: ReactNode }) => {
     navigate("/auth?next=/admin/dashboard");
   };
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (search.trim()) navigate(`/admin/users?q=${encodeURIComponent(search.trim())}`);
-  };
-
   const markAllRead = async () => {
     if (!admin) return;
     await supabase.from("admin_notifications").update({ is_read: true }).eq("admin_id", admin.id).eq("is_read", false);
@@ -385,29 +378,22 @@ const AdminLayout = ({ children }: { children: ReactNode }) => {
     const allowedForRole = admin ? ROLE_NAV_GROUPS[admin.role] : undefined;
     if (allowedForRole && !allowedForRole.has(group.label)) return null;
 
-    const filteredItems = navSearch
-      ? group.items.filter((item) => item.label.toLowerCase().includes(navSearch.toLowerCase()))
-      : group.items;
-    if (navSearch && filteredItems.length === 0) return null;
-
-    const isExpanded = navSearch ? true : (expandedSections[group.label] ?? group.defaultOpen ?? false);
-    const GroupIcon = group.icon;
-    const kycBadge = group.label === "Queue" && pendingKycCount > 0 ? pendingKycCount : null;
-
-    const visibleItems = filteredItems.filter(
+    const visibleItems = group.items.filter(
       (item) =>
         (!item.requiresStaffMgmt || hasPermission("manage_staff")) &&
         (!item.requiresDeveloperOnboarding || hasPermission("developer_onboarding"))
     );
     if (visibleItems.length === 0) return null;
 
+    const isExpanded = expandedSections[group.label] ?? group.defaultOpen ?? false;
+    const GroupIcon = group.icon;
+    const kycBadge = group.label === "Queue" && pendingKycCount > 0 ? pendingKycCount : null;
+
     return (
       <div key={group.label} className={cn(group.emphasize && !collapsed && "rounded-xl bg-sidebar-accent/40 p-1.5 mb-1")}>
         <button
           onClick={() => {
-            if (!navSearch) {
-              setExpandedSections((prev) => ({ ...prev, [group.label]: !prev[group.label] }));
-            }
+            setExpandedSections((prev) => ({ ...prev, [group.label]: !prev[group.label] }));
           }}
           className={cn(
             "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors",
@@ -475,15 +461,12 @@ const AdminLayout = ({ children }: { children: ReactNode }) => {
               .map(renderNavItem)
           : (
             <>
-              <div className="relative mb-2">
-                <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  value={navSearch}
-                  onChange={(e) => setNavSearch(e.target.value)}
-                  placeholder="Search nav..."
-                  className="pl-8 h-8 text-xs bg-muted/50 border-transparent focus-visible:bg-background"
-                />
-              </div>
+              <AdminGlobalSearch
+                compact
+                placeholder="Search nav..."
+                className="mb-2"
+                onNavigate={() => setMobileOpen(false)}
+              />
               {TOP_NAV.filter(
                 (item) =>
                   (!item.requiresStaffMgmt || hasPermission("manage_staff")) &&
@@ -542,17 +525,7 @@ const AdminLayout = ({ children }: { children: ReactNode }) => {
             <PanelLeft className="w-5 h-5" />
           </Button>
 
-          <form onSubmit={handleSearch} className="flex-1 max-w-md">
-            <div className="relative">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search users by name, email, account #"
-                className="pl-9 h-9 bg-muted/50 border-transparent focus-visible:bg-background"
-              />
-            </div>
-          </form>
+          <AdminGlobalSearch className="flex-1 max-w-md" />
 
           <div className="ml-auto flex items-center gap-2">
             <Button

@@ -1,3 +1,4 @@
+import { useSearchParams } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import SectionBoundary from "@/components/common/SectionBoundary";
 import PartnersPanel from "./partners/PartnersPanel";
@@ -32,8 +33,29 @@ import PartnerFeaturesPanel from "./partners/PartnerFeaturesPanel";
 
 
 
-export const PartnerNetworkPanel = () => (
-  <Tabs defaultValue="rails" className="space-y-4">
+const PARTNER_PANELS = new Set([
+  "rails", "partners", "relationships", "corridors", "features", "activation",
+  "pricing", "fx", "customer", "liquidity", "strategy", "live", "simulator",
+  "readiness", "attempts", "profitability", "cost", "settlements", "guardrails",
+  "recommendations", "fee-adjustments", "scorecards", "forecast", "runway",
+  "incidents", "limits", "api", "alerts",
+]);
+
+export const PartnerNetworkPanel = () => {
+  const [params, setParams] = useSearchParams();
+  const raw = params.get("panel") || "rails";
+  const panel = PARTNER_PANELS.has(raw) ? raw : "rails";
+
+  const setPanel = (value: string) => {
+    const next = new URLSearchParams(params);
+    next.set("tab", "partners");
+    if (value === "rails") next.delete("panel");
+    else next.set("panel", value);
+    setParams(next, { replace: true });
+  };
+
+  return (
+  <Tabs value={panel} onValueChange={setPanel} className="space-y-4">
     <div className="overflow-x-auto pb-2">
       <TabsList className="inline-flex w-auto">
         <TabsTrigger value="rails">Corridor rails</TabsTrigger>
@@ -165,6 +187,7 @@ export const PartnerNetworkPanel = () => (
       <SectionBoundary name="PartnerAlertsPanel"><PartnerAlertsPanel /></SectionBoundary>
     </TabsContent>
   </Tabs>
-);
+  );
+};
 
 export default PartnerNetworkPanel;

@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useCorridorReadiness } from "@/hooks/useCostAssurance";
 import { useActivePaymentPartners } from "@/hooks/usePartnerNetwork";
+import { useLiveCorridors } from "@/hooks/useRoutingEngine";
 import { supabase } from "@/integrations/supabase/client";
 import { countryLabel } from "./CountryCombobox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -43,16 +44,38 @@ function testKeyFor(code: string): string | null {
  * Inactive partners (Circle, Stripe, …) are hidden.
  */
 export const PartnerFeaturesPanel = () => {
-  const { data: readiness, isLoading } = useCorridorReadiness();
+  const { data: corridors = [], isLoading } = useLiveCorridors();
+  const { data: readiness } = useCorridorReadiness();
   const { data: activePartners } = useActivePaymentPartners();
   const activeIds = useMemo(() => new Set((activePartners ?? []).map((p) => p.id)), [activePartners]);
+  const readyByCorridor = useMemo(() => {
+    const map = new Map<string, boolean>();
+    for (const r of readiness ?? []) map.set(r.corridor_id, !!r.ready);
+    return map;
+  }, [readiness]);
   const [search, setSearch] = useState("");
   const [testing, setTesting] = useState<string | null>(null);
 
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return (readiness ?? [])
-      .filter((r) => activeIds.has(r.partner_id))
+    return (corridors as any[])
+      .filter((c) => activeIds.has(c.partner_id))
+      .map((c) => {
+        const code = String(c.payment_partners?.code || "");
+        const name = String(c.payment_partners?.name || code || "—");
+        return {
+          corridor_id: c.id as string,
+          partner_id: c.partner_id as string,
+          partner_code: code,
+          partner_name: name,
+          dest_country: (c.dest_country as string | null) ?? null,
+          dest_currency: String(c.dest_currency || ""),
+          source_currency: String(c.source_currency || ""),
+          payment_method: (c.payment_method as string | null) ?? null,
+          live_routing_enabled: !!c.live_routing_enabled,
+          ready: readyByCorridor.get(c.id) ?? null,
+        };
+      })
       .filter((r) =>
         !q
           ? true
@@ -66,7 +89,7 @@ export const PartnerFeaturesPanel = () => {
         || a.partner_name.localeCompare(b.partner_name)
         || a.source_currency.localeCompare(b.source_currency),
       );
-  }, [readiness, activeIds, search]);
+  }, [corridors, activeIds, readyByCorridor, search]);
 
   const runTest = async (code: string, name: string) => {
     const key = testKeyFor(code);
@@ -141,8 +164,8 @@ export const PartnerFeaturesPanel = () => {
                   const key = testKeyFor(r.partner_code);
                   const busy = testing === key;
                   return (
-                    <TableRow key={r.corridor_id}>
-                      <TableCell>{r.dest_country ? countryLabel(r.dest_country) : "—"}</TableCell>
+                    <TableRow key={r.corridor_id || `${r.partner_id}-${r.source_currency}-${r.dest_currency}-${r.payment_method}`}>
+                      <TableCell>{r.dest_country ? countryLabel(String(r.dest_country)) : "—"}</TableCell>
                       <TableCell className="font-medium">{r.partner_name}</TableCell>
                       <TableCell className="tabular-nums">
                         {r.source_currency}→{r.dest_currency}
@@ -157,11 +180,8 @@ export const PartnerFeaturesPanel = () => {
                           ) : (
                             <Badge variant="outline">Off</Badge>
                           )}
-                          {r.ready ? (
-                            <Badge variant="secondary">Ready</Badge>
-                          ) : (
-                            <Badge variant="outline">Not ready</Badge>
-                          )}
+                          {r.ready === true && <Badge variant="secondary">Ready</Badge>}
+                          {r.ready === false && <Badge variant="outline">Not ready</Badge>}
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
