@@ -181,6 +181,18 @@ export async function bamboraCreateProfileFromToken(input: {
   });
 }
 
+export async function bamboraCreateProfileFromTransaction(customerCode: string, transactionId: string | number) {
+  return bamboraFetch("/v1/profiles", {
+    method: "POST",
+    body: JSON.stringify({
+      customer_code: customerCode,
+      language: "eng",
+      create_from_id: Number(transactionId),
+    }),
+    kind: "profiles",
+  });
+}
+
 export async function bamboraAddCardToProfile(customerCode: string, token: string, name: string) {
   return bamboraFetch(`/v1/profiles/${encodeURIComponent(customerCode)}/cards`, {
     method: "POST",

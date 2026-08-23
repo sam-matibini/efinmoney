@@ -83,7 +83,7 @@ export default function BamboraTopUpCard({
 
   const [amount, setAmount] = useState(initialAmount);
   const [name, setName] = useState("");
-  const [saveCard, setSaveCard] = useState(true);
+  const [saveCard, setSaveCard] = useState(false);
   const [selectedSavedId, setSelectedSavedId] = useState<string>("");
   const [busy, setBusy] = useState(false);
   const [ready, setReady] = useState(false);
@@ -235,11 +235,14 @@ export default function BamboraTopUpCard({
           saveCard,
         },
       });
+      const payload = data as { error?: string; bambora?: { message?: string; code?: unknown } } | null;
+      const bamboraMsg = payload?.bambora?.message;
       const errMsg =
-        (data as { error?: string } | null)?.error
+        payload?.error
+        || bamboraMsg
         || (typeof data === "string" ? data : null)
         || error?.message;
-      if (error || (data as { error?: string } | null)?.error) {
+      if (error || payload?.error) {
         throw new Error(errMsg || "Payment failed");
       }
 

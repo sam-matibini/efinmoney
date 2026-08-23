@@ -1,12 +1,13 @@
 /**
  * Charge a Bambora single-use card token and credit CAD/USD wallet.
  * Body: { token, name?, amount, currency, walletId, orderNumber?, saveCard? }
+ *
+ * Flow: charge token first, then optionally save profile from transaction id.
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import {
-  bamboraAddCardToProfile,
   bamboraChargeToken,
-  bamboraCreateProfileFromToken,
+  bamboraCreateProfileFromTransaction,
   bamboraGetProfile,
   getBamboraConfig,
   isBamboraPaymentApproved,
@@ -14,7 +15,7 @@ import {
 } from "../_shared/bambora.ts";
 import { creditWalletViaBambora } from "../_shared/bambora-credit.ts";
 import { bamboraCustomerCode, supportedBamboraCurrency } from "../_shared/bambora-auth.ts";
-import { upsertBamboraCardRow, syncBamboraProfileToDb } from "../_shared/bambora-profiles-db.ts";
+import { syncBamboraProfileToDb } from "../_shared/bambora-profiles-db.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -80,103 +81,51 @@ Deno.serve(async (req) => {
       return jr(400, { error: `Wallet currency is ${wallet.currency_code}, not ${currency}` });
     }
 
-    // Prefer: save profile from token first (consumes token), then charge profile.
-    // Fallback: charge token directly when save not requested.
-    let txnId = "";
-    let creditAmount = amount;
-    let message = "";
-    let authCode: unknown = null;
-    let saved = false;
+    const charged = await bamboraChargeToken({
+      token,
+      name: cardName,
+      amount,
+      currency,
+      orderNumber,
+    });
 
+    const approved = isBamboraPaymentApproved(charged.json);
+    const txnId = bamboraTxnId(charged.json);
+    const message = String(charged.json.message || charged.json.code || `HTTP ${charged.status}`);
+    const authCode = charged.json.auth_code ?? null;
+    const creditAmount = Number(charged.json.amount ?? amount);
+
+    if (!charged.ok || !approved || !txnId) {
+      console.error("bambora-create-payment declined", charged.status, charged.json);
+      return jr(400, {
+        error: message || "Card payment was not approved",
+        bambora: {
+          http_status: charged.status,
+          code: charged.json.code ?? null,
+          category: charged.json.category ?? null,
+          message,
+          details: charged.json.details ?? null,
+        },
+      });
+    }
+
+    let saved = false;
     if (saveCard && cfg.profilesPasscode) {
       const customerCode = bamboraCustomerCode(user.id);
-      let profileRes = await bamboraGetProfile(customerCode);
-      let cardPayload: Record<string, unknown> = {};
-
-      if (profileRes.status === 404) {
-        profileRes = await bamboraCreateProfileFromToken({
-          customerCode, token, name: cardName, validate: true,
-        });
+      const existing = await bamboraGetProfile(customerCode);
+      if (existing.status === 404) {
+        const profileRes = await bamboraCreateProfileFromTransaction(customerCode, txnId);
+        saved = profileRes.ok;
         if (!profileRes.ok) {
-          return jr(400, {
-            error: String(profileRes.json.message || "Could not save card"),
-            bambora: profileRes.json,
-          });
+          console.warn("bambora save profile after charge failed", profileRes.json);
         }
-        cardPayload = (profileRes.json.card as Record<string, unknown>) || profileRes.json;
       } else {
-        const addRes = await bamboraAddCardToProfile(customerCode, token, cardName);
-        if (!addRes.ok) {
-          return jr(400, {
-            error: String(addRes.json.message || "Could not save card"),
-            bambora: addRes.json,
-          });
-        }
-        cardPayload = (addRes.json.card as Record<string, unknown>) || addRes.json;
+        saved = true;
       }
-
-      await upsertBamboraCardRow(admin, user.id, customerCode, cardPayload, currency, true);
-      await syncBamboraProfileToDb(admin, user.id, customerCode, currency);
-      saved = true;
-
-      const cardId = Number(cardPayload.card_id || cardPayload.cardId || 0);
-      const { data: savedRow } = await admin.from("bambora_payment_methods")
-        .select("bambora_card_id")
-        .eq("user_id", user.id)
-        .eq("customer_code", customerCode)
-        .eq("method_type", "card")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      const resolvedCardId = Number(savedRow?.bambora_card_id || cardId);
-      if (!resolvedCardId) {
-        return jr(400, { error: "Card saved but charge failed — missing card_id", saved: true });
-      }
-
-      const { bamboraChargeProfile } = await import("../_shared/bambora.ts");
-      const charged = await bamboraChargeProfile({
-        customerCode,
-        cardId: resolvedCardId,
-        amount,
-        currency,
-        orderNumber,
-      });
-      const approved = isBamboraPaymentApproved(charged.json);
-      txnId = bamboraTxnId(charged.json);
-      message = String(charged.json.message || charged.json.code || `HTTP ${charged.status}`);
-      authCode = charged.json.auth_code ?? null;
-      creditAmount = Number(charged.json.amount ?? amount);
-      if (!charged.ok || !approved || !txnId) {
-        return jr(400, {
-          error: message || "Card payment was not approved",
-          saved: true,
-          bambora: { http_status: charged.status, message },
-        });
-      }
-    } else {
-      const charged = await bamboraChargeToken({
-        token,
-        name: cardName,
-        amount,
-        currency,
-        orderNumber,
-      });
-      const approved = isBamboraPaymentApproved(charged.json);
-      txnId = bamboraTxnId(charged.json);
-      message = String(charged.json.message || charged.json.code || `HTTP ${charged.status}`);
-      authCode = charged.json.auth_code ?? null;
-      creditAmount = Number(charged.json.amount ?? amount);
-      if (!charged.ok || !approved || !txnId) {
-        console.error("bambora-create-payment declined", charged.status, charged.json);
-        return jr(400, {
-          error: message || "Card payment was not approved",
-          bambora: {
-            http_status: charged.status,
-            code: charged.json.code ?? null,
-            category: charged.json.category ?? null,
-            message,
-          },
-        });
+      try {
+        await syncBamboraProfileToDb(admin, user.id, customerCode, currency);
+      } catch (syncErr) {
+        console.warn("bambora profile sync failed", syncErr);
       }
     }
 
