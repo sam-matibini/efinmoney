@@ -31,10 +31,11 @@ declare global {
 type BamboraCheckout = {
   create: (field: string, opts?: Record<string, unknown>) => BamboraField;
   createToken: (cb: (result: {
-    error?: { message?: string };
+    error?: { message?: string; type?: string };
     token?: string;
     last4?: string;
   }) => void) => void;
+  on: (event: string, cb: (data: { field?: string; message?: string; empty?: boolean; error?: { message?: string } }) => void) => void;
 };
 
 type BamboraField = {
@@ -100,11 +101,20 @@ export default function BamboraTopUpCard({
     if (savedCards.length && !selectedSavedId) {
       const def = savedCards.find((c) => c.is_default) || savedCards[0];
       setSelectedSavedId(def.id);
+    } else if (!savedCards.length) {
+      setSelectedSavedId("__new__");
     }
   }, [savedCards, selectedSavedId]);
 
+  const usingNew = selectedSavedId === "__new__" || !savedCards.length;
+
   useEffect(() => {
-    if (!SUPPORTED.has(ccy)) return;
+    if (!SUPPORTED.has(ccy) || !usingNew) {
+      checkoutRef.current = null;
+      mountedRef.current = false;
+      setReady(false);
+      return;
+    }
     let cancelled = false;
     (async () => {
       try {
@@ -119,8 +129,15 @@ export default function BamboraTopUpCard({
         await loadScript();
         if (cancelled || !window.customcheckout) throw new Error("Bambora script missing");
 
+        // Small delay so mount targets exist in DOM after radio selection.
+        await new Promise((r) => setTimeout(r, 50));
+        if (cancelled) return;
+
         const cc = window.customcheckout();
         checkoutRef.current = cc;
+        cc.on("error", (event: { field?: string; message?: string }) => {
+          if (event?.message) setFieldError(event.message);
+        });
         if (!mountedRef.current) {
           const style = {
             base: {
@@ -130,12 +147,14 @@ export default function BamboraTopUpCard({
             },
             error: { color: "#b91c1c" },
           };
-          cc.create("card-number", { style, placeholder: "Card number" }).mount(`#bambora-card-number-${mountSuffix}`);
+          cc.create("card-number", { style, placeholder: "Card number", brands: ["visa", "mastercard"] })
+            .mount(`#bambora-card-number-${mountSuffix}`);
           cc.create("expiry", { style, placeholder: "MM / YY" }).mount(`#bambora-expiry-${mountSuffix}`);
           cc.create("cvv", { style, placeholder: "CVV" }).mount(`#bambora-cvv-${mountSuffix}`);
           mountedRef.current = true;
         }
         setReady(true);
+        setFieldError("");
       } catch (e) {
         if (!cancelled) {
           setFieldError(e instanceof Error ? e.message : "Bambora unavailable");
@@ -145,7 +164,7 @@ export default function BamboraTopUpCard({
     return () => {
       cancelled = true;
     };
-  }, [ccy, mountSuffix]);
+  }, [ccy, mountSuffix, usingNew]);
 
   if (!SUPPORTED.has(ccy)) {
     return <p className="text-sm text-destructive">Bambora card top-up supports CAD and USD.</p>;
@@ -194,7 +213,12 @@ export default function BamboraTopUpCard({
       const token = await new Promise<string>((resolve, reject) => {
         checkoutRef.current!.createToken((result) => {
           if (result.error || !result.token) {
-            reject(new Error(result.error?.message || "Could not tokenize card"));
+            const msg = result.error?.message || "Could not tokenize card";
+            if (/timeout|no response|TokenizationNoResponse/i.test(msg + (result.error?.type || ""))) {
+              reject(new Error("Bambora could not reach Worldline — try again, disable ad blockers, or use CAD if USD is not enabled on the merchant."));
+              return;
+            }
+            reject(new Error(msg));
             return;
           }
           resolve(result.token);
@@ -237,14 +261,12 @@ export default function BamboraTopUpCard({
       toast.error(`Enter at least ${prefix}1.00`);
       return;
     }
-    if (selectedSavedId === "__new__" || !savedCards.length) {
+    if (usingNew) {
       await payNew(amt);
     } else {
       await paySaved(amt);
     }
   };
-
-  const usingNew = selectedSavedId === "__new__" || !savedCards.length;
 
   const body = (
     <div className="space-y-4">

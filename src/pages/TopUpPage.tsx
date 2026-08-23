@@ -893,7 +893,7 @@ const TopUpPage = () => {
       });
     }
 
-    if (showRail("square") && (productFeatures.square || productFeatures.paypal) && ccyUpper !== "CAD") {
+    if (showRail("square") && (productFeatures.square || productFeatures.paypal) && ccyUpper !== "CAD" && !(ccyUpper === "USD" && productFeatures.bambora)) {
       payMethods.push({
         id: "square",
         tone: "card",

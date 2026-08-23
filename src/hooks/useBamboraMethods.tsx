@@ -29,13 +29,20 @@ export function useBamboraMethods() {
     queryKey: ["bambora-methods", user?.id],
     enabled: !!user,
     queryFn: async (): Promise<BamboraMethod[]> => {
+      if (!user) return [];
       const { data, error } = await supabase
         .from("bambora_payment_methods" as never)
         .select("*")
-        .eq("user_id", user!.id)
+        .eq("user_id", user.id)
         .order("is_default", { ascending: false })
         .order("created_at", { ascending: false });
-      if (error) throw error;
+      if (error) {
+        if (error.code === "42501" || error.code === "PGRST301") {
+          console.warn("bambora_payment_methods unavailable:", error.message);
+          return [];
+        }
+        throw error;
+      }
       return (data || []) as BamboraMethod[];
     },
   });
