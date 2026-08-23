@@ -1,5 +1,5 @@
 /**
- * Public Bambora config for Custom Checkout (merchant id only).
+ * Public Bambora config for Custom Checkout (merchant id + capability flags).
  */
 import { getBamboraConfig } from "../_shared/bambora.ts";
 
@@ -20,6 +20,9 @@ Deno.serve(async (req) => {
       ready,
       merchant_id: cfg.merchantId || null,
       currency: cfg.currency || "CAD",
+      currencies: ["CAD", "USD"],
+      profiles: Boolean(cfg.profilesPasscode),
+      eft_batch: Boolean(cfg.batchPasscode),
       custom_checkout_js: "https://libs.na.bambora.com/customcheckout/1/customcheckout.js",
     }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } },

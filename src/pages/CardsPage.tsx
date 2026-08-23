@@ -15,6 +15,7 @@ import CardPaymentModal from "@/components/modals/CardPaymentModal";
 import CardStack from "@/components/cards/CardStack";
 import CardFeatureSpotlights from "@/components/cards/CardFeatureSpotlights";
 import SwychrCardsPanel from "@/components/cards/SwychrCardsPanel";
+import BamboraSavedMethods from "@/components/cards/BamboraSavedMethods";
 import { useCards, useCardMutations, type Card as CardRow, type RevealedCardSecrets } from "@/hooks/useCards";
 import { usePinGate } from "@/components/send/usePinGate";
 import { useSavedCards, useDeleteSavedCard } from "@/hooks/useSavedCards";
@@ -414,6 +415,17 @@ const CardsPage = () => {
             >
               <SwychrCardsPanel />
             </motion.div></SectionBoundary>
+          )}
+
+          {productFeatures.bambora && (
+            <SectionBoundary name="BamboraSavedMethods">
+              <motion.div
+                variants={{ hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 180, damping: 22 } } }}
+                className="rounded-xl border bg-card/80 p-4"
+              >
+                <BamboraSavedMethods />
+              </motion.div>
+            </SectionBoundary>
           )}
         </motion.div>
       </AppPage>

@@ -43,8 +43,10 @@ export const productFeatures = {
   flovideInterac: envFlag("VITE_FEATURE_FLOVIDE_INTERAC", true),
   /** Wise bank-deposit top-up (shared receive account + unique payment reference). */
   wise: envFlag("VITE_FEATURE_WISE", true),
-  /** Square Checkout — card top-up for USD/CAD/EUR/GBP. */
+  /** Square Checkout — card top-up for USD/EUR/GBP (CAD uses Bambora). */
   square: envFlag("VITE_FEATURE_SQUARE", true),
+  /** Bambora / Worldline NAM — CAD+USD card, saved cards, Canadian EFT debit. */
+  bambora: envFlag("VITE_FEATURE_BAMBORA", true),
   /** PayPal Orders API — wallet top-up for USD/CAD/EUR/GBP. */
   paypal: envFlag("VITE_FEATURE_PAYPAL", true),
   /** Lenhub Flutter wrapper — card collect (USD/CAD/…) + FX bank/MoMo payouts. */

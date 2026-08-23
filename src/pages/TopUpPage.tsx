@@ -47,6 +47,7 @@ import PaytotaTopUpCard from "@/components/payments/PaytotaTopUpCard";
 import DodoTopUpCard from "@/components/payments/DodoTopUpCard";
 import SquareTopUpCard, { verifySquareCheckout } from "@/components/payments/SquareTopUpCard";
 import BamboraTopUpCard from "@/components/payments/BamboraTopUpCard";
+import BamboraEftTopUpCard from "@/components/payments/BamboraEftTopUpCard";
 import PayPalTopUpCard from "@/components/payments/PayPalTopUpCard";
 import SwychrTopUpCard from "@/components/payments/SwychrTopUpCard";
 import { validateMinAmount, minAmount, type FlwMethod } from "@/lib/flutterwave";
@@ -867,13 +868,17 @@ const TopUpPage = () => {
       westernCardRail === "paypal"
       || (!productFeatures.square && productFeatures.paypal && rails.has("paypal"));
 
-    // CAD card collect: Bambora / Worldline (Canadian merchant) — primary.
-    if (ccyUpper === "CAD" && (showRail("square") || showRail("card") || showRail("bambora"))) {
+    // CAD/USD card collect: Bambora / Worldline (Canadian merchant) — primary for CAD; also USD.
+    if (
+      (ccyUpper === "CAD" || ccyUpper === "USD") &&
+      (showRail("square") || showRail("card") || showRail("bambora")) &&
+      productFeatures.bambora
+    ) {
       payMethods.push({
         id: "bambora",
         tone: "card",
         label: "Card",
-        description: "Visa / Mastercard — Canada",
+        description: ccyUpper === "CAD" ? "Visa / Mastercard — Canada" : "Visa / Mastercard — Worldline",
         content: (
           <SectionBoundary name="BamboraTopUp">
             <BamboraTopUpCard
@@ -1055,9 +1060,32 @@ const TopUpPage = () => {
           </SectionBoundary>
         ),
       });
-    } else if (
+    }
+
+    if (isCadWallet && productFeatures.bambora) {
+      payMethods.push({
+        id: "bambora_eft",
+        tone: "bank",
+        label: "Bank debit (EFT)",
+        description: "Canadian bank account · 3–5 business days",
+        content: (
+          <SectionBoundary name="BamboraEftTopUp">
+            <BamboraEftTopUpCard
+              walletId={walletId}
+              walletCurrency={currency}
+              initialAmount={amount}
+              embedded
+              onComplete={invalidateWallets}
+            />
+          </SectionBoundary>
+        ),
+      });
+    }
+
+    if (
       showRail("interac") &&
       isCadWallet &&
+      !productFeatures.plaid &&
       (rails.has("interac") ||
         productFeatures.fincraInterac ||
         productFeatures.flovideInterac ||

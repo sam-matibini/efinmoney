@@ -1,14 +1,18 @@
 /**
- * CAD wallet top-up via Bambora Custom Checkout (tokenize in browser → charge on edge).
+ * Wallet top-up via Bambora Custom Checkout (CAD / USD).
+ * Supports one-shot charge, save card, and charge saved profile cards.
  */
 import { useEffect, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2, CreditCard } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { useBamboraMethods, useChargeBamboraSaved } from "@/hooks/useBamboraMethods";
+import { useQueryClient } from "@tanstack/react-query";
 
 type Props = {
   walletId: string;
@@ -26,7 +30,11 @@ declare global {
 
 type BamboraCheckout = {
   create: (field: string, opts?: Record<string, unknown>) => BamboraField;
-  createToken: (cb: (result: { error?: { message?: string }; token?: string }) => void) => void;
+  createToken: (cb: (result: {
+    error?: { message?: string };
+    token?: string;
+    last4?: string;
+  }) => void) => void;
 };
 
 type BamboraField = {
@@ -35,6 +43,7 @@ type BamboraField = {
 };
 
 const SCRIPT_URL = "https://libs.na.bambora.com/customcheckout/1/customcheckout.js";
+const SUPPORTED = new Set(["CAD", "USD"]);
 
 function loadScript(): Promise<void> {
   if (window.customcheckout) return Promise.resolve();
@@ -54,6 +63,10 @@ function loadScript(): Promise<void> {
   });
 }
 
+function moneyPrefix(ccy: string) {
+  return ccy === "USD" ? "$" : "C$";
+}
+
 export default function BamboraTopUpCard({
   walletId,
   walletCurrency,
@@ -62,20 +75,36 @@ export default function BamboraTopUpCard({
   onComplete,
 }: Props) {
   const ccy = walletCurrency.toUpperCase();
+  const qc = useQueryClient();
+  const { data: methods = [] } = useBamboraMethods();
+  const chargeSaved = useChargeBamboraSaved();
+  const savedCards = methods.filter((m) => m.method_type === "card" && m.currency_code === ccy);
+
   const [amount, setAmount] = useState(initialAmount);
   const [name, setName] = useState("");
+  const [saveCard, setSaveCard] = useState(true);
+  const [selectedSavedId, setSelectedSavedId] = useState<string>("");
   const [busy, setBusy] = useState(false);
   const [ready, setReady] = useState(false);
   const [merchantId, setMerchantId] = useState("");
   const [fieldError, setFieldError] = useState("");
   const checkoutRef = useRef<BamboraCheckout | null>(null);
   const mountedRef = useRef(false);
+  const mountSuffix = useRef(`b${Math.random().toString(36).slice(2, 8)}`).current;
 
   useEffect(() => {
     if (initialAmount != null && initialAmount !== "") setAmount(initialAmount);
   }, [initialAmount]);
 
   useEffect(() => {
+    if (savedCards.length && !selectedSavedId) {
+      const def = savedCards.find((c) => c.is_default) || savedCards[0];
+      setSelectedSavedId(def.id);
+    }
+  }, [savedCards, selectedSavedId]);
+
+  useEffect(() => {
+    if (!SUPPORTED.has(ccy)) return;
     let cancelled = false;
     (async () => {
       try {
@@ -101,9 +130,9 @@ export default function BamboraTopUpCard({
             },
             error: { color: "#b91c1c" },
           };
-          cc.create("card-number", { style, placeholder: "Card number" }).mount("#bambora-card-number");
-          cc.create("expiry", { style, placeholder: "MM / YY" }).mount("#bambora-expiry");
-          cc.create("cvv", { style, placeholder: "CVV" }).mount("#bambora-cvv");
+          cc.create("card-number", { style, placeholder: "Card number" }).mount(`#bambora-card-number-${mountSuffix}`);
+          cc.create("expiry", { style, placeholder: "MM / YY" }).mount(`#bambora-expiry-${mountSuffix}`);
+          cc.create("cvv", { style, placeholder: "CVV" }).mount(`#bambora-cvv-${mountSuffix}`);
           mountedRef.current = true;
         }
         setReady(true);
@@ -116,18 +145,40 @@ export default function BamboraTopUpCard({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [ccy, mountSuffix]);
 
-  if (ccy !== "CAD") {
-    return <p className="text-sm text-destructive">Bambora card top-up is CAD only for now.</p>;
+  if (!SUPPORTED.has(ccy)) {
+    return <p className="text-sm text-destructive">Bambora card top-up supports CAD and USD.</p>;
   }
 
-  const pay = async () => {
-    const amt = Number(String(amount).replace(/,/g, ""));
-    if (!Number.isFinite(amt) || amt < 1) {
-      toast.error("Enter at least C$1.00");
+  const prefix = moneyPrefix(ccy);
+
+  const paySaved = async (amt: number) => {
+    if (!selectedSavedId) {
+      toast.error("Select a saved card");
       return;
     }
+    setBusy(true);
+    setFieldError("");
+    try {
+      const data = await chargeSaved.mutateAsync({
+        methodId: selectedSavedId,
+        amount: amt,
+        currency: ccy,
+        walletId,
+      });
+      toast.success(`${prefix}${Number(data.amount ?? amt).toFixed(2)} added to your wallet`);
+      onComplete?.();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Payment failed";
+      setFieldError(msg);
+      toast.error(msg);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const payNew = async (amt: number) => {
     if (!name.trim()) {
       toast.error("Enter the name on the card");
       return;
@@ -155,8 +206,9 @@ export default function BamboraTopUpCard({
           token,
           name: name.trim(),
           amount: amt,
-          currency: "CAD",
+          currency: ccy,
           walletId,
+          saveCard,
         },
       });
       const errMsg =
@@ -167,7 +219,8 @@ export default function BamboraTopUpCard({
         throw new Error(errMsg || "Payment failed");
       }
 
-      toast.success(`C$${Number((data as { amount?: number }).amount ?? amt).toFixed(2)} added to your wallet`);
+      if (saveCard) qc.invalidateQueries({ queryKey: ["bambora-methods"] });
+      toast.success(`${prefix}${Number((data as { amount?: number }).amount ?? amt).toFixed(2)} added to your wallet`);
       onComplete?.();
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Payment failed";
@@ -178,11 +231,26 @@ export default function BamboraTopUpCard({
     }
   };
 
+  const pay = async () => {
+    const amt = Number(String(amount).replace(/,/g, ""));
+    if (!Number.isFinite(amt) || amt < 1) {
+      toast.error(`Enter at least ${prefix}1.00`);
+      return;
+    }
+    if (selectedSavedId === "__new__" || !savedCards.length) {
+      await payNew(amt);
+    } else {
+      await paySaved(amt);
+    }
+  };
+
+  const usingNew = selectedSavedId === "__new__" || !savedCards.length;
+
   const body = (
     <div className="space-y-4">
       {!embedded && (
         <div className="space-y-2">
-          <Label>Amount (CAD)</Label>
+          <Label>Amount ({ccy})</Label>
           <Input
             inputMode="decimal"
             value={amount}
@@ -191,28 +259,75 @@ export default function BamboraTopUpCard({
           />
         </div>
       )}
-      <div className="space-y-2">
-        <Label>Name on card</Label>
-        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="As printed on card" autoComplete="cc-name" />
-      </div>
-      <div className="space-y-2">
-        <Label>Card number</Label>
-        <div id="bambora-card-number" className="h-10 rounded-md border bg-background px-3 py-2" />
-      </div>
-      <div className="grid grid-cols-2 gap-3">
+
+      {savedCards.length > 0 && (
         <div className="space-y-2">
-          <Label>Expiry</Label>
-          <div id="bambora-expiry" className="h-10 rounded-md border bg-background px-3 py-2" />
+          <Label>Pay with</Label>
+          <div className="space-y-2">
+            {savedCards.map((c) => (
+              <label
+                key={c.id}
+                className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm cursor-pointer"
+              >
+                <input
+                  type="radio"
+                  name={`bambora-saved-${mountSuffix}`}
+                  checked={selectedSavedId === c.id}
+                  onChange={() => setSelectedSavedId(c.id)}
+                />
+                <span className="capitalize">{c.card_brand || "Card"}</span>
+                <span>•••• {c.last_four}</span>
+                {c.exp_month && c.exp_year ? (
+                  <span className="text-muted-foreground">
+                    {String(c.exp_month).padStart(2, "0")}/{String(c.exp_year).slice(-2)}
+                  </span>
+                ) : null}
+              </label>
+            ))}
+            <label className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm cursor-pointer">
+              <input
+                type="radio"
+                name={`bambora-saved-${mountSuffix}`}
+                checked={selectedSavedId === "__new__"}
+                onChange={() => setSelectedSavedId("__new__")}
+              />
+              New card
+            </label>
+          </div>
         </div>
-        <div className="space-y-2">
-          <Label>CVV</Label>
-          <div id="bambora-cvv" className="h-10 rounded-md border bg-background px-3 py-2" />
-        </div>
-      </div>
+      )}
+
+      {usingNew && (
+        <>
+          <div className="space-y-2">
+            <Label>Name on card</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="As printed on card" autoComplete="cc-name" />
+          </div>
+          <div className="space-y-2">
+            <Label>Card number</Label>
+            <div id={`bambora-card-number-${mountSuffix}`} className="h-10 rounded-md border bg-background px-3 py-2" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label>Expiry</Label>
+              <div id={`bambora-expiry-${mountSuffix}`} className="h-10 rounded-md border bg-background px-3 py-2" />
+            </div>
+            <div className="space-y-2">
+              <Label>CVV</Label>
+              <div id={`bambora-cvv-${mountSuffix}`} className="h-10 rounded-md border bg-background px-3 py-2" />
+            </div>
+          </div>
+          <label className="flex items-center gap-2 text-sm">
+            <Checkbox checked={saveCard} onCheckedChange={(v) => setSaveCard(v === true)} />
+            Save card for next time
+          </label>
+        </>
+      )}
+
       {fieldError && <p className="text-sm text-destructive">{fieldError}</p>}
-      <Button className="w-full" disabled={busy || !ready} onClick={() => void pay()}>
+      <Button className="w-full" disabled={busy || (usingNew && !ready)} onClick={() => void pay()}>
         {busy ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CreditCard className="h-4 w-4 mr-2" />}
-        {busy ? "Processing…" : `Pay C$${Number(amount || 0).toFixed(2) || "—"}`}
+        {busy ? "Processing…" : `Pay ${prefix}${Number(amount || 0).toFixed(2) || "—"}`}
       </Button>
       {merchantId && (
         <p className="text-[11px] text-muted-foreground text-center">
@@ -227,7 +342,7 @@ export default function BamboraTopUpCard({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Card top-up (CAD)</CardTitle>
+        <CardTitle className="text-base">Card top-up ({ccy})</CardTitle>
       </CardHeader>
       <CardContent>{body}</CardContent>
     </Card>

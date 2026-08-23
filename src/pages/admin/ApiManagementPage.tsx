@@ -59,7 +59,7 @@ const INTEGRATIONS: Array<{
   { key: "paypal", name: "PayPal", description: "Orders API wallet top-up for USD/CAD/EUR/GBP", category: "Payments — Global & Cards", envHints: ["PAYPAL_CLIENT_ID", "PAYPAL_CLIENT_SECRET"] },
   { key: "square", name: "Square", description: "Card checkout for USD/CAD/EUR/GBP wallet top-up", category: "Payments — Global & Cards", envHints: ["SQUARE_ACCESS_TOKEN", "SQUARE_APPLICATION_ID", "SQUARE_LOCATION_ID"] },
   { key: "paysafe", name: "Paysafe", description: "Canadian Interac & EFT payouts", category: "Payments — Global & Cards", envHints: ["PAYSAFE_API_KEY"] },
-  { key: "bambora", name: "Bambora (Worldline)", description: "Canada CAD card collect / payment profiles", category: "Payments — Global & Cards", envHints: ["BAMBORA_MERCHANT_ID", "BAMBORA_API_PASSCODE", "BAMBORA_PAYMENTS_PASSCODE"] },
+  { key: "bambora", name: "Bambora (Worldline)", description: "CAD/USD card collect, saved profiles, Canadian EFT debit", category: "Payments — Global & Cards", envHints: ["BAMBORA_MERCHANT_ID", "BAMBORA_API_PASSCODE", "BAMBORA_PAYMENTS_PASSCODE", "BAMBORA_BATCH_PASSCODE"] },
   // Banking
   { key: "plaid", name: "Plaid", description: "Bank account linking & balances (Canada domestic)", category: "Banking", envHints: ["PLAID_CLIENT_ID", "PLAID_SECRET"] },
   { key: "interac", name: "Interac", description: "Canada domestic e-Transfer / EFT rail", category: "Banking", envHints: ["INTERAC_CLIENT_ID", "INTERAC_PRIVATE_JWK"] },
@@ -104,7 +104,15 @@ const EDGE_FUNCTIONS: Array<{ name: string; description: string; jwt: boolean; c
   { name: "paysafe-verify-transfer",   description: "Verify Paysafe transfer status",            jwt: false, category: "Paysafe" },
   { name: "paysafe-webhook",           description: "Receives Paysafe events",                   jwt: false, category: "Paysafe" },
   // Bambora / Worldline NAM
-  { name: "bambora-probe",             description: "Test Bambora CAD API credentials",          jwt: true,  category: "Bambora" },
+  { name: "bambora-probe",             description: "Test Bambora Profile/Payments/Batch auth",  jwt: true,  category: "Bambora" },
+  { name: "bambora-config",            description: "Public Custom Checkout merchant config",   jwt: false, category: "Bambora" },
+  { name: "bambora-create-payment",    description: "Charge card token + credit wallet",        jwt: true,  category: "Bambora" },
+  { name: "bambora-save-card",         description: "Save Custom Checkout token as profile",    jwt: true,  category: "Bambora" },
+  { name: "bambora-charge-saved",      description: "Charge saved Bambora profile card",        jwt: true,  category: "Bambora" },
+  { name: "bambora-save-bank",         description: "Save Canadian bank for EFT",               jwt: true,  category: "Bambora" },
+  { name: "bambora-eft-collect",       description: "Submit EFT debit batch collect",           jwt: true,  category: "Bambora" },
+  { name: "bambora-delete-method",     description: "Delete saved Bambora method",              jwt: true,  category: "Bambora" },
+  { name: "bambora-batch-reconcile",   description: "Credit settled EFT collections (ops)",     jwt: true,  category: "Bambora" },
   // Stripe
   { name: "stripe-payout",             description: "Visa Direct push payouts",                  jwt: false, category: "Stripe" },
   { name: "stripe-payout-webhook",     description: "Receives Stripe payout events",             jwt: false, category: "Stripe" },

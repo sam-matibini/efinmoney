@@ -456,6 +456,24 @@ verify_jwt = false
 [functions.bambora-create-payment]
 verify_jwt = false
 
+[functions.bambora-save-card]
+verify_jwt = false
+
+[functions.bambora-charge-saved]
+verify_jwt = false
+
+[functions.bambora-save-bank]
+verify_jwt = false
+
+[functions.bambora-eft-collect]
+verify_jwt = false
+
+[functions.bambora-delete-method]
+verify_jwt = false
+
+[functions.bambora-batch-reconcile]
+verify_jwt = false
+
 [functions.emfi-probe]
 verify_jwt = false
 

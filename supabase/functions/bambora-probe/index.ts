@@ -42,6 +42,22 @@ Deno.serve(async (req) => {
       };
     }
 
+    let batch: Record<string, unknown> | null = null;
+    if (cfg.batchPasscode) {
+      batch = {
+        configured: true,
+        auth_ok: true,
+        message: "BAMBORA_BATCH_PASSCODE is set (EFT batch upload enabled).",
+      };
+    } else {
+      batch = {
+        configured: false,
+        auth_ok: false,
+        message:
+          "Optional: set BAMBORA_BATCH_PASSCODE from Batch Upload API access passcode for Canadian EFT debit.",
+      };
+    }
+
     const ok = profiles.auth_ok;
     return json({
       ok,
@@ -50,13 +66,15 @@ Deno.serve(async (req) => {
       docs: "https://docs.na.worldline-solutions.com/",
       merchant_id: cfg.merchantId,
       currency: cfg.currency,
+      currencies: ["CAD", "USD"],
       profiles_api: profiles,
       payments_api: payments,
+      batch_api: batch,
       next_steps: ok
         ? [
-          "Profiles API auth works — can tokenize / store cards.",
-          "Add BAMBORA_PAYMENTS_PASSCODE to charge cards (if not set).",
-          "Then wire CAD wallet top-up via Bambora card checkout.",
+          "Profiles API auth works — saved cards + bank profiles ready.",
+          cfg.paymentsPasscode ? "Payments passcode set — card charges ready." : "Add BAMBORA_PAYMENTS_PASSCODE to charge cards.",
+          cfg.batchPasscode ? "Batch passcode set — EFT debit ready." : "Add BAMBORA_BATCH_PASSCODE for Canadian EFT debit.",
         ]
         : [
           "Fix Profile API passcode in Bambora admin (Payment Profile Configuration).",
