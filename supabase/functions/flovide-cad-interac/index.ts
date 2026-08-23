@@ -1,7 +1,15 @@
+/**
+ * Flovide CAD Interac Autodeposit collect.
+ * Creates a referenced intent; customer sends Interac to FLOVIDE_CAD_INTERAC_ALIAS
+ * (default efin@flovide.com). Settlement via flovide-reconcile polling (no merchant webhook yet).
+ *
+ * Does NOT use POST /collections/interac (email money-request) — that is OTC-only.
+ */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import {
+  buildFlovideAutodepositInstructions,
   flovideConfigured,
-  flovideCreateInteracCollection,
+  resolveFlovideCadAlias,
 } from "../_shared/flovide.ts";
 
 const corsHeaders = {
@@ -25,11 +33,23 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    if (!flovideConfigured()) {
+    const alias = resolveFlovideCadAlias();
+    const configured = flovideConfigured() && alias.includes("@");
+    const railMeta = {
+      configured,
+      alias: configured ? alias : null,
+      provider: "flovide" as const,
+      rail: "flovide_interac",
+      mode: "autodeposit" as const,
+      eft: null,
+      eft_configured: false,
+    };
+
+    if (!configured) {
       if (req.method === "GET") {
-        return json({ configured: false, pending: [], rail: "flovide_interac" });
+        return json({ pending: [], ...railMeta, configured: false });
       }
-      return json({ error: "Flovide is not configured", code: "provider_not_configured" }, 503);
+      return json({ error: "Flovide CAD Autodeposit is not configured", code: "provider_not_configured" }, 503);
     }
 
     const authHeader = req.headers.get("Authorization") || "";
@@ -70,16 +90,17 @@ Deno.serve(async (req) => {
           }
           const { data: fresh } = await admin.from("flovide_transactions").select(COLS)
             .eq("id", intentId).eq("user_id", user.id).maybeSingle();
-          return json({ intent: fresh || data, configured: true, rail: "flovide_interac", reconciled: true });
+          return json({ intent: fresh || data, ...railMeta, reconciled: true });
         }
 
-        return json({ intent: data, configured: true, rail: "flovide_interac" });
+        return json({ intent: data, ...railMeta });
       }
       const { data: pending } = await admin.from("flovide_transactions").select(COLS)
         .eq("user_id", user.id).eq("kind", "interac_collection")
         .in("status", OPEN)
+        .gt("expires_at", new Date().toISOString())
         .order("created_at", { ascending: false }).limit(5);
-      return json({ pending: pending ?? [], configured: true, rail: "flovide_interac" });
+      return json({ pending: pending ?? [], ...railMeta });
     }
 
     if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
@@ -87,7 +108,7 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({})) as Record<string, unknown>;
     const amount = Number(body.amount);
     const walletId = String(body.wallet_id || "");
-    const payerEmail = String(body.sender_email || body.email || user.email || "").trim();
+    const payerEmail = String(body.sender_email || body.email || user.email || "").trim().toLowerCase();
     const payerName = String(body.sender_name || body.name || "").trim();
     const purpose = ["topup", "transfer", "merchant_collection"].includes(String(body.purpose))
       ? String(body.purpose)
@@ -95,7 +116,7 @@ Deno.serve(async (req) => {
     const transferId = typeof body.transfer_id === "string" ? body.transfer_id : null;
 
     if (!Number.isFinite(amount) || amount < 2) {
-      return json({ error: "Amount must be at least CAD 2.00 (Flovide Interac fee is CAD 1.30)" }, 400);
+      return json({ error: "Amount must be at least CAD 2.00" }, 400);
     }
     if (!walletId) return json({ error: "wallet_id required" }, 400);
     if (!payerEmail.includes("@")) return json({ error: "A valid payer email is required" }, 400);
@@ -107,16 +128,17 @@ Deno.serve(async (req) => {
       return json({ error: "Flovide Interac only supports CAD wallets" }, 400);
     }
 
-    const reference = `EFN-FV-${user.id.slice(0, 8)}-${Date.now()}`;
+    const reference = `EFN-FV-${user.id.slice(0, 8)}-${Date.now()}`.toUpperCase();
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    const creditAmount = Math.round(amount * 100) / 100;
 
     const { data: txn, error: insErr } = await admin.from("flovide_transactions").insert({
       user_id: user.id,
       kind: "interac_collection",
-      status: "pending",
-      amount: Math.round(amount * 100) / 100,
+      status: "awaiting_payment",
+      amount: creditAmount,
       currency_code: "CAD",
-      credit_amount: Math.round(amount * 100) / 100,
+      credit_amount: creditAmount,
       credit_currency: "CAD",
       target_wallet_id: walletId,
       purpose,
@@ -125,62 +147,37 @@ Deno.serve(async (req) => {
       payer_name: payerName || null,
       reference,
       expires_at: expiresAt,
-      raw_request: { amount, payerEmail, purpose, transferId },
+      raw_request: {
+        mode: "autodeposit",
+        alias,
+        amount: creditAmount,
+        payerEmail,
+        purpose,
+        transferId,
+      },
     }).select(COLS).single();
 
     if (insErr || !txn) {
       return json({ error: "Could not record Interac intent", detail: insErr?.message }, 500);
     }
 
-    const created = await flovideCreateInteracCollection(
-      Math.round(amount * 100) / 100,
-      payerEmail,
-    );
-
-    if (!created.ok) {
-      await admin.from("flovide_transactions").update({
-        status: "failed",
-        failure_reason: String(created.json?.message || created.raw || "Flovide Interac failed"),
-        raw_response: created.json,
-      }).eq("id", txn.id);
-      return json({
-        error: String(created.json?.message || "Flovide Interac request failed"),
-        provider: created.json,
-      }, 200);
-    }
-
-    const data = (created.json?.data && typeof created.json.data === "object")
-      ? created.json.data as Record<string, unknown>
-      : {};
-    const providerRef = String(data.reference || data.transaction_id || data.id || created.json?.reference || "").trim() || null;
-    const orderId = String(data.transaction_id || data.order_id || data.id || "").trim() || null;
-    const fee = Number(data.fee);
-    const net = Number(data.net_amount);
-    const creditAmount = Number.isFinite(net) && net > 0 ? net : Math.round(amount * 100) / 100;
-
-    await admin.from("flovide_transactions").update({
-      status: "awaiting_payment",
-      provider_reference: providerRef,
-      provider_order_id: orderId,
-      credit_amount: creditAmount,
-      raw_response: created.json,
-    }).eq("id", txn.id);
-
-    const { data: fresh } = await admin.from("flovide_transactions").select(COLS)
-      .eq("id", txn.id).maybeSingle();
-
     return json({
       success: true,
-      rail: "flovide_interac",
-      intent: fresh || txn,
-      message: "Interac Auto Deposit request sent to the payer email. Approve it in your banking app — your CAD wallet credits when Flovide confirms payment.",
-      instructions: [
-        `Check ${payerEmail} for an Interac e-Transfer money request for CAD ${amount.toFixed(2)}.`,
-        Number.isFinite(fee) && fee > 0
-          ? `Flovide fee is CAD ${fee.toFixed(2)} — your wallet will be credited CAD ${creditAmount.toFixed(2)}.`
-          : "Approve the request in your Canadian banking app (Auto Deposit).",
-        "Your eFinMoney CAD wallet credits automatically once Flovide confirms the payment.",
-      ],
+      ...railMeta,
+      intent: {
+        ...txn,
+        sender_email: payerEmail,
+        payer_email: payerEmail,
+        public_id: reference,
+      },
+      message: `Send CAD ${creditAmount.toFixed(2)} Interac Autodeposit to ${alias}`,
+      instructions: buildFlovideAutodepositInstructions(
+        creditAmount,
+        alias,
+        reference,
+        payerEmail,
+        purpose,
+      ),
     });
   } catch (err) {
     console.error("flovide-cad-interac error:", err);

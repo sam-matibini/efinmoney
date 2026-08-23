@@ -4,8 +4,9 @@
  */
 export const PAYOUT_MIN_BY_CURRENCY: Record<string, number> = {
   NGN: 100,
-  KES: 10,
-  GHS: 1,
+  // Fincra KES MoMo flat fee is ~100 KES — sending ≤ fee fails downstream.
+  KES: 150,
+  GHS: 10,
   USD: 1,
   UGX: 500,
   TZS: 1000,

@@ -85,24 +85,28 @@ export const useStatement = (walletId?: string | null, limit = 500) => {
       const targetWalletIds = walletId ? [walletId] : userWalletIds;
       if (targetWalletIds.length === 0) return [];
 
-      // Fetch ledger entries for those wallets
-      const { data: entries, error } = await supabase
+      // Newest first — previously ordered ascending + limit, which returned the *oldest*
+      // N rows and hid recent (e.g. in-flight) transfers once history exceeded the limit.
+      const { data: rawEntries, error } = await supabase
         .from("ledger_entries")
         .select(
           "id, journal_id, wallet_id, currency_code, debit_amount, credit_amount, description, reference_type, reference_id, created_at"
         )
         .in("wallet_id", targetWalletIds)
-        .order("created_at", { ascending: true })
+        .order("created_at", { ascending: false })
         .limit(limit);
       if (error) {
         console.error(error);
         return [];
       }
 
+      // Chronological for running balance within this window
+      const entries = [...(rawEntries ?? [])].reverse();
+
       // Collect transfer ids for joining sender/recipient/purpose
       const transferIds = Array.from(
         new Set(
-          (entries ?? [])
+          entries
             .filter((e) => TRANSFER_REF_TYPES.has(e.reference_type ?? "") && e.reference_id)
             .map((e) => e.reference_id as string)
         )
@@ -123,7 +127,7 @@ export const useStatement = (walletId?: string | null, limit = 500) => {
       const runningByWallet: Record<string, number> = {};
 
       // Deduplicate by journal_id per wallet (an entry per journal per wallet is fine)
-      const rows: StatementRow[] = (entries ?? []).map((e) => {
+      const rows: StatementRow[] = entries.map((e) => {
         const dbt = Number(e.debit_amount || 0);
         const crd = Number(e.credit_amount || 0);
         // For an asset wallet ledger: credit_amount = money in, debit_amount = money out

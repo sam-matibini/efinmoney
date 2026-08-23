@@ -21,7 +21,7 @@ type Item =
 const items: Item[] = [
   { kind: "modal", Modal: SendMoneyModal, icon: Send, label: "Send" },
   { kind: "link", to: "/wallet/topup", icon: Download, label: "Add Money" },
-  { kind: "link", to: "/wallet/receive", icon: Smartphone, label: "Receive" },
+  { kind: "link", to: "/wallet/receive", icon: Smartphone, label: "Bank account" },
   { kind: "modal", Modal: ExchangeModal, icon: RefreshCw, label: "Exchange" },
 ];
 

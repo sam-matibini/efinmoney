@@ -447,5 +447,17 @@ verify_jwt = false
 [functions.fincra-cad-va-probe]
 verify_jwt = false
 
+[functions.bambora-probe]
+verify_jwt = false
+
+[functions.bambora-config]
+verify_jwt = false
+
+[functions.bambora-create-payment]
+verify_jwt = false
+
+[functions.emfi-probe]
+verify_jwt = false
+
 [functions.flw-create-virtual-account]
 verify_jwt = false

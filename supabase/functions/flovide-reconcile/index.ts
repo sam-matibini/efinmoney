@@ -50,10 +50,49 @@ function extractList(payload: Record<string, unknown>): Record<string, unknown>[
   return [];
 }
 
+function blobText(remote: Record<string, unknown>): string {
+  const nested = [
+    asRecord(remote.meta),
+    asRecord(remote.metadata),
+    asRecord(remote.details),
+    asRecord(remote.recipient),
+    asRecord(remote.sender),
+    asRecord(remote.payer),
+    asRecord(remote.bank_account),
+  ];
+  const parts = [
+    remote.reference,
+    remote.payment_reference,
+    remote.order_id,
+    remote.description,
+    remote.narration,
+    remote.narrative,
+    remote.message,
+    remote.memo,
+    remote.note,
+    remote.remarks,
+    remote.comment,
+    ...nested.flatMap((o) => Object.values(o)),
+  ];
+  return parts.map((v) => String(v ?? "")).join(" ").toUpperCase();
+}
+
+function isInboundCadDeposit(remote: Record<string, unknown>): boolean {
+  const type = String(
+    remote.transaction_type ?? remote.type ?? remote.kind ?? "",
+  ).toLowerCase();
+  if (["payout", "withdrawal", "payment"].includes(type)) return false;
+  const currency = String(remote.currency ?? remote.to_currency ?? "CAD").toUpperCase();
+  if (currency && currency !== "CAD") return false;
+  return true;
+}
+
 function matchTxn(
   remote: Record<string, unknown>,
   local: Record<string, unknown>,
 ): boolean {
+  if (!isInboundCadDeposit(remote)) return false;
+
   const refs = [
     String(remote.reference || ""),
     String(remote.payment_reference || ""),
@@ -71,8 +110,18 @@ function matchTxn(
 
   if (refs.some((r) => localRefs.includes(r))) return true;
 
-  // Fallback: same CAD amount + payer email within recent window
+  // Autodeposit: our EFN-FV-… reference in Interac message / Flovide narrative
+  const localRef = String(local.reference || "").trim().toUpperCase();
   const amount = Number(remote.amount ?? remote.net_amount ?? remote.to_amount);
+  const localAmount = Number(local.amount);
+  if (localRef.length >= 8 && blobText(remote).includes(localRef)) {
+    if (!Number.isFinite(amount) || !Number.isFinite(localAmount)) return true;
+    const delta = Math.abs(amount - localAmount);
+    if (delta < 0.05 || delta <= Math.max(2, localAmount * 0.2)) return true;
+    return false;
+  }
+
+  // Fallback: same CAD amount + payer email (when message ref is missing)
   const email = String(
     remote.email
       ?? remote.payer_email
@@ -80,16 +129,18 @@ function matchTxn(
       ?? asRecord(remote.sender).email
       ?? "",
   ).trim().toLowerCase();
-  const localAmount = Number(local.amount);
   const localEmail = String(local.payer_email || "").trim().toLowerCase();
   if (
     Number.isFinite(amount)
     && Number.isFinite(localAmount)
-    && Math.abs(amount - localAmount) < 0.02
+    && Math.abs(amount - localAmount) < 0.05
     && email
     && localEmail
     && email === localEmail
   ) {
+    const remoteCreated = String(remote.created_at ?? remote.created ?? remote.updated_at ?? "");
+    const localCreated = String(local.created_at || "");
+    if (remoteCreated && localCreated && remoteCreated < localCreated) return false;
     return true;
   }
   return false;

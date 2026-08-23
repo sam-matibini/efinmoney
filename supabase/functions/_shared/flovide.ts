@@ -95,6 +95,38 @@ export async function flovideCreateInteracCollection(amount: number, email: stri
   });
 }
 
+/**
+ * Standing CAD Autodeposit alias (dashboard-registered @flovide.com).
+ * Not the per-payment collections/interac email-request product.
+ */
+export function resolveFlovideCadAlias(): string {
+  const fromEnv = (Deno.env.get("FLOVIDE_CAD_INTERAC_ALIAS") || "").trim().toLowerCase();
+  if (fromEnv.includes("@")) return fromEnv;
+  // Activated merchant alias for eFinMoney (Aug 2026).
+  return "efin@flovide.com";
+}
+
+export function buildFlovideAutodepositInstructions(
+  amount: number,
+  alias: string,
+  reference: string,
+  contact: string,
+  purpose: string,
+): string[] {
+  return [
+    `Open your Canadian banking app and start an Interac e-Transfer.`,
+    `Send exactly CAD ${amount.toFixed(2)} to ${alias}.`,
+    `Put the reference ${reference} in the message field.`,
+    `Send from ${contact} so we can match your deposit.`,
+    `Autodeposit is enabled — no security question needed.`,
+    purpose === "transfer"
+      ? `Your transfer is released once we match the deposit to this reference.`
+      : purpose === "merchant_collection"
+      ? `The payment is confirmed once we match the deposit to this reference.`
+      : `Your CAD wallet credits once we match the deposit to this reference.`,
+  ];
+}
+
 /** Probe undocumented paths (virtual accounts / other collections). */
 export async function flovideProbePath(path: string, init: RequestInit = {}) {
   return flovideFetch(path, init);

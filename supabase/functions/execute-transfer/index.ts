@@ -521,9 +521,14 @@ Deno.serve(async (req) => {
       transfer.payout_method === "bank" &&
       !!transfer.recipient_account &&
       !!transfer.recipient_bank_code;
+    const isGhanaBank =
+      targetCurrency === "GHS" &&
+      (transfer.payout_method === "bank" || String(transfer.payout_method || "").toLowerCase() === "bank") &&
+      !!transfer.recipient_account &&
+      !!transfer.recipient_bank_code;
 
     // Corridors Fincra can serve → fixed priority chain (not random).
-    // Order: Fincra → Flutterwave → Lenhub → Nomba → Paytota → Swychr
+    // Order: Fincra → Flutterwave → … (Flovide inserted for NG/GH/KE/UG)
     // EXCEPTION: Zambia + Kenya + Ghana MoMo are Fincra-only (no FLW/Ghana Pay/Elicate failover).
     const fincraCapable =
       !isCanada
@@ -531,6 +536,7 @@ Deno.serve(async (req) => {
       && (
         (isMobileMoneyMethod && FINCRA_MOMO.has(targetCurrency))
         || isNigeriaBank
+        || isGhanaBank
       );
     // Zambia MoMo is Fincra-exclusive: Fincra is the only payout rail for ZMW.
     // No Elicate / Flutterwave failover.
@@ -937,8 +943,12 @@ Deno.serve(async (req) => {
           && Deno.env.get("FLOVIDE_SECRET_KEY")?.trim()
         );
         const flovideFirstNgn = flovideKeys && isNigeriaBank && Deno.env.get("FLOVIDE_PAYOUT_FIRST") !== "false";
+        // Fincra KE MoMo often accepts then fails async with a vague reason — prefer Flovide first.
+        const isKesMomo = targetCurrency === "KES" && !isNigeriaBank && !isGhanaBank
+          && String(transfer.payout_method || "").toLowerCase() !== "bank";
+        const flovideFirstKes = flovideKeys && isKesMomo && Deno.env.get("FLOVIDE_KES_FIRST") !== "false";
 
-        if (flovideFirstNgn) {
+        if (flovideFirstNgn || flovideFirstKes) {
           await tryNext("flovide", async () => {
             const fvRes = await fetch(
               `${Deno.env.get("SUPABASE_URL")}/functions/v1/flovide-payout`,
@@ -1003,11 +1013,12 @@ Deno.serve(async (req) => {
           }
         }
 
-        // 1c) Flovide — NGN bank (if not already first) / KES-GHS-UGX MoMo when Fincra misses
+        // 1c) Flovide — NGN bank / GHS bank / KES-GHS-UGX MoMo when Fincra misses
         if (
           flovideKeys
           && !flovideFirstNgn
-          && (isNigeriaBank || ["KES", "GHS", "UGX"].includes(targetCurrency))
+          && !flovideFirstKes
+          && (isNigeriaBank || isGhanaBank || ["KES", "GHS", "UGX"].includes(targetCurrency))
         ) {
           await tryNext("flovide", async () => {
             const fvRes = await fetch(

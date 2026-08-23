@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Wallet } from "lucide-react";
+import { ArrowLeft, PlusCircle, Wallet } from "lucide-react";
 import { filterStatementRows, hasStatementFilters } from "@/lib/statementFilters";
 import { StatementFilters } from "@/components/statement/StatementFilters";
 import { useAuth } from "@/hooks/useAuth";
@@ -93,7 +93,19 @@ const WalletStatementPage = () => {
               variant="primary"
               className="flex-1"
             />
-            <div className="shrink-0">
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+              <Button
+                size="sm"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white border-0 shadow-sm"
+                onClick={() =>
+                  navigate(
+                    `/wallet/topup?walletId=${encodeURIComponent(walletId || "")}&currency=${encodeURIComponent(wallet?.currency_code || "")}`,
+                  )
+                }
+                disabled={!walletId}
+              >
+                <PlusCircle className="w-3.5 h-3.5 mr-1.5" /> Top up
+              </Button>
               <StatementActions rows={rows} meta={meta} defaultEmail={user?.email || ""} />
             </div>
           </div>

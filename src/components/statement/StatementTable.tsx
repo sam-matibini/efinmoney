@@ -17,12 +17,42 @@ const dateGroupLabel = (iso: string) => {
   return format(d, "MMM d, yyyy");
 };
 
-const statusBadge = (s: string) => {
-  if (s === "completed") return "bg-primary/15 text-primary border-primary/30";
-  if (["failed", "reversed", "expired"].includes(s)) return "bg-destructive/15 text-destructive border-destructive/30";
-  if (["processing", "funded", "initiated"].includes(s)) return "bg-amber-500/15 text-amber-600 border-amber-500/30";
-  return "bg-muted text-muted-foreground border-border";
+/** Match TransferTrackingPage labels so list + detail stay consistent. */
+const statusMeta = (status: string) => {
+  switch (status) {
+    case "completed":
+      return { label: "Completed", className: "bg-primary/15 text-primary border-primary/30" };
+    case "failed":
+      return { label: "Failed", className: "bg-destructive/15 text-destructive border-destructive/30" };
+    case "reversed":
+      return { label: "Reversed", className: "bg-destructive/15 text-destructive border-destructive/30" };
+    case "expired":
+      return { label: "Expired", className: "bg-destructive/15 text-destructive border-destructive/30" };
+    case "processing":
+      return { label: "Processing", className: "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30" };
+    case "funded":
+    case "pending_liquidity":
+    case "pending_ops":
+      return { label: "Pending", className: "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30" };
+    case "initiated":
+      return { label: "Pending", className: "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30" };
+    default:
+      return {
+        label: status ? status.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) : "Completed",
+        className: "bg-muted text-muted-foreground border-border",
+      };
+  }
 };
+
+const gridCols = (showBalance: boolean) =>
+  showBalance
+    ? "lg:grid-cols-[120px_minmax(0,1.4fr)_100px_minmax(0,0.9fr)_minmax(0,0.8fr)_100px_110px_110px_120px_32px]"
+    : "lg:grid-cols-[120px_minmax(0,1.4fr)_100px_minmax(0,0.9fr)_minmax(0,0.8fr)_100px_110px_110px_32px]";
+
+const headerCols = (showBalance: boolean) =>
+  showBalance
+    ? "grid-cols-[120px_minmax(0,1.4fr)_100px_minmax(0,0.9fr)_minmax(0,0.8fr)_100px_110px_110px_120px_32px]"
+    : "grid-cols-[120px_minmax(0,1.4fr)_100px_minmax(0,0.9fr)_minmax(0,0.8fr)_100px_110px_110px_32px]";
 
 interface Props {
   rows: StatementRow[];
@@ -68,12 +98,13 @@ export const StatementTable = ({ rows, loading, showBalance = true, filtered = f
   return (
     <div className="rounded-xl border border-border overflow-hidden">
       {/* Header */}
-      <div className={`hidden lg:grid ${showBalance ? "grid-cols-[140px_1.5fr_110px_1fr_1fr_120px_120px_140px_40px]" : "grid-cols-[140px_1.5fr_110px_1fr_1fr_120px_120px_40px]"} gap-3 px-4 py-2.5 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold bg-muted/40 border-b border-border`}>
+      <div className={`hidden lg:grid ${headerCols(showBalance)} gap-3 px-4 py-2.5 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold bg-muted/40 border-b border-border`}>
         <div>Date</div>
         <div>Description</div>
         <div>Reference</div>
         <div>Sender / Payee</div>
         <div>Purpose</div>
+        <div>Status</div>
         <div className="text-right">Money Out</div>
         <div className="text-right">Money In</div>
         {showBalance && <div className="text-right">Balance</div>}
@@ -89,6 +120,7 @@ export const StatementTable = ({ rows, loading, showBalance = true, filtered = f
             {rs.map((r, i) => {
               const isIn = r.moneyIn > 0;
               const isFailed = ["failed", "reversed", "expired"].includes(r.status);
+              const meta = statusMeta(r.status);
               const linkTo = r.transferId ? `/transfers/${r.transferId}` : `/transactions/${r.journalId}`;
               const outClass = isFailed ? "text-muted-foreground line-through" : "text-rose-600 dark:text-rose-400";
               const inClass = isFailed ? "text-muted-foreground line-through" : "text-indigo-600 dark:text-indigo-400";
@@ -102,7 +134,7 @@ export const StatementTable = ({ rows, loading, showBalance = true, filtered = f
                 >
                   <Link
                     to={linkTo}
-                    className={`${showBalance ? "lg:grid-cols-[140px_1.5fr_110px_1fr_1fr_120px_120px_140px_40px]" : "lg:grid-cols-[140px_1.5fr_110px_1fr_1fr_120px_120px_40px]"} grid grid-cols-[1fr_auto] lg:gap-3 gap-2 px-4 py-3 hover:bg-muted/40 transition-colors items-center`}
+                    className={`${gridCols(showBalance)} grid grid-cols-[1fr_auto] lg:gap-3 gap-2 px-4 py-3 hover:bg-muted/40 transition-colors items-center`}
                   >
                     {/* Date - mobile shows icon, desktop column */}
                     <div className="hidden lg:block text-[12px] text-muted-foreground tabular-nums">
@@ -133,6 +165,13 @@ export const StatementTable = ({ rows, loading, showBalance = true, filtered = f
                     {/* Purpose (lg) */}
                     <div className="hidden lg:block text-[12px] text-muted-foreground truncate">{r.purpose}</div>
 
+                    {/* Status (lg) */}
+                    <div className="hidden lg:block">
+                      <Badge variant="outline" className={`text-[10px] font-medium capitalize ${meta.className}`}>
+                        {meta.label}
+                      </Badge>
+                    </div>
+
                     {/* Mobile combined amount */}
                     <div className="lg:hidden text-right">
                       <p className={`text-sm font-display font-bold tabular-nums ${isIn ? inClass : outClass}`}>
@@ -143,7 +182,7 @@ export const StatementTable = ({ rows, loading, showBalance = true, filtered = f
                           Bal {fmt(r.balance)} {r.currency}
                         </p>
                       )}
-                      <Badge variant="outline" className={`text-[9px] mt-0.5 ${statusBadge(r.status)}`}>{r.status}</Badge>
+                      <Badge variant="outline" className={`text-[9px] mt-0.5 ${meta.className}`}>{meta.label}</Badge>
                     </div>
 
                     {/* Desktop debit/credit/balance */}

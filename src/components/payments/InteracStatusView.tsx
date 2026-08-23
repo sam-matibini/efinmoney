@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { CheckCircle2, Copy, Loader2, Mail } from "lucide-react";
+import { CheckCircle2, Copy, Loader2 } from "lucide-react";
 import { CHECKOUT_STRINGS, type Lang } from "@/components/payments/checkoutStrings";
 import type { InteracIntent } from "@/components/payments/InteracCheckout";
 import { LOOP_CAD_EFT, type LoopCadEft } from "@/lib/loopCad";
@@ -14,45 +14,11 @@ interface Props {
   lang: Lang;
   purpose: "topup" | "transfer" | "merchant_collection";
   done: boolean;
-  /** Flovide = email money-request; Loop = Autodeposit/EFT; Fincra = @fincra.ca Autodeposit */
   variant?: InteracRailVariant;
 }
 
-function waitingCopy(
-  status: string,
-  purpose: string,
-  lang: Lang,
-  variant: InteracRailVariant,
-): string {
-  const t = CHECKOUT_STRINGS[lang];
-  switch (status) {
-    case "received":
-    case "matched":
-      return lang === "fr"
-        ? "Dépôt reçu — vérification en cours."
-        : "Deposit received — confirming it now.";
-    case "confirmed":
-      return purpose === "transfer"
-        ? lang === "fr"
-          ? "Paiement confirmé — votre transfert est libéré."
-          : "Payment confirmed — releasing your transfer."
-        : lang === "fr"
-          ? "Paiement confirmé — votre portefeuille est crédité."
-          : "Payment confirmed — crediting your wallet.";
-    case "unmatched":
-      return lang === "fr"
-        ? "Nous avons reçu un dépôt à allouer manuellement. Notre équipe s'en occupe."
-        : "We received a deposit we couldn't match automatically. Our team is allocating it.";
-    case "awaiting_payment":
-    case "pending":
-    case "processing":
-    default:
-      return variant === "flovide" ? t.flovideWaiting : variant === "fincra" ? t.fincraWaiting : t.waiting;
-  }
-}
-
 /**
- * Interac status: Flovide (approve email request), Fincra Autodeposit, or Loop Bank.
+ * Compact Autodeposit instructions: amount, alias, reference.
  */
 export default function InteracStatusView({
   intent,
@@ -67,40 +33,36 @@ export default function InteracStatusView({
   const reference = intent.public_id || intent.reference;
   const amountLabel = `CAD ${Number(intent.amount).toFixed(2)}`;
   const eftDetails = eft ?? LOOP_CAD_EFT;
-  const payerEmail = (intent.payer_email || intent.sender_email || "").trim();
   const isFlovide = variant === "flovide";
   const isFincra = variant === "fincra";
   const showEft = !isFlovide && !isFincra;
+  const sendTo = alias || (isFlovide ? "efin@flovide.com" : null);
 
-  const loopDetailsText = [
+  const tip =
+    lang === "fr"
+      ? "Mettez la référence dans le message Interac. Pas de question de sécurité."
+      : "Put the reference in the Interac message. No security question.";
+
+  const detailsText = [
     `Amount: ${amountLabel}`,
-    alias ? `${t.sendTo}: ${alias}` : null,
-    `${t.reference}: ${reference}`,
-    "",
+    sendTo ? `Send to: ${sendTo}` : null,
+    `Reference: ${reference}`,
     ...(showEft
       ? [
-          "EFT / bank transfer (Loop Bank):",
-          `${t.bankNumber}: ${eftDetails.bankNumber}`,
-          `${t.transitNumber}: ${eftDetails.transitNumber}`,
-          `${t.accountNumber}: ${eftDetails.accountNumber}`,
+          "",
+          "EFT / bank transfer:",
+          `Institution: ${eftDetails.bankNumber}`,
+          `Transit: ${eftDetails.transitNumber}`,
+          `Account: ${eftDetails.accountNumber}`,
         ]
       : []),
   ]
     .filter((line) => line !== null)
     .join("\n");
 
-  const flovideDetailsText = [
-    `Amount: ${amountLabel}`,
-    payerEmail ? `${t.flovideRequestTo}: ${payerEmail}` : null,
-    `${t.reference}: ${reference}`,
-    t.flovideCopyHint,
-  ]
-    .filter((line) => line !== null)
-    .join("\n");
-
   const copyDetails = async () => {
-    await navigator.clipboard.writeText(isFlovide ? flovideDetailsText : loopDetailsText);
-    toast.success(isFlovide ? t.flovideDetailsCopied : t.detailsCopied);
+    await navigator.clipboard.writeText(detailsText);
+    toast.success(lang === "fr" ? "Détails copiés" : "Payment details copied");
   };
 
   if (done) {
@@ -119,100 +81,30 @@ export default function InteracStatusView({
     );
   }
 
-  if (isFlovide) {
-    return (
-      <div className="space-y-4">
-        <div className="flex items-center gap-2 rounded-lg border bg-muted/40 p-3 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-          {waitingCopy(intent.status, purpose, lang, "flovide")}
-        </div>
-
-        <p className="text-xs text-muted-foreground leading-relaxed">{t.flovidePushHint}</p>
-
-        <div className="space-y-2 rounded-lg border p-3 text-sm">
-          <div className="flex justify-between gap-2">
-            <span className="text-muted-foreground">{t.amountDue}</span>
-            <span className="font-semibold tabular-nums">{amountLabel}</span>
-          </div>
-          {payerEmail && (
-            <div className="flex justify-between gap-2">
-              <span className="text-muted-foreground">{t.flovideRequestTo}</span>
-              <code className="break-all text-right font-medium">{payerEmail}</code>
-            </div>
-          )}
-          <div className="flex justify-between gap-2">
-            <span className="text-muted-foreground">{t.reference}</span>
-            <code className="break-all text-right font-medium">{reference}</code>
-          </div>
-          <p className="flex items-start gap-2 text-[11px] text-muted-foreground pt-1">
-            <Mail className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-            {lang === "fr"
-              ? "Cherchez le courriel Interac, puis approuvez dans votre app bancaire."
-              : "Check your email for the Interac request, then approve it in your banking app."}
-          </p>
-        </div>
-
-        <Button type="button" className="w-full" onClick={() => void copyDetails()}>
-          <Copy className="mr-2 h-4 w-4" />
-          {t.paymentDetails}
-        </Button>
-        <p className="text-center text-[11px] text-muted-foreground">{t.flovidePoweredBy}</p>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2 rounded-lg border bg-muted/40 p-3 text-sm text-muted-foreground">
+    <div className="w-full min-w-0 space-y-4">
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-        {waitingCopy(intent.status, purpose, lang, variant)}
+        <span>
+          {lang === "fr"
+            ? "En attente de votre Virement Interac…"
+            : "Waiting for your Interac e-Transfer…"}
+        </span>
       </div>
 
-      <p className="text-xs text-muted-foreground leading-relaxed">
-        {isFincra ? t.fincraPushHint : t.pushHint}
-      </p>
-
-      <div className="space-y-2 rounded-lg border p-3 text-sm">
-        <div className="flex justify-between gap-2">
-          <span className="text-muted-foreground">{t.amountDue}</span>
-          <span className="font-semibold tabular-nums">{amountLabel}</span>
-        </div>
-        {alias && (
-          <div className="flex justify-between gap-2">
-            <span className="text-muted-foreground">{t.sendTo}</span>
-            <code className="break-all text-right font-medium">{alias}</code>
-          </div>
-        )}
-        <div className="flex justify-between gap-2">
-          <span className="text-muted-foreground">{t.reference}</span>
-          <code className="break-all text-right font-medium">{reference}</code>
-        </div>
-        <p className="text-[11px] text-muted-foreground">
-          {isFincra
-            ? lang === "fr"
-              ? "Autodeposit activé — aucune question de sécurité. Mettez la référence dans le message."
-              : "Autodeposit is on — no security question. Put the reference in the message field."
-            : lang === "fr"
-            ? "Autodeposit Loop activé — aucune question de sécurité. Mettez la référence dans le message."
-            : "Loop Autodeposit is on — no security question. Put the reference in the message field."}
-        </p>
+      <div className="w-full min-w-0 space-y-3 rounded-lg border p-4 text-sm">
+        <Detail label={t.amountDue} value={amountLabel} />
+        {sendTo ? <Detail label={t.sendTo} value={sendTo} /> : null}
+        <Detail label={t.reference} value={reference} />
+        <p className="pt-1 text-[11px] leading-relaxed text-muted-foreground">{tip}</p>
       </div>
 
       {showEft && (
-        <div className="space-y-2 rounded-lg border p-3 text-sm">
+        <div className="w-full min-w-0 space-y-2 rounded-lg border p-3 text-sm">
           <p className="text-xs font-medium text-foreground">{t.eftHint}</p>
-          <div className="flex justify-between gap-2">
-            <span className="text-muted-foreground">{t.bankNumber}</span>
-            <code className="font-medium">{eftDetails.bankNumber}</code>
-          </div>
-          <div className="flex justify-between gap-2">
-            <span className="text-muted-foreground">{t.transitNumber}</span>
-            <code className="font-medium">{eftDetails.transitNumber}</code>
-          </div>
-          <div className="flex justify-between gap-2">
-            <span className="text-muted-foreground">{t.accountNumber}</span>
-            <code className="font-medium">{eftDetails.accountNumber}</code>
-          </div>
+          <Detail label={t.bankNumber} value={eftDetails.bankNumber} />
+          <Detail label={t.transitNumber} value={eftDetails.transitNumber} />
+          <Detail label={t.accountNumber} value={eftDetails.accountNumber} />
         </div>
       )}
 
@@ -220,11 +112,16 @@ export default function InteracStatusView({
         <Copy className="mr-2 h-4 w-4" />
         {t.paymentDetails}
       </Button>
-      <p className="text-center text-[11px] text-muted-foreground">
-        {lang === "fr"
-          ? "Ouvrez votre app bancaire vous-même — nous n'ouvrons pas les pages de connexion."
-          : "Open your banking app yourself — we do not open bank login pages."}
-      </p>
+    </div>
+  );
+}
+
+/** Stacked label/value so long references never collapse the column. */
+function Detail({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 space-y-0.5">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="break-words font-medium text-foreground [overflow-wrap:anywhere]">{value}</p>
     </div>
   );
 }

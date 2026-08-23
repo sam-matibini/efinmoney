@@ -2032,6 +2032,91 @@ const SendPage = () => {
     ? (recipientName.trim().length > 2 && !!ghBankCode && ghAccountNumber.replace(/\D/g, "").length >= 6 && receivedAmount > 0)
     : (recipientName.length > 2 && recipientPhone.length > 8 && !!effectivePayoutMethod && receivedAmount > 0);
 
+  const continueBlockers = useMemo(() => {
+    const reasons: string[] = [];
+    if (!isLiveSendCountryId(targetCountryId)) {
+      reasons.push(`${targetCountry.country} is coming soon`);
+      return reasons;
+    }
+    if (!(parsedAmount > 0)) reasons.push("Enter an amount to send");
+    if (parsedAmount > 0 && !rateAvailable) reasons.push("Waiting for exchange rate");
+    if (payoutMinError) reasons.push(payoutMinError);
+    if (noLinkedSource) reasons.push("Link a bank account first");
+    if (insufficientFunds) {
+      reasons.push(
+        selectedWallet
+          ? `Need ${sourceSymbol}${totalCharge.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} — wallet has ${sourceSymbol}${Number(selectedWallet.balance).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+          : "Insufficient wallet balance",
+      );
+    }
+    if (fundingSource === "wallet" && !selectedWallet) reasons.push("Select a wallet");
+    if (fundingSource === "card") {
+      if (!cardSendEnabled || !cardPayoutCodes.includes(targetCountry.code)) {
+        reasons.push(`Card send is not available to ${targetCountry.country}`);
+      } else if (availableCardProviders.length === 0 || !cardSendProvider) {
+        reasons.push("No card provider available for this corridor");
+      } else if (parsedAmount > 0 && parsedAmount < cardSendMinAmount(cardSendProvider, sourceCurrency)) {
+        reasons.push(`Minimum card send is ${cardSendMinAmount(cardSendProvider, sourceCurrency)} ${sourceCurrency}`);
+      } else if (inlineCardEntry) {
+        if (showNewCardForm && !isCardFieldsValid(cardFields)) reasons.push("Complete your card details");
+        else if (!showNewCardForm && !activeSavedCard) reasons.push("Select or add a card");
+      }
+    }
+
+    if (useLink) {
+      if (recipientName.trim().length <= 2) reasons.push("Enter the recipient’s name");
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail)) reasons.push("Enter the recipient’s email");
+    } else if (isNGNBank) {
+      if (!ngnBankCode) reasons.push("Select the recipient’s bank");
+      if (ngnAccountNumber.replace(/\D/g, "").length !== 10) reasons.push("Enter a 10-digit account number");
+      else if (!ngnResolvedName) reasons.push("Waiting for account name to resolve");
+    } else if (isGhanaBank) {
+      if (recipientName.trim().length <= 2) reasons.push("Enter the recipient’s name");
+      if (!ghBankCode) reasons.push("Select the recipient’s bank");
+      if (ghAccountNumber.replace(/\D/g, "").length < 6) reasons.push("Enter the bank account number");
+    } else {
+      if (recipientName.trim().length <= 2) reasons.push("Enter the recipient’s name");
+      if (recipientPhone.replace(/\D/g, "").length <= 8) reasons.push("Enter the recipient’s phone number");
+      if (!effectivePayoutMethod) reasons.push("Select how they receive the money");
+    }
+    return reasons;
+  }, [
+    targetCountryId,
+    targetCountry.country,
+    parsedAmount,
+    rateAvailable,
+    payoutMinError,
+    noLinkedSource,
+    insufficientFunds,
+    selectedWallet,
+    sourceSymbol,
+    totalCharge,
+    fundingSource,
+    cardSendEnabled,
+    cardPayoutCodes,
+    availableCardProviders.length,
+    cardSendProvider,
+    sourceCurrency,
+    inlineCardEntry,
+    showNewCardForm,
+    cardFields,
+    activeSavedCard,
+    useLink,
+    recipientName,
+    recipientEmail,
+    isNGNBank,
+    ngnBankCode,
+    ngnAccountNumber,
+    ngnResolvedName,
+    isGhanaBank,
+    ghBankCode,
+    ghAccountNumber,
+    recipientPhone,
+    effectivePayoutMethod,
+  ]);
+
+  const canContinue = continueBlockers.length === 0;
+
   const modeParam = searchParams.get('mode');
   const canadaLive = productFeatures.canadaDomestic;
   const activeTab =
@@ -2061,7 +2146,7 @@ const SendPage = () => {
       ? [{
           id: "interac" as const,
           label: "Interac",
-          sublabel: interacUsesFlovide ? "Email request · approve in app" : "Bank account · instant",
+          sublabel: interacUsesFlovide ? "Autodeposit · efin@flovide.com" : "Bank account · instant",
           icon: Landmark,
           tone: "bank" as const,
         }]
@@ -2405,24 +2490,40 @@ const SendPage = () => {
                                   footer={
                                     <div className="space-y-3">
                                       <motion.div
-                                        whileTap={{ scale: 0.97 }}
-                                        animate={isStep1Valid && isStep2Valid && isLiveSendCountryId(targetCountryId) ? { boxShadow: [
+                                        whileTap={canContinue ? { scale: 0.97 } : undefined}
+                                        animate={canContinue ? { boxShadow: [
                                           "0 0 0 0 hsl(var(--primary) / 0)",
                                           "0 0 0 6px hsl(var(--primary) / 0.15)",
                                           "0 0 0 0 hsl(var(--primary) / 0)",
                                         ] } : { boxShadow: "0 0 0 0 hsl(var(--primary) / 0)" }}
-                                        transition={isStep1Valid && isStep2Valid && isLiveSendCountryId(targetCountryId) ? { duration: 1.8, repeat: Infinity, ease: "easeInOut" } : { duration: 0.2 }}
+                                        transition={canContinue ? { duration: 1.8, repeat: Infinity, ease: "easeInOut" } : { duration: 0.2 }}
                                         className="rounded-md"
                                       >
                                         <Button
                                           className="w-full"
                                           size="lg"
-                                          onClick={() => goToStep(3)}
-                                          disabled={!isStep1Valid || !isStep2Valid || !isLiveSendCountryId(targetCountryId)}
+                                          onClick={() => {
+                                            if (!canContinue) {
+                                              toast.error(continueBlockers[0] || "Complete the form to continue");
+                                              return;
+                                            }
+                                            goToStep(3);
+                                          }}
+                                          disabled={!canContinue}
+                                          title={!canContinue ? continueBlockers.join(" · ") : undefined}
                                         >
-                                          Continue
+                                          {canContinue
+                                            ? "Continue"
+                                            : continueBlockers[0] || "Complete required fields"}
                                         </Button>
                                       </motion.div>
+                                      {!canContinue && continueBlockers.length > 1 && (
+                                        <ul className="space-y-1 px-1 text-center text-xs text-muted-foreground">
+                                          {continueBlockers.slice(1, 4).map((reason) => (
+                                            <li key={reason}>{reason}</li>
+                                          ))}
+                                        </ul>
+                                      )}
                                       <button
                                         type="button"
                                         onClick={() => navigate('/dashboard')}

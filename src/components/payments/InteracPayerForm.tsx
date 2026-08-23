@@ -55,6 +55,8 @@ interface Props {
   submitting?: boolean;
   error?: string | null;
   onSubmit: () => void;
+  /** Autodeposit rails only need name + email (no bank / address block). */
+  compact?: boolean;
 }
 
 /**
@@ -71,6 +73,7 @@ export default function InteracPayerForm({
   submitting = false,
   error,
   onSubmit,
+  compact = false,
 }: Props) {
   const t = CHECKOUT_STRINGS[lang];
   const set = <K extends keyof PayerForm>(key: K, next: PayerForm[K]) =>
@@ -90,7 +93,7 @@ export default function InteracPayerForm({
           <Input
             id="etx-amount"
             type="number"
-            min={1}
+            min={2}
             step="0.01"
             value={amount ?? ""}
             onChange={(e) => onAmountChange(e.target.value)}
@@ -99,33 +102,6 @@ export default function InteracPayerForm({
       )}
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Label>{t.accountType}</Label>
-          <Select
-            value={value.accountType}
-            onValueChange={(v) => set("accountType", v as PayerForm["accountType"])}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="personal">{t.personal}</SelectItem>
-              <SelectItem value="business">{t.business}</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="etx-phone">{t.phone}</Label>
-          <Input
-            id="etx-phone"
-            type="tel"
-            autoComplete="tel"
-            maxLength={20}
-            placeholder="+1 416 555 0134"
-            value={value.phone}
-            onChange={(e) => set("phone", e.target.value)}
-          />
-        </div>
         <div className="space-y-1.5">
           <Label htmlFor="etx-first">{t.firstName}</Label>
           <Input
@@ -158,75 +134,114 @@ export default function InteracPayerForm({
           value={value.email}
           onChange={(e) => set("email", e.target.value)}
         />
+        <p className="text-[11px] text-muted-foreground">
+          {lang === "fr"
+            ? "Utilisez le même courriel que votre Virement Interac."
+            : "Use the same email you send the Interac from."}
+        </p>
       </div>
 
-      <div className="space-y-1.5">
-        <Label>{t.bank}</Label>
-        <Select value={value.bank} onValueChange={(v) => set("bank", v)}>
-          <SelectTrigger>
-            <SelectValue placeholder={t.bank} />
-          </SelectTrigger>
-          <SelectContent>
-            {BANK_ETRANSFER_LINKS.map((b) => (
-              <SelectItem key={b.name} value={b.name}>
-                {b.name}
-              </SelectItem>
-            ))}
-            <SelectItem value="Other">Other</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      {!compact && (
+        <>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label>{t.accountType}</Label>
+              <Select
+                value={value.accountType}
+                onValueChange={(v) => set("accountType", v as PayerForm["accountType"])}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="personal">{t.personal}</SelectItem>
+                  <SelectItem value="business">{t.business}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="etx-phone">{t.phone}</Label>
+              <Input
+                id="etx-phone"
+                type="tel"
+                autoComplete="tel"
+                maxLength={20}
+                placeholder="+1 416 555 0134"
+                value={value.phone}
+                onChange={(e) => set("phone", e.target.value)}
+              />
+            </div>
+          </div>
 
-      <div className="space-y-3 pt-1">
-        <p className="text-sm font-medium">{t.billingAddress}</p>
-        <Input
-          aria-label={t.line1}
-          placeholder={t.line1}
-          autoComplete="address-line1"
-          maxLength={200}
-          value={value.line1}
-          onChange={(e) => set("line1", e.target.value)}
-        />
-        <Input
-          aria-label={t.line2}
-          placeholder={t.line2}
-          autoComplete="address-line2"
-          maxLength={200}
-          value={value.line2}
-          onChange={(e) => set("line2", e.target.value)}
-        />
-        <div className="grid gap-3 sm:grid-cols-4">
-          <Input
-            aria-label={t.city}
-            placeholder={t.city}
-            autoComplete="address-level2"
-            maxLength={100}
-            value={value.city}
-            onChange={(e) => set("city", e.target.value)}
-          />
-          <Select value={value.region} onValueChange={(v) => set("region", v)}>
-            <SelectTrigger aria-label={t.province}>
-              <SelectValue placeholder={t.province} />
-            </SelectTrigger>
-            <SelectContent>
-              {CA_PROVINCES.map((p) => (
-                <SelectItem key={p.code} value={p.code}>
-                  {p.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Input
-            aria-label={t.postal}
-            placeholder={t.postal}
-            autoComplete="postal-code"
-            maxLength={10}
-            value={value.postalCode}
-            onChange={(e) => set("postalCode", e.target.value)}
-          />
-          <Input aria-label={t.country} value="Canada" readOnly className="bg-muted/40" />
-        </div>
-      </div>
+          <div className="space-y-1.5">
+            <Label>{t.bank}</Label>
+            <Select value={value.bank} onValueChange={(v) => set("bank", v)}>
+              <SelectTrigger>
+                <SelectValue placeholder={t.bank} />
+              </SelectTrigger>
+              <SelectContent>
+                {BANK_ETRANSFER_LINKS.map((b) => (
+                  <SelectItem key={b.name} value={b.name}>
+                    {b.name}
+                  </SelectItem>
+                ))}
+                <SelectItem value="Other">Other</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-3 pt-1">
+            <p className="text-sm font-medium">{t.billingAddress}</p>
+            <Input
+              aria-label={t.line1}
+              placeholder={t.line1}
+              autoComplete="address-line1"
+              maxLength={200}
+              value={value.line1}
+              onChange={(e) => set("line1", e.target.value)}
+            />
+            <Input
+              aria-label={t.line2}
+              placeholder={t.line2}
+              autoComplete="address-line2"
+              maxLength={200}
+              value={value.line2}
+              onChange={(e) => set("line2", e.target.value)}
+            />
+            <div className="grid gap-3 sm:grid-cols-4">
+              <Input
+                aria-label={t.city}
+                placeholder={t.city}
+                autoComplete="address-level2"
+                maxLength={100}
+                value={value.city}
+                onChange={(e) => set("city", e.target.value)}
+              />
+              <Select value={value.region} onValueChange={(v) => set("region", v)}>
+                <SelectTrigger aria-label={t.province}>
+                  <SelectValue placeholder={t.province} />
+                </SelectTrigger>
+                <SelectContent>
+                  {CA_PROVINCES.map((p) => (
+                    <SelectItem key={p.code} value={p.code}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Input
+                aria-label={t.postal}
+                placeholder={t.postal}
+                autoComplete="postal-code"
+                maxLength={10}
+                value={value.postalCode}
+                onChange={(e) => set("postalCode", e.target.value)}
+              />
+              <Input aria-label={t.country} value="Canada" readOnly className="bg-muted/40" />
+            </div>
+          </div>
+        </>
+      )}
 
       {error && <p className="text-sm text-destructive">{error}</p>}
 

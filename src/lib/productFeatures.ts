@@ -35,11 +35,11 @@ export const productFeatures = {
   paytotaPayout: envFlag("VITE_FEATURE_PAYTOTA_PAYOUT", true),
   /** Fincra hosted checkout — western + Africa collect (NGN/GHS/KES/…). */
   fincra: envFlag("VITE_FEATURE_FINCRA", true),
-  /** Fincra CAD Interac e-Transfer collections (platform alias + intent matching). */
+  /** Fincra CAD Interac Autodeposit (@fincra.ca) — fallback when Flovide unavailable. */
   fincraInterac: envFlag("VITE_FEATURE_FINCRA_INTERAC", true),
   /** Flovide (OhentPay) — banks, resolve, FX, NGN/KES/GHS/UGX/CAD payouts. */
   flovide: envFlag("VITE_FEATURE_FLOVIDE", true),
-  /** Flovide CAD Interac Auto Deposit collect (subset of flovide). */
+  /** Flovide CAD Interac Autodeposit collect (efin@flovide.com). */
   flovideInterac: envFlag("VITE_FEATURE_FLOVIDE_INTERAC", true),
   /** Wise bank-deposit top-up (shared receive account + unique payment reference). */
   wise: envFlag("VITE_FEATURE_WISE", true),

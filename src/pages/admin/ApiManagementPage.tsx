@@ -59,6 +59,7 @@ const INTEGRATIONS: Array<{
   { key: "paypal", name: "PayPal", description: "Orders API wallet top-up for USD/CAD/EUR/GBP", category: "Payments — Global & Cards", envHints: ["PAYPAL_CLIENT_ID", "PAYPAL_CLIENT_SECRET"] },
   { key: "square", name: "Square", description: "Card checkout for USD/CAD/EUR/GBP wallet top-up", category: "Payments — Global & Cards", envHints: ["SQUARE_ACCESS_TOKEN", "SQUARE_APPLICATION_ID", "SQUARE_LOCATION_ID"] },
   { key: "paysafe", name: "Paysafe", description: "Canadian Interac & EFT payouts", category: "Payments — Global & Cards", envHints: ["PAYSAFE_API_KEY"] },
+  { key: "bambora", name: "Bambora (Worldline)", description: "Canada CAD card collect / payment profiles", category: "Payments — Global & Cards", envHints: ["BAMBORA_MERCHANT_ID", "BAMBORA_API_PASSCODE", "BAMBORA_PAYMENTS_PASSCODE"] },
   // Banking
   { key: "plaid", name: "Plaid", description: "Bank account linking & balances (Canada domestic)", category: "Banking", envHints: ["PLAID_CLIENT_ID", "PLAID_SECRET"] },
   { key: "interac", name: "Interac", description: "Canada domestic e-Transfer / EFT rail", category: "Banking", envHints: ["INTERAC_CLIENT_ID", "INTERAC_PRIVATE_JWK"] },
@@ -102,6 +103,8 @@ const EDGE_FUNCTIONS: Array<{ name: string; description: string; jwt: boolean; c
   { name: "paysafe-payout",            description: "Initiates Paysafe EFT/Interac payouts",    jwt: false, category: "Paysafe" },
   { name: "paysafe-verify-transfer",   description: "Verify Paysafe transfer status",            jwt: false, category: "Paysafe" },
   { name: "paysafe-webhook",           description: "Receives Paysafe events",                   jwt: false, category: "Paysafe" },
+  // Bambora / Worldline NAM
+  { name: "bambora-probe",             description: "Test Bambora CAD API credentials",          jwt: true,  category: "Bambora" },
   // Stripe
   { name: "stripe-payout",             description: "Visa Direct push payouts",                  jwt: false, category: "Stripe" },
   { name: "stripe-payout-webhook",     description: "Receives Stripe payout events",             jwt: false, category: "Stripe" },
@@ -181,6 +184,7 @@ const EDGE_FUNCTIONS: Array<{ name: string; description: string; jwt: boolean; c
   { name: "wise-cad-interac",           description: "CAD Interac e-Transfer pay-in (Loop)",    jwt: true,  category: "Wise" },
   { name: "fincra-cad-interac",         description: "Fincra CAD Interac (@fincra.ca Autodeposit)", jwt: true,  category: "Fincra" },
   { name: "fincra-cad-va-probe",        description: "List/request Fincra CAD Interac virtual account", jwt: true,  category: "Fincra" },
+  { name: "emfi-probe",                 description: "Fiserv EmFi (Payfare BaaS) auth + host smoke test", jwt: true,  category: "Fiserv EmFi" },
   { name: "flovide-cad-interac",        description: "Flovide CAD Interac Auto Deposit collect", jwt: true,  category: "Flovide" },
   { name: "flovide-payout",             description: "Flovide NGN/KES/GHS/UGX/CAD payouts",     jwt: false, category: "Flovide" },
   { name: "flovide-webhook",            description: "Receives Flovide payment events",         jwt: false, category: "Flovide" },
@@ -283,6 +287,7 @@ const EDGE_FUNCTIONS: Array<{ name: string; description: string; jwt: boolean; c
   { name: "flw-corridor-probe",        description: "Tests CAD/USD/NGN collect on FLW",        jwt: true,  category: "Diagnostics" },
   { name: "flw-va-usdc-probe",         description: "Tests FLW USD virtual account + USDC",    jwt: true,  category: "Diagnostics" },
   { name: "fincra-cad-va-probe",        description: "Tests Fincra CAD VA list + API request",  jwt: true,  category: "Diagnostics" },
+  { name: "bambora-probe",             description: "Tests Bambora CAD Profile/Payments auth", jwt: true,  category: "Diagnostics" },
 ];
 
 export default function ApiManagementPage() {
@@ -362,6 +367,26 @@ export default function ApiManagementPage() {
         hint: "Deploy fincra-cad-va-probe, then retry. Fincra asked us to request CAD via POST /profile/virtual-accounts/requests.",
       });
       toast.error("Fincra CAD VA probe failed", { description: msg });
+    } finally {
+      setProbeLoading(false);
+    }
+  };
+
+  const runBamboraProbe = async () => {
+    setProbeLoading(true);
+    setProbeResult(null);
+    setProbeTitle("Bambora (Worldline) CAD");
+    setProbeOpen(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("bambora-probe", { body: {} });
+      if (error) throw error;
+      setProbeResult(data);
+      if ((data as { ok?: boolean })?.ok) toast.success("Bambora Profile API auth OK");
+      else toast.message("Bambora probe finished — check result");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Probe failed";
+      setProbeResult({ error: msg, hint: "Deploy bambora-probe and confirm BAMBORA_* secrets." });
+      toast.error("Bambora probe failed", { description: msg });
     } finally {
       setProbeLoading(false);
     }
@@ -620,6 +645,16 @@ export default function ApiManagementPage() {
                           Request CAD VA
                         </Button>
                       </>
+                    )}
+                    {integ.key === "bambora" && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={probeLoading}
+                        onClick={() => void runBamboraProbe()}
+                      >
+                        Test Bambora API
+                      </Button>
                     )}
                     </div>
                     </div>

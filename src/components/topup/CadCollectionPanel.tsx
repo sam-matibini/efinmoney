@@ -1,7 +1,6 @@
 import { useState } from "react";
-import WiseInteracInvoiceCheckout from "@/components/payments/WiseInteracInvoiceCheckout";
 import InteracCheckout from "@/components/payments/InteracCheckout";
-import CheckoutMethodGrid, { type CheckoutMethod } from "@/components/payments/CheckoutMethodGrid";
+import WiseInteracInvoiceCheckout from "@/components/payments/WiseInteracInvoiceCheckout";
 import CheckoutShell from "@/components/payments/CheckoutShell";
 import { type Lang } from "@/components/payments/checkoutStrings";
 import { productFeatures } from "@/lib/productFeatures";
@@ -11,13 +10,12 @@ interface Props {
   walletCurrency: string;
   initialAmount?: string;
   onComplete?: () => void;
-  /** Leave Interac checkout (e.g. change top-up method). */
   onExit?: () => void;
 }
 
 /**
- * CAD collection — prefer Fincra Interac when enabled; Flovide / Loop as fallbacks.
- * Wise is offered as a separate top-level Top Up category (not nested here).
+ * CAD collection via Interac Autodeposit (Flovide / Fincra).
+ * Skips the method picker when Interac is the only option.
  */
 export default function CadCollectionPanel({ walletId, walletCurrency, initialAmount, onComplete, onExit }: Props) {
   const isCad = walletCurrency.toUpperCase() === "CAD";
@@ -26,7 +24,6 @@ export default function CadCollectionPanel({ walletId, walletCurrency, initialAm
     productFeatures.fincraInterac || productFeatures.flovide || productFeatures.flovideInterac;
   const plaidOn = productFeatures.plaid;
 
-  const [method, setMethod] = useState<CheckoutMethod | null>(null);
   const [lang, setLang] = useState<Lang>("en");
 
   if (!isCad) {
@@ -38,50 +35,36 @@ export default function CadCollectionPanel({ walletId, walletCurrency, initialAm
   }
 
   if (interacOn) {
-    const amountLabel = `CAD ${amount.toFixed(2)}`;
-    const interacTitle = "Interac";
-    const interacDescription = lang === "fr"
-      ? "Virement Interac Autodeposit — min. 2,00 $"
-      : "Interac Autodeposit e-Transfer — min. CAD 2.00";
+    const amountLabel = amount > 0 ? `CAD ${amount.toFixed(2)}` : "CAD";
 
     return (
       <CheckoutShell
         lang={lang}
         onLangChange={setLang}
-        onBack={method ? () => setMethod(null) : onExit}
+        onBack={onExit}
+        showMethodTitle={false}
         summary={{
           brandName: "eFinMoney",
-          payeeName: "eFinMoney wallet top-up",
+          payeeName: lang === "fr" ? "Rechargement portefeuille" : "Wallet top-up",
           amountLabel,
-          description: "Funds are credited to your CAD wallet automatically once the deposit arrives.",
-          lineItem: `CAD wallet top-up (${walletCurrency.toUpperCase()})`,
+          description:
+            lang === "fr"
+              ? "Envoyez un Virement Interac Autodeposit — votre portefeuille CAD est crédité automatiquement."
+              : "Send an Interac Autodeposit e-Transfer — your CAD wallet credits automatically.",
+          lineItem: lang === "fr" ? "Rechargement CAD" : "CAD wallet top-up",
         }}
       >
-        {method === null ? (
-          <CheckoutMethodGrid
-            onChange={setMethod}
-            interacAvailable={interacOn}
-            cardAvailable={false}
-            wiseAvailable={false}
-            eftAvailable={false}
-            interacTitle={interacTitle}
-            interacDescription={interacDescription}
-            lang={lang}
-          />
-        ) : (
-          <InteracCheckout
-            walletId={walletId}
-            purpose="topup"
-            initialAmount={initialAmount}
-            lang={lang}
-            onComplete={onComplete}
-          />
-        )}
+        <InteracCheckout
+          walletId={walletId}
+          purpose="topup"
+          initialAmount={initialAmount}
+          lang={lang}
+          onComplete={onComplete}
+        />
       </CheckoutShell>
     );
   }
 
-  // Plaid → Loop Zum-style invoice checkout
   if (plaidOn) {
     return (
       <WiseInteracInvoiceCheckout

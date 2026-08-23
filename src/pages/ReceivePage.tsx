@@ -50,8 +50,10 @@ const ReceivePage = () => {
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
           <BackToDashboard />
           <div>
-            <h1 className="text-2xl font-display font-bold">Receive Money</h1>
-            <p className="text-muted-foreground">Share a bank account number for NGN or GHS transfers, or your eFin tag for in-app sends.</p>
+            <h1 className="text-2xl font-display font-bold">Bank account</h1>
+            <p className="text-muted-foreground">
+              Share your NGN or GHS bank details to receive transfers into your wallet — then send or spend from that wallet.
+            </p>
           </div>
 
           <PageHeroBanner
@@ -156,7 +158,7 @@ const ReceivePage = () => {
           ) : null}
 
           <p className="text-sm text-muted-foreground">
-            Bank transfers credit your NGN or GHS wallet automatically. USD virtual accounts are not available yet.
+            Virtual bank accounts are deposit addresses only — they have no separate balance. Transfers credit your NGN or GHS wallet; use Top up, Send, or the wallet statement from there.
           </p>
         </motion.div>
     </AppPage>

@@ -6,6 +6,7 @@ export const NAV_ICON_FILES: Record<string, string> = {
   "Payment Links": "payment-links",
   "Top up": "top-up",
   Receive: "wallets",
+  "Bank account": "wallets",
   Contacts: "contacts",
   "Foreign Currency Exchange": "fx-exchange",
   Wallets: "wallets",

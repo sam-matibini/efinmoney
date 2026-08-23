@@ -83,6 +83,13 @@ const payerSchema = z.object({
     .string()
     .trim()
     .refine((v) => !v || CA_PHONE_RE.test(v.replace(/[^\d+]/g, "")), "Enter a valid Canadian mobile number"),
+  line1: z.string().trim().max(200).optional(),
+  city: z.string().trim().max(100).optional(),
+  region: z.string().trim().max(40).optional(),
+  postalCode: z.string().trim().max(10).optional(),
+});
+
+const payerSchemaFull = payerSchema.extend({
   line1: z.string().trim().min(3, "Enter your address").max(200),
   city: z.string().trim().min(2, "Enter your city").max(100),
   region: z.string().trim().min(2, "Select your province"),
@@ -90,7 +97,7 @@ const payerSchema = z.object({
 });
 
 /**
- * CAD Interac checkout: prefer Fincra (@fincra.ca) when enabled, then Flovide, then Loop.
+ * CAD Interac checkout: prefer Flovide Autodeposit (efin@flovide.com), then Fincra, then Loop.
  * Deposits credit the wallet and (for `purpose: "transfer"`) release the linked payout.
  */
 export default function InteracCheckout({
@@ -118,10 +125,10 @@ export default function InteracCheckout({
   const [eft, setEft] = useState<{ bankNumber: string; transitNumber: string; accountNumber: string } | null>(null);
   const [configured, setConfigured] = useState(true);
   const [railFn, setRailFn] = useState(
-    productFeatures.fincraInterac
-      ? FINCRA_FN
-      : (productFeatures.flovide || productFeatures.flovideInterac)
+    (productFeatures.flovide || productFeatures.flovideInterac)
       ? FLOVIDE_FN
+      : productFeatures.fincraInterac
+      ? FINCRA_FN
       : WISE_FN,
   );
   const [intent, setIntent] = useState<InteracIntent | null>(null);
@@ -179,26 +186,30 @@ export default function InteracCheckout({
         let json: Record<string, unknown> | null = null;
         let fn = WISE_FN;
 
-        // Prefer Fincra CAD Interac when the feature is on and an alias is configured.
-        if (productFeatures.fincraInterac) {
+        // Prefer Flovide Autodeposit (efin@flovide.com) when keys + alias are live.
+        if (productFeatures.flovide || productFeatures.flovideInterac) {
+          json = await tryFn(FLOVIDE_FN);
+          if (json && json.configured !== false && (json.alias || json.mode === "autodeposit")) {
+            fn = FLOVIDE_FN;
+          } else if (json && json.configured !== false) {
+            fn = FLOVIDE_FN;
+          } else {
+            json = null;
+          }
+        }
+        if (!json && productFeatures.fincraInterac) {
           json = await tryFn(FINCRA_FN);
           if (json && json.configured !== false) fn = FINCRA_FN;
-          else json = null;
-        }
-        if (!json && (productFeatures.flovide || productFeatures.flovideInterac)) {
-          json = await tryFn(FLOVIDE_FN);
-          if (json && json.configured !== false) fn = FLOVIDE_FN;
           else json = null;
         }
         if (!json) {
           json = await tryFn(WISE_FN);
           if (json && json.configured !== false) fn = WISE_FN;
-          else if (productFeatures.fincraInterac) {
-            // Surface Fincra's configured:false rather than silently looking configured.
-            const fincra = await tryFn(FINCRA_FN);
-            if (fincra) {
-              json = fincra;
-              fn = FINCRA_FN;
+          else if (productFeatures.flovide || productFeatures.flovideInterac) {
+            const flovide = await tryFn(FLOVIDE_FN);
+            if (flovide) {
+              json = flovide;
+              fn = FLOVIDE_FN;
             }
           }
         }
@@ -232,7 +243,9 @@ export default function InteracCheckout({
   }, [resumePending]);
 
   const pay = useCallback(async () => {
-    const parsed = payerSchema.safeParse({ ...form, amount });
+    const compactRail = railFn === FLOVIDE_FN || railFn === FINCRA_FN;
+    const schema = compactRail ? payerSchema : payerSchemaFull;
+    const parsed = schema.safeParse({ ...form, amount });
     if (!parsed.success) {
       const message = parsed.error.errors[0]?.message ?? "Check your details";
       setError(message);
@@ -250,14 +263,14 @@ export default function InteracCheckout({
         transfer_id: transferId,
         sender_name: `${parsed.data.firstName} ${parsed.data.lastName}`.trim(),
         sender_email: parsed.data.email,
-        sender_phone: parsed.data.phone || undefined,
+        sender_phone: form.phone || undefined,
         sender_bank: form.bank || undefined,
         sender_account_type: form.accountType,
-        sender_address_line1: parsed.data.line1,
+        sender_address_line1: parsed.data.line1 || form.line1 || "Canada",
         sender_address_line2: form.line2 || undefined,
-        sender_city: parsed.data.city,
-        sender_region: parsed.data.region,
-        sender_postal_code: parsed.data.postalCode,
+        sender_city: parsed.data.city || form.city || "Toronto",
+        sender_region: parsed.data.region || form.region || "ON",
+        sender_postal_code: parsed.data.postalCode || form.postalCode || "M5V1A1",
         sender_country: "CA",
       };
 
@@ -267,7 +280,7 @@ export default function InteracCheckout({
         return data as Record<string, unknown>;
       };
 
-      const fallbackOrder = [FINCRA_FN, FLOVIDE_FN, WISE_FN].filter(
+      const fallbackOrder = [FLOVIDE_FN, FINCRA_FN, WISE_FN].filter(
         (fn, i, arr) => fn !== railFn && arr.indexOf(fn) === i,
       );
 
@@ -309,44 +322,32 @@ export default function InteracCheckout({
       }
 
       const created = data.intent as InteracIntent;
+      const next = {
+        ...created,
+        hosted_url: null,
+        sender_email: created.sender_email || created.payer_email || parsed.data.email,
+        payer_email: created.payer_email || created.sender_email || parsed.data.email,
+        public_id: created.public_id || created.reference,
+      };
+      setIntent(next);
+      onIntentCreated?.(next);
 
-      if (usedFn === FLOVIDE_FN) {
-        const next = {
-          ...created,
-          sender_email: created.sender_email || created.payer_email || parsed.data.email,
-          payer_email: created.payer_email || parsed.data.email,
-        };
-        setIntent(next);
-        onIntentCreated?.(next);
-        const hosted = (data.hosted_url as string | null) || created.hosted_url || null;
-        if (hosted) window.open(hosted, "_blank", "noopener,noreferrer");
-        else {
-          toast.success("Interac request sent", {
-            description: Array.isArray(data.instructions)
-              ? String((data.instructions as string[])[0])
-              : `Approve the CAD ${Number(created.amount).toFixed(2)} request in your banking app.`,
-          });
-        }
-      } else {
-        // Interac funds Wise via Autodeposit — never open Quick Pay (self-pay blocked).
-        const next = { ...created, hosted_url: null };
-        setIntent(next);
-        onIntentCreated?.(next);
-
-        const aliasLine = (data.alias as string | null) || alias;
-        await navigator.clipboard
-          .writeText(
-            [
-              `Amount: CAD ${Number(created.amount).toFixed(2)}`,
-              aliasLine ? `${t.sendTo}: ${aliasLine}` : null,
-              `${t.reference}: ${created.public_id || created.reference}`,
-            ]
-              .filter(Boolean)
-              .join("\n"),
-          )
-          .catch(() => undefined);
-        toast.success(t.detailsCopied);
-      }
+      const aliasLine =
+        (data.alias as string | null)
+        || alias
+        || (usedFn === FLOVIDE_FN ? "efin@flovide.com" : null);
+      await navigator.clipboard
+        .writeText(
+          [
+            `Amount: CAD ${Number(created.amount).toFixed(2)}`,
+            aliasLine ? `${t.sendTo}: ${aliasLine}` : null,
+            `${t.reference}: ${next.public_id || next.reference}`,
+          ]
+            .filter(Boolean)
+            .join("\n"),
+        )
+        .catch(() => undefined);
+      toast.success(usedFn === FLOVIDE_FN ? t.flovideDetailsCopied : t.detailsCopied);
     } catch (e) {
       const message = e instanceof Error ? e.message : "Could not start the payment";
       setError(message);
@@ -422,7 +423,7 @@ export default function InteracCheckout({
     return (
       <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
         <Loader2 className="h-4 w-4 animate-spin" />
-        {t.waiting}
+        {lang === "fr" ? "Préparation d'Interac…" : "Preparing Interac…"}
       </div>
     );
   }
@@ -433,7 +434,7 @@ export default function InteracCheckout({
     return (
       <InteracStatusView
         intent={intent}
-        alias={isFlovide ? null : alias}
+        alias={alias || (isFlovide ? "efin@flovide.com" : null)}
         eft={isFlovide || isFincra ? null : eft}
         lang={lang}
         purpose={purpose}
@@ -473,6 +474,7 @@ export default function InteracCheckout({
       submitting={loading}
       error={error}
       onSubmit={() => void pay()}
+      compact={railFn === FLOVIDE_FN || railFn === FINCRA_FN}
     />
   );
 }

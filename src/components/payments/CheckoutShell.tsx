@@ -47,9 +47,9 @@ export default function CheckoutShell({
 
   return (
     <div className={cn("mx-auto w-full max-w-3xl overflow-hidden rounded-xl border bg-card shadow-sm", className)}>
-      <div className="grid gap-0 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-0 md:grid-cols-2">
         {/* Left — invoice summary */}
-        <div className="relative space-y-4 border-b bg-muted/40 p-6 md:border-b-0 md:border-r">
+        <div className="relative min-w-0 space-y-4 border-b bg-muted/40 p-6 md:border-b-0 md:border-r">
           {summary.brandName && (
             <p className="absolute right-5 top-5 text-sm font-semibold tracking-tight text-foreground">
               {summary.brandName}
@@ -70,9 +70,8 @@ export default function CheckoutShell({
               </p>
             )}
             {(summary.comment || summary.description) && (
-              <p>
-                <span className="text-muted-foreground">{lang === "fr" ? "Commentaire : " : "Comment : "}</span>
-                <span className="font-medium">{summary.comment || summary.description}</span>
+              <p className="text-muted-foreground leading-relaxed">
+                {summary.comment || summary.description}
               </p>
             )}
           </div>
@@ -134,7 +133,7 @@ export default function CheckoutShell({
         </div>
 
         {/* Right — payment methods / step */}
-        <div className="flex flex-col p-6">
+        <div className="flex min-w-0 flex-col p-6">
           <div className="mb-1 flex items-center justify-between gap-2">
             {onBack ? (
               <Button type="button" variant="ghost" size="sm" className="-ml-2 h-8" onClick={onBack}>
@@ -172,7 +171,9 @@ export default function CheckoutShell({
         </div>
       </div>
 
-      <p className="border-t py-3 text-center text-[11px] text-muted-foreground">{t.poweredBy}</p>
+      <p className="border-t py-3 text-center text-[11px] text-muted-foreground">
+        {lang === "fr" ? "Propulsé par eFinMoney" : "Powered by eFinMoney"}
+      </p>
     </div>
   );
 }

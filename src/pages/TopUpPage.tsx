@@ -46,6 +46,7 @@ import LenhubFlutterTopUpCard from "@/components/payments/LenhubFlutterTopUpCard
 import PaytotaTopUpCard from "@/components/payments/PaytotaTopUpCard";
 import DodoTopUpCard from "@/components/payments/DodoTopUpCard";
 import SquareTopUpCard, { verifySquareCheckout } from "@/components/payments/SquareTopUpCard";
+import BamboraTopUpCard from "@/components/payments/BamboraTopUpCard";
 import PayPalTopUpCard from "@/components/payments/PayPalTopUpCard";
 import SwychrTopUpCard from "@/components/payments/SwychrTopUpCard";
 import { validateMinAmount, minAmount, type FlwMethod } from "@/lib/flutterwave";
@@ -865,7 +866,29 @@ const TopUpPage = () => {
     const usePaypalCard =
       westernCardRail === "paypal"
       || (!productFeatures.square && productFeatures.paypal && rails.has("paypal"));
-    if (showRail("square") && (productFeatures.square || productFeatures.paypal)) {
+
+    // CAD card collect: Bambora / Worldline (Canadian merchant) — primary.
+    if (ccyUpper === "CAD" && (showRail("square") || showRail("card") || showRail("bambora"))) {
+      payMethods.push({
+        id: "bambora",
+        tone: "card",
+        label: "Card",
+        description: "Visa / Mastercard — Canada",
+        content: (
+          <SectionBoundary name="BamboraTopUp">
+            <BamboraTopUpCard
+              walletId={walletId}
+              walletCurrency={currency}
+              initialAmount={amount}
+              embedded
+              onComplete={invalidateWallets}
+            />
+          </SectionBoundary>
+        ),
+      });
+    }
+
+    if (showRail("square") && (productFeatures.square || productFeatures.paypal) && ccyUpper !== "CAD") {
       payMethods.push({
         id: "square",
         tone: "card",

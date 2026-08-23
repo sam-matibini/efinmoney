@@ -7,6 +7,86 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-internal-secret",
 };
 
+/** Map Flutterwave / stored GH bank codes to Fincra bankSwiftCode values via /core/banks. */
+async function resolveGhBankSwiftCodes(
+  storedCode: string,
+  storedName: string,
+): Promise<string[]> {
+  const out: string[] = [];
+  const push = (c: string) => {
+    const s = String(c || "").trim();
+    if (s && !out.includes(s)) out.push(s);
+  };
+
+  const name = storedName.trim().toLowerCase();
+  const paths = [
+    "/core/banks?currency=GHS&country=GH",
+    "/core/banks?currency=GHS",
+    "/core/banks?country=GH",
+  ];
+
+  // Prefer Fincra's own codes matched by bank name — FLW numeric codes are usually invalid as bankSwiftCode.
+  for (const path of paths) {
+    try {
+      const r = await fincraFetch(path, { method: "GET" });
+      if (!r.ok) continue;
+      const data = r.json?.data;
+      const list = Array.isArray(data)
+        ? data
+        : Array.isArray((data as Record<string, unknown> | undefined)?.data)
+        ? (data as Record<string, unknown>).data as unknown[]
+        : Array.isArray(r.json?.banks)
+        ? r.json.banks as unknown[]
+        : [];
+
+      const rows = list
+        .filter((raw): raw is Record<string, unknown> => !!raw && typeof raw === "object")
+        .map((row) => ({
+          code: String(
+            row.swiftCode
+              ?? row.swift_code
+              ?? row.bankSwiftCode
+              ?? row.code
+              ?? row.bankCode
+              ?? row.bank_code
+              ?? "",
+          ).trim(),
+          name: String(row.name ?? row.bankName ?? row.bank_name ?? "").trim().toLowerCase(),
+        }))
+        .filter((b) => b.code);
+
+      // 1) Exact name match first
+      if (name) {
+        for (const b of rows) {
+          if (b.name === name) push(b.code);
+        }
+        for (const b of rows) {
+          if (b.name.includes(name) || name.includes(b.name)) push(b.code);
+        }
+      }
+      // 2) Exact code match (only if it already looks like a SWIFT / Fincra code)
+      for (const b of rows) {
+        if (
+          b.code === storedCode
+          || b.code.toUpperCase() === storedCode.toUpperCase()
+        ) {
+          push(b.code);
+        }
+      }
+
+      if (out.length) break;
+    } catch {
+      /* try next path */
+    }
+  }
+
+  // Last resort: stored value only if it looks like a SWIFT (letters), not a short FLW digit code.
+  if (!out.length && /[A-Za-z]/.test(storedCode) && storedCode.length >= 4) {
+    push(storedCode);
+  }
+  return out;
+}
+
 interface PayoutRequest {
   transfer_id: string;
   phone_number?: string;
@@ -22,6 +102,8 @@ interface PayoutRequest {
   // When true (set by execute-transfer for fallback logic), on Fincra API failure
   // skip the ledger reversal and status update — execute-transfer will handle them.
   skip_reversal?: boolean;
+  /** Retry a failed payout that was never refunded (always uses a new customerReference). */
+  force_retry?: boolean;
 }
 
 function isFincraBalanceError(message: string): boolean {
@@ -36,7 +118,7 @@ function isFincraBalanceError(message: string): boolean {
 }
 
 const FINCRA_MM_CODE: Record<string, string> = {
-  // Fincra Kenya docs use SAFARICOM for M-Pesa (not "MPESA")
+  // Payout API for KE expects SAFARICOM (MPESA returns "not supported for country KE").
   "KES:mpesa": "SAFARICOM",
   "KES:safaricom": "SAFARICOM",
   "KES:m-pesa": "SAFARICOM",
@@ -72,7 +154,8 @@ const DIAL_BY_CURRENCY: Record<string, string> = {
 function splitName(full: string): { firstName: string; lastName: string } {
   const parts = full.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return { firstName: "Recipient", lastName: "User" };
-  if (parts.length === 1) return { firstName: parts[0], lastName: parts[0] };
+  // Single given name — do NOT duplicate ("Mary Mary" fails KE name checks).
+  if (parts.length === 1) return { firstName: parts[0], lastName: "Customer" };
   return { firstName: parts[0], lastName: parts.slice(1).join(" ") };
 }
 
@@ -446,9 +529,45 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "phone_number required for mobile money payout" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    // Allow retry when status is failed but wallet was NOT refunded yet (rare).
+    // If already reversed, caller must create a new Send — re-debit here risks double-refunds.
+    const forceRetry = body.force_retry === true || String(transfer.status) === "failed";
+    if (forceRetry) {
+      const { data: revRows } = await supabase.from("ledger_entries").select("id")
+        .eq("reference_type", "transfer_reversal").eq("reference_id", transfer_id).limit(1);
+      if (revRows?.length) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error:
+              "This payout already failed and was refunded to the wallet. Create a new Send to Mary (same number) — do not reuse this transfer id.",
+            needs_new_send: true,
+          }),
+          { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      await supabase.from("transfers").update({
+        status: "processing",
+        failure_reason: null,
+        provider_reference: `FINCRA-PENDING-${Date.now().toString(36)}`,
+      }).eq("id", transfer_id);
+    }
+
     const { firstName, lastName } = splitName(recipient_name || transfer.recipient_name || "Recipient");
     const ccy = currency.toUpperCase();
     const paymentDestination = hasBankRail ? "bank_account" as const : "mobile_money_wallet" as const;
+
+    // Fincra MoMo / IMT examples include beneficiary.email + sender { name, email, phone }.
+    const { data: senderProfile } = await supabase
+      .from("profiles")
+      .select("full_name, email, phone")
+      .eq("id", senderId)
+      .maybeSingle();
+    const senderEmail = String(senderProfile?.email || "").trim() || `noreply+${senderId.slice(0, 8)}@efin.money`;
+    const senderName = String(senderProfile?.full_name || "eFinMoney Customer").trim();
+    const senderPhoneRaw = String(senderProfile?.phone || phone_number || "254700000000");
+    const senderPhone = fincraMsisdnDigits(senderPhoneRaw, ccy === "KES" ? "KES" : ccy);
+    const beneficiaryEmail = senderEmail;
 
     let mmCode: string | null = null;
     let beneficiaryBase: Record<string, unknown>;
@@ -458,16 +577,53 @@ Deno.serve(async (req) => {
       const storedCode = String(bank_code);
       const storedName = String(transfer.recipient_bank_name || "");
       // Try primary code first, then known aliases (e.g. OPay 100004 / 305).
-      const codeVariants = ngBankCodeCandidates(storedCode, storedName);
-      beneficiaryBase = {
-        firstName,
-        lastName,
-        type: "individual",
-        accountHolderName: recipient_name || transfer.recipient_name,
-        accountNumber: String(account_number).replace(/\D/g, ""),
-        bankCode: codeVariants[0] || storedCode,
-        country: CURRENCY_TO_COUNTRY[ccy] || undefined,
-      };
+      let codeVariants = ccy === "NGN"
+        ? ngBankCodeCandidates(storedCode, storedName)
+        : ccy === "GHS"
+        ? await resolveGhBankSwiftCodes(storedCode, storedName)
+        : [storedCode];
+      if (!codeVariants.length) codeVariants = ccy === "GHS" ? [] : [storedCode];
+
+      if (ccy === "GHS" && !codeVariants.length) {
+        const reason =
+          `Ghana bank “${storedName || storedCode}” is not on Fincra’s bank list (need a SWIFT code). Reselect the bank and retry.`;
+        if (!skip_reversal) {
+          const rev = await reverseTransferLedger(supabase, transfer_id);
+          await supabase.from("transfers").update({ status: "failed", failure_reason: reason.slice(0, 500) }).eq("id", transfer_id);
+          return new Response(
+            JSON.stringify({ success: false, error: reason, error_class: "hard", refunded: rev.reversed }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+        return new Response(
+          JSON.stringify({ success: false, error: reason, error_class: "hard", refunded: false }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      // Fincra GHS bank payouts expect bankSwiftCode (e.g. ABNGGHAC), not Flutterwave numeric bankCode.
+      // Sending a FLW code as bankCode triggers: "Invalid beneficiary bankCode supplied."
+      if (ccy === "GHS") {
+        beneficiaryBase = {
+          firstName,
+          lastName,
+          type: "individual",
+          accountHolderName: recipient_name || transfer.recipient_name,
+          accountNumber: String(account_number).replace(/\D/g, ""),
+          bankSwiftCode: codeVariants[0] || storedCode,
+          country: CURRENCY_TO_COUNTRY[ccy] || "GH",
+        };
+      } else {
+        beneficiaryBase = {
+          firstName,
+          lastName,
+          type: "individual",
+          accountHolderName: recipient_name || transfer.recipient_name,
+          accountNumber: String(account_number).replace(/\D/g, ""),
+          bankCode: codeVariants[0] || storedCode,
+          country: CURRENCY_TO_COUNTRY[ccy] || undefined,
+        };
+      }
       accountVariants = [String(account_number).replace(/\D/g, "")];
       // Also try alternate bank codes as separate outer attempts via networkVariants-style list
       // by expanding bankCode on each funding attempt below when payout fails.
@@ -509,6 +665,7 @@ Deno.serve(async (req) => {
         phone: ccy === "ZMW" ? accountVariants[0] : fincraMsisdnDigits(rawPhone, ccy),
         country: CURRENCY_TO_COUNTRY[ccy] || "ZM",
         mobileMoneyCode: mmCode,
+        email: beneficiaryEmail,
       };
     }
 
@@ -529,6 +686,24 @@ Deno.serve(async (req) => {
       destAmountNum = Math.round(destAmountNum);
     } else {
       destAmountNum = Math.round(destAmountNum * 100) / 100;
+    }
+
+    // Fincra KES MoMo fee is ~100 KES flat — sub-fee amounts fail with a vague "retry later".
+    if (ccy === "KES" && !hasBankRail && destAmountNum < 150) {
+      const reason =
+        `Kenya MoMo via Fincra needs at least KES 150 (their fee is ~KES 100). You tried KES ${destAmountNum}.`;
+      if (!skip_reversal) {
+        const rev = await reverseTransferLedger(supabase, transfer_id);
+        await supabase.from("transfers").update({ status: "failed", failure_reason: reason.slice(0, 500) }).eq("id", transfer_id);
+        return new Response(
+          JSON.stringify({ success: false, error: reason, error_class: "hard", refunded: rev.reversed }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      return new Response(
+        JSON.stringify({ success: false, error: reason, error_class: "hard", refunded: false }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
 
     const preferred = preferredFundingCurrency(body, ccy);
@@ -557,21 +732,43 @@ Deno.serve(async (req) => {
       for (const netCode of (networkVariants.length ? networkVariants : [null])) {
         if (successJson || outageClass) break;
 
+        // AIRTEL requires whole destination amounts (Fincra docs).
+        const attemptDestAmount = (!hasBankRail && netCode === "AIRTEL")
+          ? Math.round(destAmountNum)
+          : destAmountNum;
+
         for (const bankCodeTry of (hasBankRail ? bankCodeVariants : [null])) {
           if (successJson || outageClass) break;
 
         for (const accountNumber of accountVariants) {
           attemptNo += 1;
-          // Unique per attempt — Fincra rejects reuse of the same customerReference after a failed create.
-          const customerReference = attemptNo === 1 ? transfer_id : `${transfer_id}__${attemptNo}`;
+          // Always unique — Fincra rejects reuse after a failed/processing create (retry-safe).
+          const customerReference = `${transfer_id}__${attemptNo}_${Date.now().toString(36)}`;
           const beneficiary = hasBankRail
-            ? { ...beneficiaryBase, accountNumber, bankCode: bankCodeTry || beneficiaryBase.bankCode }
+            ? (ccy === "GHS"
+              ? {
+                firstName: beneficiaryBase.firstName,
+                lastName: beneficiaryBase.lastName,
+                type: "individual",
+                accountHolderName: beneficiaryBase.accountHolderName,
+                accountNumber,
+                country: beneficiaryBase.country || "GH",
+                bankSwiftCode: bankCodeTry || beneficiaryBase.bankSwiftCode,
+                email: beneficiaryEmail,
+              }
+              : {
+                ...beneficiaryBase,
+                accountNumber,
+                bankCode: bankCodeTry || beneficiaryBase.bankCode,
+                email: beneficiaryEmail,
+              })
             : {
               ...beneficiaryBase,
               accountNumber,
               phone: accountNumber.startsWith("260") || accountNumber.startsWith("254") || accountNumber.startsWith("233")
                 ? accountNumber
                 : ((beneficiaryBase.phone as string) || accountNumber),
+              email: beneficiaryEmail,
               ...(netCode ? { mobileMoneyCode: netCode } : {}),
             };
 
@@ -581,7 +778,7 @@ Deno.serve(async (req) => {
               businessId: cfg.businessId!,
               sourceCurrency,
               destinationCurrency: ccy,
-              receiveAmount: destAmountNum,
+              receiveAmount: attemptDestAmount,
               paymentDestination,
             });
             if (!q.ok) {
@@ -606,9 +803,30 @@ Deno.serve(async (req) => {
             beneficiary,
             amount: cross && quoted
               ? String(Math.round(quoted.sourceAmount * 100) / 100)
-              : String(destAmountNum),
+              : String(attemptDestAmount),
           };
           if (cross && quoted) payload.quoteReference = quoted.reference;
+          // Cross-currency MoMo (IMT) examples include sender — omit only for same-currency bank.
+          if (!hasBankRail || cross) {
+            payload.sender = {
+              name: senderName,
+              email: senderEmail,
+              phone: senderPhone,
+              type: "individual",
+              // IMT examples include address — omit → vague KE failures on some merchants.
+              address: cross
+                ? "eFinMoney, Lagos, Nigeria"
+                : undefined,
+              sourceOfFunds: cross ? "Personal" : undefined,
+              nationality: cross ? "NG" : undefined,
+              countryOfOrigin: cross ? "NG" : undefined,
+            };
+            // Drop undefined keys
+            const s = payload.sender as Record<string, unknown>;
+            for (const k of Object.keys(s)) {
+              if (s[k] === undefined) delete s[k];
+            }
+          }
 
           console.log("fincra-payout attempt", {
             transfer_id,
@@ -666,6 +884,10 @@ Deno.serve(async (req) => {
           }
           if (isFincraAccountNumberError(reason)) {
             continue; // try next MSISDN shape
+          }
+          // Wrong mobileMoneyCode for this corridor — try the next operator (don't wipe MSISDNs).
+          if (/mobile\s*money\s*code/i.test(reason) && /not supported/i.test(reason)) {
+            break; // next bankCodeTry / netCode with same accountVariants
           }
           if (
             (reason.toLowerCase().includes("not supported") && !isUnsupportedFundingError(reason)) ||

@@ -86,8 +86,13 @@ Deno.serve(async (req) => {
       return json({ error: "FINCRA_SECRET_KEY is not configured" }, 503);
     }
 
-    const body = await req.json().catch(() => ({})) as { action?: string };
+    const body = await req.json().catch(() => ({})) as {
+      action?: string;
+      payload?: Record<string, unknown>;
+      force?: boolean;
+    };
     const action = String(body.action || "probe").toLowerCase();
+    const force = body.force === true;
     const cfg = getFincraConfig();
 
     const [cad, gbp, eur, usd, all, requests, me] = await Promise.all([
@@ -135,19 +140,23 @@ Deno.serve(async (req) => {
     };
 
     if (action === "request") {
-      if (cadReady) {
+      if (cadReady && !force) {
         result.request = { skipped: true, reason: "CAD virtual account already exists", account: cadReady };
         return json(result);
       }
 
       const merchantReference = `efm-cad-${Date.now()}`;
-      const payload = {
-        currency: "CAD",
-        accountType: "corporate",
-        purpose: "third_party",
-        merchantReference,
-        note: "eFinMoney CAD Interac collection account — requested via API while CAD is added to the merchant dashboard.",
-      };
+      // Prefer full KYC payload from client (Fincra individual CAD VA). Else thin corporate stub.
+      const kycPayload = (body as { payload?: Record<string, unknown> }).payload;
+      const payload = (kycPayload && typeof kycPayload === "object" && kycPayload.currency)
+        ? { ...kycPayload, merchantReference: kycPayload.merchantReference ?? merchantReference }
+        : {
+          currency: "CAD",
+          accountType: "corporate",
+          purpose: "third_party",
+          merchantReference,
+          note: "eFinMoney CAD Interac collection account — requested via API while CAD is added to the merchant dashboard.",
+        };
       const created = await fincraFetch("/profile/virtual-accounts/requests", {
         method: "POST",
         body: JSON.stringify(payload),
