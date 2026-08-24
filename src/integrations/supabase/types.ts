@@ -849,6 +849,128 @@ export type Database = {
         }
         Relationships: []
       }
+      bambora_eft_collections: {
+        Row: {
+          amount: number
+          batch_id: string | null
+          batch_message: string | null
+          created_at: string
+          credited_at: string | null
+          currency_code: string
+          customer_code: string
+          external_reference: string
+          id: string
+          idempotency_key: string
+          settled_at: string | null
+          status: string
+          user_id: string
+          wallet_id: string
+        }
+        Insert: {
+          amount: number
+          batch_id?: string | null
+          batch_message?: string | null
+          created_at?: string
+          credited_at?: string | null
+          currency_code?: string
+          customer_code: string
+          external_reference: string
+          id?: string
+          idempotency_key: string
+          settled_at?: string | null
+          status?: string
+          user_id: string
+          wallet_id: string
+        }
+        Update: {
+          amount?: number
+          batch_id?: string | null
+          batch_message?: string | null
+          created_at?: string
+          credited_at?: string | null
+          currency_code?: string
+          customer_code?: string
+          external_reference?: string
+          id?: string
+          idempotency_key?: string
+          settled_at?: string | null
+          status?: string
+          user_id?: string
+          wallet_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bambora_eft_collections_wallet_id_fkey"
+            columns: ["wallet_id"]
+            isOneToOne: false
+            referencedRelation: "wallets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bambora_payment_methods: {
+        Row: {
+          account_last_four: string | null
+          bambora_card_id: number | null
+          bank_account_holder: string | null
+          branch_number: string | null
+          card_brand: string | null
+          cardholder_name: string | null
+          created_at: string
+          currency_code: string
+          customer_code: string
+          exp_month: number | null
+          exp_year: number | null
+          id: string
+          institution_number: string | null
+          is_default: boolean
+          last_four: string | null
+          method_type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_last_four?: string | null
+          bambora_card_id?: number | null
+          bank_account_holder?: string | null
+          branch_number?: string | null
+          card_brand?: string | null
+          cardholder_name?: string | null
+          created_at?: string
+          currency_code?: string
+          customer_code: string
+          exp_month?: number | null
+          exp_year?: number | null
+          id?: string
+          institution_number?: string | null
+          is_default?: boolean
+          last_four?: string | null
+          method_type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_last_four?: string | null
+          bambora_card_id?: number | null
+          bank_account_holder?: string | null
+          branch_number?: string | null
+          card_brand?: string | null
+          cardholder_name?: string | null
+          created_at?: string
+          currency_code?: string
+          customer_code?: string
+          exp_month?: number | null
+          exp_year?: number | null
+          id?: string
+          institution_number?: string | null
+          is_default?: boolean
+          last_four?: string | null
+          method_type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       bank_accounts: {
         Row: {
           account_name: string
@@ -6844,6 +6966,56 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "partner_addresses_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "payment_partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      partner_agreements: {
+        Row: {
+          created_at: string
+          expires_at: string | null
+          file_path: string | null
+          id: string
+          notes: string | null
+          partner_id: string
+          signed_at: string | null
+          status: string
+          title: string | null
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string | null
+          file_path?: string | null
+          id?: string
+          notes?: string | null
+          partner_id: string
+          signed_at?: string | null
+          status?: string
+          title?: string | null
+          type?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string | null
+          file_path?: string | null
+          id?: string
+          notes?: string | null
+          partner_id?: string
+          signed_at?: string | null
+          status?: string
+          title?: string | null
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_agreements_partner_id_fkey"
             columns: ["partner_id"]
             isOneToOne: false
             referencedRelation: "payment_partners"
