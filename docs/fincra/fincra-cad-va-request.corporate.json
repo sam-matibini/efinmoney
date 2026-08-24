@@ -1,0 +1,88 @@
+{
+  "currency": "CAD",
+  "accountType": "corporate",
+  "purpose": "third_party",
+  "merchantReference": "efm-cad-corp-FILL_ME_TIMESTAMP",
+  "note": "eFinMoney CAD Interac e-Transfer collection account for customer wallet top-ups and inbound remittance funding.",
+
+  "business": {
+    "legalName": "eFin Tax Advisors Ltd",
+    "tradingName": "eFinMoney",
+    "registrationNumber": "FILL_ME_CORPORATION_NUMBER",
+    "incorporationDate": "FILL_ME_YYYY-MM-DD",
+    "businessType": "private_limited_company",
+    "industry": "financial_services",
+    "subIndustry": "money_services_business",
+    "description": "Licensed money services business providing cross-border remittance and multi-currency wallets.",
+    "website": "https://www.efin.money",
+    "supportEmail": "support@efin.money",
+    "supportPhone": "FILL_ME_+1XXXXXXXXXX",
+    "taxIdentificationNumber": "FILL_ME_CRA_BN",
+    "regulatoryLicence": {
+      "regulator": "FINTRAC",
+      "licenceType": "Money Services Business",
+      "licenceNumber": "FILL_ME_MSB_NUMBER",
+      "expiryDate": "FILL_ME_YYYY-MM-DD"
+    }
+  },
+
+  "registeredAddress": {
+    "street": "FILL_ME_STREET_ADDRESS",
+    "unit": "FILL_ME_OR_REMOVE",
+    "city": "FILL_ME_CITY",
+    "state": "FILL_ME_PROVINCE",
+    "postalCode": "FILL_ME_POSTAL_CODE",
+    "country": "CA"
+  },
+
+  "operatingAddress": {
+    "sameAsRegistered": true,
+    "street": "FILL_ME_STREET_ADDRESS",
+    "unit": "FILL_ME_OR_REMOVE",
+    "city": "FILL_ME_CITY",
+    "state": "FILL_ME_PROVINCE",
+    "postalCode": "FILL_ME_POSTAL_CODE",
+    "country": "CA"
+  },
+
+  "representative": {
+    "role": "director",
+    "firstName": "Samson",
+    "lastName": "Matibini",
+    "dateOfBirth": "FILL_ME_YYYY-MM-DD",
+    "email": "FILL_ME_DIRECTOR_EMAIL",
+    "phoneNumber": "FILL_ME_+1XXXXXXXXXX",
+    "nationality": "FILL_ME_ISO2",
+    "countryOfResidence": "CA",
+    "ownershipPercentage": "FILL_ME_NUMBER",
+    "identification": {
+      "type": "FILL_ME_passport_or_drivers_licence",
+      "number": "FILL_ME_ID_NUMBER",
+      "issuingCountry": "FILL_ME_ISO2",
+      "expiryDate": "FILL_ME_YYYY-MM-DD"
+    },
+    "address": {
+      "street": "FILL_ME_STREET_ADDRESS",
+      "city": "FILL_ME_CITY",
+      "state": "FILL_ME_PROVINCE",
+      "postalCode": "FILL_ME_POSTAL_CODE",
+      "country": "CA"
+    }
+  },
+
+  "documents": {
+    "certificateOfIncorporation": "FILL_ME_PUBLIC_URL",
+    "articlesOfIncorporation": "FILL_ME_PUBLIC_URL",
+    "proofOfBusinessAddress": "FILL_ME_PUBLIC_URL",
+    "directorIdentification": "FILL_ME_PUBLIC_URL",
+    "directorProofOfAddress": "FILL_ME_PUBLIC_URL",
+    "amlPolicy": "FILL_ME_PUBLIC_URL_OR_REMOVE",
+    "msbRegistrationCertificate": "FILL_ME_PUBLIC_URL_OR_REMOVE"
+  },
+
+  "expectedVolumes": {
+    "monthlyInboundCad": "FILL_ME_NUMBER",
+    "averageTransactionCad": "FILL_ME_NUMBER",
+    "sourceOfFunds": "Customer wallet top-ups funded by Interac e-Transfer from Canadian bank accounts."
+  }
+}
