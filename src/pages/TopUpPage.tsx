@@ -1221,18 +1221,19 @@ const TopUpPage = () => {
                     <span className="font-medium tabular-nums">{"C$"}{cadQuote.creditAmount.toFixed(2)} CAD</span>
                   </div>
                   <div className="flex justify-between gap-2">
-                    <span className="text-muted-foreground">You pay (approx.)</span>
-                    <span className="font-semibold tabular-nums">{"$"}{cadQuote.checkoutAmount.toFixed(2)} USD</span>
+                    <span className="text-muted-foreground">Processing fee</span>
+                    <span className="font-medium tabular-nums">{"C$"}{cadQuote.feeAmount.toFixed(2)} CAD</span>
                   </div>
-                  {cadQuote.fxRate && (
-                    <p className="text-[11px] text-muted-foreground pt-1">
-                      Rate: 1 CAD ≈ {cadQuote.fxRate.toFixed(4)} USD · fee included
-                    </p>
-                  )}
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted-foreground">You pay</span>
+                    <span className="font-semibold tabular-nums">
+                      {"C$"}{(cadQuote.creditAmount + cadQuote.feeAmount).toFixed(2)} CAD
+                    </span>
+                  </div>
                 </div>
               ) : (
                 <p className="text-xs text-amber-700 dark:text-amber-400">
-                  CAD/USD rate loading — try again in a moment.
+                  Checkout quote loading — try again in a moment.
                 </p>
               )
             )}
