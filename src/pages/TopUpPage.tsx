@@ -812,7 +812,7 @@ const TopUpPage = () => {
       }
       if (isCadViaUsd) {
         toast.message("Opening checkout", {
-          description: `Pay $${chargeAmount.toFixed(2)} USD — CAD ${creditAmount.toFixed(2)} credits after payment.`,
+          description: "Complete payment on the secure checkout page.",
         });
       }
       window.location.href = link;

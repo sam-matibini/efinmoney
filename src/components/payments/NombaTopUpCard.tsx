@@ -109,7 +109,7 @@ export default function NombaTopUpCard({ walletId, walletCurrency, onComplete, i
       return;
     }
     if (isCadViaUsd && !quote) {
-      toast.error("CAD/USD rate unavailable — try again shortly");
+      toast.error("Card checkout is temporarily unavailable — try again shortly");
       return;
     }
     if (!email.trim() || !email.includes("@")) {
@@ -129,9 +129,7 @@ export default function NombaTopUpCard({ walletId, walletCurrency, onComplete, i
       });
       savePendingNombaTxn(result.transaction_id);
       toast.message("Opening secure checkout", {
-        description: isCadViaUsd
-          ? `Pay $${quote?.checkoutAmount.toFixed(2)} USD — CAD cards accepted`
-          : "Complete payment on the secure checkout page.",
+        description: "Complete payment on the secure checkout page.",
       });
       window.location.href = result.payment_link;
     } catch (e) {
@@ -143,10 +141,14 @@ export default function NombaTopUpCard({ walletId, walletCurrency, onComplete, i
   const title = "Secure checkout";
 
   const subtitle = isCadViaUsd
-    ? "Enter how much CAD you want in your wallet. You'll pay the USD equivalent at checkout."
+    ? "Enter how much CAD you want in your wallet. Pay securely by card."
     : isInternational
       ? `Card payment for your ${currency} wallet on a secure page.`
       : "Card payment on a secure page. Your wallet credits when payment succeeds.";
+
+  const cadYouPay = isCadViaUsd && quote
+    ? Math.round((quote.creditAmount + quote.feeAmount) * 100) / 100
+    : null;
 
   return (
     <Card className={
@@ -197,22 +199,14 @@ export default function NombaTopUpCard({ walletId, walletCurrency, onComplete, i
               <span className="text-muted-foreground">Processing fee</span>
               <span className="font-medium tabular-nums">{formatCredited(quote.feeAmount, quote.creditCurrency)}</span>
             </div>
-            {isCadViaUsd && quote.fxRate ? (
-              <>
-                <div className="flex justify-between gap-2">
-                  <span className="text-muted-foreground">Checkout total (approx.)</span>
-                  <span className="font-semibold tabular-nums">${quote.checkoutAmount.toFixed(2)} USD</span>
-                </div>
-                <p className="text-[11px] text-muted-foreground pt-1">
-                  Rate: 1 CAD ≈ {quote.fxRate.toFixed(4)} USD · You pay USD at checkout; your CAD wallet is credited after confirmation.
-                </p>
-              </>
-            ) : (
-              <div className="flex justify-between gap-2">
-                <span className="text-muted-foreground">You pay</span>
-                <span className="font-semibold tabular-nums">{formatCredited(quote.checkoutAmount, quote.checkoutCurrency)}</span>
-              </div>
-            )}
+            <div className="flex justify-between gap-2">
+              <span className="text-muted-foreground">You pay</span>
+              <span className="font-semibold tabular-nums">
+                {cadYouPay != null
+                  ? formatCredited(cadYouPay, "CAD")
+                  : formatCredited(quote.checkoutAmount, quote.checkoutCurrency)}
+              </span>
+            </div>
           </div>
         )}
 
