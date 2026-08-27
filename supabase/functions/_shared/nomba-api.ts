@@ -140,3 +140,29 @@ export async function createNombaCheckoutOrder(params: {
   }
   return { ok: true, checkoutLink, orderReference };
 }
+
+/** Fetch checkout transaction by merchant orderReference or Nomba orderId. */
+export async function fetchNombaCheckoutTransaction(params: {
+  id: string;
+  idType?: "ORDER_REFERENCE" | "ORDER_ID";
+}): Promise<{ ok: boolean; status: number; json: any; paid: boolean }> {
+  const idType = params.idType || (params.id.includes("efin-nomba") ? "ORDER_REFERENCE" : "ORDER_ID");
+  const { ok, status, json } = await nombaApiFetch(
+    `/v1/checkout/transaction?idType=${encodeURIComponent(idType)}&id=${encodeURIComponent(params.id)}`,
+    { method: "GET" },
+  );
+  const data = (json?.data ?? {}) as Record<string, unknown>;
+  const details = (data.transactionDetails && typeof data.transactionDetails === "object")
+    ? data.transactionDetails as Record<string, unknown>
+    : {};
+  const statusCode = String(details.statusCode ?? data.status ?? data.message ?? "").toLowerCase();
+  const successFlag = String(data.success ?? "").toLowerCase();
+  const paid = successFlag === "true"
+    || successFlag === "1"
+    || statusCode === "00"
+    || statusCode.includes("approved")
+    || statusCode.includes("success")
+    || statusCode.includes("paid")
+    || String(json?.description || "").toLowerCase().includes("success");
+  return { ok, status, json, paid };
+}

@@ -76,6 +76,9 @@ verify_jwt = false
 [functions.nomba-payment-callback]
 verify_jwt = false
 
+[functions.nomba-verify-payment]
+verify_jwt = true
+
 [functions.paytota-collection]
 verify_jwt = true
 

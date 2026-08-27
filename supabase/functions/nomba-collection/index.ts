@@ -214,9 +214,11 @@ Deno.serve(async (req) => {
     // Official Nomba Developer Checkout (NGN + CAD/USD/EUR/GBP).
     if (useOfficialApi) {
       const appBase = (Deno.env.get("APP_URL") || "https://www.efin.money").replace(/\/+$/, "");
-      const callbackUrl = returnUrl
-        || `${appBase}/wallet/topup?nomba=1&walletId=${encodeURIComponent(String(target_wallet_id))}`;
-      console.log("Nomba OFFICIAL checkout:", { amountRounded, checkoutCurrency, internalRef });
+      const supabaseUrl = (Deno.env.get("SUPABASE_URL") || "").replace(/\/+$/, "");
+      // Browser return MUST hit our edge function so we credit the wallet, then redirect to the app.
+      // (Frontend /wallet/topup alone only polls — it never posts ledger entries.)
+      const callbackUrl = `${supabaseUrl}/functions/v1/nomba-payment-callback`;
+      console.log("Nomba OFFICIAL checkout:", { amountRounded, checkoutCurrency, internalRef, callbackUrl });
 
       const created = await createNombaCheckoutOrder({
         amount: amountRounded,
@@ -228,6 +230,7 @@ Deno.serve(async (req) => {
           efin_txn_id: String(txn.id),
           wallet_id: String(target_wallet_id),
           user_id: userId,
+          app_return: returnUrl || `${appBase}/wallet/topup?walletId=${encodeURIComponent(String(target_wallet_id))}`,
         },
       });
 

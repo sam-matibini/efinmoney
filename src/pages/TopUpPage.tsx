@@ -81,7 +81,7 @@ import { clearPendingSwychrTxn } from "@/lib/swychrPay";
 import FlutterwaveWesternTopUpHints from "@/components/wallets/FlutterwaveWesternTopUpHints";
 import BankVirtualAccountCard from "@/components/payments/BankVirtualAccountCard";
 import { buildFincraTopupRedirectUrl, parseFincraReturnReference, isFincraCheckoutCurrency } from "@/lib/fincraTopup";
-import { clearPendingNombaTxn } from "@/lib/nombaPay";
+import { clearPendingNombaTxn, readPendingNombaTxn } from "@/lib/nombaPay";
 import { clearPendingPaytotaTxn, confirmPaytotaPayment, readPendingPaytotaTxn } from "@/lib/paytotaPay";
 import {
   clearPendingDodoRef,
@@ -492,6 +492,42 @@ const TopUpPage = () => {
     if (nombaStatus === "failed") {
       clearPendingNombaTxn();
       setVerifyState({ status: "failed", message: "Payment could not be completed." });
+      return;
+    }
+    // Nomba may return to the app with orderReference/orderId (legacy callbackUrl) — reconcile.
+    const nombaOrderRef = params.get("orderReference") || params.get("order_reference") || params.get("reference");
+    const nombaOrderId = params.get("orderId") || params.get("order_id");
+    const pendingNomba = readPendingNombaTxn();
+    if (nombaOrderRef || nombaOrderId || pendingNomba) {
+      void (async () => {
+        try {
+          setVerifyState({ status: "verifying", message: "Confirming card payment…" });
+          const { data, error } = await supabase.functions.invoke("nomba-verify-payment", {
+            body: {
+              transaction_id: pendingNomba || undefined,
+              reference: nombaOrderRef || undefined,
+              order_id: nombaOrderId || undefined,
+            },
+          });
+          if (error) throw error;
+          if (data?.verified || data?.already_completed || data?.credited) {
+            clearPendingNombaTxn();
+            setVerifyState({ status: "success", message: "Payment received — wallet updated." });
+            toast.success("Top-up complete");
+            void queryClient.invalidateQueries({ queryKey: ["wallets"] });
+          } else {
+            setVerifyState({
+              status: "failed",
+              message: data?.error || "Payment not confirmed yet. If you were charged, contact support.",
+            });
+          }
+        } catch (e) {
+          setVerifyState({
+            status: "failed",
+            message: e instanceof Error ? e.message : "Could not confirm Nomba payment",
+          });
+        }
+      })();
       return;
     }
 

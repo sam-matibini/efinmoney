@@ -37,18 +37,49 @@ function isSuccessStatus(status: unknown): boolean {
 }
 
 function extractOrderId(payload: Record<string, unknown>, data: Record<string, unknown>): string {
+  const order = (data.order && typeof data.order === "object")
+    ? data.order as Record<string, unknown>
+    : (payload.order && typeof payload.order === "object")
+    ? payload.order as Record<string, unknown>
+    : {};
   return String(
-    data.orderReference ?? data.order_reference ?? payload.orderReference ?? payload.order_reference
-    ?? data.order_id ?? data.orderId ?? payload.order_id ?? payload.orderId
-    ?? data.id ?? payload.id ?? "",
+    order.orderId
+    ?? order.order_id
+    ?? data.orderId
+    ?? data.order_id
+    ?? payload.orderId
+    ?? payload.order_id
+    ?? order.orderReference
+    ?? order.order_reference
+    ?? data.orderReference
+    ?? data.order_reference
+    ?? payload.orderReference
+    ?? payload.order_reference
+    ?? data.id
+    ?? payload.id
+    ?? "",
   ).trim();
 }
 
 function extractMerchantReference(payload: Record<string, unknown>, data: Record<string, unknown>): string {
+  const order = (data.order && typeof data.order === "object")
+    ? data.order as Record<string, unknown>
+    : (payload.order && typeof payload.order === "object")
+    ? payload.order as Record<string, unknown>
+    : {};
   return String(
-    data.merchantReference ?? data.merchant_reference ?? payload.merchantReference
-    ?? data.orderReference ?? data.order_reference ?? payload.orderReference
-    ?? data.reference ?? payload.reference ?? "",
+    order.orderReference
+    ?? order.order_reference
+    ?? data.orderReference
+    ?? data.order_reference
+    ?? payload.orderReference
+    ?? payload.order_reference
+    ?? data.merchantReference
+    ?? data.merchant_reference
+    ?? payload.merchantReference
+    ?? data.reference
+    ?? payload.reference
+    ?? "",
   ).trim();
 }
 
@@ -92,13 +123,14 @@ async function findTxn(
   orderId: string,
   reference?: string,
 ) {
-  if (orderId) {
-    const r = await supabase.from("nomba_pay_transactions").select("*").eq("order_id", orderId).maybeSingle();
-    if (r.data) return r.data;
-  }
-  if (reference) {
-    const r = await supabase.from("nomba_pay_transactions").select("*").eq("reference", reference).maybeSingle();
-    if (r.data) return r.data;
+  const refs = [orderId, reference].map((r) => String(r || "").trim()).filter(Boolean);
+  for (const ref of refs) {
+    const byOrder = await supabase.from("nomba_pay_transactions").select("*").eq("order_id", ref).maybeSingle();
+    if (byOrder.data) return byOrder.data;
+    const byRef = await supabase.from("nomba_pay_transactions").select("*").eq("reference", ref).maybeSingle();
+    if (byRef.data) return byRef.data;
+    const byProvider = await supabase.from("nomba_pay_transactions").select("*").eq("provider_reference", ref).maybeSingle();
+    if (byProvider.data) return byProvider.data;
   }
   return null;
 }
@@ -284,6 +316,37 @@ Deno.serve(async (req) => {
   );
 
   if (req.method === "GET" || req.method === "HEAD") {
+    // Prefer verifying with Nomba before crediting on browser return.
+    const url = new URL(req.url);
+    const orderId = String(url.searchParams.get("orderId") ?? url.searchParams.get("order_id") ?? "").trim();
+    const reference = String(
+      url.searchParams.get("orderReference")
+      ?? url.searchParams.get("order_reference")
+      ?? url.searchParams.get("reference")
+      ?? "",
+    ).trim();
+    if ((orderId || reference) && !isFailureStatus(url.searchParams.get("status"))) {
+      try {
+        const { fetchNombaCheckoutTransaction } = await import("../_shared/nomba-api.ts");
+        const id = reference || orderId;
+        const idType = id.startsWith("efin-nomba") ? "ORDER_REFERENCE" as const : "ORDER_ID" as const;
+        const fetched = await fetchNombaCheckoutTransaction({ id, idType });
+        if (fetched.paid) {
+          const txn = await findTxn(supabase, orderId, reference || undefined);
+          if (txn && txn.status !== "completed") {
+            const result = await completeNombaCollection(
+              supabase,
+              txn,
+              orderId || String(txn.order_id || ""),
+              { ...Object.fromEntries(url.searchParams.entries()), nomba_verify: fetched.json },
+            );
+            if (result.ok) return Response.redirect(buildReturnUrl(txn, "success"), 302);
+          }
+        }
+      } catch (e) {
+        console.warn("nomba browser return verify failed", e);
+      }
+    }
     return handleBrowserReturn(req, supabase);
   }
 
